@@ -101,7 +101,7 @@ function ClassicTabLayout() {
           tabBarIcon: ({ focused }) => (
             <FeedCenterIcon focused={focused} isDark={isDark} />
           ),
-          tabBarItemStyle: { paddingVertical: 8 },
+          tabBarItemStyle: { paddingTop: 20, paddingBottom: 0 },
         }}
       />
 
@@ -157,9 +157,9 @@ function FeedCenterIcon({ focused }: { focused: boolean; isDark: boolean }) {
 
 const feedStyles = StyleSheet.create({
   pill: {
-    width: 52,
-    height: 26,
-    borderRadius: 13,
+    width: 62,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#C026D3',
