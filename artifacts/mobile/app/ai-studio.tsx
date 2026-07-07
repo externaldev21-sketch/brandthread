@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -27,33 +27,23 @@ const RECENT_MOCKUPS = [
 
 export default function AIStudioScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
-  const router = useRouter();
   const [selected, setSelected] = useState<string | null>(null);
 
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const aiBadge = (
+    <View style={[styles.aiBadge, { backgroundColor: '#C9A96E22', borderColor: '#C9A96E44' }]}>
+      <Feather name="zap" size={12} color={colors.primary} />
+      <Text style={[styles.aiText, { color: colors.primary }]}>AI</Text>
+    </View>
+  );
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={{ paddingTop: topPad + 8, paddingBottom: 100, paddingHorizontal: 16 }}
-      showsVerticalScrollIndicator={false}
-    >
-      <TouchableOpacity onPress={() => router.back()} style={styles.back} activeOpacity={0.7}>
-        <Feather name="arrow-left" size={20} color={colors.foreground} />
-        <Text style={[styles.backText, { color: colors.foreground }]}>Back</Text>
-      </TouchableOpacity>
-
-      <View style={styles.headerRow}>
-        <View>
-          <Text style={[styles.pageTitle, { color: colors.foreground }]}>AI Design Studio</Text>
-          <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>Powered by generative AI</Text>
-        </View>
-        <View style={[styles.aiBadge, { backgroundColor: '#C9A96E22', borderColor: '#C9A96E44' }]}>
-          <Feather name="zap" size={12} color={colors.primary} />
-          <Text style={[styles.aiText, { color: colors.primary }]}>AI</Text>
-        </View>
-      </View>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScreenHeader title="AI Design Studio" subtitle="Powered by generative AI" rightElement={aiBadge} />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
+        showsVerticalScrollIndicator={false}
+      >
 
       {/* Credits */}
       <View style={[styles.creditsRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -137,6 +127,7 @@ export default function AIStudioScreen() {
         ))}
       </View>
     </ScrollView>
+    </View>
   );
 }
 

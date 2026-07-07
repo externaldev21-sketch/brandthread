@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Switch } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
@@ -31,12 +31,9 @@ const AUDIT_LOGS = [
 
 export default function TeamScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const [twoFactor, setTwoFactor] = useState(true);
   const [fraud, setFraud] = useState(true);
-
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   const priorityColor = (p: string) => {
     if (p === 'High') return colors.destructive;
@@ -45,18 +42,13 @@ export default function TeamScreen() {
   };
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={{ paddingTop: topPad + 8, paddingBottom: 100, paddingHorizontal: 16 }}
-      showsVerticalScrollIndicator={false}
-    >
-      <TouchableOpacity onPress={() => router.back()} style={styles.back} activeOpacity={0.7}>
-        <Feather name="arrow-left" size={20} color={colors.foreground} />
-        <Text style={[styles.backText, { color: colors.foreground }]}>Back</Text>
-      </TouchableOpacity>
-
-      <Text style={[styles.pageTitle, { color: colors.foreground }]}>Team Management</Text>
-      <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>Staff, permissions & tasks</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScreenHeader title="Team Management" subtitle="Staff, permissions & tasks" />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
+        showsVerticalScrollIndicator={false}
+      >
 
       {/* Members */}
       <View style={styles.sectionHeader}>
@@ -154,6 +146,7 @@ export default function TeamScreen() {
         ))}
       </View>
     </ScrollView>
+    </View>
   );
 }
 

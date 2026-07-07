@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
@@ -21,25 +21,17 @@ const ORDERS = [
 
 export default function ManufacturerScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const [tab, setTab] = useState<'hub' | 'orders'>('hub');
 
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
-
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={{ paddingTop: topPad + 8, paddingBottom: 100, paddingHorizontal: 16 }}
-      showsVerticalScrollIndicator={false}
-    >
-      <TouchableOpacity onPress={() => router.back()} style={styles.back} activeOpacity={0.7}>
-        <Feather name="arrow-left" size={20} color={colors.foreground} />
-        <Text style={[styles.backText, { color: colors.foreground }]}>Back</Text>
-      </TouchableOpacity>
-
-      <Text style={[styles.pageTitle, { color: colors.foreground }]}>Manufacturer Hub</Text>
-      <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>Find, connect & manage production partners</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScreenHeader title="Manufacturer Hub" subtitle="Find, connect & manage production partners" />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
+        showsVerticalScrollIndicator={false}
+      >
 
       {/* Tab Toggle */}
       <View style={[styles.tabRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -132,6 +124,7 @@ export default function ManufacturerScreen() {
         </>
       )}
     </ScrollView>
+    </View>
   );
 }
 

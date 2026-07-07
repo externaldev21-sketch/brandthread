@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
@@ -19,25 +19,17 @@ const THEMES = ['Minimal', 'Bold', 'Editorial', 'Luxe', 'Street'];
 
 export default function WebsiteScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const [selectedTheme, setSelectedTheme] = useState('Minimal');
 
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
-
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={{ paddingTop: topPad + 8, paddingBottom: 100, paddingHorizontal: 16 }}
-      showsVerticalScrollIndicator={false}
-    >
-      <TouchableOpacity onPress={() => router.back()} style={styles.back} activeOpacity={0.7}>
-        <Feather name="arrow-left" size={20} color={colors.foreground} />
-        <Text style={[styles.backText, { color: colors.foreground }]}>Back</Text>
-      </TouchableOpacity>
-
-      <Text style={[styles.pageTitle, { color: colors.foreground }]}>Website & Store Builder</Text>
-      <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>Design, customize & publish your store</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScreenHeader title="Website & Store Builder" subtitle="Design, customize & publish your store" />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
+        showsVerticalScrollIndicator={false}
+      >
 
       {/* Store Preview */}
       <View style={[styles.previewCard, { backgroundColor: '#1A1500', borderColor: '#C9A96E44' }]}>
@@ -131,6 +123,7 @@ export default function WebsiteScreen() {
         <Feather name="settings" size={16} color={colors.mutedForeground} />
       </View>
     </ScrollView>
+    </View>
   );
 }
 

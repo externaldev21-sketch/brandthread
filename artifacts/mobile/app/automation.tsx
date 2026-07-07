@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Switch } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
@@ -45,30 +45,21 @@ const TEMPLATES = [
 
 export default function AutomationScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
-  const router = useRouter();
   const [enabled, setEnabled] = useState<Record<string, boolean>>(
     Object.fromEntries(AUTOMATIONS.map((a) => [a.id, a.enabled]))
   );
-
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   const totalRuns = AUTOMATIONS.reduce((s, a) => s + a.runs, 0);
   const activeCount = Object.values(enabled).filter(Boolean).length;
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={{ paddingTop: topPad + 8, paddingBottom: 100, paddingHorizontal: 16 }}
-      showsVerticalScrollIndicator={false}
-    >
-      <TouchableOpacity onPress={() => router.back()} style={styles.back} activeOpacity={0.7}>
-        <Feather name="arrow-left" size={20} color={colors.foreground} />
-        <Text style={[styles.backText, { color: colors.foreground }]}>Back</Text>
-      </TouchableOpacity>
-
-      <Text style={[styles.pageTitle, { color: colors.foreground }]}>Automation</Text>
-      <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>Set it and forget it — your brand runs itself</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScreenHeader title="Automation" subtitle="Set it and forget it — your brand runs itself" />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
+        showsVerticalScrollIndicator={false}
+      >
 
       {/* Stats */}
       <View style={styles.statsRow}>
@@ -155,6 +146,7 @@ export default function AutomationScreen() {
         </TouchableOpacity>
       ))}
     </ScrollView>
+    </View>
   );
 }
 

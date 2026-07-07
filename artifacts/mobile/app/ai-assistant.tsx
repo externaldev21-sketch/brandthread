@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -54,7 +55,6 @@ export default function AIAssistantScreen() {
   const [loading, setLoading] = useState(false);
   const flatRef = useRef<FlatList>(null);
 
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPad = Platform.OS === 'web' ? 34 : insets.bottom;
 
   function sendMessage(text: string) {
@@ -90,19 +90,15 @@ export default function AIAssistantScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border, backgroundColor: colors.background }]}>
-        <TouchableOpacity onPress={() => router.back()} activeOpacity={0.7} style={styles.backBtn}>
-          <Feather name="arrow-left" size={20} color={colors.foreground} />
-        </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <View style={[styles.aiDot, { backgroundColor: colors.primary }]} />
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>AI Assistant</Text>
-        </View>
-        <View style={[styles.statusBadge, { backgroundColor: '#22C55E22' }]}>
-          <Text style={[styles.statusText, { color: colors.success }]}>Online</Text>
-        </View>
-      </View>
+      <ScreenHeader
+        title="AI Assistant"
+        subtitle="Your AI-powered business advisor"
+        rightElement={
+          <View style={[styles.statusBadge, { backgroundColor: '#22C55E22' }]}>
+            <Text style={[styles.statusText, { color: colors.success }]}>Online</Text>
+          </View>
+        }
+      />
 
       {/* Messages */}
       <FlatList

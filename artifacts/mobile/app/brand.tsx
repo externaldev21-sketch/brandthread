@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput, Platform } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -22,27 +22,18 @@ const STYLE_OPTIONS = ['Minimalist', 'Streetwear', 'Luxury', 'Sporty', 'Vintage'
 
 export default function BrandScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const router = useRouter();
   const [nameInput, setNameInput] = useState('Brandthread');
   const [selectedStyle, setSelectedStyle] = useState('Minimalist');
 
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
-
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={{ paddingTop: topPad + 8, paddingBottom: 100, paddingHorizontal: 16 }}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Nav */}
-      <TouchableOpacity onPress={() => router.back()} style={styles.back} activeOpacity={0.7}>
-        <Feather name="arrow-left" size={20} color={colors.foreground} />
-        <Text style={[styles.backText, { color: colors.foreground }]}>Back</Text>
-      </TouchableOpacity>
-
-      <Text style={[styles.pageTitle, { color: colors.foreground }]}>Brand Creation</Text>
-      <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>Build a brand identity that sells</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScreenHeader title="Brand Creation" subtitle="Build a brand identity that sells" />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
+        showsVerticalScrollIndicator={false}
+      >
 
       {/* Brand Profile */}
       <LinearGradient colors={['#2A2010', '#1A1500']} style={[styles.profileCard, { borderColor: '#C9A96E44' }]}>
@@ -169,6 +160,7 @@ export default function BrandScreen() {
         </TouchableOpacity>
       </View>
     </ScrollView>
+    </View>
   );
 }
 

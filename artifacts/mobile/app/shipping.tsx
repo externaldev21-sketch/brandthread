@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
@@ -25,10 +25,7 @@ const WAREHOUSES = [
 
 export default function ShippingScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
   const router = useRouter();
-
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   function shipmentBadge(status: string) {
     if (status === 'Delivered') return 'success';
@@ -38,18 +35,13 @@ export default function ShippingScreen() {
   }
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={{ paddingTop: topPad + 8, paddingBottom: 100, paddingHorizontal: 16 }}
-      showsVerticalScrollIndicator={false}
-    >
-      <TouchableOpacity onPress={() => router.back()} style={styles.back} activeOpacity={0.7}>
-        <Feather name="arrow-left" size={20} color={colors.foreground} />
-        <Text style={[styles.backText, { color: colors.foreground }]}>Back</Text>
-      </TouchableOpacity>
-
-      <Text style={[styles.pageTitle, { color: colors.foreground }]}>Shipping & Fulfillment</Text>
-      <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>Labels, carriers & returns</Text>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScreenHeader title="Shipping & Fulfillment" subtitle="Labels, carriers & returns" />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
+        showsVerticalScrollIndicator={false}
+      >
 
       {/* Stats */}
       <View style={styles.statsRow}>
@@ -148,6 +140,7 @@ export default function ShippingScreen() {
         </View>
       ))}
     </ScrollView>
+    </View>
   );
 }
 
