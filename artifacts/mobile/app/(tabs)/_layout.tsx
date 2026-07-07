@@ -116,15 +116,7 @@ function ClassicTabLayout() {
       {/* ─── Right side ────────────────────────────────────────── */}
       <Tabs.Screen
         name="marketing"
-        options={{
-          title: 'Marketing',
-          tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
-              <SymbolView name={focused ? 'megaphone.fill' : 'megaphone'} tintColor={color} size={20} />
-            ) : (
-              <TabIcon name="send" color={color} focused={focused} />
-            ),
-        }}
+        options={{ href: null }}
       />
       <Tabs.Screen
         name="more"
