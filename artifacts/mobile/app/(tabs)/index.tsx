@@ -21,11 +21,11 @@ import * as Haptics from 'expo-haptics';
 const PERIODS = ['Today', '7D', '30D', '90D'] as const;
 type Period = typeof PERIODS[number];
 
-const OVERVIEW: Record<Period, { sessions: string; revenue: string; orders: string; conversion: string }> = {
-  Today:  { sessions: '320',   revenue: '$4,892',  orders: '12',  conversion: '3.4%' },
-  '7D':   { sessions: '2,180', revenue: '$28,450', orders: '84',  conversion: '3.9%' },
-  '30D':  { sessions: '9,400', revenue: '$94,200', orders: '312', conversion: '3.4%' },
-  '90D':  { sessions: '28.1k', revenue: '$284k',   orders: '940', conversion: '3.2%' },
+const OVERVIEW: Record<Period, { sessions: string; payout: string; orders: string; conversion: string }> = {
+  Today:  { sessions: '320',   payout: '$4,892',  orders: '12',  conversion: '3.4%' },
+  '7D':   { sessions: '2,180', payout: '$28,450', orders: '84',  conversion: '3.9%' },
+  '30D':  { sessions: '9,400', payout: '$94,200', orders: '312', conversion: '3.4%' },
+  '90D':  { sessions: '28.1k', payout: '$284k',   orders: '940', conversion: '3.2%' },
 };
 
 // progress position of the range track thumb (0–1) per period
@@ -185,9 +185,9 @@ export default function DashboardScreen() {
         <View style={[styles.overviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {/* 4-column stats row */}
           <View style={styles.statsRow}>
-            <StatColumn label="Sessions"  value={ov.sessions}   />
-            <StatColumn label="Revenue"   value={ov.revenue}    />
-            <StatColumn label="Orders"    value={ov.orders}     />
+            <StatColumn label="Sessions"   value={ov.sessions}   />
+            <StatColumn label="Payout"     value={ov.payout}     />
+            <StatColumn label="Orders"     value={ov.orders}     />
             <StatColumn label="Conv. rate" value={ov.conversion} last />
           </View>
 
