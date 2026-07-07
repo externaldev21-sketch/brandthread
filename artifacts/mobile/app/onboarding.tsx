@@ -9,6 +9,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ONBOARDING_KEY } from './_layout';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -599,7 +601,8 @@ export default function OnboardingScreen() {
     }).start();
   }
 
-  function handleFinish() {
+  async function handleFinish() {
+    await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
     router.replace('/');
   }
 

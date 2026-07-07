@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -15,6 +15,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { ClerkProvider, ClerkLoaded, useAuth } from '@clerk/expo';
 import { tokenCache } from '@/lib/tokenCache';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -28,24 +29,47 @@ const proxyUrl = process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;
 // Flip back to false before shipping.
 const DEV_BYPASS_AUTH = true;
 
+export const ONBOARDING_KEY = 'onboarding_complete';
+
 // ─── Auth gate — redirects to /sign-in when signed out ───────────────────────
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { isSignedIn, isLoaded } = useAuth();
   const router = useRouter();
   const segments = useSegments();
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
+  const [onboardingDone, setOnboardingDone] = useState(false);
+
+  // Check AsyncStorage once when the user is signed in
+  useEffect(() => {
+    if (!isSignedIn && !DEV_BYPASS_AUTH) { setOnboardingChecked(false); return; }
+    AsyncStorage.getItem(ONBOARDING_KEY).then((val) => {
+      setOnboardingDone(val === 'true');
+      setOnboardingChecked(true);
+    });
+  }, [isSignedIn]);
 
   useEffect(() => {
-    if (DEV_BYPASS_AUTH) return; // skip auth during development
+    if (DEV_BYPASS_AUTH) return;
     if (!isLoaded) return;
-    const inAuthGroup   = segments[0] === 'sign-in';
-    const inOnboarding  = segments[0] === 'onboarding';
-    // Onboarding requires auth — redirect unsigned-out users to sign-in
-    if (!isSignedIn && !inAuthGroup && !inOnboarding) {
+    const inAuthGroup  = segments[0] === 'sign-in';
+    const inOnboarding = segments[0] === 'onboarding';
+
+    if (!isSignedIn && !inAuthGroup) {
       router.replace('/sign-in');
-    } else if (isSignedIn && inAuthGroup) {
-      router.replace('/');
+      return;
     }
-  }, [isSignedIn, isLoaded, segments]);
+    if (isSignedIn && inAuthGroup) {
+      // Will be redirected by the onboarding check below once checked
+      return;
+    }
+    if (isSignedIn && onboardingChecked) {
+      if (!onboardingDone && !inOnboarding) {
+        router.replace('/onboarding');
+      } else if (onboardingDone && (inAuthGroup || inOnboarding)) {
+        router.replace('/');
+      }
+    }
+  }, [isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone]);
 
   return <>{children}</>;
 }
