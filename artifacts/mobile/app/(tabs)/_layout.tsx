@@ -99,7 +99,7 @@ function ClassicTabLayout() {
           title: 'Feed',
           tabBarLabel: () => null,
           tabBarIcon: ({ focused }) => (
-            <FeedCenterIcon focused={focused} isDark={isDark} />
+            <FeedCenterIcon focused={focused} />
           ),
         }}
       />
@@ -139,7 +139,7 @@ function ClassicTabLayout() {
 
 // ─── Feed centre button ───────────────────────────────────────────────────────
 
-function FeedCenterIcon({ focused }: { focused: boolean; isDark: boolean }) {
+function FeedCenterIcon({ focused }: { focused: boolean }) {
   return (
     <LinearGradient
       colors={focused
