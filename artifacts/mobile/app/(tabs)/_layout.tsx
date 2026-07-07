@@ -164,37 +164,57 @@ function ClassicTabLayout() {
 function FeedCenterIcon({ focused, isDark }: { focused: boolean; isDark: boolean }) {
   return (
     <View style={feedStyles.wrapper}>
+      {/* outer glow ring */}
+      <View style={[feedStyles.glowRing, focused && feedStyles.glowRingActive]} />
+      {/* gradient pill — lifted above the tab bar */}
       <LinearGradient
-        colors={focused
-          ? ['#A855F7', '#7C3AED', '#5B21B6']
-          : isDark
-            ? ['#3D2070', '#2A1060', '#1A0840']
-            : ['#C4B5FD', '#A78BFA', '#8B5CF6']}
+        colors={['#C026D3', '#9333EA', '#6D28D9']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={feedStyles.circle}
+        style={[feedStyles.circle, focused && feedStyles.circleFocused]}
       >
-        <Feather name="play-circle" size={22} color="#FFFFFF" />
+        <Feather name="play" size={24} color="#FFFFFF" />
       </LinearGradient>
-      {focused && <View style={feedStyles.glow} />}
     </View>
   );
 }
 
 const feedStyles = StyleSheet.create({
-  wrapper: { alignItems: 'center', justifyContent: 'center', width: 46, height: 46 },
-  circle: {
-    width: 46, height: 46, borderRadius: 23,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.6,
-    shadowRadius: 10,
-    elevation: 12,
+  wrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 60,
+    height: 60,
+    marginTop: -22, // lifts the button above the tab bar
   },
-  glow: {
-    position: 'absolute', width: 54, height: 54, borderRadius: 27,
-    backgroundColor: '#7C3AED', opacity: 0.2,
+  glowRing: {
+    position: 'absolute',
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#9333EA',
+    opacity: 0,
+  },
+  glowRingActive: {
+    opacity: 0.25,
+  },
+  circle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.8,
+    shadowRadius: 16,
+    elevation: 20,
+  },
+  circleFocused: {
+    shadowOpacity: 1,
+    shadowRadius: 24,
   },
 });
 
