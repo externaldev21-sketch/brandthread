@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, ScrollView, TouchableOpacity,
-  useColorScheme, Dimensions, Animated, Image,
+  useColorScheme, Dimensions, Animated,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -122,6 +123,18 @@ const FEED_ITEMS = [
     saved: true,
     liked: false,
   },
+];
+
+// ─── Stories (followed users) ────────────────────────────────────────────────
+
+const STORIES = [
+  { id: 's1', name: 'vaultstudio',  initials: 'VS', color: '#7C3AED', viewed: false },
+  { id: 's2', name: 'meridian.co',  initials: 'MC', color: '#0F766E', viewed: false },
+  { id: 's3', name: 'nxgendrops',   initials: 'NX', color: '#B45309', viewed: true  },
+  { id: 's4', name: 'softwear__',   initials: 'SW', color: '#BE185D', viewed: false },
+  { id: 's5', name: 'atlasgoods',   initials: 'AG', color: '#1D4ED8', viewed: true  },
+  { id: 's6', name: 'coldform',     initials: 'CF', color: '#065F46', viewed: false },
+  { id: 's7', name: 'rawthread',    initials: 'RT', color: '#92400E', viewed: false },
 ];
 
 // ─── Feed card ───────────────────────────────────────────────────────────────
@@ -280,8 +293,12 @@ export default function FeedScreen() {
   const primary = isDark ? '#9F7AEA' : '#7C3AED';
 
   const [items, setItems] = useState(FEED_ITEMS);
-  const [activeFilter, setActiveFilter] = useState('For you');
-  const filters = ['For you', 'Following', 'Drops', 'Pre-order', 'Trending'];
+  const [stories, setStories] = useState(STORIES);
+
+  function handleViewStory(id: string) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setStories(prev => prev.map(s => s.id === id ? { ...s, viewed: true } : s));
+  }
 
   function handleLike(id: string) {
     setItems(prev => prev.map(item =>
@@ -310,33 +327,44 @@ export default function FeedScreen() {
         </View>
       </View>
 
-      {/* ─ Filter pills ─ */}
-      <View style={{ height: 54, borderBottomWidth: 1, borderBottomColor: border }}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filtersScroll}
+      {/* ─ Stories row ─ */}
+      <View style={[styles.storiesRow, { borderBottomColor: border }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.storiesScroll}
         >
-          {filters.map((filter) => {
-            const active = filter === activeFilter;
-            return (
-              <TouchableOpacity
-                key={filter}
-                onPress={() => setActiveFilter(filter)}
-                style={[
-                  styles.filterPill,
-                  active
-                    ? { backgroundColor: primary }
-                    : { backgroundColor: 'transparent', borderColor: border, borderWidth: 1 },
-                ]}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.filterText, { color: active ? '#FFFFFF' : muted }]}>
-                  {filter}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+          {stories.map((story) => (
+            <TouchableOpacity
+              key={story.id}
+              onPress={() => handleViewStory(story.id)}
+              activeOpacity={0.8}
+              style={styles.storyItem}
+            >
+              {/* ring */}
+              {story.viewed ? (
+                <View style={[styles.storyRingViewed, { borderColor: border }]}>
+                  <View style={[styles.storyAvatar, { backgroundColor: story.color }]}>
+                    <Text style={styles.storyInitials}>{story.initials}</Text>
+                  </View>
+                </View>
+              ) : (
+                <LinearGradient
+                  colors={['#F0ABFC', '#C026D3', '#7C3AED']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.storyRing}
+                >
+                  <View style={[styles.storyAvatarInner, { backgroundColor: isDark ? '#08080F' : '#F8F7FF' }]}>
+                    <View style={[styles.storyAvatar, { backgroundColor: story.color }]}>
+                      <Text style={styles.storyInitials}>{story.initials}</Text>
+                    </View>
+                  </View>
+                </LinearGradient>
+              )}
+              <Text style={[styles.storyName, { color: muted }]} numberOfLines={1}>
+                {story.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </ScrollView>
       </View>
 
@@ -372,9 +400,15 @@ const styles = StyleSheet.create({
   headerRight: { flexDirection: 'row', gap: 8 },
   headerIconBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
 
-  filtersScroll: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
-  filterPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, flexShrink: 0 },
-  filterText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', flexShrink: 0 },
+  storiesRow:    { borderBottomWidth: 1, height: 100 },
+  storiesScroll: { paddingHorizontal: 16, paddingVertical: 10, gap: 14, alignItems: 'center' },
+  storyItem:     { alignItems: 'center', gap: 5, width: 62 },
+  storyRing:     { width: 62, height: 62, borderRadius: 31, padding: 2.5, alignItems: 'center', justifyContent: 'center' },
+  storyRingViewed: { width: 62, height: 62, borderRadius: 31, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
+  storyAvatarInner: { width: 55, height: 55, borderRadius: 28, padding: 2, alignItems: 'center', justifyContent: 'center' },
+  storyAvatar:   { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
+  storyInitials: { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  storyName:     { fontSize: 10, fontFamily: 'Inter_500Medium', textAlign: 'center', width: 62 },
 
   card: { borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
 
