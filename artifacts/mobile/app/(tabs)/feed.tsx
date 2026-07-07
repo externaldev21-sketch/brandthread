@@ -375,8 +375,8 @@ const styles = StyleSheet.create({
   headerIconBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
 
   filtersScroll: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
-  filterPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20 },
-  filterText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  filterPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, flexShrink: 0 },
+  filterText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', flexShrink: 0 },
 
   card: { borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
 

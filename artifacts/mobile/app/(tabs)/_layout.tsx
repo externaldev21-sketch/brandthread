@@ -157,8 +157,8 @@ function FeedCenterIcon({ focused }: { focused: boolean; isDark: boolean }) {
 
 const feedStyles = StyleSheet.create({
   pill: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
@@ -169,10 +169,11 @@ const feedStyles = StyleSheet.create({
     elevation: 12,
   },
   label: {
-    fontSize: 13,
+    fontSize: 12,
     fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
     letterSpacing: 0.2,
+    includeFontPadding: false,
   },
 });
 
