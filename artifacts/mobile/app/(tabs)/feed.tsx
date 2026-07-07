@@ -311,33 +311,34 @@ export default function FeedScreen() {
       </View>
 
       {/* ─ Filter pills ─ */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filtersScroll}
-        style={{ borderBottomWidth: 1, borderBottomColor: border }}
-      >
-        {filters.map((filter) => {
-          const active = filter === activeFilter;
-          return (
-            <TouchableOpacity
-              key={filter}
-              onPress={() => setActiveFilter(filter)}
-              style={[
-                styles.filterPill,
-                active
-                  ? { backgroundColor: primary }
-                  : { backgroundColor: 'transparent', borderColor: border, borderWidth: 1 },
-              ]}
-              activeOpacity={0.75}
-            >
-              <Text style={[styles.filterText, { color: active ? '#FFFFFF' : muted }]}>
-                {filter}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      <View style={{ height: 54, borderBottomWidth: 1, borderBottomColor: border }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filtersScroll}
+        >
+          {filters.map((filter) => {
+            const active = filter === activeFilter;
+            return (
+              <TouchableOpacity
+                key={filter}
+                onPress={() => setActiveFilter(filter)}
+                style={[
+                  styles.filterPill,
+                  active
+                    ? { backgroundColor: primary }
+                    : { backgroundColor: 'transparent', borderColor: border, borderWidth: 1 },
+                ]}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.filterText, { color: active ? '#FFFFFF' : muted }]}>
+                  {filter}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
 
       {/* ─ Feed ─ */}
       <FlatList
