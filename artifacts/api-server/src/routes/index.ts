@@ -1,8 +1,20 @@
-import { Router, type IRouter } from "express";
+import { Router } from "express";
 import healthRouter from "./health";
+import authRouter from "./auth";
+import productsRouter from "./products";
+import ordersRouter from "./orders";
+import customersRouter from "./customers";
+import dropsRouter from "./drops";
+import analyticsRouter from "./analytics";
 
-const router: IRouter = Router();
+const router = Router();
 
-router.use(healthRouter);
+router.use("/healthz",   healthRouter);
+router.use("/auth",      authRouter);
+router.use("/products",  productsRouter);
+router.use("/orders",    ordersRouter);
+router.use("/customers", customersRouter);
+router.use("/drops",     dropsRouter);
+router.use("/analytics", analyticsRouter);
 
 export default router;

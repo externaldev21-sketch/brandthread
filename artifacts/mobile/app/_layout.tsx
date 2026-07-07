@@ -11,30 +11,56 @@ import {
   Inter_700Bold,
   useFonts,
 } from '@expo-google-fonts/inter';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { ClerkProvider, ClerkLoaded, useAuth } from '@clerk/expo';
+import { tokenCache } from '@/lib/tokenCache';
 
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
+const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
+
+// ─── Auth gate — redirects to /sign-in when signed out ───────────────────────
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const { isSignedIn, isLoaded } = useAuth();
+  const router = useRouter();
+  const segments = useSegments();
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    const inAuthGroup = segments[0] === 'sign-in';
+    if (!isSignedIn && !inAuthGroup) {
+      router.replace('/sign-in');
+    } else if (isSignedIn && inAuthGroup) {
+      router.replace('/');
+    }
+  }, [isSignedIn, isLoaded, segments]);
+
+  return <>{children}</>;
+}
+
 function RootLayoutNav() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="brand" options={{ headerShown: false }} />
-      <Stack.Screen name="ai-studio" options={{ headerShown: false }} />
-      <Stack.Screen name="manufacturer" options={{ headerShown: false }} />
-      <Stack.Screen name="finance" options={{ headerShown: false }} />
-      <Stack.Screen name="customers" options={{ headerShown: false }} />
-      <Stack.Screen name="shipping" options={{ headerShown: false }} />
-      <Stack.Screen name="team" options={{ headerShown: false }} />
-      <Stack.Screen name="ai-assistant" options={{ headerShown: false }} />
-      <Stack.Screen name="community" options={{ headerShown: false }} />
-      <Stack.Screen name="automation" options={{ headerShown: false }} />
-      <Stack.Screen name="payments" options={{ headerShown: false }} />
-      <Stack.Screen name="website" options={{ headerShown: false }} />
-    </Stack>
+    <AuthGate>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)"        options={{ headerShown: false }} />
+        <Stack.Screen name="sign-in"       options={{ headerShown: false }} />
+        <Stack.Screen name="brand"         options={{ headerShown: false }} />
+        <Stack.Screen name="ai-studio"     options={{ headerShown: false }} />
+        <Stack.Screen name="manufacturer"  options={{ headerShown: false }} />
+        <Stack.Screen name="finance"       options={{ headerShown: false }} />
+        <Stack.Screen name="customers"     options={{ headerShown: false }} />
+        <Stack.Screen name="shipping"      options={{ headerShown: false }} />
+        <Stack.Screen name="team"          options={{ headerShown: false }} />
+        <Stack.Screen name="ai-assistant"  options={{ headerShown: false }} />
+        <Stack.Screen name="community"     options={{ headerShown: false }} />
+        <Stack.Screen name="automation"    options={{ headerShown: false }} />
+        <Stack.Screen name="payments"      options={{ headerShown: false }} />
+        <Stack.Screen name="website"       options={{ headerShown: false }} />
+      </Stack>
+    </AuthGate>
   );
 }
 
@@ -55,16 +81,20 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null;
 
   return (
-    <SafeAreaProvider>
-      <ErrorBoundary>
-        <QueryClientProvider client={queryClient}>
-          <GestureHandlerRootView style={{ flex: 1 }}>
-            <KeyboardProvider>
-              <RootLayoutNav />
-            </KeyboardProvider>
-          </GestureHandlerRootView>
-        </QueryClientProvider>
-      </ErrorBoundary>
-    </SafeAreaProvider>
+    <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
+      <ClerkLoaded>
+        <SafeAreaProvider>
+          <ErrorBoundary>
+            <QueryClientProvider client={queryClient}>
+              <GestureHandlerRootView style={{ flex: 1 }}>
+                <KeyboardProvider>
+                  <RootLayoutNav />
+                </KeyboardProvider>
+              </GestureHandlerRootView>
+            </QueryClientProvider>
+          </ErrorBoundary>
+        </SafeAreaProvider>
+      </ClerkLoaded>
+    </ClerkProvider>
   );
 }
