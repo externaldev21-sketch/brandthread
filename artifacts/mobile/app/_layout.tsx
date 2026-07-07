@@ -26,7 +26,7 @@ const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 // Empty in dev (Clerk hits dev FAPI directly), auto-set in prod. Do NOT gate on NODE_ENV.
 const proxyUrl = process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;
 
-// Set to true to skip auth and go straight to the dashboard while building.
+// Set to true to skip Clerk sign-in while building (onboarding still runs).
 // Flip back to false before shipping.
 const DEV_BYPASS_AUTH = true;
 
@@ -40,7 +40,14 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [onboardingDone, setOnboardingDone] = useState(false);
 
-  // Check AsyncStorage once when the user is signed in
+  // In dev bypass mode, clear onboarding state on every boot so the full
+  // flow can be tested without manually wiping AsyncStorage.
+  useEffect(() => {
+    if (!DEV_BYPASS_AUTH) return;
+    AsyncStorage.multiRemove([ONBOARDING_KEY, 'user_role']);
+  }, []);
+
+  // Check AsyncStorage once when the user is signed in (or in dev bypass)
   useEffect(() => {
     if (!isSignedIn && !DEV_BYPASS_AUTH) { setOnboardingChecked(false); return; }
     AsyncStorage.getItem(ONBOARDING_KEY).then((val) => {
@@ -50,25 +57,21 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }, [isSignedIn]);
 
   useEffect(() => {
-    if (DEV_BYPASS_AUTH) return;
-    if (!isLoaded) return;
-    const inAuthGroup  = segments[0] === 'sign-in';
-    const inOnboarding = segments[0] === 'onboarding';
+    if (!DEV_BYPASS_AUTH) {
+      if (!isLoaded) return;
+      const inAuthGroup = segments[0] === 'sign-in';
+      if (!isSignedIn && !inAuthGroup) { router.replace('/sign-in'); return; }
+      if (isSignedIn && inAuthGroup) return;
+    }
 
-    if (!isSignedIn && !inAuthGroup) {
-      router.replace('/sign-in');
-      return;
-    }
-    if (isSignedIn && inAuthGroup) {
-      // Will be redirected by the onboarding check below once checked
-      return;
-    }
-    if (isSignedIn && onboardingChecked) {
-      if (!onboardingDone && !inOnboarding) {
-        router.replace('/onboarding');
-      } else if (onboardingDone && (inAuthGroup || inOnboarding)) {
-        router.replace('/');
-      }
+    // Onboarding redirect applies in both normal and dev-bypass mode
+    if (!onboardingChecked) return;
+    const inOnboarding = segments[0] === 'onboarding';
+    const inAuthGroup  = segments[0] === 'sign-in';
+    if (!onboardingDone && !inOnboarding) {
+      router.replace('/onboarding');
+    } else if (onboardingDone && (inAuthGroup || inOnboarding)) {
+      router.replace('/');
     }
   }, [isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone]);
 
