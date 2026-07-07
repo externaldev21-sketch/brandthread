@@ -101,7 +101,7 @@ function ClassicTabLayout() {
           tabBarIcon: ({ focused }) => (
             <FeedCenterIcon focused={focused} isDark={isDark} />
           ),
-          tabBarItemStyle: { paddingTop: 14, paddingBottom: 2 },
+          tabBarItemStyle: { paddingVertical: 8 },
         }}
       />
 
@@ -157,9 +157,9 @@ function FeedCenterIcon({ focused }: { focused: boolean; isDark: boolean }) {
 
 const feedStyles = StyleSheet.create({
   pill: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
+    width: 52,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#C026D3',
@@ -173,7 +173,6 @@ const feedStyles = StyleSheet.create({
     fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
     letterSpacing: 0.2,
-    includeFontPadding: false,
   },
 });
 

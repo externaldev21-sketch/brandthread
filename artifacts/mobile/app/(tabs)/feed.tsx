@@ -331,10 +331,10 @@ export default function FeedScreen() {
               ]}
               activeOpacity={0.75}
             >
-              <Text style={[
-                styles.filterText,
-                { color: active ? '#FFFFFF' : muted },
-              ]}>
+              <Text
+                style={[styles.filterText, { color: active ? '#FFFFFF' : muted }]}
+                numberOfLines={1}
+              >
                 {filter}
               </Text>
             </TouchableOpacity>
