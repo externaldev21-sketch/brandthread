@@ -42,11 +42,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [onboardingDone, setOnboardingDone] = useState(false);
   const [storedRole, setStoredRole] = useState<string | null>(null);
 
-  // In dev bypass mode, clear onboarding state on every boot so the full
-  // flow can be tested without manually wiping AsyncStorage.
+  // In dev bypass mode, seed storage as a buyer so the buyer screens are
+  // immediately visible for preview. Flip DEV_BYPASS_AUTH to false before shipping.
   useEffect(() => {
     if (!DEV_BYPASS_AUTH) return;
-    AsyncStorage.multiRemove([ONBOARDING_KEY, 'user_role']);
+    AsyncStorage.multiSet([[ONBOARDING_KEY, 'true'], ['user_role', 'buyer']]);
   }, []);
 
   // Re-read AsyncStorage whenever the user signs in OR navigates to a new
