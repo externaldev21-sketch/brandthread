@@ -97,7 +97,6 @@ function ClassicTabLayout() {
         name="feed"
         options={{
           title: 'Feed',
-          tabBarLabel: () => null,
           tabBarIcon: ({ focused }) => (
             <FeedCenterIcon focused={focused} isDark={isDark} />
           ),
@@ -149,30 +148,20 @@ function FeedCenterIcon({ focused }: { focused: boolean; isDark: boolean }) {
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={feedStyles.pill}
-    >
-      <Text style={feedStyles.label}>Feed</Text>
-    </LinearGradient>
+    />
   );
 }
 
 const feedStyles = StyleSheet.create({
   pill: {
-    width: 62,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 52,
+    height: 22,
+    borderRadius: 11,
     shadowColor: '#C026D3',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.7,
     shadowRadius: 10,
     elevation: 12,
-  },
-  label: {
-    fontSize: 12,
-    fontFamily: 'Inter_700Bold',
-    color: '#FFFFFF',
-    letterSpacing: 0.2,
   },
 });
 
