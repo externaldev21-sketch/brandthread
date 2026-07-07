@@ -20,7 +20,7 @@ const FILTERS = ['All', 'Active', 'Draft', 'Archived'] as const;
 type Filter = typeof FILTERS[number];
 
 const PRODUCTS = [
-  { name: 'Classic Thread Tee', category: 'T-Shirts', price: '$42.00', stock: 124, color: '#C9A96E' },
+  { name: 'Classic Thread Tee', category: 'T-Shirts', price: '$42.00', stock: 124, color: '#9F7AEA' },
   { name: 'Cargo Shorts', category: 'Bottoms', price: '$68.00', stock: 3, color: '#5C8A5C' },
   { name: 'Oversized Hoodie', category: 'Outerwear', price: '$115.00', stock: 0, color: '#2A2A5A' },
   { name: 'Wide-Leg Trousers', category: 'Bottoms', price: '$98.00', stock: 47, color: '#8A6A5C' },
@@ -111,10 +111,10 @@ export default function ProductsScreen() {
         <TouchableOpacity
           onPress={() => router.push('/ai-studio')}
           activeOpacity={0.8}
-          style={[styles.studioCard, { borderColor: '#C9A96E44' }]}
+          style={[styles.studioCard, { borderColor: '#9F7AEA44' }]}
         >
           <View style={styles.studioLeft}>
-            <View style={[styles.studioIcon, { backgroundColor: '#C9A96E22' }]}>
+            <View style={[styles.studioIcon, { backgroundColor: '#9F7AEA22' }]}>
               <Feather name="zap" size={20} color={colors.primary} />
             </View>
             <View>
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
   filtersRow: { marginBottom: 20 },
   filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
   filterText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  studioCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#1A1500', borderWidth: 1, borderRadius: 14, padding: 14, marginBottom: 24 },
+  studioCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#0F0A1E', borderWidth: 1, borderRadius: 14, padding: 14, marginBottom: 24 },
   studioLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   studioIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   studioTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },

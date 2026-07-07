@@ -1,1 +1,1 @@
-- [Brandthread dark theme](brandthread-theme.md) — app uses dark luxury palette (#0D0D0D bg, #C9A96E gold primary), both light and dark keys in colors.ts must be identical since the app is dark-only.
+- [Brandthread theme — purple](brandthread-theme.md) — app uses dual light/dark purple theme; primary is #7C3AED (light) / #9F7AEA (dark). Gold (#C9A96E) was fully replaced with purple. Both modes now genuinely differ.

@@ -18,6 +18,9 @@ function ClassicTabLayout() {
   const insets = useSafeAreaInsets();
   const bottomOffset = isWeb ? 20 : Math.max(insets.bottom, 8) + 12;
 
+  const pillBg = isDark ? '#111118F0' : '#FFFFFFF0';
+  const inactiveTint = isDark ? '#555570' : '#9090B0';
+
   const tabBarStyle = {
     position: 'absolute' as const,
     bottom: bottomOffset,
@@ -26,19 +29,19 @@ function ClassicTabLayout() {
     height: 64,
     borderRadius: 32,
     borderTopWidth: 0,
-    backgroundColor: isIOS ? 'transparent' : '#181818EE',
+    backgroundColor: isIOS ? 'transparent' : pillBg,
     elevation: 24,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.5,
-    shadowRadius: 24,
+    shadowColor: isDark ? '#000000' : '#7C3AED',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: isDark ? 0.5 : 0.15,
+    shadowRadius: 20,
   };
 
   return (
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: '#555555',
+        tabBarInactiveTintColor: inactiveTint,
         headerShown: false,
         tabBarShowLabel: false,
         tabBarStyle,
@@ -46,11 +49,11 @@ function ClassicTabLayout() {
           isIOS ? (
             <BlurView
               intensity={70}
-              tint="dark"
+              tint={isDark ? 'dark' : 'light'}
               style={[StyleSheet.absoluteFill, { borderRadius: 32, overflow: 'hidden' }]}
             />
           ) : (
-            <View style={[StyleSheet.absoluteFill, { borderRadius: 32, backgroundColor: '#181818EE' }]} />
+            <View style={[StyleSheet.absoluteFill, { borderRadius: 32, backgroundColor: pillBg }]} />
           ),
         tabBarItemStyle: {
           paddingVertical: 8,
@@ -126,7 +129,7 @@ function TabIcon({ name, color, focused }: { name: keyof typeof Feather.glyphMap
     <View style={{ alignItems: 'center', gap: 4 }}>
       <Feather name={name} size={21} color={color} />
       {focused && (
-        <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#C9A96E' }} />
+        <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#9F7AEA' }} />
       )}
     </View>
   );

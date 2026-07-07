@@ -32,7 +32,7 @@ export default function WebsiteScreen() {
       >
 
       {/* Store Preview */}
-      <View style={[styles.previewCard, { backgroundColor: '#1A1500', borderColor: '#C9A96E44' }]}>
+      <View style={[styles.previewCard, { backgroundColor: '#0F0A1E', borderColor: '#9F7AEA44' }]}>
         <View style={styles.previewBar}>
           {[...Array(3)].map((_, i) => (
             <View key={i} style={[styles.previewDot, { backgroundColor: i === 0 ? '#EF4444' : i === 1 ? '#F59E0B' : '#22C55E' }]} />
@@ -48,7 +48,7 @@ export default function WebsiteScreen() {
             <Text style={[styles.previewHeroSub, { color: colors.mutedForeground }]}>The New Collection</Text>
           </View>
           <View style={styles.previewGrid}>
-            {['#C9A96E', '#1A1A4A', '#2A3A1A', '#4A2A2A'].map((c, i) => (
+            {['#9F7AEA', '#1A1A4A', '#2A3A1A', '#4A2A2A'].map((c, i) => (
               <View key={i} style={[styles.previewProduct, { backgroundColor: c + '88' }]} />
             ))}
           </View>

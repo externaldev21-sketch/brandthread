@@ -37,10 +37,10 @@ export default function PaymentsScreen() {
       >
 
       {/* Balance */}
-      <View style={[styles.balanceCard, { backgroundColor: '#1A1500', borderColor: '#C9A96E44' }]}>
-        <Text style={[styles.balanceLabel, { color: '#C9A96E88' }]}>PENDING BALANCE</Text>
+      <View style={[styles.balanceCard, { backgroundColor: '#0F0A1E', borderColor: '#9F7AEA44' }]}>
+        <Text style={[styles.balanceLabel, { color: '#9F7AEA88' }]}>PENDING BALANCE</Text>
         <Text style={[styles.balanceAmount, { color: colors.primary }]}>$4,892.50</Text>
-        <Text style={[styles.balanceSub, { color: '#C9A96E66' }]}>Estimated payout: Jul 9, 2025</Text>
+        <Text style={[styles.balanceSub, { color: '#9F7AEA66' }]}>Estimated payout: Jul 9, 2025</Text>
         <TouchableOpacity style={[styles.payoutBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8}>
           <Text style={[styles.payoutBtnText, { color: colors.primaryForeground }]}>Request Payout</Text>
         </TouchableOpacity>

@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Platform,
+  useColorScheme,
 } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -52,15 +53,27 @@ const statusMap: Record<string, { variant: 'success' | 'info' | 'warning' | 'err
   cancelled: { variant: 'error', label: 'Cancelled' },
 };
 
-// Mini sparkline dots for revenue card
-const SPARK = [40, 55, 48, 72, 60, 80, 68, 95, 78, 100];
+const SPARK = [32, 48, 41, 65, 55, 74, 60, 88, 72, 100];
 
 export default function DashboardScreen() {
   const colors = useColors();
+  const scheme = useColorScheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const isDark = scheme !== 'light';
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
+
+  // Mode-aware gradient
+  const heroGradient: readonly [string, string, string] = isDark
+    ? ['#2A1060', '#130828', '#08080F']
+    : ['#EDE9FE', '#C4B5FD', '#F4F0FF'];
+
+  const heroAmountColor = isDark ? '#FFFFFF' : '#4C1D95';
+  const heroLabelColor = isDark ? '#C4B5FDA0' : '#7C3AED99';
+  const heroSubColor = isDark ? '#C4B5FD55' : '#9F7AEA77';
+  const heroSparkPrimary = isDark ? '#9F7AEA' : '#7C3AED';
+  const heroBorderColor = isDark ? '#9F7AEA22' : '#DDD6FE';
 
   function nav(route: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -75,7 +88,7 @@ export default function DashboardScreen() {
     >
       {/* ─── Header ─── */}
       <View style={[styles.header, { paddingHorizontal: 20 }]}>
-        <View>
+        <View style={styles.headerLeft}>
           <Text style={[styles.greeting, { color: colors.mutedForeground }]}>Good morning 👋</Text>
           <Text style={[styles.brand, { color: colors.foreground }]}>Brandthread</Text>
         </View>
@@ -100,45 +113,55 @@ export default function DashboardScreen() {
       {/* ─── Revenue Hero ─── */}
       <View style={{ paddingHorizontal: 20 }}>
         <LinearGradient
-          colors={['#2A2010', '#1C1800', '#0D0D0D']}
-          style={[styles.revenueCard, { borderColor: '#C9A96E33' }]}
+          colors={heroGradient}
+          style={[styles.heroCard, { borderColor: heroBorderColor }]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
         >
-          <View style={styles.revenueTop}>
-            <Text style={[styles.revenueLabel, { color: '#C9A96E88' }]}>REVENUE TODAY</Text>
-            <View style={[styles.revenuePill, { backgroundColor: '#22C55E1A', borderColor: '#22C55E33' }]}>
+          {/* Blurred glow orb */}
+          {isDark && (
+            <View style={styles.glowOrb} />
+          )}
+
+          <View style={styles.heroTop}>
+            <Text style={[styles.heroLabel, { color: heroLabelColor }]}>REVENUE TODAY</Text>
+            <View style={[styles.growthPill, { backgroundColor: '#16A34A18', borderColor: '#22C55E33' }]}>
               <Feather name="trending-up" size={11} color={colors.success} />
-              <Text style={[styles.revenuePillText, { color: colors.success }]}>18.4%</Text>
+              <Text style={[styles.growthText, { color: colors.success }]}>18.4%</Text>
             </View>
           </View>
 
-          <Text style={[styles.revenueAmount, { color: '#C9A96E' }]}>$4,892.50</Text>
-          <Text style={[styles.revenueSub, { color: '#C9A96E55' }]}>
+          <Text style={[styles.heroAmount, { color: heroAmountColor }]}>$4,892.50</Text>
+          <Text style={[styles.heroSub, { color: heroSubColor }]}>
             This week: $28,450 · This month: $94,200
           </Text>
 
           {/* Sparkline */}
           <View style={styles.sparkRow}>
-            {SPARK.map((h, i) => (
-              <View
-                key={i}
-                style={[
-                  styles.sparkBar,
-                  {
-                    height: (h / 100) * 36,
-                    backgroundColor:
-                      i === SPARK.length - 1 ? '#C9A96E' : i > SPARK.length - 4 ? '#C9A96E66' : '#C9A96E22',
-                    borderRadius: 2,
-                  },
-                ]}
-              />
-            ))}
+            {SPARK.map((h, i) => {
+              const isLast = i === SPARK.length - 1;
+              const isRecent = i >= SPARK.length - 3;
+              const opacity = isLast ? 1 : isRecent ? 0.55 : 0.2;
+              return (
+                <View
+                  key={i}
+                  style={[
+                    styles.sparkBar,
+                    {
+                      height: (h / 100) * 36,
+                      backgroundColor: heroSparkPrimary,
+                      opacity,
+                      borderRadius: 3,
+                    },
+                  ]}
+                />
+              );
+            })}
           </View>
         </LinearGradient>
       </View>
 
-      {/* ─── Stats (horizontal scroll) ─── */}
+      {/* ─── Stats Scroll ─── */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -155,7 +178,7 @@ export default function DashboardScreen() {
               i === STATS.length - 1 && { marginRight: 20 },
             ]}
           >
-            <View style={[styles.statIconWrap, { backgroundColor: '#C9A96E15' }]}>
+            <View style={[styles.statIcon, { backgroundColor: colors.secondary }]}>
               <Feather name={s.icon} size={16} color={colors.primary} />
             </View>
             <Text style={[styles.statValue, { color: colors.foreground }]}>{s.value}</Text>
@@ -167,7 +190,7 @@ export default function DashboardScreen() {
         ))}
       </ScrollView>
 
-      {/* ─── Quick Actions (horizontal chips) ─── */}
+      {/* ─── Quick Actions ─── */}
       <View style={{ paddingHorizontal: 20, marginTop: 28 }}>
         <SectionHeader title="Quick Actions" />
       </View>
@@ -188,7 +211,7 @@ export default function DashboardScreen() {
             onPress={() => nav(qa.route)}
             activeOpacity={0.75}
           >
-            <View style={[styles.chipIcon, { backgroundColor: '#C9A96E15' }]}>
+            <View style={[styles.chipIcon, { backgroundColor: colors.secondary }]}>
               <Feather name={qa.icon} size={16} color={colors.primary} />
             </View>
             <Text style={[styles.chipLabel, { color: colors.foreground }]}>{qa.label}</Text>
@@ -210,7 +233,6 @@ export default function DashboardScreen() {
                   i > 0 && { borderTopWidth: 1, borderTopColor: colors.border },
                 ]}
               >
-                {/* Left gold accent bar */}
                 <View style={[styles.orderAccent, { backgroundColor: colors.primary }]} />
                 <View style={styles.orderLeft}>
                   <Text style={[styles.orderId, { color: colors.primary }]}>{order.id}</Text>
@@ -229,9 +251,9 @@ export default function DashboardScreen() {
         </View>
       </View>
 
-      {/* ─── Low Stock ─── */}
+      {/* ─── Low Stock Alerts ─── */}
       <View style={{ paddingHorizontal: 20, marginTop: 28 }}>
-        <SectionHeader title="Low Stock Alerts" action="Manage" onAction={() => nav('/products')} />
+        <SectionHeader title="Low Stock" action="Manage" onAction={() => nav('/products')} />
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {LOW_STOCK.map((item, i) => (
             <View
@@ -241,14 +263,24 @@ export default function DashboardScreen() {
                 i > 0 && { borderTopWidth: 1, borderTopColor: colors.border },
               ]}
             >
-              <View style={[styles.stockIcon, { backgroundColor: '#F59E0B15' }]}>
-                <Feather name="alert-triangle" size={13} color={colors.warning} />
+              <View style={[styles.stockIcon, {
+                backgroundColor: item.stock <= 3 ? `${colors.destructive}18` : `${colors.warning}18`,
+              }]}>
+                <Feather
+                  name="alert-triangle"
+                  size={13}
+                  color={item.stock <= 3 ? colors.destructive : colors.warning}
+                />
               </View>
               <Text style={[styles.stockName, { color: colors.foreground }]} numberOfLines={1}>
                 {item.name}
               </Text>
-              <View style={[styles.stockBadge, { backgroundColor: item.stock <= 3 ? '#EF444415' : '#F59E0B15' }]}>
-                <Text style={[styles.stockQty, { color: item.stock <= 3 ? colors.destructive : colors.warning }]}>
+              <View style={[styles.stockBadge, {
+                backgroundColor: item.stock <= 3 ? `${colors.destructive}15` : `${colors.warning}15`,
+              }]}>
+                <Text style={[styles.stockQty, {
+                  color: item.stock <= 3 ? colors.destructive : colors.warning,
+                }]}>
                   {item.stock} left
                 </Text>
               </View>
@@ -265,34 +297,40 @@ const styles = StyleSheet.create({
 
   // Header
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
+  headerLeft: { flex: 1 },
   greeting: { fontSize: 13, fontFamily: 'Inter_400Regular' },
   brand: { fontSize: 26, fontFamily: 'Inter_700Bold', letterSpacing: -0.6 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  notifDot: { position: 'absolute', top: 9, right: 9, width: 7, height: 7, borderRadius: 4, borderWidth: 1, borderColor: '#0D0D0D' },
+  notifDot: { position: 'absolute', top: 9, right: 9, width: 7, height: 7, borderRadius: 4, borderWidth: 1, borderColor: 'transparent' },
   avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
 
-  // Revenue
-  revenueCard: { borderRadius: 20, padding: 22, borderWidth: 1 },
-  revenueTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  revenueLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 1 },
-  revenuePill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1 },
-  revenuePillText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-  revenueAmount: { fontSize: 44, fontFamily: 'Inter_700Bold', letterSpacing: -1.5 },
-  revenueSub: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 4, marginBottom: 16 },
+  // Revenue hero
+  heroCard: { borderRadius: 22, padding: 22, borderWidth: 1, overflow: 'hidden' },
+  glowOrb: {
+    position: 'absolute', top: -40, right: -40,
+    width: 180, height: 180, borderRadius: 90,
+    backgroundColor: '#7C3AED', opacity: 0.12,
+  },
+  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  heroLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 1.2 },
+  growthPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1 },
+  growthText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  heroAmount: { fontSize: 44, fontFamily: 'Inter_700Bold', letterSpacing: -1.5 },
+  heroSub: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 4, marginBottom: 16 },
   sparkRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 36 },
   sparkBar: { flex: 1 },
 
   // Stats
   statsScroll: { gap: 10, paddingVertical: 2 },
-  statCard: { width: 120, borderRadius: 16, padding: 16, borderWidth: 1, gap: 4, marginHorizontal: 0 },
-  statIconWrap: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  statCard: { width: 120, borderRadius: 16, padding: 16, borderWidth: 1, gap: 4 },
+  statIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   statValue: { fontSize: 24, fontFamily: 'Inter_700Bold', letterSpacing: -0.5 },
   statLabel: { fontSize: 11, fontFamily: 'Inter_400Regular' },
   statChange: { fontSize: 11, fontFamily: 'Inter_500Medium' },
 
-  // Quick Actions
+  // Quick actions
   actionsScroll: { gap: 10, paddingVertical: 2 },
   actionChip: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, borderWidth: 1 },
   chipIcon: { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
@@ -301,7 +339,7 @@ const styles = StyleSheet.create({
   // Orders
   card: { borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
   orderRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  orderAccent: { width: 3, height: 36, borderRadius: 2 },
+  orderAccent: { width: 3, height: 40, borderRadius: 2 },
   orderLeft: { flex: 1, gap: 2 },
   orderId: { fontSize: 14, fontFamily: 'Inter_700Bold' },
   orderCustomer: { fontSize: 12, fontFamily: 'Inter_400Regular' },

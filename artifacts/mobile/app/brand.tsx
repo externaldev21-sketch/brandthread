@@ -36,15 +36,15 @@ export default function BrandScreen() {
       >
 
       {/* Brand Profile */}
-      <LinearGradient colors={['#2A2010', '#1A1500']} style={[styles.profileCard, { borderColor: '#C9A96E44' }]}>
+      <LinearGradient colors={['#180D2E', '#0F0A1E']} style={[styles.profileCard, { borderColor: '#9F7AEA44' }]}>
         <View style={[styles.logoCircle, { borderColor: colors.primary }]}>
           <Text style={[styles.logoText, { color: colors.primary }]}>BT</Text>
         </View>
         <View>
           <Text style={[styles.brandName, { color: colors.primary }]}>Brandthread</Text>
-          <Text style={[styles.brandStyle, { color: '#C9A96E77' }]}>Minimalist · Est. 2025</Text>
+          <Text style={[styles.brandStyle, { color: '#9F7AEA77' }]}>Minimalist · Est. 2025</Text>
         </View>
-        <View style={[styles.completeBadge, { backgroundColor: '#C9A96E22' }]}>
+        <View style={[styles.completeBadge, { backgroundColor: '#9F7AEA22' }]}>
           <Text style={[styles.completeText, { color: colors.primary }]}>62%</Text>
         </View>
       </LinearGradient>
@@ -54,7 +54,7 @@ export default function BrandScreen() {
         <View style={styles.cardHeader}>
           <Feather name="cpu" size={16} color={colors.primary} />
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>AI Brand Name Generator</Text>
-          <View style={[styles.aiBadge, { backgroundColor: '#C9A96E22' }]}>
+          <View style={[styles.aiBadge, { backgroundColor: '#9F7AEA22' }]}>
             <Text style={[styles.aiText, { color: colors.primary }]}>AI</Text>
           </View>
         </View>
@@ -107,7 +107,7 @@ export default function BrandScreen() {
         {/* Color Palette */}
         <Text style={[styles.subLabel, { color: colors.mutedForeground }]}>Color Palette</Text>
         <View style={styles.palette}>
-          {['#0D0D0D', '#C9A96E', '#FFFFFF', '#2A2A2A', '#A8853A'].map((c) => (
+          {['#0D0D0D', '#9F7AEA', '#FFFFFF', '#2A2A2A', '#A8853A'].map((c) => (
             <View key={c} style={[styles.swatch, { backgroundColor: c, borderColor: colors.border }]} />
           ))}
           <TouchableOpacity style={[styles.swatchAdd, { borderColor: colors.border }]} activeOpacity={0.7}>
@@ -119,7 +119,7 @@ export default function BrandScreen() {
         <Text style={[styles.subLabel, { color: colors.mutedForeground }]}>Typography</Text>
         <View style={styles.fontRow}>
           {['Inter', 'Playfair', 'Montserrat'].map((f) => (
-            <View key={f} style={[styles.fontChip, { backgroundColor: f === 'Inter' ? '#C9A96E22' : colors.secondary, borderColor: f === 'Inter' ? colors.primary : colors.border }]}>
+            <View key={f} style={[styles.fontChip, { backgroundColor: f === 'Inter' ? '#9F7AEA22' : colors.secondary, borderColor: f === 'Inter' ? colors.primary : colors.border }]}>
               <Text style={[styles.fontText, { color: f === 'Inter' ? colors.primary : colors.mutedForeground }]}>{f}</Text>
             </View>
           ))}

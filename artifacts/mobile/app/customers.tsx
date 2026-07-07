@@ -10,7 +10,7 @@ const SEGMENTS = ['All', 'VIP', 'Returning', 'At-Risk'] as const;
 type Segment = typeof SEGMENTS[number];
 
 const CUSTOMERS = [
-  { name: 'Jordan Lee', email: 'j.lee@email.com', orders: 14, ltv: '$1,840', segment: 'VIP', initials: 'JL', color: '#C9A96E' },
+  { name: 'Jordan Lee', email: 'j.lee@email.com', orders: 14, ltv: '$1,840', segment: 'VIP', initials: 'JL', color: '#9F7AEA' },
   { name: 'Maya Chen', email: 'm.chen@email.com', orders: 8, ltv: '$960', segment: 'VIP', initials: 'MC', color: '#3B82F6' },
   { name: 'Amir Patel', email: 'a.patel@email.com', orders: 3, ltv: '$340', segment: 'Returning', initials: 'AP', color: '#22C55E' },
   { name: 'Sofia Reyes', email: 's.reyes@email.com', orders: 1, ltv: '$89', segment: 'New', initials: 'SR', color: '#F59E0B' },
@@ -56,7 +56,7 @@ export default function CustomersScreen() {
       </View>
 
       {/* Loyalty Card */}
-      <View style={[styles.loyaltyCard, { backgroundColor: '#1A1500', borderColor: '#C9A96E44' }]}>
+      <View style={[styles.loyaltyCard, { backgroundColor: '#0F0A1E', borderColor: '#9F7AEA44' }]}>
         <View style={styles.loyaltyLeft}>
           <Feather name="star" size={20} color={colors.primary} />
           <View>
