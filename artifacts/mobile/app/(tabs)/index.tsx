@@ -47,7 +47,7 @@ const SPARK: Record<string, number[]> = {
 const STATS = [
   { label: 'Orders',    value: '12',   change: '+3 today', icon: 'shopping-bag' as const, up: true },
   { label: 'Sessions',  value: '9,400', change: '+5% today', icon: 'eye'          as const, up: true },
-  { label: 'Customers', value: '1.2k', change: '+12 new',  icon: 'users'        as const, up: true },
+  { label: 'Conv. Rate', value: '3.4%', change: '+0.6%',    icon: 'trending-up'  as const, up: true },
   { label: 'Returns',   value: '2',    change: '-1 vs avg',icon: 'refresh-cw'   as const, up: true },
 ];
 
