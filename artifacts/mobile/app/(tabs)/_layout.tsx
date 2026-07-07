@@ -97,7 +97,10 @@ function ClassicTabLayout() {
         name="feed"
         options={{
           title: 'Feed',
-          tabBarButton: (props) => <FeedTabButton {...props} />,
+          tabBarLabel: () => null,
+          tabBarIcon: ({ focused }) => (
+            <FeedCenterIcon focused={focused} isDark={isDark} />
+          ),
         }}
       />
 
@@ -134,42 +137,30 @@ function ClassicTabLayout() {
   );
 }
 
-// ─── Feed tab button (fully custom, bypasses RN icon/label layout) ────────────
+// ─── Feed centre button ───────────────────────────────────────────────────────
 
-function FeedTabButton(props: any) {
-  const { onPress, accessibilityState } = props;
-  const focused = accessibilityState?.selected;
-
+function FeedCenterIcon({ focused }: { focused: boolean; isDark: boolean }) {
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.8}
-      style={feedStyles.wrapper}
+    <LinearGradient
+      colors={focused
+        ? ['#F0ABFC', '#C026D3', '#7C3AED']
+        : ['#D946EF', '#A855F7', '#7C3AED']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={feedStyles.pill}
     >
-      <LinearGradient
-        colors={focused
-          ? ['#F0ABFC', '#C026D3', '#7C3AED']
-          : ['#D946EF', '#A855F7', '#7C3AED']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={feedStyles.pill}
-      />
-      <Text style={[feedStyles.label, { opacity: focused ? 1 : 0.55 }]}>Feed</Text>
-    </TouchableOpacity>
+      <Text style={feedStyles.label}>Feed</Text>
+    </LinearGradient>
   );
 }
 
 const feedStyles = StyleSheet.create({
-  wrapper: {
-    flex: 1,
+  pill: {
+    width: 62,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
-  },
-  pill: {
-    width: 52,
-    height: 22,
-    borderRadius: 11,
     shadowColor: '#C026D3',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.7,
@@ -177,10 +168,10 @@ const feedStyles = StyleSheet.create({
     elevation: 12,
   },
   label: {
-    fontSize: 9,
-    fontFamily: 'Inter_500Medium',
-    color: '#9F7AEA',
-    marginTop: -2,
+    fontSize: 12,
+    fontFamily: 'Inter_700Bold',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
   },
 });
 
