@@ -26,7 +26,7 @@ function ClassicTabLayout() {
     bottom: bottomOffset,
     left: 20,
     right: 20,
-    height: 64,
+    height: 72,
     borderRadius: 32,
     borderTopWidth: 0,
     backgroundColor: isIOS ? 'transparent' : pillBg,
@@ -43,7 +43,12 @@ function ClassicTabLayout() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: inactiveTint,
         headerShown: false,
-        tabBarShowLabel: false,
+        tabBarShowLabel: true,
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontFamily: 'Inter_500Medium',
+          marginTop: -2,
+        },
         tabBarStyle,
         tabBarBackground: () =>
           isIOS ? (
