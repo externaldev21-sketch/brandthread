@@ -281,7 +281,7 @@ function FeedCard({
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
-export default function FeedScreen() {
+export default function FeedScreen({ showStories = true }: { showStories?: boolean }) {
   const insets = useSafeAreaInsets();
   const scheme = useColorScheme();
   const isDark = scheme !== 'light';
@@ -327,46 +327,47 @@ export default function FeedScreen() {
         </View>
       </View>
 
-      {/* ─ Stories row ─ */}
-      <View style={[styles.storiesRow, { borderBottomColor: border }]}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.storiesScroll}
-        >
-          {stories.map((story) => (
-            <TouchableOpacity
-              key={story.id}
-              onPress={() => handleViewStory(story.id)}
-              activeOpacity={0.8}
-              style={styles.storyItem}
-            >
-              {/* ring */}
-              {story.viewed ? (
-                <View style={[styles.storyRingViewed, { borderColor: border }]}>
-                  <View style={[styles.storyAvatar, { backgroundColor: story.color }]}>
-                    <Text style={styles.storyInitials}>{story.initials}</Text>
-                  </View>
-                </View>
-              ) : (
-                <LinearGradient
-                  colors={['#F0ABFC', '#C026D3', '#7C3AED']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.storyRing}
-                >
-                  <View style={[styles.storyAvatarInner, { backgroundColor: isDark ? '#08080F' : '#F8F7FF' }]}>
+      {/* ─ Stories row — seller/both only ─ */}
+      {showStories && (
+        <View style={[styles.storiesRow, { borderBottomColor: border }]}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.storiesScroll}
+          >
+            {stories.map((story) => (
+              <TouchableOpacity
+                key={story.id}
+                onPress={() => handleViewStory(story.id)}
+                activeOpacity={0.8}
+                style={styles.storyItem}
+              >
+                {story.viewed ? (
+                  <View style={[styles.storyRingViewed, { borderColor: border }]}>
                     <View style={[styles.storyAvatar, { backgroundColor: story.color }]}>
                       <Text style={styles.storyInitials}>{story.initials}</Text>
                     </View>
                   </View>
-                </LinearGradient>
-              )}
-              <Text style={[styles.storyName, { color: muted }]} numberOfLines={1}>
-                {story.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
+                ) : (
+                  <LinearGradient
+                    colors={['#F0ABFC', '#C026D3', '#7C3AED']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.storyRing}
+                  >
+                    <View style={[styles.storyAvatarInner, { backgroundColor: isDark ? '#08080F' : '#F8F7FF' }]}>
+                      <View style={[styles.storyAvatar, { backgroundColor: story.color }]}>
+                        <Text style={styles.storyInitials}>{story.initials}</Text>
+                      </View>
+                    </View>
+                  </LinearGradient>
+                )}
+                <Text style={[styles.storyName, { color: muted }]} numberOfLines={1}>
+                  {story.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       {/* ─ Feed ─ */}
       <FlatList
