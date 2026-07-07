@@ -101,7 +101,7 @@ function ClassicTabLayout() {
           tabBarIcon: ({ focused }) => (
             <FeedCenterIcon focused={focused} isDark={isDark} />
           ),
-          tabBarItemStyle: { paddingTop: 20, paddingBottom: 0 },
+          tabBarItemStyle: { paddingVertical: 8 },
         }}
       />
 
