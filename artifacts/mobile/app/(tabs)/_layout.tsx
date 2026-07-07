@@ -6,9 +6,8 @@ import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
+import { LinearGradient } from 'expo-linear-gradient';
 
-// Always use the custom floating-pill layout for a consistent luxury look
-// across all platforms (including iOS 26 liquid glass devices).
 function ClassicTabLayout() {
   const colors = useColors();
   const colorScheme = useColorScheme();
@@ -18,14 +17,14 @@ function ClassicTabLayout() {
   const insets = useSafeAreaInsets();
   const bottomOffset = isWeb ? 20 : Math.max(insets.bottom, 8) + 12;
 
-  const pillBg = isDark ? '#111118F0' : '#FFFFFFF0';
+  const pillBg      = isDark ? '#111118F0' : '#FFFFFFF0';
   const inactiveTint = isDark ? '#555570' : '#9090B0';
 
   const tabBarStyle = {
     position: 'absolute' as const,
     bottom: bottomOffset,
-    left: 20,
-    right: 20,
+    left: 12,
+    right: 12,
     height: 72,
     borderRadius: 32,
     borderTopWidth: 0,
@@ -45,7 +44,7 @@ function ClassicTabLayout() {
         headerShown: false,
         tabBarShowLabel: true,
         tabBarLabelStyle: {
-          fontSize: 10,
+          fontSize: 9,
           fontFamily: 'Inter_500Medium',
           marginTop: -2,
         },
@@ -60,18 +59,17 @@ function ClassicTabLayout() {
           ) : (
             <View style={[StyleSheet.absoluteFill, { borderRadius: 32, backgroundColor: pillBg }]} />
           ),
-        tabBarItemStyle: {
-          paddingVertical: 8,
-        },
+        tabBarItemStyle: { paddingVertical: 8 },
       }}
     >
+      {/* ─── Left side ─────────────────────────────────────────── */}
       <Tabs.Screen
         name="index"
         options={{
           title: 'Dashboard',
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name={focused ? 'house.fill' : 'house'} tintColor={color} size={22} />
+              <SymbolView name={focused ? 'house.fill' : 'house'} tintColor={color} size={20} />
             ) : (
               <TabIcon name="home" color={color} focused={focused} />
             ),
@@ -83,37 +81,51 @@ function ClassicTabLayout() {
           title: 'Products',
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name={focused ? 'square.grid.2x2.fill' : 'square.grid.2x2'} tintColor={color} size={22} />
+              <SymbolView name={focused ? 'square.grid.2x2.fill' : 'square.grid.2x2'} tintColor={color} size={20} />
             ) : (
               <TabIcon name="box" color={color} focused={focused} />
             ),
         }}
       />
       <Tabs.Screen
-        name="feed"
+        name="analytics"
         options={{
-          title: 'Feed',
+          title: 'Analytics',
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name={focused ? 'play.square.stack.fill' : 'play.square.stack'} tintColor={color} size={22} />
+              <SymbolView name={focused ? 'chart.bar.fill' : 'chart.bar'} tintColor={color} size={20} />
             ) : (
-              <TabIcon name="play-circle" color={color} focused={focused} />
+              <TabIcon name="bar-chart-2" color={color} focused={focused} />
             ),
         }}
       />
+
+      {/* ─── Centre — Feed (stands out) ────────────────────────── */}
       <Tabs.Screen
-        name="analytics"
+        name="feed"
         options={{
-          href: null, // hidden from tab bar — accessible via More
+          title: 'Feed',
+          tabBarLabelStyle: {
+            fontSize: 9,
+            fontFamily: 'Inter_700Bold',
+            color: isDark ? '#C4B5FD' : '#7C3AED',
+            marginTop: 0,
+          },
+          tabBarIcon: ({ focused }) => (
+            <FeedCenterIcon focused={focused} isDark={isDark} />
+          ),
+          tabBarItemStyle: { paddingVertical: 4 },
         }}
       />
+
+      {/* ─── Right side ────────────────────────────────────────── */}
       <Tabs.Screen
         name="marketing"
         options={{
           title: 'Marketing',
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name={focused ? 'megaphone.fill' : 'megaphone'} tintColor={color} size={22} />
+              <SymbolView name={focused ? 'megaphone.fill' : 'megaphone'} tintColor={color} size={20} />
             ) : (
               <TabIcon name="send" color={color} focused={focused} />
             ),
@@ -125,9 +137,21 @@ function ClassicTabLayout() {
           title: 'More',
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name={focused ? 'ellipsis.circle.fill' : 'ellipsis.circle'} tintColor={color} size={22} />
+              <SymbolView name={focused ? 'ellipsis.circle.fill' : 'ellipsis.circle'} tintColor={color} size={20} />
             ) : (
               <TabIcon name="grid" color={color} focused={focused} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, focused }) =>
+            isIOS ? (
+              <SymbolView name={focused ? 'person.fill' : 'person'} tintColor={color} size={20} />
+            ) : (
+              <TabIcon name="user" color={color} focused={focused} />
             ),
         }}
       />
@@ -135,10 +159,51 @@ function ClassicTabLayout() {
   );
 }
 
+// ─── Feed centre button ───────────────────────────────────────────────────────
+
+function FeedCenterIcon({ focused, isDark }: { focused: boolean; isDark: boolean }) {
+  return (
+    <View style={feedStyles.wrapper}>
+      <LinearGradient
+        colors={focused
+          ? ['#A855F7', '#7C3AED', '#5B21B6']
+          : isDark
+            ? ['#3D2070', '#2A1060', '#1A0840']
+            : ['#C4B5FD', '#A78BFA', '#8B5CF6']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={feedStyles.circle}
+      >
+        <Feather name="play-circle" size={22} color="#FFFFFF" />
+      </LinearGradient>
+      {focused && <View style={feedStyles.glow} />}
+    </View>
+  );
+}
+
+const feedStyles = StyleSheet.create({
+  wrapper: { alignItems: 'center', justifyContent: 'center', width: 46, height: 46 },
+  circle: {
+    width: 46, height: 46, borderRadius: 23,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+    elevation: 12,
+  },
+  glow: {
+    position: 'absolute', width: 54, height: 54, borderRadius: 27,
+    backgroundColor: '#7C3AED', opacity: 0.2,
+  },
+});
+
+// ─── Regular tab icon ─────────────────────────────────────────────────────────
+
 function TabIcon({ name, color, focused }: { name: keyof typeof Feather.glyphMap; color: string; focused: boolean }) {
   return (
     <View style={{ alignItems: 'center', gap: 4 }}>
-      <Feather name={name} size={21} color={color} />
+      <Feather name={name} size={20} color={color} />
       {focused && (
         <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#9F7AEA' }} />
       )}
