@@ -603,6 +603,7 @@ export default function OnboardingScreen() {
 
   async function handleFinish() {
     await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+    if (role) await AsyncStorage.setItem('user_role', role);
     router.replace('/');
   }
 

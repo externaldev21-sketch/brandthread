@@ -1,12 +1,7 @@
 import React, { useState } from 'react';
 import {
-  ScrollView,
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Platform,
-  useColorScheme,
+  ScrollView, View, Text, TouchableOpacity, StyleSheet,
+  Platform, useColorScheme,
 } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,8 +12,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import DateRangePicker, { DateRange, buildPresets } from '@/components/DateRangePicker';
+import { useRole } from '@/contexts/RoleContext';
 
-// ─── Mock revenue data per period ────────────────────────────────────────────
+// ─── Seller mock data ─────────────────────────────────────────────────────────
 
 const REVENUE_DATA: Record<string, { amount: string; context: string; growth: string; up: boolean }> = {
   today:     { amount: '$4,892.50', context: 'Yesterday: $3,240 · This week: $28,450', growth: '18.4%', up: true },
@@ -30,7 +26,6 @@ const REVENUE_DATA: Record<string, { amount: string; context: string; growth: st
   lastMonth: { amount: '$78,400',   context: 'Month before: $85,200 · YTD: $448,000',  growth: '8.0%',  up: false },
   custom:    { amount: '$94,200',   context: 'Custom date range selected',              growth: '24.1%', up: true },
 };
-
 const SPARK: Record<string, number[]> = {
   today:     [32, 48, 41, 65, 55, 74, 60, 88, 72, 100],
   yesterday: [55, 60, 45, 70, 50, 65, 80, 55, 72, 90],
@@ -41,16 +36,12 @@ const SPARK: Record<string, number[]> = {
   lastMonth: [60, 80, 70, 90, 75, 85, 95, 100, 88, 82],
   custom:    [32, 48, 41, 65, 55, 74, 60, 88, 72, 100],
 };
-
-// ─── Static data ──────────────────────────────────────────────────────────────
-
 const STATS = [
-  { label: 'Sessions',  value: '9,400', change: '+5% today', icon: 'eye'          as const, up: true },
-  { label: 'Orders',    value: '12',    change: '+3 today',  icon: 'shopping-bag' as const, up: true },
-  { label: 'Conv. Rate', value: '3.4%', change: '+0.6%',     icon: 'trending-up'  as const, up: true },
-  { label: 'Returns',   value: '2',     change: '-1 vs avg', icon: 'refresh-cw'   as const, up: true },
+  { label: 'Sessions',   value: '9,400', change: '+5% today', icon: 'eye'          as const, up: true },
+  { label: 'Orders',     value: '12',    change: '+3 today',  icon: 'shopping-bag' as const, up: true },
+  { label: 'Conv. Rate', value: '3.4%',  change: '+0.6%',     icon: 'trending-up'  as const, up: true },
+  { label: 'Returns',    value: '2',     change: '-1 vs avg', icon: 'refresh-cw'   as const, up: true },
 ];
-
 const QUICK_ACTIONS = [
   { label: 'Add Product', icon: 'plus-circle'    as const, route: '/products'     },
   { label: 'AI Studio',   icon: 'zap'            as const, route: '/ai-studio'    },
@@ -59,35 +50,66 @@ const QUICK_ACTIONS = [
   { label: 'Shipping',    icon: 'truck'          as const, route: '/shipping'     },
   { label: 'Finance',     icon: 'bar-chart-2'    as const, route: '/finance'      },
 ];
-
 const RECENT_ORDERS = [
-  { id: '#5041', customer: 'Jordan Lee',   amount: '$128.00', status: 'fulfilled'  as const, time: '2m ago'  },
-  { id: '#5040', customer: 'Maya Chen',    amount: '$256.50', status: 'processing' as const, time: '18m ago' },
-  { id: '#5039', customer: 'Amir Patel',   amount: '$89.00',  status: 'fulfilled'  as const, time: '1h ago'  },
-  { id: '#5038', customer: 'Sofia Reyes',  amount: '$312.00', status: 'shipped'    as const, time: '3h ago'  },
+  { id: '#5041', customer: 'Jordan Lee',  amount: '$128.00', status: 'fulfilled'  as const, time: '2m ago'  },
+  { id: '#5040', customer: 'Maya Chen',   amount: '$256.50', status: 'processing' as const, time: '18m ago' },
+  { id: '#5039', customer: 'Amir Patel',  amount: '$89.00',  status: 'fulfilled'  as const, time: '1h ago'  },
+  { id: '#5038', customer: 'Sofia Reyes', amount: '$312.00', status: 'shipped'    as const, time: '3h ago'  },
 ];
-
 const LOW_STOCK = [
-  { name: 'Classic Tee – White XL',   stock: 3 },
-  { name: 'Cargo Shorts – Khaki M',   stock: 1 },
-  { name: 'Hoodie – Black S',          stock: 7 },
+  { name: 'Classic Tee – White XL',  stock: 3 },
+  { name: 'Cargo Shorts – Khaki M',  stock: 1 },
+  { name: 'Hoodie – Black S',         stock: 7 },
 ];
-
 const ANALYTICS_METRICS = [
-  { label: 'Conversion Rate', value: '3.4%',  change: '+0.6%', up: true,  icon: 'trending-up'  as const },
-  { label: 'Avg. Order Value', value: '$128',  change: '+$12',  up: true,  icon: 'dollar-sign'  as const },
-  { label: 'Returning Rate',  value: '42%',   change: '+4%',   up: true,  icon: 'refresh-cw'   as const },
-  { label: 'CLV',             value: '$480',  change: '+$30',  up: true,  icon: 'heart'         as const },
+  { label: 'Conversion Rate', value: '3.4%', change: '+0.6%', up: true,  icon: 'trending-up' as const },
+  { label: 'Avg. Order Value', value: '$128', change: '+$12',  up: true,  icon: 'dollar-sign' as const },
+  { label: 'Returning Rate',  value: '42%',  change: '+4%',   up: true,  icon: 'refresh-cw'  as const },
+  { label: 'CLV',             value: '$480', change: '+$30',  up: true,  icon: 'heart'        as const },
 ];
-
-const statusMap: Record<string, { variant: 'success' | 'info' | 'warning' | 'error'; label: string }> = {
+const statusMap: Record<string, { variant: 'success'|'info'|'warning'|'error'; label: string }> = {
   fulfilled:  { variant: 'success', label: 'Fulfilled'  },
   processing: { variant: 'warning', label: 'Processing' },
   shipped:    { variant: 'info',    label: 'Shipped'    },
   cancelled:  { variant: 'error',   label: 'Cancelled'  },
 };
 
-// ─── Default range (last 30 days) ────────────────────────────────────────────
+// ─── Buyer mock data ──────────────────────────────────────────────────────────
+
+const CATEGORIES = [
+  { label: 'All',        emoji: '✦' },
+  { label: 'Streetwear', emoji: '🔥' },
+  { label: 'Luxury',     emoji: '✨' },
+  { label: 'Casual',     emoji: '☁️' },
+  { label: 'Athletic',   emoji: '⚡' },
+  { label: 'Vintage',    emoji: '🎞️' },
+];
+
+const FEATURED_DROP = {
+  brand: 'Vault Studio',
+  initials: 'VS',
+  color: '#7C3AED',
+  product: 'Canvas Cargo Jacket',
+  price: '$189',
+  desc: 'Limited run of 50. Oversized canvas jacket — dropping today at 12PM.',
+  tag: 'DROPPING TODAY',
+  countdown: '2h 14m left',
+};
+
+const NEW_DROPS = [
+  { id: 'd1', brand: 'Softwear__',  name: 'Micro-Fleece Jogger', price: '$92',  color: '#BE185D', initials: 'SW' },
+  { id: 'd2', brand: 'Meridian Co.', name: 'Relaxed Tee',          price: '$48',  color: '#0F766E', initials: 'MC' },
+  { id: 'd3', brand: 'Atlas Goods', name: 'Utility Vest',           price: '$220', color: '#1D4ED8', initials: 'AG' },
+  { id: 'd4', brand: 'Coldform',    name: 'Raw Denim Jacket',       price: '$310', color: '#065F46', initials: 'CF' },
+];
+
+const TRENDING = [
+  { id: 't1', rank: 1, brand: 'NxGen Drops',   desc: 'Archive Hoodie Vol. 3 — 8 left', color: '#B45309', initials: 'NX', price: '$135' },
+  { id: 't2', rank: 2, brand: 'Vault Studio',   desc: 'Canvas Cargo Jacket — dropping today', color: '#7C3AED', initials: 'VS', price: '$189' },
+  { id: 't3', rank: 3, brand: 'Atlas Goods',    desc: 'Utility Vest — Slate — limited',      color: '#1D4ED8', initials: 'AG', price: '$220' },
+];
+
+// ─── Seller Dashboard ─────────────────────────────────────────────────────────
 
 function defaultRange(): DateRange {
   const presets = buildPresets();
@@ -96,226 +118,119 @@ function defaultRange(): DateRange {
   return { start, end, presetId: 'last30', label: 'Last 30 days' };
 }
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
-
-export default function DashboardScreen() {
+function SellerDashboard() {
   const colors = useColors();
   const scheme = useColorScheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const isDark = scheme !== 'light';
-
   const [pickerVisible, setPickerVisible] = useState(false);
   const [range, setRange] = useState<DateRange>(defaultRange);
-
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
-
-  const rev = REVENUE_DATA[range.presetId] ?? REVENUE_DATA.last30;
+  const rev   = REVENUE_DATA[range.presetId] ?? REVENUE_DATA.last30;
   const spark = SPARK[range.presetId] ?? SPARK.last30;
-
-  // Mode-aware colours
   const primary = isDark ? '#9F7AEA' : '#7C3AED';
   const heroGradient: readonly [string, string, string] = isDark
-    ? ['#2A1060', '#130828', '#08080F']
-    : ['#EDE9FE', '#C4B5FD', '#F4F0FF'];
-  const heroAmountColor  = isDark ? '#FFFFFF'    : '#4C1D95';
-  const heroLabelColor   = isDark ? '#C4B5FDA0'  : '#7C3AED99';
-  const heroSubColor     = isDark ? '#C4B5FD55'  : '#9F7AEA77';
-  const heroBorderColor  = isDark ? '#9F7AEA22'  : '#DDD6FE';
+    ? ['#2A1060', '#130828', '#08080F'] : ['#EDE9FE', '#C4B5FD', '#F4F0FF'];
+  const heroAmountColor = isDark ? '#FFFFFF'   : '#4C1D95';
+  const heroLabelColor  = isDark ? '#C4B5FDA0' : '#7C3AED99';
+  const heroSubColor    = isDark ? '#C4B5FD55' : '#9F7AEA77';
+  const heroBorderColor = isDark ? '#9F7AEA22' : '#DDD6FE';
 
   function nav(route: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(route as never);
   }
 
-  function openPicker() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setPickerVisible(true);
-  }
-
-  function handleApply(r: DateRange) {
-    setRange(r);
-    setPickerVisible(false);
-  }
-
   return (
     <>
       <ScrollView
-        style={[styles.container, { backgroundColor: colors.background }]}
+        style={[st.container, { backgroundColor: colors.background }]}
         contentContainerStyle={{ paddingTop: topPad + 20, paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* ─── Header ─── */}
-        <View style={[styles.header, { paddingHorizontal: 20 }]}>
-          <View style={styles.headerLeft}>
-            <Text style={[styles.greeting, { color: colors.mutedForeground }]}>Good morning 👋</Text>
-            <Text style={[styles.brand, { color: colors.foreground }]}>Brandthread</Text>
+        <View style={[st.header, { paddingHorizontal: 20 }]}>
+          <View style={st.headerLeft}>
+            <Text style={[st.greeting, { color: colors.mutedForeground }]}>Good morning 👋</Text>
+            <Text style={[st.brand, { color: colors.foreground }]}>Brandthread</Text>
           </View>
-          <View style={styles.headerRight}>
-            <TouchableOpacity
-              style={[styles.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-              activeOpacity={0.7}
-            >
+          <View style={st.headerRight}>
+            <TouchableOpacity style={[st.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]} activeOpacity={0.7}>
               <Feather name="bell" size={18} color={colors.mutedForeground} />
-              <View style={[styles.notifDot, { backgroundColor: colors.destructive }]} />
+              <View style={[st.notifDot, { backgroundColor: colors.destructive }]} />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.avatar, { backgroundColor: primary }]}
-              onPress={() => nav('/team')}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.avatarText, { color: '#FFFFFF' }]}>AT</Text>
+            <TouchableOpacity style={[st.avatar, { backgroundColor: primary }]} onPress={() => nav('/team')} activeOpacity={0.8}>
+              <Text style={[st.avatarText, { color: '#FFFFFF' }]}>AT</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* ─── Revenue Hero ─── */}
+        {/* Revenue hero */}
         <View style={{ paddingHorizontal: 20 }}>
-          <LinearGradient
-            colors={heroGradient}
-            style={[styles.heroCard, { borderColor: heroBorderColor }]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            {isDark && <View style={styles.glowOrb} />}
-
-            {/* Top row: label + period picker + growth */}
-            <View style={styles.heroTop}>
-              <Text style={[styles.heroLabel, { color: heroLabelColor }]}>REVENUE</Text>
-
-              <TouchableOpacity
-                style={[styles.periodPill, {
-                  backgroundColor: isDark ? '#FFFFFF15' : '#7C3AED18',
-                  borderColor: isDark ? '#FFFFFF25' : '#7C3AED30',
-                }]}
-                onPress={openPicker}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.periodText, { color: isDark ? '#E0D4FF' : '#5B21B6' }]}>
-                  {range.label}
-                </Text>
+          <LinearGradient colors={heroGradient} style={[st.heroCard, { borderColor: heroBorderColor }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+            {isDark && <View style={st.glowOrb} />}
+            <View style={st.heroTop}>
+              <Text style={[st.heroLabel, { color: heroLabelColor }]}>REVENUE</Text>
+              <TouchableOpacity style={[st.periodPill, { backgroundColor: isDark ? '#FFFFFF15' : '#7C3AED18', borderColor: isDark ? '#FFFFFF25' : '#7C3AED30' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPickerVisible(true); }} activeOpacity={0.75}>
+                <Text style={[st.periodText, { color: isDark ? '#E0D4FF' : '#5B21B6' }]}>{range.label}</Text>
                 <Feather name="chevron-down" size={12} color={isDark ? '#C4B5FD' : '#7C3AED'} />
               </TouchableOpacity>
-
-              <View style={[styles.growthPill, {
-                backgroundColor: rev.up ? '#16A34A18' : '#DC262618',
-                borderColor:     rev.up ? '#22C55E33' : '#EF444433',
-              }]}>
-                <Feather
-                  name={rev.up ? 'trending-up' : 'trending-down'}
-                  size={11}
-                  color={rev.up ? colors.success : colors.destructive}
-                />
-                <Text style={[styles.growthText, { color: rev.up ? colors.success : colors.destructive }]}>
-                  {rev.growth}
-                </Text>
+              <View style={[st.growthPill, { backgroundColor: rev.up ? '#16A34A18' : '#DC262618', borderColor: rev.up ? '#22C55E33' : '#EF444433' }]}>
+                <Feather name={rev.up ? 'trending-up' : 'trending-down'} size={11} color={rev.up ? colors.success : colors.destructive} />
+                <Text style={[st.growthText, { color: rev.up ? colors.success : colors.destructive }]}>{rev.growth}</Text>
               </View>
             </View>
-
-            <Text style={[styles.heroAmount, { color: heroAmountColor }]}>{rev.amount}</Text>
-            <Text style={[styles.heroSub, { color: heroSubColor }]}>{rev.context}</Text>
-
-            {/* Sparkline */}
-            <View style={styles.sparkRow}>
+            <Text style={[st.heroAmount, { color: heroAmountColor }]}>{rev.amount}</Text>
+            <Text style={[st.heroSub, { color: heroSubColor }]}>{rev.context}</Text>
+            <View style={st.sparkRow}>
               {spark.map((h, i) => {
-                const isLast   = i === spark.length - 1;
+                const isLast = i === spark.length - 1;
                 const isRecent = i >= spark.length - 3;
-                const opacity  = isLast ? 1 : isRecent ? 0.55 : 0.2;
-                return (
-                  <View
-                    key={i}
-                    style={[styles.sparkBar, {
-                      height: (h / 100) * 36,
-                      backgroundColor: primary,
-                      opacity,
-                    }]}
-                  />
-                );
+                return <View key={i} style={[st.sparkBar, { height: (h / 100) * 36, backgroundColor: primary, opacity: isLast ? 1 : isRecent ? 0.55 : 0.2 }]} />;
               })}
             </View>
           </LinearGradient>
         </View>
 
-        {/* ─── Stats Scroll ─── */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.statsScroll}
-          style={{ marginTop: 16 }}
-        >
+        {/* Stats */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.statsScroll} style={{ marginTop: 16 }}>
           {STATS.map((s, i) => (
-            <View
-              key={s.label}
-              style={[
-                styles.statCard,
-                { backgroundColor: colors.card, borderColor: colors.border },
-                i === 0 && { marginLeft: 20 },
-                i === STATS.length - 1 && { marginRight: 20 },
-              ]}
-            >
-              <View style={[styles.statIcon, { backgroundColor: colors.secondary }]}>
-                <Feather name={s.icon} size={16} color={colors.primary} />
-              </View>
-              <Text style={[styles.statValue, { color: colors.foreground }]}>{s.value}</Text>
-              <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
-              <Text style={[styles.statChange, { color: s.up ? colors.success : colors.destructive }]}>
-                {s.change}
-              </Text>
+            <View key={s.label} style={[st.statCard, { backgroundColor: colors.card, borderColor: colors.border }, i === 0 && { marginLeft: 20 }, i === STATS.length - 1 && { marginRight: 20 }]}>
+              <View style={[st.statIcon, { backgroundColor: colors.secondary }]}><Feather name={s.icon} size={16} color={colors.primary} /></View>
+              <Text style={[st.statValue, { color: colors.foreground }]}>{s.value}</Text>
+              <Text style={[st.statLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
+              <Text style={[st.statChange, { color: s.up ? colors.success : colors.destructive }]}>{s.change}</Text>
             </View>
           ))}
         </ScrollView>
 
-        {/* ─── Quick Actions ─── */}
-        <View style={{ paddingHorizontal: 20, marginTop: 28 }}>
-          <SectionHeader title="Quick Actions" />
-        </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.actionsScroll}
-        >
+        {/* Quick Actions */}
+        <View style={{ paddingHorizontal: 20, marginTop: 28 }}><SectionHeader title="Quick Actions" /></View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.actionsScroll}>
           {QUICK_ACTIONS.map((qa, i) => (
-            <TouchableOpacity
-              key={qa.label}
-              style={[
-                styles.actionChip,
-                { backgroundColor: colors.card, borderColor: colors.border },
-                i === 0 && { marginLeft: 20 },
-                i === QUICK_ACTIONS.length - 1 && { marginRight: 20 },
-              ]}
-              onPress={() => nav(qa.route)}
-              activeOpacity={0.75}
-            >
-              <View style={[styles.chipIcon, { backgroundColor: colors.secondary }]}>
-                <Feather name={qa.icon} size={16} color={colors.primary} />
-              </View>
-              <Text style={[styles.chipLabel, { color: colors.foreground }]}>{qa.label}</Text>
+            <TouchableOpacity key={qa.label} style={[st.actionChip, { backgroundColor: colors.card, borderColor: colors.border }, i === 0 && { marginLeft: 20 }, i === QUICK_ACTIONS.length - 1 && { marginRight: 20 }]} onPress={() => nav(qa.route)} activeOpacity={0.75}>
+              <View style={[st.chipIcon, { backgroundColor: colors.secondary }]}><Feather name={qa.icon} size={16} color={colors.primary} /></View>
+              <Text style={[st.chipLabel, { color: colors.foreground }]}>{qa.label}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
 
-        {/* ─── Recent Orders ─── */}
+        {/* Recent Orders */}
         <View style={{ paddingHorizontal: 20, marginTop: 32 }}>
           <SectionHeader title="Recent Orders" action="View all" onAction={() => nav('/analytics')} />
-          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {RECENT_ORDERS.map((order, i) => {
               const s = statusMap[order.status];
               return (
-                <View
-                  key={order.id}
-                  style={[
-                    styles.orderRow,
-                    i > 0 && { borderTopWidth: 1, borderTopColor: colors.border },
-                  ]}
-                >
-                  <View style={[styles.orderAccent, { backgroundColor: colors.primary }]} />
-                  <View style={styles.orderLeft}>
-                    <Text style={[styles.orderId, { color: colors.primary }]}>{order.id}</Text>
-                    <Text style={[styles.orderCustomer, { color: colors.mutedForeground }]}>{order.customer}</Text>
-                    <Text style={[styles.orderTime, { color: colors.mutedForeground }]}>{order.time}</Text>
+                <View key={order.id} style={[st.orderRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+                  <View style={[st.orderAccent, { backgroundColor: colors.primary }]} />
+                  <View style={st.orderLeft}>
+                    <Text style={[st.orderId, { color: colors.primary }]}>{order.id}</Text>
+                    <Text style={[st.orderCustomer, { color: colors.mutedForeground }]}>{order.customer}</Text>
+                    <Text style={[st.orderTime, { color: colors.mutedForeground }]}>{order.time}</Text>
                   </View>
-                  <View style={styles.orderRight}>
-                    <Text style={[styles.orderAmount, { color: colors.foreground }]}>{order.amount}</Text>
+                  <View style={st.orderRight}>
+                    <Text style={[st.orderAmount, { color: colors.foreground }]}>{order.amount}</Text>
                     <Badge label={s.label} variant={s.variant} />
                   </View>
                 </View>
@@ -324,85 +239,208 @@ export default function DashboardScreen() {
           </View>
         </View>
 
-        {/* ─── Low Stock ─── */}
+        {/* Low Stock */}
         <View style={{ paddingHorizontal: 20, marginTop: 28 }}>
           <SectionHeader title="Low Stock" action="Manage" onAction={() => nav('/products')} />
-          <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {LOW_STOCK.map((item, i) => (
-              <View
-                key={item.name}
-                style={[
-                  styles.stockRow,
-                  i > 0 && { borderTopWidth: 1, borderTopColor: colors.border },
-                ]}
-              >
-                <View style={[styles.stockIcon, {
-                  backgroundColor: item.stock <= 3
-                    ? `${colors.destructive}18`
-                    : `${colors.warning}18`,
-                }]}>
-                  <Feather
-                    name="alert-triangle"
-                    size={13}
-                    color={item.stock <= 3 ? colors.destructive : colors.warning}
-                  />
+              <View key={item.name} style={[st.stockRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+                <View style={[st.stockIcon, { backgroundColor: item.stock <= 3 ? `${colors.destructive}18` : `${colors.warning}18` }]}>
+                  <Feather name="alert-triangle" size={13} color={item.stock <= 3 ? colors.destructive : colors.warning} />
                 </View>
-                <Text style={[styles.stockName, { color: colors.foreground }]} numberOfLines={1}>
-                  {item.name}
-                </Text>
-                <View style={[styles.stockBadge, {
-                  backgroundColor: item.stock <= 3
-                    ? `${colors.destructive}15`
-                    : `${colors.warning}15`,
-                }]}>
-                  <Text style={[styles.stockQty, {
-                    color: item.stock <= 3 ? colors.destructive : colors.warning,
-                  }]}>
-                    {item.stock} left
-                  </Text>
+                <Text style={[st.stockName, { color: colors.foreground }]} numberOfLines={1}>{item.name}</Text>
+                <View style={[st.stockBadge, { backgroundColor: item.stock <= 3 ? `${colors.destructive}15` : `${colors.warning}15` }]}>
+                  <Text style={[st.stockQty, { color: item.stock <= 3 ? colors.destructive : colors.warning }]}>{item.stock} left</Text>
                 </View>
               </View>
             ))}
           </View>
         </View>
 
-        {/* ─── Analytics Snapshot ─── */}
+        {/* Analytics */}
         <View style={{ paddingHorizontal: 20, marginTop: 28 }}>
           <SectionHeader title="Analytics" action="View all" onAction={() => nav('/analytics')} />
-          <View style={styles.metricsGrid}>
+          <View style={st.metricsGrid}>
             {ANALYTICS_METRICS.map((m) => (
-              <View
-                key={m.label}
-                style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-              >
+              <View key={m.label} style={[st.metricCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Feather name={m.icon} size={16} color={colors.primary} />
-                <Text style={[styles.metricValue, { color: colors.foreground }]}>{m.value}</Text>
-                <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>{m.label}</Text>
-                <Text style={[styles.metricChange, { color: m.up ? colors.success : colors.destructive }]}>
-                  {m.change}
-                </Text>
+                <Text style={[st.metricValue, { color: colors.foreground }]}>{m.value}</Text>
+                <Text style={[st.metricLabel, { color: colors.mutedForeground }]}>{m.label}</Text>
+                <Text style={[st.metricChange, { color: m.up ? colors.success : colors.destructive }]}>{m.change}</Text>
               </View>
             ))}
           </View>
         </View>
       </ScrollView>
 
-      {/* ─── Date Range Picker Modal ─── */}
-      <DateRangePicker
-        visible={pickerVisible}
-        current={range}
-        onApply={handleApply}
-        onClose={() => setPickerVisible(false)}
-      />
+      <DateRangePicker visible={pickerVisible} current={range} onApply={(r) => { setRange(r); setPickerVisible(false); }} onClose={() => setPickerVisible(false)} />
     </>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── Buyer Home ───────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+function BuyerHome() {
+  const scheme  = useColorScheme();
+  const insets  = useSafeAreaInsets();
+  const isDark  = scheme !== 'light';
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [savedDrops, setSavedDrops] = useState<string[]>([]);
+
+  const bg      = isDark ? '#08080F' : '#F8F7FF';
+  const card    = isDark ? '#111118' : '#FFFFFF';
+  const border  = isDark ? '#1E1E30' : '#DDD6FE';
+  const fg      = isDark ? '#F0EEFF' : '#1A1035';
+  const muted   = isDark ? '#6B6B8A' : '#6D6892';
+  const primary = isDark ? '#9F7AEA' : '#7C3AED';
+  const topPad  = Platform.OS === 'web' ? 67 : insets.top;
+
+  function toggleSave(id: string) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSavedDrops(prev => prev.includes(id) ? prev.filter(d => d !== id) : [...prev, id]);
+  }
+
+  return (
+    <ScrollView style={[bt.container, { backgroundColor: bg }]} contentContainerStyle={{ paddingTop: topPad + 20, paddingBottom: 140 }} showsVerticalScrollIndicator={false}>
+
+      {/* Header */}
+      <View style={[bt.header, { paddingHorizontal: 20 }]}>
+        <View>
+          <Text style={[bt.greeting, { color: muted }]}>Good morning 👋</Text>
+          <Text style={[bt.title, { color: fg }]}>Discover</Text>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <TouchableOpacity style={[bt.headerBtn, { backgroundColor: card, borderColor: border }]} activeOpacity={0.7}>
+            <Feather name="search" size={18} color={muted} />
+          </TouchableOpacity>
+          <TouchableOpacity style={[bt.headerBtn, { backgroundColor: card, borderColor: border }]} activeOpacity={0.7}>
+            <Feather name="bell" size={18} color={muted} />
+            <View style={[bt.notifDot, { backgroundColor: '#EF4444' }]} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Category pills */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 8, paddingBottom: 4 }} style={{ marginBottom: 20 }}>
+        {CATEGORIES.map(cat => {
+          const active = activeCategory === cat.label;
+          return (
+            <TouchableOpacity
+              key={cat.label}
+              onPress={() => { setActiveCategory(cat.label); Haptics.selectionAsync(); }}
+              style={[bt.catPill, { backgroundColor: active ? primary : card, borderColor: active ? primary : border }]}
+              activeOpacity={0.8}
+            >
+              <Text style={bt.catEmoji}>{cat.emoji}</Text>
+              <Text style={[bt.catLabel, { color: active ? '#FFFFFF' : fg }]}>{cat.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {/* Featured drop hero */}
+      <View style={{ paddingHorizontal: 20, marginBottom: 28 }}>
+        <LinearGradient colors={isDark ? ['#2A1060', '#130828'] : ['#EDE9FE', '#C4B5FD']} style={[bt.featuredCard, { borderColor: isDark ? '#9F7AEA22' : '#DDD6FE' }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+          {isDark && <View style={bt.glowOrb} />}
+
+          {/* Top row */}
+          <View style={bt.featuredTop}>
+            <View style={[bt.featuredBrandRow]}>
+              <View style={[bt.featuredAvatar, { backgroundColor: FEATURED_DROP.color }]}>
+                <Text style={bt.featuredAvatarText}>{FEATURED_DROP.initials}</Text>
+              </View>
+              <Text style={[bt.featuredBrand, { color: isDark ? '#E0D4FF' : '#5B21B6' }]}>{FEATURED_DROP.brand}</Text>
+            </View>
+            <View style={[bt.tagPill, { backgroundColor: FEATURED_DROP.color + '30', borderColor: FEATURED_DROP.color + '60' }]}>
+              <View style={[bt.tagDot, { backgroundColor: FEATURED_DROP.color }]} />
+              <Text style={[bt.tagText, { color: isDark ? '#E0D4FF' : FEATURED_DROP.color }]}>{FEATURED_DROP.tag}</Text>
+            </View>
+          </View>
+
+          <Text style={[bt.featuredName, { color: isDark ? '#FFFFFF' : '#1A1035' }]}>{FEATURED_DROP.product}</Text>
+          <Text style={[bt.featuredDesc, { color: isDark ? '#C4B5FD80' : '#7C3AED99' }]}>{FEATURED_DROP.desc}</Text>
+
+          {/* Bottom row */}
+          <View style={bt.featuredBottom}>
+            <View>
+              <Text style={[bt.featuredPrice, { color: isDark ? '#FFFFFF' : '#1A1035' }]}>{FEATURED_DROP.price}</Text>
+              <Text style={[bt.featuredCountdown, { color: isDark ? '#C4B5FD' : '#7C3AED' }]}>⏱ {FEATURED_DROP.countdown}</Text>
+            </View>
+            <TouchableOpacity style={[bt.shopBtn, { backgroundColor: primary }]} activeOpacity={0.85} onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)}>
+              <Feather name="shopping-bag" size={14} color="#FFF" />
+              <Text style={bt.shopBtnText}>Shop Drop</Text>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
+      </View>
+
+      {/* New Drops */}
+      <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
+        <SectionHeader title="New Drops" action="See all" />
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20, gap: 12, paddingBottom: 4 }} style={{ marginBottom: 28 }}>
+        {NEW_DROPS.map(drop => {
+          const isSaved = savedDrops.includes(drop.id);
+          return (
+            <View key={drop.id} style={[bt.dropCard, { backgroundColor: card, borderColor: border }]}>
+              <LinearGradient colors={[drop.color + 'CC', drop.color + '44']} style={bt.dropVisual}>
+                <View style={[bt.dropIcon, { backgroundColor: '#FFFFFF25' }]}>
+                  <Feather name="shopping-bag" size={20} color="#FFF" />
+                </View>
+              </LinearGradient>
+              <View style={bt.dropBody}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 3 }}>
+                  <View style={[bt.brandDot, { backgroundColor: drop.color }]}>
+                    <Text style={bt.brandDotText}>{drop.initials[0]}</Text>
+                  </View>
+                  <Text style={[bt.dropBrand, { color: muted }]} numberOfLines={1}>{drop.brand}</Text>
+                </View>
+                <Text style={[bt.dropName, { color: fg }]} numberOfLines={2}>{drop.name}</Text>
+                <Text style={[bt.dropPrice, { color: drop.color }]}>{drop.price}</Text>
+              </View>
+              <TouchableOpacity onPress={() => toggleSave(drop.id)} style={bt.saveBtn} activeOpacity={0.7}>
+                <Feather name="bookmark" size={16} color={isSaved ? primary : muted} />
+              </TouchableOpacity>
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      {/* Trending */}
+      <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
+        <SectionHeader title="Trending Now" />
+      </View>
+      <View style={{ paddingHorizontal: 20, gap: 10 }}>
+        {TRENDING.map(t => (
+          <TouchableOpacity key={t.id} style={[bt.trendRow, { backgroundColor: card, borderColor: border }]} activeOpacity={0.8} onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}>
+            <Text style={[bt.trendRank, { color: primary }]}>#{t.rank}</Text>
+            <View style={[bt.trendAvatar, { backgroundColor: t.color }]}>
+              <Text style={bt.trendAvatarText}>{t.initials}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[bt.trendBrand, { color: fg }]}>{t.brand}</Text>
+              <Text style={[bt.trendDesc, { color: muted }]} numberOfLines={1}>{t.desc}</Text>
+            </View>
+            <Text style={[bt.trendPrice, { color: t.color }]}>{t.price}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
+// ─── Root export (role-aware) ─────────────────────────────────────────────────
+
+export default function HomeScreen() {
+  const { role } = useRole();
+  if (role === 'buyer') return <BuyerHome />;
+  return <SellerDashboard />;
+}
+
+// ─── Seller styles ────────────────────────────────────────────────────────────
+
+const st = StyleSheet.create({
   container: { flex: 1 },
-
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
   headerLeft: { flex: 1 },
   greeting: { fontSize: 13, fontFamily: 'Inter_400Regular' },
@@ -412,41 +450,28 @@ const styles = StyleSheet.create({
   notifDot: { position: 'absolute', top: 9, right: 9, width: 7, height: 7, borderRadius: 4 },
   avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
-
   heroCard: { borderRadius: 22, padding: 22, borderWidth: 1, overflow: 'hidden' },
   glowOrb: { position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: '#7C3AED', opacity: 0.12 },
-
   heroTop: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' },
   heroLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 1.2 },
-
-  periodPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    paddingHorizontal: 10, paddingVertical: 5,
-    borderRadius: 20, borderWidth: 1,
-  },
+  periodPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
   periodText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-
   growthPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1 },
   growthText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-
   heroAmount: { fontSize: 44, fontFamily: 'Inter_700Bold', letterSpacing: -1.5 },
   heroSub: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 4, marginBottom: 16 },
-
   sparkRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 36 },
   sparkBar: { flex: 1, borderRadius: 3 },
-
   statsScroll: { gap: 10, paddingVertical: 2 },
   statCard: { width: 120, borderRadius: 16, padding: 16, borderWidth: 1, gap: 4 },
   statIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   statValue: { fontSize: 24, fontFamily: 'Inter_700Bold', letterSpacing: -0.5 },
   statLabel: { fontSize: 11, fontFamily: 'Inter_400Regular' },
   statChange: { fontSize: 11, fontFamily: 'Inter_500Medium' },
-
   actionsScroll: { gap: 10, paddingVertical: 2 },
   actionChip: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 14, borderWidth: 1 },
   chipIcon: { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   chipLabel: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-
   card: { borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
   orderRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   orderAccent: { width: 3, height: 40, borderRadius: 2 },
@@ -456,16 +481,66 @@ const styles = StyleSheet.create({
   orderTime: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 1 },
   orderRight: { alignItems: 'flex-end', gap: 6 },
   orderAmount: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-
   stockRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   stockIcon: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   stockName: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular' },
   stockBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 7 },
   stockQty: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-
   metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   metricCard: { width: '47.5%', borderRadius: 14, padding: 14, borderWidth: 1, gap: 3 },
   metricValue: { fontSize: 22, fontFamily: 'Inter_700Bold', marginTop: 4 },
   metricLabel: { fontSize: 11, fontFamily: 'Inter_400Regular' },
   metricChange: { fontSize: 11, fontFamily: 'Inter_500Medium' },
+});
+
+// ─── Buyer styles ─────────────────────────────────────────────────────────────
+
+const bt = StyleSheet.create({
+  container: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
+  greeting: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  title: { fontSize: 26, fontFamily: 'Inter_700Bold', letterSpacing: -0.6 },
+  headerBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  notifDot: { position: 'absolute', top: 9, right: 9, width: 7, height: 7, borderRadius: 4 },
+
+  catPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
+  catEmoji: { fontSize: 13 },
+  catLabel: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+
+  featuredCard: { borderRadius: 22, padding: 22, borderWidth: 1, overflow: 'hidden' },
+  glowOrb: { position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: '#7C3AED', opacity: 0.12 },
+  featuredTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  featuredBrandRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  featuredAvatar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  featuredAvatarText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  featuredBrand: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  tagPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, borderWidth: 1 },
+  tagDot: { width: 5, height: 5, borderRadius: 3 },
+  tagText: { fontSize: 10, fontFamily: 'Inter_700Bold', letterSpacing: 0.5 },
+  featuredName: { fontSize: 26, fontFamily: 'Inter_700Bold', letterSpacing: -0.6, marginBottom: 6 },
+  featuredDesc: { fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 19, marginBottom: 18 },
+  featuredBottom: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  featuredPrice: { fontSize: 28, fontFamily: 'Inter_700Bold', letterSpacing: -0.5 },
+  featuredCountdown: { fontSize: 12, fontFamily: 'Inter_500Medium', marginTop: 2 },
+  shopBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 20 },
+  shopBtnText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+
+  dropCard: { width: 150, borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
+  dropVisual: { height: 110, alignItems: 'center', justifyContent: 'center' },
+  dropIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  dropBody: { padding: 10 },
+  brandDot: { width: 16, height: 16, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  brandDotText: { fontSize: 7, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  dropBrand: { fontSize: 10, fontFamily: 'Inter_500Medium' },
+  dropName: { fontSize: 12, fontFamily: 'Inter_700Bold', lineHeight: 16, marginTop: 2 },
+  dropPrice: { fontSize: 14, fontFamily: 'Inter_700Bold', marginTop: 3 },
+  saveBtn: { position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: 14, backgroundColor: '#00000030', alignItems: 'center', justifyContent: 'center' },
+
+  trendRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 14, borderWidth: 1 },
+  trendRank: { fontSize: 15, fontFamily: 'Inter_700Bold', width: 24, textAlign: 'center' },
+  trendAvatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  trendAvatarText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  trendBrand: { fontSize: 14, fontFamily: 'Inter_700Bold', marginBottom: 2 },
+  trendDesc: { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  trendPrice: { fontSize: 14, fontFamily: 'Inter_700Bold' },
 });

@@ -16,6 +16,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { ClerkProvider, ClerkLoaded, useAuth } from '@clerk/expo';
 import { tokenCache } from '@/lib/tokenCache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { RoleProvider } from '@/contexts/RoleContext';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -121,9 +122,11 @@ export default function RootLayout() {
           <ErrorBoundary>
             <QueryClientProvider client={queryClient}>
               <GestureHandlerRootView style={{ flex: 1 }}>
-                <KeyboardProvider>
-                  <RootLayoutNav />
-                </KeyboardProvider>
+                <RoleProvider>
+                  <KeyboardProvider>
+                    <RootLayoutNav />
+                  </KeyboardProvider>
+                </RoleProvider>
               </GestureHandlerRootView>
             </QueryClientProvider>
           </ErrorBoundary>
