@@ -1,0 +1,186 @@
+import React, { useState } from 'react';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, TextInput } from 'react-native';
+import { useColors } from '@/hooks/useColors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
+import { Badge } from '@/components/Badge';
+import { useRouter } from 'expo-router';
+
+const SEGMENTS = ['All', 'VIP', 'Returning', 'At-Risk'] as const;
+type Segment = typeof SEGMENTS[number];
+
+const CUSTOMERS = [
+  { name: 'Jordan Lee', email: 'j.lee@email.com', orders: 14, ltv: '$1,840', segment: 'VIP', initials: 'JL', color: '#C9A96E' },
+  { name: 'Maya Chen', email: 'm.chen@email.com', orders: 8, ltv: '$960', segment: 'VIP', initials: 'MC', color: '#3B82F6' },
+  { name: 'Amir Patel', email: 'a.patel@email.com', orders: 3, ltv: '$340', segment: 'Returning', initials: 'AP', color: '#22C55E' },
+  { name: 'Sofia Reyes', email: 's.reyes@email.com', orders: 1, ltv: '$89', segment: 'New', initials: 'SR', color: '#F59E0B' },
+  { name: 'Elijah Brooks', email: 'e.brooks@email.com', orders: 0, ltv: '$0', segment: 'At-Risk', initials: 'EB', color: '#EF4444' },
+];
+
+const segVariant: Record<string, 'gold' | 'info' | 'success' | 'warning' | 'error' | 'default'> = {
+  VIP: 'gold',
+  Returning: 'success',
+  New: 'info',
+  'At-Risk': 'error',
+};
+
+export default function CustomersScreen() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const [segment, setSegment] = useState<Segment>('All');
+  const [search, setSearch] = useState('');
+
+  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+
+  return (
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={{ paddingTop: topPad + 8, paddingBottom: 100, paddingHorizontal: 16 }}
+      showsVerticalScrollIndicator={false}
+    >
+      <TouchableOpacity onPress={() => router.back()} style={styles.back} activeOpacity={0.7}>
+        <Feather name="arrow-left" size={20} color={colors.foreground} />
+        <Text style={[styles.backText, { color: colors.foreground }]}>Back</Text>
+      </TouchableOpacity>
+
+      <Text style={[styles.pageTitle, { color: colors.foreground }]}>Customers</Text>
+      <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>CRM, loyalty & rewards</Text>
+
+      {/* Stats */}
+      <View style={styles.statsRow}>
+        {[
+          { label: 'Total', value: '1,240', icon: 'users' as const },
+          { label: 'VIP', value: '84', icon: 'star' as const },
+          { label: 'CLV', value: '$480', icon: 'heart' as const },
+          { label: 'Retention', value: '42%', icon: 'refresh-cw' as const },
+        ].map((s) => (
+          <View key={s.label} style={[styles.stat, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name={s.icon} size={14} color={colors.primary} />
+            <Text style={[styles.statVal, { color: colors.foreground }]}>{s.value}</Text>
+            <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Loyalty Card */}
+      <View style={[styles.loyaltyCard, { backgroundColor: '#1A1500', borderColor: '#C9A96E44' }]}>
+        <View style={styles.loyaltyLeft}>
+          <Feather name="star" size={20} color={colors.primary} />
+          <View>
+            <Text style={[styles.loyaltyTitle, { color: colors.foreground }]}>Loyalty Program</Text>
+            <Text style={[styles.loyaltySub, { color: colors.mutedForeground }]}>840 customers enrolled · $3.2k rewards issued</Text>
+          </View>
+        </View>
+        <TouchableOpacity style={[styles.loyaltyBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8}>
+          <Text style={[styles.loyaltyBtnText, { color: colors.primaryForeground }]}>Manage</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Search */}
+      <View style={[styles.searchWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Feather name="search" size={16} color={colors.mutedForeground} />
+        <TextInput
+          style={[styles.searchInput, { color: colors.foreground }]}
+          placeholder="Search customers..."
+          placeholderTextColor={colors.mutedForeground}
+          value={search}
+          onChangeText={setSearch}
+        />
+      </View>
+
+      {/* Segments */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.segments} contentContainerStyle={{ gap: 8 }}>
+        {SEGMENTS.map((s) => (
+          <TouchableOpacity
+            key={s}
+            onPress={() => setSegment(s)}
+            activeOpacity={0.7}
+            style={[styles.segChip, { backgroundColor: segment === s ? colors.primary : colors.card, borderColor: segment === s ? colors.primary : colors.border }]}
+          >
+            <Text style={[styles.segText, { color: segment === s ? colors.primaryForeground : colors.mutedForeground }]}>{s}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* Customer List */}
+      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {CUSTOMERS.filter((c) => segment === 'All' || c.segment === segment).map((c, i) => (
+          <TouchableOpacity
+            key={c.email}
+            activeOpacity={0.8}
+            style={[styles.custRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
+          >
+            <View style={[styles.avatar, { backgroundColor: c.color + '33' }]}>
+              <Text style={[styles.avatarText, { color: c.color }]}>{c.initials}</Text>
+            </View>
+            <View style={styles.custInfo}>
+              <Text style={[styles.custName, { color: colors.foreground }]}>{c.name}</Text>
+              <Text style={[styles.custEmail, { color: colors.mutedForeground }]}>{c.email}</Text>
+              <Text style={[styles.custOrders, { color: colors.mutedForeground }]}>{c.orders} orders · LTV {c.ltv}</Text>
+            </View>
+            <View style={styles.custRight}>
+              <Badge label={c.segment} variant={segVariant[c.segment] ?? 'default'} />
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Wishlists & Gift Cards */}
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Rewards & Gifts</Text>
+      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {[
+          { label: 'Active Wishlists', value: '312', icon: 'heart' as const },
+          { label: 'Gift Cards Issued', value: '$4,800', icon: 'gift' as const },
+          { label: 'Points Redeemed', value: '18,400 pts', icon: 'award' as const },
+          { label: 'Referrals Active', value: '124', icon: 'share-2' as const },
+        ].map((r, i) => (
+          <View key={r.label} style={[styles.rewardRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+            <View style={[styles.rewardIcon, { backgroundColor: colors.secondary }]}>
+              <Feather name={r.icon} size={15} color={colors.primary} />
+            </View>
+            <Text style={[styles.rewardLabel, { color: colors.foreground }]}>{r.label}</Text>
+            <Text style={[styles.rewardVal, { color: colors.mutedForeground }]}>{r.value}</Text>
+          </View>
+        ))}
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  back: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
+  backText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
+  pageTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 4 },
+  pageSubtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 20 },
+  statsRow: { flexDirection: 'row', gap: 6, marginBottom: 16 },
+  stat: { flex: 1, borderRadius: 12, padding: 10, borderWidth: 1, alignItems: 'center', gap: 3 },
+  statVal: { fontSize: 14, fontFamily: 'Inter_700Bold' },
+  statLabel: { fontSize: 10, fontFamily: 'Inter_400Regular' },
+  loyaltyCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 14, padding: 14, borderWidth: 1, marginBottom: 16 },
+  loyaltyLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  loyaltyTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  loyaltySub: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  loyaltyBtn: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10 },
+  loyaltyBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  searchWrap: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 12, gap: 10, borderWidth: 1, marginBottom: 12 },
+  searchInput: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  segments: { marginBottom: 16 },
+  segChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  segText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
+  custRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
+  avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
+  custInfo: { flex: 1, gap: 2 },
+  custName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  custEmail: { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  custOrders: { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  custRight: {},
+  sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
+  rewardRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
+  rewardIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  rewardLabel: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  rewardVal: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+});

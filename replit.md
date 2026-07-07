@@ -1,6 +1,6 @@
-# [Project name]
+# Brandthread
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A comprehensive clothing brand management mobile app covering 18 modules: brand creation, AI design studio, products, store builder, manufacturer hub, payments, shipping, CRM, marketing, social media, analytics, finance, team management, AI assistant, community, mobile app builder, security, and automation.
 
 ## Run & Operate
 

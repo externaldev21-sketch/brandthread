@@ -1,0 +1,1 @@
+- [Brandthread dark theme](brandthread-theme.md) — app uses dark luxury palette (#0D0D0D bg, #C9A96E gold primary), both light and dark keys in colors.ts must be identical since the app is dark-only.
