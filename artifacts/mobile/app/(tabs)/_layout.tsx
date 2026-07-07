@@ -105,7 +105,7 @@ function ClassicTabLayout() {
         name="feed"
         options={{
           title: 'Feed',
-          tabBarShowLabel: false,
+          tabBarLabel: () => null,
           tabBarIcon: ({ focused }) => (
             <FeedCenterIcon focused={focused} isDark={isDark} />
           ),
