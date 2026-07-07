@@ -164,16 +164,22 @@ function ClassicTabLayout() {
 function FeedCenterIcon({ focused, isDark }: { focused: boolean; isDark: boolean }) {
   return (
     <View style={feedStyles.wrapper}>
-      {/* outer glow ring */}
-      <View style={[feedStyles.glowRing, focused && feedStyles.glowRingActive]} />
-      {/* gradient pill — lifted above the tab bar */}
+      {/* white halo ring — visible on both web and native */}
+      <View style={[feedStyles.halo, { borderColor: isDark ? '#1C1C2E' : '#F8F7FF' }]} />
       <LinearGradient
-        colors={['#C026D3', '#9333EA', '#6D28D9']}
+        colors={focused
+          ? ['#F0ABFC', '#C026D3', '#7C3AED']
+          : ['#D946EF', '#A855F7', '#7C3AED']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[feedStyles.circle, focused && feedStyles.circleFocused]}
+        style={feedStyles.circle}
       >
-        <Feather name="play" size={24} color="#FFFFFF" />
+        {/* stacked bars icon — feels like a "content feed" */}
+        <View style={feedStyles.iconStack}>
+          <View style={feedStyles.iconBar} />
+          <View style={[feedStyles.iconBar, { width: 14 }]} />
+          <View style={feedStyles.iconBar} />
+        </View>
       </LinearGradient>
     </View>
   );
@@ -183,39 +189,31 @@ const feedStyles = StyleSheet.create({
   wrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 60,
-    height: 60,
-    marginTop: -22, // lifts the button above the tab bar
+    width: 64,
+    height: 64,
+    marginTop: -28,
   },
-  glowRing: {
+  halo: {
     position: 'absolute',
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: '#9333EA',
-    opacity: 0,
-  },
-  glowRingActive: {
-    opacity: 0.25,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    borderWidth: 5,
   },
   circle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: '#FFFFFF',
-    shadowColor: '#7C3AED',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.8,
-    shadowRadius: 16,
-    elevation: 20,
-  },
-  circleFocused: {
+    shadowColor: '#C026D3',
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 1,
-    shadowRadius: 24,
+    shadowRadius: 20,
+    elevation: 24,
   },
+  iconStack: { gap: 5, alignItems: 'center' },
+  iconBar:   { width: 20, height: 2.5, borderRadius: 2, backgroundColor: '#FFFFFF' },
 });
 
 // ─── Regular tab icon ─────────────────────────────────────────────────────────
