@@ -24,6 +24,10 @@ const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 // Empty in dev (Clerk hits dev FAPI directly), auto-set in prod. Do NOT gate on NODE_ENV.
 const proxyUrl = process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;
 
+// Set to true to skip auth and go straight to the dashboard while building.
+// Flip back to false before shipping.
+const DEV_BYPASS_AUTH = true;
+
 // ─── Auth gate — redirects to /sign-in when signed out ───────────────────────
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { isSignedIn, isLoaded } = useAuth();
@@ -31,6 +35,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const segments = useSegments();
 
   useEffect(() => {
+    if (DEV_BYPASS_AUTH) return; // skip auth during development
     if (!isLoaded) return;
     const inAuthGroup   = segments[0] === 'sign-in';
     const inOnboarding  = segments[0] === 'onboarding';
