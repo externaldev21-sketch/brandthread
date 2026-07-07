@@ -44,6 +44,32 @@ router.post("/sync", requireAuth, async (req, res) => {
   }
 });
 
+// PATCH /api/auth/onboarding — save brand setup answers and mark onboarding complete
+router.patch("/onboarding", requireAuth, async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+  const { brandName, brandType, brandStage, sellModel } = req.body;
+  if (!brandName || typeof brandName !== "string" || brandName.trim() === "") {
+    res.status(400).json({ error: "brandName required" }); return;
+  }
+  const [updated] = await db
+    .update(users)
+    .set({
+      brandName: brandName.trim(),
+      ...(brandType  && { brandType }),
+      ...(brandStage && { brandStage }),
+      ...(sellModel  && { sellModel }),
+      onboardingComplete: true,
+      updatedAt: new Date(),
+    })
+    .where(eq(users.clerkId, clerkUserId))
+    .returning();
+  if (!updated) {
+    res.status(404).json({ error: "User not found — call POST /auth/sync first" });
+    return;
+  }
+  res.json(updated);
+});
+
 // GET /api/auth/me
 router.get("/me", requireAuth, async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;

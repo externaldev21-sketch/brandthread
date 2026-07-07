@@ -40,8 +40,9 @@ export function createApi(getToken: GetToken) {
 
   return {
     auth: {
-      sync: ()           => post('/api/auth/sync', {}),
-      me:   ()           => get('/api/auth/me'),
+      sync:        ()             => post('/api/auth/sync', {}),
+      me:          ()             => get('/api/auth/me'),
+      onboarding:  (body: unknown) => patch('/api/auth/onboarding', body),
     },
     products: {
       list:           ()                       => get('/api/products'),

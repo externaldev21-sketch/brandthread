@@ -82,7 +82,7 @@ export default function SignInScreen() {
       if (verifyError) { setError(verifyError.longMessage ?? verifyError.message ?? 'Invalid code'); return; }
       const { error: finalizeError } = await signUpCtx.signUp.finalize();
       if (finalizeError) { setError(finalizeError.longMessage ?? finalizeError.message ?? 'Could not activate account'); return; }
-      router.replace('/');
+      router.replace('/onboarding');
     } catch (e: any) {
       setError(clerkMsg(e));
     } finally {

@@ -30,8 +30,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isLoaded) return;
-    const inAuthGroup = segments[0] === 'sign-in';
-    if (!isSignedIn && !inAuthGroup) {
+    const inAuthGroup   = segments[0] === 'sign-in';
+    const inOnboarding  = segments[0] === 'onboarding';
+    // Onboarding requires auth — redirect unsigned-out users to sign-in
+    if (!isSignedIn && !inAuthGroup && !inOnboarding) {
       router.replace('/sign-in');
     } else if (isSignedIn && inAuthGroup) {
       router.replace('/');
@@ -46,7 +48,8 @@ function RootLayoutNav() {
     <AuthGate>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)"        options={{ headerShown: false }} />
-        <Stack.Screen name="sign-in"       options={{ headerShown: false }} />
+        <Stack.Screen name="sign-in"        options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding"     options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="brand"         options={{ headerShown: false }} />
         <Stack.Screen name="ai-studio"     options={{ headerShown: false }} />
         <Stack.Screen name="manufacturer"  options={{ headerShown: false }} />

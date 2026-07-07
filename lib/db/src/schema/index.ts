@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp, json } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, timestamp, json, boolean } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
 // ─── Users (brand team members, linked to Clerk) ──────────────────────────────
@@ -10,6 +10,12 @@ export const users = pgTable('users', {
   name: text('name').notNull(),
   role: text('role').notNull().default('owner'), // 'owner' | 'admin' | 'member'
   avatarUrl: text('avatar_url'),
+  // Brand onboarding fields
+  brandName: text('brand_name'),
+  brandType: text('brand_type'),
+  brandStage: text('brand_stage'),
+  sellModel: text('sell_model'),
+  onboardingComplete: boolean('onboarding_complete').notNull().default(false),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
