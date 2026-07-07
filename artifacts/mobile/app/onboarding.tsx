@@ -16,24 +16,6 @@ const { width: SCREEN_W } = Dimensions.get('window');
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
-const STYLES_BUYER = [
-  { value: 'streetwear',  label: 'Streetwear',  emoji: '🔥' },
-  { value: 'luxury',      label: 'Luxury',       emoji: '✨' },
-  { value: 'casual',      label: 'Casual',       emoji: '☁️' },
-  { value: 'athletic',    label: 'Athletic',     emoji: '⚡' },
-  { value: 'workwear',    label: 'Workwear',     emoji: '🏗️' },
-  { value: 'accessories', label: 'Accessories',  emoji: '💍' },
-  { value: 'vintage',     label: 'Vintage',      emoji: '🎞️' },
-  { value: 'techwear',    label: 'Techwear',     emoji: '🤖' },
-];
-
-const BUDGETS = [
-  { value: 'under50',   label: 'Under $50',     sub: 'Great finds, everyday wear' },
-  { value: '50to150',   label: '$50 – $150',    sub: 'Quality pieces, indie brands' },
-  { value: '150to500',  label: '$150 – $500',   sub: 'Premium drops & limited runs' },
-  { value: '500plus',   label: '$500+',          sub: 'Luxury & collector-grade' },
-];
-
 const SELLER_CATEGORIES = [
   { value: 'streetwear',  label: 'Streetwear',  emoji: '🔥' },
   { value: 'luxury',      label: 'Luxury',       emoji: '✨' },
@@ -197,146 +179,6 @@ const roleStyles = StyleSheet.create({
   cardSub:    { fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 18 },
 });
 
-// ─── Buyer setup ──────────────────────────────────────────────────────────────
-
-function BuyerSetup({
-  isDark, onFinish,
-}: {
-  isDark: boolean;
-  onFinish: () => void;
-}) {
-  const insets  = useSafeAreaInsets();
-  const STEPS   = 2;
-  const [step, setStep]       = useState(0);
-  const [styles2, setStyles2] = useState<string[]>([]);
-  const [budget, setBudget]   = useState('');
-  const slideAnim             = useRef(new Animated.Value(0)).current;
-
-  const bg      = isDark ? '#08080F' : '#F8F7FF';
-  const card    = isDark ? '#111118' : '#FFFFFF';
-  const border  = isDark ? '#252535' : '#DDD6FE';
-  const fg      = isDark ? '#F0EEFF' : '#1A1035';
-  const muted   = isDark ? '#6B6B8A' : '#6D6892';
-  const primary = isDark ? '#9F7AEA' : '#7C3AED';
-  const cardSel = isDark ? '#2D1F5E' : '#EDE9FE';
-
-  function animateTo(next: number, dir: number) {
-    Animated.timing(slideAnim, { toValue: dir * -SCREEN_W, duration: 240, useNativeDriver: true }).start(() => {
-      setStep(next);
-      slideAnim.setValue(dir * SCREEN_W);
-      Animated.timing(slideAnim, { toValue: 0, duration: 240, useNativeDriver: true }).start();
-    });
-  }
-
-  function canAdvance() {
-    if (step === 0) return styles2.length > 0;
-    if (step === 1) return !!budget;
-    return false;
-  }
-
-  function handleNext() {
-    if (!canAdvance()) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (step < STEPS - 1) animateTo(step + 1, 1);
-    else onFinish();
-  }
-
-  function handleBack() {
-    if (step === 0) return;
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    animateTo(step - 1, -1);
-  }
-
-  function toggleStyle(val: string) {
-    Haptics.selectionAsync();
-    setStyles2(prev => prev.includes(val) ? prev.filter(s => s !== val) : [...prev, val]);
-  }
-
-  function renderStep() {
-    if (step === 0) return (
-      <ScrollView contentContainerStyle={setupStyles.stepContent} showsVerticalScrollIndicator={false}>
-        <Text style={setupStyles.emoji}>👕</Text>
-        <Text style={[setupStyles.q, { color: fg }]}>What's your{'\n'}style?</Text>
-        <Text style={[setupStyles.qSub, { color: muted }]}>Pick everything that fits — we'll find brands you'll love.</Text>
-        <View style={setupStyles.gridWrap}>
-          {STYLES_BUYER.map(s => {
-            const sel = styles2.includes(s.value);
-            return (
-              <TouchableOpacity
-                key={s.value}
-                style={[setupStyles.gridCard, { backgroundColor: sel ? cardSel : card, borderColor: sel ? primary : border }]}
-                onPress={() => toggleStyle(s.value)}
-                activeOpacity={0.8}
-              >
-                <Text style={setupStyles.gridEmoji}>{s.emoji}</Text>
-                <Text style={[setupStyles.gridLabel, { color: sel ? primary : fg }]}>{s.label}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </ScrollView>
-    );
-
-    if (step === 1) return (
-      <ScrollView contentContainerStyle={setupStyles.stepContent} showsVerticalScrollIndicator={false}>
-        <Text style={setupStyles.emoji}>💰</Text>
-        <Text style={[setupStyles.q, { color: fg }]}>What's your{'\n'}usual spend?</Text>
-        <Text style={[setupStyles.qSub, { color: muted }]}>We'll surface drops in your range first.</Text>
-        {BUDGETS.map(b => {
-          const sel = budget === b.value;
-          return (
-            <TouchableOpacity
-              key={b.value}
-              style={[setupStyles.listCard, { backgroundColor: sel ? cardSel : card, borderColor: sel ? primary : border }]}
-              onPress={() => { setBudget(b.value); Haptics.selectionAsync(); }}
-              activeOpacity={0.8}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={[setupStyles.listLabel, { color: sel ? primary : fg }]}>{b.label}</Text>
-                <Text style={[setupStyles.listSub, { color: muted }]}>{b.sub}</Text>
-              </View>
-              <View style={[setupStyles.radio, { borderColor: sel ? primary : border, backgroundColor: sel ? primary : 'transparent' }]}>
-                {sel && <View style={setupStyles.radioDot} />}
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-    );
-
-    return null;
-  }
-
-  return (
-    <View style={[{ flex: 1 }, { backgroundColor: bg }]}>
-      <View style={[setupStyles.header, { paddingTop: insets.top + 12 }]}>
-        <View style={setupStyles.dots}>
-          {Array.from({ length: STEPS }).map((_, i) => (
-            <View key={i} style={[setupStyles.dot, { backgroundColor: i <= step ? primary : border }, i === step && setupStyles.dotActive]} />
-          ))}
-        </View>
-        <Text style={[setupStyles.stepLabel, { color: muted }]}>Step {step + 1} of {STEPS}</Text>
-      </View>
-      <Animated.View style={[{ flex: 1 }, { transform: [{ translateX: slideAnim }] }]}>
-        {renderStep()}
-      </Animated.View>
-      <View style={[setupStyles.footer, { paddingBottom: insets.bottom + 12, borderTopColor: border }]}>
-        {step > 0 ? (
-          <TouchableOpacity style={[setupStyles.backBtn, { borderColor: border }]} onPress={handleBack} activeOpacity={0.7}>
-            <Text style={[setupStyles.backText, { color: muted }]}>← Back</Text>
-          </TouchableOpacity>
-        ) : <View style={setupStyles.backBtn} />}
-        <TouchableOpacity
-          style={[setupStyles.nextBtn, { backgroundColor: canAdvance() ? primary : border }]}
-          onPress={handleNext}
-          activeOpacity={0.85}
-        >
-          <Text style={setupStyles.nextText}>{step === STEPS - 1 ? '🛍️  Start shopping' : 'Continue →'}</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
 
 // ─── Seller setup ─────────────────────────────────────────────────────────────
 
@@ -624,18 +466,10 @@ export default function OnboardingScreen() {
         </View>
       )}
 
-      {/* Setup page — slides in once role is chosen */}
+      {/* Setup page — slides in for seller / both */}
       {role !== null && (
         <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX: pageAnim }] }]}>
-          {(role === 'buyer') && (
-            <BuyerSetup isDark={isDark} onFinish={handleFinish} />
-          )}
-          {(role === 'seller') && (
-            <SellerSetup isDark={isDark} onFinish={handleFinish} isBoth={false} />
-          )}
-          {(role === 'both') && (
-            <SellerSetup isDark={isDark} onFinish={handleFinish} isBoth={true} />
-          )}
+          <SellerSetup isDark={isDark} onFinish={handleFinish} isBoth={role === 'both'} />
         </Animated.View>
       )}
     </View>
