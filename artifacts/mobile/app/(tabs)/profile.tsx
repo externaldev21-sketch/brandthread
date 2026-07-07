@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
@@ -85,6 +86,20 @@ export default function ProfileScreen() {
             </View>
           ))}
         </View>
+      </View>
+
+      {/* ─ Post on Story ─ */}
+      <View style={{ paddingHorizontal: 20, marginBottom: 24 }}>
+        <TouchableOpacity
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/story-creator' as never); }}
+          activeOpacity={0.85}
+          style={styles.storyBtnWrap}
+        >
+          <LinearGradient colors={['#A855F7', '#7C3AED']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.storyBtnGrad}>
+            <Feather name="camera" size={17} color="#FFF" />
+            <Text style={styles.storyBtnText}>Post on Story</Text>
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
 
       {/* ─ Recent Drops ─ */}
@@ -187,4 +202,8 @@ const styles = StyleSheet.create({
 
   signOutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 15, borderRadius: 14, borderWidth: 1 },
   signOutText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: '#EF4444' },
+
+  storyBtnWrap: { borderRadius: 16, overflow: 'hidden' },
+  storyBtnGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 15 },
+  storyBtnText: { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#FFF' },
 });

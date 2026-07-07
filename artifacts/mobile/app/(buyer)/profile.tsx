@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
@@ -45,9 +46,10 @@ const statusColor = (s: string) =>
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function BuyerProfileScreen() {
-  const insets = useSafeAreaInsets();
-  const scheme = useColorScheme();
-  const isDark = scheme !== 'light';
+  const insets  = useSafeAreaInsets();
+  const scheme  = useColorScheme();
+  const isDark  = scheme !== 'light';
+  const router  = useRouter();
 
   const bg      = isDark ? '#08080F' : '#F9F9FC';
   const card    = isDark ? '#111118' : '#FFFFFF';
@@ -100,50 +102,17 @@ export default function BuyerProfileScreen() {
         ))}
       </View>
 
-      {/* ─ Following brands ─ */}
-      <View style={[s.section, { marginTop: 28 }]}>
-        <View style={[s.sectionHeader, { paddingHorizontal: 20 }]}>
-          <Text style={[s.sectionTitle, { color: fg }]}>Following</Text>
-          <TouchableOpacity activeOpacity={0.7}>
-            <Text style={[s.sectionAction, { color: primary }]}>See all</Text>
-          </TouchableOpacity>
-        </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 20, gap: 14, paddingVertical: 8 }}
+      {/* ─ Post on Story ─ */}
+      <View style={{ paddingHorizontal: 20, marginTop: 24 }}>
+        <TouchableOpacity
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/story-creator' as never); }}
+          activeOpacity={0.85}
         >
-          {FOLLOWED_BRANDS.map(brand => (
-            <TouchableOpacity
-              key={brand.name}
-              style={s.brandItem}
-              activeOpacity={0.8}
-              onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
-            >
-              {brand.hasNew ? (
-                <LinearGradient
-                  colors={['#F0ABFC', '#C026D3', '#7C3AED']}
-                  style={s.brandRing}
-                >
-                  <View style={[s.brandRingInner, { backgroundColor: bg }]}>
-                    <View style={[s.brandCircle, { backgroundColor: brand.color }]}>
-                      <Text style={s.brandInitials}>{brand.initials}</Text>
-                    </View>
-                  </View>
-                </LinearGradient>
-              ) : (
-                <View style={[s.brandRingViewed, { borderColor: border }]}>
-                  <View style={[s.brandCircle, { backgroundColor: brand.color }]}>
-                    <Text style={s.brandInitials}>{brand.initials}</Text>
-                  </View>
-                </View>
-              )}
-              <Text style={[s.brandName, { color: muted }]} numberOfLines={1}>
-                {brand.name.split(' ')[0]}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+          <LinearGradient colors={['#A855F7', '#7C3AED']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.storyBtn}>
+            <Feather name="camera" size={17} color="#FFF" />
+            <Text style={s.storyBtnText}>Post on Story</Text>
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
 
       {/* ─ Recent orders ─ */}
@@ -267,6 +236,9 @@ const s = StyleSheet.create({
   menuIcon:  { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   menuLabel: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   menuSub:   { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
+
+  storyBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 15, borderRadius: 16 },
+  storyBtnText:{ fontSize: 16, fontFamily: 'Inter_700Bold', color: '#FFF' },
 
   signOut:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 15, borderRadius: 14, borderWidth: 1 },
   signOutText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: '#EF4444' },
