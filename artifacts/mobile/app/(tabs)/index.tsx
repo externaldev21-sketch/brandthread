@@ -67,6 +67,13 @@ const RECENT_ORDERS = [
   { id: '#5038', customer: 'Sofia Reyes',  amount: '$312.00', status: 'shipped'    as const, time: '3h ago'  },
 ];
 
+const ANALYTICS_METRICS = [
+  { label: 'Conversion Rate', value: '3.4%',  change: '+0.6%', up: true,  icon: 'trending-up'  as const },
+  { label: 'Avg. Order Value', value: '$128',  change: '+$12',  up: true,  icon: 'dollar-sign'  as const },
+  { label: 'Returning Rate',  value: '42%',   change: '+4%',   up: true,  icon: 'refresh-cw'   as const },
+  { label: 'CLV',             value: '$480',  change: '+$30',  up: true,  icon: 'heart'         as const },
+];
+
 const LOW_STOCK = [
   { name: 'Classic Tee – White XL',   stock: 3 },
   { name: 'Cargo Shorts – Khaki M',   stock: 1 },
@@ -359,6 +366,26 @@ export default function DashboardScreen() {
             ))}
           </View>
         </View>
+
+        {/* ─── Analytics Snapshot ─── */}
+        <View style={{ paddingHorizontal: 20, marginTop: 28 }}>
+          <SectionHeader title="Analytics" action="View all" onAction={() => nav('/analytics')} />
+          <View style={styles.metricsGrid}>
+            {ANALYTICS_METRICS.map((m) => (
+              <View
+                key={m.label}
+                style={[styles.metricCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              >
+                <Feather name={m.icon} size={16} color={colors.primary} />
+                <Text style={[styles.metricValue, { color: colors.foreground }]}>{m.value}</Text>
+                <Text style={[styles.metricLabel, { color: colors.mutedForeground }]}>{m.label}</Text>
+                <Text style={[styles.metricChange, { color: m.up ? colors.success : colors.destructive }]}>
+                  {m.change}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
       </ScrollView>
 
       {/* ─── Date Range Picker Modal ─── */}
@@ -436,4 +463,10 @@ const styles = StyleSheet.create({
   stockName: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular' },
   stockBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 7 },
   stockQty: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+
+  metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  metricCard: { width: '47.5%', borderRadius: 14, padding: 14, borderWidth: 1, gap: 3 },
+  metricValue: { fontSize: 22, fontFamily: 'Inter_700Bold', marginTop: 4 },
+  metricLabel: { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  metricChange: { fontSize: 11, fontFamily: 'Inter_500Medium' },
 });
