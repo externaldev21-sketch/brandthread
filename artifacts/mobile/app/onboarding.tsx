@@ -591,6 +591,11 @@ export default function OnboardingScreen() {
   const pageAnim = useRef(new Animated.Value(0)).current;
 
   function handleRoleSelect(r: Role) {
+    if (r === 'buyer') {
+      // Buyers skip all setup questions and go straight to the app
+      handleFinish(r);
+      return;
+    }
     setRole(r);
     pageAnim.setValue(SCREEN_W);
     Animated.spring(pageAnim, {
@@ -601,9 +606,10 @@ export default function OnboardingScreen() {
     }).start();
   }
 
-  async function handleFinish() {
+  async function handleFinish(overrideRole?: Role) {
+    const finalRole = overrideRole ?? role;
     await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
-    if (role) await AsyncStorage.setItem('user_role', role);
+    if (finalRole) await AsyncStorage.setItem('user_role', finalRole);
     router.replace('/');
   }
 
