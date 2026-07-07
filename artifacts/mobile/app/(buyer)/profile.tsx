@@ -1,13 +1,14 @@
 import React from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, useColorScheme,
+  TouchableOpacity, useColorScheme, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
@@ -119,7 +120,10 @@ export default function BuyerProfileScreen() {
       <View style={[s.section, { paddingHorizontal: 20, marginTop: 28 }]}>
         <View style={s.sectionHeader}>
           <Text style={[s.sectionTitle, { color: fg }]}>Recent Orders</Text>
-          <TouchableOpacity activeOpacity={0.7}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => Alert.alert('My Orders', '#2041 · Canvas Cargo Jacket — ✅ Delivered\n#1988 · Archive Hoodie Vol.3 — 📦 Shipped\n#1740 · Relaxed Tee — Sage — ⏳ Processing', [{ text: 'OK' }])}
+          >
             <Text style={[s.sectionAction, { color: primary }]}>View all</Text>
           </TouchableOpacity>
         </View>
@@ -154,7 +158,29 @@ export default function BuyerProfileScreen() {
               key={item.label}
               style={[s.menuRow, i > 0 && { borderTopWidth: 1, borderTopColor: border }]}
               activeOpacity={0.7}
-              onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                if (item.label === 'My orders') {
+                  Alert.alert('My Orders', '#2041 · Canvas Cargo Jacket — ✅ Delivered\n#1988 · Archive Hoodie Vol.3 — 📦 Shipped\n#1740 · Relaxed Tee — ⏳ Processing', [{ text: 'OK' }]);
+                } else if (item.label === 'Style preferences') {
+                  Alert.alert('Style Preferences', 'Your current taste profile: Archive Fashion 🎞️', [
+                    { text: 'Update Profile', onPress: () => router.push('/onboarding' as never) },
+                    { text: 'Cancel', style: 'cancel' },
+                  ]);
+                } else if (item.label === 'Drop notifications') {
+                  Alert.alert('Drop Notifications', 'Choose what to be notified about:', [
+                    { text: 'All Drops',      onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
+                    { text: 'Following Only', onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
+                    { text: 'Cancel', style: 'cancel' },
+                  ]);
+                } else {
+                  Alert.alert('Help & Support', 'How can we help?', [
+                    { text: 'Browse FAQ',  onPress: () => {} },
+                    { text: 'Contact Us', onPress: () => {} },
+                    { text: 'Cancel', style: 'cancel' },
+                  ]);
+                }
+              }}
             >
               <View style={[s.menuIcon, { backgroundColor: primary + '15' }]}>
                 <Feather name={item.icon} size={16} color={primary} />
@@ -174,6 +200,13 @@ export default function BuyerProfileScreen() {
         <TouchableOpacity
           style={[s.signOut, { borderColor: '#EF444440' }]}
           activeOpacity={0.8}
+          onPress={() => Alert.alert('Sign out', 'Are you sure you want to sign out?', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Sign out', style: 'destructive', onPress: async () => {
+              await AsyncStorage.clear();
+              router.replace('/onboarding' as never);
+            }},
+          ])}
         >
           <Feather name="log-out" size={16} color="#EF4444" />
           <Text style={s.signOutText}>Sign out</Text>

@@ -1,11 +1,12 @@
 import React, { useState, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, ScrollView, TouchableOpacity,
-  useColorScheme, Dimensions, Animated,
+  useColorScheme, Dimensions, Animated, Alert, Share, TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -140,16 +141,16 @@ const STORIES = [
 // ─── Feed card ───────────────────────────────────────────────────────────────
 
 function FeedCard({
-  item,
-  isDark,
-  onLike,
-  onSave,
+  item, isDark, onLike, onSave, following, onFollow,
 }: {
   item: typeof FEED_ITEMS[0];
   isDark: boolean;
   onLike: (id: string) => void;
   onSave: (id: string) => void;
+  following: boolean;
+  onFollow: (id: string) => void;
 }) {
+  const router  = useRouter();
   const bg      = isDark ? '#111118' : '#FFFFFF';
   const border  = isDark ? '#1E1E30' : '#EDE9FE';
   const fg      = isDark ? '#F0EEFF' : '#1A1035';
@@ -191,10 +192,13 @@ function FeedCard({
           <Text style={[styles.brandHandle, { color: muted }]}>{item.brandHandle} · {item.timeAgo}</Text>
         </View>
         <TouchableOpacity
-          style={[styles.followBtn, { borderColor: item.accentColor }]}
+          style={[styles.followBtn, { borderColor: item.accentColor, backgroundColor: following ? item.accentColor : 'transparent' }]}
           activeOpacity={0.75}
+          onPress={() => onFollow(item.id)}
         >
-          <Text style={[styles.followText, { color: item.accentColor }]}>Follow</Text>
+          <Text style={[styles.followText, { color: following ? '#FFF' : item.accentColor }]}>
+            {following ? 'Following' : 'Follow'}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -246,12 +250,29 @@ function FeedCard({
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionBtn} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            activeOpacity={0.7}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              Alert.alert(`Message ${item.brand}`, `Send a DM to ${item.brandHandle}?`, [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Message', onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
+              ]);
+            }}
+          >
             <Feather name="message-circle" size={20} color={muted} />
             <Text style={[styles.actionCount, { color: muted }]}>{item.comments}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.actionBtn} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            activeOpacity={0.7}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              Share.share({ message: `Check out ${item.productName} by ${item.brand} — ${item.productPrice} 🔥 on Brandthread` });
+            }}
+          >
             <Feather name="share-2" size={20} color={muted} />
             <Text style={[styles.actionCount, { color: muted }]}>{item.shares}</Text>
           </TouchableOpacity>
@@ -269,6 +290,18 @@ function FeedCard({
           <TouchableOpacity
             style={[styles.shopBtn, { backgroundColor: item.accentColor }]}
             activeOpacity={0.85}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              Alert.alert(
+                item.brand,
+                `${item.productName} · ${item.productPrice}${item.productOriginalPrice ? `\nWas ${item.productOriginalPrice}` : ''}`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: '🔖 Save for later', onPress: () => onSave(item.id) },
+                  { text: '🛍️ Add to Bag', onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
+                ],
+              );
+            }}
           >
             <Feather name="shopping-bag" size={13} color="#FFF" />
             <Text style={styles.shopBtnText}>Shop</Text>
@@ -292,8 +325,25 @@ export default function FeedScreen({ showStories = true }: { showStories?: boole
   const border  = isDark ? '#1E1E30' : '#DDD6FE';
   const primary = isDark ? '#9F7AEA' : '#7C3AED';
 
-  const [items, setItems] = useState(FEED_ITEMS);
-  const [stories, setStories] = useState(STORIES);
+  const [items,        setItems]        = useState(FEED_ITEMS);
+  const [stories,      setStories]      = useState(STORIES);
+  const [followed,     setFollowed]     = useState<Record<string, boolean>>({});
+  const [showSearch,   setShowSearch]   = useState(false);
+  const [searchQuery,  setSearchQuery]  = useState('');
+  const [followingOnly, setFollowingOnly] = useState(false);
+
+  const displayItems = (() => {
+    let result = followingOnly ? items.filter(item => !!followed[item.id]) : items;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(item =>
+        item.brand.toLowerCase().includes(q) ||
+        item.productName.toLowerCase().includes(q) ||
+        item.tags.some(t => t.toLowerCase().includes(q)),
+      );
+    }
+    return result;
+  })();
 
   function handleViewStory(id: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -312,16 +362,49 @@ export default function FeedScreen({ showStories = true }: { showStories?: boole
     ));
   }
 
+  function handleFollow(id: string) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setFollowed(prev => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function toggleSearch() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (showSearch) { setShowSearch(false); setSearchQuery(''); }
+    else setShowSearch(true);
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: bg }]}>
       {/* ─ Header ─ */}
       <View style={[styles.header, { paddingTop: insets.top + 16, borderBottomColor: border }]}>
-        <Text style={[styles.headerTitle, { color: fg }]}>Feed</Text>
+        {showSearch ? (
+          <TextInput
+            style={[styles.searchBar, { color: fg, backgroundColor: isDark ? '#1A1A2E' : '#EDE9FE', borderColor: border }]}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search brands, products…"
+            placeholderTextColor={muted}
+            autoFocus
+          />
+        ) : (
+          <Text style={[styles.headerTitle, { color: fg }]}>Feed</Text>
+        )}
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.headerIconBtn} activeOpacity={0.7}>
-            <Feather name="search" size={20} color={muted} />
+          <TouchableOpacity style={styles.headerIconBtn} activeOpacity={0.7} onPress={toggleSearch}>
+            <Feather name={showSearch ? 'x' : 'search'} size={20} color={showSearch ? primary : muted} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.headerIconBtn} activeOpacity={0.7}>
+          <TouchableOpacity
+            style={styles.headerIconBtn}
+            activeOpacity={0.7}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              Alert.alert('Filter Feed', 'Show posts from:', [
+                { text: 'Everyone',       onPress: () => { setFollowingOnly(false); setSearchQuery(''); } },
+                { text: 'Following only', onPress: () => { setFollowingOnly(true);  setSearchQuery(''); } },
+                { text: 'Cancel', style: 'cancel' },
+              ]);
+            }}
+          >
             <Feather name="sliders" size={20} color={muted} />
           </TouchableOpacity>
         </View>
@@ -371,16 +454,26 @@ export default function FeedScreen({ showStories = true }: { showStories?: boole
 
       {/* ─ Feed ─ */}
       <FlatList
-        data={items}
+        data={displayItems}
         keyExtractor={item => item.id}
         contentContainerStyle={{ paddingVertical: 12, paddingHorizontal: 16, paddingBottom: 120, gap: 16 }}
         showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={{ alignItems: 'center', paddingTop: 60, gap: 10 }}>
+            <Feather name="search" size={32} color={muted} />
+            <Text style={{ fontSize: 15, fontFamily: 'Inter_500Medium', color: muted }}>
+              No results for "{searchQuery}"
+            </Text>
+          </View>
+        }
         renderItem={({ item }) => (
           <FeedCard
             item={item}
             isDark={isDark}
             onLike={handleLike}
             onSave={handleSave}
+            following={!!followed[item.id]}
+            onFollow={handleFollow}
           />
         )}
       />
@@ -400,6 +493,7 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', letterSpacing: -0.6 },
   headerRight: { flexDirection: 'row', gap: 8 },
   headerIconBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  searchBar: { flex: 1, height: 36, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, fontSize: 14, fontFamily: 'Inter_400Regular', marginRight: 4 },
 
   storiesRow:    { borderBottomWidth: 1, height: 100 },
   storiesScroll: { paddingHorizontal: 16, paddingVertical: 10, gap: 14, alignItems: 'center' },

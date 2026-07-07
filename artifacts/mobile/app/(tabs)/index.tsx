@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   ScrollView, View, Text, TouchableOpacity, StyleSheet,
-  Platform, useColorScheme,
+  Platform, useColorScheme, Alert,
 } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -121,7 +121,17 @@ export default function SellerDashboard() {
             <Text style={[st.brand, { color: colors.foreground }]}>Brandthread</Text>
           </View>
           <View style={st.headerRight}>
-            <TouchableOpacity style={[st.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={[st.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              activeOpacity={0.7}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                Alert.alert('Notifications', '• New order #2048 from Jordan K.\n• Low stock: Canvas Cargo (3 left)\n• Summer Capsule goes live in 2h', [
+                  { text: 'View Analytics', onPress: () => nav('/analytics') },
+                  { text: 'Dismiss', style: 'cancel' },
+                ]);
+              }}
+            >
               <Feather name="bell" size={18} color={colors.mutedForeground} />
               <View style={[st.notifDot, { backgroundColor: colors.destructive }]} />
             </TouchableOpacity>

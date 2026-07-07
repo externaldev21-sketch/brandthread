@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  useColorScheme,
+  useColorScheme, Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -27,7 +28,7 @@ const MENU = [
   { icon: 'truck'        as const, label: 'Shipping setup',     route: '/shipping' },
   { icon: 'bar-chart-2'  as const, label: 'Analytics',          route: '/analytics'},
   { icon: 'credit-card'  as const, label: 'Payments & billing', route: '/payments' },
-  { icon: 'help-circle'  as const, label: 'Help & support',     route: null        },
+  { icon: 'help-circle'  as const, label: 'Help & support',     route: '__help__'  },
 ];
 
 export default function ProfileScreen() {
@@ -46,6 +47,14 @@ export default function ProfileScreen() {
 
   function nav(route: string | null) {
     if (!route) return;
+    if (route === '__help__') {
+      Alert.alert('Help & Support', 'How can we help?', [
+        { text: 'Browse FAQ',   onPress: () => {} },
+        { text: 'Contact Us',  onPress: () => {} },
+        { text: 'Cancel', style: 'cancel' },
+      ]);
+      return;
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(route as never);
   }
@@ -156,6 +165,13 @@ export default function ProfileScreen() {
         <TouchableOpacity
           style={[styles.signOutBtn, { borderColor: '#EF4444' }]}
           activeOpacity={0.8}
+          onPress={() => Alert.alert('Sign out', 'Are you sure you want to sign out?', [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Sign out', style: 'destructive', onPress: async () => {
+              await AsyncStorage.clear();
+              router.replace('/onboarding' as never);
+            }},
+          ])}
         >
           <Feather name="log-out" size={16} color="#EF4444" />
           <Text style={styles.signOutText}>Sign out</Text>

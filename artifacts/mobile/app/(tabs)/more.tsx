@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Alert } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -176,6 +176,19 @@ export default function MoreScreen() {
             key={item.label}
             activeOpacity={0.75}
             style={[styles.listRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              if (item.label === 'Two-Factor Auth') {
+                Alert.alert('Two-Factor Auth', '2FA is currently enabled on your account.', [
+                  { text: 'Disable 2FA', style: 'destructive', onPress: () => {} },
+                  { text: 'OK', style: 'cancel' },
+                ]);
+              } else if (item.label === 'User Permissions') {
+                handleNav('/team');
+              } else {
+                Alert.alert(item.label, 'This feature is coming soon in a future update.', [{ text: 'Got it' }]);
+              }
+            }}
           >
             <View style={[styles.listIconWrap, { backgroundColor: colors.secondary }]}>
               <Feather name={item.icon} size={16} color={colors.mutedForeground} />

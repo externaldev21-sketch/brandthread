@@ -1,22 +1,28 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  useColorScheme, FlatList,
+  useColorScheme, FlatList, Share, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
 const FRIENDS = [
-  { id: 'f1', name: 'Maya Chen',   handle: '@mayachen',   initials: 'MC', color: '#BE185D', hasNew: true,  activity: 'saved 3 items from Vault Studio' },
-  { id: 'f2', name: 'Jordan Lee',  handle: '@jordanlee',  initials: 'JL', color: '#1D4ED8', hasNew: true,  activity: 'posted a fit check' },
-  { id: 'f3', name: 'Amir Patel',  handle: '@amirpatel',  initials: 'AP', color: '#0F766E', hasNew: false, activity: 'copped the NxGen hoodie' },
-  { id: 'f4', name: 'Sofia Reyes', handle: '@sofiareyes', initials: 'SR', color: '#B45309', hasNew: true,  activity: 'shared her wishlist' },
-  { id: 'f5', name: 'Kai Nakamura',handle: '@kainakamura',initials: 'KN', color: '#7C3AED', hasNew: false, activity: 'liked a drop from Atlas Goods' },
+  { id: 'f1', name: 'Maya Chen',    handle: '@mayachen',    chatId: 'maya',   initials: 'MC', color: '#BE185D', hasNew: true,  activity: 'saved 3 items from Vault Studio' },
+  { id: 'f2', name: 'Jordan Lee',   handle: '@jordanlee',   chatId: 'jordan', initials: 'JL', color: '#1D4ED8', hasNew: true,  activity: 'posted a fit check' },
+  { id: 'f3', name: 'Amir Patel',   handle: '@amirpatel',   chatId: 'amir',   initials: 'AP', color: '#0F766E', hasNew: false, activity: 'copped the NxGen hoodie' },
+  { id: 'f4', name: 'Sofia Reyes',  handle: '@sofiareyes',  chatId: 'sofia',  initials: 'SR', color: '#B45309', hasNew: true,  activity: 'shared her wishlist' },
+  { id: 'f5', name: 'Kai Nakamura', handle: '@kainakamura', chatId: 'kai',    initials: 'KN', color: '#7C3AED', hasNew: false, activity: 'liked a drop from Atlas Goods' },
 ];
+
+const FRIEND_CHAT_MAP: Record<string, string> = {
+  'Maya Chen': 'maya', 'Jordan Lee': 'jordan', 'Amir Patel': 'amir',
+  'Sofia Reyes': 'sofia', 'Kai Nakamura': 'kai',
+};
 
 const FRIEND_POSTS = [
   {
@@ -71,12 +77,12 @@ const FRIEND_POSTS = [
 // ─── Friend post card ─────────────────────────────────────────────────────────
 
 function FriendCard({
-  post, isDark,
-  onLike,
+  post, isDark, onLike, onMessage,
 }: {
   post: typeof FRIEND_POSTS[0];
   isDark: boolean;
   onLike: (id: string) => void;
+  onMessage: (name: string) => void;
 }) {
   const card   = isDark ? '#111118' : '#FFFFFF';
   const border = isDark ? '#1E1E30' : '#E8E6F0';
@@ -145,11 +151,22 @@ function FriendCard({
             {post.liked ? post.likes + 1 : post.likes}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.actionBtn} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={s.actionBtn}
+          activeOpacity={0.7}
+          onPress={() => onMessage(post.friend)}
+        >
           <Feather name="message-circle" size={18} color={muted} />
           <Text style={[s.actionCount, { color: muted }]}>{post.comments}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.actionBtn} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={s.actionBtn}
+          activeOpacity={0.7}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            Share.share({ message: `${post.friend} ${post.type === 'cop' ? 'just copped' : 'wishlisted'}: ${post.items.map(i => `${i.name} by ${i.brand}`).join(', ')} — Brandthread` });
+          }}
+        >
           <Feather name="share-2" size={18} color={muted} />
         </TouchableOpacity>
       </View>
@@ -160,9 +177,10 @@ function FriendCard({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function FriendsScreen() {
-  const insets = useSafeAreaInsets();
-  const scheme = useColorScheme();
-  const isDark = scheme !== 'light';
+  const insets  = useSafeAreaInsets();
+  const scheme  = useColorScheme();
+  const router  = useRouter();
+  const isDark  = scheme !== 'light';
 
   const [posts, setPosts] = useState(FRIEND_POSTS);
 
@@ -176,6 +194,11 @@ export default function FriendsScreen() {
     setPosts(prev => prev.map(p => p.id === id ? { ...p, liked: !p.liked } : p));
   }
 
+  function handleMessage(name: string) {
+    const chatId = FRIEND_CHAT_MAP[name];
+    if (chatId) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/chat/${chatId}` as never); }
+  }
+
   const newActivity = FRIENDS.filter(f => f.hasNew).length;
 
   return (
@@ -186,7 +209,15 @@ export default function FriendsScreen() {
           <Text style={[s.headerTitle, { color: fg }]}>Friends</Text>
           <Text style={[s.headerSub, { color: muted }]}>{newActivity} friends active</Text>
         </View>
-        <TouchableOpacity style={[s.headerBtn, { borderColor: border }]} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={[s.headerBtn, { borderColor: border }]}
+          activeOpacity={0.7}
+          onPress={() => Alert.alert('Find Friends', 'Connect with friends on Brandthread', [
+            { text: 'Search by Username', onPress: () => {} },
+            { text: 'Sync Contacts',      onPress: () => {} },
+            { text: 'Cancel', style: 'cancel' },
+          ])}
+        >
           <Feather name="user-plus" size={18} color={muted} />
         </TouchableOpacity>
       </View>
@@ -203,7 +234,7 @@ export default function FriendsScreen() {
               key={friend.id}
               style={s.avatarItem}
               activeOpacity={0.8}
-              onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/chat/${friend.chatId}` as never); }}
             >
               {friend.hasNew ? (
                 <LinearGradient
@@ -238,7 +269,7 @@ export default function FriendsScreen() {
         contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
         renderItem={({ item }) => (
-          <FriendCard post={item} isDark={isDark} onLike={handleLike} />
+          <FriendCard post={item} isDark={isDark} onLike={handleLike} onMessage={handleMessage} />
         )}
       />
     </View>

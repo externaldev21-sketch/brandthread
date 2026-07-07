@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  useColorScheme, SectionList, ScrollView,
+  useColorScheme, SectionList, ScrollView, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -141,7 +141,24 @@ function NotifRow({ item, isDark, onRead }: {
         </View>
         <Text style={[s.notifBody, { color: muted }]} numberOfLines={2}>{item.body}</Text>
         {item.cta && (
-          <TouchableOpacity style={[s.ctaBtn, { backgroundColor: primary + '18', borderColor: primary + '40' }]} activeOpacity={0.8}>
+          <TouchableOpacity
+            style={[s.ctaBtn, { backgroundColor: primary + '18', borderColor: primary + '40' }]}
+            activeOpacity={0.8}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              if (item.cta === 'Track order') {
+                Alert.alert('Order Status', 'Your order is on its way! 📦\n\nEstimated delivery: Tomorrow, 2–5 PM', [{ text: 'OK' }]);
+              } else if (item.cta === 'Shop now' || item.cta === 'Buy now') {
+                Alert.alert(item.title, 'Ready to shop this drop?', [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: '🛍️ Go to Drop', onPress: () => { onRead(item.id); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } },
+                ]);
+              } else {
+                onRead(item.id);
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              }
+            }}
+          >
             <Text style={[s.ctaText, { color: primary }]}>{item.cta}</Text>
           </TouchableOpacity>
         )}
@@ -169,7 +186,10 @@ export default function InboxScreen() {
 
   // Trigger re-renders when store changes
   const [, forceUpdate] = useState(0);
-  useEffect(() => subscribe(() => forceUpdate(n => n + 1)), []);
+  useEffect(() => {
+    const unsub = subscribe(() => forceUpdate(n => n + 1));
+    return () => { unsub(); };
+  }, []);
 
   // Notification read state
   const [notifSections, setNotifSections] = useState(NOTIF_SECTIONS);
@@ -208,7 +228,16 @@ export default function InboxScreen() {
             Messages & activity
           </Text>
         </View>
-        <TouchableOpacity style={[s.iconBtn, { borderColor: border }]} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={[s.iconBtn, { borderColor: border }]}
+          activeOpacity={0.7}
+          onPress={() => Alert.alert('New Message', 'Choose a friend to start a conversation', [
+            { text: 'Maya Chen',    onPress: () => openChat('maya')  },
+            { text: 'Kai Nakamura',onPress: () => openChat('kai')   },
+            { text: 'Jordan Lee',  onPress: () => openChat('jordan') },
+            { text: 'Cancel', style: 'cancel' },
+          ])}
+        >
           <Feather name="edit" size={17} color={muted} />
         </TouchableOpacity>
       </View>
@@ -217,7 +246,10 @@ export default function InboxScreen() {
       <View style={{ paddingHorizontal: 20, marginTop: 20 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <Text style={[s.sectionTitle, { color: fg }]}>Messages</Text>
-          <TouchableOpacity activeOpacity={0.7}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => openChat('maya')}
+          >
             <Text style={[s.seeAll, { color: primary }]}>See all</Text>
           </TouchableOpacity>
         </View>

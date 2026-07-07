@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Animated, Dimensions, Platform, ScrollView, StyleSheet,
-  Text, TouchableOpacity, View, useColorScheme,
+  Text, TouchableOpacity, View, useColorScheme, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
 const { width: W } = Dimensions.get('window');
@@ -168,7 +169,18 @@ function HeroCard({ isDark }: { isDark: boolean }) {
         <TouchableOpacity
           style={s.heroShopBtn}
           activeOpacity={0.85}
-          onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            Alert.alert(
+              HERO_DROP.brand,
+              `${HERO_DROP.name} · ${HERO_DROP.price}\n${HERO_DROP.remaining} left of ${HERO_DROP.units} — act fast!`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                { text: '🔔 Notify Me',  onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
+                { text: '🛍️ Shop Now',   onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
+              ],
+            );
+          }}
         >
           <LinearGradient colors={HERO_DROP.accentGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.heroShopGrad}>
             <Feather name="shopping-bag" size={15} color="#FFF" />
@@ -197,7 +209,22 @@ function ForYouCard({ item, isDark }: { item: typeof FOR_YOU[0]; isDark: boolean
   const muted  = isDark ? '#6B6B8A' : '#8080A0';
 
   return (
-    <View style={[fy.card, { backgroundColor: card, borderColor: border }]}>
+    <TouchableOpacity
+      style={[fy.card, { backgroundColor: card, borderColor: border }]}
+      activeOpacity={0.85}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        Alert.alert(
+          item.brand,
+          `${item.name} · ${item.price}${item.originalPrice ? `\nWas ${item.originalPrice}` : ''}`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: '🔖 Save',      onPress: () => { setSaved(v => !v); } },
+            { text: '🛍️ Shop Now', onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
+          ],
+        );
+      }}
+    >
       <LinearGradient colors={[item.color + 'DD', item.color + '44']} style={fy.visual}>
         <View style={[fy.visualIcon, { backgroundColor: '#FFFFFF20' }]}>
           <Feather name="shopping-bag" size={22} color="#FFF" />
@@ -230,7 +257,7 @@ function ForYouCard({ item, isDark }: { item: typeof FOR_YOU[0]; isDark: boolean
           )}
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -262,7 +289,19 @@ function DroppingRow({ item, isDark }: { item: typeof DROPPING_SOON[0]; isDark: 
     <TouchableOpacity
       style={[dr.row, { backgroundColor: card, borderColor: border }]}
       activeOpacity={0.8}
-      onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        Alert.alert(
+          item.brand,
+          `${item.name} · ${item.price}${item.live ? '\n🔴 Live now!' : `\nDrops in ${item.inHours}h`}`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            item.live
+              ? { text: '🛍️ Shop Now',  onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) }
+              : { text: '🔔 Notify Me', onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
+          ],
+        );
+      }}
     >
       <View style={[dr.avatar, { backgroundColor: item.color }]}>
         <Text style={dr.initials}>{item.initials}</Text>
@@ -311,7 +350,18 @@ function TrendingRow({ item, isDark }: { item: typeof TRENDING[0]; isDark: boole
     <TouchableOpacity
       style={[tr.row, { backgroundColor: card, borderColor: border }]}
       activeOpacity={0.8}
-      onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        Alert.alert(
+          item.brand,
+          `${item.name} · ${item.price}\n${item.hype}`,
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: '🔖 Save',      onPress: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light) },
+            { text: '🛍️ Shop Now', onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
+          ],
+        );
+      }}
     >
       <Text style={[tr.rank, { color: primary }]}>#{item.rank}</Text>
       <View style={[tr.avatar, { backgroundColor: item.color }]}>
@@ -342,7 +392,7 @@ const tr = StyleSheet.create({
 
 // ─── Section header ───────────────────────────────────────────────────────────
 
-function SectionHead({ title, sub, action }: { title: string; sub?: string; action?: string }) {
+function SectionHead({ title, sub, action, onAction }: { title: string; sub?: string; action?: string; onAction?: () => void }) {
   const scheme = useColorScheme();
   const isDark = scheme !== 'light';
   const fg     = isDark ? '#F0EEFF' : '#1A1035';
@@ -356,7 +406,7 @@ function SectionHead({ title, sub, action }: { title: string; sub?: string; acti
         {sub && <Text style={{ fontSize: 11, fontFamily: 'Inter_400Regular', color: muted, marginTop: 2 }}>{sub}</Text>}
       </View>
       {action && (
-        <TouchableOpacity activeOpacity={0.7} onPress={() => Haptics.selectionAsync()}>
+        <TouchableOpacity activeOpacity={0.7} onPress={() => { Haptics.selectionAsync(); onAction?.(); }}>
           <Text style={{ fontSize: 13, fontFamily: 'Inter_600SemiBold', color: primary }}>{action}</Text>
         </TouchableOpacity>
       )}
@@ -369,6 +419,7 @@ function SectionHead({ title, sub, action }: { title: string; sub?: string; acti
 export default function InspoScreen() {
   const scheme  = useColorScheme();
   const insets  = useSafeAreaInsets();
+  const router  = useRouter();
   const isDark  = scheme !== 'light';
 
   const bg      = isDark ? '#08080F' : '#F4F3FA';
@@ -394,12 +445,17 @@ export default function InspoScreen() {
           <TouchableOpacity
             style={[s.headerBtn, { backgroundColor: isDark ? '#111118' : '#FFFFFF', borderColor: border }]}
             activeOpacity={0.75}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              Alert.alert('Search', 'Search for brands and drops coming soon 🔍', [{ text: 'OK' }]);
+            }}
           >
             <Feather name="search" size={18} color={muted} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[s.headerBtn, { backgroundColor: isDark ? '#111118' : '#FFFFFF', borderColor: border }]}
             activeOpacity={0.75}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/inbox' as never); }}
           >
             <Feather name="bell" size={18} color={muted} />
             <View style={[s.notifDot, { backgroundColor: '#EF4444' }]} />
@@ -418,7 +474,7 @@ export default function InspoScreen() {
             key={brand.id}
             style={s.storyItem}
             activeOpacity={0.8}
-            onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/feed' as never); }}
           >
             {brand.hasNew ? (
               <LinearGradient
@@ -454,6 +510,7 @@ export default function InspoScreen() {
           title="For You"
           sub="Based on your Archive Fashion taste"
           action="See all"
+          onAction={() => router.push('/(buyer)/feed' as never)}
         />
       </View>
       <ScrollView
@@ -473,6 +530,7 @@ export default function InspoScreen() {
           title="Dropping Soon"
           sub="From brands you follow"
           action="All drops"
+          onAction={() => router.push('/(buyer)/feed' as never)}
         />
       </View>
       <View style={{ paddingHorizontal: 20, gap: 10, marginBottom: 32 }}>
