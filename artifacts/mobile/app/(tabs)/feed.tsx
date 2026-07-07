@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity,
+  View, Text, StyleSheet, FlatList, ScrollView, TouchableOpacity,
   useColorScheme, Dimensions, Animated, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -311,17 +311,17 @@ export default function FeedScreen() {
       </View>
 
       {/* ─ Filter pills ─ */}
-      <FlatList
+      <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        data={filters}
-        keyExtractor={f => f}
         contentContainerStyle={styles.filtersScroll}
-        style={{ flexGrow: 0, borderBottomWidth: 1, borderBottomColor: border }}
-        renderItem={({ item: filter }) => {
+        style={{ borderBottomWidth: 1, borderBottomColor: border }}
+      >
+        {filters.map((filter) => {
           const active = filter === activeFilter;
           return (
             <TouchableOpacity
+              key={filter}
               onPress={() => setActiveFilter(filter)}
               style={[
                 styles.filterPill,
@@ -331,16 +331,13 @@ export default function FeedScreen() {
               ]}
               activeOpacity={0.75}
             >
-              <Text
-                style={[styles.filterText, { color: active ? '#FFFFFF' : muted }]}
-                numberOfLines={1}
-              >
+              <Text style={[styles.filterText, { color: active ? '#FFFFFF' : muted }]}>
                 {filter}
               </Text>
             </TouchableOpacity>
           );
-        }}
-      />
+        })}
+      </ScrollView>
 
       {/* ─ Feed ─ */}
       <FlatList
