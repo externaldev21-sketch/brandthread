@@ -90,15 +90,21 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen
-        name="analytics"
+        name="feed"
         options={{
-          title: 'Analytics',
+          title: 'Feed',
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name={focused ? 'chart.bar.fill' : 'chart.bar'} tintColor={color} size={22} />
+              <SymbolView name={focused ? 'play.square.stack.fill' : 'play.square.stack'} tintColor={color} size={22} />
             ) : (
-              <TabIcon name="bar-chart-2" color={color} focused={focused} />
+              <TabIcon name="play-circle" color={color} focused={focused} />
             ),
+        }}
+      />
+      <Tabs.Screen
+        name="analytics"
+        options={{
+          href: null, // hidden from tab bar — accessible via More
         }}
       />
       <Tabs.Screen
