@@ -89,15 +89,7 @@ function ClassicTabLayout() {
       />
       <Tabs.Screen
         name="analytics"
-        options={{
-          title: 'Analytics',
-          tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
-              <SymbolView name={focused ? 'chart.bar.fill' : 'chart.bar'} tintColor={color} size={20} />
-            ) : (
-              <TabIcon name="bar-chart-2" color={color} focused={focused} />
-            ),
-        }}
+        options={{ href: null }}
       />
 
       {/* ─── Centre — Feed (stands out) ────────────────────────── */}
