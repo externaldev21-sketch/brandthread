@@ -16,6 +16,14 @@ const { width: SCREEN_W } = Dimensions.get('window');
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
+const BUYER_STYLES = [
+  { value: 'streetwear',      label: 'Streetwear',      emoji: '🔥' },
+  { value: 'archive-fashion', label: 'Archive Fashion',  emoji: '🎞️' },
+  { value: 'luxury',          label: 'Luxury',           emoji: '✨' },
+  { value: 'athletic-wear',   label: 'Athletic Wear',    emoji: '⚡' },
+  { value: 'accessories',     label: 'Accessories',      emoji: '💍' },
+];
+
 const SELLER_CATEGORIES = [
   { value: 'streetwear',  label: 'Streetwear',  emoji: '🔥' },
   { value: 'luxury',      label: 'Luxury',       emoji: '✨' },
@@ -179,6 +187,67 @@ const roleStyles = StyleSheet.create({
   cardSub:    { fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 18 },
 });
 
+
+// ─── Buyer style picker ───────────────────────────────────────────────────────
+
+function BuyerStylePicker({
+  isDark, onFinish,
+}: {
+  isDark: boolean;
+  onFinish: () => void;
+}) {
+  const insets  = useSafeAreaInsets();
+  const [picked, setPicked] = useState('');
+
+  const bg      = isDark ? '#08080F' : '#F8F7FF';
+  const card    = isDark ? '#111118' : '#FFFFFF';
+  const border  = isDark ? '#252535' : '#DDD6FE';
+  const fg      = isDark ? '#F0EEFF' : '#1A1035';
+  const muted   = isDark ? '#6B6B8A' : '#6D6892';
+  const primary = isDark ? '#9F7AEA' : '#7C3AED';
+  const cardSel = isDark ? '#2D1F5E' : '#EDE9FE';
+
+  return (
+    <View style={[{ flex: 1 }, { backgroundColor: bg }]}>
+      <ScrollView contentContainerStyle={[setupStyles.stepContent, { paddingTop: insets.top + 24 }]} showsVerticalScrollIndicator={false}>
+        <Text style={setupStyles.emoji}>🛍️</Text>
+        <Text style={[setupStyles.q, { color: fg }]}>What's your{'\n'}style?</Text>
+        <Text style={[setupStyles.qSub, { color: muted }]}>We'll show you drops that match your taste.</Text>
+        <View style={setupStyles.gridWrap}>
+          {BUYER_STYLES.map(s => {
+            const sel = picked === s.value;
+            return (
+              <TouchableOpacity
+                key={s.value}
+                style={[
+                  setupStyles.gridCard,
+                  { backgroundColor: sel ? cardSel : card, borderColor: sel ? primary : border },
+                ]}
+                onPress={() => { setPicked(s.value); Haptics.selectionAsync(); }}
+                activeOpacity={0.8}
+              >
+                <Text style={setupStyles.gridEmoji}>{s.emoji}</Text>
+                <Text style={[setupStyles.gridLabel, { color: sel ? primary : fg }]}>{s.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </ScrollView>
+
+      <View style={[setupStyles.footer, { paddingBottom: insets.bottom + 12, borderTopColor: border }]}>
+        {/* spacer so button sits right-aligned like seller flow */}
+        <View style={setupStyles.backBtn} />
+        <TouchableOpacity
+          style={[setupStyles.nextBtn, { backgroundColor: picked ? primary : border }]}
+          onPress={() => { if (picked) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onFinish(); } }}
+          activeOpacity={0.85}
+        >
+          <Text style={setupStyles.nextText}>🛍️  Start shopping</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+}
 
 // ─── Seller setup ─────────────────────────────────────────────────────────────
 
@@ -433,11 +502,6 @@ export default function OnboardingScreen() {
   const pageAnim = useRef(new Animated.Value(0)).current;
 
   function handleRoleSelect(r: Role) {
-    if (r === 'buyer') {
-      // Buyers skip all setup questions and go straight to the app
-      handleFinish(r);
-      return;
-    }
     setRole(r);
     pageAnim.setValue(SCREEN_W);
     Animated.spring(pageAnim, {
@@ -466,10 +530,13 @@ export default function OnboardingScreen() {
         </View>
       )}
 
-      {/* Setup page — slides in for seller / both */}
+      {/* Setup page — slides in once role is chosen */}
       {role !== null && (
         <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX: pageAnim }] }]}>
-          <SellerSetup isDark={isDark} onFinish={handleFinish} isBoth={role === 'both'} />
+          {role === 'buyer'
+            ? <BuyerStylePicker isDark={isDark} onFinish={handleFinish} />
+            : <SellerSetup isDark={isDark} onFinish={handleFinish} isBoth={role === 'both'} />
+          }
         </Animated.View>
       )}
     </View>
