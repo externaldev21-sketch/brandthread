@@ -7,9 +7,11 @@ import { BlurView } from 'expo-blur';
 import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRole } from '@/contexts/RoleContext';
 
-function ClassicTabLayout() {
+// ─── Seller / Both layout ─────────────────────────────────────────────────────
+// Tabs: Dashboard · Products · Feed (centre pill) · More · Profile
+
+function SellerTabLayout() {
   const colors = useColors();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
@@ -17,11 +19,9 @@ function ClassicTabLayout() {
   const isWeb = Platform.OS === 'web';
   const insets = useSafeAreaInsets();
   const bottomOffset = isWeb ? 20 : Math.max(insets.bottom, 8) + 12;
-  const { role } = useRole();
-  const isBuyer = role === 'buyer';
 
-  const pillBg      = isDark ? '#111118F0' : '#FFFFFFF0';
-  const inactiveTint = isDark ? '#555570' : '#9090B0';
+  const pillBg       = isDark ? '#111118F0' : '#FFFFFFF0';
+  const inactiveTint = isDark ? '#555570'   : '#9090B0';
 
   const tabBarStyle = {
     position: 'absolute' as const,
@@ -65,11 +65,11 @@ function ClassicTabLayout() {
         tabBarItemStyle: { paddingVertical: 8 },
       }}
     >
-      {/* ─── Tab 1: Home (label changes by role) ───────────────── */}
+      {/* Dashboard */}
       <Tabs.Screen
         name="index"
         options={{
-          title: isBuyer ? 'Discover' : 'Dashboard',
+          title: 'Dashboard',
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
               <SymbolView name={focused ? 'house.fill' : 'house'} tintColor={color} size={20} />
@@ -79,11 +79,10 @@ function ClassicTabLayout() {
         }}
       />
 
-      {/* ─── Tab 2: Products (seller) or Following (buyer) ─────── */}
+      {/* Products */}
       <Tabs.Screen
         name="products"
         options={{
-          href: isBuyer ? null : undefined,
           title: 'Products',
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
@@ -93,25 +92,14 @@ function ClassicTabLayout() {
             ),
         }}
       />
-      <Tabs.Screen
-        name="following"
-        options={{
-          href: isBuyer ? undefined : null,
-          title: 'Following',
-          tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
-              <SymbolView name={focused ? 'heart.fill' : 'heart'} tintColor={color} size={20} />
-            ) : (
-              <TabIcon name="heart" color={color} focused={focused} />
-            ),
-        }}
-      />
 
-      {/* ─── Always hidden ─────────────────────────────────────── */}
-      <Tabs.Screen name="analytics"  options={{ href: null }} />
-      <Tabs.Screen name="marketing"  options={{ href: null }} />
+      {/* Always hidden — buyer-only screens kept here so routes still resolve */}
+      <Tabs.Screen name="following" options={{ href: null }} />
+      <Tabs.Screen name="analytics" options={{ href: null }} />
+      <Tabs.Screen name="marketing" options={{ href: null }} />
+      <Tabs.Screen name="wishlist"  options={{ href: null }} />
 
-      {/* ─── Centre — Feed ─────────────────────────────────────── */}
+      {/* Feed — centre gradient pill */}
       <Tabs.Screen
         name="feed"
         options={{
@@ -121,11 +109,10 @@ function ClassicTabLayout() {
         }}
       />
 
-      {/* ─── Tab 4: More (seller) or Wishlist (buyer) ──────────── */}
+      {/* More */}
       <Tabs.Screen
         name="more"
         options={{
-          href: isBuyer ? null : undefined,
           title: 'More',
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
@@ -135,21 +122,8 @@ function ClassicTabLayout() {
             ),
         }}
       />
-      <Tabs.Screen
-        name="wishlist"
-        options={{
-          href: isBuyer ? undefined : null,
-          title: 'Wishlist',
-          tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
-              <SymbolView name={focused ? 'bookmark.fill' : 'bookmark'} tintColor={color} size={20} />
-            ) : (
-              <TabIcon name="bookmark" color={color} focused={focused} />
-            ),
-        }}
-      />
 
-      {/* ─── Tab 5: Profile (all roles) ────────────────────────── */}
+      {/* Profile */}
       <Tabs.Screen
         name="profile"
         options={{
@@ -218,5 +192,5 @@ function TabIcon({ name, color, focused }: { name: keyof typeof Feather.glyphMap
 }
 
 export default function TabLayout() {
-  return <ClassicTabLayout />;
+  return <SellerTabLayout />;
 }

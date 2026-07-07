@@ -37,8 +37,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const { isSignedIn, isLoaded } = useAuth();
   const router = useRouter();
   const segments = useSegments();
+  const topSegment = segments[0]; // stable string, safe as a dep
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [onboardingDone, setOnboardingDone] = useState(false);
+  const [storedRole, setStoredRole] = useState<string | null>(null);
 
   // In dev bypass mode, clear onboarding state on every boot so the full
   // flow can be tested without manually wiping AsyncStorage.
@@ -47,14 +49,20 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     AsyncStorage.multiRemove([ONBOARDING_KEY, 'user_role']);
   }, []);
 
-  // Check AsyncStorage once when the user is signed in (or in dev bypass)
+  // Re-read AsyncStorage whenever the user signs in OR navigates to a new
+  // top-level segment.  Setting onboardingChecked=false first ensures the
+  // redirect effect never fires while the read is in-flight — this prevents
+  // the "sent back to /onboarding right after completing it" race condition.
   useEffect(() => {
     if (!isSignedIn && !DEV_BYPASS_AUTH) { setOnboardingChecked(false); return; }
-    AsyncStorage.getItem(ONBOARDING_KEY).then((val) => {
-      setOnboardingDone(val === 'true');
+    setOnboardingChecked(false);
+    AsyncStorage.multiGet([ONBOARDING_KEY, 'user_role']).then((pairs) => {
+      setOnboardingDone(pairs[0][1] === 'true');
+      setStoredRole(pairs[1][1]);
       setOnboardingChecked(true);
     });
-  }, [isSignedIn]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSignedIn, topSegment]);
 
   useEffect(() => {
     if (!DEV_BYPASS_AUTH) {
@@ -66,14 +74,25 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
     // Onboarding redirect applies in both normal and dev-bypass mode
     if (!onboardingChecked) return;
-    const inOnboarding = segments[0] === 'onboarding';
-    const inAuthGroup  = segments[0] === 'sign-in';
+    const inOnboarding  = segments[0] === 'onboarding';
+    const inAuthGroup   = segments[0] === 'sign-in';
+    const inBuyerGroup  = segments[0] === '(buyer)';
+    const inTabsGroup   = segments[0] === '(tabs)';
+
     if (!onboardingDone && !inOnboarding) {
       router.replace('/onboarding');
     } else if (onboardingDone && (inAuthGroup || inOnboarding)) {
-      router.replace('/');
+      // Route to the correct group based on saved role
+      const dest = storedRole === 'buyer' ? '/(buyer)/' : '/(tabs)/';
+      router.replace(dest as never);
+    } else if (onboardingDone && storedRole === 'buyer' && inTabsGroup) {
+      // Buyer somehow landed in the seller group — correct it
+      router.replace('/(buyer)/' as never);
+    } else if (onboardingDone && storedRole !== 'buyer' && storedRole !== null && inBuyerGroup) {
+      // Seller/both somehow landed in the buyer group — correct it
+      router.replace('/(tabs)/' as never);
     }
-  }, [isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone]);
+  }, [isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole]);
 
   return <>{children}</>;
 }
@@ -83,6 +102,7 @@ function RootLayoutNav() {
     <AuthGate>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)"        options={{ headerShown: false }} />
+        <Stack.Screen name="(buyer)"       options={{ headerShown: false }} />
         <Stack.Screen name="sign-in"        options={{ headerShown: false }} />
         <Stack.Screen name="onboarding"     options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="brand"         options={{ headerShown: false }} />

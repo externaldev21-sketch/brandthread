@@ -516,7 +516,9 @@ export default function OnboardingScreen() {
     const finalRole = overrideRole ?? role;
     await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
     if (finalRole) await AsyncStorage.setItem('user_role', finalRole);
-    router.replace('/');
+    // Route buyers to their dedicated group; sellers/both go to the dashboard
+    const dest = finalRole === 'buyer' ? '/(buyer)/' : '/(tabs)/';
+    router.replace(dest as never);
   }
 
   const bg = isDark ? '#08080F' : '#F8F7FF';
