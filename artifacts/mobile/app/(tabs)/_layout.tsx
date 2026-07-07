@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform, StyleSheet, Text, useColorScheme, View } from 'react-native';
+import { Platform, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -97,10 +97,7 @@ function ClassicTabLayout() {
         name="feed"
         options={{
           title: 'Feed',
-          tabBarIcon: ({ focused }) => (
-            <FeedCenterIcon focused={focused} isDark={isDark} />
-          ),
-          tabBarItemStyle: { paddingVertical: 8 },
+          tabBarButton: (props) => <FeedTabButton {...props} />,
         }}
       />
 
@@ -137,22 +134,38 @@ function ClassicTabLayout() {
   );
 }
 
-// ─── Feed centre button ───────────────────────────────────────────────────────
+// ─── Feed tab button (fully custom, bypasses RN icon/label layout) ────────────
 
-function FeedCenterIcon({ focused }: { focused: boolean; isDark: boolean }) {
+function FeedTabButton(props: any) {
+  const { onPress, accessibilityState } = props;
+  const focused = accessibilityState?.selected;
+
   return (
-    <LinearGradient
-      colors={focused
-        ? ['#F0ABFC', '#C026D3', '#7C3AED']
-        : ['#D946EF', '#A855F7', '#7C3AED']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={feedStyles.pill}
-    />
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.8}
+      style={feedStyles.wrapper}
+    >
+      <LinearGradient
+        colors={focused
+          ? ['#F0ABFC', '#C026D3', '#7C3AED']
+          : ['#D946EF', '#A855F7', '#7C3AED']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={feedStyles.pill}
+      />
+      <Text style={[feedStyles.label, { opacity: focused ? 1 : 0.55 }]}>Feed</Text>
+    </TouchableOpacity>
   );
 }
 
 const feedStyles = StyleSheet.create({
+  wrapper: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+  },
   pill: {
     width: 52,
     height: 22,
@@ -162,6 +175,12 @@ const feedStyles = StyleSheet.create({
     shadowOpacity: 0.7,
     shadowRadius: 10,
     elevation: 12,
+  },
+  label: {
+    fontSize: 9,
+    fontFamily: 'Inter_500Medium',
+    color: '#9F7AEA',
+    marginTop: -2,
   },
 });
 
