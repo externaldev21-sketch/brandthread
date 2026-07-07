@@ -103,6 +103,7 @@ function RootLayoutNav() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)"        options={{ headerShown: false }} />
         <Stack.Screen name="(buyer)"       options={{ headerShown: false }} />
+        <Stack.Screen name="chat/[id]"     options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="sign-in"        options={{ headerShown: false }} />
         <Stack.Screen name="onboarding"     options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="brand"         options={{ headerShown: false }} />
