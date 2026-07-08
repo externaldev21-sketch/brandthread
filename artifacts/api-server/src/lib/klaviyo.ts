@@ -32,7 +32,7 @@ export async function fetchKlaviyoAccount(apiKey: string): Promise<{ accountId: 
   if (!res.ok) {
     throw new KlaviyoError(`Klaviyo API error (${res.status})`, res.status);
   }
-  const body = await res.json();
+  const body = await res.json() as any;
   const account = body?.data?.[0];
   return {
     accountId: account?.id ?? "",
@@ -58,7 +58,7 @@ export async function fetchKlaviyoSubscriberSummary(apiKey: string): Promise<{
   if (!listsRes.ok) {
     throw new KlaviyoError(`Failed to fetch Klaviyo lists (${listsRes.status})`, listsRes.status);
   }
-  const listsBody = await listsRes.json();
+  const listsBody = await listsRes.json() as any;
   const lists: any[] = listsBody?.data ?? [];
   const listCount = lists.length;
 
@@ -88,7 +88,7 @@ async function fetchConsentedProfileCount(apiKey: string, channel: "email" | "sm
   while (url && guard < 500) {
     const res: Response = await fetch(url, { headers: authHeaders(apiKey) });
     if (!res.ok) break;
-    const body = await res.json();
+    const body = await res.json() as any;
     count += Array.isArray(body?.data) ? body.data.length : 0;
     url = body?.links?.next ?? null;
     guard += 1;

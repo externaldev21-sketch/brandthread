@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput, Platform } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput, Platform, Image, Alert } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useApi } from '@/hooks/useApi';
 
 const BRAND_CHECKLIST_ITEMS = [
   'Brand name finalized',
@@ -20,21 +21,6 @@ const BRAND_CHECKLIST_ITEMS = [
 
 const LOGO_STYLES = ['Minimalist', 'Bold', 'Vintage', 'Luxury', 'Streetwear', 'Playful'];
 
-type LogoConcept = { bg: string; fg: string; shape: 'circle' | 'square' | 'diamond'; style: string };
-
-function generateLogoConcepts(brandName: string, style: string): LogoConcept[] {
-  const palettes: Record<string, { bg: string; fg: string }[]> = {
-    Minimalist: [{ bg: '#1A1A1A', fg: '#FFFFFF' }, { bg: '#F5F0E8', fg: '#1A1A1A' }, { bg: '#2D2D2D', fg: '#C0A060' }],
-    Bold:       [{ bg: '#C94D1F', fg: '#FFFFFF' }, { bg: '#1A1A2E', fg: '#E94560' }, { bg: '#0F3460', fg: '#FFFFFF' }],
-    Vintage:    [{ bg: '#8B4513', fg: '#F5DEB3' }, { bg: '#2F4F2F', fg: '#F5F5DC' }, { bg: '#4A3728', fg: '#D4AF6A' }],
-    Luxury:     [{ bg: '#1A1208', fg: '#C9A96E' }, { bg: '#0D0D0D', fg: '#B8A060' }, { bg: '#1C1410', fg: '#E0C87A' }],
-    Streetwear: [{ bg: '#000000', fg: '#FFFFFF' }, { bg: '#FF4500', fg: '#000000' }, { bg: '#1A1A1A', fg: '#7FFF00' }],
-    Playful:    [{ bg: '#FF6B9D', fg: '#FFFFFF' }, { bg: '#4ECDC4', fg: '#1A1A1A' }, { bg: '#FFE66D', fg: '#1A1A1A' }],
-  };
-  const shapes: LogoConcept['shape'][] = ['circle', 'square', 'diamond'];
-  const chosen = palettes[style] ?? palettes['Minimalist'];
-  return chosen.map((p, i) => ({ ...p, shape: shapes[i % shapes.length], style }));
-}
 
 const NAME_PREFIXES = [
   'Thread', 'Core', 'Moon', 'Raw', 'Grain', 'Silt', 'Nova', 'Ash', 'Bare',
@@ -64,19 +50,38 @@ export default function BrandScreen() {
   const [selectedStyle, setSelectedStyle] = useState('Minimalist');
   const [suggestedNames, setSuggestedNames] = useState<string[]>(['ThreadCraft', 'Corevox', 'Moodwear', 'Rawline', 'Grainhaus']);
   const [isGenerating, setIsGenerating] = useState(false);
+  const api = useApi();
   const [logoStyle, setLogoStyle] = useState('Minimalist');
   const [logoGenerating, setLogoGenerating] = useState(false);
-  const [logoConcepts, setLogoConcepts] = useState<LogoConcept[]>([]);
+  const [logoImages, setLogoImages] = useState<string[]>([]); // base64 strings
   const [selectedLogo, setSelectedLogo] = useState<number | null>(null);
 
-  function handleGenerateLogo() {
+  async function handleGenerateLogo() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLogoGenerating(true);
     setSelectedLogo(null);
-    setTimeout(() => {
-      setLogoConcepts(generateLogoConcepts(nameInput || 'Brand', logoStyle));
+    setLogoImages([]);
+    try {
+      // Generate 3 variations in parallel
+      const settled = await Promise.allSettled([
+        api.logo.generate(nameInput || 'Brand', logoStyle),
+        api.logo.generate(nameInput || 'Brand', logoStyle),
+        api.logo.generate(nameInput || 'Brand', logoStyle),
+      ]);
+      const images = settled
+        .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+        .map(r => r.value?.b64_json)
+        .filter(Boolean);
+      if (images.length === 0) {
+        Alert.alert('Generation failed', 'No logos could be generated. Please try again.');
+      } else {
+        setLogoImages(images);
+      }
+    } catch (err: any) {
+      Alert.alert('Generation failed', 'Please try again.');
+    } finally {
       setLogoGenerating(false);
-    }, 1200);
+    }
   }
 
   const [checklist, setChecklist] = useState<boolean[]>(BRAND_CHECKLIST_ITEMS.map(() => false));
@@ -207,31 +212,25 @@ export default function BrandScreen() {
           </Text>
         </TouchableOpacity>
 
-        {/* Logo concepts */}
-        {logoConcepts.length > 0 && (
+        {/* Generated logos */}
+        {logoImages.length > 0 && (
           <>
-            <Text style={[styles.subLabel, { color: colors.mutedForeground, marginTop: 16 }]}>Concepts — tap to select</Text>
+            <Text style={[styles.subLabel, { color: colors.mutedForeground, marginTop: 16 }]}>Tap a logo to select it</Text>
             <View style={styles.logoGrid}>
-              {logoConcepts.map((c, i) => {
-                const initials = (nameInput || 'B').slice(0, 2).toUpperCase();
+              {logoImages.map((b64, i) => {
                 const isSelected = selectedLogo === i;
                 return (
                   <TouchableOpacity
                     key={i}
-                    activeOpacity={0.8}
+                    activeOpacity={0.85}
                     onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedLogo(i); }}
                     style={[styles.logoCard, { borderColor: isSelected ? colors.primary : colors.border, borderWidth: isSelected ? 2 : 1 }]}
                   >
-                    <View style={[
-                      styles.logoShape,
-                      { backgroundColor: c.bg, borderRadius: c.shape === 'circle' ? 36 : c.shape === 'diamond' ? 8 : 12 },
-                      c.shape === 'diamond' && { transform: [{ rotate: '45deg' }] },
-                    ]}>
-                      <Text style={[styles.logoInitials, { color: c.fg, transform: c.shape === 'diamond' ? [{ rotate: '-45deg' }] : [] }]}>
-                        {initials}
-                      </Text>
-                    </View>
-                    <Text style={[styles.logoStyleLabel, { color: colors.mutedForeground }]}>Style {i + 1}</Text>
+                    <Image
+                      source={{ uri: `data:image/png;base64,${b64}` }}
+                      style={styles.logoImage}
+                      resizeMode="contain"
+                    />
                     {isSelected && (
                       <View style={[styles.logoCheckBadge, { backgroundColor: colors.primary }]}>
                         <Feather name="check" size={10} color="#FFF" />
@@ -330,11 +329,9 @@ const styles = StyleSheet.create({
   styleText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
   subLabel: { fontSize: 11, fontFamily: 'Inter_500Medium', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
   logoGrid: { flexDirection: 'row', gap: 10 },
-  logoCard: { flex: 1, borderRadius: 14, padding: 12, alignItems: 'center', gap: 8, position: 'relative', backgroundColor: '#0D0B08' },
-  logoShape: { width: 72, height: 72, alignItems: 'center', justifyContent: 'center' },
-  logoInitials: { fontSize: 22, fontFamily: 'Inter_700Bold' },
-  logoStyleLabel: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  logoCheckBadge: { position: 'absolute', top: 8, right: 8, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  logoCard: { flex: 1, borderRadius: 14, overflow: 'hidden', position: 'relative', backgroundColor: '#0D0B08' },
+  logoImage: { width: '100%', aspectRatio: 1, borderRadius: 12 },
+  logoCheckBadge: { position: 'absolute', top: 8, right: 8, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   checkRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, gap: 12 },
   checkBox: { width: 24, height: 24, borderRadius: 6, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   checkLabel: { fontSize: 14, fontFamily: 'Inter_400Regular' },
