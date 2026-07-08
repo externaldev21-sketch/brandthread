@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, PanResponder, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, PanResponder, Alert, ScrollView, useWindowDimensions } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -19,6 +19,26 @@ export default function DesignCanvasScreen() {
   const dims = params.dims;
   const ratio = params.ratio ? parseFloat(params.ratio) : undefined;
   const isFullBleed = !ratio || params.label === 'Screen Size';
+  const { width: screenW, height: screenH } = useWindowDimensions();
+
+  // Compute canvas pixel size so it fills available space while respecting aspect ratio.
+  // Reserve ~120px for header + ~80px for bottom bar + 32px padding.
+  const RESERVED = 120 + 80 + 32;
+  const availW = screenW - 32;
+  const availH = screenH - RESERVED;
+  let canvasW: number, canvasH: number;
+  if (!ratio || isFullBleed) {
+    canvasW = screenW;
+    canvasH = availH + 32; // full bleed — no padding needed
+  } else if (ratio >= 1) {
+    // Landscape: constrained by width first
+    canvasW = Math.min(availW, availH * ratio);
+    canvasH = canvasW / ratio;
+  } else {
+    // Portrait: constrained by height first
+    canvasH = Math.min(availH, availW / ratio);
+    canvasW = canvasH * ratio;
+  }
 
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [redoStack, setRedoStack] = useState<Stroke[]>([]);
@@ -169,10 +189,7 @@ export default function DesignCanvasScreen() {
       {/* Canvas */}
       <View style={styles.canvasWrap}>
         <View
-          style={[
-            styles.canvas,
-            isFullBleed ? { flex: 1, width: '100%' } : { width: '100%', aspectRatio: ratio, flex: undefined },
-          ]}
+          style={[styles.canvas, { width: canvasW, height: canvasH }]}
           {...panResponder.panHandlers}
         >
           <Svg style={StyleSheet.absoluteFill}>
@@ -226,8 +243,8 @@ const styles = StyleSheet.create({
 
   palettePopover: { backgroundColor: '#232323', paddingHorizontal: 16, paddingVertical: 10, gap: 12, borderBottomWidth: 1, borderBottomColor: '#333' },
 
-  canvasWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 0, backgroundColor: '#FFFFFF' },
-  canvas: { flex: 1, width: '100%', backgroundColor: '#FFFFFF' },
+  canvasWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1A1A1A' },
+  canvas: { backgroundColor: '#FFFFFF' },
 
   bottomBar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
