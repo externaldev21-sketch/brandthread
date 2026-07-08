@@ -72,6 +72,16 @@ export default function MarketingScreen() {
         ))}
       </View>
 
+      {/* Connect Klaviyo */}
+      <TouchableOpacity
+        style={[styles.klaviyoBtn, { backgroundColor: colors.primary }]}
+        activeOpacity={0.85}
+        onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)}
+      >
+        <Feather name="zap" size={16} color={colors.primaryForeground} />
+        <Text style={[styles.klaviyoText, { color: colors.primaryForeground }]}>Connect Klaviyo: Email Marketing & SMS</Text>
+      </TouchableOpacity>
+
       {/* Campaigns */}
       <SectionHeader title="Campaigns" action="New +" />
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -181,6 +191,8 @@ const styles = StyleSheet.create({
   statChip: { flex: 1, borderRadius: 12, padding: 12, borderWidth: 1, alignItems: 'center', gap: 4 },
   statVal: { fontSize: 16, fontFamily: 'Inter_700Bold' },
   statLabel: { fontSize: 10, fontFamily: 'Inter_400Regular' },
+  klaviyoBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, paddingVertical: 14, marginBottom: 24 },
+  klaviyoText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
   campaignRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   campaignIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
