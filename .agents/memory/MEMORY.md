@@ -1,3 +1,4 @@
 - [Brandthread theme — purple](brandthread-theme.md) — app uses dual light/dark purple theme; primary is #7C3AED (light) / #9F7AEA (dark). Gold (#C9A96E) was fully replaced with purple. Both modes now genuinely differ.
 - [Clerk Expo v3 Signals API](clerk-expo-v3-signals-api.md) — @clerk/expo v3 hooks return SignInFutureResource; use password()+finalize() not create()+setActive(); Metro needs _tmp_ blockList fix.
 - [Brandthread backend architecture](brandthread-backend-architecture.md) — ownerId scoping, transactional orders, lib/db build requirement, clerkClient usage, healthz double-path gotcha.
+- [Inbox structural flattening](inbox-flattening-pattern.md) — Brandthread screens (profile, inbox) use flat Instagram-style rows, no card chrome; keep new screens consistent.

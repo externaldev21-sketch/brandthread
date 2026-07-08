@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  useColorScheme, SectionList, ScrollView, Alert,
+  useColorScheme, ScrollView, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -14,21 +14,11 @@ import {
 
 // ─── Notification mock data ───────────────────────────────────────────────────
 
-const NOTIF_SECTIONS = [
-  {
-    title: 'Today',
-    data: [
-      { id: 'n1', type: 'drop'    as const, read: false, avatar: '#B33F1E', initials: 'VS', title: 'Vault Studio drop is live', body: 'Canvas Cargo Jacket is now available — only 50 units.', time: '2h ago', cta: 'Shop now' },
-      { id: 'n2', type: 'restock' as const, read: false, avatar: '#B45309', initials: 'NX', title: 'Back in stock', body: 'Archive Hoodie Vol.3 by NxGen Drops — 8 units remaining.', time: '6h ago', cta: 'Buy now' },
-    ],
-  },
-  {
-    title: 'Yesterday',
-    data: [
-      { id: 'n3', type: 'order'   as const, read: true,  avatar: '#0F766E', initials: 'BT', title: 'Order shipped', body: 'Your Essential Relaxed Tee from Meridian Co. is on its way.', time: '1d ago', cta: 'Track order' },
-      { id: 'n4', type: 'drop'    as const, read: true,  avatar: '#1D4ED8', initials: 'AG', title: 'Atlas Goods — new drop', body: 'City Chore Coat now available in sand and slate.', time: '1d ago', cta: 'Shop now' },
-    ],
-  },
+const NOTIF_ITEMS = [
+  { id: 'n1', type: 'drop'    as const, read: false, title: 'Vault Studio drop is live', body: 'Canvas Cargo Jacket is now available — only 50 units.', time: '2h', cta: 'Shop now' },
+  { id: 'n2', type: 'restock' as const, read: false, title: 'Back in stock', body: 'Archive Hoodie Vol.3 by NxGen Drops — 8 units remaining.', time: '6h', cta: 'Buy now' },
+  { id: 'n3', type: 'order'   as const, read: true,  title: 'Order shipped', body: 'Your Essential Relaxed Tee from Meridian Co. is on its way.', time: '1d', cta: 'Track order' },
+  { id: 'n4', type: 'drop'    as const, read: true,  title: 'Atlas Goods — new drop', body: 'City Chore Coat now available in sand and slate.', time: '1d', cta: 'Shop now' },
 ];
 
 type NotifType = 'drop' | 'order' | 'restock';
@@ -50,6 +40,36 @@ function timeAgo(ts: number): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+// ─── Flat list row shell ──────────────────────────────────────────────────────
+// Instagram-style inbox row: no card/border chrome, just icon + text + trailing glyph.
+
+function InboxRow({ leading, title, titleBold, subtitle, cta, ctaColor, trailing, onPress, fg, muted }: {
+  leading: React.ReactNode;
+  title: string;
+  titleBold?: boolean;
+  subtitle: string;
+  cta?: string;
+  ctaColor?: string;
+  trailing?: React.ReactNode;
+  onPress: () => void;
+  fg: string;
+  muted: string;
+}) {
+  return (
+    <TouchableOpacity style={s.row} onPress={onPress} activeOpacity={0.75} hitSlop={{ top: 4, bottom: 4 }}>
+      {leading}
+      <View style={{ flex: 1 }}>
+        <Text style={[s.rowTitle, { color: fg }, titleBold && { fontFamily: 'Inter_700Bold' }]} numberOfLines={1}>
+          {title}
+        </Text>
+        <Text style={[s.rowSubtitle, { color: muted }]} numberOfLines={1}>{subtitle}</Text>
+        {cta && <Text style={[s.rowCta, { color: ctaColor ?? muted }]}>{cta}</Text>}
+      </View>
+      {trailing}
+    </TouchableOpacity>
+  );
+}
+
 // ─── DM thread row ────────────────────────────────────────────────────────────
 
 function DMRow({ friend, last, unread, isDark, onPress }: {
@@ -59,112 +79,86 @@ function DMRow({ friend, last, unread, isDark, onPress }: {
   isDark: boolean;
   onPress: () => void;
 }) {
-  const card    = isDark ? '#1B1917' : '#FFFFFF';
-  const border  = isDark ? '#33302A' : '#E3DCC9';
-  const fg      = isDark ? '#EDE7D9' : '#17140F';
-  const muted   = isDark ? '#8C8577' : '#8080A0';
+  const fg     = isDark ? '#EDE7D9' : '#17140F';
+  const muted  = isDark ? '#8C8577' : '#5C5548';
   const primary = isDark ? '#C94D1F' : '#B33F1E';
 
   return (
-    <TouchableOpacity
-      style={[s.dmRow, { backgroundColor: card, borderColor: border }]}
+    <InboxRow
+      fg={fg}
+      muted={muted}
       onPress={onPress}
-      activeOpacity={0.78}
-    >
-      {/* Avatar + online dot */}
-      <View style={{ position: 'relative' }}>
+      leading={
         <View style={[s.dmAvatar, { backgroundColor: friend.color }]}>
           <Text style={s.dmInitials}>{friend.initials}</Text>
         </View>
-        {friend.online && <View style={[s.onlineDot, { borderColor: card }]} />}
-      </View>
-
-      {/* Text */}
-      <View style={{ flex: 1 }}>
-        <Text style={[s.dmName, { color: fg }, unread > 0 && { fontFamily: 'Inter_700Bold' }]}>
-          {friend.name}
-        </Text>
-        <Text style={[s.dmPreview, { color: muted }, unread > 0 && { color: isDark ? '#E2DDD0' : '#7A2D14' }]} numberOfLines={1}>
-          {last ? (last.fromMe ? `You: ${last.text}` : last.text) : 'Start a conversation'}
-        </Text>
-      </View>
-
-      {/* Time + badge */}
-      <View style={{ alignItems: 'flex-end', gap: 5 }}>
-        {last && <Text style={[s.dmTime, { color: muted }]}>{timeAgo(last.ts)}</Text>}
-        {unread > 0 ? (
+      }
+      title={friend.name}
+      titleBold={unread > 0}
+      subtitle={last ? `${last.fromMe ? 'You: ' : ''}${last.text} · ${timeAgo(last.ts)}` : 'Start a conversation'}
+      trailing={
+        unread > 0 ? (
           <View style={[s.unreadBadge, { backgroundColor: primary }]}>
             <Text style={s.unreadText}>{unread}</Text>
           </View>
         ) : (
-          <Feather name="chevron-right" size={14} color={muted} />
-        )}
-      </View>
-    </TouchableOpacity>
+          <Feather name="camera" size={19} color={muted} />
+        )
+      }
+    />
   );
 }
 
 // ─── Notification row ─────────────────────────────────────────────────────────
 
 function NotifRow({ item, isDark, onRead }: {
-  item: typeof NOTIF_SECTIONS[0]['data'][0];
+  item: typeof NOTIF_ITEMS[number];
   isDark: boolean;
   onRead: (id: string) => void;
 }) {
-  const card   = isDark ? '#1B1917' : '#FFFFFF';
-  const border = isDark ? '#33302A' : '#E3DCC9';
-  const fg     = isDark ? '#EDE7D9' : '#17140F';
-  const muted  = isDark ? '#8C8577' : '#8080A0';
+  const fg      = isDark ? '#EDE7D9' : '#17140F';
+  const muted   = isDark ? '#8C8577' : '#5C5548';
   const primary = isDark ? '#C94D1F' : '#B33F1E';
-  const meta   = TYPE_META[item.type];
+  const meta    = TYPE_META[item.type];
+  const badgeCountVisible = !item.read && (item.type === 'drop' || item.type === 'restock');
+  const badgeDotVisible   = !item.read && !badgeCountVisible;
 
   return (
-    <TouchableOpacity
-      style={[s.notifRow, { backgroundColor: card, borderColor: border }, !item.read && { borderLeftWidth: 3, borderLeftColor: primary }]}
-      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onRead(item.id); }}
-      activeOpacity={0.75}
-    >
-      <View style={s.notifAvatarWrap}>
-        <View style={[s.notifAvatar, { backgroundColor: item.avatar }]}>
-          <Text style={s.notifInitials}>{item.initials}</Text>
+    <InboxRow
+      fg={fg}
+      muted={muted}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onRead(item.id);
+        if (item.cta === 'Track order') {
+          Alert.alert('Order Status', 'Your order is on its way! 📦\n\nEstimated delivery: Tomorrow, 2–5 PM', [{ text: 'OK' }]);
+        } else {
+          Alert.alert(item.title, item.body, [
+            { text: 'Cancel', style: 'cancel' },
+            { text: item.cta, onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
+          ]);
+        }
+      }}
+      leading={
+        <View style={[s.notifAvatar, { backgroundColor: meta.color }]}>
+          <Feather name={meta.icon} size={18} color="#FFF" />
         </View>
-        <View style={[s.typeBadge, { backgroundColor: meta.color + '22' }]}>
-          <Feather name={meta.icon} size={9} color={meta.color} />
-        </View>
-      </View>
-      <View style={{ flex: 1, gap: 2 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <Text style={[s.notifTitle, { color: fg }, !item.read && { fontFamily: 'Inter_700Bold' }]} numberOfLines={1}>
-            {item.title}
-          </Text>
-          <Text style={[s.notifTime, { color: muted }]}>{item.time}</Text>
-        </View>
-        <Text style={[s.notifBody, { color: muted }]} numberOfLines={2}>{item.body}</Text>
-        {item.cta && (
-          <TouchableOpacity
-            style={[s.ctaBtn, { backgroundColor: primary + '18', borderColor: primary + '40' }]}
-            activeOpacity={0.8}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              if (item.cta === 'Track order') {
-                Alert.alert('Order Status', 'Your order is on its way! 📦\n\nEstimated delivery: Tomorrow, 2–5 PM', [{ text: 'OK' }]);
-              } else if (item.cta === 'Shop now' || item.cta === 'Buy now') {
-                Alert.alert(item.title, 'Ready to shop this drop?', [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: '🛍️ Go to Drop', onPress: () => { onRead(item.id); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); } },
-                ]);
-              } else {
-                onRead(item.id);
-                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              }
-            }}
-          >
-            <Text style={[s.ctaText, { color: primary }]}>{item.cta}</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-      {!item.read && <View style={[s.unreadDot, { backgroundColor: primary }]} />}
-    </TouchableOpacity>
+      }
+      title={item.title}
+      titleBold={!item.read}
+      subtitle={`${item.body} · ${item.time}`}
+      cta={item.cta}
+      ctaColor={primary}
+      trailing={
+        badgeCountVisible ? (
+          <View style={[s.unreadBadge, { backgroundColor: primary }]}>
+            <Text style={s.unreadText}>1</Text>
+          </View>
+        ) : badgeDotVisible ? (
+          <View style={[s.unreadDot, { backgroundColor: primary }]} />
+        ) : undefined
+      }
+    />
   );
 }
 
@@ -180,9 +174,10 @@ export default function InboxScreen() {
 
   const bg      = isDark ? '#121110' : '#F5F1E7';
   const fg      = isDark ? '#EDE7D9' : '#17140F';
-  const muted   = isDark ? '#8C8577' : '#6E6759';
+  const muted   = isDark ? '#8C8577' : '#5C5548';
   const border  = isDark ? '#33302A' : '#E3DCC9';
   const primary = isDark ? '#C94D1F' : '#B33F1E';
+  const chipBg  = isDark ? '#1B1917' : '#FFFFFF';
 
   // Trigger re-renders when store changes
   const [, forceUpdate] = useState(0);
@@ -192,11 +187,9 @@ export default function InboxScreen() {
   }, []);
 
   // Notification read state
-  const [notifSections, setNotifSections] = useState(NOTIF_SECTIONS);
+  const [notifItems, setNotifItems] = useState(NOTIF_ITEMS);
   function markNotifRead(id: string) {
-    setNotifSections(prev =>
-      prev.map(sec => ({ ...sec, data: sec.data.map(n => n.id === id ? { ...n, read: true } : n) })),
-    );
+    setNotifItems(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
   }
 
   const totalUnread = FRIEND_ORDER.reduce((acc, id) => acc + getUnread(id), 0);
@@ -214,73 +207,139 @@ export default function InboxScreen() {
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + 16, borderBottomColor: border }]}>
-        <View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={[s.headerTitle, { color: fg }]}>Inbox</Text>
-            {totalUnread > 0 && (
-              <View style={[s.headerBadge, { backgroundColor: primary }]}>
-                <Text style={s.headerBadgeText}>{totalUnread}</Text>
-              </View>
-            )}
-          </View>
-          <Text style={[s.headerSub, { color: muted }]}>
-            Messages & activity
-          </Text>
-        </View>
+      <View style={[s.header, { paddingTop: insets.top + 16 }]}>
         <TouchableOpacity
-          style={[s.iconBtn, { borderColor: border }]}
+          style={s.headerIconBtn}
           activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           onPress={() => Alert.alert('New Message', 'Choose a friend to start a conversation', [
             { text: 'Maya Chen',    onPress: () => openChat('maya')  },
-            { text: 'Kai Nakamura',onPress: () => openChat('kai')   },
-            { text: 'Jordan Lee',  onPress: () => openChat('jordan') },
+            { text: 'Kai Nakamura', onPress: () => openChat('kai')   },
+            { text: 'Jordan Lee',   onPress: () => openChat('jordan') },
             { text: 'Cancel', style: 'cancel' },
           ])}
         >
-          <Feather name="edit" size={17} color={muted} />
+          <Feather name="users" size={22} color={fg} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={s.headerTitleRow}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8 }}
+          onPress={() => Alert.alert('Inbox', undefined, [
+            { text: 'General', onPress: () => {} },
+            { text: 'Requests', onPress: () => {} },
+            { text: 'Cancel', style: 'cancel' },
+          ])}
+        >
+          <Text style={[s.headerTitle, { color: fg }]}>Inbox</Text>
+          <View style={[s.headerChevronPill, { backgroundColor: chipBg }]}>
+            {totalUnread > 0 && <View style={[s.headerDot, { backgroundColor: primary }]} />}
+            <Feather name="chevron-down" size={13} color={muted} />
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={s.headerIconBtn}
+          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          onPress={() => Alert.alert('Search', 'Search your inbox for messages and activity.', [{ text: 'OK' }])}
+        >
+          <Feather name="search" size={21} color={fg} />
         </TouchableOpacity>
       </View>
 
-      {/* ── Messages section ── */}
-      <View style={{ paddingHorizontal: 20, marginTop: 20 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <Text style={[s.sectionTitle, { color: fg }]}>Messages</Text>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => openChat('maya')}
-          >
-            <Text style={[s.seeAll, { color: primary }]}>See all</Text>
-          </TouchableOpacity>
-        </View>
+      {/* ── Stories row ── */}
+      <View style={{ marginTop: 6 }}>
+        <TouchableOpacity
+          style={[s.thoughtsChip, { backgroundColor: chipBg, borderColor: border }]}
+          activeOpacity={0.75}
+          hitSlop={{ top: 8, bottom: 8 }}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/story-creator' as never); }}
+        >
+          <Text style={[s.thoughtsText, { color: muted }]}>Thoughts?</Text>
+        </TouchableOpacity>
 
-        <View style={{ gap: 10 }}>
-          {FRIEND_ORDER.map(id => (
-            <DMRow
-              key={id}
-              friend={FRIENDS[id]}
-              last={getLastMessage(id)}
-              unread={getUnread(id)}
-              isDark={isDark}
-              onPress={() => openChat(id)}
-            />
-          ))}
-        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 20, gap: 16, paddingTop: 10, paddingBottom: 4 }}
+        >
+          <TouchableOpacity
+            style={s.storyItem}
+            activeOpacity={0.8}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/story-creator' as never); }}
+          >
+            <View style={[s.createRing, { backgroundColor: border }]}>
+              <Feather name="user" size={24} color={muted} />
+              <View style={[s.createBadge, { backgroundColor: primary, borderColor: bg }]}>
+                <Feather name="plus" size={11} color="#FFF" />
+              </View>
+            </View>
+            <Text style={[s.storyLabel, { color: fg }]}>Create</Text>
+          </TouchableOpacity>
+
+          {FRIEND_ORDER.map(id => {
+            const friend = FRIENDS[id];
+            return (
+              <TouchableOpacity
+                key={id}
+                style={s.storyItem}
+                activeOpacity={0.8}
+                onPress={() => openChat(id)}
+              >
+                <View style={[s.storyRing, { borderColor: friend.color }]}>
+                  <View style={[s.storyAvatar, { backgroundColor: friend.color }]}>
+                    <Text style={s.storyInitials}>{friend.initials}</Text>
+                  </View>
+                </View>
+                <Text style={[s.storyLabel, { color: fg }]} numberOfLines={1}>{friend.handle.replace('@', '')}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
-      {/* ── Activity section ── */}
-      <View style={{ paddingHorizontal: 20, marginTop: 32 }}>
-        <Text style={[s.sectionTitle, { color: fg }, { marginBottom: 12 }]}>Activity</Text>
-
-        {notifSections.map(section => (
-          <View key={section.title}>
-            <Text style={[s.dayLabel, { color: muted }]}>{section.title}</Text>
-            <View style={{ gap: 8, marginBottom: 16 }}>
-              {section.data.map(item => (
-                <NotifRow key={item.id} item={item} isDark={isDark} onRead={markNotifRead} />
-              ))}
+      {/* ── Unified flat feed ── */}
+      <View style={{ marginTop: 14 }}>
+        <InboxRow
+          fg={fg}
+          muted={muted}
+          onPress={() => Alert.alert('New Followers', 'CARD PLUG started following you.', [{ text: 'OK' }])}
+          leading={
+            <View style={[s.notifAvatar, { backgroundColor: '#1D4ED8' }]}>
+              <Feather name="users" size={18} color="#FFF" />
             </View>
-          </View>
+          }
+          title="New followers"
+          subtitle="CARD PLUG started following you."
+        />
+        <InboxRow
+          fg={fg}
+          muted={muted}
+          onPress={() => Alert.alert('Activity', 'co.luvsnayy liked photos you reposted.', [{ text: 'OK' }])}
+          leading={
+            <View style={[s.notifAvatar, { backgroundColor: '#DB2777' }]}>
+              <Feather name="heart" size={18} color="#FFF" />
+            </View>
+          }
+          title="Activity"
+          subtitle="co.luvsnayy liked photos you reposted."
+        />
+
+        {FRIEND_ORDER.map(id => (
+          <DMRow
+            key={id}
+            friend={FRIENDS[id]}
+            last={getLastMessage(id)}
+            unread={getUnread(id)}
+            isDark={isDark}
+            onPress={() => openChat(id)}
+          />
+        ))}
+
+        {notifItems.map(item => (
+          <NotifRow key={item.id} item={item} isDark={isDark} onRead={markNotifRead} />
         ))}
       </View>
     </ScrollView>
@@ -291,38 +350,38 @@ export default function InboxScreen() {
 
 const s = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: 1 },
-  headerTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', letterSpacing: -0.6 },
-  headerSub:   { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  headerBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10 },
-  headerBadgeText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
-  iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
 
-  sectionTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', letterSpacing: -0.3 },
-  seeAll:       { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  dayLabel:     { fontSize: 11, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 10 },
+  headerIconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44 },
+  headerTitle: { fontSize: 17, fontFamily: 'Inter_700Bold' },
+  headerChevronPill: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 10, paddingHorizontal: 5, paddingVertical: 3 },
+  headerDot: { width: 6, height: 6, borderRadius: 3 },
+
+  // Stories row
+  thoughtsChip: { alignSelf: 'flex-start', marginLeft: 20, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, borderWidth: 1 },
+  thoughtsText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  storyItem: { alignItems: 'center', gap: 6, width: 62 },
+  createRing: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' },
+  createBadge: { position: 'absolute', bottom: -2, right: -2, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
+  storyRing: { width: 58, height: 58, borderRadius: 29, borderWidth: 2, alignItems: 'center', justifyContent: 'center', padding: 2 },
+  storyAvatar: { flex: 1, width: '100%', borderRadius: 25, alignItems: 'center', justifyContent: 'center' },
+  storyInitials: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#FFF' },
+  storyLabel: { fontSize: 11, fontFamily: 'Inter_400Regular', width: 62, textAlign: 'center' },
+
+  // Flat row shell
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 10 },
+  rowTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginBottom: 2 },
+  rowSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  rowCta: { fontSize: 12, fontFamily: 'Inter_700Bold', marginTop: 3 },
 
   // DM row
-  dmRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: 16, borderWidth: 1 },
   dmAvatar:   { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   dmInitials: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFF' },
-  onlineDot:  { position: 'absolute', bottom: 2, right: 2, width: 12, height: 12, borderRadius: 6, backgroundColor: '#4C9A5E', borderWidth: 2 },
-  dmName:     { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginBottom: 3 },
-  dmPreview:  { fontSize: 12, fontFamily: 'Inter_400Regular' },
-  dmTime:     { fontSize: 11, fontFamily: 'Inter_400Regular' },
   unreadBadge:{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, minWidth: 20, alignItems: 'center' },
   unreadText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#FFF' },
 
   // Notif row
-  notifRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 13, borderRadius: 15, borderWidth: 1 },
-  notifAvatarWrap:{ position: 'relative' },
   notifAvatar:    { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  notifInitials:  { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#FFF' },
-  typeBadge:      { position: 'absolute', bottom: -2, right: -2, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  notifTitle:     { flex: 1, fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  notifTime:      { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  notifBody:      { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17 },
-  ctaBtn:         { alignSelf: 'flex-start', marginTop: 5, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9, borderWidth: 1 },
-  ctaText:        { fontSize: 12, fontFamily: 'Inter_700Bold' },
-  unreadDot:      { width: 8, height: 8, borderRadius: 4, marginTop: 4 },
+  unreadDot:      { width: 8, height: 8, borderRadius: 4 },
 });
