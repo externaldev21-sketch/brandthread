@@ -10,25 +10,33 @@ import {
 } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SectionHeader } from '@/components/SectionHeader';
-import { ProductCard } from '@/components/ProductCard';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
 const FILTERS = ['All', 'Active', 'Draft', 'Archived'] as const;
 type Filter = typeof FILTERS[number];
+type Status = 'Active' | 'Draft' | 'Archived';
 
-const PRODUCTS = [
-  { name: 'Classic Thread Tee', category: 'T-Shirts', price: '$42.00', stock: 124, color: '#C94D1F' },
-  { name: 'Cargo Shorts', category: 'Bottoms', price: '$68.00', stock: 3, color: '#5C8A5C' },
-  { name: 'Oversized Hoodie', category: 'Outerwear', price: '$115.00', stock: 0, color: '#2A2A5A' },
-  { name: 'Wide-Leg Trousers', category: 'Bottoms', price: '$98.00', stock: 47, color: '#8A6A5C' },
-  { name: 'Logo Cap', category: 'Accessories', price: '$36.00', stock: 88, color: '#2A5A4A' },
-  { name: 'Canvas Tote Bag', category: 'Accessories', price: '$28.00', stock: 7, color: '#5A2A2A' },
-  { name: 'Drop-Shoulder Blazer', category: 'Outerwear', price: '$185.00', stock: 22, color: '#1A1A3A' },
-  { name: 'Ribbed Tank Top', category: 'T-Shirts', price: '$34.00', stock: 65, color: '#6A5C5C' },
+const PRODUCTS: { name: string; variants: number; status: Status; color: string }[] = [
+  { name: '"Runner Tee" Dark Grey',    variants: 5, status: 'Active', color: '#5C5C5C' },
+  { name: '"Runner Tight Shorts"',      variants: 5, status: 'Active', color: '#2A2A2A' },
+  { name: '"Runner Hoodie" Black',      variants: 5, status: 'Active', color: '#17140F' },
+  { name: '"i miss you" tee',           variants: 6, status: 'Active', color: '#B8AD8F' },
+  { name: '"perception" thermal',       variants: 5, status: 'Active', color: '#8A7C63' },
+  { name: '"faceless" tank',            variants: 5, status: 'Active', color: '#4A4638' },
+  { name: '"nothing" tee',              variants: 6, status: 'Active', color: '#2A2A2A' },
+  { name: '"i miss you" tee',           variants: 6, status: 'Active', color: '#B8AD8F' },
+  { name: '"nostalgia" tee',            variants: 6, status: 'Active', color: '#C7BFA8' },
+  { name: '"vacant" hoodie',            variants: 4, status: 'Draft',  color: '#3A3A3A' },
+  { name: '"echo" longsleeve',          variants: 3, status: 'Archived', color: '#5C5248' },
 ];
+
+const statusKind: Record<Status, 'success' | 'warning' | 'default'> = {
+  Active: 'success',
+  Draft: 'warning',
+  Archived: 'default',
+};
 
 export default function ProductsScreen() {
   const colors = useColors();
@@ -41,142 +49,201 @@ export default function ProductsScreen() {
   const bottomPad = Platform.OS === 'web' ? 34 : 0;
 
   const filtered = PRODUCTS.filter((p) => {
+    if (filter !== 'All' && p.status !== filter) return false;
     if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
 
+  function haptic() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView
-        contentContainerStyle={{ paddingTop: topPad + 16, paddingBottom: bottomPad + 120, paddingHorizontal: 16 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={[styles.title, { color: colors.foreground }]}>Products</Text>
-            <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>{PRODUCTS.length} items · 847 total variants</Text>
+      {/* Dark header */}
+      <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: '#17140F' }]}>
+        <TouchableOpacity style={styles.titleRow} activeOpacity={0.7} onPress={haptic}>
+          <Text style={styles.title}>Products</Text>
+          <Feather name="chevron-down" size={18} color="#FFFFFF" />
+        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.headerIconBtn}
+            activeOpacity={0.7}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            onPress={() => { haptic(); router.push('/ai-studio'); }}
+          >
+            <Feather name="plus" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.headerIconBtn}
+            activeOpacity={0.7}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            onPress={haptic}
+          >
+            <Feather name="more-horizontal" size={20} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <View style={[styles.sheet, { backgroundColor: colors.background }]}>
+        {/* Search + sort/filter */}
+        <View style={styles.toolRow}>
+          <View style={[styles.searchWrap, { backgroundColor: colors.secondary }]}>
+            <Feather name="search" size={16} color={colors.mutedForeground} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.foreground }]}
+              placeholder="Search"
+              placeholderTextColor={colors.mutedForeground}
+              value={search}
+              onChangeText={setSearch}
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch('')} activeOpacity={0.7}>
+                <Feather name="x" size={16} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            )}
           </View>
           <TouchableOpacity
-            style={[styles.addBtn, { backgroundColor: colors.primary }]}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            }}
-            activeOpacity={0.8}
+            style={[styles.toolBtn, { backgroundColor: colors.secondary }]}
+            activeOpacity={0.7}
+            onPress={haptic}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Feather name="plus" size={20} color={colors.primaryForeground} />
+            <Feather name="arrow-up" size={16} color={colors.foreground} style={{ marginBottom: -6 }} />
+            <Feather name="arrow-down" size={16} color={colors.foreground} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toolBtn, { backgroundColor: colors.secondary }]}
+            activeOpacity={0.7}
+            onPress={haptic}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Feather name="sliders" size={16} color={colors.foreground} />
           </TouchableOpacity>
         </View>
 
-        {/* Search */}
-        <View style={[styles.searchWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Feather name="search" size={16} color={colors.mutedForeground} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.foreground }]}
-            placeholder="Search products..."
-            placeholderTextColor={colors.mutedForeground}
-            value={search}
-            onChangeText={setSearch}
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch('')} activeOpacity={0.7}>
-              <Feather name="x" size={16} color={colors.mutedForeground} />
-            </TouchableOpacity>
-          )}
-        </View>
-
         {/* Filters */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersRow} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.filtersRow}
+          contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
+        >
           {FILTERS.map((f) => (
             <TouchableOpacity
               key={f}
-              onPress={() => setFilter(f)}
+              onPress={() => { haptic(); setFilter(f); }}
               activeOpacity={0.7}
               style={[
                 styles.filterChip,
                 {
-                  backgroundColor: filter === f ? colors.primary : colors.card,
-                  borderColor: filter === f ? colors.primary : colors.border,
+                  backgroundColor: filter === f ? colors.foreground : 'transparent',
+                  borderColor: filter === f ? colors.foreground : colors.border,
                 },
               ]}
             >
-              <Text style={[styles.filterText, { color: filter === f ? colors.primaryForeground : colors.mutedForeground }]}>
+              <Text style={[styles.filterText, { color: filter === f ? colors.background : colors.mutedForeground }]}>
                 {f}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
 
-        {/* AI Studio Card */}
-        <TouchableOpacity
-          onPress={() => router.push('/ai-studio')}
-          activeOpacity={0.8}
-          style={[styles.studioCard, { borderColor: '#C1440E44' }]}
+        {/* Product list */}
+        <ScrollView
+          contentContainerStyle={{ paddingBottom: bottomPad + 130 }}
+          showsVerticalScrollIndicator={false}
         >
-          <View style={styles.studioLeft}>
-            <View style={[styles.studioIcon, { backgroundColor: '#C1440E22' }]}>
-              <Feather name="zap" size={20} color={colors.primary} />
-            </View>
-            <View>
-              <Text style={[styles.studioTitle, { color: colors.foreground }]}>AI Design Studio</Text>
-              <Text style={[styles.studioSub, { color: colors.mutedForeground }]}>Generate mockups & photography</Text>
-            </View>
-          </View>
-          <Feather name="arrow-right" size={18} color={colors.primary} />
-        </TouchableOpacity>
-
-        {/* Product List */}
-        <SectionHeader title={`${filter} Products`} />
-        {filtered.map((product) => (
-          <ProductCard
-            key={product.name}
-            name={product.name}
-            category={product.category}
-            price={product.price}
-            stock={product.stock}
-            colorDot={product.color}
-          />
-        ))}
-
-        {/* Inventory Overview */}
-        <SectionHeader title="Inventory Overview" />
-        <View style={[styles.invGrid, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          {[
-            { label: 'Total SKUs', value: '2,840', icon: 'tag' as const },
-            { label: 'Low Stock', value: '14', icon: 'alert-triangle' as const },
-            { label: 'Out of Stock', value: '3', icon: 'x-circle' as const },
-            { label: 'Inventory Value', value: '$84k', icon: 'dollar-sign' as const },
-          ].map((item, i) => (
-            <View key={item.label} style={[styles.invItem, i % 2 === 0 && { borderRightWidth: 1, borderRightColor: colors.border }]}>
-              <Feather name={item.icon} size={16} color={colors.primary} />
-              <Text style={[styles.invValue, { color: colors.foreground }]}>{item.value}</Text>
-              <Text style={[styles.invLabel, { color: colors.mutedForeground }]}>{item.label}</Text>
-            </View>
+          {filtered.map((product, i) => (
+            <TouchableOpacity
+              key={`${product.name}-${i}`}
+              activeOpacity={0.7}
+              onPress={haptic}
+              style={[
+                styles.row,
+                i < filtered.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
+              ]}
+            >
+              <View style={[styles.thumb, { backgroundColor: product.color }]} />
+              <View style={styles.rowInfo}>
+                <Text style={[styles.rowName, { color: colors.foreground }]} numberOfLines={1}>{product.name}</Text>
+                <Text style={[styles.rowSub, { color: colors.mutedForeground }]}>{product.variants} variants</Text>
+              </View>
+              <View
+                style={[
+                  styles.statusPill,
+                  {
+                    backgroundColor:
+                      statusKind[product.status] === 'success' ? `${colors.success}22`
+                        : statusKind[product.status] === 'warning' ? `${colors.warning}22`
+                        : colors.secondary,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.statusText,
+                    {
+                      color:
+                        statusKind[product.status] === 'success' ? colors.success
+                          : statusKind[product.status] === 'warning' ? colors.warning
+                          : colors.mutedForeground,
+                    },
+                  ]}
+                >
+                  {product.status}
+                </Text>
+              </View>
+            </TouchableOpacity>
           ))}
-        </View>
-      </ScrollView>
+          {filtered.length === 0 && (
+            <View style={styles.emptyState}>
+              <Feather name="package" size={28} color={colors.mutedForeground} />
+              <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No products found</Text>
+            </View>
+          )}
+        </ScrollView>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  title: { fontSize: 24, fontFamily: 'Inter_700Bold' },
-  subtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  addBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  searchWrap: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 12, gap: 10, borderWidth: 1, marginBottom: 12 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  title: { fontSize: 26, fontFamily: 'Inter_700Bold', color: '#FFFFFF', letterSpacing: -0.5 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 18 },
+  headerIconBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  sheet: {
+    flex: 1,
+    marginTop: -24,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 16,
+    paddingHorizontal: 16,
+  },
+  toolRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  searchWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, gap: 10 },
   searchInput: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
-  filtersRow: { marginBottom: 20 },
+  toolBtn: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  filtersRow: { marginBottom: 16 },
   filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
   filterText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  studioCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#17140F', borderWidth: 1, borderRadius: 14, padding: 14, marginBottom: 24 },
-  studioLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  studioIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  studioTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  studioSub: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  invGrid: { flexDirection: 'row', flexWrap: 'wrap', borderRadius: 14, borderWidth: 1, marginBottom: 24 },
-  invItem: { width: '50%', padding: 16, gap: 4, borderBottomWidth: 1 },
-  invValue: { fontSize: 22, fontFamily: 'Inter_700Bold' },
-  invLabel: { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 12 },
+  thumb: { width: 44, height: 44, borderRadius: 8 },
+  rowInfo: { flex: 1, gap: 2 },
+  rowName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  rowSub: { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  statusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  statusText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 10 },
+  emptyText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
 });
