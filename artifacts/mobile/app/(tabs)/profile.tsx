@@ -70,6 +70,18 @@ export default function ProfileScreen() {
     >
       {/* ─ Header ─ */}
       <View style={[styles.hero, { paddingTop: insets.top + 20, backgroundColor: card, borderBottomColor: border }]}>
+        <TouchableOpacity
+          style={[styles.settingsBtn, { top: insets.top + 14, backgroundColor: bg }]}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          activeOpacity={0.7}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push('/settings' as never);
+          }}
+        >
+          <Feather name="settings" size={17} color={fg} />
+        </TouchableOpacity>
+
         {/* Avatar */}
         <View style={[styles.avatarRing, { borderColor: primary }]}>
           <View style={[styles.avatar, { backgroundColor: primary }]}>
@@ -184,7 +196,17 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  hero: { alignItems: 'center', paddingBottom: 0, borderBottomWidth: 1, marginBottom: 24 },
+  hero: { alignItems: 'center', paddingBottom: 0, borderBottomWidth: 1, marginBottom: 24, position: 'relative' },
+  settingsBtn: {
+    position: 'absolute',
+    right: 20,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
   avatarRing: { width: 82, height: 82, borderRadius: 41, borderWidth: 3, padding: 3, marginBottom: 12 },
   avatar: { flex: 1, borderRadius: 99, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 22, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },

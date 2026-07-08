@@ -172,29 +172,19 @@ export default function SellerDashboard() {
           <View style={st.brandRow}>
             <Text style={[st.brand, { color: colors.foreground }]}>Brandthread</Text>
           </View>
-          <View style={st.headerRightRow}>
-            <TouchableOpacity
-              style={st.storeLinkRow}
-              hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
-              activeOpacity={0.7}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                Clipboard.setStringAsync(`https://${STORE_HANDLE}`);
-                Alert.alert('Link copied', `${STORE_HANDLE} copied to clipboard.`);
-              }}
-            >
-              <Text style={[st.storeLinkText, { color: primary }]} numberOfLines={1}>{STORE_HANDLE}</Text>
-              <Feather name="copy" size={14} color={primary} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[st.settingsBtn, { backgroundColor: colors.secondary }]}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              activeOpacity={0.7}
-              onPress={() => nav('/settings')}
-            >
-              <Feather name="settings" size={16} color={colors.foreground} />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={st.storeLinkRow}
+            hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+            activeOpacity={0.7}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              Clipboard.setStringAsync(`https://${STORE_HANDLE}`);
+              Alert.alert('Link copied', `${STORE_HANDLE} copied to clipboard.`);
+            }}
+          >
+            <Text style={[st.storeLinkText, { color: primary }]} numberOfLines={1}>{STORE_HANDLE}</Text>
+            <Feather name="copy" size={14} color={primary} />
+          </TouchableOpacity>
         </View>
 
         {/* Revenue hero */}
@@ -369,10 +359,8 @@ const st = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 10 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   brand: { fontSize: 22, fontFamily: 'Inter_700Bold', letterSpacing: -0.5 },
-  headerRightRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   storeLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1, paddingVertical: 6 },
   storeLinkText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  settingsBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   heroRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   heroThumb: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' },
   heroLabel: { fontSize: 12, fontFamily: 'Inter_500Medium' },
