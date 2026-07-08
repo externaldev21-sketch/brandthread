@@ -6,15 +6,17 @@ import ordersRouter from "./orders";
 import customersRouter from "./customers";
 import dropsRouter from "./drops";
 import analyticsRouter from "./analytics";
+import integrationsRouter from "./integrations";
 
 const router = Router();
 
-router.use("/healthz",   healthRouter);
-router.use("/auth",      authRouter);
-router.use("/products",  productsRouter);
-router.use("/orders",    ordersRouter);
-router.use("/customers", customersRouter);
-router.use("/drops",     dropsRouter);
-router.use("/analytics", analyticsRouter);
+router.use("/healthz",     healthRouter);
+router.use("/auth",        authRouter);
+router.use("/products",    productsRouter);
+router.use("/orders",      ordersRouter);
+router.use("/customers",   customersRouter);
+router.use("/drops",       dropsRouter);
+router.use("/analytics",   analyticsRouter);
+router.use("/integrations", integrationsRouter);
 
 export default router;

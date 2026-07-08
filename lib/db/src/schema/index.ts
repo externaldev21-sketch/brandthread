@@ -128,6 +128,22 @@ export const orderItems = pgTable('order_items', {
   priceCents: integer('price_cents').notNull(), // server-resolved price at time of order
 });
 
+// ─── Klaviyo Integration ────────────────────────────────────────────────────────
+
+export const klaviyoIntegrations = pgTable('klaviyo_integrations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  ownerId: text('owner_id').notNull().unique(), // Clerk user ID of brand owner
+  apiKey: text('api_key').notNull(), // Klaviyo Private API Key
+  accountId: text('account_id'),
+  companyName: text('company_name'),
+  emailSubscriberCount: integer('email_subscriber_count').notNull().default(0),
+  smsSubscriberCount: integer('sms_subscriber_count').notNull().default(0),
+  listCount: integer('list_count').notNull().default(0),
+  lastSyncedAt: timestamp('last_synced_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // ─── Relations ────────────────────────────────────────────────────────────────
 
 export const productsRelations = relations(products, ({ many }) => ({

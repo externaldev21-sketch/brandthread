@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Switch } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Badge } from '@/components/Badge';
 import { Feather } from '@expo/vector-icons';
+import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useApi } from '@/hooks/useApi';
 
 const CAMPAIGNS = [
   { id: '1', name: 'Summer Drop 2025', type: 'Email', status: 'active', opens: '48%', revenue: '$2,840', sent: '4,200' },
@@ -33,13 +35,38 @@ const AUTOMATIONS = [
   { name: 'VIP Tier Upgrade', enabled: true, triggers: 'When spend > $500' },
 ];
 
+type KlaviyoStatus = {
+  connected: boolean;
+  companyName?: string | null;
+  emailSubscriberCount?: number;
+  smsSubscriberCount?: number;
+};
+
+function formatCount(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
+}
+
 export default function MarketingScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const api = useApi();
   const [automations, setAutomations] = useState(AUTOMATIONS.map((a) => a.enabled));
+  const [klaviyo, setKlaviyo] = useState<KlaviyoStatus | null>(null);
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPad = Platform.OS === 'web' ? 34 : 0;
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      api.integrations.klaviyoStatus()
+        .then((res) => { if (!cancelled) setKlaviyo(res); })
+        .catch(() => { if (!cancelled) setKlaviyo({ connected: false }); });
+      return () => { cancelled = true; };
+    }, [api]),
+  );
 
   const statusVariant = (s: string) => {
     if (s === 'active') return 'success';
@@ -60,8 +87,8 @@ export default function MarketingScreen() {
       {/* Stats Row */}
       <View style={styles.statsRow}>
         {[
-          { label: 'Email Subs', value: '12.4k', icon: 'mail' as const },
-          { label: 'SMS Subs', value: '4.2k', icon: 'message-square' as const },
+          { label: 'Email Subs', value: klaviyo == null ? '—' : klaviyo.connected ? formatCount(klaviyo.emailSubscriberCount ?? 0) : '0', icon: 'mail' as const },
+          { label: 'SMS Subs', value: klaviyo == null ? '—' : klaviyo.connected ? formatCount(klaviyo.smsSubscriberCount ?? 0) : '0', icon: 'message-square' as const },
           { label: 'Push Subs', value: '8.1k', icon: 'bell' as const },
         ].map((s) => (
           <View key={s.label} style={[styles.statChip, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -74,12 +101,17 @@ export default function MarketingScreen() {
 
       {/* Connect Klaviyo */}
       <TouchableOpacity
-        style={[styles.klaviyoBtn, { backgroundColor: colors.primary }]}
+        style={[styles.klaviyoBtn, { backgroundColor: klaviyo?.connected ? colors.card : colors.primary, borderColor: colors.border, borderWidth: klaviyo?.connected ? 1 : 0 }]}
         activeOpacity={0.85}
-        onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          router.push('/integrations/klaviyo' as never);
+        }}
       >
-        <Feather name="zap" size={16} color={colors.primaryForeground} />
-        <Text style={[styles.klaviyoText, { color: colors.primaryForeground }]}>Connect Klaviyo: Email Marketing & SMS</Text>
+        <Feather name={klaviyo?.connected ? 'check-circle' : 'zap'} size={16} color={klaviyo?.connected ? colors.success : colors.primaryForeground} />
+        <Text style={[styles.klaviyoText, { color: klaviyo?.connected ? colors.foreground : colors.primaryForeground }]}>
+          {klaviyo?.connected ? `Klaviyo connected${klaviyo.companyName ? ` · ${klaviyo.companyName}` : ''}` : 'Connect Klaviyo: Email Marketing & SMS'}
+        </Text>
       </TouchableOpacity>
 
       {/* Campaigns */}

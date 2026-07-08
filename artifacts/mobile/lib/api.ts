@@ -76,6 +76,12 @@ export function createApi(getToken: GetToken) {
       dashboard: () => get('/api/analytics/dashboard'),
       revenue:   (period: string) => get(`/api/analytics/revenue?period=${period}`),
     },
+    integrations: {
+      klaviyoStatus:      () => get<any>('/api/integrations/klaviyo'),
+      klaviyoConnect:     (apiKey: string) => post<any>('/api/integrations/klaviyo/connect', { apiKey }),
+      klaviyoSync:        () => post<any>('/api/integrations/klaviyo/sync', {}),
+      klaviyoDisconnect:  () => del<any>('/api/integrations/klaviyo'),
+    },
   };
 }
 
