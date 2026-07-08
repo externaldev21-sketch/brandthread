@@ -1,29 +1,33 @@
 import React, { useState } from 'react';
 import {
   ScrollView, View, Text, TouchableOpacity, StyleSheet,
-  Platform, useColorScheme, Alert,
+  Platform, useColorScheme, Alert, Dimensions,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Badge } from '@/components/Badge';
 import { SectionHeader } from '@/components/SectionHeader';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Path } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import DateRangePicker, { DateRange, buildPresets } from '@/components/DateRangePicker';
 
+const SCREEN_W = Dimensions.get('window').width;
+
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
-const REVENUE_DATA: Record<string, { amount: string; context: string; growth: string; up: boolean }> = {
-  today:     { amount: '$4,892.50', context: 'Yesterday: $3,240 · This week: $28,450', growth: '18.4%', up: true },
-  yesterday: { amount: '$3,240.00', context: 'Day before: $3,080 · This week: $28,450', growth: '5.2%',  up: true },
-  last7:     { amount: '$28,450',   context: 'Prev 7 days: $25,400 · This month: $94,200', growth: '12.0%', up: true },
-  last30:    { amount: '$94,200',   context: 'Prev 30 days: $75,900 · YTD: $542,000',  growth: '24.1%', up: true },
-  last90:    { amount: '$284,600',  context: 'Prev 90 days: $216,800 · YTD: $542,000', growth: '31.3%', up: true },
-  thisMonth: { amount: '$94,200',   context: 'Last month: $78,400 · YTD: $542,000',    growth: '20.2%', up: true },
-  lastMonth: { amount: '$78,400',   context: 'Month before: $85,200 · YTD: $448,000',  growth: '8.0%',  up: false },
-  custom:    { amount: '$94,200',   context: 'Custom date range selected',              growth: '24.1%', up: true },
+const REVENUE_DATA: Record<string, { amount: string }> = {
+  today:     { amount: '$4,892.50' },
+  yesterday: { amount: '$3,240.00' },
+  last7:     { amount: '$28,450'   },
+  last30:    { amount: '$94,200'   },
+  last90:    { amount: '$284,600'  },
+  thisMonth: { amount: '$94,200'   },
+  lastMonth: { amount: '$78,400'   },
+  custom:    { amount: '$94,200'   },
 };
 const SPARK: Record<string, number[]> = {
   today:     [32, 48, 41, 65, 55, 74, 60, 88, 72, 100],
@@ -40,6 +44,15 @@ const STATS = [
   { label: 'Orders',     value: '12',    change: '+3 today',  icon: 'shopping-bag' as const, up: true },
   { label: 'Conv. Rate', value: '3.4%',  change: '+0.6%',     icon: 'trending-up'  as const, up: true },
   { label: 'Returns',    value: '2',     change: '-1 vs avg', icon: 'refresh-cw'   as const, up: true },
+];
+const STORE_HANDLE = 'brandthread.store/vaultstudio';
+const ACCOUNT_BALANCE = '$12,678.77';
+const HELD_BY_PLATFORM = '$0.00';
+const PENDING_PAYOUT = '$3,543.31';
+const CHART_MONTH_LABELS = ['Jun 11', 'Jun 14', 'Jun 17', 'Jun 20', 'Jun 23', 'Jun 26', 'Jun 29', 'Jul 02', 'Jul 05', 'Jul 08'];
+const KEY_STATS = [
+  { label: 'Leads',       value: '523', up: true },
+  { label: 'Store Views', value: '839', up: true },
 ];
 const QUICK_ACTIONS = [
   { label: 'Add Product', icon: 'plus-circle'    as const, route: '/products'     },
@@ -73,6 +86,52 @@ const statusMap: Record<string, { variant: 'success'|'info'|'warning'|'error'; l
   cancelled:  { variant: 'error',   label: 'Cancelled'  },
 };
 
+// ─── Revenue line chart (SVG) ─────────────────────────────────────────────────
+
+function RevenueChart({ data, color, width, labelColor }: { data: number[]; color: string; width: number; labelColor: string }) {
+  if (data.length < 2) return null;
+  const height = 130;
+  const padTop = 8;
+  const padBottom = 22;
+  const plotH = height - padTop - padBottom;
+  const max = Math.max(...data, 1);
+  const stepX = width / (data.length - 1);
+
+  const points = data.map((v, i) => ({ x: i * stepX, y: padTop + plotH - (v / max) * plotH }));
+
+  const linePath = points.reduce((acc, p, i) => {
+    if (i === 0) return `M ${p.x} ${p.y}`;
+    const prev = points[i - 1];
+    const midX = (prev.x + p.x) / 2;
+    return `${acc} C ${midX} ${prev.y}, ${midX} ${p.y}, ${p.x} ${p.y}`;
+  }, '');
+
+  const areaPath = `${linePath} L ${width} ${height - padBottom} L 0 ${height - padBottom} Z`;
+
+  return (
+    <View>
+      <Svg width={width} height={height}>
+        <Path d={areaPath} fill={color} fillOpacity={0.12} />
+        <Path d={linePath} stroke={color} strokeWidth={2.5} fill="none" strokeLinecap="round" />
+      </Svg>
+      <View style={st.chartXLabels}>
+        {CHART_MONTH_LABELS.map((label, i) => (
+          <Text
+            key={label}
+            style={[
+              st.chartXLabel,
+              { color: labelColor },
+              i === CHART_MONTH_LABELS.length - 1 && { fontFamily: 'Inter_700Bold', color },
+            ]}
+          >
+            {label}
+          </Text>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 // ─── Default date range ───────────────────────────────────────────────────────
 
 function defaultRange(): DateRange {
@@ -96,12 +155,6 @@ export default function SellerDashboard() {
   const rev    = REVENUE_DATA[range.presetId] ?? REVENUE_DATA.last30;
   const spark  = SPARK[range.presetId] ?? SPARK.last30;
   const primary = isDark ? '#C94D1F' : '#B33F1E';
-  const heroGradient: readonly [string, string, string] = isDark
-    ? ['#2A1060', '#130828', '#121110'] : ['#E8E1CF', '#E2DDD0', '#F4F0FF'];
-  const heroAmountColor = isDark ? '#FFFFFF'   : '#4C1D95';
-  const heroLabelColor  = isDark ? '#E2DDD0A0' : '#B33F1E99';
-  const heroSubColor    = isDark ? '#E2DDD055' : '#C94D1F77';
-  const heroBorderColor = isDark ? '#C1440E22' : '#DBD3C0';
 
   function nav(route: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -116,56 +169,99 @@ export default function SellerDashboard() {
         showsVerticalScrollIndicator={false}
       >
         <View style={[st.header, { paddingHorizontal: 20 }]}>
-          <View style={st.headerLeft}>
-            <Text style={[st.greeting, { color: colors.mutedForeground }]}>Good morning 👋</Text>
+          <View style={st.brandRow}>
+            <View style={[st.brandIcon, { backgroundColor: primary }]}>
+              <Feather name="dollar-sign" size={18} color="#FFFFFF" />
+            </View>
             <Text style={[st.brand, { color: colors.foreground }]}>Brandthread</Text>
           </View>
-          <View style={st.headerRight}>
+          <TouchableOpacity
+            style={st.storeLinkRow}
+            hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+            activeOpacity={0.7}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              Clipboard.setStringAsync(`https://${STORE_HANDLE}`);
+              Alert.alert('Link copied', `${STORE_HANDLE} copied to clipboard.`);
+            }}
+          >
+            <Text style={[st.storeLinkText, { color: primary }]} numberOfLines={1}>{STORE_HANDLE}</Text>
+            <Feather name="copy" size={14} color={primary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Revenue hero */}
+        <View style={[st.heroRow, { paddingHorizontal: 20 }]}>
+          <LinearGradient colors={[primary, primary + '99']} style={st.heroThumb}>
+            <Feather name="shopping-bag" size={26} color="#FFFFFF" />
+          </LinearGradient>
+          <View style={{ flex: 1 }}>
+            <Text style={[st.heroLabel, { color: colors.mutedForeground }]}>Total Revenue</Text>
+            <Text style={[st.heroAmount, { color: colors.foreground }]}>{rev.amount}</Text>
+          </View>
+        </View>
+
+        {/* Account balance */}
+        <View style={{ paddingHorizontal: 20, marginTop: 18 }}>
+          <View style={[st.balanceCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={st.balanceTopRow}>
+              <View>
+                <Text style={[st.balanceLabel, { color: colors.mutedForeground }]}>Account Balance</Text>
+                <Text style={[st.balanceAmount, { color: colors.foreground }]}>{ACCOUNT_BALANCE}</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={[st.balanceSubLabel, { color: colors.mutedForeground }]}>
+                  Held by Brandthread: <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold' }}>{HELD_BY_PLATFORM}</Text>
+                </Text>
+                <Text style={[st.balanceSubLabel, { color: colors.mutedForeground, marginTop: 3 }]}>
+                  Pending: <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold' }}>{PENDING_PAYOUT}</Text>
+                </Text>
+              </View>
+            </View>
             <TouchableOpacity
-              style={[st.iconBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
-              activeOpacity={0.7}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                Alert.alert('Notifications', '• New order #2048 from Jordan K.\n• Low stock: Canvas Cargo (3 left)\n• Summer Capsule goes live in 2h', [
-                  { text: 'View Analytics', onPress: () => nav('/analytics') },
-                  { text: 'Dismiss', style: 'cancel' },
-                ]);
-              }}
+              style={[st.cashOutBtn, { backgroundColor: primary }]}
+              activeOpacity={0.85}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); nav('/finance'); }}
             >
-              <Feather name="bell" size={18} color={colors.mutedForeground} />
-              <View style={[st.notifDot, { backgroundColor: colors.destructive }]} />
-            </TouchableOpacity>
-            <TouchableOpacity style={[st.avatar, { backgroundColor: primary }]} onPress={() => nav('/team')} activeOpacity={0.8}>
-              <Text style={[st.avatarText, { color: '#FFFFFF' }]}>AT</Text>
+              <Feather name="plus" size={15} color="#FFFFFF" />
+              <Text style={st.cashOutText}>Cash Out</Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Revenue hero */}
-        <View style={{ paddingHorizontal: 20 }}>
-          <LinearGradient colors={heroGradient} style={[st.heroCard, { borderColor: heroBorderColor }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-            {isDark && <View style={st.glowOrb} />}
-            <View style={st.heroTop}>
-              <Text style={[st.heroLabel, { color: heroLabelColor }]}>REVENUE</Text>
-              <TouchableOpacity style={[st.periodPill, { backgroundColor: isDark ? '#FFFFFF15' : '#B33F1E18', borderColor: isDark ? '#FFFFFF25' : '#B33F1E30' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPickerVisible(true); }} activeOpacity={0.75}>
-                <Text style={[st.periodText, { color: isDark ? '#E0D4FF' : '#7A2D14' }]}>{range.label}</Text>
-                <Feather name="chevron-down" size={12} color={isDark ? '#E2DDD0' : '#B33F1E'} />
-              </TouchableOpacity>
-              <View style={[st.growthPill, { backgroundColor: rev.up ? '#3F7A4F18' : '#DC262618', borderColor: rev.up ? '#4C9A5E33' : '#EF444433' }]}>
-                <Feather name={rev.up ? 'trending-up' : 'trending-down'} size={11} color={rev.up ? colors.success : colors.destructive} />
-                <Text style={[st.growthText, { color: rev.up ? colors.success : colors.destructive }]}>{rev.growth}</Text>
+        {/* Stats (Last 28 days) */}
+        <View style={{ paddingHorizontal: 20, marginTop: 28 }}>
+          <SectionHeader title="Stats (Last 28 days)" action="View All →" onAction={() => nav('/analytics')} />
+        </View>
+        <View style={[st.keyStatsRow, { paddingHorizontal: 20 }]}>
+          {KEY_STATS.map((s) => (
+            <View key={s.label} style={[st.keyStatCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[st.keyStatLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
+              <View style={st.keyStatValueRow}>
+                <Text style={[st.keyStatValue, { color: colors.foreground }]}>{s.value}</Text>
+                <View style={[st.keyStatArrow, { backgroundColor: colors.success }]}>
+                  <Feather name={s.up ? 'arrow-up' : 'arrow-down'} size={11} color="#FFFFFF" />
+                </View>
               </View>
             </View>
-            <Text style={[st.heroAmount, { color: heroAmountColor }]}>{rev.amount}</Text>
-            <Text style={[st.heroSub, { color: heroSubColor }]}>{rev.context}</Text>
-            <View style={st.sparkRow}>
-              {spark.map((h, i) => {
-                const isLast   = i === spark.length - 1;
-                const isRecent = i >= spark.length - 3;
-                return <View key={i} style={[st.sparkBar, { height: (h / 100) * 36, backgroundColor: primary, opacity: isLast ? 1 : isRecent ? 0.55 : 0.2 }]} />;
-              })}
+          ))}
+        </View>
+
+        {/* Revenue chart */}
+        <View style={{ paddingHorizontal: 20, marginTop: 20 }}>
+          <View style={[st.chartCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={st.chartHeaderRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[st.heroLabel, { color: colors.mutedForeground }]}>Total Revenue</Text>
+                <Text style={[st.chartAmount, { color: colors.foreground }]}>{rev.amount}</Text>
+              </View>
+              <TouchableOpacity style={[st.periodPill, { backgroundColor: colors.secondary, borderColor: colors.border }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPickerVisible(true); }} activeOpacity={0.75}>
+                <Text style={[st.periodText, { color: colors.primary }]}>{range.label}</Text>
+                <Feather name="chevron-down" size={12} color={colors.primary} />
+              </TouchableOpacity>
             </View>
-          </LinearGradient>
+            <RevenueChart data={spark} color={primary} width={SCREEN_W - 40 - 36} labelColor={colors.mutedForeground} />
+          </View>
         </View>
 
         {/* Stats */}
@@ -191,9 +287,9 @@ export default function SellerDashboard() {
           ))}
         </ScrollView>
 
-        {/* Recent Orders */}
+        {/* My Orders */}
         <View style={{ paddingHorizontal: 20, marginTop: 32 }}>
-          <SectionHeader title="Recent Orders" action="View all" onAction={() => nav('/analytics')} />
+          <SectionHeader title="My Orders" action="View All →" onAction={() => nav('/analytics')} />
           <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {RECENT_ORDERS.map((order, i) => {
               const s = statusMap[order.status];
@@ -263,27 +359,36 @@ export default function SellerDashboard() {
 
 const st = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
-  headerLeft: { flex: 1 },
-  greeting: { fontSize: 13, fontFamily: 'Inter_400Regular' },
-  brand: { fontSize: 26, fontFamily: 'Inter_700Bold', letterSpacing: -0.6 },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  iconBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-  notifDot: { position: 'absolute', top: 9, right: 9, width: 7, height: 7, borderRadius: 4 },
-  avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
-  heroCard: { borderRadius: 22, padding: 22, borderWidth: 1, overflow: 'hidden' },
-  glowOrb: { position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: '#B33F1E', opacity: 0.12 },
-  heroTop: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' },
-  heroLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 1.2 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 10 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  brandIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  brand: { fontSize: 22, fontFamily: 'Inter_700Bold', letterSpacing: -0.5 },
+  storeLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1, paddingVertical: 6 },
+  storeLinkText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  heroRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  heroThumb: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' },
+  heroLabel: { fontSize: 12, fontFamily: 'Inter_500Medium' },
   periodPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
   periodText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  growthPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, borderWidth: 1 },
-  growthText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-  heroAmount: { fontSize: 44, fontFamily: 'Inter_700Bold', letterSpacing: -1.5 },
-  heroSub: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 4, marginBottom: 16 },
-  sparkRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, height: 36 },
-  sparkBar: { flex: 1, borderRadius: 3 },
+  heroAmount: { fontSize: 30, fontFamily: 'Inter_700Bold', letterSpacing: -0.8, marginTop: 2 },
+  balanceCard: { borderRadius: 18, borderWidth: 1, padding: 18, gap: 16 },
+  balanceTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  balanceLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', marginBottom: 4 },
+  balanceAmount: { fontSize: 24, fontFamily: 'Inter_700Bold', letterSpacing: -0.5 },
+  balanceSubLabel: { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  cashOutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 14 },
+  cashOutText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  keyStatsRow: { flexDirection: 'row', gap: 10, marginTop: 2 },
+  keyStatCard: { flex: 1, borderRadius: 16, borderWidth: 1, padding: 16, gap: 8 },
+  keyStatLabel: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  keyStatValueRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  keyStatValue: { fontSize: 22, fontFamily: 'Inter_700Bold', letterSpacing: -0.4 },
+  keyStatArrow: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  chartCard: { borderRadius: 18, borderWidth: 1, padding: 18 },
+  chartHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 },
+  chartAmount: { fontSize: 22, fontFamily: 'Inter_700Bold', letterSpacing: -0.5, marginTop: 2 },
+  chartXLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
+  chartXLabel: { fontSize: 8.5, fontFamily: 'Inter_400Regular', color: '#8C8577', flexShrink: 1 },
   statsScroll: { gap: 10, paddingVertical: 2 },
   statCard: { width: 120, borderRadius: 16, padding: 16, borderWidth: 1, gap: 4 },
   statIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },

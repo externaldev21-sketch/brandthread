@@ -60,6 +60,7 @@
     "zod-validation-error": "^3.4.0"
   },
   "dependencies": {
+    "expo-clipboard": "^8.0.8",
     "expo-media-library": "~18.2.1",
     "expo-video": "~3.0.16"
   }
