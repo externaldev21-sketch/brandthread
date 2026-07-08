@@ -108,94 +108,94 @@ function HeroCard({ isDark }: { isDark: boolean }) {
   const [saved, setSaved] = useState(false);
   const soldPct = Math.round(((HERO_DROP.units - HERO_DROP.remaining) / HERO_DROP.units) * 100);
 
-  return (
-    <LinearGradient
-      colors={HERO_DROP.gradient}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={s.hero}
-    >
-      {/* Glow orbs */}
-      <View style={[s.orb, s.orb1]} />
-      <View style={[s.orb, s.orb2]} />
+  const card    = isDark ? '#1B1917' : '#FFFFFF';
+  const border  = isDark ? '#33302A' : '#E3DCC9';
+  const fg      = isDark ? '#EDE7D9' : '#17140F';
+  const muted   = isDark ? '#8C8577' : '#8080A0';
+  const divider = isDark ? '#33302A' : '#EDE8DC';
 
-      {/* Brand row */}
-      <View style={s.heroTopRow}>
+  return (
+    <View style={[s.hero, { backgroundColor: card, borderColor: border }]}>
+      {/* Visual block — flat brand colour, no gradient/glow */}
+      <View style={[s.heroVisual, { backgroundColor: HERO_DROP.brandColor }]}>
+        <View style={s.heroTagRow}>
+          <LiveDot color="#FFFFFF" />
+          <Text style={s.heroTag}>{HERO_DROP.tag}</Text>
+        </View>
         <View style={s.heroBrandRow}>
-          <View style={[s.heroBrandAvatar, { backgroundColor: HERO_DROP.brandColor }]}>
-            <Text style={s.heroBrandInitials}>{HERO_DROP.initials}</Text>
+          <View style={s.heroBrandAvatar}>
+            <Text style={[s.heroBrandInitials, { color: HERO_DROP.brandColor }]}>{HERO_DROP.initials}</Text>
           </View>
           <View>
             <Text style={s.heroBrandName}>{HERO_DROP.brand}</Text>
             <Text style={s.heroBrandHandle}>{HERO_DROP.handle}</Text>
           </View>
         </View>
-        <View style={s.heroTagRow}>
-          <LiveDot color="#EF4444" />
-          <Text style={s.heroTag}>{HERO_DROP.tag}</Text>
+      </View>
+
+      <View style={{ padding: 18 }}>
+        {/* Product name + price */}
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
+          <Text style={[s.heroProductName, { color: fg }]}>{HERO_DROP.name}</Text>
+          <Text style={[s.heroPrice, { color: fg }]}>{HERO_DROP.price}</Text>
         </View>
-      </View>
 
-      {/* Product name */}
-      <Text style={s.heroProductName}>{HERO_DROP.name}</Text>
-
-      {/* Countdown */}
-      <View style={s.countdown}>
-        {[
-          { label: 'HRS', val: time.h },
-          { label: 'MIN', val: time.m },
-          { label: 'SEC', val: time.s },
-        ].map(({ label, val }, i) => (
-          <React.Fragment key={label}>
-            {i > 0 && <Text style={s.countdownColon}>:</Text>}
-            <View style={s.countdownBlock}>
-              <Text style={s.countdownNum}>{pad(val)}</Text>
-              <Text style={s.countdownLabel}>{label}</Text>
-            </View>
-          </React.Fragment>
-        ))}
-      </View>
-
-      {/* Stock bar */}
-      <View style={s.stockRow}>
-        <View style={s.stockBar}>
-          <View style={[s.stockFill, { width: `${soldPct}%` as any, backgroundColor: HERO_DROP.brandColor }]} />
+        {/* Countdown */}
+        <View style={[s.countdown, { borderColor: divider }]}>
+          {[
+            { label: 'HRS', val: time.h },
+            { label: 'MIN', val: time.m },
+            { label: 'SEC', val: time.s },
+          ].map(({ label, val }, i) => (
+            <React.Fragment key={label}>
+              {i > 0 && <View style={[s.countdownDivider, { backgroundColor: divider }]} />}
+              <View style={s.countdownBlock}>
+                <Text style={[s.countdownNum, { color: fg }]}>{pad(val)}</Text>
+                <Text style={[s.countdownLabel, { color: muted }]}>{label}</Text>
+              </View>
+            </React.Fragment>
+          ))}
         </View>
-        <Text style={s.stockText}>{HERO_DROP.remaining} left of {HERO_DROP.units}</Text>
-      </View>
 
-      {/* Actions */}
-      <View style={s.heroActions}>
-        <TouchableOpacity
-          style={s.heroShopBtn}
-          activeOpacity={0.85}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            Alert.alert(
-              HERO_DROP.brand,
-              `${HERO_DROP.name} · ${HERO_DROP.price}\n${HERO_DROP.remaining} left of ${HERO_DROP.units} — act fast!`,
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { text: '🔔 Notify Me',  onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
-                { text: '🛍️ Shop Now',   onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
-              ],
-            );
-          }}
-        >
-          <LinearGradient colors={HERO_DROP.accentGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.heroShopGrad}>
+        {/* Stock bar */}
+        <View style={s.stockRow}>
+          <View style={[s.stockBar, { backgroundColor: divider }]}>
+            <View style={[s.stockFill, { width: `${soldPct}%` as any, backgroundColor: HERO_DROP.brandColor }]} />
+          </View>
+          <Text style={[s.stockText, { color: muted }]}>{HERO_DROP.remaining} left of {HERO_DROP.units}</Text>
+        </View>
+
+        {/* Actions */}
+        <View style={s.heroActions}>
+          <TouchableOpacity
+            style={[s.heroShopBtn, { backgroundColor: HERO_DROP.brandColor }]}
+            activeOpacity={0.85}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              Alert.alert(
+                HERO_DROP.brand,
+                `${HERO_DROP.name} · ${HERO_DROP.price}\n${HERO_DROP.remaining} left of ${HERO_DROP.units} — act fast!`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: '🔔 Notify Me',  onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
+                  { text: '🛍️ Shop Now',   onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
+                ],
+              );
+            }}
+          >
             <Feather name="shopping-bag" size={15} color="#FFF" />
             <Text style={s.heroShopText}>Shop Drop — {HERO_DROP.price}</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={s.heroSaveBtn}
-          activeOpacity={0.8}
-          onPress={() => { setSaved(v => !v); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
-        >
-          <Feather name="bookmark" size={18} color={saved ? '#C94D1F' : '#FFFFFF80'} />
-        </TouchableOpacity>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.heroSaveBtn, { borderColor: border }]}
+            activeOpacity={0.8}
+            onPress={() => { setSaved(v => !v); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+          >
+            <Feather name="bookmark" size={18} color={saved ? HERO_DROP.brandColor : muted} />
+          </TouchableOpacity>
+        </View>
       </View>
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -225,12 +225,12 @@ function ForYouCard({ item, isDark }: { item: typeof FOR_YOU[0]; isDark: boolean
         );
       }}
     >
-      <LinearGradient colors={[item.color + 'DD', item.color + '44']} style={fy.visual}>
-        <View style={[fy.visualIcon, { backgroundColor: '#FFFFFF20' }]}>
-          <Feather name="shopping-bag" size={22} color="#FFF" />
+      <View style={[fy.visual, { backgroundColor: item.color }]}>
+        <View style={fy.visualIcon}>
+          <Feather name="shopping-bag" size={20} color={item.color} />
         </View>
         {item.tag && (
-          <View style={[fy.tagPill, { backgroundColor: '#00000050' }]}>
+          <View style={fy.tagPill}>
             <Text style={fy.tagText}>{item.tag}</Text>
           </View>
         )}
@@ -239,9 +239,9 @@ function ForYouCard({ item, isDark }: { item: typeof FOR_YOU[0]; isDark: boolean
           onPress={() => { setSaved(v => !v); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
           activeOpacity={0.8}
         >
-          <Feather name="bookmark" size={14} color={saved ? '#C94D1F' : '#FFFFFF'} />
+          <Feather name="bookmark" size={14} color={saved ? '#FFFFFF' : '#FFFFFFB0'} />
         </TouchableOpacity>
-      </LinearGradient>
+      </View>
       <View style={fy.body}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 3 }}>
           <View style={[fy.dot, { backgroundColor: item.color }]}>
@@ -262,14 +262,14 @@ function ForYouCard({ item, isDark }: { item: typeof FOR_YOU[0]; isDark: boolean
 }
 
 const fy = StyleSheet.create({
-  card:      { width: 160, borderRadius: 18, borderWidth: 1, overflow: 'hidden' },
-  visual:    { height: 140, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  visualIcon:{ width: 44, height: 44, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  tagPill:   { position: 'absolute', top: 9, left: 9, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 7 },
-  tagText:   { fontSize: 9, fontFamily: 'Inter_700Bold', color: '#FFFFFF', letterSpacing: 0.5, textTransform: 'uppercase' },
-  saveBtn:   { position: 'absolute', top: 9, right: 9, width: 28, height: 28, borderRadius: 14, backgroundColor: '#00000040', alignItems: 'center', justifyContent: 'center' },
+  card:      { width: 158, borderRadius: 6, borderWidth: 1, overflow: 'hidden' },
+  visual:    { height: 130, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  visualIcon:{ width: 40, height: 40, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  tagPill:   { position: 'absolute', top: 8, left: 8, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 4, backgroundColor: '#FFFFFF' },
+  tagText:   { fontSize: 9, fontFamily: 'Inter_700Bold', color: '#17140F', letterSpacing: 0.5, textTransform: 'uppercase' },
+  saveBtn:   { position: 'absolute', top: 8, right: 8, width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
   body:      { padding: 11 },
-  dot:       { width: 15, height: 15, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  dot:       { width: 15, height: 15, borderRadius: 3, alignItems: 'center', justifyContent: 'center' },
   dotText:   { fontSize: 7, fontFamily: 'Inter_700Bold', color: '#FFF' },
   brand:     { fontSize: 10, fontFamily: 'Inter_500Medium', flex: 1 },
   name:      { fontSize: 12, fontFamily: 'Inter_700Bold', lineHeight: 16 },
@@ -326,8 +326,8 @@ function DroppingRow({ item, isDark }: { item: typeof DROPPING_SOON[0]; isDark: 
 }
 
 const dr = StyleSheet.create({
-  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: 15, borderWidth: 1 },
-  avatar:   { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: 6, borderWidth: 1 },
+  avatar:   { width: 40, height: 40, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
   initials: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#FFF' },
   name:     { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   brand:    { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
@@ -380,9 +380,9 @@ function TrendingRow({ item, isDark }: { item: typeof TRENDING[0]; isDark: boole
 }
 
 const tr = StyleSheet.create({
-  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: 15, borderWidth: 1 },
+  row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: 6, borderWidth: 1 },
   rank:     { fontSize: 14, fontFamily: 'Inter_700Bold', width: 28 },
-  avatar:   { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  avatar:   { width: 40, height: 40, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
   initials: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#FFF' },
   name:     { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   brand:    { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
@@ -571,40 +571,40 @@ const s = StyleSheet.create({
   storyLabel:      { fontSize: 10, fontFamily: 'Inter_500Medium', textAlign: 'center', width: 60 },
 
   hero: {
-    borderRadius: 24,
-    padding: 22,
+    borderRadius: 6,
     overflow: 'hidden',
-    minHeight: 260,
+    borderWidth: 1,
   },
-  orb:  { position: 'absolute', borderRadius: 999, opacity: 0.18 },
-  orb1: { width: 220, height: 220, backgroundColor: '#B33F1E', top: -80, right: -60 },
-  orb2: { width: 160, height: 160, backgroundColor: '#C1440E', bottom: -60, left: -40 },
+  heroVisual: {
+    padding: 18,
+    minHeight: 150,
+    justifyContent: 'space-between',
+  },
 
-  heroTopRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   heroBrandRow:    { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  heroBrandAvatar: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  heroBrandInitials: { fontSize: 12, fontFamily: 'Inter_700Bold', color: '#FFF' },
+  heroBrandAvatar: { width: 34, height: 34, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  heroBrandInitials: { fontSize: 12, fontFamily: 'Inter_700Bold' },
   heroBrandName:   { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
-  heroBrandHandle: { fontSize: 11, fontFamily: 'Inter_400Regular', color: '#FFFFFF70', marginTop: 1 },
-  heroTagRow:      { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#FF000025', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, borderWidth: 1, borderColor: '#FF000040' },
-  heroTag:         { fontSize: 10, fontFamily: 'Inter_700Bold', color: '#FF6B6B', letterSpacing: 0.5 },
+  heroBrandHandle: { fontSize: 11, fontFamily: 'Inter_400Regular', color: '#FFFFFFB0', marginTop: 1 },
+  heroTagRow:      { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
+  heroTag:         { fontSize: 10, fontFamily: 'Inter_700Bold', color: '#FFFFFF', letterSpacing: 0.8, textTransform: 'uppercase' },
 
-  heroProductName: { fontSize: 26, fontFamily: 'Inter_700Bold', color: '#FFFFFF', letterSpacing: -0.5, lineHeight: 32, marginBottom: 16 },
+  heroProductName: { flex: 1, fontSize: 20, fontFamily: 'Inter_700Bold', letterSpacing: -0.3, lineHeight: 25, marginRight: 12 },
+  heroPrice:       { fontSize: 20, fontFamily: 'Inter_700Bold', letterSpacing: -0.3 },
 
-  countdown:      { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 14 },
-  countdownBlock: { alignItems: 'center', backgroundColor: '#FFFFFF18', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
-  countdownNum:   { fontSize: 20, fontFamily: 'Inter_700Bold', color: '#FFFFFF', letterSpacing: -0.5 },
-  countdownLabel: { fontSize: 8, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF70', letterSpacing: 1, marginTop: 1 },
-  countdownColon: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#FFFFFF50', marginBottom: 10 },
+  countdown:      { flexDirection: 'row', alignItems: 'center', gap: 0, marginBottom: 14, borderTopWidth: 1, borderBottomWidth: 1, paddingVertical: 10 },
+  countdownBlock: { flex: 1, alignItems: 'center' },
+  countdownNum:   { fontSize: 18, fontFamily: 'Inter_700Bold', letterSpacing: -0.3, fontVariant: ['tabular-nums'] },
+  countdownLabel: { fontSize: 9, fontFamily: 'Inter_600SemiBold', letterSpacing: 1, marginTop: 2 },
+  countdownDivider: { width: 1, height: 24 },
 
   stockRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
-  stockBar:  { flex: 1, height: 4, borderRadius: 2, backgroundColor: '#FFFFFF20', overflow: 'hidden' },
-  stockFill: { height: 4, borderRadius: 2 },
-  stockText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: '#FFFFFF80' },
+  stockBar:  { flex: 1, height: 3, borderRadius: 0, overflow: 'hidden' },
+  stockFill: { height: 3 },
+  stockText: { fontSize: 11, fontFamily: 'Inter_500Medium' },
 
   heroActions:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  heroShopBtn:  { flex: 1, borderRadius: 14, overflow: 'hidden' },
-  heroShopGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13 },
+  heroShopBtn:  { flex: 1, borderRadius: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13 },
   heroShopText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
-  heroSaveBtn:  { width: 46, height: 46, borderRadius: 14, backgroundColor: '#FFFFFF15', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#FFFFFF20' },
+  heroSaveBtn:  { width: 46, height: 46, borderRadius: 6, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
 });

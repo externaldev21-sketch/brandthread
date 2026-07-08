@@ -42,7 +42,7 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: 6,
     padding: 12,
     borderWidth: 1,
     marginBottom: 8,
@@ -51,14 +51,14 @@ const styles = StyleSheet.create({
   image: {
     width: 56,
     height: 56,
-    borderRadius: 10,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
   dot: {
     width: 20,
     height: 20,
-    borderRadius: 10,
+    borderRadius: 4,
   },
   info: { flex: 1, gap: 3 },
   name: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },

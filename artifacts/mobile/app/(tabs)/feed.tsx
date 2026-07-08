@@ -11,6 +11,16 @@ import * as Haptics from 'expo-haptics';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
+// Pick a readable ink/white foreground for a given flat background color.
+function readableOn(hex: string): string {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? '#17140F' : '#FFFFFF';
+}
+
 // ─── Mock feed data ──────────────────────────────────────────────────────────
 
 const FEED_ITEMS = [
@@ -27,9 +37,7 @@ const FEED_ITEMS = [
     productName: 'Canvas Cargo Jacket',
     productPrice: '$189',
     productOriginalPrice: null,
-    cardColor: '#1A0A2E',
     accentColor: '#C94D1F',
-    patternColor: '#241708',
     likes: 1240,
     comments: 87,
     shares: 34,
@@ -49,9 +57,7 @@ const FEED_ITEMS = [
     productName: 'Essential Relaxed Tee',
     productPrice: '$48',
     productOriginalPrice: null,
-    cardColor: '#0A1F1E',
     accentColor: '#14B8A6',
-    patternColor: '#0D2929',
     likes: 892,
     comments: 44,
     shares: 21,
@@ -71,9 +77,7 @@ const FEED_ITEMS = [
     productName: 'Ripstop Cargo Trousers',
     productPrice: '$134',
     productOriginalPrice: '$160',
-    cardColor: '#1C1000',
     accentColor: '#B98A2E',
-    patternColor: '#2A1A00',
     likes: 3410,
     comments: 215,
     shares: 98,
@@ -93,9 +97,7 @@ const FEED_ITEMS = [
     productName: 'Sunday Washed Hoodie',
     productPrice: '$98',
     productOriginalPrice: null,
-    cardColor: '#1A0010',
     accentColor: '#EC4899',
-    patternColor: '#2A0018',
     likes: 2180,
     comments: 132,
     shares: 67,
@@ -115,9 +117,7 @@ const FEED_ITEMS = [
     productName: 'City Chore Coat',
     productPrice: '$215',
     productOriginalPrice: '$260',
-    cardColor: '#020B1A',
     accentColor: '#4A6FA5',
-    patternColor: '#071226',
     likes: 975,
     comments: 58,
     shares: 29,
@@ -203,24 +203,26 @@ function FeedCard({
       </View>
 
       {/* ─ Product visual ─ */}
-      <View style={[styles.productVisual, { backgroundColor: item.cardColor }]}>
-        {/* Background pattern circles */}
-        <View style={[styles.patternCircle, styles.patternCircle1, { backgroundColor: item.patternColor }]} />
-        <View style={[styles.patternCircle, styles.patternCircle2, { backgroundColor: item.patternColor }]} />
-        {/* Product card */}
-        <View style={[styles.productCard, { backgroundColor: item.patternColor, borderColor: `${item.accentColor}40` }]}>
-          <View style={[styles.productIcon, { backgroundColor: `${item.accentColor}25` }]}>
-            <Feather name="package" size={28} color={item.accentColor} />
+      {(() => {
+        const onAccent = readableOn(item.accentColor);
+        const isLight  = onAccent === '#17140F';
+        return (
+          <View style={[styles.productVisual, { backgroundColor: item.accentColor }]}>
+            <View style={styles.productIcon}>
+              <Feather name="package" size={26} color={item.accentColor} />
+            </View>
+            <View style={{ flex: 1, marginLeft: 14 }}>
+              <Text style={[styles.productCardName, { color: onAccent }]} numberOfLines={1}>{item.productName}</Text>
+              <View style={styles.priceRow}>
+                <Text style={[styles.productCardPrice, { color: onAccent }]}>{item.productPrice}</Text>
+                {item.productOriginalPrice && (
+                  <Text style={[styles.originalPrice, { color: isLight ? '#17140F80' : '#FFFFFFA0' }]}>{item.productOriginalPrice}</Text>
+                )}
+              </View>
+            </View>
           </View>
-          <Text style={[styles.productCardName, { color: '#FFFFFF' }]}>{item.productName}</Text>
-          <View style={styles.priceRow}>
-            <Text style={[styles.productCardPrice, { color: item.accentColor }]}>{item.productPrice}</Text>
-            {item.productOriginalPrice && (
-              <Text style={styles.originalPrice}>{item.productOriginalPrice}</Text>
-            )}
-          </View>
-        </View>
-      </View>
+        );
+      })()}
 
       {/* ─ Caption + tags ─ */}
       <View style={styles.captionBlock}>
@@ -505,7 +507,7 @@ const styles = StyleSheet.create({
   storyInitials: { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
   storyName:     { fontSize: 10, fontFamily: 'Inter_500Medium', textAlign: 'center', width: 62 },
 
-  card: { borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
+  card: { borderRadius: 6, borderWidth: 1, overflow: 'hidden' },
 
   cardHeader: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10 },
   avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
@@ -514,30 +516,22 @@ const styles = StyleSheet.create({
   brandNameRow: { flexDirection: 'row', alignItems: 'center' },
   brandName: { fontSize: 14, fontFamily: 'Inter_700Bold' },
   brandHandle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 1 },
-  followBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
+  followBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 4, borderWidth: 1 },
   followText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
 
   productVisual: {
-    height: 200, alignItems: 'center', justifyContent: 'center',
-    overflow: 'hidden',
+    flexDirection: 'row', alignItems: 'center', padding: 16,
   },
-  patternCircle: { position: 'absolute', borderRadius: 999 },
-  patternCircle1: { width: 240, height: 240, top: -80, right: -60 },
-  patternCircle2: { width: 160, height: 160, bottom: -60, left: -40 },
-  productCard: {
-    width: SCREEN_W * 0.55, padding: 18, borderRadius: 18, borderWidth: 1,
-    alignItems: 'center', gap: 8,
-  },
-  productIcon: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  productCardName: { fontSize: 14, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
-  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  productCardPrice: { fontSize: 18, fontFamily: 'Inter_700Bold' },
-  originalPrice: { fontSize: 13, fontFamily: 'Inter_400Regular', color: '#FFFFFF60', textDecorationLine: 'line-through' },
+  productIcon: { width: 48, height: 48, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  productCardName: { fontSize: 15, fontFamily: 'Inter_700Bold' },
+  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 },
+  productCardPrice: { fontSize: 16, fontFamily: 'Inter_700Bold' },
+  originalPrice: { fontSize: 12, fontFamily: 'Inter_400Regular', textDecorationLine: 'line-through' },
 
   captionBlock: { paddingHorizontal: 14, paddingBottom: 10, gap: 8 },
   caption: { fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 20 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  tag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
+  tag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 },
   tagText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
 
   actions: {
@@ -550,7 +544,7 @@ const styles = StyleSheet.create({
   actionCount: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   shopBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20,
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 6,
   },
   shopBtnText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
 });

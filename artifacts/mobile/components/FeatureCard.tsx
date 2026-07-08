@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: 6,
     padding: 14,
     gap: 12,
     marginBottom: 8,
@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   iconWrap: {
     width: 40,
     height: 40,
-    borderRadius: 10,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
   },
