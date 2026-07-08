@@ -1,17 +1,4 @@
 import React, { useState } from 'react';
-
-/** Small aspect-ratio preview thumbnail shown next to each size preset row. */
-function SheetThumb({ ratio }: { ratio: number }) {
-  const BOX = 44; // fixed container size
-  const isLandscape = ratio >= 1;
-  const w = isLandscape ? BOX : Math.round(BOX * ratio);
-  const h = isLandscape ? Math.round(BOX / ratio) : BOX;
-  return (
-    <View style={{ width: BOX, height: BOX, alignItems: 'center', justifyContent: 'center' }}>
-      <View style={{ width: w, height: h, backgroundColor: '#3A3A3A', borderRadius: 3, borderWidth: 1, borderColor: '#5A5A5A' }} />
-    </View>
-  );
-}
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Alert, Modal } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -151,17 +138,16 @@ export default function AIStudioScreen() {
                 activeOpacity={0.8}
                 onPress={() => openCanvas({ label: 'Untitled Artwork', dims: c.dims, ratio: c.ratio })}
               >
-                <View
-                  style={[
-                    styles.canvasTile,
-                    { aspectRatio: c.ratio, backgroundColor: c.dark ? '#1C1C1C' : '#FFFFFF', borderColor: colors.border },
-                  ]}
-                >
-                  {c.hasContent && (
-                    <View style={styles.canvasThumb}>
-                      <Feather name="user" size={22} color="#B8B8B8" />
-                    </View>
-                  )}
+                <View style={[styles.canvasTile, { borderColor: colors.border }]}>
+                  <View style={[styles.canvasShape, {
+                    aspectRatio: c.ratio,
+                    backgroundColor: c.dark ? '#1C1C1C' : '#FFFFFF',
+                    ...(c.ratio >= 1
+                      ? { width: '90%' }
+                      : { height: '90%' }),
+                  }]}>
+                    {c.hasContent && <Feather name="user" size={18} color="#B8B8B8" />}
+                  </View>
                 </View>
                 <Text style={[styles.canvasLabel, { color: colors.foreground }]}>Untitled Artwork</Text>
                 <Text style={[styles.canvasDims, { color: colors.mutedForeground }]}>{c.dims}</Text>
@@ -266,7 +252,6 @@ export default function AIStudioScreen() {
               activeOpacity={0.7}
               onPress={() => openCanvas(SCREEN_SIZE)}
             >
-              <SheetThumb ratio={SCREEN_SIZE.ratio} />
               <Text style={styles.sheetRowLabel}>{SCREEN_SIZE.label}</Text>
               <Text style={styles.sheetRowDims}>{SCREEN_SIZE.dims}</Text>
             </TouchableOpacity>
@@ -279,8 +264,7 @@ export default function AIStudioScreen() {
                   activeOpacity={0.7}
                   onPress={() => openCanvas(p)}
                 >
-                  <SheetThumb ratio={p.ratio} />
-                  <Text style={[styles.sheetRowLabel, { flex: 1 }]}>{p.label}</Text>
+                  <Text style={styles.sheetRowLabel}>{p.label}</Text>
                   <View style={styles.sheetRowRight}>
                     {p.profile != null && <Text style={styles.sheetRowProfile}>{p.profile}</Text>}
                     <Text style={styles.sheetRowDims}>{p.dims}</Text>
@@ -316,8 +300,8 @@ const styles = StyleSheet.create({
 
   canvasGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: '3%', rowGap: 20 },
   canvasCell: { width: '31.333%' },
-  canvasTile: { width: '100%', borderRadius: 10, borderWidth: 1, marginBottom: 8, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  canvasThumb: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: '#E8E8E8' },
+  canvasTile: { width: '100%', height: 110, borderRadius: 10, borderWidth: 1, marginBottom: 8, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: '#111' },
+  canvasShape: { borderRadius: 4, alignItems: 'center', justifyContent: 'center' },
   canvasLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   canvasDims: { fontSize: 10, fontFamily: 'Inter_400Regular', marginTop: 2 },
   toolRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 14, borderWidth: 1, marginBottom: 8, gap: 12 },
