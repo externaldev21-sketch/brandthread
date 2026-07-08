@@ -134,7 +134,7 @@ const SPOTLIGHT_ITEMS = [
 type SpotlightItem = typeof SPOTLIGHT_ITEMS[number];
 type EngagementState = {
   liked: boolean; likes: number;
-  saved: boolean; favorited: boolean;
+  saved: boolean;
   reposted: boolean; reposts: number;
   following: boolean;
   comments: { id: string; user: string; text: string }[];
@@ -143,7 +143,7 @@ type EngagementState = {
 function initialEngagement(item: SpotlightItem): EngagementState {
   return {
     liked: false, likes: item.likes,
-    saved: false, favorited: false,
+    saved: false,
     reposted: false, reposts: item.reposts,
     following: false,
     comments: item.comments,
@@ -158,7 +158,7 @@ function formatCount(n: number) {
 // ─── Single video page ────────────────────────────────────────────────────────
 
 function SpotlightPage({
-  item, isActive, engagement, onLike, onDoubleTapLike, onSave, onFavorite, onRepost, onFollow, onOpenComments, onShop,
+  item, isActive, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShop,
 }: {
   item: SpotlightItem;
   isActive: boolean;
@@ -166,7 +166,6 @@ function SpotlightPage({
   onLike: (id: string) => void;
   onDoubleTapLike: (id: string) => void;
   onSave: (id: string) => void;
-  onFavorite: (id: string) => void;
   onRepost: (id: string) => void;
   onFollow: (id: string) => void;
   onOpenComments: (id: string) => void;
@@ -309,10 +308,10 @@ function SpotlightPage({
           style={styles.railBtn}
           activeOpacity={0.7}
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-          onPress={() => { onFavorite(item.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+          onPress={() => onShop(item.id)}
         >
-          <Feather name="star" size={27} color={engagement.favorited ? '#F5C542' : '#FFFFFF'} />
-          <Text style={styles.railCount}>Fave</Text>
+          <Feather name="shopping-bag" size={27} color="#FFFFFF" />
+          <Text style={styles.railCount}>SHOP</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -477,7 +476,6 @@ export default function FeedScreen() {
   }, []);
 
   const handleSave = useCallback((id: string) => update(id, e => ({ saved: !e.saved })), []);
-  const handleFavorite = useCallback((id: string) => update(id, e => ({ favorited: !e.favorited })), []);
   const handleRepost = useCallback((id: string) => update(id, e => ({
     reposted: !e.reposted, reposts: e.reposted ? e.reposts - 1 : e.reposts + 1,
   })), []);
@@ -544,7 +542,6 @@ export default function FeedScreen() {
             onLike={handleLike}
             onDoubleTapLike={handleDoubleTapLike}
             onSave={handleSave}
-            onFavorite={handleFavorite}
             onRepost={handleRepost}
             onFollow={handleFollow}
             onOpenComments={setCommentsFor}
