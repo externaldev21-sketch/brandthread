@@ -1,261 +1,298 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  useColorScheme, FlatList, Share, Alert,
+  FlatList, Share, Alert, Dimensions, Modal, TextInput, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
+const { width: SCREEN_W } = Dimensions.get('window');
+
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
 const FRIENDS = [
-  { id: 'f1', name: 'Maya Chen',    handle: '@mayachen',    chatId: 'maya',   initials: 'MC', color: '#BE185D', hasNew: true,  activity: 'saved 3 items from Vault Studio' },
-  { id: 'f2', name: 'Jordan Lee',   handle: '@jordanlee',   chatId: 'jordan', initials: 'JL', color: '#1D4ED8', hasNew: true,  activity: 'posted a fit check' },
-  { id: 'f3', name: 'Amir Patel',   handle: '@amirpatel',   chatId: 'amir',   initials: 'AP', color: '#0F766E', hasNew: false, activity: 'copped the NxGen hoodie' },
-  { id: 'f4', name: 'Sofia Reyes',  handle: '@sofiareyes',  chatId: 'sofia',  initials: 'SR', color: '#B45309', hasNew: true,  activity: 'shared her wishlist' },
-  { id: 'f5', name: 'Kai Nakamura', handle: '@kainakamura', chatId: 'kai',    initials: 'KN', color: '#B33F1E', hasNew: false, activity: 'liked a drop from Atlas Goods' },
+  { id: 'f1', name: 'Maya Chen',    handle: '@mayachen',    chatId: 'maya',   initials: 'MC', color: '#BE185D', hasNew: true  },
+  { id: 'f2', name: 'Jordan Lee',   handle: '@jordanlee',   chatId: 'jordan', initials: 'JL', color: '#1D4ED8', hasNew: true  },
+  { id: 'f3', name: 'Amir Patel',   handle: '@amirpatel',   chatId: 'amir',   initials: 'AP', color: '#0F766E', hasNew: false },
+  { id: 'f4', name: 'Sofia Reyes',  handle: '@sofiareyes',  chatId: 'sofia',  initials: 'SR', color: '#B45309', hasNew: true  },
+  { id: 'f5', name: 'Kai Nakamura', handle: '@kainakamura', chatId: 'kai',    initials: 'KN', color: '#B33F1E', hasNew: false },
 ];
-
-const FRIEND_CHAT_MAP: Record<string, string> = {
-  'Maya Chen': 'maya', 'Jordan Lee': 'jordan', 'Amir Patel': 'amir',
-  'Sofia Reyes': 'sofia', 'Kai Nakamura': 'kai',
-};
 
 const FRIEND_POSTS = [
   {
     id: 'p1',
     friend: 'Maya Chen',
+    handle: '@mayachen',
     friendInitials: 'MC',
     friendColor: '#BE185D',
-    timeAgo: '1h',
-    type: 'wishlist' as const,
+    dateLabel: 'June 28',
+    tagline: 'Vault Studio · Rooftop drop',
     caption: 'Can\'t decide between these two 😩',
-    items: [
-      { name: 'Canvas Cargo Jacket', brand: 'Vault Studio', price: '$189', color: '#B33F1E', initials: 'VS' },
-      { name: 'Micro-Fleece Jogger',  brand: 'Softwear__',   price: '$92',  color: '#BE185D', initials: 'SW' },
-    ],
-    likes: 14,
-    comments: 6,
+    gradient: ['#3A1530', '#0E0A14', '#1A0F18'] as [string, string, string],
+    accent: '#EC4899',
+    likes: 224,
+    commentsList: ['So clean 😍', 'Get the jacket!!'],
+    reposts: 2,
     liked: false,
+    reposted: false,
+    saved: false,
   },
   {
     id: 'p2',
     friend: 'Jordan Lee',
+    handle: '@jordanlee',
     friendInitials: 'JL',
     friendColor: '#1D4ED8',
-    timeAgo: '3h',
-    type: 'cop' as const,
+    dateLabel: 'June 26',
+    tagline: 'NxGen Drops · Archive Hoodie Vol.3',
     caption: 'Finally copped 🙌 been waiting weeks for this restock.',
-    items: [
-      { name: 'Archive Hoodie Vol.3', brand: 'NxGen Drops', price: '$135', color: '#B45309', initials: 'NX' },
-    ],
-    likes: 31,
-    comments: 9,
+    gradient: ['#0B1B33', '#0A0E14', '#101826'] as [string, string, string],
+    accent: '#3B82F6',
+    likes: 331,
+    commentsList: ['LFG 🔥', 'Been waiting on this restock forever', 'W'],
+    reposts: 9,
     liked: true,
+    reposted: false,
+    saved: true,
   },
   {
     id: 'p3',
     friend: 'Sofia Reyes',
+    handle: '@sofiareyes',
     friendInitials: 'SR',
     friendColor: '#B45309',
-    timeAgo: '5h',
-    type: 'wishlist' as const,
+    dateLabel: 'June 24',
+    tagline: 'Atlas Goods · Utility Vest',
     caption: 'This season\'s grail list 🔥 @ me if you copped any of these',
-    items: [
-      { name: 'Utility Vest — Slate', brand: 'Atlas Goods', price: '$220', color: '#1D4ED8', initials: 'AG' },
-      { name: 'Raw Denim Jacket',     brand: 'Coldform',    price: '$310', color: '#065F46', initials: 'CF' },
-    ],
-    likes: 22,
-    comments: 13,
+    gradient: ['#2B1607', '#120C08', '#1F1209'] as [string, string, string],
+    accent: '#F59E0B',
+    likes: 122,
+    commentsList: ['Need the vest asap', 'Grail list is unmatched'],
+    reposts: 13,
     liked: false,
+    reposted: false,
+    saved: false,
   },
 ];
 
-// ─── Friend post card ─────────────────────────────────────────────────────────
+type FriendPost = typeof FRIEND_POSTS[0];
+
+// ─── Friend post (Instagram-style) ─────────────────────────────────────────────
 
 function FriendCard({
-  post, isDark, onLike, onMessage,
+  post, onLike, onSave, onRepost, onOpenComments,
 }: {
-  post: typeof FRIEND_POSTS[0];
-  isDark: boolean;
+  post: FriendPost;
   onLike: (id: string) => void;
-  onMessage: (name: string) => void;
+  onSave: (id: string) => void;
+  onRepost: (id: string) => void;
+  onOpenComments: (id: string) => void;
 }) {
-  const card   = isDark ? '#1B1917' : '#FFFFFF';
-  const border = isDark ? '#33302A' : '#E3DCC9';
-  const fg     = isDark ? '#EDE7D9' : '#17140F';
-  const muted  = isDark ? '#8C8577' : '#6E6759';
-  const tagBg  = isDark ? '#201D18' : '#EDE7D9';
-  const tagFg  = isDark ? '#C94D1F' : '#B33F1E';
-
-  const typeLabel = post.type === 'cop' ? '✅ Copped' : '🔖 Wishlist';
-  const typeColor = post.type === 'cop' ? '#3F7A4F' : tagFg;
-  const typeBg    = post.type === 'cop' ? (isDark ? '#3F7A4F18' : '#F0FDF4') : tagBg;
-
   return (
-    <View style={[s.card, { backgroundColor: card, borderColor: border }]}>
+    <View style={s.card}>
       {/* Header */}
       <View style={s.cardHeader}>
         <View style={[s.avatar, { backgroundColor: post.friendColor }]}>
           <Text style={s.avatarText}>{post.friendInitials}</Text>
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={[s.friendName, { color: fg }]}>{post.friend}</Text>
-          <Text style={[s.timeAgo, { color: muted }]}>{post.timeAgo} ago</Text>
+          <Text style={s.friendName}>{post.friend}</Text>
+          <View style={s.taglineRow}>
+            <Ionicons name="bag" size={11} color="#8C8577" />
+            <Text style={s.tagline} numberOfLines={1}>{post.tagline}</Text>
+          </View>
         </View>
-        <View style={[s.typePill, { backgroundColor: typeBg }]}>
-          <Text style={[s.typeText, { color: typeColor }]}>{typeLabel}</Text>
-        </View>
+        <TouchableOpacity style={s.moreBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Feather name="more-horizontal" size={20} color="#EDE7D9" />
+        </TouchableOpacity>
       </View>
 
-      {/* Caption */}
-      <Text style={[s.caption, { color: fg }]}>{post.caption}</Text>
+      {/* Photo */}
+      <LinearGradient colors={post.gradient} style={s.photo}>
+        <View style={[s.photoIconRing, { borderColor: post.accent + '80' }]}>
+          <Ionicons name="bag" size={30} color={post.accent} />
+        </View>
+      </LinearGradient>
 
-      {/* Items */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ gap: 10, paddingHorizontal: 14, paddingBottom: 4 }}
-      >
-        {post.items.map((item, i) => (
-          <View key={i} style={[s.itemCard, { borderColor: item.color + '40' }]}>
-            <LinearGradient
-              colors={[item.color + 'CC', item.color + '44']}
-              style={s.itemVisual}
-            >
-              <View style={[s.itemIcon, { backgroundColor: '#FFFFFF25' }]}>
-                <Feather name="shopping-bag" size={18} color="#FFF" />
-              </View>
-            </LinearGradient>
-            <View style={{ padding: 8 }}>
-              <Text style={[s.itemBrand, { color: muted }]} numberOfLines={1}>{item.brand}</Text>
-              <Text style={[s.itemName, { color: fg }]} numberOfLines={2}>{item.name}</Text>
-              <Text style={[s.itemPrice, { color: item.color }]}>{item.price}</Text>
-            </View>
-          </View>
-        ))}
-      </ScrollView>
-
-      {/* Actions */}
-      <View style={[s.actions, { borderTopColor: border }]}>
+      {/* Action row */}
+      <View style={s.actions}>
         <TouchableOpacity
           style={s.actionBtn}
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onLike(post.id); }}
           activeOpacity={0.7}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
         >
-          <Feather name="heart" size={18} color={post.liked ? '#EF4444' : muted} />
-          <Text style={[s.actionCount, { color: muted }]}>
-            {post.liked ? post.likes + 1 : post.likes}
-          </Text>
+          <Ionicons name={post.liked ? 'heart' : 'heart-outline'} size={25} color={post.liked ? '#EF4444' : '#EDE7D9'} />
         </TouchableOpacity>
         <TouchableOpacity
           style={s.actionBtn}
           activeOpacity={0.7}
-          onPress={() => onMessage(post.friend)}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          onPress={() => onOpenComments(post.id)}
         >
-          <Feather name="message-circle" size={18} color={muted} />
-          <Text style={[s.actionCount, { color: muted }]}>{post.comments}</Text>
+          <Ionicons name="chatbubble-outline" size={23} color="#EDE7D9" />
         </TouchableOpacity>
         <TouchableOpacity
           style={s.actionBtn}
           activeOpacity={0.7}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onRepost(post.id); }}
+        >
+          <Ionicons name="repeat" size={25} color={post.reposted ? post.accent : '#EDE7D9'} />
+        </TouchableOpacity>
+        <View style={{ flex: 1 }} />
+        <TouchableOpacity
+          style={s.actionBtn}
+          activeOpacity={0.7}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            Share.share({ message: `${post.friend} ${post.type === 'cop' ? 'just copped' : 'wishlisted'}: ${post.items.map(i => `${i.name} by ${i.brand}`).join(', ')} — Brandthread` });
+            Share.share({ message: `${post.friend} on Brandthread: ${post.caption}` });
           }}
         >
-          <Feather name="share-2" size={18} color={muted} />
+          <Ionicons name="paper-plane-outline" size={23} color="#EDE7D9" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={s.actionBtn}
+          activeOpacity={0.7}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onSave(post.id); }}
+        >
+          <Ionicons name={post.saved ? 'bookmark' : 'bookmark-outline'} size={23} color="#EDE7D9" />
         </TouchableOpacity>
       </View>
+
+      {/* Counts */}
+      <View style={s.countsRow}>
+        <Text style={s.countText}>{formatCount(post.liked ? post.likes + 1 : post.likes)} likes</Text>
+        <Text style={s.countDot}>·</Text>
+        <Text style={s.countText}>{post.commentsList.length} comments</Text>
+        <Text style={s.countDot}>·</Text>
+        <Text style={s.countText}>{formatCount(post.reposted ? post.reposts + 1 : post.reposts)} reposts</Text>
+      </View>
+
+      {/* Caption */}
+      <Text style={s.captionRow}>
+        <Text style={s.captionName}>{post.friend.split(' ')[0].toLowerCase()}_{post.friend.split(' ')[1]?.toLowerCase() ?? ''} </Text>
+        {post.caption}
+      </Text>
+      <Text style={s.dateLabel}>{post.dateLabel}</Text>
     </View>
   );
+}
+
+function formatCount(n: number) {
+  if (n >= 1000) return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+  return String(n);
 }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function FriendsScreen() {
   const insets  = useSafeAreaInsets();
-  const scheme  = useColorScheme();
   const router  = useRouter();
-  const isDark  = scheme !== 'light';
 
   const [posts, setPosts] = useState(FRIEND_POSTS);
-
-  const bg      = isDark ? '#121110' : '#F5F1E7';
-  const fg      = isDark ? '#EDE7D9' : '#17140F';
-  const muted   = isDark ? '#8C8577' : '#6E6759';
-  const border  = isDark ? '#33302A' : '#E3DCC9';
-  const primary = isDark ? '#C94D1F' : '#B33F1E';
+  const [activePostId, setActivePostId] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
 
   function handleLike(id: string) {
     setPosts(prev => prev.map(p => p.id === id ? { ...p, liked: !p.liked } : p));
   }
 
-  function handleMessage(name: string) {
-    const chatId = FRIEND_CHAT_MAP[name];
-    if (chatId) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/chat/${chatId}` as never); }
+  function handleSave(id: string) {
+    setPosts(prev => prev.map(p => p.id === id ? { ...p, saved: !p.saved } : p));
   }
 
-  const newActivity = FRIENDS.filter(f => f.hasNew).length;
+  function handleRepost(id: string) {
+    setPosts(prev => prev.map(p => p.id === id ? { ...p, reposted: !p.reposted } : p));
+  }
+
+  function handleOpenComments(id: string) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setActivePostId(id);
+  }
+
+  function handleSendComment() {
+    if (!activePostId || !draft.trim()) return;
+    setPosts(prev => prev.map(p => p.id === activePostId ? { ...p, commentsList: [...p.commentsList, draft.trim()] } : p));
+    setDraft('');
+  }
+
+  const activePost = posts.find(p => p.id === activePostId) ?? null;
 
   return (
-    <View style={[s.container, { backgroundColor: bg }]}>
+    <View style={s.container}>
       {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + 16, borderBottomColor: border }]}>
-        <View>
-          <Text style={[s.headerTitle, { color: fg }]}>Friends</Text>
-          <Text style={[s.headerSub, { color: muted }]}>{newActivity} friends active</Text>
-        </View>
+      <View style={[s.header, { paddingTop: insets.top + 10 }]}>
+        <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Feather name="plus" size={24} color="#EDE7D9" />
+        </TouchableOpacity>
+        <Text style={s.headerTitle}>Friends</Text>
         <TouchableOpacity
-          style={[s.headerBtn, { borderColor: border }]}
-          activeOpacity={0.7}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           onPress={() => Alert.alert('Find Friends', 'Connect with friends on Brandthread', [
             { text: 'Search by Username', onPress: () => {} },
             { text: 'Sync Contacts',      onPress: () => {} },
             { text: 'Cancel', style: 'cancel' },
           ])}
         >
-          <Feather name="user-plus" size={18} color={muted} />
+          <Feather name="user-plus" size={22} color="#EDE7D9" />
         </TouchableOpacity>
       </View>
 
-      {/* Friend avatars */}
-      <View style={[s.avatarsRow, { borderBottomColor: border }]}>
+      {/* Stories row */}
+      <View style={s.storiesRow}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.avatarsScroll}
+          contentContainerStyle={s.storiesScroll}
         >
+          {/* Your story */}
+          <TouchableOpacity style={s.storyItem} activeOpacity={0.8}>
+            <View style={s.yourStoryRing}>
+              <View style={[s.avatarCircle, { backgroundColor: '#33302A' }]}>
+                <Feather name="user" size={22} color="#8C8577" />
+              </View>
+              <View style={s.yourStoryPlus}>
+                <Feather name="plus" size={11} color="#FFFFFF" />
+              </View>
+            </View>
+            <Text style={s.storyLabel} numberOfLines={1}>Your story</Text>
+          </TouchableOpacity>
+
           {FRIENDS.map(friend => (
             <TouchableOpacity
               key={friend.id}
-              style={s.avatarItem}
+              style={s.storyItem}
               activeOpacity={0.8}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/chat/${friend.chatId}` as never); }}
             >
               {friend.hasNew ? (
                 <LinearGradient
-                  colors={['#D9714B', '#C1440E', '#B33F1E']}
-                  style={s.avatarRing}
+                  colors={['#F9CE34', '#EE2A7B', '#6228D7']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={s.storyRing}
                 >
-                  <View style={[s.avatarRingInner, { backgroundColor: bg }]}>
+                  <View style={s.storyRingInner}>
                     <View style={[s.avatarCircle, { backgroundColor: friend.color }]}>
                       <Text style={s.avatarInitials}>{friend.initials}</Text>
                     </View>
                   </View>
                 </LinearGradient>
               ) : (
-                <View style={[s.avatarRingViewed, { borderColor: border }]}>
+                <View style={s.storyRingViewed}>
                   <View style={[s.avatarCircle, { backgroundColor: friend.color }]}>
                     <Text style={s.avatarInitials}>{friend.initials}</Text>
                   </View>
                 </View>
               )}
-              <Text style={[s.avatarLabel, { color: muted }]} numberOfLines={1}>
-                {friend.name.split(' ')[0]}
+              <Text style={s.storyLabel} numberOfLines={1}>
+                {friend.name.split(' ')[0].toLowerCase()}
               </Text>
             </TouchableOpacity>
           ))}
@@ -266,12 +303,55 @@ export default function FriendsScreen() {
       <FlatList
         data={posts}
         keyExtractor={p => p.id}
-        contentContainerStyle={{ padding: 16, gap: 16, paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
         renderItem={({ item }) => (
-          <FriendCard post={item} isDark={isDark} onLike={handleLike} onMessage={handleMessage} />
+          <FriendCard post={item} onLike={handleLike} onSave={handleSave} onRepost={handleRepost} onOpenComments={handleOpenComments} />
         )}
       />
+
+      {/* Comments sheet */}
+      <Modal
+        visible={!!activePost}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setActivePostId(null)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={s.modalBackdrop}
+        >
+          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setActivePostId(null)} />
+          <View style={[s.commentsSheet, { paddingBottom: insets.bottom + 12 }]}>
+            <View style={s.commentsHandle} />
+            <Text style={s.commentsTitle}>Comments</Text>
+            <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
+              {activePost?.commentsList.length ? activePost.commentsList.map((c, i) => (
+                <View key={i} style={s.commentRow}>
+                  <Text style={s.commentUser}>{activePost.friend.split(' ')[0].toLowerCase()}</Text>
+                  <Text style={s.commentText}>{c}</Text>
+                </View>
+              )) : (
+                <Text style={s.commentsEmpty}>No comments yet — be the first.</Text>
+              )}
+            </ScrollView>
+            <View style={s.commentInputRow}>
+              <TextInput
+                style={s.commentInput}
+                placeholder="Add a comment…"
+                placeholderTextColor="#8C8577"
+                value={draft}
+                onChangeText={setDraft}
+                onSubmitEditing={handleSendComment}
+                returnKeyType="send"
+              />
+              <TouchableOpacity style={s.commentSendBtn} onPress={handleSendComment} activeOpacity={0.7}>
+                <Feather name="send" size={17} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -279,44 +359,68 @@ export default function FriendsScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: '#000000' },
+
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: 1,
+    paddingHorizontal: 16, paddingBottom: 10,
   },
-  headerTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', letterSpacing: -0.6 },
-  headerSub:   { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  headerBtn:   { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  headerTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#EDE7D9', letterSpacing: -0.3 },
 
-  avatarsRow:    { borderBottomWidth: 1, height: 100 },
-  avatarsScroll: { paddingHorizontal: 16, paddingVertical: 10, gap: 14, alignItems: 'center' },
-  avatarItem:    { alignItems: 'center', gap: 5, width: 58 },
-  avatarRing:    { width: 58, height: 58, borderRadius: 29, padding: 2.5, alignItems: 'center', justifyContent: 'center' },
-  avatarRingViewed: { width: 58, height: 58, borderRadius: 29, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  avatarRingInner:  { width: 51, height: 51, borderRadius: 26, padding: 2, alignItems: 'center', justifyContent: 'center' },
-  avatarCircle:     { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  avatarInitials:   { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
-  avatarLabel:      { fontSize: 10, fontFamily: 'Inter_500Medium', textAlign: 'center' },
+  storiesRow:    { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#26231D' },
+  storiesScroll: { paddingHorizontal: 14, paddingVertical: 12, gap: 14, alignItems: 'flex-start' },
 
-  card:       { borderRadius: 20, borderWidth: 1, overflow: 'hidden' },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10 },
-  avatar:     { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
-  friendName: { fontSize: 14, fontFamily: 'Inter_700Bold' },
-  timeAgo:    { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 1 },
-  typePill:   { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10 },
-  typeText:   { fontSize: 11, fontFamily: 'Inter_700Bold' },
+  storyItem:  { alignItems: 'center', gap: 5, width: 62 },
+  storyRing:  { width: 62, height: 62, borderRadius: 31, padding: 2.5, alignItems: 'center', justifyContent: 'center' },
+  storyRingInner: { width: 55, height: 55, borderRadius: 28, padding: 2, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000000' },
+  storyRingViewed: { width: 62, height: 62, borderRadius: 31, borderWidth: 2, borderColor: '#33302A', alignItems: 'center', justifyContent: 'center' },
+  yourStoryRing: { width: 62, height: 62, alignItems: 'center', justifyContent: 'center' },
+  yourStoryPlus: {
+    position: 'absolute', bottom: 0, right: 0, width: 20, height: 20, borderRadius: 10,
+    backgroundColor: '#3B82F6', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#000000',
+  },
+  avatarCircle:   { width: 51, height: 51, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
+  avatarInitials: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  storyLabel:     { fontSize: 10.5, fontFamily: 'Inter_500Medium', textAlign: 'center', color: '#B8B2A3' },
 
-  caption: { fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 19, paddingHorizontal: 14, paddingBottom: 12 },
+  card:       { marginBottom: 8 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 10 },
+  moreBtn:    { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
+  avatar:     { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 12.5, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  friendName: { fontSize: 13.5, fontFamily: 'Inter_700Bold', color: '#EDE7D9' },
+  taglineRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 },
+  tagline:    { fontSize: 11, fontFamily: 'Inter_400Regular', color: '#8C8577', flexShrink: 1 },
 
-  itemCard:    { width: 130, borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
-  itemVisual:  { height: 90, alignItems: 'center', justifyContent: 'center' },
-  itemIcon:    { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  itemBrand:   { fontSize: 10, fontFamily: 'Inter_500Medium', marginBottom: 2 },
-  itemName:    { fontSize: 12, fontFamily: 'Inter_700Bold', lineHeight: 16 },
-  itemPrice:   { fontSize: 13, fontFamily: 'Inter_700Bold', marginTop: 3 },
+  photo: { width: SCREEN_W, height: SCREEN_W * 1.05, alignItems: 'center', justifyContent: 'center' },
+  photoIconRing: {
+    width: 64, height: 64, borderRadius: 32, borderWidth: 1.5,
+    alignItems: 'center', justifyContent: 'center',
+  },
 
-  actions:     { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 12, borderTopWidth: 1 },
-  actionBtn:   { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 8, paddingVertical: 6 },
-  actionCount: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  actions:   { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingTop: 10 },
+  actionBtn: { paddingHorizontal: 6, paddingVertical: 4 },
+
+  countsRow:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingTop: 6, gap: 6, flexWrap: 'wrap' },
+  countText:  { fontSize: 12.5, fontFamily: 'Inter_600SemiBold', color: '#EDE7D9' },
+  countDot:   { fontSize: 12.5, color: '#5A564C' },
+
+  captionRow:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: '#EDE7D9', lineHeight: 18, paddingHorizontal: 14, paddingTop: 6 },
+  captionName:  { fontFamily: 'Inter_700Bold' },
+  dateLabel:    { fontSize: 11, fontFamily: 'Inter_400Regular', color: '#5A564C', paddingHorizontal: 14, paddingTop: 4, paddingBottom: 4 },
+
+  modalBackdrop:  { flex: 1, justifyContent: 'flex-end', backgroundColor: '#00000090' },
+  commentsSheet:  { backgroundColor: '#151310', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 16, paddingTop: 10 },
+  commentsHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#33302A', alignSelf: 'center', marginBottom: 10 },
+  commentsTitle:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#EDE7D9', textAlign: 'center', marginBottom: 12 },
+  commentsEmpty:  { fontSize: 13, fontFamily: 'Inter_400Regular', color: '#8C8577', textAlign: 'center', paddingVertical: 20 },
+  commentRow:     { flexDirection: 'row', gap: 8, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#26231D' },
+  commentUser:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#EDE7D9' },
+  commentText:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: '#B8B2A3', flexShrink: 1 },
+  commentInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 12 },
+  commentInput:   {
+    flex: 1, backgroundColor: '#201D18', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10,
+    fontSize: 13, fontFamily: 'Inter_400Regular', color: '#EDE7D9',
+  },
+  commentSendBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#C94D1F', alignItems: 'center', justifyContent: 'center' },
 });
