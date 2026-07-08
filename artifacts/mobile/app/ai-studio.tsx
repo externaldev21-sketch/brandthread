@@ -68,13 +68,6 @@ export default function AIStudioScreen() {
   const [mode, setMode] = useState<'ai' | 'manual'>('ai');
   const [newCanvasVisible, setNewCanvasVisible] = useState(false);
 
-  const aiBadge = (
-    <View style={[styles.aiBadge, { backgroundColor: '#C1440E22', borderColor: '#C1440E44' }]}>
-      <Feather name="zap" size={12} color={colors.primary} />
-      <Text style={[styles.aiText, { color: colors.primary }]}>AI</Text>
-    </View>
-  );
-
   function openCanvas(preset: SizePreset) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setNewCanvasVisible(false);
@@ -86,7 +79,7 @@ export default function AIStudioScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScreenHeader title="Design Studio" subtitle="Powered by generative AI" rightElement={aiBadge} />
+      <ScreenHeader title="Design Studio" subtitle="Powered by generative AI" />
 
       {/* Mode switch */}
       <View style={styles.modeRow}>
@@ -312,8 +305,6 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 },
   pageTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 4 },
   pageSubtitle: { fontSize: 13, fontFamily: 'Inter_400Regular' },
-  aiBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
-  aiText: { fontSize: 12, fontFamily: 'Inter_700Bold' },
   creditsRow: { flexDirection: 'row', borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 24 },
   creditItem: { flex: 1, alignItems: 'center', gap: 3 },
   creditVal: { fontSize: 22, fontFamily: 'Inter_700Bold' },
