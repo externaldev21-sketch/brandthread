@@ -163,24 +163,6 @@ export default function AIStudioScreen() {
         showsVerticalScrollIndicator={false}
       >
 
-      {/* Credits */}
-      <View style={[styles.creditsRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={styles.creditItem}>
-          <Text style={[styles.creditVal, { color: colors.foreground }]}>840</Text>
-          <Text style={[styles.creditLabel, { color: colors.mutedForeground }]}>Credits left</Text>
-        </View>
-        <View style={[styles.divider, { backgroundColor: colors.border }]} />
-        <View style={styles.creditItem}>
-          <Text style={[styles.creditVal, { color: colors.foreground }]}>124</Text>
-          <Text style={[styles.creditLabel, { color: colors.mutedForeground }]}>Generated</Text>
-        </View>
-        <View style={[styles.divider, { backgroundColor: colors.border }]} />
-        <View style={styles.creditItem}>
-          <Text style={[styles.creditVal, { color: colors.foreground }]}>18s</Text>
-          <Text style={[styles.creditLabel, { color: colors.mutedForeground }]}>Avg. time</Text>
-        </View>
-      </View>
-
       {/* Tools */}
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Studio Tools</Text>
       {STUDIO_TOOLS.map((tool) => (
@@ -305,11 +287,6 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 },
   pageTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 4 },
   pageSubtitle: { fontSize: 13, fontFamily: 'Inter_400Regular' },
-  creditsRow: { flexDirection: 'row', borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 24 },
-  creditItem: { flex: 1, alignItems: 'center', gap: 3 },
-  creditVal: { fontSize: 22, fontFamily: 'Inter_700Bold' },
-  creditLabel: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  divider: { width: 1 },
   sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
 
   modeRow: { paddingHorizontal: 20, marginBottom: 16 },
