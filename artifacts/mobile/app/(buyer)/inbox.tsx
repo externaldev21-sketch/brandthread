@@ -268,7 +268,7 @@ export default function InboxScreen() {
           <TouchableOpacity
             style={s.storyItem}
             activeOpacity={0.8}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/story-creator' as never); }}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/story-picker' as never); }}
           >
             <View style={[s.createRing, { backgroundColor: border }]}>
               <Feather name="user" size={24} color={muted} />

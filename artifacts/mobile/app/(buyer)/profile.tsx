@@ -130,7 +130,7 @@ export default function BuyerProfileScreen() {
       <View style={[s.hero, { paddingHorizontal: 20 }]}>
         <TouchableOpacity
           activeOpacity={0.85}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/story-creator' as never); }}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/story-picker' as never); }}
         >
           <View style={[s.avatarRing, { borderColor: border }]}>
             <View style={[s.avatarFill, { backgroundColor: primary }]}>

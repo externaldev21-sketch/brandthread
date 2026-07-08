@@ -5,7 +5,7 @@ import {
   TouchableOpacity, TouchableWithoutFeedback, useColorScheme, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
@@ -116,9 +116,10 @@ export default function StoryCreatorScreen() {
   const insets  = useSafeAreaInsets();
   const scheme  = useColorScheme();
   const isDark  = scheme !== 'light';
+  const params  = useLocalSearchParams<{ uri?: string }>();
 
   // Canvas state
-  const [imageUri,      setImageUri]      = useState<string | null>(null);
+  const [imageUri,      setImageUri]      = useState<string | null>(params.uri ?? null);
   const [textItems,     setTextItems]     = useState<TxtItem[]>([]);
   const [selectedMusic, setSelectedMusic] = useState<Song | null>(null);
   const [selectedGif,   setSelectedGif]   = useState<GifItem | null>(null);
@@ -211,8 +212,8 @@ export default function StoryCreatorScreen() {
     setTimeout(() => router.back(), 1800);
   }
 
-  // Auto-open picker on mount
-  useEffect(() => { pickImage(); }, []);
+  // Auto-open picker on mount only if no photo was already handed to us
+  useEffect(() => { if (!params.uri) pickImage(); }, []);
 
   const filteredSongs = musicQuery.trim()
     ? SONGS.filter(s =>
