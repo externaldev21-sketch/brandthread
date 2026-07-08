@@ -128,7 +128,7 @@ export default function ProductsScreen() {
           horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.filtersRow}
-          contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
+          contentContainerStyle={styles.filtersContent}
         >
           {FILTERS.map((f) => (
             <TouchableOpacity
@@ -143,7 +143,10 @@ export default function ProductsScreen() {
                 },
               ]}
             >
-              <Text style={[styles.filterText, { color: filter === f ? colors.background : colors.mutedForeground }]}>
+              <Text
+                style={[styles.filterText, { color: filter === f ? colors.background : colors.mutedForeground }]}
+                numberOfLines={1}
+              >
                 {f}
               </Text>
             </TouchableOpacity>
@@ -234,8 +237,9 @@ const styles = StyleSheet.create({
   searchWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 11, gap: 10 },
   searchInput: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
   toolBtn: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  filtersRow: { marginBottom: 16 },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  filtersRow: { marginBottom: 16, flexGrow: 0, height: 40 },
+  filtersContent: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  filterChip: { flexShrink: 0, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
   filterText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 12 },
   thumb: { width: 44, height: 44, borderRadius: 8 },
