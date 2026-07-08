@@ -104,10 +104,10 @@ export default function ProfileScreen() {
             activeOpacity={0.7}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              Alert.alert('Share', 'Share your storefront link with others.');
+              nav('/settings');
             }}
           >
-            <Feather name="share" size={20} color={fg} />
+            <Feather name="settings" size={20} color={fg} />
           </TouchableOpacity>
           <TouchableOpacity
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
