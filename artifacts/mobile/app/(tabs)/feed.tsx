@@ -323,19 +323,8 @@ function SpotlightPage({
         </TouchableOpacity>
       </View>
 
-      {/* ─ Bottom-left overlay: shop pill, creator, sound ─ */}
+      {/* ─ Bottom-left overlay: caption, creator, sound ─ */}
       <View style={[styles.bottomInfo, { bottom: tabBarClearance }]} pointerEvents="box-none">
-        <TouchableOpacity
-          style={[styles.shopPill, { backgroundColor: item.accentColor }]}
-          activeOpacity={0.85}
-          onPress={() => onShop(item.id)}
-        >
-          <Feather name="shopping-bag" size={13} color="#FFF" />
-          <Text style={styles.shopPillText}>
-            Shop · {item.productName} {item.productPrice}
-          </Text>
-        </TouchableOpacity>
-
         <Text style={styles.caption} numberOfLines={2}>{item.caption}</Text>
 
         <View style={styles.creatorRow}>
@@ -659,8 +648,6 @@ const styles = StyleSheet.create({
 
   bottomInfo: { position: 'absolute', left: 16, right: 84, bottom: 26, gap: 8 },
 
-  shopPill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: 12, minHeight: 34, borderRadius: 17 },
-  shopPillText: { fontSize: 12.5, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
 
   caption: { fontSize: 14, fontFamily: 'Inter_400Regular', color: '#FFFFFF', lineHeight: 19 },
   creatorRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
