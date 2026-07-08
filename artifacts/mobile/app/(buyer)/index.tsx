@@ -14,7 +14,7 @@ const { width: W } = Dimensions.get('window');
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
 const BRAND_STORIES = [
-  { id: 's1', name: 'Vault',     initials: 'VS', color: '#7C3AED', hasNew: true  },
+  { id: 's1', name: 'Vault',     initials: 'VS', color: '#B33F1E', hasNew: true  },
   { id: 's2', name: 'NxGen',     initials: 'NX', color: '#B45309', hasNew: true  },
   { id: 's3', name: 'Softwear',  initials: 'SW', color: '#BE185D', hasNew: true  },
   { id: 's4', name: 'Meridian',  initials: 'MC', color: '#0F766E', hasNew: false },
@@ -27,15 +27,15 @@ const HERO_DROP = {
   brand: 'Vault Studio',
   handle: '@vaultstudio',
   initials: 'VS',
-  brandColor: '#7C3AED',
+  brandColor: '#B33F1E',
   name: 'Canvas Cargo Jacket',
   tag: 'DROPPING TODAY',
   price: '$189',
   units: 50,
   remaining: 14,
   countdown: { h: 2, m: 14, s: 37 },
-  gradient: ['#1A0A40', '#2D1060', '#0D0520'] as [string, string, string],
-  accentGradient: ['#9F7AEA', '#7C3AED'] as [string, string],
+  gradient: ['#14110D', '#241708', '#0D0520'] as [string, string, string],
+  accentGradient: ['#C94D1F', '#B33F1E'] as [string, string],
 };
 
 const FOR_YOU = [
@@ -49,12 +49,12 @@ const DROPPING_SOON = [
   { id: 'd1', brand: 'Meridian Co.',  name: 'Essential Tee — Sage',   price: '$48',  color: '#0F766E', initials: 'MC', inHours: 0,  live: true  },
   { id: 'd2', brand: 'NxGen Drops',   name: 'Cargo Trouser S/S',      price: '$134', color: '#B45309', initials: 'NX', inHours: 4,  live: false },
   { id: 'd3', brand: 'Rawthread',     name: 'Boxy Flannel Shirt',     price: '$96',  color: '#92400E', initials: 'RT', inHours: 9,  live: false },
-  { id: 'd4', brand: 'Vault Studio',  name: 'Fleece Zip Jacket',      price: '$220', color: '#7C3AED', initials: 'VS', inHours: 23, live: false },
+  { id: 'd4', brand: 'Vault Studio',  name: 'Fleece Zip Jacket',      price: '$220', color: '#B33F1E', initials: 'VS', inHours: 23, live: false },
 ];
 
 const TRENDING = [
   { id: 't1', rank: 1, brand: 'NxGen Drops',  name: 'Archive Hoodie Vol.3',   price: '$135', color: '#B45309', initials: 'NX', hype: '🔥 Hot'    },
-  { id: 't2', rank: 2, brand: 'Vault Studio',  name: 'Canvas Cargo Jacket',    price: '$189', color: '#7C3AED', initials: 'VS', hype: '⚡ Live'   },
+  { id: 't2', rank: 2, brand: 'Vault Studio',  name: 'Canvas Cargo Jacket',    price: '$189', color: '#B33F1E', initials: 'VS', hype: '⚡ Live'   },
   { id: 't3', rank: 3, brand: 'Atlas Goods',   name: 'Utility Vest — Slate',   price: '$220', color: '#1D4ED8', initials: 'AG', hype: '⏳ Limited' },
   { id: 't4', rank: 4, brand: 'Coldform',      name: 'Raw Denim Jacket',       price: '$310', color: '#065F46', initials: 'CF', hype: '💎 Grail'  },
 ];
@@ -192,7 +192,7 @@ function HeroCard({ isDark }: { isDark: boolean }) {
           activeOpacity={0.8}
           onPress={() => { setSaved(v => !v); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
         >
-          <Feather name="bookmark" size={18} color={saved ? '#9F7AEA' : '#FFFFFF80'} />
+          <Feather name="bookmark" size={18} color={saved ? '#C94D1F' : '#FFFFFF80'} />
         </TouchableOpacity>
       </View>
     </LinearGradient>
@@ -203,10 +203,10 @@ function HeroCard({ isDark }: { isDark: boolean }) {
 
 function ForYouCard({ item, isDark }: { item: typeof FOR_YOU[0]; isDark: boolean }) {
   const [saved, setSaved] = useState(false);
-  const card   = isDark ? '#111118' : '#FFFFFF';
-  const border = isDark ? '#1E1E30' : '#E8E6F0';
-  const fg     = isDark ? '#F0EEFF' : '#1A1035';
-  const muted  = isDark ? '#6B6B8A' : '#8080A0';
+  const card   = isDark ? '#1B1917' : '#FFFFFF';
+  const border = isDark ? '#33302A' : '#E3DCC9';
+  const fg     = isDark ? '#EDE7D9' : '#17140F';
+  const muted  = isDark ? '#8C8577' : '#8080A0';
 
   return (
     <TouchableOpacity
@@ -239,7 +239,7 @@ function ForYouCard({ item, isDark }: { item: typeof FOR_YOU[0]; isDark: boolean
           onPress={() => { setSaved(v => !v); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
           activeOpacity={0.8}
         >
-          <Feather name="bookmark" size={14} color={saved ? '#9F7AEA' : '#FFFFFF'} />
+          <Feather name="bookmark" size={14} color={saved ? '#C94D1F' : '#FFFFFF'} />
         </TouchableOpacity>
       </LinearGradient>
       <View style={fy.body}>
@@ -280,10 +280,10 @@ const fy = StyleSheet.create({
 // ─── Dropping-soon row ────────────────────────────────────────────────────────
 
 function DroppingRow({ item, isDark }: { item: typeof DROPPING_SOON[0]; isDark: boolean }) {
-  const card   = isDark ? '#111118' : '#FFFFFF';
-  const border = isDark ? '#1E1E30' : '#E8E6F0';
-  const fg     = isDark ? '#F0EEFF' : '#1A1035';
-  const muted  = isDark ? '#6B6B8A' : '#8080A0';
+  const card   = isDark ? '#1B1917' : '#FFFFFF';
+  const border = isDark ? '#33302A' : '#E3DCC9';
+  const fg     = isDark ? '#EDE7D9' : '#17140F';
+  const muted  = isDark ? '#8C8577' : '#8080A0';
 
   return (
     <TouchableOpacity
@@ -340,11 +340,11 @@ const dr = StyleSheet.create({
 // ─── Trending row ─────────────────────────────────────────────────────────────
 
 function TrendingRow({ item, isDark }: { item: typeof TRENDING[0]; isDark: boolean }) {
-  const card   = isDark ? '#111118' : '#FFFFFF';
-  const border = isDark ? '#1E1E30' : '#E8E6F0';
-  const fg     = isDark ? '#F0EEFF' : '#1A1035';
-  const muted  = isDark ? '#6B6B8A' : '#8080A0';
-  const primary = isDark ? '#9F7AEA' : '#7C3AED';
+  const card   = isDark ? '#1B1917' : '#FFFFFF';
+  const border = isDark ? '#33302A' : '#E3DCC9';
+  const fg     = isDark ? '#EDE7D9' : '#17140F';
+  const muted  = isDark ? '#8C8577' : '#8080A0';
+  const primary = isDark ? '#C94D1F' : '#B33F1E';
 
   return (
     <TouchableOpacity
@@ -387,7 +387,7 @@ const tr = StyleSheet.create({
   name:     { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   brand:    { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
   price:    { fontSize: 13, fontFamily: 'Inter_700Bold' },
-  hype:     { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: '#9F7AEA' },
+  hype:     { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: '#C94D1F' },
 });
 
 // ─── Section header ───────────────────────────────────────────────────────────
@@ -395,9 +395,9 @@ const tr = StyleSheet.create({
 function SectionHead({ title, sub, action, onAction }: { title: string; sub?: string; action?: string; onAction?: () => void }) {
   const scheme = useColorScheme();
   const isDark = scheme !== 'light';
-  const fg     = isDark ? '#F0EEFF' : '#1A1035';
-  const muted  = isDark ? '#6B6B8A' : '#8080A0';
-  const primary = isDark ? '#9F7AEA' : '#7C3AED';
+  const fg     = isDark ? '#EDE7D9' : '#17140F';
+  const muted  = isDark ? '#8C8577' : '#8080A0';
+  const primary = isDark ? '#C94D1F' : '#B33F1E';
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -422,11 +422,11 @@ export default function InspoScreen() {
   const router  = useRouter();
   const isDark  = scheme !== 'light';
 
-  const bg      = isDark ? '#08080F' : '#F4F3FA';
-  const fg      = isDark ? '#F0EEFF' : '#1A1035';
-  const muted   = isDark ? '#6B6B8A' : '#8080A0';
-  const border  = isDark ? '#1A1A28' : '#E8E6F0';
-  const primary = isDark ? '#9F7AEA' : '#7C3AED';
+  const bg      = isDark ? '#121110' : '#F4F3FA';
+  const fg      = isDark ? '#EDE7D9' : '#17140F';
+  const muted   = isDark ? '#8C8577' : '#8080A0';
+  const border  = isDark ? '#1A1A28' : '#E3DCC9';
+  const primary = isDark ? '#C94D1F' : '#B33F1E';
   const topPad  = Platform.OS === 'web' ? 67 : insets.top;
 
   return (
@@ -443,7 +443,7 @@ export default function InspoScreen() {
         </View>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <TouchableOpacity
-            style={[s.headerBtn, { backgroundColor: isDark ? '#111118' : '#FFFFFF', borderColor: border }]}
+            style={[s.headerBtn, { backgroundColor: isDark ? '#1B1917' : '#FFFFFF', borderColor: border }]}
             activeOpacity={0.75}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -453,7 +453,7 @@ export default function InspoScreen() {
             <Feather name="search" size={18} color={muted} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[s.headerBtn, { backgroundColor: isDark ? '#111118' : '#FFFFFF', borderColor: border }]}
+            style={[s.headerBtn, { backgroundColor: isDark ? '#1B1917' : '#FFFFFF', borderColor: border }]}
             activeOpacity={0.75}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/inbox' as never); }}
           >
@@ -478,7 +478,7 @@ export default function InspoScreen() {
           >
             {brand.hasNew ? (
               <LinearGradient
-                colors={['#F0ABFC', '#C026D3', '#7C3AED']}
+                colors={['#D9714B', '#C1440E', '#B33F1E']}
                 style={s.storyRing}
               >
                 <View style={[s.storyRingInner, { backgroundColor: bg }]}>
@@ -577,8 +577,8 @@ const s = StyleSheet.create({
     minHeight: 260,
   },
   orb:  { position: 'absolute', borderRadius: 999, opacity: 0.18 },
-  orb1: { width: 220, height: 220, backgroundColor: '#7C3AED', top: -80, right: -60 },
-  orb2: { width: 160, height: 160, backgroundColor: '#C026D3', bottom: -60, left: -40 },
+  orb1: { width: 220, height: 220, backgroundColor: '#B33F1E', top: -80, right: -60 },
+  orb2: { width: 160, height: 160, backgroundColor: '#C1440E', bottom: -60, left: -40 },
 
   heroTopRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   heroBrandRow:    { flexDirection: 'row', alignItems: 'center', gap: 10 },

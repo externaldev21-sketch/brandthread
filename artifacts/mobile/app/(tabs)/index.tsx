@@ -95,13 +95,13 @@ export default function SellerDashboard() {
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const rev    = REVENUE_DATA[range.presetId] ?? REVENUE_DATA.last30;
   const spark  = SPARK[range.presetId] ?? SPARK.last30;
-  const primary = isDark ? '#9F7AEA' : '#7C3AED';
+  const primary = isDark ? '#C94D1F' : '#B33F1E';
   const heroGradient: readonly [string, string, string] = isDark
-    ? ['#2A1060', '#130828', '#08080F'] : ['#EDE9FE', '#C4B5FD', '#F4F0FF'];
+    ? ['#2A1060', '#130828', '#121110'] : ['#E8E1CF', '#E2DDD0', '#F4F0FF'];
   const heroAmountColor = isDark ? '#FFFFFF'   : '#4C1D95';
-  const heroLabelColor  = isDark ? '#C4B5FDA0' : '#7C3AED99';
-  const heroSubColor    = isDark ? '#C4B5FD55' : '#9F7AEA77';
-  const heroBorderColor = isDark ? '#9F7AEA22' : '#DDD6FE';
+  const heroLabelColor  = isDark ? '#E2DDD0A0' : '#B33F1E99';
+  const heroSubColor    = isDark ? '#E2DDD055' : '#C94D1F77';
+  const heroBorderColor = isDark ? '#C1440E22' : '#DBD3C0';
 
   function nav(route: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -147,11 +147,11 @@ export default function SellerDashboard() {
             {isDark && <View style={st.glowOrb} />}
             <View style={st.heroTop}>
               <Text style={[st.heroLabel, { color: heroLabelColor }]}>REVENUE</Text>
-              <TouchableOpacity style={[st.periodPill, { backgroundColor: isDark ? '#FFFFFF15' : '#7C3AED18', borderColor: isDark ? '#FFFFFF25' : '#7C3AED30' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPickerVisible(true); }} activeOpacity={0.75}>
-                <Text style={[st.periodText, { color: isDark ? '#E0D4FF' : '#5B21B6' }]}>{range.label}</Text>
-                <Feather name="chevron-down" size={12} color={isDark ? '#C4B5FD' : '#7C3AED'} />
+              <TouchableOpacity style={[st.periodPill, { backgroundColor: isDark ? '#FFFFFF15' : '#B33F1E18', borderColor: isDark ? '#FFFFFF25' : '#B33F1E30' }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPickerVisible(true); }} activeOpacity={0.75}>
+                <Text style={[st.periodText, { color: isDark ? '#E0D4FF' : '#7A2D14' }]}>{range.label}</Text>
+                <Feather name="chevron-down" size={12} color={isDark ? '#E2DDD0' : '#B33F1E'} />
               </TouchableOpacity>
-              <View style={[st.growthPill, { backgroundColor: rev.up ? '#16A34A18' : '#DC262618', borderColor: rev.up ? '#22C55E33' : '#EF444433' }]}>
+              <View style={[st.growthPill, { backgroundColor: rev.up ? '#3F7A4F18' : '#DC262618', borderColor: rev.up ? '#4C9A5E33' : '#EF444433' }]}>
                 <Feather name={rev.up ? 'trending-up' : 'trending-down'} size={11} color={rev.up ? colors.success : colors.destructive} />
                 <Text style={[st.growthText, { color: rev.up ? colors.success : colors.destructive }]}>{rev.growth}</Text>
               </View>
@@ -273,7 +273,7 @@ const st = StyleSheet.create({
   avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
   heroCard: { borderRadius: 22, padding: 22, borderWidth: 1, overflow: 'hidden' },
-  glowOrb: { position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: '#7C3AED', opacity: 0.12 },
+  glowOrb: { position: 'absolute', top: -40, right: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: '#B33F1E', opacity: 0.12 },
   heroTop: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' },
   heroLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 1.2 },
   periodPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },

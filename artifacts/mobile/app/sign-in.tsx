@@ -29,13 +29,13 @@ export default function SignInScreen() {
   const [name, setName]         = useState('');
   const [code, setCode]         = useState('');
 
-  const bg      = isDark ? '#08080F' : '#F8F7FF';
-  const card    = isDark ? '#111118' : '#FFFFFF';
-  const border  = isDark ? '#252535' : '#DDD6FE';
-  const fg      = isDark ? '#F0EEFF' : '#1A1035';
-  const muted   = isDark ? '#6B6B8A' : '#6D6892';
-  const primary = isDark ? '#9F7AEA' : '#7C3AED';
-  const inputBg = isDark ? '#1C1C2E' : '#F0EEFF';
+  const bg      = isDark ? '#121110' : '#F2EEE3';
+  const card    = isDark ? '#1B1917' : '#FFFFFF';
+  const border  = isDark ? '#33302A' : '#DBD3C0';
+  const fg      = isDark ? '#EDE7D9' : '#17140F';
+  const muted   = isDark ? '#8C8577' : '#6E6759';
+  const primary = isDark ? '#C94D1F' : '#B33F1E';
+  const inputBg = isDark ? '#201D18' : '#EDE7D9';
 
   // ─── Sign-in ───────────────────────────────────────────────────────────────
 

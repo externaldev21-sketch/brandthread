@@ -20,28 +20,28 @@ const CANVAS_H = H - PANEL_H;
 
 const SONGS = [
   { id: '1',  title: 'Espresso',              artist: 'Sabrina Carpenter',     duration: '2:55', color: '#E879A0' },
-  { id: '2',  title: 'Please Please Please',   artist: 'Sabrina Carpenter',     duration: '3:06', color: '#C026D3' },
+  { id: '2',  title: 'Please Please Please',   artist: 'Sabrina Carpenter',     duration: '3:06', color: '#C1440E' },
   { id: '3',  title: 'Good Luck, Babe!',       artist: 'Chappell Roan',         duration: '3:38', color: '#EC4899' },
   { id: '4',  title: 'Not Like Us',            artist: 'Kendrick Lamar',        duration: '4:34', color: '#1D4ED8' },
-  { id: '5',  title: 'Beautiful Things',       artist: 'Benson Boone',          duration: '3:37', color: '#F59E0B' },
+  { id: '5',  title: 'Beautiful Things',       artist: 'Benson Boone',          duration: '3:37', color: '#B98A2E' },
   { id: '6',  title: 'Too Sweet',              artist: 'Hozier',                duration: '4:09', color: '#0F766E' },
   { id: '7',  title: 'BIRDS OF A FEATHER',     artist: 'Billie Eilish',         duration: '3:30', color: '#065F46' },
-  { id: '8',  title: 'Die With A Smile',       artist: 'Lady Gaga & Bruno Mars',duration: '4:11', color: '#7C3AED' },
+  { id: '8',  title: 'Die With A Smile',       artist: 'Lady Gaga & Bruno Mars',duration: '4:11', color: '#B33F1E' },
   { id: '9',  title: 'APT.',                   artist: 'ROSÉ & Bruno Mars',     duration: '2:51', color: '#F43F5E' },
   { id: '10', title: 'luther',                 artist: 'Kendrick Lamar & SZA',  duration: '3:56', color: '#0369A1' },
   { id: '11', title: 'End of Beginning',       artist: 'Djo',                   duration: '3:36', color: '#B45309' },
-  { id: '12', title: "Texas Hold 'Em",         artist: 'Beyoncé',               duration: '3:54', color: '#D97706' },
+  { id: '12', title: "Texas Hold 'Em",         artist: 'Beyoncé',               duration: '3:54', color: '#A66A1E' },
   { id: '13', title: 'Timeless',               artist: 'The Weeknd',            duration: '4:02', color: '#DC2626' },
-  { id: '14', title: 'Lose Control',           artist: 'Teddy Swims',           duration: '3:44', color: '#7C3AED' },
-  { id: '15', title: 'Stargazing',             artist: 'Myles Smith',           duration: '3:22', color: '#2563EB' },
+  { id: '14', title: 'Lose Control',           artist: 'Teddy Swims',           duration: '3:44', color: '#B33F1E' },
+  { id: '15', title: 'Stargazing',             artist: 'Myles Smith',           duration: '3:22', color: '#3D5A80' },
   { id: '16', title: 'Nokia',                  artist: 'Drake',                 duration: '2:52', color: '#475569' },
-  { id: '17', title: 'Disease',                artist: 'Lady Gaga',             duration: '4:05', color: '#9333EA' },
+  { id: '17', title: 'Disease',                artist: 'Lady Gaga',             duration: '4:05', color: '#8A3A22' },
   { id: '18', title: 'Taste',                  artist: 'Sabrina Carpenter',     duration: '2:37', color: '#DB2777' },
   { id: '19', title: 'My Eyes',                artist: 'Travis Scott',          duration: '3:48', color: '#78350F' },
   { id: '20', title: 'Dinner',                 artist: 'Beyoncé',               duration: '4:14', color: '#92400E' },
 ];
 
-const TEXT_COLORS = ['#FFFFFF', '#000000', '#9F7AEA', '#EC4899', '#F59E0B', '#22C55E', '#3B82F6', '#EF4444'];
+const TEXT_COLORS = ['#FFFFFF', '#000000', '#C94D1F', '#EC4899', '#B98A2E', '#4C9A5E', '#4A6FA5', '#EF4444'];
 const TEXT_SIZES  = [18, 24, 32, 44];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -223,8 +223,8 @@ export default function StoryCreatorScreen() {
   // ── Posted state ──────────────────────────────────────────────────────────
   if (posted) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#08080F', alignItems: 'center', justifyContent: 'center' }}>
-        <LinearGradient colors={['#A855F7', '#7C3AED']} style={s.postedCircle}>
+      <View style={{ flex: 1, backgroundColor: '#121110', alignItems: 'center', justifyContent: 'center' }}>
+        <LinearGradient colors={['#8A3A22', '#B33F1E']} style={s.postedCircle}>
           <Feather name="check" size={40} color="#FFF" />
         </LinearGradient>
         <Text style={s.postedTitle}>Story posted!</Text>
@@ -235,7 +235,7 @@ export default function StoryCreatorScreen() {
 
   const canvasGradient: [string, string, string] = imageUri
     ? ['#000', '#000', '#000']
-    : ['#1A0A40', '#2D1060', '#0D0520'];
+    : ['#14110D', '#241708', '#0F0D0A'];
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
@@ -324,8 +324,8 @@ export default function StoryCreatorScreen() {
                   style={s.topBtn}
                   activeOpacity={0.75}
                 >
-                  <BlurView intensity={40} tint="dark" style={[s.topBtnBlur, activePanel === panel && { backgroundColor: '#9F7AEA60' }]}>
-                    <Feather name={icon} size={18} color={activePanel === panel ? '#C4B5FD' : '#FFF'} />
+                  <BlurView intensity={40} tint="dark" style={[s.topBtnBlur, activePanel === panel && { backgroundColor: '#C94D1F60' }]}>
+                    <Feather name={icon} size={18} color={activePanel === panel ? '#E2DDD0' : '#FFF'} />
                   </BlurView>
                 </TouchableOpacity>
               ))}
@@ -349,7 +349,7 @@ export default function StoryCreatorScreen() {
         </TouchableOpacity>
 
         <TouchableOpacity onPress={handlePost} activeOpacity={0.85}>
-          <LinearGradient colors={['#A855F7', '#7C3AED']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.postBtn}>
+          <LinearGradient colors={['#8A3A22', '#B33F1E']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.postBtn}>
             <Text style={s.postBtnText}>Post Story</Text>
             <Feather name="arrow-right" size={16} color="#FFF" />
           </LinearGradient>
@@ -362,25 +362,25 @@ export default function StoryCreatorScreen() {
           {Platform.OS === 'ios' && (
             <BlurView intensity={70} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
           )}
-          <View style={[s.panelInner, { backgroundColor: isDark ? '#111118F5' : '#FFFFFFF5' }]}>
+          <View style={[s.panelInner, { backgroundColor: isDark ? '#1B1917F5' : '#FFFFFFF5' }]}>
             {/* Handle */}
-            <View style={[s.handle, { backgroundColor: isDark ? '#3A3A55' : '#D1D1E0' }]} />
+            <View style={[s.handle, { backgroundColor: isDark ? '#3A362C' : '#D1D1E0' }]} />
 
             {/* Text Panel */}
             {activePanel === 'text' && (
               <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-                <Text style={[s.panelTitle, { color: isDark ? '#F0EEFF' : '#1A1035' }]}>Add Text</Text>
+                <Text style={[s.panelTitle, { color: isDark ? '#EDE7D9' : '#17140F' }]}>Add Text</Text>
                 <TextInput
-                  style={[s.textInputLarge, { color: textColor, backgroundColor: isDark ? '#1A1A2E' : '#F0EEFF', borderColor: isDark ? '#2A2A45' : '#DDD6FE' }]}
+                  style={[s.textInputLarge, { color: textColor, backgroundColor: isDark ? '#1D1A15' : '#EDE7D9', borderColor: isDark ? '#2A261E' : '#DBD3C0' }]}
                   value={textInput}
                   onChangeText={setTextInput}
                   placeholder="Type something…"
-                  placeholderTextColor={isDark ? '#4A4A65' : '#A090C0'}
+                  placeholderTextColor={isDark ? '#4A453B' : '#A69C87'}
                   multiline
                   autoFocus
                   maxLength={80}
                 />
-                <Text style={[s.subLabel, { color: isDark ? '#6B6B8A' : '#8080A0' }]}>Colour</Text>
+                <Text style={[s.subLabel, { color: isDark ? '#8C8577' : '#8080A0' }]}>Colour</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.colorRow}>
                   {TEXT_COLORS.map(c => (
                     <TouchableOpacity
@@ -390,22 +390,22 @@ export default function StoryCreatorScreen() {
                     />
                   ))}
                 </ScrollView>
-                <Text style={[s.subLabel, { color: isDark ? '#6B6B8A' : '#8080A0' }]}>Size</Text>
+                <Text style={[s.subLabel, { color: isDark ? '#8C8577' : '#8080A0' }]}>Size</Text>
                 <View style={s.sizeRow}>
                   {TEXT_SIZES.map(sz => (
                     <TouchableOpacity
                       key={sz}
                       onPress={() => setTextSize(sz)}
-                      style={[s.sizeBtn, { backgroundColor: textSize === sz ? '#7C3AED' : (isDark ? '#1A1A2E' : '#EDE9FE'), borderColor: isDark ? '#2A2A45' : '#DDD6FE' }]}
+                      style={[s.sizeBtn, { backgroundColor: textSize === sz ? '#B33F1E' : (isDark ? '#1D1A15' : '#E8E1CF'), borderColor: isDark ? '#2A261E' : '#DBD3C0' }]}
                     >
-                      <Text style={{ fontSize: 12, fontFamily: 'Inter_600SemiBold', color: textSize === sz ? '#FFF' : (isDark ? '#9F7AEA' : '#7C3AED') }}>
+                      <Text style={{ fontSize: 12, fontFamily: 'Inter_600SemiBold', color: textSize === sz ? '#FFF' : (isDark ? '#C94D1F' : '#B33F1E') }}>
                         {sz === 18 ? 'S' : sz === 24 ? 'M' : sz === 32 ? 'L' : 'XL'}
                       </Text>
                     </TouchableOpacity>
                   ))}
                 </View>
                 <TouchableOpacity onPress={addText} style={s.doneBtn} activeOpacity={0.85}>
-                  <LinearGradient colors={['#A855F7', '#7C3AED']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.doneBtnGrad}>
+                  <LinearGradient colors={['#8A3A22', '#B33F1E']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.doneBtnGrad}>
                     <Text style={s.doneBtnText}>Add to Story</Text>
                   </LinearGradient>
                 </TouchableOpacity>
@@ -415,24 +415,24 @@ export default function StoryCreatorScreen() {
             {/* Music Panel */}
             {activePanel === 'music' && (
               <View style={{ flex: 1 }}>
-                <Text style={[s.panelTitle, { color: isDark ? '#F0EEFF' : '#1A1035' }]}>Add Music</Text>
-                <View style={[s.searchRow, { backgroundColor: isDark ? '#1A1A2E' : '#EDE9FE', borderColor: isDark ? '#2A2A45' : '#DDD6FE' }]}>
-                  <Feather name="search" size={16} color={isDark ? '#6B6B8A' : '#8080A0'} />
+                <Text style={[s.panelTitle, { color: isDark ? '#EDE7D9' : '#17140F' }]}>Add Music</Text>
+                <View style={[s.searchRow, { backgroundColor: isDark ? '#1D1A15' : '#E8E1CF', borderColor: isDark ? '#2A261E' : '#DBD3C0' }]}>
+                  <Feather name="search" size={16} color={isDark ? '#8C8577' : '#8080A0'} />
                   <TextInput
-                    style={[s.searchInput, { color: isDark ? '#F0EEFF' : '#1A1035' }]}
+                    style={[s.searchInput, { color: isDark ? '#EDE7D9' : '#17140F' }]}
                     value={musicQuery}
                     onChangeText={setMusicQuery}
                     placeholder="Search songs or artists…"
-                    placeholderTextColor={isDark ? '#4A4A65' : '#A090C0'}
+                    placeholderTextColor={isDark ? '#4A453B' : '#A69C87'}
                   />
                   {musicQuery.length > 0 && (
                     <TouchableOpacity onPress={() => setMusicQuery('')}>
-                      <Feather name="x-circle" size={15} color={isDark ? '#6B6B8A' : '#8080A0'} />
+                      <Feather name="x-circle" size={15} color={isDark ? '#8C8577' : '#8080A0'} />
                     </TouchableOpacity>
                   )}
                 </View>
                 {!musicQuery && (
-                  <Text style={[s.subLabel, { color: isDark ? '#6B6B8A' : '#8080A0', marginTop: 6 }]}>🔥 Trending Now</Text>
+                  <Text style={[s.subLabel, { color: isDark ? '#8C8577' : '#8080A0', marginTop: 6 }]}>🔥 Trending Now</Text>
                 )}
                 <FlatList
                   data={filteredSongs}
@@ -443,7 +443,7 @@ export default function StoryCreatorScreen() {
                     const chosen = selectedMusic?.id === item.id;
                     return (
                       <TouchableOpacity
-                        style={[s.songRow, chosen && { backgroundColor: isDark ? '#1A0A40' : '#EDE9FE' }]}
+                        style={[s.songRow, chosen && { backgroundColor: isDark ? '#14110D' : '#E8E1CF' }]}
                         onPress={() => { setSelectedMusic(chosen ? null : item); closePanel(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
                         activeOpacity={0.75}
                       >
@@ -451,12 +451,12 @@ export default function StoryCreatorScreen() {
                           <Feather name="music" size={14} color="#FFF" />
                         </View>
                         <View style={{ flex: 1 }}>
-                          <Text style={[s.songTitle, { color: isDark ? '#F0EEFF' : '#1A1035' }]} numberOfLines={1}>{item.title}</Text>
-                          <Text style={[s.songArtist, { color: isDark ? '#6B6B8A' : '#8080A0' }]} numberOfLines={1}>{item.artist} · {item.duration}</Text>
+                          <Text style={[s.songTitle, { color: isDark ? '#EDE7D9' : '#17140F' }]} numberOfLines={1}>{item.title}</Text>
+                          <Text style={[s.songArtist, { color: isDark ? '#8C8577' : '#8080A0' }]} numberOfLines={1}>{item.artist} · {item.duration}</Text>
                         </View>
                         {chosen
-                          ? <Feather name="check-circle" size={20} color="#9F7AEA" />
-                          : <Feather name="play-circle" size={20} color={isDark ? '#3A3A55' : '#C4B5FD'} />}
+                          ? <Feather name="check-circle" size={20} color="#C94D1F" />
+                          : <Feather name="play-circle" size={20} color={isDark ? '#3A362C' : '#E2DDD0'} />}
                       </TouchableOpacity>
                     );
                   }}
@@ -467,20 +467,20 @@ export default function StoryCreatorScreen() {
             {/* GIF Panel */}
             {activePanel === 'gif' && (
               <View style={{ flex: 1 }}>
-                <Text style={[s.panelTitle, { color: isDark ? '#F0EEFF' : '#1A1035' }]}>Add GIF</Text>
-                <View style={[s.searchRow, { backgroundColor: isDark ? '#1A1A2E' : '#EDE9FE', borderColor: isDark ? '#2A2A45' : '#DDD6FE' }]}>
-                  <Feather name="search" size={16} color={isDark ? '#6B6B8A' : '#8080A0'} />
+                <Text style={[s.panelTitle, { color: isDark ? '#EDE7D9' : '#17140F' }]}>Add GIF</Text>
+                <View style={[s.searchRow, { backgroundColor: isDark ? '#1D1A15' : '#E8E1CF', borderColor: isDark ? '#2A261E' : '#DBD3C0' }]}>
+                  <Feather name="search" size={16} color={isDark ? '#8C8577' : '#8080A0'} />
                   <TextInput
-                    style={[s.searchInput, { color: isDark ? '#F0EEFF' : '#1A1035' }]}
+                    style={[s.searchInput, { color: isDark ? '#EDE7D9' : '#17140F' }]}
                     value={gifQuery}
                     onChangeText={onGifSearch}
                     placeholder="Search GIFs…"
-                    placeholderTextColor={isDark ? '#4A4A65' : '#A090C0'}
+                    placeholderTextColor={isDark ? '#4A453B' : '#A69C87'}
                   />
                 </View>
                 {gifLoading ? (
                   <View style={s.loadingRow}>
-                    <Text style={[s.loadingText, { color: isDark ? '#6B6B8A' : '#8080A0' }]}>Loading GIFs…</Text>
+                    <Text style={[s.loadingText, { color: isDark ? '#8C8577' : '#8080A0' }]}>Loading GIFs…</Text>
                   </View>
                 ) : (
                   <FlatList
@@ -501,7 +501,7 @@ export default function StoryCreatorScreen() {
                     )}
                   />
                 )}
-                <Text style={[s.poweredBy, { color: isDark ? '#3A3A55' : '#C0BBDD' }]}>Powered by GIPHY · Long-press GIF on canvas to remove</Text>
+                <Text style={[s.poweredBy, { color: isDark ? '#4A453B' : '#B8AE99' }]}>Powered by GIPHY · Long-press GIF on canvas to remove</Text>
               </View>
             )}
           </View>
@@ -548,7 +548,7 @@ const s = StyleSheet.create({
   textInputLarge: { borderRadius: 14, borderWidth: 1, padding: 14, fontSize: 20, fontFamily: 'Inter_700Bold', minHeight: 70, textAlignVertical: 'top' },
   colorRow:     { gap: 10, paddingVertical: 4 },
   colorSwatch:  { width: 34, height: 34, borderRadius: 17 },
-  colorSwatchActive: { borderWidth: 3, borderColor: '#9F7AEA', transform: [{ scale: 1.15 }] },
+  colorSwatchActive: { borderWidth: 3, borderColor: '#C94D1F', transform: [{ scale: 1.15 }] },
   sizeRow:      { flexDirection: 'row', gap: 8 },
   sizeBtn:      { flex: 1, borderRadius: 10, borderWidth: 1, paddingVertical: 9, alignItems: 'center' },
   doneBtn:      { marginTop: 18, borderRadius: 16, overflow: 'hidden' },
@@ -564,7 +564,7 @@ const s = StyleSheet.create({
   songArtist:   { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
 
   gifGrid:      { gap: 4, paddingVertical: 4, paddingBottom: 20 },
-  gifThumb:     { flex: 1, height: 90, borderRadius: 8, overflow: 'hidden', backgroundColor: '#1A1A2E' },
+  gifThumb:     { flex: 1, height: 90, borderRadius: 8, overflow: 'hidden', backgroundColor: '#1D1A15' },
   gifThumbImg:  { width: '100%', height: '100%' },
   loadingRow:   { flex: 1, alignItems: 'center', justifyContent: 'center' },
   loadingText:  { fontSize: 14, fontFamily: 'Inter_400Regular' },
@@ -572,5 +572,5 @@ const s = StyleSheet.create({
 
   postedCircle: { width: 90, height: 90, borderRadius: 45, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
   postedTitle:  { fontSize: 24, fontFamily: 'Inter_700Bold', color: '#FFF', marginBottom: 8 },
-  postedSub:    { fontSize: 14, fontFamily: 'Inter_400Regular', color: '#6B6B8A' },
+  postedSub:    { fontSize: 14, fontFamily: 'Inter_400Regular', color: '#8C8577' },
 });

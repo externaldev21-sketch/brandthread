@@ -39,9 +39,9 @@ function Bubble({ msg, prevMsg, isDark, friendColor }: {
   isDark: boolean;
   friendColor: string;
 }) {
-  const fg       = isDark ? '#F0EEFF' : '#1A1035';
-  const cardBg   = isDark ? '#1A1A2E' : '#F0EEFF';
-  const mutedFg  = isDark ? '#6B6B8A' : '#8080A0';
+  const fg       = isDark ? '#EDE7D9' : '#17140F';
+  const cardBg   = isDark ? '#1D1A15' : '#EDE7D9';
+  const mutedFg  = isDark ? '#8C8577' : '#8080A0';
 
   // Show day divider if first message or >6 hour gap or different day
   const showDivider = !prevMsg
@@ -55,16 +55,16 @@ function Bubble({ msg, prevMsg, isDark, friendColor }: {
     <>
       {showDivider && (
         <View style={bub.dividerRow}>
-          <View style={[bub.dividerLine, { backgroundColor: isDark ? '#2A2A40' : '#E0DDEE' }]} />
+          <View style={[bub.dividerLine, { backgroundColor: isDark ? '#2A261E' : '#E8E1CF' }]} />
           <Text style={[bub.dividerText, { color: mutedFg }]}>{formatDay(msg.ts)}</Text>
-          <View style={[bub.dividerLine, { backgroundColor: isDark ? '#2A2A40' : '#E0DDEE' }]} />
+          <View style={[bub.dividerLine, { backgroundColor: isDark ? '#2A261E' : '#E8E1CF' }]} />
         </View>
       )}
 
       <View style={[bub.row, isMe ? bub.rowMe : bub.rowThem]}>
         {isMe ? (
           <LinearGradient
-            colors={['#A855F7', '#7C3AED']}
+            colors={['#8A3A22', '#B33F1E']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[bub.bubble, bub.bubbleMe]}
@@ -115,8 +115,8 @@ function TypingIndicator({ isDark }: { isDark: boolean }) {
     return () => clearInterval(id);
   }, []);
   return (
-    <View style={[ty.wrap, { backgroundColor: isDark ? '#1A1A2E' : '#F0EEFF' }]}>
-      <Text style={[ty.dots, { color: isDark ? '#9F7AEA' : '#7C3AED' }]}>{dots}</Text>
+    <View style={[ty.wrap, { backgroundColor: isDark ? '#1D1A15' : '#EDE7D9' }]}>
+      <Text style={[ty.dots, { color: isDark ? '#C94D1F' : '#B33F1E' }]}>{dots}</Text>
     </View>
   );
 }
@@ -142,12 +142,12 @@ export default function ChatScreen() {
   const [text,     setText]     = useState('');
   const listRef = useRef<FlatList>(null);
 
-  const bg      = isDark ? '#08080F' : '#F4F3FA';
-  const headerBg = isDark ? '#111118' : '#FFFFFF';
-  const border  = isDark ? '#1A1A28' : '#E8E6F0';
-  const fg      = isDark ? '#F0EEFF' : '#1A1035';
-  const muted   = isDark ? '#6B6B8A' : '#8080A0';
-  const inputBg = isDark ? '#1A1A2E' : '#FFFFFF';
+  const bg      = isDark ? '#121110' : '#F4F3FA';
+  const headerBg = isDark ? '#1B1917' : '#FFFFFF';
+  const border  = isDark ? '#1A1A28' : '#E3DCC9';
+  const fg      = isDark ? '#EDE7D9' : '#17140F';
+  const muted   = isDark ? '#8C8577' : '#8080A0';
+  const inputBg = isDark ? '#1D1A15' : '#FFFFFF';
 
   // Subscribe to store updates
   useEffect(() => {
@@ -190,7 +190,7 @@ export default function ChatScreen() {
       {/* Header */}
       <View style={[s.header, { backgroundColor: headerBg, borderBottomColor: border, paddingTop: insets.top + 8 }]}>
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
-          <Feather name="chevron-left" size={26} color={isDark ? '#9F7AEA' : '#7C3AED'} />
+          <Feather name="chevron-left" size={26} color={isDark ? '#C94D1F' : '#B33F1E'} />
         </TouchableOpacity>
 
         <TouchableOpacity style={s.headerCenter} activeOpacity={0.85}>
@@ -263,7 +263,7 @@ export default function ChatScreen() {
           disabled={!text.trim()}
         >
           <LinearGradient
-            colors={text.trim() ? ['#A855F7', '#7C3AED'] : [isDark ? '#2A2A40' : '#E0DDEE', isDark ? '#2A2A40' : '#E0DDEE']}
+            colors={text.trim() ? ['#8A3A22', '#B33F1E'] : [isDark ? '#2A261E' : '#E8E1CF', isDark ? '#2A261E' : '#E8E1CF']}
             style={s.sendBtn}
           >
             <Feather name="send" size={17} color={text.trim() ? '#FFFFFF' : muted} />
@@ -285,7 +285,7 @@ const s = StyleSheet.create({
   headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   headerInitials: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#FFF' },
-  onlineDot: { position: 'absolute', bottom: 1, right: 1, width: 11, height: 11, borderRadius: 6, backgroundColor: '#22C55E', borderWidth: 2 },
+  onlineDot: { position: 'absolute', bottom: 1, right: 1, width: 11, height: 11, borderRadius: 6, backgroundColor: '#4C9A5E', borderWidth: 2 },
   headerName:   { fontSize: 15, fontFamily: 'Inter_700Bold' },
   headerStatus: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 1 },
   headerBtn:    { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },

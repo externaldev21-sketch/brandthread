@@ -12,7 +12,7 @@ interface ProductCardProps {
   onPress?: () => void;
 }
 
-export function ProductCard({ name, category, price, stock, colorDot = '#9F7AEA', onPress }: ProductCardProps) {
+export function ProductCard({ name, category, price, stock, colorDot = '#C94D1F', onPress }: ProductCardProps) {
   const colors = useColors();
   const stockVariant = stock === 0 ? 'error' : stock < 10 ? 'warning' : 'success';
   const stockLabel = stock === 0 ? 'Out of stock' : stock < 10 ? `Low: ${stock}` : `In stock: ${stock}`;

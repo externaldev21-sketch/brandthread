@@ -9,10 +9,10 @@ import { useState } from 'react';
 import * as Haptics from 'expo-haptics';
 
 const MEMBERS = [
-  { name: 'Alex Torres', role: 'Owner', access: 'Full Access', initials: 'AT', color: '#9F7AEA', online: true },
-  { name: 'Jamie Kim', role: 'Manager', access: 'Orders, Products', initials: 'JK', color: '#3B82F6', online: true },
-  { name: 'Sam Rivera', role: 'Marketing', access: 'Marketing only', initials: 'SR', color: '#22C55E', online: false },
-  { name: 'Casey Brown', role: 'Fulfillment', access: 'Shipping only', initials: 'CB', color: '#F59E0B', online: true },
+  { name: 'Alex Torres', role: 'Owner', access: 'Full Access', initials: 'AT', color: '#C94D1F', online: true },
+  { name: 'Jamie Kim', role: 'Manager', access: 'Orders, Products', initials: 'JK', color: '#4A6FA5', online: true },
+  { name: 'Sam Rivera', role: 'Marketing', access: 'Marketing only', initials: 'SR', color: '#4C9A5E', online: false },
+  { name: 'Casey Brown', role: 'Fulfillment', access: 'Shipping only', initials: 'CB', color: '#B98A2E', online: true },
 ];
 
 const TASKS = [

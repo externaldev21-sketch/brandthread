@@ -175,8 +175,8 @@ function Calendar({ month, rangeStart, rangeEnd, onDayPress, colors, isDark }: C
   // Pad to complete last row
   while (cells.length % 7 !== 0) cells.push(null);
 
-  const primary = isDark ? '#9F7AEA' : '#7C3AED';
-  const rangeBg = isDark ? '#9F7AEA28' : '#7C3AED18';
+  const primary = isDark ? '#C94D1F' : '#B33F1E';
+  const rangeBg = isDark ? '#C94D1F28' : '#B33F1E18';
   const rangeEdgeBg = primary;
   const todayD = today0();
 
@@ -316,7 +316,7 @@ const calStyles = StyleSheet.create({
 export default function DateRangePicker({ visible, current, onApply, onClose }: Props) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const isDark = colors.background === '#08080F' || colors.background.startsWith('#0');
+  const isDark = colors.background === '#121110' || colors.background.startsWith('#0');
 
   const PRESETS = buildPresets();
 
@@ -328,7 +328,7 @@ export default function DateRangePicker({ visible, current, onApply, onClose }: 
   const [rangeStart, setRangeStart] = useState<Date | null>(current.start);
   const [rangeEnd, setRangeEnd] = useState<Date | null>(current.end);
 
-  const primary = isDark ? '#9F7AEA' : '#7C3AED';
+  const primary = isDark ? '#C94D1F' : '#B33F1E';
 
   function selectPreset(id: PresetId) {
     setSelectedId(id);

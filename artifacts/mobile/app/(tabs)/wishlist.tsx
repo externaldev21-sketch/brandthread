@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
 const WISHLIST_ITEMS = [
-  { id: 'w1', brand: 'Vault Studio', name: 'Canvas Cargo Jacket', price: '$189', color: '#7C3AED', initials: 'VS', available: true,  tag: 'Limited — 14 left' },
+  { id: 'w1', brand: 'Vault Studio', name: 'Canvas Cargo Jacket', price: '$189', color: '#B33F1E', initials: 'VS', available: true,  tag: 'Limited — 14 left' },
   { id: 'w2', brand: 'Meridian Co.', name: 'Essential Relaxed Tee', price: '$48', color: '#0F766E', initials: 'MC', available: true,  tag: 'Pre-order open' },
   { id: 'w3', brand: 'Atlas Goods', name: 'Utility Vest — Slate', price: '$220', color: '#1D4ED8', initials: 'AG', available: false, tag: 'Sold out' },
   { id: 'w4', brand: 'Softwear__', name: 'Micro-Fleece Jogger', price: '$92', color: '#BE185D', initials: 'SW', available: true,  tag: 'In stock' },
@@ -28,12 +28,12 @@ function WishlistCard({
   isDark: boolean;
   onRemove: (id: string) => void;
 }) {
-  const bg     = isDark ? '#111118' : '#FFFFFF';
-  const border = isDark ? '#1E1E30' : '#DDD6FE';
-  const fg     = isDark ? '#F0EEFF' : '#1A1035';
-  const muted  = isDark ? '#6B6B8A' : '#6D6892';
+  const bg     = isDark ? '#1B1917' : '#FFFFFF';
+  const border = isDark ? '#33302A' : '#DBD3C0';
+  const fg     = isDark ? '#EDE7D9' : '#17140F';
+  const muted  = isDark ? '#8C8577' : '#6E6759';
 
-  const tagColor = item.available ? '#16A34A' : '#DC2626';
+  const tagColor = item.available ? '#3F7A4F' : '#DC2626';
 
   return (
     <View style={[c.card, { backgroundColor: bg, borderColor: border }]}>
@@ -85,7 +85,7 @@ function WishlistCard({
 
         <TouchableOpacity
           style={[c.shopBtn, {
-            backgroundColor: item.available ? item.color : (isDark ? '#252535' : '#E5E3F0'),
+            backgroundColor: item.available ? item.color : (isDark ? '#33302A' : '#E5E3F0'),
             opacity: item.available ? 1 : 0.6,
           }]}
           disabled={!item.available}
@@ -109,11 +109,11 @@ export default function WishlistScreen() {
   const isDark  = scheme !== 'light';
   const [items, setItems] = useState(WISHLIST_ITEMS);
 
-  const bg     = isDark ? '#08080F' : '#F8F7FF';
-  const fg     = isDark ? '#F0EEFF' : '#1A1035';
-  const muted  = isDark ? '#6B6B8A' : '#6D6892';
-  const border = isDark ? '#1E1E30' : '#DDD6FE';
-  const primary = isDark ? '#9F7AEA' : '#7C3AED';
+  const bg     = isDark ? '#121110' : '#F2EEE3';
+  const fg     = isDark ? '#EDE7D9' : '#17140F';
+  const muted  = isDark ? '#8C8577' : '#6E6759';
+  const border = isDark ? '#33302A' : '#DBD3C0';
+  const primary = isDark ? '#C94D1F' : '#B33F1E';
 
   function removeItem(id: string) {
     setItems(prev => prev.filter(i => i.id !== id));

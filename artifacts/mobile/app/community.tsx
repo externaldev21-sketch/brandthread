@@ -40,7 +40,7 @@ export default function CommunityScreen() {
       >
 
       {/* Member Badge */}
-      <View style={[styles.memberCard, { backgroundColor: '#0F0A1E', borderColor: '#9F7AEA44' }]}>
+      <View style={[styles.memberCard, { backgroundColor: '#17140F', borderColor: '#C1440E44' }]}>
         <Feather name="award" size={20} color={colors.primary} />
         <View style={{ flex: 1 }}>
           <Text style={[styles.memberTitle, { color: colors.foreground }]}>Member since Jan 2025</Text>
@@ -76,7 +76,7 @@ export default function CommunityScreen() {
               style={[styles.postCard, { backgroundColor: colors.card, borderColor: colors.border }]}
             >
               <View style={styles.postHeader}>
-                <View style={[styles.userAvatar, { backgroundColor: '#9F7AEA33' }]}>
+                <View style={[styles.userAvatar, { backgroundColor: '#C1440E33' }]}>
                   <Text style={[styles.userInitial, { color: colors.primary }]}>{post.user[0]}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
@@ -100,7 +100,7 @@ export default function CommunityScreen() {
         <>
           {EVENTS.map((e) => (
             <View key={e.title} style={[styles.eventCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={[styles.eventBadge, { backgroundColor: '#9F7AEA22' }]}>
+              <View style={[styles.eventBadge, { backgroundColor: '#C1440E22' }]}>
                 <Feather name="video" size={14} color={colors.primary} />
                 <Text style={[styles.eventBadgeText, { color: colors.primary }]}>LIVE</Text>
               </View>
@@ -125,7 +125,7 @@ export default function CommunityScreen() {
           <Text style={[styles.hireSubtitle, { color: colors.mutedForeground }]}>Vetted creatives ready to work on your brand</Text>
           {FREELANCERS.map((f) => (
             <View key={f.name} style={[styles.freelancerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={[styles.freAvatar, { backgroundColor: '#9F7AEA22' }]}>
+              <View style={[styles.freAvatar, { backgroundColor: '#C1440E22' }]}>
                 <Text style={[styles.freInitial, { color: colors.primary }]}>{f.name[0]}</Text>
               </View>
               <View style={styles.freInfo}>

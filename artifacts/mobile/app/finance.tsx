@@ -61,7 +61,7 @@ export default function FinanceScreen() {
             style={[
               styles.plRow,
               i > 0 && { borderTopWidth: 1, borderTopColor: colors.border },
-              item.highlight && { backgroundColor: '#9F7AEA11' },
+              item.highlight && { backgroundColor: '#C94D1F11' },
             ]}
           >
             <Text style={[styles.plLabel, { color: item.highlight ? colors.foreground : colors.mutedForeground, fontFamily: item.highlight ? 'Inter_600SemiBold' : 'Inter_400Regular' }]}>

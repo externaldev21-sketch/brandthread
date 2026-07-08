@@ -17,7 +17,7 @@ const STATS = [
 ];
 
 const RECENT_DROPS = [
-  { name: 'Summer Capsule',     status: 'Active',   revenue: '$14,200', type: 'Pre-Made',   color: '#7C3AED' },
+  { name: 'Summer Capsule',     status: 'Active',   revenue: '$14,200', type: 'Pre-Made',   color: '#B33F1E' },
   { name: 'Monochrome Series',  status: 'Closed',   revenue: '$8,900',  type: 'Pre-Order',  color: '#0F766E' },
   { name: 'Heritage Collection',status: 'Upcoming', revenue: '—',       type: 'Pre-Order',  color: '#B45309' },
 ];
@@ -37,13 +37,13 @@ export default function ProfileScreen() {
   const isDark = scheme !== 'light';
   const router = useRouter();
 
-  const bg      = isDark ? '#08080F' : '#F8F7FF';
-  const card    = isDark ? '#111118' : '#FFFFFF';
-  const border  = isDark ? '#1E1E30' : '#DDD6FE';
-  const fg      = isDark ? '#F0EEFF' : '#1A1035';
-  const muted   = isDark ? '#6B6B8A' : '#6D6892';
-  const primary = isDark ? '#9F7AEA' : '#7C3AED';
-  const secondary = isDark ? '#1C1C2E' : '#F0EEFF';
+  const bg      = isDark ? '#121110' : '#F2EEE3';
+  const card    = isDark ? '#1B1917' : '#FFFFFF';
+  const border  = isDark ? '#33302A' : '#DBD3C0';
+  const fg      = isDark ? '#EDE7D9' : '#17140F';
+  const muted   = isDark ? '#8C8577' : '#6E6759';
+  const primary = isDark ? '#C94D1F' : '#B33F1E';
+  const secondary = isDark ? '#201D18' : '#EDE7D9';
 
   function nav(route: string | null) {
     if (!route) return;
@@ -60,7 +60,7 @@ export default function ProfileScreen() {
   }
 
   const statusColor = (s: string) =>
-    s === 'Active' ? '#22C55E' : s === 'Upcoming' ? '#F59E0B' : muted;
+    s === 'Active' ? '#4C9A5E' : s === 'Upcoming' ? '#B98A2E' : muted;
 
   return (
     <ScrollView
@@ -104,7 +104,7 @@ export default function ProfileScreen() {
           activeOpacity={0.85}
           style={styles.storyBtnWrap}
         >
-          <LinearGradient colors={['#A855F7', '#7C3AED']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.storyBtnGrad}>
+          <LinearGradient colors={['#8A3A22', '#B33F1E']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.storyBtnGrad}>
             <Feather name="camera" size={17} color="#FFF" />
             <Text style={styles.storyBtnText}>Post on Story</Text>
           </LinearGradient>

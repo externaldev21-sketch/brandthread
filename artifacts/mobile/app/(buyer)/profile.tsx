@@ -12,7 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
-const STYLE_BADGE = { label: 'Archive Fashion', emoji: '🎞️', color: '#7C3AED' };
+const STYLE_BADGE = { label: 'Archive Fashion', emoji: '🎞️', color: '#B33F1E' };
 
 const STATS = [
   { label: 'Wishlist',  value: '6'  },
@@ -21,13 +21,13 @@ const STATS = [
 ];
 
 const RECENT_ORDERS = [
-  { id: '#2041', name: 'Canvas Cargo Jacket', brand: 'Vault Studio', price: '$189', status: 'Delivered',  color: '#7C3AED' },
+  { id: '#2041', name: 'Canvas Cargo Jacket', brand: 'Vault Studio', price: '$189', status: 'Delivered',  color: '#B33F1E' },
   { id: '#1988', name: 'Archive Hoodie Vol.3', brand: 'NxGen Drops', price: '$135', status: 'Shipped',    color: '#B45309' },
   { id: '#1740', name: 'Relaxed Tee — Sage',   brand: 'Meridian Co.', price: '$48', status: 'Processing', color: '#0F766E' },
 ];
 
 const FOLLOWED_BRANDS = [
-  { initials: 'VS', name: 'Vault Studio',  color: '#7C3AED', hasNew: true  },
+  { initials: 'VS', name: 'Vault Studio',  color: '#B33F1E', hasNew: true  },
   { initials: 'MC', name: 'Meridian Co.',  color: '#0F766E', hasNew: true  },
   { initials: 'NX', name: 'NxGen Drops',   color: '#B45309', hasNew: false },
   { initials: 'SW', name: 'Softwear__',    color: '#BE185D', hasNew: true  },
@@ -42,7 +42,7 @@ const MENU = [
 ];
 
 const statusColor = (s: string) =>
-  s === 'Delivered' ? '#22C55E' : s === 'Shipped' ? '#3B82F6' : '#F59E0B';
+  s === 'Delivered' ? '#4C9A5E' : s === 'Shipped' ? '#4A6FA5' : '#B98A2E';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -52,12 +52,12 @@ export default function BuyerProfileScreen() {
   const isDark  = scheme !== 'light';
   const router  = useRouter();
 
-  const bg      = isDark ? '#08080F' : '#F9F9FC';
-  const card    = isDark ? '#111118' : '#FFFFFF';
-  const border  = isDark ? '#1E1E30' : '#E8E6F0';
-  const fg      = isDark ? '#F0EEFF' : '#1A1035';
-  const muted   = isDark ? '#6B6B8A' : '#6D6892';
-  const primary = isDark ? '#9F7AEA' : '#7C3AED';
+  const bg      = isDark ? '#121110' : '#F5F1E7';
+  const card    = isDark ? '#1B1917' : '#FFFFFF';
+  const border  = isDark ? '#33302A' : '#E3DCC9';
+  const fg      = isDark ? '#EDE7D9' : '#17140F';
+  const muted   = isDark ? '#8C8577' : '#6E6759';
+  const primary = isDark ? '#C94D1F' : '#B33F1E';
 
   return (
     <ScrollView
@@ -69,7 +69,7 @@ export default function BuyerProfileScreen() {
       <View style={[s.hero, { paddingHorizontal: 20 }]}>
         <View style={[s.avatarRing, { borderColor: primary + '60' }]}>
           <LinearGradient
-            colors={['#9F7AEA', '#7C3AED']}
+            colors={['#C94D1F', '#B33F1E']}
             style={s.avatarGradient}
           >
             <Text style={s.avatarInitials}>JD</Text>
@@ -109,7 +109,7 @@ export default function BuyerProfileScreen() {
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/story-creator' as never); }}
           activeOpacity={0.85}
         >
-          <LinearGradient colors={['#A855F7', '#7C3AED']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.storyBtn}>
+          <LinearGradient colors={['#8A3A22', '#B33F1E']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.storyBtn}>
             <Feather name="camera" size={17} color="#FFF" />
             <Text style={s.storyBtnText}>Post on Story</Text>
           </LinearGradient>

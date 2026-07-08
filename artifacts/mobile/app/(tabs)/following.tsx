@@ -13,13 +13,13 @@ import * as Haptics from 'expo-haptics';
 const FOLLOWING_BRANDS = [
   {
     id: 'b1', name: 'Vault Studio', handle: '@vaultstudio',
-    initials: 'VS', color: '#7C3AED', verified: true,
+    initials: 'VS', color: '#B33F1E', verified: true,
     followers: '12.4K', hasNew: true,
     latestDrop: {
       name: 'Canvas Cargo Jacket',
       price: '$189',
       tag: 'New Drop',
-      tagColor: '#7C3AED',
+      tagColor: '#B33F1E',
       desc: 'Oversized canvas jacket — limited run of 50.',
     },
   },
@@ -43,7 +43,7 @@ const FOLLOWING_BRANDS = [
       name: 'Archive Hoodie Vol. 3',
       price: '$135',
       tag: 'In Stock',
-      tagColor: '#16A34A',
+      tagColor: '#3F7A4F',
       desc: 'Garment-dyed heavyweight fleece, unisex sizing.',
     },
   },
@@ -77,10 +77,10 @@ const FOLLOWING_BRANDS = [
 
 function BrandDropCard({ brand, isDark }: { brand: typeof FOLLOWING_BRANDS[0]; isDark: boolean }) {
   const [saved, setSaved] = useState(false);
-  const bg     = isDark ? '#111118' : '#FFFFFF';
-  const border = isDark ? '#1E1E30' : '#DDD6FE';
-  const fg     = isDark ? '#F0EEFF' : '#1A1035';
-  const muted  = isDark ? '#6B6B8A' : '#6D6892';
+  const bg     = isDark ? '#1B1917' : '#FFFFFF';
+  const border = isDark ? '#33302A' : '#DBD3C0';
+  const fg     = isDark ? '#EDE7D9' : '#17140F';
+  const muted  = isDark ? '#8C8577' : '#6E6759';
 
   return (
     <View style={[s.card, { backgroundColor: bg, borderColor: border }]}>
@@ -156,11 +156,11 @@ export default function FollowingScreen() {
   const scheme = useColorScheme();
   const isDark = scheme !== 'light';
 
-  const bg     = isDark ? '#08080F' : '#F8F7FF';
-  const fg     = isDark ? '#F0EEFF' : '#1A1035';
-  const muted  = isDark ? '#6B6B8A' : '#6D6892';
-  const border = isDark ? '#1E1E30' : '#DDD6FE';
-  const primary = isDark ? '#9F7AEA' : '#7C3AED';
+  const bg     = isDark ? '#121110' : '#F2EEE3';
+  const fg     = isDark ? '#EDE7D9' : '#17140F';
+  const muted  = isDark ? '#8C8577' : '#6E6759';
+  const border = isDark ? '#33302A' : '#DBD3C0';
+  const primary = isDark ? '#C94D1F' : '#B33F1E';
 
   const newCount = FOLLOWING_BRANDS.filter(b => b.hasNew).length;
 
@@ -184,7 +184,7 @@ export default function FollowingScreen() {
             <TouchableOpacity key={brand.id} style={s.avatarItem} activeOpacity={0.8}
               onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}>
               {brand.hasNew ? (
-                <LinearGradient colors={['#F0ABFC', '#C026D3', '#7C3AED']} style={s.avatarRing}>
+                <LinearGradient colors={['#D9714B', '#C1440E', '#B33F1E']} style={s.avatarRing}>
                   <View style={[s.avatarRingInner, { backgroundColor: bg }]}>
                     <View style={[s.avatarCircle, { backgroundColor: brand.color }]}>
                       <Text style={s.avatarInitials}>{brand.initials}</Text>

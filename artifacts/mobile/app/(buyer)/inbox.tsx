@@ -18,7 +18,7 @@ const NOTIF_SECTIONS = [
   {
     title: 'Today',
     data: [
-      { id: 'n1', type: 'drop'    as const, read: false, avatar: '#7C3AED', initials: 'VS', title: 'Vault Studio drop is live', body: 'Canvas Cargo Jacket is now available — only 50 units.', time: '2h ago', cta: 'Shop now' },
+      { id: 'n1', type: 'drop'    as const, read: false, avatar: '#B33F1E', initials: 'VS', title: 'Vault Studio drop is live', body: 'Canvas Cargo Jacket is now available — only 50 units.', time: '2h ago', cta: 'Shop now' },
       { id: 'n2', type: 'restock' as const, read: false, avatar: '#B45309', initials: 'NX', title: 'Back in stock', body: 'Archive Hoodie Vol.3 by NxGen Drops — 8 units remaining.', time: '6h ago', cta: 'Buy now' },
     ],
   },
@@ -33,9 +33,9 @@ const NOTIF_SECTIONS = [
 
 type NotifType = 'drop' | 'order' | 'restock';
 const TYPE_META: Record<NotifType, { icon: keyof typeof Feather.glyphMap; color: string }> = {
-  drop:    { icon: 'zap',        color: '#7C3AED' },
-  order:   { icon: 'package',    color: '#22C55E' },
-  restock: { icon: 'refresh-cw', color: '#F59E0B' },
+  drop:    { icon: 'zap',        color: '#B33F1E' },
+  order:   { icon: 'package',    color: '#4C9A5E' },
+  restock: { icon: 'refresh-cw', color: '#B98A2E' },
 };
 
 // ─── Time helper ──────────────────────────────────────────────────────────────
@@ -59,11 +59,11 @@ function DMRow({ friend, last, unread, isDark, onPress }: {
   isDark: boolean;
   onPress: () => void;
 }) {
-  const card    = isDark ? '#111118' : '#FFFFFF';
-  const border  = isDark ? '#1E1E30' : '#E8E6F0';
-  const fg      = isDark ? '#F0EEFF' : '#1A1035';
-  const muted   = isDark ? '#6B6B8A' : '#8080A0';
-  const primary = isDark ? '#9F7AEA' : '#7C3AED';
+  const card    = isDark ? '#1B1917' : '#FFFFFF';
+  const border  = isDark ? '#33302A' : '#E3DCC9';
+  const fg      = isDark ? '#EDE7D9' : '#17140F';
+  const muted   = isDark ? '#8C8577' : '#8080A0';
+  const primary = isDark ? '#C94D1F' : '#B33F1E';
 
   return (
     <TouchableOpacity
@@ -84,7 +84,7 @@ function DMRow({ friend, last, unread, isDark, onPress }: {
         <Text style={[s.dmName, { color: fg }, unread > 0 && { fontFamily: 'Inter_700Bold' }]}>
           {friend.name}
         </Text>
-        <Text style={[s.dmPreview, { color: muted }, unread > 0 && { color: isDark ? '#C4B5FD' : '#5B21B6' }]} numberOfLines={1}>
+        <Text style={[s.dmPreview, { color: muted }, unread > 0 && { color: isDark ? '#E2DDD0' : '#7A2D14' }]} numberOfLines={1}>
           {last ? (last.fromMe ? `You: ${last.text}` : last.text) : 'Start a conversation'}
         </Text>
       </View>
@@ -111,11 +111,11 @@ function NotifRow({ item, isDark, onRead }: {
   isDark: boolean;
   onRead: (id: string) => void;
 }) {
-  const card   = isDark ? '#111118' : '#FFFFFF';
-  const border = isDark ? '#1E1E30' : '#E8E6F0';
-  const fg     = isDark ? '#F0EEFF' : '#1A1035';
-  const muted  = isDark ? '#6B6B8A' : '#8080A0';
-  const primary = isDark ? '#9F7AEA' : '#7C3AED';
+  const card   = isDark ? '#1B1917' : '#FFFFFF';
+  const border = isDark ? '#33302A' : '#E3DCC9';
+  const fg     = isDark ? '#EDE7D9' : '#17140F';
+  const muted  = isDark ? '#8C8577' : '#8080A0';
+  const primary = isDark ? '#C94D1F' : '#B33F1E';
   const meta   = TYPE_META[item.type];
 
   return (
@@ -178,11 +178,11 @@ export default function InboxScreen() {
   const router  = useRouter();
   const isDark  = scheme !== 'light';
 
-  const bg      = isDark ? '#08080F' : '#F9F9FC';
-  const fg      = isDark ? '#F0EEFF' : '#1A1035';
-  const muted   = isDark ? '#6B6B8A' : '#6D6892';
-  const border  = isDark ? '#1E1E30' : '#E8E6F0';
-  const primary = isDark ? '#9F7AEA' : '#7C3AED';
+  const bg      = isDark ? '#121110' : '#F5F1E7';
+  const fg      = isDark ? '#EDE7D9' : '#17140F';
+  const muted   = isDark ? '#8C8577' : '#6E6759';
+  const border  = isDark ? '#33302A' : '#E3DCC9';
+  const primary = isDark ? '#C94D1F' : '#B33F1E';
 
   // Trigger re-renders when store changes
   const [, forceUpdate] = useState(0);
@@ -306,7 +306,7 @@ const s = StyleSheet.create({
   dmRow:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: 16, borderWidth: 1 },
   dmAvatar:   { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
   dmInitials: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFF' },
-  onlineDot:  { position: 'absolute', bottom: 2, right: 2, width: 12, height: 12, borderRadius: 6, backgroundColor: '#22C55E', borderWidth: 2 },
+  onlineDot:  { position: 'absolute', bottom: 2, right: 2, width: 12, height: 12, borderRadius: 6, backgroundColor: '#4C9A5E', borderWidth: 2 },
   dmName:     { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginBottom: 3 },
   dmPreview:  { fontSize: 12, fontFamily: 'Inter_400Regular' },
   dmTime:     { fontSize: 11, fontFamily: 'Inter_400Regular' },

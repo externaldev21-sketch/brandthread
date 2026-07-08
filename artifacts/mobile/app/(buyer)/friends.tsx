@@ -16,7 +16,7 @@ const FRIENDS = [
   { id: 'f2', name: 'Jordan Lee',   handle: '@jordanlee',   chatId: 'jordan', initials: 'JL', color: '#1D4ED8', hasNew: true,  activity: 'posted a fit check' },
   { id: 'f3', name: 'Amir Patel',   handle: '@amirpatel',   chatId: 'amir',   initials: 'AP', color: '#0F766E', hasNew: false, activity: 'copped the NxGen hoodie' },
   { id: 'f4', name: 'Sofia Reyes',  handle: '@sofiareyes',  chatId: 'sofia',  initials: 'SR', color: '#B45309', hasNew: true,  activity: 'shared her wishlist' },
-  { id: 'f5', name: 'Kai Nakamura', handle: '@kainakamura', chatId: 'kai',    initials: 'KN', color: '#7C3AED', hasNew: false, activity: 'liked a drop from Atlas Goods' },
+  { id: 'f5', name: 'Kai Nakamura', handle: '@kainakamura', chatId: 'kai',    initials: 'KN', color: '#B33F1E', hasNew: false, activity: 'liked a drop from Atlas Goods' },
 ];
 
 const FRIEND_CHAT_MAP: Record<string, string> = {
@@ -34,7 +34,7 @@ const FRIEND_POSTS = [
     type: 'wishlist' as const,
     caption: 'Can\'t decide between these two 😩',
     items: [
-      { name: 'Canvas Cargo Jacket', brand: 'Vault Studio', price: '$189', color: '#7C3AED', initials: 'VS' },
+      { name: 'Canvas Cargo Jacket', brand: 'Vault Studio', price: '$189', color: '#B33F1E', initials: 'VS' },
       { name: 'Micro-Fleece Jogger',  brand: 'Softwear__',   price: '$92',  color: '#BE185D', initials: 'SW' },
     ],
     likes: 14,
@@ -84,16 +84,16 @@ function FriendCard({
   onLike: (id: string) => void;
   onMessage: (name: string) => void;
 }) {
-  const card   = isDark ? '#111118' : '#FFFFFF';
-  const border = isDark ? '#1E1E30' : '#E8E6F0';
-  const fg     = isDark ? '#F0EEFF' : '#1A1035';
-  const muted  = isDark ? '#6B6B8A' : '#6D6892';
-  const tagBg  = isDark ? '#1C1C2E' : '#F0EEFF';
-  const tagFg  = isDark ? '#9F7AEA' : '#7C3AED';
+  const card   = isDark ? '#1B1917' : '#FFFFFF';
+  const border = isDark ? '#33302A' : '#E3DCC9';
+  const fg     = isDark ? '#EDE7D9' : '#17140F';
+  const muted  = isDark ? '#8C8577' : '#6E6759';
+  const tagBg  = isDark ? '#201D18' : '#EDE7D9';
+  const tagFg  = isDark ? '#C94D1F' : '#B33F1E';
 
   const typeLabel = post.type === 'cop' ? '✅ Copped' : '🔖 Wishlist';
-  const typeColor = post.type === 'cop' ? '#16A34A' : tagFg;
-  const typeBg    = post.type === 'cop' ? (isDark ? '#16A34A18' : '#F0FDF4') : tagBg;
+  const typeColor = post.type === 'cop' ? '#3F7A4F' : tagFg;
+  const typeBg    = post.type === 'cop' ? (isDark ? '#3F7A4F18' : '#F0FDF4') : tagBg;
 
   return (
     <View style={[s.card, { backgroundColor: card, borderColor: border }]}>
@@ -184,11 +184,11 @@ export default function FriendsScreen() {
 
   const [posts, setPosts] = useState(FRIEND_POSTS);
 
-  const bg      = isDark ? '#08080F' : '#F9F9FC';
-  const fg      = isDark ? '#F0EEFF' : '#1A1035';
-  const muted   = isDark ? '#6B6B8A' : '#6D6892';
-  const border  = isDark ? '#1E1E30' : '#E8E6F0';
-  const primary = isDark ? '#9F7AEA' : '#7C3AED';
+  const bg      = isDark ? '#121110' : '#F5F1E7';
+  const fg      = isDark ? '#EDE7D9' : '#17140F';
+  const muted   = isDark ? '#8C8577' : '#6E6759';
+  const border  = isDark ? '#33302A' : '#E3DCC9';
+  const primary = isDark ? '#C94D1F' : '#B33F1E';
 
   function handleLike(id: string) {
     setPosts(prev => prev.map(p => p.id === id ? { ...p, liked: !p.liked } : p));
@@ -238,7 +238,7 @@ export default function FriendsScreen() {
             >
               {friend.hasNew ? (
                 <LinearGradient
-                  colors={['#F0ABFC', '#C026D3', '#7C3AED']}
+                  colors={['#D9714B', '#C1440E', '#B33F1E']}
                   style={s.avatarRing}
                 >
                   <View style={[s.avatarRingInner, { backgroundColor: bg }]}>

@@ -63,27 +63,27 @@ function RolePage({
       emoji: '🛍️',
       title: 'I\'m a Buyer',
       sub: 'I want to discover and shop drops from clothing brands',
-      colors: ['#1E1035', '#2D1F5E'] as [string, string],
-      accent: '#9F7AEA',
-      border: '#3D2F7E',
+      colors: ['#1D140D', '#2A1B12'] as [string, string],
+      accent: '#C94D1F',
+      border: '#4A3423',
     },
     {
       role: 'seller' as Role,
       emoji: '🏷️',
       title: 'I\'m a Seller',
       sub: 'I run a clothing brand and want to manage drops & sales',
-      colors: ['#0F1E35', '#1A2F52'] as [string, string],
-      accent: '#60A5FA',
-      border: '#1E3D6E',
+      colors: ['#161512', '#20211E'] as [string, string],
+      accent: '#4A6FA5',
+      border: '#33342F',
     },
     {
       role: 'both' as Role,
       emoji: '⚡',
       title: 'I\'m Both',
       sub: 'I buy from brands and also sell my own clothing line',
-      colors: ['#1A0F35', '#2E1A52'] as [string, string],
-      accent: '#C026D3',
-      border: '#4A1F7A',
+      colors: ['#1D140D', '#2A1B12'] as [string, string],
+      accent: '#C1440E',
+      border: '#4A3423',
     },
   ];
 
@@ -91,7 +91,7 @@ function RolePage({
     <View style={{ flex: 1 }}>
       {/* Hero header */}
       <LinearGradient
-        colors={isDark ? ['#0D0A1A', '#12082A'] : ['#2D1B69', '#1A0A3D']}
+        colors={isDark ? ['#0F0D0A', '#181410'] : ['#241708', '#14110D']}
         style={[roleStyles.hero, { paddingTop: insets.top + 24 }]}
       >
         <Text style={roleStyles.heroLogo}>Brandthread</Text>
@@ -143,7 +143,7 @@ const roleStyles = StyleSheet.create({
   heroLogo: {
     fontSize: 14,
     fontFamily: 'Inter_700Bold',
-    color: '#9F7AEA',
+    color: '#C94D1F',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
     marginBottom: 28,
@@ -199,13 +199,13 @@ function BuyerStylePicker({
   const insets  = useSafeAreaInsets();
   const [picked, setPicked] = useState('');
 
-  const bg      = isDark ? '#08080F' : '#F8F7FF';
-  const card    = isDark ? '#111118' : '#FFFFFF';
-  const border  = isDark ? '#252535' : '#DDD6FE';
-  const fg      = isDark ? '#F0EEFF' : '#1A1035';
-  const muted   = isDark ? '#6B6B8A' : '#6D6892';
-  const primary = isDark ? '#9F7AEA' : '#7C3AED';
-  const cardSel = isDark ? '#2D1F5E' : '#EDE9FE';
+  const bg      = isDark ? '#121110' : '#F2EEE3';
+  const card    = isDark ? '#1B1917' : '#FFFFFF';
+  const border  = isDark ? '#33302A' : '#DBD3C0';
+  const fg      = isDark ? '#EDE7D9' : '#17140F';
+  const muted   = isDark ? '#8C8577' : '#6E6759';
+  const primary = isDark ? '#C94D1F' : '#B33F1E';
+  const cardSel = isDark ? '#2A1B12' : '#E8E1CF';
 
   return (
     <View style={[{ flex: 1 }, { backgroundColor: bg }]}>
@@ -269,13 +269,13 @@ function SellerSetup({
   const [error, setError]         = useState('');
   const slideAnim                 = useRef(new Animated.Value(0)).current;
 
-  const bg      = isDark ? '#08080F' : '#F8F7FF';
-  const card    = isDark ? '#111118' : '#FFFFFF';
-  const border  = isDark ? '#252535' : '#DDD6FE';
-  const fg      = isDark ? '#F0EEFF' : '#1A1035';
-  const muted   = isDark ? '#6B6B8A' : '#6D6892';
-  const primary = isDark ? '#9F7AEA' : '#7C3AED';
-  const cardSel = isDark ? '#2D1F5E' : '#EDE9FE';
+  const bg      = isDark ? '#121110' : '#F2EEE3';
+  const card    = isDark ? '#1B1917' : '#FFFFFF';
+  const border  = isDark ? '#33302A' : '#DBD3C0';
+  const fg      = isDark ? '#EDE7D9' : '#17140F';
+  const muted   = isDark ? '#8C8577' : '#6E6759';
+  const primary = isDark ? '#C94D1F' : '#B33F1E';
+  const cardSel = isDark ? '#2A1B12' : '#E8E1CF';
 
   function animateTo(next: number, dir: number) {
     Animated.timing(slideAnim, { toValue: dir * -SCREEN_W, duration: 240, useNativeDriver: true }).start(() => {
@@ -325,7 +325,7 @@ function SellerSetup({
           <Text style={[setupStyles.q, { color: fg }]}>What's your{'\n'}brand called?</Text>
           <Text style={[setupStyles.qSub, { color: muted }]}>You can change this anytime in settings.</Text>
           <TextInput
-            style={[setupStyles.bigInput, { backgroundColor: isDark ? '#1C1C2E' : '#F0EEFF', borderColor: border, color: fg }]}
+            style={[setupStyles.bigInput, { backgroundColor: isDark ? '#201D18' : '#EDE7D9', borderColor: border, color: fg }]}
             placeholder="e.g. Noir Collective"
             placeholderTextColor={muted}
             value={brandName}
@@ -521,7 +521,7 @@ export default function OnboardingScreen() {
     router.replace(dest as never);
   }
 
-  const bg = isDark ? '#08080F' : '#F8F7FF';
+  const bg = isDark ? '#121110' : '#F2EEE3';
 
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>

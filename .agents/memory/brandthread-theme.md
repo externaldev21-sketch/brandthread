@@ -1,36 +1,18 @@
 ---
-name: Brandthread theme — purple
-description: Purple/black dual-mode theme replacing the original gold palette
+name: Brandthread theme — Vault Archive
+description: Editorial lookbook theme (bone/black ink + blood-orange accent) replacing the earlier purple/violet SaaS palette
 ---
 
-The app switched from a gold luxury palette to a purple/black professional palette with genuine light and dark mode support.
+The app was rebranded from a purple/violet gradient-heavy "AI SaaS" look to **Vault Archive**: an editorial fashion-lookbook aesthetic — bone/paper backgrounds, near-black ink text, a single blood-orange accent, warm hairline borders, sharper corners, and flattened (non-neon) gradients.
 
-**Dark mode** (`colors.dark`):
-- background: #08080F (near-black with purple tint)
-- card: #111118
-- primary: #9F7AEA (vivid violet)
-- primaryForeground: #FFFFFF
-- secondary: #1C1C2E
-- border: #252535
-- foreground: #F0EEFF
-- mutedForeground: #6B6B8A
+**Light mode** (`colors.light`): background `#F2EEE3` (bone), text/foreground `#17140F` (warm ink), card `#FFFFFF`, primary `#B33F1E`, secondary `#E8E1CF` (oat/tan), border `#DBD3C0`, mutedForeground `#6E6759`.
 
-**Light mode** (`colors.light`):
-- background: #F8F7FF (light lavender)
-- card: #FFFFFF
-- primary: #7C3AED (deeper purple for contrast on white)
-- primaryForeground: #FFFFFF
-- secondary: #EDE9FE
-- border: #DDD6FE
-- foreground: #1A1035
-- mutedForeground: #6D6892
+**Dark mode** (`colors.dark`): background `#121110` (warm near-black), card `#1B1917`, foreground `#EDE7D9` (cream), primary `#C94D1F`, secondary `#201D18`, border `#33302A`, mutedForeground `#8C8577`.
 
-**Hardcoded purple equivalents** (used in gradient/special cards):
-- Hero gradient dark: ['#2A1060', '#130828', '#08080F']
-- Hero gradient light: ['#EDE9FE', '#C4B5FD', '#F4F0FF']
-- Purple tints: #9F7AEA22, #9F7AEA44, #9F7AEA33 etc.
-- Dark card bg: #0F0A1E (replaces old #1A1500 gold card)
+Shared `radius` token dropped from 12 → 6 for a flatter, less "rounded SaaS card" feel.
 
-**Why:** User requested a professional purple + black theme with light/dark mode support. Gold (#C9A96E) was fully removed via global sed across all files. Both `colors.light` and `colors.dark` are now genuinely distinct palettes.
+**Why:** User explicitly said the app "looked AI-made" — the tell was purple/violet gradients, heavy glow shadows, and generic rounded SaaS card style. Chose an editorial/fashion-lookbook direction to match the clothing-brand-management domain instead of a generic tech palette.
 
-**How to apply:** Always use `colors.primary` from `useColors()` for purple accents. For gradients, use `useColorScheme()` to branch between dark/light gradient arrays. Hardcoded opacity variants follow the `#9F7AEA` hex base.
+**How to apply:** Always source colors via `useColors()` / `constants/colors.ts` tokens, not new hardcoded hex. Multi-color "brand differentiator" chips (e.g. per-brand avatar rings: blue, teal, rose, amber) were intentionally left alone — only the *system-wide* purple/lavender tokens and neon story/tab gradients were converted to the warm rust/orange family. When adding new UI, keep gradients duotone/flat (e.g. `['#D9714B', '#C1440E', '#B33F1E']`) rather than multi-hue neon, and prefer hairline `border` dividers over heavy colored shadows/glows.
+
+A global hex-remapping script (Node, longest-key-first substring replace) was used to convert ~34 files at once — a fast way to do consistent app-wide rebrands when a design-token system already exists, faster than hand-editing each file. Also watch for stray non-token hex values the automated pass misses (e.g. one-off colors in mock data or muted label text) — grep for old hue's hex range after any bulk rebrand and re-run a targeted architect review for leftovers + contrast regressions (e.g. white text on a newly-brightened accent color can drop below AA contrast).

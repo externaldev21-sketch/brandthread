@@ -92,9 +92,9 @@ export default function MoreScreen() {
       <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>All Brandthread features</Text>
 
       {/* Plan card */}
-      <View style={[styles.planCard, { backgroundColor: '#0F0A1E', borderColor: '#9F7AEA33' }]}>
+      <View style={[styles.planCard, { backgroundColor: '#17140F', borderColor: '#C1440E33' }]}>
         <View style={{ flex: 1 }}>
-          <Text style={[styles.planLabel, { color: '#9F7AEA88' }]}>CURRENT PLAN</Text>
+          <Text style={[styles.planLabel, { color: '#C1440E88' }]}>CURRENT PLAN</Text>
           <Text style={[styles.planName, { color: colors.primary }]}>Brandthread Pro</Text>
           <Text style={[styles.planSub, { color: colors.mutedForeground }]}>
             All features unlocked · Renews Aug 1
@@ -120,8 +120,8 @@ export default function MoreScreen() {
                 style={[
                   styles.gridCard,
                   {
-                    backgroundColor: item.accent ? '#0F0A1E' : colors.card,
-                    borderColor: item.accent ? '#9F7AEA33' : colors.border,
+                    backgroundColor: item.accent ? '#17140F' : colors.card,
+                    borderColor: item.accent ? '#C1440E33' : colors.border,
                   },
                 ]}
               >
@@ -147,7 +147,7 @@ export default function MoreScreen() {
                 <View
                   style={[
                     styles.gridIconWrap,
-                    { backgroundColor: item.accent ? '#9F7AEA22' : colors.secondary },
+                    { backgroundColor: item.accent ? '#C1440E22' : colors.secondary },
                   ]}
                 >
                   <Feather

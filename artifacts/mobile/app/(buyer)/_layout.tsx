@@ -18,9 +18,9 @@ function BuyerTabLayout() {
   const insets  = useSafeAreaInsets();
   const bottomOffset = isWeb ? 20 : Math.max(insets.bottom, 8) + 12;
 
-  const pillBg       = isDark ? '#111118F0' : '#FFFFFFF0';
-  const activeTint   = isDark ? '#9F7AEA'   : '#7C3AED';
-  const inactiveTint = isDark ? '#555570'   : '#9090B0';
+  const pillBg       = isDark ? '#1B1917F0' : '#FAF7EEF0';
+  const activeTint   = isDark ? '#C94D1F'   : '#B33F1E';
+  const inactiveTint = isDark ? '#6E685C'   : '#A69C87';
 
   const tabBarStyle = {
     position: 'absolute' as const,
@@ -32,7 +32,7 @@ function BuyerTabLayout() {
     borderTopWidth: 0,
     backgroundColor: isIOS ? 'transparent' : pillBg,
     elevation: 24,
-    shadowColor: isDark ? '#000000' : '#7C3AED',
+    shadowColor: isDark ? '#000000' : '#B33F1E',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: isDark ? 0.5 : 0.15,
     shadowRadius: 20,
@@ -63,7 +63,7 @@ function BuyerTabLayout() {
           ),
         tabBarItemStyle: { paddingVertical: 8 },
         // Ensure the whole tab item (icon + label) is tappable, not just the icon glyph.
-        tabBarButton: (props) => (
+        tabBarButton: (props: any) => (
           <Pressable
             {...props}
             style={[props.style, { alignItems: 'center', justifyContent: 'center' }]}
@@ -150,8 +150,8 @@ function FeedCenterIcon({ focused }: { focused: boolean }) {
   return (
     <LinearGradient
       colors={focused
-        ? ['#F0ABFC', '#C026D3', '#7C3AED']
-        : ['#D946EF', '#A855F7', '#7C3AED']}
+        ? ['#D9714B', '#C1440E', '#B33F1E']
+        : ['#D9714B', '#8A3A22', '#B33F1E']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={feedStyles.pill}
@@ -168,7 +168,7 @@ const feedStyles = StyleSheet.create({
     borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#C026D3',
+    shadowColor: '#C1440E',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.7,
     shadowRadius: 10,
@@ -195,7 +195,7 @@ function TabIcon({
     <View style={{ alignItems: 'center', gap: 4 }}>
       <Feather name={name} size={20} color={color} />
       {focused && (
-        <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#9F7AEA' }} />
+        <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#C94D1F' }} />
       )}
     </View>
   );

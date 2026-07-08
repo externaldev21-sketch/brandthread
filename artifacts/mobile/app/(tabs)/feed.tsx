@@ -18,7 +18,7 @@ const FEED_ITEMS = [
     id: '1',
     brand: 'Vault Studio',
     brandHandle: '@vaultstudio',
-    avatar: '#7C3AED',
+    avatar: '#B33F1E',
     avatarInitials: 'VS',
     verified: true,
     timeAgo: '2h',
@@ -28,8 +28,8 @@ const FEED_ITEMS = [
     productPrice: '$189',
     productOriginalPrice: null,
     cardColor: '#1A0A2E',
-    accentColor: '#9F7AEA',
-    patternColor: '#2D1060',
+    accentColor: '#C94D1F',
+    patternColor: '#241708',
     likes: 1240,
     comments: 87,
     shares: 34,
@@ -72,7 +72,7 @@ const FEED_ITEMS = [
     productPrice: '$134',
     productOriginalPrice: '$160',
     cardColor: '#1C1000',
-    accentColor: '#F59E0B',
+    accentColor: '#B98A2E',
     patternColor: '#2A1A00',
     likes: 3410,
     comments: 215,
@@ -116,7 +116,7 @@ const FEED_ITEMS = [
     productPrice: '$215',
     productOriginalPrice: '$260',
     cardColor: '#020B1A',
-    accentColor: '#3B82F6',
+    accentColor: '#4A6FA5',
     patternColor: '#071226',
     likes: 975,
     comments: 58,
@@ -129,7 +129,7 @@ const FEED_ITEMS = [
 // ─── Stories (followed users) ────────────────────────────────────────────────
 
 const STORIES = [
-  { id: 's1', name: 'vaultstudio',  initials: 'VS', color: '#7C3AED', viewed: false },
+  { id: 's1', name: 'vaultstudio',  initials: 'VS', color: '#B33F1E', viewed: false },
   { id: 's2', name: 'meridian.co',  initials: 'MC', color: '#0F766E', viewed: false },
   { id: 's3', name: 'nxgendrops',   initials: 'NX', color: '#B45309', viewed: true  },
   { id: 's4', name: 'softwear__',   initials: 'SW', color: '#BE185D', viewed: false },
@@ -151,12 +151,12 @@ function FeedCard({
   onFollow: (id: string) => void;
 }) {
   const router  = useRouter();
-  const bg      = isDark ? '#111118' : '#FFFFFF';
-  const border  = isDark ? '#1E1E30' : '#EDE9FE';
-  const fg      = isDark ? '#F0EEFF' : '#1A1035';
-  const muted   = isDark ? '#6B6B8A' : '#6D6892';
-  const tagBg   = isDark ? '#1C1C2E' : '#F0EEFF';
-  const tagFg   = isDark ? '#9F7AEA' : '#7C3AED';
+  const bg      = isDark ? '#1B1917' : '#FFFFFF';
+  const border  = isDark ? '#33302A' : '#E8E1CF';
+  const fg      = isDark ? '#EDE7D9' : '#17140F';
+  const muted   = isDark ? '#8C8577' : '#6E6759';
+  const tagBg   = isDark ? '#201D18' : '#EDE7D9';
+  const tagFg   = isDark ? '#C94D1F' : '#B33F1E';
 
   const heartScale = useRef(new Animated.Value(1)).current;
 
@@ -319,11 +319,11 @@ export default function FeedScreen({ showStories = true }: { showStories?: boole
   const scheme = useColorScheme();
   const isDark = scheme !== 'light';
 
-  const bg      = isDark ? '#08080F' : '#F8F7FF';
-  const fg      = isDark ? '#F0EEFF' : '#1A1035';
-  const muted   = isDark ? '#6B6B8A' : '#6D6892';
-  const border  = isDark ? '#1E1E30' : '#DDD6FE';
-  const primary = isDark ? '#9F7AEA' : '#7C3AED';
+  const bg      = isDark ? '#121110' : '#F2EEE3';
+  const fg      = isDark ? '#EDE7D9' : '#17140F';
+  const muted   = isDark ? '#8C8577' : '#6E6759';
+  const border  = isDark ? '#33302A' : '#DBD3C0';
+  const primary = isDark ? '#C94D1F' : '#B33F1E';
 
   const [items,        setItems]        = useState(FEED_ITEMS);
   const [stories,      setStories]      = useState(STORIES);
@@ -379,7 +379,7 @@ export default function FeedScreen({ showStories = true }: { showStories?: boole
       <View style={[styles.header, { paddingTop: insets.top + 16, borderBottomColor: border }]}>
         {showSearch ? (
           <TextInput
-            style={[styles.searchBar, { color: fg, backgroundColor: isDark ? '#1A1A2E' : '#EDE9FE', borderColor: border }]}
+            style={[styles.searchBar, { color: fg, backgroundColor: isDark ? '#1D1A15' : '#E8E1CF', borderColor: border }]}
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholder="Search brands, products…"
@@ -431,12 +431,12 @@ export default function FeedScreen({ showStories = true }: { showStories?: boole
                   </View>
                 ) : (
                   <LinearGradient
-                    colors={['#F0ABFC', '#C026D3', '#7C3AED']}
+                    colors={['#D9714B', '#C1440E', '#B33F1E']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
                     style={styles.storyRing}
                   >
-                    <View style={[styles.storyAvatarInner, { backgroundColor: isDark ? '#08080F' : '#F8F7FF' }]}>
+                    <View style={[styles.storyAvatarInner, { backgroundColor: isDark ? '#121110' : '#F2EEE3' }]}>
                       <View style={[styles.storyAvatar, { backgroundColor: story.color }]}>
                         <Text style={styles.storyInitials}>{story.initials}</Text>
                       </View>

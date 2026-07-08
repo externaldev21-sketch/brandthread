@@ -13,11 +13,11 @@ export function Badge({ label, variant = 'default' }: BadgeProps) {
   const colors = useColors();
 
   const config: Record<BadgeVariant, { bg: string; text: string }> = {
-    success: { bg: '#22C55E22', text: colors.success },
-    warning: { bg: '#F59E0B22', text: colors.warning },
+    success: { bg: '#4C9A5E22', text: colors.success },
+    warning: { bg: '#B98A2E22', text: colors.warning },
     error: { bg: '#EF444422', text: colors.destructive },
-    info: { bg: '#3B82F622', text: colors.info },
-    gold: { bg: '#9F7AEA22', text: colors.primary },
+    info: { bg: '#4A6FA522', text: colors.info },
+    gold: { bg: '#C1440E22', text: colors.primary },
     default: { bg: colors.secondary, text: colors.mutedForeground },
   };
 

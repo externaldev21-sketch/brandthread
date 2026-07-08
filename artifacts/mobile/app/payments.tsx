@@ -115,14 +115,14 @@ interface DropCardProps {
 }
 
 function DropCard({ drop, colors, isDark, isLast }: DropCardProps) {
-  const primary = isDark ? '#9F7AEA' : '#7C3AED';
+  const primary = isDark ? '#C94D1F' : '#B33F1E';
   const isPreOrder = drop.type === 'pre-order';
   const s = statusConfig[drop.status];
 
-  const typeColor   = isPreOrder ? (isDark ? '#C4B5FD' : '#7C3AED') : (isDark ? '#22C55E' : '#16A34A');
-  const typeBg      = isPreOrder ? (isDark ? '#9F7AEA18' : '#EDE9FE') : (isDark ? '#22C55E18' : '#DCFCE7');
-  const typeBorder  = isPreOrder ? (isDark ? '#9F7AEA33' : '#DDD6FE') : (isDark ? '#22C55E33' : '#BBF7D0');
-  const progressBg  = isDark ? '#252535' : '#EDE9FE';
+  const typeColor   = isPreOrder ? (isDark ? '#E2DDD0' : '#B33F1E') : (isDark ? '#4C9A5E' : '#3F7A4F');
+  const typeBg      = isPreOrder ? (isDark ? '#C94D1F18' : '#E8E1CF') : (isDark ? '#4C9A5E18' : '#DCFCE7');
+  const typeBorder  = isPreOrder ? (isDark ? '#C1440E33' : '#DBD3C0') : (isDark ? '#4C9A5E33' : '#BBF7D0');
+  const progressBg  = isDark ? '#33302A' : '#E8E1CF';
 
   return (
     <View style={[
@@ -217,8 +217,8 @@ export default function PaymentsScreen() {
   const insets = useSafeAreaInsets();
   const [methods, setMethods] = useState(PAYMENT_METHODS.map((m) => m.on));
 
-  const isDark = colors.background === '#08080F' || colors.background.startsWith('#0');
-  const primary = isDark ? '#9F7AEA' : '#7C3AED';
+  const isDark = colors.background === '#121110' || colors.background.startsWith('#0');
+  const primary = isDark ? '#C94D1F' : '#B33F1E';
 
   // Summary numbers
   const heldTotal     = DROPS.filter((d) => d.status === 'held').reduce((s, d) => s + d.totalRaw, 0);
@@ -238,11 +238,11 @@ export default function PaymentsScreen() {
       >
 
         {/* ── Balance summary ── */}
-        <View style={[styles.summaryCard, { backgroundColor: isDark ? '#0F0A1E' : colors.secondary, borderColor: isDark ? '#9F7AEA44' : colors.border }]}>
+        <View style={[styles.summaryCard, { backgroundColor: isDark ? '#17140F' : colors.secondary, borderColor: isDark ? '#C1440E44' : colors.border }]}>
           <View style={styles.summaryRow}>
             {/* Available */}
             <View style={styles.summaryItem}>
-              <Text style={[styles.summaryLabel, { color: isDark ? '#9F7AEA88' : colors.mutedForeground }]}>
+              <Text style={[styles.summaryLabel, { color: isDark ? '#C1440E88' : colors.mutedForeground }]}>
                 AVAILABLE NOW
               </Text>
               <Text style={[styles.summaryAmount, { color: colors.success }]}>
@@ -251,14 +251,14 @@ export default function PaymentsScreen() {
               <Text style={[styles.summarySub, { color: colors.mutedForeground }]}>Pre Made drops</Text>
             </View>
 
-            <View style={[styles.summaryDivider, { backgroundColor: isDark ? '#9F7AEA22' : colors.border }]} />
+            <View style={[styles.summaryDivider, { backgroundColor: isDark ? '#C1440E22' : colors.border }]} />
 
             {/* Held */}
             <View style={styles.summaryItem}>
-              <Text style={[styles.summaryLabel, { color: isDark ? '#9F7AEA88' : colors.mutedForeground }]}>
+              <Text style={[styles.summaryLabel, { color: isDark ? '#C1440E88' : colors.mutedForeground }]}>
                 HELD IN ESCROW
               </Text>
-              <Text style={[styles.summaryAmount, { color: isDark ? '#C4B5FD' : primary }]}>
+              <Text style={[styles.summaryAmount, { color: isDark ? '#E2DDD0' : primary }]}>
                 ${heldTotal.toLocaleString()}
               </Text>
               <Text style={[styles.summarySub, { color: colors.mutedForeground }]}>Pre Order drops</Text>
@@ -266,7 +266,7 @@ export default function PaymentsScreen() {
           </View>
 
           {/* Info line */}
-          <View style={[styles.summaryInfo, { borderTopColor: isDark ? '#9F7AEA22' : colors.border }]}>
+          <View style={[styles.summaryInfo, { borderTopColor: isDark ? '#C1440E22' : colors.border }]}>
             <Feather name="info" size={12} color={colors.mutedForeground} />
             <Text style={[styles.summaryInfoText, { color: colors.mutedForeground }]}>
               Pre Order funds are held until your drop ships and customers receive their orders
@@ -285,13 +285,13 @@ export default function PaymentsScreen() {
 
         {/* ── Pre Order Drops ── */}
         <View style={styles.sectionHeader}>
-          <View style={[styles.sectionDot, { backgroundColor: isDark ? '#C4B5FD' : '#7C3AED' }]} />
+          <View style={[styles.sectionDot, { backgroundColor: isDark ? '#E2DDD0' : '#B33F1E' }]} />
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Pre Order Drops</Text>
           <Text style={[styles.sectionCount, { color: colors.mutedForeground }]}>{preOrderDrops.length}</Text>
         </View>
-        <View style={[styles.preOrderNote, { backgroundColor: isDark ? '#9F7AEA10' : '#EDE9FE', borderColor: isDark ? '#9F7AEA33' : '#DDD6FE' }]}>
-          <Feather name="clock" size={13} color={isDark ? '#C4B5FD' : primary} />
-          <Text style={[styles.preOrderNoteText, { color: isDark ? '#C4B5FD' : primary }]}>
+        <View style={[styles.preOrderNote, { backgroundColor: isDark ? '#C94D1F10' : '#E8E1CF', borderColor: isDark ? '#C1440E33' : '#DBD3C0' }]}>
+          <Feather name="clock" size={13} color={isDark ? '#E2DDD0' : primary} />
+          <Text style={[styles.preOrderNoteText, { color: isDark ? '#E2DDD0' : primary }]}>
             Funds collected upfront and held until each drop ships
           </Text>
         </View>
@@ -305,7 +305,7 @@ export default function PaymentsScreen() {
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Pre Made Drops</Text>
           <Text style={[styles.sectionCount, { color: colors.mutedForeground }]}>{preMadeDrops.length}</Text>
         </View>
-        <View style={[styles.preOrderNote, { backgroundColor: isDark ? '#22C55E10' : '#DCFCE7', borderColor: isDark ? '#22C55E33' : '#BBF7D0' }]}>
+        <View style={[styles.preOrderNote, { backgroundColor: isDark ? '#4C9A5E10' : '#DCFCE7', borderColor: isDark ? '#4C9A5E33' : '#BBF7D0' }]}>
           <Feather name="package" size={13} color={colors.success} />
           <Text style={[styles.preOrderNoteText, { color: colors.success }]}>
             Standard payout 2–3 business days after order fulfillment

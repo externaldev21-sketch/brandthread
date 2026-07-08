@@ -30,7 +30,7 @@ export default function AIStudioScreen() {
   const [selected, setSelected] = useState<string | null>(null);
 
   const aiBadge = (
-    <View style={[styles.aiBadge, { backgroundColor: '#9F7AEA22', borderColor: '#9F7AEA44' }]}>
+    <View style={[styles.aiBadge, { backgroundColor: '#C1440E22', borderColor: '#C1440E44' }]}>
       <Feather name="zap" size={12} color={colors.primary} />
       <Text style={[styles.aiText, { color: colors.primary }]}>AI</Text>
     </View>
@@ -75,10 +75,10 @@ export default function AIStudioScreen() {
           activeOpacity={0.75}
           style={[
             styles.toolRow,
-            { backgroundColor: selected === tool.label ? '#0F0A1E' : colors.card, borderColor: selected === tool.label ? colors.primary : colors.border },
+            { backgroundColor: selected === tool.label ? '#17140F' : colors.card, borderColor: selected === tool.label ? colors.primary : colors.border },
           ]}
         >
-          <View style={[styles.toolIcon, { backgroundColor: selected === tool.label ? '#9F7AEA22' : colors.secondary }]}>
+          <View style={[styles.toolIcon, { backgroundColor: selected === tool.label ? '#C1440E22' : colors.secondary }]}>
             <Feather name={tool.icon} size={18} color={selected === tool.label ? colors.primary : colors.mutedForeground} />
           </View>
           <View style={styles.toolInfo}>
@@ -86,7 +86,7 @@ export default function AIStudioScreen() {
             <Text style={[styles.toolDesc, { color: colors.mutedForeground }]}>{tool.desc}</Text>
           </View>
           {tool.badge != null && (
-            <View style={[styles.toolBadge, { backgroundColor: tool.badge === 'Popular' ? '#9F7AEA22' : '#22C55E22' }]}>
+            <View style={[styles.toolBadge, { backgroundColor: tool.badge === 'Popular' ? '#C1440E22' : '#4C9A5E22' }]}>
               <Text style={[styles.toolBadgeText, { color: tool.badge === 'Popular' ? colors.primary : colors.success }]}>{tool.badge}</Text>
             </View>
           )}

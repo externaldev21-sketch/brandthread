@@ -94,7 +94,7 @@ export default function AIAssistantScreen() {
         title="AI Assistant"
         subtitle="Your AI-powered business advisor"
         rightElement={
-          <View style={[styles.statusBadge, { backgroundColor: '#22C55E22' }]}>
+          <View style={[styles.statusBadge, { backgroundColor: '#4C9A5E22' }]}>
             <Text style={[styles.statusText, { color: colors.success }]}>Online</Text>
           </View>
         }
