@@ -124,6 +124,7 @@ function RootLayoutNav() {
         <Stack.Screen name="payments"      options={{ headerShown: false }} />
         <Stack.Screen name="website"       options={{ headerShown: false }} />
         <Stack.Screen name="integrations/klaviyo" options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
+        <Stack.Screen name="edit-profile" options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
       </Stack>
     </AuthGate>
   );

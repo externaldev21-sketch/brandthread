@@ -139,7 +139,7 @@ export default function ProfileScreen() {
       <View style={styles.nameRow}>
         <Text style={styles.brandName}>Brandthread</Text>
         <Text style={styles.badgeEmoji}>💜</Text>
-        <TouchableOpacity style={styles.editBtn} activeOpacity={0.8} onPress={() => nav('/brand')}>
+        <TouchableOpacity style={styles.editBtn} activeOpacity={0.8} onPress={() => nav('/edit-profile')}>
           <Text style={styles.editBtnText}>Edit</Text>
         </TouchableOpacity>
       </View>
