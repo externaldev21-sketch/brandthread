@@ -416,7 +416,7 @@ function SectionHead({ title, sub, action, onAction }: { title: string; sub?: st
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-export default function InspoScreen() {
+export default function HomeScreen() {
   const scheme  = useColorScheme();
   const insets  = useSafeAreaInsets();
   const router  = useRouter();
@@ -439,7 +439,7 @@ export default function InspoScreen() {
       <View style={[s.header, { paddingTop: topPad + 16, paddingHorizontal: 20 }]}>
         <View>
           <Text style={[s.greeting, { color: muted }]}>Good morning ✦</Text>
-          <Text style={[s.pageTitle, { color: fg }]}>Inspo</Text>
+          <Text style={[s.pageTitle, { color: fg }]}>Home</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <TouchableOpacity

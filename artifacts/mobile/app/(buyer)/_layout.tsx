@@ -8,7 +8,7 @@ import { SymbolView } from 'expo-symbols';
 import { LinearGradient } from 'expo-linear-gradient';
 
 // ─── Buyer tab layout ─────────────────────────────────────────────────────────
-// Tabs: Inspo · Friends · Feed (centre pill) · Inbox · Profile
+// Tabs: Home · Friends · Feed (centre pill) · Inbox · Profile
 
 function BuyerTabLayout() {
   const colorScheme = useColorScheme();
@@ -71,16 +71,16 @@ function BuyerTabLayout() {
         ),
       }}
     >
-      {/* Inspo */}
+      {/* Home */}
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Inspo',
+          title: 'Home',
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name={focused ? 'sparkles' : 'sparkle'} tintColor={color} size={20} />
+              <SymbolView name={focused ? 'house.fill' : 'house'} tintColor={color} size={20} />
             ) : (
-              <TabIcon name="compass" color={color} focused={focused} />
+              <TabIcon name="home" color={color} focused={focused} />
             ),
         }}
       />
