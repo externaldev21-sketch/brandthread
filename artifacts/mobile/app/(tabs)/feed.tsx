@@ -302,16 +302,6 @@ function SpotlightPage({
         <TouchableOpacity
           style={styles.railBtn}
           activeOpacity={0.7}
-          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-          onPress={() => onShop(item.id)}
-        >
-          <Ionicons name="bag" size={27} color="#FFFFFF" />
-          <Text style={styles.railCount}>SHOP</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.railBtn}
-          activeOpacity={0.7}
           hitSlop={{ top: 6, bottom: 10, left: 10, right: 10 }}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -323,8 +313,18 @@ function SpotlightPage({
         </TouchableOpacity>
       </View>
 
-      {/* ─ Bottom-left overlay: creator, caption, sound ─ */}
+      {/* ─ Bottom-left overlay: shop CTA, creator, caption, sound ─ */}
       <View style={[styles.bottomInfo, { bottom: tabBarClearance }]} pointerEvents="box-none">
+        <TouchableOpacity
+          style={[styles.shopBtn, { backgroundColor: item.accentColor }]}
+          activeOpacity={0.85}
+          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
+          onPress={() => onShop(item.id)}
+        >
+          <Ionicons name="bag" size={18} color="#FFFFFF" />
+          <Text style={styles.shopBtnText}>SHOP</Text>
+        </TouchableOpacity>
+
         <View style={styles.creatorRow}>
           <Text style={styles.creatorName}>{item.creator}</Text>
           {item.verified && <Feather name="check-circle" size={13} color="#4FA8FF" style={{ marginLeft: 4 }} />}
@@ -646,6 +646,13 @@ const styles = StyleSheet.create({
   },
   railBtn: { alignItems: 'center', gap: 3 },
   railCount: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
+
+  shopBtn: {
+    alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingVertical: 10, paddingHorizontal: 18, borderRadius: 24, marginBottom: 2,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.35, shadowRadius: 6, elevation: 8,
+  },
+  shopBtnText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#FFFFFF', letterSpacing: 0.4 },
 
   bottomInfo: { position: 'absolute', left: 16, right: 84, bottom: 26, gap: 8 },
 
