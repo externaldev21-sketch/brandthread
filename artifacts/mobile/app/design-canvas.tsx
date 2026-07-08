@@ -14,8 +14,11 @@ const WIDTHS = [2, 4, 8, 16];
 export default function DesignCanvasScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const params = useLocalSearchParams<{ label?: string }>();
+  const params = useLocalSearchParams<{ label?: string; dims?: string; ratio?: string }>();
   const title = params.label ?? 'Untitled Artwork';
+  const dims = params.dims;
+  const ratio = params.ratio ? parseFloat(params.ratio) : undefined;
+  const isFullBleed = !ratio || params.label === 'Screen Size';
 
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [redoStack, setRedoStack] = useState<Stroke[]>([]);
@@ -91,7 +94,10 @@ export default function DesignCanvasScreen() {
         <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} onPress={() => router.back()}>
           <Feather name="chevron-left" size={24} color="#FFF" />
         </TouchableOpacity>
-        <Text style={styles.title} numberOfLines={1}>{title}</Text>
+        <View style={styles.titleWrap}>
+          <Text style={styles.title} numberOfLines={1}>{title}</Text>
+          {dims != null && <Text style={styles.subtitle} numberOfLines={1}>{dims}</Text>}
+        </View>
         <View style={styles.headerActions}>
           <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }} onPress={undo} disabled={strokes.length === 0}>
             <Feather name="rotate-ccw" size={19} color={strokes.length === 0 ? '#4A4A4A' : '#FFF'} />
@@ -110,7 +116,13 @@ export default function DesignCanvasScreen() {
 
       {/* Canvas */}
       <View style={styles.canvasWrap}>
-        <View style={styles.canvas} {...panResponder.panHandlers}>
+        <View
+          style={[
+            styles.canvas,
+            isFullBleed ? { flex: 1, width: '100%' } : { width: '100%', aspectRatio: ratio, flex: undefined },
+          ]}
+          {...panResponder.panHandlers}
+        >
           <Svg style={StyleSheet.absoluteFill}>
             {strokes.map((s, i) => (
               <Path key={i} d={s.d} stroke={s.color} strokeWidth={s.width} fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -158,7 +170,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingBottom: 12, gap: 10,
   },
-  title: { flex: 1, textAlign: 'center', fontSize: 15, fontFamily: 'Inter_600SemiBold', color: '#FFF' },
+  titleWrap: { flex: 1, alignItems: 'center' },
+  title: { textAlign: 'center', fontSize: 15, fontFamily: 'Inter_600SemiBold', color: '#FFF' },
+  subtitle: { textAlign: 'center', fontSize: 11, fontFamily: 'Inter_400Regular', color: '#8A8A8A', marginTop: 1 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   saveBtn: { backgroundColor: '#9F7AEA', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6, marginLeft: 2 },
   saveBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: '#FFF' },

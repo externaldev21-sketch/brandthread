@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Alert } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Alert, Modal } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
@@ -35,6 +35,25 @@ const STUDIO_TOOLS = [
   { label: 'Lookbook Creator', icon: 'book-open' as const, desc: 'Professional brand lookbooks & catalogs', badge: null },
 ];
 
+type SizePreset = {
+  label: string;
+  profile?: string;
+  dims: string;
+  ratio: number;
+};
+
+const SCREEN_SIZE: SizePreset = { label: 'Screen Size', dims: '1320 \u00d7 2868px', ratio: 1320 / 2868 };
+
+const SIZE_PRESETS: SizePreset[] = [
+  { label: 'Square',        profile: 'sRGB', dims: '2048 \u00d7 2048px', ratio: 1 },
+  { label: '4K',             profile: 'sRGB', dims: '4096 \u00d7 1714px', ratio: 4096 / 1714 },
+  { label: 'A4',             profile: 'sRGB', dims: '210 \u00d7 297mm',   ratio: 210 / 297 },
+  { label: '4 \u00d7 6 Photo', profile: 'sRGB', dims: '6" \u00d7 4"',       ratio: 6 / 4 },
+  { label: 'Paper',          profile: 'sRGB', dims: '11" \u00d7 8.5"',    ratio: 11 / 8.5 },
+  { label: 'Comic',          profile: 'CMYK', dims: '6" \u00d7 9.5"',     ratio: 6 / 9.5 },
+  { label: 'FacePaint',      profile: 'sRGB', dims: '2048 \u00d7 2048px', ratio: 1 },
+];
+
 const RECENT_MOCKUPS = [
   { name: 'Classic Tee – White', color: '#E8E8E8', status: 'ready' },
   { name: 'Hoodie – Black', color: '#1A1A1A', status: 'ready' },
@@ -47,6 +66,7 @@ export default function AIStudioScreen() {
   const router = useRouter();
   const [selected, setSelected] = useState<string | null>(null);
   const [mode, setMode] = useState<'ai' | 'manual'>('ai');
+  const [newCanvasVisible, setNewCanvasVisible] = useState(false);
 
   const aiBadge = (
     <View style={[styles.aiBadge, { backgroundColor: '#C1440E22', borderColor: '#C1440E44' }]}>
@@ -55,9 +75,13 @@ export default function AIStudioScreen() {
     </View>
   );
 
-  function openCanvas(label: string) {
+  function openCanvas(preset: SizePreset) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push({ pathname: '/design-canvas', params: { label } } as never);
+    setNewCanvasVisible(false);
+    router.push({
+      pathname: '/design-canvas',
+      params: { label: preset.label, dims: preset.dims, ratio: String(preset.ratio) },
+    } as never);
   }
 
   return (
@@ -107,7 +131,7 @@ export default function AIStudioScreen() {
             <TouchableOpacity
               style={[styles.newCanvasBtn, { backgroundColor: colors.primary }]}
               activeOpacity={0.8}
-              onPress={() => openCanvas('Untitled Artwork')}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setNewCanvasVisible(true); }}
             >
               <Feather name="plus" size={18} color={colors.primaryForeground} />
             </TouchableOpacity>
@@ -119,7 +143,7 @@ export default function AIStudioScreen() {
                 key={c.id}
                 style={styles.canvasCell}
                 activeOpacity={0.8}
-                onPress={() => openCanvas('Untitled Artwork')}
+                onPress={() => openCanvas({ label: 'Untitled Artwork', dims: c.dims, ratio: c.ratio })}
               >
                 <View
                   style={[
@@ -229,6 +253,54 @@ export default function AIStudioScreen() {
       </View>
       </ScrollView>
       )}
+
+      {/* New canvas sheet */}
+      <Modal
+        visible={newCanvasVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setNewCanvasVisible(false)}
+      >
+        <View style={styles.sheetOverlay}>
+          <View style={styles.sheetCard}>
+            <TouchableOpacity style={styles.sheetCancel} activeOpacity={0.7} onPress={() => setNewCanvasVisible(false)}>
+              <Text style={styles.sheetCancelText}>Cancel</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.sheetTitle}>New canvas</Text>
+            <View style={styles.sheetSubRow}>
+              <Text style={styles.sheetSubActive}>Custom Size</Text>
+              <Text style={styles.sheetSubMuted}>From Clipboard</Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.sheetSoloRow}
+              activeOpacity={0.7}
+              onPress={() => openCanvas(SCREEN_SIZE)}
+            >
+              <Text style={styles.sheetRowLabel}>{SCREEN_SIZE.label}</Text>
+              <Text style={styles.sheetRowDims}>{SCREEN_SIZE.dims}</Text>
+            </TouchableOpacity>
+
+            <View style={styles.sheetGroup}>
+              {SIZE_PRESETS.map((p, i) => (
+                <TouchableOpacity
+                  key={p.label}
+                  style={[styles.sheetRow, i > 0 && styles.sheetRowBorder]}
+                  activeOpacity={0.7}
+                  onPress={() => openCanvas(p)}
+                >
+                  <Text style={styles.sheetRowLabel}>{p.label}</Text>
+                  <View style={styles.sheetRowRight}>
+                    {p.profile != null && <Text style={styles.sheetRowProfile}>{p.profile}</Text>}
+                    <Text style={styles.sheetRowDims}>{p.dims}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -281,4 +353,21 @@ const styles = StyleSheet.create({
   generatingOverlay: { ...StyleSheet.absoluteFillObject, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   mockupName: { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginBottom: 3 },
   mockupStatus: { fontSize: 11, fontFamily: 'Inter_500Medium' },
+
+  sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-start' },
+  sheetCard: { backgroundColor: '#161616', paddingTop: 60, paddingHorizontal: 20, paddingBottom: 24, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
+  sheetCancel: { position: 'absolute', top: 16, right: 20 },
+  sheetCancelText: { fontSize: 16, fontFamily: 'Inter_400Regular', color: '#9A9A9A' },
+  sheetTitle: { fontSize: 30, fontFamily: 'Inter_700Bold', color: '#FFFFFF', marginBottom: 8 },
+  sheetSubRow: { flexDirection: 'row', gap: 18, marginBottom: 16 },
+  sheetSubActive: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
+  sheetSubMuted: { fontSize: 14, fontFamily: 'Inter_400Regular', color: '#6E6E6E' },
+  sheetSoloRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#232323', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, marginBottom: 14 },
+  sheetGroup: { backgroundColor: '#232323', borderRadius: 12, overflow: 'hidden' },
+  sheetRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14 },
+  sheetRowBorder: { borderTopWidth: 1, borderTopColor: '#2E2E2E' },
+  sheetRowLabel: { fontSize: 15, fontFamily: 'Inter_400Regular', color: '#FFFFFF' },
+  sheetRowRight: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  sheetRowProfile: { fontSize: 12, fontFamily: 'Inter_400Regular', color: '#8A8A8A' },
+  sheetRowDims: { fontSize: 14, fontFamily: 'Inter_400Regular', color: '#8A8A8A' },
 });
