@@ -171,6 +171,9 @@ function SpotlightPage({
   onOpenComments: (id: string) => void;
   onShop: (id: string) => void;
 }) {
+  const insets = useSafeAreaInsets();
+  // Clear the floating pill tab bar (see (tabs)/_layout.tsx: bottomOffset + height 72 + margin).
+  const tabBarClearance = Math.max(insets.bottom, 8) + 12 + 72 + 14;
   const player = useVideoPlayer(item.videoUri, p => { p.loop = true; p.muted = false; });
   const [paused, setPaused] = useState(false);
   const heartBurst = useRef(new Animated.Value(0)).current;
@@ -243,11 +246,8 @@ function SpotlightPage({
         </View>
       </TouchableWithoutFeedback>
 
-      {/* gradient-less scrim for legibility */}
-      <View pointerEvents="none" style={styles.bottomScrim} />
-
       {/* ─ Right action rail ─ */}
-      <View style={styles.rail}>
+      <View style={[styles.rail, { bottom: tabBarClearance }]}>
         <TouchableOpacity activeOpacity={0.8} onPress={() => onFollow(item.id)} style={styles.railAvatarWrap}>
           <View style={[styles.railAvatar, { backgroundColor: item.avatarColor }]}>
             <Text style={styles.railAvatarText}>{item.initials}</Text>
@@ -329,7 +329,7 @@ function SpotlightPage({
       </View>
 
       {/* ─ Bottom-left overlay: chip, shop pill, creator, sound ─ */}
-      <View style={styles.bottomInfo} pointerEvents="box-none">
+      <View style={[styles.bottomInfo, { bottom: tabBarClearance }]} pointerEvents="box-none">
         <View style={styles.topRowChips}>
           <View style={styles.trendChip}>
             <Text style={styles.trendChipText}>{item.chip}</Text>
@@ -654,11 +654,6 @@ const styles = StyleSheet.create({
 
   pauseOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
   heartBurst: { position: 'absolute', top: '38%', left: '50%', marginLeft: -55, marginTop: -55 },
-
-  bottomScrim: {
-    position: 'absolute', left: 0, right: 0, bottom: 0, height: 220,
-    backgroundColor: '#00000066',
-  },
 
   rail: {
     position: 'absolute', right: 10, bottom: 116, alignItems: 'center', gap: 18,
