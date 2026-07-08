@@ -7,15 +7,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
-const BRAND_CHECKLIST = [
-  { label: 'Brand name finalized', done: true },
-  { label: 'Logo created', done: true },
-  { label: 'Color palette defined', done: true },
-  { label: 'Typography selected', done: true },
-  { label: 'Domain connected', done: false },
-  { label: 'Trademark filing started', done: false },
-  { label: 'Business entity formed', done: false },
-  { label: 'Social handles secured', done: true },
+const BRAND_CHECKLIST_ITEMS = [
+  'Brand name finalized',
+  'Logo created',
+  'Color palette defined',
+  'Typography selected',
+  'Domain connected',
+  'Trademark filing started',
+  'Business entity formed',
+  'Social handles secured',
 ];
 
 const STYLE_OPTIONS = ['Minimalist', 'Streetwear', 'Luxury', 'Sporty', 'Vintage', 'Y2K'];
@@ -48,6 +48,16 @@ export default function BrandScreen() {
   const [selectedStyle, setSelectedStyle] = useState('Minimalist');
   const [suggestedNames, setSuggestedNames] = useState<string[]>(['ThreadCraft', 'Corevox', 'Moodwear', 'Rawline', 'Grainhaus']);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [checklist, setChecklist] = useState<boolean[]>(BRAND_CHECKLIST_ITEMS.map(() => false));
+
+  const doneCount = checklist.filter(Boolean).length;
+  const totalCount = BRAND_CHECKLIST_ITEMS.length;
+  const completionPct = Math.round((doneCount / totalCount) * 100);
+
+  function toggleCheck(i: number) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setChecklist(prev => prev.map((v, idx) => idx === i ? !v : v));
+  }
 
   function handleGenerateNames() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -77,7 +87,7 @@ export default function BrandScreen() {
           <Text style={[styles.brandStyle, { color: '#C94D1F77' }]}>Minimalist · Est. 2025</Text>
         </View>
         <View style={[styles.completeBadge, { backgroundColor: '#C1440E22' }]}>
-          <Text style={[styles.completeText, { color: colors.primary }]}>62%</Text>
+          <Text style={[styles.completeText, { color: colors.primary }]}>{completionPct}%</Text>
         </View>
       </LinearGradient>
 
@@ -174,16 +184,24 @@ export default function BrandScreen() {
         <View style={styles.cardHeader}>
           <Feather name="check-square" size={16} color={colors.primary} />
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>Business Setup</Text>
-          <Text style={[styles.checklistProgress, { color: colors.mutedForeground }]}>5/8</Text>
+          <Text style={[styles.checklistProgress, { color: colors.mutedForeground }]}>{doneCount}/{totalCount}</Text>
         </View>
-        {BRAND_CHECKLIST.map((item, i) => (
-          <View key={item.label} style={[styles.checkRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-            <View style={[styles.checkBox, { backgroundColor: item.done ? '#4C9A5E22' : colors.secondary, borderColor: item.done ? colors.success : colors.border }]}>
-              {item.done && <Feather name="check" size={12} color={colors.success} />}
-            </View>
-            <Text style={[styles.checkLabel, { color: item.done ? colors.mutedForeground : colors.foreground }]}>{item.label}</Text>
-          </View>
-        ))}
+        {BRAND_CHECKLIST_ITEMS.map((label, i) => {
+          const done = checklist[i];
+          return (
+            <TouchableOpacity
+              key={label}
+              activeOpacity={0.7}
+              onPress={() => toggleCheck(i)}
+              style={[styles.checkRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
+            >
+              <View style={[styles.checkBox, { backgroundColor: done ? '#4C9A5E22' : colors.secondary, borderColor: done ? colors.success : colors.border }]}>
+                {done && <Feather name="check" size={12} color={colors.success} />}
+              </View>
+              <Text style={[styles.checkLabel, { color: done ? colors.mutedForeground : colors.foreground }]}>{label}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {/* Domain */}
