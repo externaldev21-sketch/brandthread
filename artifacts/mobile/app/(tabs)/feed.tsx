@@ -8,18 +8,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { readableOn } from '@/lib/color';
 
 const { width: SCREEN_W } = Dimensions.get('window');
-
-// Pick a readable ink/white foreground for a given flat background color.
-function readableOn(hex: string): string {
-  const h = hex.replace('#', '');
-  const r = parseInt(h.substring(0, 2), 16);
-  const g = parseInt(h.substring(2, 4), 16);
-  const b = parseInt(h.substring(4, 6), 16);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.6 ? '#17140F' : '#FFFFFF';
-}
 
 // ─── Mock feed data ──────────────────────────────────────────────────────────
 

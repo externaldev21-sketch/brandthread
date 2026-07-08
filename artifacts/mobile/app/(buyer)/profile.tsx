@@ -1,29 +1,32 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, useColorScheme, Alert,
+  TouchableOpacity, useColorScheme, Alert, useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { readableOn } from '@/lib/color';
+
+const GRID_GAP = 2;
+const GRID_COLS = 3;
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
 const STYLE_BADGE = { label: 'Archive Fashion', emoji: '🎞️', color: '#B33F1E' };
 
 const STATS = [
-  { label: 'Wishlist',  value: '6'  },
-  { label: 'Following', value: '5'  },
-  { label: 'Orders',    value: '3'  },
+  { label: 'orders',    value: '3'  },
+  { label: 'following', value: '5'  },
+  { label: 'wishlist',  value: '6'  },
 ];
 
 const RECENT_ORDERS = [
-  { id: '#2041', name: 'Canvas Cargo Jacket', brand: 'Vault Studio', price: '$189', status: 'Delivered',  color: '#B33F1E' },
-  { id: '#1988', name: 'Archive Hoodie Vol.3', brand: 'NxGen Drops', price: '$135', status: 'Shipped',    color: '#B45309' },
-  { id: '#1740', name: 'Relaxed Tee — Sage',   brand: 'Meridian Co.', price: '$48', status: 'Processing', color: '#0F766E' },
+  { id: '#2041', name: 'Canvas Cargo Jacket',  brand: 'Vault Studio', initials: 'VS', price: '$189', status: 'Delivered',  color: '#B33F1E' },
+  { id: '#1988', name: 'Archive Hoodie Vol.3', brand: 'NxGen Drops',  initials: 'NX', price: '$135', status: 'Shipped',    color: '#B45309' },
+  { id: '#1740', name: 'Relaxed Tee — Sage',   brand: 'Meridian Co.', initials: 'MC', price: '$48',  status: 'Processing', color: '#0F766E' },
 ];
 
 const FOLLOWED_BRANDS = [
@@ -34,12 +37,19 @@ const FOLLOWED_BRANDS = [
   { initials: 'AG', name: 'Atlas Goods',   color: '#1D4ED8', hasNew: false },
 ];
 
-const MENU = [
-  { icon: 'package'      as const, label: 'My orders',          sub: 'Track & manage purchases'  },
-  { icon: 'sliders'      as const, label: 'Style preferences',  sub: 'Update your taste profile' },
-  { icon: 'bell'         as const, label: 'Drop notifications',  sub: 'Never miss a release'      },
-  { icon: 'help-circle'  as const, label: 'Help & support',      sub: 'FAQ, contact us'           },
+const HIGHLIGHTS = [
+  { label: 'Delivered',  icon: 'check-circle' as const, color: '#4C9A5E' },
+  { label: 'Shipped',    icon: 'truck'        as const, color: '#4A6FA5' },
+  { label: 'Wishlist',   icon: 'heart'        as const, color: '#B33F1E' },
 ];
+
+const TABS = [
+  { key: 'orders',   icon: 'grid'  as const },
+  { key: 'brands',   icon: 'users' as const },
+  { key: 'wishlist', icon: 'heart' as const },
+] as const;
+
+type TabKey = typeof TABS[number]['key'];
 
 const statusColor = (s: string) =>
   s === 'Delivered' ? '#4C9A5E' : s === 'Shipped' ? '#4A6FA5' : '#B98A2E';
@@ -51,168 +61,249 @@ export default function BuyerProfileScreen() {
   const scheme  = useColorScheme();
   const isDark  = scheme !== 'light';
   const router  = useRouter();
+  const [tab, setTab] = useState<TabKey>('orders');
+  const { width: screenW } = useWindowDimensions();
+  const tileSize = (screenW - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
 
   const bg      = isDark ? '#121110' : '#F5F1E7';
-  const card    = isDark ? '#1B1917' : '#FFFFFF';
   const border  = isDark ? '#33302A' : '#E3DCC9';
   const fg      = isDark ? '#EDE7D9' : '#17140F';
   const muted   = isDark ? '#8C8577' : '#6E6759';
   const primary = isDark ? '#C94D1F' : '#B33F1E';
 
+  function openAccountMenu() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Alert.alert('Account', undefined, [
+      { text: 'My orders',         onPress: () => Alert.alert('My Orders', '#2041 · Canvas Cargo Jacket — ✅ Delivered\n#1988 · Archive Hoodie Vol.3 — 📦 Shipped\n#1740 · Relaxed Tee — ⏳ Processing', [{ text: 'OK' }]) },
+      { text: 'Style preferences', onPress: () => Alert.alert('Style Preferences', 'Your current taste profile: Archive Fashion 🎞️', [
+          { text: 'Update Profile', onPress: () => router.push('/onboarding' as never) },
+          { text: 'Cancel', style: 'cancel' },
+        ]) },
+      { text: 'Drop notifications', onPress: () => Alert.alert('Drop Notifications', 'Choose what to be notified about:', [
+          { text: 'All Drops',      onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
+          { text: 'Following Only', onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
+          { text: 'Cancel', style: 'cancel' },
+        ]) },
+      { text: 'Help & support', onPress: () => Alert.alert('Help & Support', 'How can we help?', [
+          { text: 'Browse FAQ', onPress: () => {} },
+          { text: 'Contact Us', onPress: () => {} },
+          { text: 'Cancel', style: 'cancel' },
+        ]) },
+      { text: 'Sign out', style: 'destructive', onPress: () => Alert.alert('Sign out', 'Are you sure you want to sign out?', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Sign out', style: 'destructive', onPress: async () => {
+              await AsyncStorage.clear();
+              router.replace('/onboarding' as never);
+            } },
+        ]) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
+
   return (
     <ScrollView
       style={[s.container, { backgroundColor: bg }]}
-      contentContainerStyle={{ paddingTop: insets.top + 20, paddingBottom: 110 }}
+      contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 110 }}
       showsVerticalScrollIndicator={false}
     >
-      {/* ─ Avatar + name ─ */}
-      <View style={[s.hero, { paddingHorizontal: 20 }]}>
-        <View style={[s.avatarRing, { borderColor: primary + '60' }]}>
-          <LinearGradient
-            colors={['#C94D1F', '#B33F1E']}
-            style={s.avatarGradient}
+      {/* ─ Top bar ─ */}
+      <View style={[s.topBar, { paddingHorizontal: 20 }]}>
+        <TouchableOpacity style={s.usernameRow} activeOpacity={0.7} onPress={() => Haptics.selectionAsync()}>
+          <Feather name="lock" size={13} color={muted} />
+          <Text style={[s.username, { color: fg }]}>jordan</Text>
+          <Feather name="chevron-down" size={16} color={fg} />
+        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18 }}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/inbox' as never); }}
           >
-            <Text style={s.avatarInitials}>JD</Text>
-          </LinearGradient>
+            <Feather name="bell" size={22} color={fg} />
+          </TouchableOpacity>
+          <TouchableOpacity activeOpacity={0.7} onPress={openAccountMenu}>
+            <Feather name="menu" size={22} color={fg} />
+          </TouchableOpacity>
         </View>
-        <View style={s.heroText}>
-          <Text style={[s.heroName, { color: fg }]}>Jordan</Text>
-          <Text style={[s.heroSub, { color: muted }]}>@jordan · Joined Jul 2026</Text>
-        </View>
+      </View>
 
-        {/* Style badge */}
+      {/* ─ Avatar + stats ─ */}
+      <View style={[s.hero, { paddingHorizontal: 20 }]}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/story-creator' as never); }}
+        >
+          <View style={[s.avatarRing, { borderColor: border }]}>
+            <View style={[s.avatarFill, { backgroundColor: primary }]}>
+              <Text style={s.avatarInitials}>JD</Text>
+            </View>
+          </View>
+          <View style={[s.avatarBadge, { backgroundColor: primary, borderColor: bg }]}>
+            <Feather name="plus" size={12} color="#FFF" />
+          </View>
+        </TouchableOpacity>
+
+        <View style={s.statsRow}>
+          {STATS.map(stat => (
+            <View key={stat.label} style={s.statItem}>
+              <Text style={[s.statValue, { color: fg }]}>{stat.value}</Text>
+              <Text style={[s.statLabel, { color: muted }]}>{stat.label}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* ─ Name + bio ─ */}
+      <View style={{ paddingHorizontal: 20, marginTop: 12 }}>
+        <Text style={[s.heroName, { color: fg }]}>Jordan</Text>
+        <Text style={[s.heroSub, { color: muted }]}>@jordan · Joined Jul 2026</Text>
         <View style={[s.styleBadge, { backgroundColor: STYLE_BADGE.color + '18', borderColor: STYLE_BADGE.color + '40' }]}>
           <Text style={s.styleBadgeEmoji}>{STYLE_BADGE.emoji}</Text>
           <Text style={[s.styleBadgeLabel, { color: STYLE_BADGE.color }]}>{STYLE_BADGE.label}</Text>
         </View>
       </View>
 
-      {/* ─ Stats row ─ */}
-      <View style={[s.statsRow, { backgroundColor: card, borderColor: border, marginHorizontal: 20 }]}>
-        {STATS.map((stat, i) => (
-          <View
-            key={stat.label}
-            style={[
-              s.statItem,
-              i < STATS.length - 1 && { borderRightWidth: 1, borderRightColor: border },
-            ]}
-          >
-            <Text style={[s.statValue, { color: fg }]}>{stat.value}</Text>
-            <Text style={[s.statLabel, { color: muted }]}>{stat.label}</Text>
+      {/* ─ Action buttons ─ */}
+      <View style={[s.actionsRow, { paddingHorizontal: 20 }]}>
+        <TouchableOpacity
+          style={[s.actionBtn, { borderColor: border }]}
+          activeOpacity={0.75}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/onboarding' as never); }}
+        >
+          <Text style={[s.actionBtnText, { color: fg }]}>Edit profile</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[s.actionBtn, { borderColor: border }]}
+          activeOpacity={0.75}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); Alert.alert('Share Profile', 'Copy link to @jordan\'s profile?', [{ text: 'Cancel', style: 'cancel' }, { text: 'Copy Link', onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) }]); }}
+        >
+          <Text style={[s.actionBtnText, { color: fg }]}>Share profile</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[s.iconActionBtn, { borderColor: border }]}
+          activeOpacity={0.75}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); Alert.alert('Invite Friends', 'Share Brandthread with friends to earn drop invites.', [{ text: 'OK' }]); }}
+        >
+          <Feather name="user-plus" size={16} color={fg} />
+        </TouchableOpacity>
+      </View>
+
+      {/* ─ Highlights ─ */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 20, gap: 16, paddingVertical: 18 }}
+      >
+        <TouchableOpacity
+          style={s.highlightItem}
+          activeOpacity={0.8}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/story-creator' as never); }}
+        >
+          <View style={[s.highlightRing, { borderColor: border, borderStyle: 'dashed' }]}>
+            <Feather name="plus" size={20} color={muted} />
           </View>
+          <Text style={[s.highlightLabel, { color: muted }]}>New</Text>
+        </TouchableOpacity>
+        {HIGHLIGHTS.map(h => (
+          <TouchableOpacity
+            key={h.label}
+            style={s.highlightItem}
+            activeOpacity={0.8}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTab(h.label === 'Wishlist' ? 'wishlist' : 'orders'); }}
+          >
+            <View style={[s.highlightRing, { borderColor: border }]}>
+              <Feather name={h.icon} size={18} color={h.color} />
+            </View>
+            <Text style={[s.highlightLabel, { color: muted }]} numberOfLines={1}>{h.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* ─ Tabs ─ */}
+      <View style={[s.tabsRow, { borderTopColor: border, borderBottomColor: border }]}>
+        {TABS.map(t => (
+          <TouchableOpacity
+            key={t.key}
+            style={[s.tabItem, tab === t.key && { borderBottomColor: fg }]}
+            activeOpacity={0.7}
+            onPress={() => { Haptics.selectionAsync(); setTab(t.key); }}
+          >
+            <Feather name={t.icon} size={20} color={tab === t.key ? fg : muted} />
+          </TouchableOpacity>
         ))}
       </View>
 
-      {/* ─ Post on Story ─ */}
-      <View style={{ paddingHorizontal: 20, marginTop: 24 }}>
-        <TouchableOpacity
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/story-creator' as never); }}
-          activeOpacity={0.85}
-        >
-          <LinearGradient colors={['#8A3A22', '#B33F1E']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.storyBtn}>
-            <Feather name="camera" size={17} color="#FFF" />
-            <Text style={s.storyBtnText}>Post on Story</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
+      {/* ─ Grid content ─ */}
+      {tab === 'orders' && (
+        RECENT_ORDERS.length > 0 ? (
+          <View style={s.grid}>
+            {RECENT_ORDERS.map(order => {
+              const onColor = readableOn(order.color);
+              return (
+                <TouchableOpacity
+                  key={order.id}
+                  style={[s.tile, { width: tileSize, height: tileSize, backgroundColor: order.color }]}
+                  activeOpacity={0.85}
+                  onPress={() => Alert.alert(order.brand, `${order.name} · ${order.price}\n${order.id} — ${order.status}`, [{ text: 'OK' }])}
+                >
+                  <Text style={[s.tileInitials, { color: onColor }]}>{order.initials}</Text>
+                  <Text style={[s.tileName, { color: onColor }]} numberOfLines={2}>{order.name}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                    <Text style={[s.tilePrice, { color: onColor }]}>{order.price}</Text>
+                    <View style={[s.tileStatusPill, { backgroundColor: onColor === '#FFFFFF' ? '#00000040' : '#FFFFFF60' }]}>
+                      <View style={[s.tileStatusDot, { backgroundColor: statusColor(order.status) }]} />
+                      <Text style={[s.tileStatus, { color: onColor }]}>{order.status}</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ) : (
+          <EmptyState icon="package" label="No orders yet" muted={muted} border={border} />
+        )
+      )}
 
-      {/* ─ Recent orders ─ */}
-      <View style={[s.section, { paddingHorizontal: 20, marginTop: 28 }]}>
-        <View style={s.sectionHeader}>
-          <Text style={[s.sectionTitle, { color: fg }]}>Recent Orders</Text>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => Alert.alert('My Orders', '#2041 · Canvas Cargo Jacket — ✅ Delivered\n#1988 · Archive Hoodie Vol.3 — 📦 Shipped\n#1740 · Relaxed Tee — Sage — ⏳ Processing', [{ text: 'OK' }])}
-          >
-            <Text style={[s.sectionAction, { color: primary }]}>View all</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={[s.card, { backgroundColor: card, borderColor: border }]}>
-          {RECENT_ORDERS.map((order, i) => (
-            <View
-              key={order.id}
-              style={[s.orderRow, i > 0 && { borderTopWidth: 1, borderTopColor: border }]}
-            >
-              <View style={[s.orderAccent, { backgroundColor: order.color }]} />
-              <View style={{ flex: 1 }}>
-                <Text style={[s.orderProduct, { color: fg }]}>{order.name}</Text>
-                <Text style={[s.orderBrand, { color: muted }]}>{order.brand} · {order.id}</Text>
-              </View>
-              <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                <Text style={[s.orderPrice, { color: fg }]}>{order.price}</Text>
-                <Text style={[s.orderStatus, { color: statusColor(order.status) }]}>
-                  {order.status}
-                </Text>
-              </View>
-            </View>
-          ))}
-        </View>
-      </View>
+      {tab === 'brands' && (
+        FOLLOWED_BRANDS.length > 0 ? (
+          <View style={s.grid}>
+            {FOLLOWED_BRANDS.map(brand => {
+              const onColor = readableOn(brand.color);
+              return (
+                <TouchableOpacity
+                  key={brand.initials}
+                  style={[s.tile, { width: tileSize, height: tileSize, backgroundColor: brand.color, alignItems: 'center', justifyContent: 'center' }]}
+                  activeOpacity={0.85}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/feed' as never); }}
+                >
+                  <Text style={[s.tileBrandInitials, { color: onColor }]}>{brand.initials}</Text>
+                  <Text style={[s.tileBrandName, { color: onColor }]} numberOfLines={1}>{brand.name}</Text>
+                  {brand.hasNew && <View style={[s.tileDot, { backgroundColor: onColor }]} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ) : (
+          <EmptyState icon="users" label="Not following any brands yet" muted={muted} border={border} />
+        )
+      )}
 
-      {/* ─ Settings menu ─ */}
-      <View style={[s.section, { paddingHorizontal: 20, marginTop: 28 }]}>
-        <Text style={[s.sectionTitle, { color: fg, marginBottom: 12 }]}>Account</Text>
-        <View style={[s.card, { backgroundColor: card, borderColor: border }]}>
-          {MENU.map((item, i) => (
-            <TouchableOpacity
-              key={item.label}
-              style={[s.menuRow, i > 0 && { borderTopWidth: 1, borderTopColor: border }]}
-              activeOpacity={0.7}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                if (item.label === 'My orders') {
-                  Alert.alert('My Orders', '#2041 · Canvas Cargo Jacket — ✅ Delivered\n#1988 · Archive Hoodie Vol.3 — 📦 Shipped\n#1740 · Relaxed Tee — ⏳ Processing', [{ text: 'OK' }]);
-                } else if (item.label === 'Style preferences') {
-                  Alert.alert('Style Preferences', 'Your current taste profile: Archive Fashion 🎞️', [
-                    { text: 'Update Profile', onPress: () => router.push('/onboarding' as never) },
-                    { text: 'Cancel', style: 'cancel' },
-                  ]);
-                } else if (item.label === 'Drop notifications') {
-                  Alert.alert('Drop Notifications', 'Choose what to be notified about:', [
-                    { text: 'All Drops',      onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
-                    { text: 'Following Only', onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
-                    { text: 'Cancel', style: 'cancel' },
-                  ]);
-                } else {
-                  Alert.alert('Help & Support', 'How can we help?', [
-                    { text: 'Browse FAQ',  onPress: () => {} },
-                    { text: 'Contact Us', onPress: () => {} },
-                    { text: 'Cancel', style: 'cancel' },
-                  ]);
-                }
-              }}
-            >
-              <View style={[s.menuIcon, { backgroundColor: primary + '15' }]}>
-                <Feather name={item.icon} size={16} color={primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[s.menuLabel, { color: fg }]}>{item.label}</Text>
-                <Text style={[s.menuSub, { color: muted }]}>{item.sub}</Text>
-              </View>
-              <Feather name="chevron-right" size={16} color={muted} />
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* ─ Sign out ─ */}
-      <View style={{ paddingHorizontal: 20, marginTop: 12 }}>
-        <TouchableOpacity
-          style={[s.signOut, { borderColor: '#EF444440' }]}
-          activeOpacity={0.8}
-          onPress={() => Alert.alert('Sign out', 'Are you sure you want to sign out?', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Sign out', style: 'destructive', onPress: async () => {
-              await AsyncStorage.clear();
-              router.replace('/onboarding' as never);
-            }},
-          ])}
-        >
-          <Feather name="log-out" size={16} color="#EF4444" />
-          <Text style={s.signOutText}>Sign out</Text>
-        </TouchableOpacity>
-      </View>
+      {tab === 'wishlist' && (
+        <EmptyState icon="heart" label="No wishlist items yet" muted={muted} border={border} />
+      )}
     </ScrollView>
+  );
+}
+
+// ─── Empty state (matches "No posts yet" reference pattern) ────────────────────
+
+function EmptyState({ icon, label, muted, border }: { icon: keyof typeof Feather.glyphMap; label: string; muted: string; border: string }) {
+  return (
+    <View style={s.emptyState}>
+      <View style={[s.emptyIconRing, { borderColor: border }]}>
+        <Feather name={icon} size={30} color={muted} />
+      </View>
+      <Text style={[s.emptyLabel, { color: muted }]}>{label}</Text>
+    </View>
   );
 }
 
@@ -221,58 +312,63 @@ export default function BuyerProfileScreen() {
 const s = StyleSheet.create({
   container: { flex: 1 },
 
-  hero:       { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 20, flexWrap: 'wrap' },
-  avatarRing: { width: 64, height: 64, borderRadius: 32, borderWidth: 2, padding: 3 },
-  avatarGradient: { flex: 1, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
-  avatarInitials: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
-  heroText:   { flex: 1 },
-  heroName:   { fontSize: 20, fontFamily: 'Inter_700Bold', letterSpacing: -0.3 },
-  heroSub:    { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
+  usernameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  username: { fontSize: 17, fontFamily: 'Inter_700Bold' },
+
+  hero: { flexDirection: 'row', alignItems: 'center', gap: 22 },
+  avatarRing: { width: 78, height: 78, borderRadius: 39, borderWidth: 1, padding: 3 },
+  avatarFill: { flex: 1, borderRadius: 33, alignItems: 'center', justifyContent: 'center' },
+  avatarInitials: { fontSize: 20, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  avatarBadge: {
+    position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 2,
+  },
+
+  statsRow:  { flex: 1, flexDirection: 'row', justifyContent: 'space-around' },
+  statItem:  { alignItems: 'center' },
+  statValue: { fontSize: 18, fontFamily: 'Inter_700Bold', letterSpacing: -0.3 },
+  statLabel: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 3 },
+
+  heroName:   { fontSize: 14, fontFamily: 'Inter_700Bold' },
+  heroSub:    { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 3 },
 
   styleBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
+    flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
     paddingHorizontal: 10, paddingVertical: 5,
-    borderRadius: 20, borderWidth: 1,
+    borderRadius: 20, borderWidth: 1, marginTop: 10,
   },
   styleBadgeEmoji: { fontSize: 14 },
   styleBadgeLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
 
-  statsRow:  {
-    flexDirection: 'row', borderRadius: 16, borderWidth: 1, overflow: 'hidden',
+  actionsRow: { flexDirection: 'row', gap: 8, marginTop: 16 },
+  actionBtn: { flex: 1, borderWidth: 1, borderRadius: 8, paddingVertical: 9, alignItems: 'center', justifyContent: 'center' },
+  actionBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  iconActionBtn: { width: 38, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+
+  highlightItem:  { alignItems: 'center', gap: 6, width: 66 },
+  highlightRing:  { width: 62, height: 62, borderRadius: 31, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  highlightLabel: { fontSize: 11, fontFamily: 'Inter_500Medium', textAlign: 'center', width: 66 },
+
+  tabsRow: { flexDirection: 'row', borderTopWidth: 1, borderBottomWidth: 1 },
+  tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
+  tile: {
+    padding: 10, justifyContent: 'space-between',
   },
-  statItem:  { flex: 1, alignItems: 'center', paddingVertical: 16 },
-  statValue: { fontSize: 20, fontFamily: 'Inter_700Bold', letterSpacing: -0.4 },
-  statLabel: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  tileInitials: { fontSize: 11, fontFamily: 'Inter_700Bold', opacity: 0.85 },
+  tileName: { fontSize: 12, fontFamily: 'Inter_600SemiBold', lineHeight: 15 },
+  tilePrice: { fontSize: 12, fontFamily: 'Inter_700Bold' },
+  tileStatusPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 },
+  tileStatusDot: { width: 5, height: 5, borderRadius: 2.5 },
+  tileStatus: { fontSize: 9, fontFamily: 'Inter_600SemiBold' },
 
-  section:      {},
-  sectionHeader:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  sectionTitle: { fontSize: 17, fontFamily: 'Inter_700Bold' },
-  sectionAction:{ fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  tileBrandInitials: { fontSize: 16, fontFamily: 'Inter_700Bold' },
+  tileBrandName: { fontSize: 11, fontFamily: 'Inter_600SemiBold', marginTop: 4 },
+  tileDot: { position: 'absolute', top: 10, right: 10, width: 6, height: 6, borderRadius: 3 },
 
-  brandItem:       { alignItems: 'center', gap: 6, width: 64 },
-  brandRing:       { width: 60, height: 60, borderRadius: 30, padding: 2.5, alignItems: 'center', justifyContent: 'center' },
-  brandRingViewed: { width: 60, height: 60, borderRadius: 30, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  brandRingInner:  { width: 53, height: 53, borderRadius: 27, padding: 2, alignItems: 'center', justifyContent: 'center' },
-  brandCircle:     { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center' },
-  brandInitials:   { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
-  brandName:       { fontSize: 10, fontFamily: 'Inter_500Medium', textAlign: 'center' },
-
-  card:      { borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
-  orderRow:  { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  orderAccent: { width: 3, height: 38, borderRadius: 2 },
-  orderProduct:{ fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  orderBrand:  { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  orderPrice:  { fontSize: 13, fontFamily: 'Inter_700Bold' },
-  orderStatus: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-
-  menuRow:   { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  menuIcon:  { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  menuLabel: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  menuSub:   { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
-
-  storyBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 15, borderRadius: 16 },
-  storyBtnText:{ fontSize: 16, fontFamily: 'Inter_700Bold', color: '#FFF' },
-
-  signOut:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 15, borderRadius: 14, borderWidth: 1 },
-  signOutText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: '#EF4444' },
+  emptyState: { alignItems: 'center', paddingVertical: 64, gap: 14 },
+  emptyIconRing: { width: 76, height: 76, borderRadius: 38, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  emptyLabel: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
 });
