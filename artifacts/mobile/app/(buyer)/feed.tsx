@@ -1,7 +1,7 @@
-// Buyer's Feed — same as the shared feed but without the brand stories strip
+// Buyer's Feed — same full-screen Spotlight video feed as the seller/shared feed.
 import FeedScreen from '../(tabs)/feed';
 import React from 'react';
 
 export default function BuyerFeed() {
-  return <FeedScreen showStories={false} />;
+  return <FeedScreen />;
 }

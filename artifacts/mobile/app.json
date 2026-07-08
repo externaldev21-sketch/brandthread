@@ -36,7 +36,8 @@
           "savePhotosPermission": "Brandthread needs access to save photos.",
           "isAccessMediaLocationEnabled": false
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,

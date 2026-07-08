@@ -1,474 +1,650 @@
-import React, { useState, useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
-  View, Text, StyleSheet, FlatList, ScrollView, TouchableOpacity,
-  useColorScheme, Dimensions, Animated, Alert, Share, TextInput,
+  View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
+  useColorScheme, Dimensions, Animated, Alert, Share, TextInput, Modal,
+  KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { readableOn } from '@/lib/color';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import type { ViewToken } from 'react-native';
 
-const { width: SCREEN_W } = Dimensions.get('window');
+const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
-// ─── Mock feed data ──────────────────────────────────────────────────────────
+// ─── Mock spotlight (video) feed data ────────────────────────────────────────
+// Videos are public sample clips standing in for creator-submitted footage.
 
-const FEED_ITEMS = [
+const SPOTLIGHT_ITEMS = [
   {
     id: '1',
-    brand: 'Vault Studio',
-    brandHandle: '@vaultstudio',
-    avatar: '#B33F1E',
-    avatarInitials: 'VS',
+    creator: 'Vault Studio',
+    handle: '@vaultstudio',
+    avatarColor: '#B33F1E',
+    initials: 'VS',
     verified: true,
-    timeAgo: '2h',
-    caption: 'New drop just landed 🔥 Oversized canvas jacket — limited run of 50. Grab yours before they\'re gone.',
-    tags: ['streetwear', 'newdrop', 'limitededition'],
+    videoUri: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4',
+    caption: 'New drop just landed 🔥 Oversized canvas jacket — limited run of 50.',
+    sound: 'Original Sound · vaultstudio',
+    chip: '🔥 Trending Now',
     productName: 'Canvas Cargo Jacket',
     productPrice: '$189',
-    productOriginalPrice: null,
+    productOriginalPrice: null as string | null,
     accentColor: '#C94D1F',
     likes: 1240,
-    comments: 87,
-    shares: 34,
-    saved: false,
-    liked: false,
+    comments: [
+      { id: 'c1', user: '@dropzone', text: 'need this in black 😍' },
+      { id: 'c2', user: '@street.era', text: 'copped one already' },
+    ],
+    reposts: 118,
+    shares: 340,
   },
   {
     id: '2',
-    brand: 'Meridian Co.',
-    brandHandle: '@meridianclothing',
-    avatar: '#0F766E',
-    avatarInitials: 'MC',
+    creator: 'Meridian Co.',
+    handle: '@meridianclothing',
+    avatarColor: '#0F766E',
+    initials: 'MC',
     verified: false,
-    timeAgo: '5h',
-    caption: 'Clean minimalist tees now in 8 colorways. Because basics shouldn\'t be boring. Pre-order open now.',
-    tags: ['minimal', 'essentials', 'preorder'],
+    videoUri: 'https://test-videos.co.uk/vids/sintel/mp4/h264/720/Sintel_720_10s_1MB.mp4',
+    caption: 'Clean minimalist tees now in 8 colorways. Basics shouldn\'t be boring.',
+    sound: 'Original Sound · meridianclothing',
+    chip: '🆕 Just Dropped',
     productName: 'Essential Relaxed Tee',
     productPrice: '$48',
-    productOriginalPrice: null,
+    productOriginalPrice: null as string | null,
     accentColor: '#14B8A6',
     likes: 892,
-    comments: 44,
-    shares: 21,
-    saved: true,
-    liked: true,
+    comments: [
+      { id: 'c1', user: '@basics.only', text: 'the fit on this is clean' },
+    ],
+    reposts: 44,
+    shares: 210,
   },
   {
     id: '3',
-    brand: 'NXGEN',
-    brandHandle: '@nxgendrops',
-    avatar: '#B45309',
-    avatarInitials: 'NX',
+    creator: 'NXGEN',
+    handle: '@nxgendrops',
+    avatarColor: '#B45309',
+    initials: 'NX',
     verified: true,
-    timeAgo: '1d',
-    caption: 'The cargo trousers everyone\'s been asking about. Heavyweight ripstop, 8 pockets, tapered fit. Back in stock 🙌',
-    tags: ['cargo', 'streetwear', 'restock'],
+    videoUri: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
+    caption: 'The cargo trousers everyone\'s been asking about. Back in stock 🙌',
+    sound: 'Original Sound · nxgendrops',
+    chip: '📦 Restocked',
     productName: 'Ripstop Cargo Trousers',
     productPrice: '$134',
     productOriginalPrice: '$160',
     accentColor: '#B98A2E',
     likes: 3410,
-    comments: 215,
-    shares: 98,
-    saved: false,
-    liked: false,
+    comments: [
+      { id: 'c1', user: '@cargofit', text: 'been waiting weeks for this restock' },
+      { id: 'c2', user: '@yn.drip', text: 'link??' },
+    ],
+    reposts: 215,
+    shares: 980,
   },
   {
     id: '4',
-    brand: 'Softwear',
-    brandHandle: '@softwearstudio',
-    avatar: '#BE185D',
-    avatarInitials: 'SW',
+    creator: 'Softwear',
+    handle: '@softwearstudio',
+    avatarColor: '#BE185D',
+    initials: 'SW',
     verified: false,
-    timeAgo: '1d',
-    caption: 'Sunday hoodies are here. 400gsm French terry, dropped shoulders, washed finish. The only hoodie you\'ll need this season.',
-    tags: ['hoodie', 'loungewear', 'heavyweight'],
+    videoUri: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/friday.mp4',
+    caption: 'Sunday hoodies are here. 400gsm French terry, washed finish.',
+    sound: 'Original Sound · softwearstudio',
+    chip: '☁️ Cozy Season',
     productName: 'Sunday Washed Hoodie',
     productPrice: '$98',
-    productOriginalPrice: null,
+    productOriginalPrice: null as string | null,
     accentColor: '#EC4899',
     likes: 2180,
-    comments: 132,
-    shares: 67,
-    saved: false,
-    liked: false,
+    comments: [
+      { id: 'c1', user: '@hoodiehoarder', text: 'the washed finish 😩' },
+    ],
+    reposts: 132,
+    shares: 670,
   },
   {
     id: '5',
-    brand: 'Atlas Goods',
-    brandHandle: '@atlasgoods',
-    avatar: '#1D4ED8',
-    avatarInitials: 'AG',
+    creator: 'Atlas Goods',
+    handle: '@atlasgoods',
+    avatarColor: '#1D4ED8',
+    initials: 'AG',
     verified: true,
-    timeAgo: '2d',
-    caption: 'Workwear inspired, streetwear executed. Our new chore coat is built for the city. Available now in sand and slate.',
-    tags: ['workwear', 'chorejacket', 'newseason'],
+    videoUri: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4',
+    caption: 'Workwear inspired, streetwear executed. Built for the city.',
+    sound: 'Original Sound · atlasgoods',
+    chip: '🧭 New Season',
     productName: 'City Chore Coat',
     productPrice: '$215',
     productOriginalPrice: '$260',
     accentColor: '#4A6FA5',
     likes: 975,
-    comments: 58,
-    shares: 29,
-    saved: true,
-    liked: false,
+    comments: [
+      { id: 'c1', user: '@city.slate', text: 'sand or slate, which one 👀' },
+    ],
+    reposts: 58,
+    shares: 290,
   },
 ];
 
-// ─── Stories (followed users) ────────────────────────────────────────────────
-
-const STORIES = [
-  { id: 's1', name: 'vaultstudio',  initials: 'VS', color: '#B33F1E', viewed: false },
-  { id: 's2', name: 'meridian.co',  initials: 'MC', color: '#0F766E', viewed: false },
-  { id: 's3', name: 'nxgendrops',   initials: 'NX', color: '#B45309', viewed: true  },
-  { id: 's4', name: 'softwear__',   initials: 'SW', color: '#BE185D', viewed: false },
-  { id: 's5', name: 'atlasgoods',   initials: 'AG', color: '#1D4ED8', viewed: true  },
-  { id: 's6', name: 'coldform',     initials: 'CF', color: '#065F46', viewed: false },
-  { id: 's7', name: 'rawthread',    initials: 'RT', color: '#92400E', viewed: false },
-];
-
-// ─── Feed card ───────────────────────────────────────────────────────────────
-
-function FeedCard({
-  item, isDark, onLike, onSave, following, onFollow,
-}: {
-  item: typeof FEED_ITEMS[0];
-  isDark: boolean;
-  onLike: (id: string) => void;
-  onSave: (id: string) => void;
+type SpotlightItem = typeof SPOTLIGHT_ITEMS[number];
+type EngagementState = {
+  liked: boolean; likes: number;
+  saved: boolean; favorited: boolean;
+  reposted: boolean; reposts: number;
   following: boolean;
+  comments: { id: string; user: string; text: string }[];
+};
+
+function initialEngagement(item: SpotlightItem): EngagementState {
+  return {
+    liked: false, likes: item.likes,
+    saved: false, favorited: false,
+    reposted: false, reposts: item.reposts,
+    following: false,
+    comments: item.comments,
+  };
+}
+
+function formatCount(n: number) {
+  if (n >= 1000) return `${(n / 1000).toFixed(n % 1000 >= 100 ? 1 : 0)}K`;
+  return String(n);
+}
+
+// ─── Single video page ────────────────────────────────────────────────────────
+
+function SpotlightPage({
+  item, isActive, engagement, onLike, onDoubleTapLike, onSave, onFavorite, onRepost, onFollow, onOpenComments, onShop,
+}: {
+  item: SpotlightItem;
+  isActive: boolean;
+  engagement: EngagementState;
+  onLike: (id: string) => void;
+  onDoubleTapLike: (id: string) => void;
+  onSave: (id: string) => void;
+  onFavorite: (id: string) => void;
+  onRepost: (id: string) => void;
   onFollow: (id: string) => void;
+  onOpenComments: (id: string) => void;
+  onShop: (id: string) => void;
 }) {
-  const router  = useRouter();
-  const bg      = isDark ? '#1B1917' : '#FFFFFF';
-  const border  = isDark ? '#33302A' : '#E8E1CF';
-  const fg      = isDark ? '#EDE7D9' : '#17140F';
-  const muted   = isDark ? '#8C8577' : '#6E6759';
-  const tagBg   = isDark ? '#201D18' : '#EDE7D9';
-  const tagFg   = isDark ? '#C94D1F' : '#B33F1E';
-
+  const player = useVideoPlayer(item.videoUri, p => { p.loop = true; p.muted = false; });
+  const [paused, setPaused] = useState(false);
+  const heartBurst = useRef(new Animated.Value(0)).current;
   const heartScale = useRef(new Animated.Value(1)).current;
+  const lastTap = useRef(0);
+  const pauseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  function handleLike() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Animated.sequence([
-      Animated.spring(heartScale, { toValue: 1.4, useNativeDriver: true, speed: 40 }),
-      Animated.spring(heartScale, { toValue: 1,   useNativeDriver: true, speed: 40 }),
-    ]).start();
-    onLike(item.id);
+  React.useEffect(() => () => { if (pauseTimer.current) clearTimeout(pauseTimer.current); }, []);
+
+  React.useEffect(() => {
+    if (isActive && !paused) player.play();
+    else player.pause();
+  }, [isActive, paused, player]);
+
+  function burstHeart() {
+    heartBurst.setValue(1);
+    Animated.timing(heartBurst, { toValue: 0, duration: 700, delay: 250, useNativeDriver: true }).start();
   }
 
-  function handleSave() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onSave(item.id);
+  function bumpHeart() {
+    Animated.sequence([
+      Animated.spring(heartScale, { toValue: 1.35, useNativeDriver: true, speed: 40 }),
+      Animated.spring(heartScale, { toValue: 1, useNativeDriver: true, speed: 40 }),
+    ]).start();
+  }
+
+  function handlePress() {
+    const now = Date.now();
+    if (now - lastTap.current < 280) {
+      lastTap.current = 0;
+      if (pauseTimer.current) { clearTimeout(pauseTimer.current); pauseTimer.current = null; }
+      onDoubleTapLike(item.id);
+      bumpHeart();
+      burstHeart();
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } else {
+      lastTap.current = now;
+      pauseTimer.current = setTimeout(() => {
+        pauseTimer.current = null;
+        setPaused(p => !p);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }, 290);
+    }
   }
 
   return (
-    <View style={[styles.card, { backgroundColor: bg, borderColor: border }]}>
+    <View style={{ width: SCREEN_W, height: SCREEN_H, backgroundColor: '#000' }}>
+      <TouchableWithoutFeedback onPress={handlePress}>
+        <View style={StyleSheet.absoluteFill}>
+          <VideoView
+            player={player}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            nativeControls={false}
+          />
+          {paused && (
+            <View style={styles.pauseOverlay}>
+              <Feather name="play" size={56} color="#FFFFFFCC" />
+            </View>
+          )}
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.heartBurst, {
+              opacity: heartBurst,
+              transform: [{ scale: heartBurst.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.5] }) }],
+            }]}
+          >
+            <Feather name="heart" size={110} color="#FFFFFF" />
+          </Animated.View>
+        </View>
+      </TouchableWithoutFeedback>
 
-      {/* ─ Brand header ─ */}
-      <View style={styles.cardHeader}>
-        <View style={[styles.avatar, { backgroundColor: item.avatar }]}>
-          <Text style={styles.avatarText}>{item.avatarInitials}</Text>
-        </View>
-        <View style={styles.brandInfo}>
-          <View style={styles.brandNameRow}>
-            <Text style={[styles.brandName, { color: fg }]}>{item.brand}</Text>
-            {item.verified && (
-              <Feather name="check-circle" size={13} color={item.accentColor} style={{ marginLeft: 4 }} />
-            )}
+      {/* gradient-less scrim for legibility */}
+      <View pointerEvents="none" style={styles.bottomScrim} />
+
+      {/* ─ Right action rail ─ */}
+      <View style={styles.rail}>
+        <TouchableOpacity activeOpacity={0.8} onPress={() => onFollow(item.id)} style={styles.railAvatarWrap}>
+          <View style={[styles.railAvatar, { backgroundColor: item.avatarColor }]}>
+            <Text style={styles.railAvatarText}>{item.initials}</Text>
           </View>
-          <Text style={[styles.brandHandle, { color: muted }]}>{item.brandHandle} · {item.timeAgo}</Text>
-        </View>
+          {!engagement.following && (
+            <View style={[styles.railFollowBadge, { backgroundColor: item.accentColor }]}>
+              <Feather name="plus" size={11} color="#FFF" />
+            </View>
+          )}
+        </TouchableOpacity>
+
         <TouchableOpacity
-          style={[styles.followBtn, { borderColor: item.accentColor, backgroundColor: following ? item.accentColor : 'transparent' }]}
-          activeOpacity={0.75}
-          onPress={() => onFollow(item.id)}
+          style={styles.railBtn}
+          activeOpacity={0.7}
+          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
+          onPress={() => { onLike(item.id); bumpHeart(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
         >
-          <Text style={[styles.followText, { color: following ? '#FFF' : item.accentColor }]}>
-            {following ? 'Following' : 'Follow'}
-          </Text>
+          <Animated.View style={{ transform: [{ scale: heartScale }] }}>
+            <Feather name="heart" size={30} color={engagement.liked ? '#EF4444' : '#FFFFFF'} />
+          </Animated.View>
+          <Text style={styles.railCount}>{formatCount(engagement.likes)}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.railBtn}
+          activeOpacity={0.7}
+          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
+          onPress={() => onOpenComments(item.id)}
+        >
+          <Feather name="message-square" size={28} color="#FFFFFF" />
+          <Text style={styles.railCount}>{formatCount(engagement.comments.length)}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.railBtn}
+          activeOpacity={0.7}
+          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
+          onPress={() => {
+            onRepost(item.id);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          }}
+        >
+          <Feather name="repeat" size={27} color={engagement.reposted ? item.accentColor : '#FFFFFF'} />
+          <Text style={styles.railCount}>{formatCount(engagement.reposts)}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.railBtn}
+          activeOpacity={0.7}
+          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
+          onPress={() => { onSave(item.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+        >
+          <Feather name="bookmark" size={27} color={engagement.saved ? item.accentColor : '#FFFFFF'} />
+          <Text style={styles.railCount}>Save</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.railBtn}
+          activeOpacity={0.7}
+          hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
+          onPress={() => { onFavorite(item.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+        >
+          <Feather name="star" size={27} color={engagement.favorited ? '#F5C542' : '#FFFFFF'} />
+          <Text style={styles.railCount}>Fave</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.railBtn}
+          activeOpacity={0.7}
+          hitSlop={{ top: 6, bottom: 10, left: 10, right: 10 }}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            Share.share({ message: `Check out ${item.productName} by ${item.creator} — ${item.productPrice} 🔥 on Brandthread` });
+          }}
+        >
+          <Feather name="share" size={27} color="#FFFFFF" />
+          <Text style={styles.railCount}>{formatCount(item.shares)}</Text>
         </TouchableOpacity>
       </View>
 
-      {/* ─ Product visual ─ */}
-      {(() => {
-        const onAccent = readableOn(item.accentColor);
-        const isLight  = onAccent === '#17140F';
-        return (
-          <View style={[styles.productVisual, { backgroundColor: item.accentColor }]}>
-            <View style={styles.productIcon}>
-              <Feather name="package" size={26} color={item.accentColor} />
-            </View>
-            <View style={{ flex: 1, marginLeft: 14 }}>
-              <Text style={[styles.productCardName, { color: onAccent }]} numberOfLines={1}>{item.productName}</Text>
-              <View style={styles.priceRow}>
-                <Text style={[styles.productCardPrice, { color: onAccent }]}>{item.productPrice}</Text>
-                {item.productOriginalPrice && (
-                  <Text style={[styles.originalPrice, { color: isLight ? '#17140F80' : '#FFFFFFA0' }]}>{item.productOriginalPrice}</Text>
-                )}
-              </View>
-            </View>
+      {/* ─ Bottom-left overlay: chip, shop pill, creator, sound ─ */}
+      <View style={styles.bottomInfo} pointerEvents="box-none">
+        <View style={styles.topRowChips}>
+          <View style={styles.trendChip}>
+            <Text style={styles.trendChipText}>{item.chip}</Text>
           </View>
-        );
-      })()}
-
-      {/* ─ Caption + tags ─ */}
-      <View style={styles.captionBlock}>
-        <Text style={[styles.caption, { color: fg }]}>{item.caption}</Text>
-        <View style={styles.tagsRow}>
-          {item.tags.map(tag => (
-            <View key={tag} style={[styles.tag, { backgroundColor: tagBg }]}>
-              <Text style={[styles.tagText, { color: tagFg }]}>#{tag}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      {/* ─ Actions ─ */}
-      <View style={[styles.actions, { borderTopColor: border }]}>
-        <View style={styles.actionsLeft}>
-          <TouchableOpacity style={styles.actionBtn} onPress={handleLike} activeOpacity={0.7}>
-            <Animated.View style={{ transform: [{ scale: heartScale }] }}>
-              <Feather
-                name="heart"
-                size={20}
-                color={item.liked ? '#EF4444' : muted}
-              />
-            </Animated.View>
-            <Text style={[styles.actionCount, { color: muted }]}>
-              {item.liked ? item.likes + 1 : item.likes}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionBtn}
-            activeOpacity={0.7}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              Alert.alert(`Message ${item.brand}`, `Send a DM to ${item.brandHandle}?`, [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Message', onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
-              ]);
-            }}
-          >
-            <Feather name="message-circle" size={20} color={muted} />
-            <Text style={[styles.actionCount, { color: muted }]}>{item.comments}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionBtn}
-            activeOpacity={0.7}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              Share.share({ message: `Check out ${item.productName} by ${item.brand} — ${item.productPrice} 🔥 on Brandthread` });
-            }}
-          >
-            <Feather name="share-2" size={20} color={muted} />
-            <Text style={[styles.actionCount, { color: muted }]}>{item.shares}</Text>
-          </TouchableOpacity>
         </View>
 
-        <View style={styles.actionsRight}>
-          <TouchableOpacity style={styles.actionBtn} onPress={handleSave} activeOpacity={0.7}>
-            <Feather
-              name="bookmark"
-              size={20}
-              color={item.saved ? item.accentColor : muted}
-            />
-          </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.shopPill, { backgroundColor: item.accentColor }]}
+          activeOpacity={0.85}
+          onPress={() => onShop(item.id)}
+        >
+          <Feather name="shopping-bag" size={13} color="#FFF" />
+          <Text style={styles.shopPillText}>
+            Shop · {item.productName} {item.productPrice}
+          </Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.shopBtn, { backgroundColor: item.accentColor }]}
-            activeOpacity={0.85}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              Alert.alert(
-                item.brand,
-                `${item.productName} · ${item.productPrice}${item.productOriginalPrice ? `\nWas ${item.productOriginalPrice}` : ''}`,
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: '🔖 Save for later', onPress: () => onSave(item.id) },
-                  { text: '🛍️ Add to Bag', onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
-                ],
-              );
-            }}
-          >
-            <Feather name="shopping-bag" size={13} color="#FFF" />
-            <Text style={styles.shopBtnText}>Shop</Text>
-          </TouchableOpacity>
+        <Text style={styles.caption} numberOfLines={2}>{item.caption}</Text>
+
+        <View style={styles.creatorRow}>
+          <Text style={styles.creatorName}>{item.creator}</Text>
+          {item.verified && <Feather name="check-circle" size={13} color="#4FA8FF" style={{ marginLeft: 4 }} />}
+        </View>
+        <View style={styles.soundRow}>
+          <Feather name="music" size={12} color="#FFFFFF" />
+          <Text style={styles.soundText} numberOfLines={1}>{item.sound}</Text>
         </View>
       </View>
     </View>
   );
 }
 
-// ─── Screen ──────────────────────────────────────────────────────────────────
+// ─── Comments modal ─────────────────────────────────────────────────────────
 
-export default function FeedScreen({ showStories = true }: { showStories?: boolean }) {
+function CommentsModal({
+  visible, item, onClose, onAddComment,
+}: {
+  visible: boolean;
+  item: SpotlightItem | null;
+  onClose: () => void;
+  onAddComment: (id: string, text: string) => void;
+}) {
   const insets = useSafeAreaInsets();
-  const scheme = useColorScheme();
-  const isDark = scheme !== 'light';
+  const [text, setText] = useState('');
+  if (!item) return null;
 
-  const bg      = isDark ? '#121110' : '#F2EEE3';
-  const fg      = isDark ? '#EDE7D9' : '#17140F';
-  const muted   = isDark ? '#8C8577' : '#6E6759';
-  const border  = isDark ? '#33302A' : '#DBD3C0';
-  const primary = isDark ? '#C94D1F' : '#B33F1E';
-
-  const [items,        setItems]        = useState(FEED_ITEMS);
-  const [stories,      setStories]      = useState(STORIES);
-  const [followed,     setFollowed]     = useState<Record<string, boolean>>({});
-  const [showSearch,   setShowSearch]   = useState(false);
-  const [searchQuery,  setSearchQuery]  = useState('');
-  const [followingOnly, setFollowingOnly] = useState(false);
-
-  const displayItems = (() => {
-    let result = followingOnly ? items.filter(item => !!followed[item.id]) : items;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      result = result.filter(item =>
-        item.brand.toLowerCase().includes(q) ||
-        item.productName.toLowerCase().includes(q) ||
-        item.tags.some(t => t.toLowerCase().includes(q)),
-      );
-    }
-    return result;
-  })();
-
-  function handleViewStory(id: string) {
+  function submit() {
+    const trimmed = text.trim();
+    if (!trimmed || !item) return;
+    onAddComment(item.id, trimmed);
+    setText('');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setStories(prev => prev.map(s => s.id === id ? { ...s, viewed: true } : s));
-  }
-
-  function handleLike(id: string) {
-    setItems(prev => prev.map(item =>
-      item.id === id ? { ...item, liked: !item.liked } : item,
-    ));
-  }
-
-  function handleSave(id: string) {
-    setItems(prev => prev.map(item =>
-      item.id === id ? { ...item, saved: !item.saved } : item,
-    ));
-  }
-
-  function handleFollow(id: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setFollowed(prev => ({ ...prev, [id]: !prev[id] }));
-  }
-
-  function toggleSearch() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (showSearch) { setShowSearch(false); setSearchQuery(''); }
-    else setShowSearch(true);
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: bg }]}>
-      {/* ─ Header ─ */}
-      <View style={[styles.header, { paddingTop: insets.top + 16, borderBottomColor: border }]}>
-        {showSearch ? (
-          <TextInput
-            style={[styles.searchBar, { color: fg, backgroundColor: isDark ? '#1D1A15' : '#E8E1CF', borderColor: border }]}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search brands, products…"
-            placeholderTextColor={muted}
-            autoFocus
-          />
-        ) : (
-          <Text style={[styles.headerTitle, { color: fg }]}>Feed</Text>
-        )}
-        <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.headerIconBtn} activeOpacity={0.7} onPress={toggleSearch}>
-            <Feather name={showSearch ? 'x' : 'search'} size={20} color={showSearch ? primary : muted} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerIconBtn}
-            activeOpacity={0.7}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              Alert.alert('Filter Feed', 'Show posts from:', [
-                { text: 'Everyone',       onPress: () => { setFollowingOnly(false); setSearchQuery(''); } },
-                { text: 'Following only', onPress: () => { setFollowingOnly(true);  setSearchQuery(''); } },
-                { text: 'Cancel', style: 'cancel' },
-              ]);
-            }}
-          >
-            <Feather name="sliders" size={20} color={muted} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* ─ Stories row — seller/both only ─ */}
-      {showStories && (
-        <View style={[styles.storiesRow, { borderBottomColor: border }]}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.storiesScroll}
-          >
-            {stories.map((story) => (
-              <TouchableOpacity
-                key={story.id}
-                onPress={() => handleViewStory(story.id)}
-                activeOpacity={0.8}
-                style={styles.storyItem}
-              >
-                {story.viewed ? (
-                  <View style={[styles.storyRingViewed, { borderColor: border }]}>
-                    <View style={[styles.storyAvatar, { backgroundColor: story.color }]}>
-                      <Text style={styles.storyInitials}>{story.initials}</Text>
-                    </View>
-                  </View>
-                ) : (
-                  <LinearGradient
-                    colors={['#D9714B', '#C1440E', '#B33F1E']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.storyRing}
-                  >
-                    <View style={[styles.storyAvatarInner, { backgroundColor: isDark ? '#121110' : '#F2EEE3' }]}>
-                      <View style={[styles.storyAvatar, { backgroundColor: story.color }]}>
-                        <Text style={styles.storyInitials}>{story.initials}</Text>
-                      </View>
-                    </View>
-                  </LinearGradient>
-                )}
-                <Text style={[styles.storyName, { color: muted }]} numberOfLines={1}>
-                  {story.name}
-                </Text>
-              </TouchableOpacity>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalBackdrop}>
+        <TouchableWithoutFeedback onPress={onClose}>
+          <View style={StyleSheet.absoluteFill} />
+        </TouchableWithoutFeedback>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={[styles.commentsSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}
+        >
+          <View style={styles.commentsHandle} />
+          <Text style={styles.commentsTitle}>{item.comments.length} comments</Text>
+          <ScrollView style={{ maxHeight: SCREEN_H * 0.42 }} contentContainerStyle={{ paddingBottom: 8 }}>
+            {item.comments.length === 0 ? (
+              <Text style={styles.commentsEmpty}>Be the first to comment.</Text>
+            ) : item.comments.map(c => (
+              <View key={c.id} style={styles.commentRow}>
+                <Text style={styles.commentUser}>{c.user}</Text>
+                <Text style={styles.commentText}>{c.text}</Text>
+              </View>
             ))}
           </ScrollView>
-        </View>
-      )}
+          <View style={styles.commentInputRow}>
+            <TextInput
+              style={styles.commentInput}
+              placeholder="Add a comment…"
+              placeholderTextColor="#8C8577"
+              value={text}
+              onChangeText={setText}
+              onSubmitEditing={submit}
+              returnKeyType="send"
+            />
+            <TouchableOpacity style={styles.commentSendBtn} activeOpacity={0.75} onPress={submit}>
+              <Feather name="send" size={17} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+    </Modal>
+  );
+}
 
-      {/* ─ Feed ─ */}
+// ─── Screen ──────────────────────────────────────────────────────────────────
+
+export default function FeedScreen() {
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const scheme = useColorScheme();
+  const isDark = scheme !== 'light';
+
+  const [engagements, setEngagements] = useState<Record<string, EngagementState>>(() => {
+    const init: Record<string, EngagementState> = {};
+    SPOTLIGHT_ITEMS.forEach(item => { init[item.id] = initialEngagement(item); });
+    return init;
+  });
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [commentsFor, setCommentsFor] = useState<string | null>(null);
+  const [showNotifs, setShowNotifs] = useState(false);
+  const [hasUnread, setHasUnread] = useState(true);
+
+  const displayItems = searchQuery.trim()
+    ? SPOTLIGHT_ITEMS.filter(item => {
+        const q = searchQuery.toLowerCase();
+        return item.creator.toLowerCase().includes(q) ||
+          item.handle.toLowerCase().includes(q) ||
+          item.productName.toLowerCase().includes(q);
+      })
+    : SPOTLIGHT_ITEMS;
+
+  function update(id: string, patch: Partial<EngagementState> | ((e: EngagementState) => Partial<EngagementState>)) {
+    setEngagements(prev => {
+      const cur = prev[id];
+      const delta = typeof patch === 'function' ? patch(cur) : patch;
+      return { ...prev, [id]: { ...cur, ...delta } };
+    });
+  }
+
+  const handleLike = useCallback((id: string) => {
+    update(id, e => ({ liked: !e.liked, likes: e.liked ? e.likes - 1 : e.likes + 1 }));
+  }, []);
+
+  const handleDoubleTapLike = useCallback((id: string) => {
+    setEngagements(prev => {
+      const e = prev[id];
+      if (e.liked) return prev;
+      return { ...prev, [id]: { ...e, liked: true, likes: e.likes + 1 } };
+    });
+  }, []);
+
+  const handleSave = useCallback((id: string) => update(id, e => ({ saved: !e.saved })), []);
+  const handleFavorite = useCallback((id: string) => update(id, e => ({ favorited: !e.favorited })), []);
+  const handleRepost = useCallback((id: string) => update(id, e => ({
+    reposted: !e.reposted, reposts: e.reposted ? e.reposts - 1 : e.reposts + 1,
+  })), []);
+  const handleFollow = useCallback((id: string) => update(id, e => ({ following: !e.following })), []);
+
+  const handleAddComment = useCallback((id: string, text: string) => {
+    update(id, e => ({ comments: [...e.comments, { id: `c${Date.now()}`, user: '@you', text }] }));
+  }, []);
+
+  function handleShop(id: string) {
+    const item = SPOTLIGHT_ITEMS.find(i => i.id === id);
+    if (!item) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Alert.alert(
+      item.creator,
+      `${item.productName} · ${item.productPrice}${item.productOriginalPrice ? `\nWas ${item.productOriginalPrice}` : ''}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: '🔖 Save for later', onPress: () => handleSave(id) },
+        { text: '🛍️ Add to Bag', onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
+      ],
+    );
+  }
+
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    if (viewableItems.length > 0 && viewableItems[0].index != null) {
+      setActiveIndex(viewableItems[0].index);
+    }
+  }).current;
+
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
+
+  const commentsItem = commentsFor ? SPOTLIGHT_ITEMS.find(i => i.id === commentsFor) ?? null : null;
+  const commentsEngagement = commentsFor ? engagements[commentsFor] : null;
+  const commentsItemWithLive = commentsItem && commentsEngagement
+    ? { ...commentsItem, comments: commentsEngagement.comments }
+    : null;
+
+  return (
+    <View style={styles.container}>
       <FlatList
         data={displayItems}
         keyExtractor={item => item.id}
-        contentContainerStyle={{ paddingVertical: 12, paddingHorizontal: 16, paddingBottom: 120, gap: 16 }}
+        pagingEnabled
         showsVerticalScrollIndicator={false}
+        snapToInterval={SCREEN_H}
+        decelerationRate="fast"
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
+        getItemLayout={(_, index) => ({ length: SCREEN_H, offset: SCREEN_H * index, index })}
         ListEmptyComponent={
-          <View style={{ alignItems: 'center', paddingTop: 60, gap: 10 }}>
-            <Feather name="search" size={32} color={muted} />
-            <Text style={{ fontSize: 15, fontFamily: 'Inter_500Medium', color: muted }}>
+          <View style={{ width: SCREEN_W, height: SCREEN_H, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+            <Feather name="search" size={32} color="#8C8577" />
+            <Text style={{ fontSize: 15, fontFamily: 'Inter_500Medium', color: '#8C8577' }}>
               No results for "{searchQuery}"
             </Text>
           </View>
         }
-        renderItem={({ item }) => (
-          <FeedCard
+        renderItem={({ item, index }) => (
+          <SpotlightPage
             item={item}
-            isDark={isDark}
+            isActive={index === activeIndex && !commentsFor && !showNotifs}
+            engagement={engagements[item.id]}
             onLike={handleLike}
+            onDoubleTapLike={handleDoubleTapLike}
             onSave={handleSave}
-            following={!!followed[item.id]}
+            onFavorite={handleFavorite}
+            onRepost={handleRepost}
             onFollow={handleFollow}
+            onOpenComments={setCommentsFor}
+            onShop={handleShop}
           />
         )}
+      />
+
+      {/* ─ Top bar overlay ─ */}
+      <View style={[styles.topBar, { paddingTop: insets.top + 6 }]} pointerEvents="box-none">
+        {showSearch ? (
+          <View style={styles.searchRow}>
+            <TextInput
+              style={styles.searchInput}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search creators, products…"
+              placeholderTextColor="#FFFFFF99"
+              autoFocus
+            />
+            <TouchableOpacity
+              style={styles.topIconBtn}
+              activeOpacity={0.7}
+              onPress={() => { setShowSearch(false); setSearchQuery(''); }}
+            >
+              <Feather name="x" size={20} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.topRow}>
+            <TouchableOpacity
+              style={styles.topAvatarBtn}
+              activeOpacity={0.75}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+              onPress={() => { setShowNotifs(true); setHasUnread(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+            >
+              <View style={[styles.topAvatar, { backgroundColor: isDark ? '#33302A' : '#DBD3C0' }]}>
+                <Feather name="user" size={16} color="#FFF" />
+              </View>
+              {hasUnread && <View style={styles.unreadDot} />}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.topIconBtn}
+              activeOpacity={0.7}
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowSearch(true); }}
+            >
+              <Feather name="search" size={21} color="#FFF" />
+            </TouchableOpacity>
+
+            <Text style={styles.topTitle}>Spotlight</Text>
+
+            <TouchableOpacity
+              style={styles.topIconBtn}
+              activeOpacity={0.7}
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                Alert.alert('Invite Friends', 'Share Brandthread with friends to earn drop invites.', [{ text: 'OK' }]);
+              }}
+            >
+              <Feather name="user-plus" size={20} color="#FFF" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.topIconBtn}
+              activeOpacity={0.7}
+              hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/story-picker' as never); }}
+            >
+              <Feather name="plus-square" size={21} color="#FFF" />
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      {/* ─ Notifications sheet ─ */}
+      <Modal visible={showNotifs} animationType="slide" transparent onRequestClose={() => setShowNotifs(false)}>
+        <View style={styles.modalBackdrop}>
+          <TouchableWithoutFeedback onPress={() => setShowNotifs(false)}>
+            <View style={StyleSheet.absoluteFill} />
+          </TouchableWithoutFeedback>
+          <View style={[styles.commentsSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+            <View style={styles.commentsHandle} />
+            <Text style={styles.commentsTitle}>Notifications</Text>
+            <View style={{ gap: 14, paddingTop: 4 }}>
+              <Text style={styles.notifRow}>❤️ NXGEN liked your comment on Ripstop Cargo Trousers</Text>
+              <Text style={styles.notifRow}>👤 Meridian Co. started following you</Text>
+              <Text style={styles.notifRow}>💬 @street.era replied to your comment</Text>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <CommentsModal
+        visible={!!commentsFor}
+        item={commentsItemWithLive}
+        onClose={() => setCommentsFor(null)}
+        onAddComment={handleAddComment}
       />
     </View>
   );
@@ -477,65 +653,74 @@ export default function FeedScreen({ showStories = true }: { showStories?: boole
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: '#000000' },
 
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: 1,
+  pauseOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  heartBurst: { position: 'absolute', top: '38%', left: '50%', marginLeft: -55, marginTop: -55 },
+
+  bottomScrim: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, height: 220,
+    backgroundColor: '#00000066',
   },
-  headerTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', letterSpacing: -0.6 },
-  headerRight: { flexDirection: 'row', gap: 8 },
-  headerIconBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
-  searchBar: { flex: 1, height: 36, borderRadius: 10, borderWidth: 1, paddingHorizontal: 12, fontSize: 14, fontFamily: 'Inter_400Regular', marginRight: 4 },
 
-  storiesRow:    { borderBottomWidth: 1, height: 100 },
-  storiesScroll: { paddingHorizontal: 16, paddingVertical: 10, gap: 14, alignItems: 'center' },
-  storyItem:     { alignItems: 'center', gap: 5, width: 62 },
-  storyRing:     { width: 62, height: 62, borderRadius: 31, padding: 2.5, alignItems: 'center', justifyContent: 'center' },
-  storyRingViewed: { width: 62, height: 62, borderRadius: 31, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  storyAvatarInner: { width: 55, height: 55, borderRadius: 28, padding: 2, alignItems: 'center', justifyContent: 'center' },
-  storyAvatar:   { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-  storyInitials: { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
-  storyName:     { fontSize: 10, fontFamily: 'Inter_500Medium', textAlign: 'center', width: 62 },
-
-  card: { borderRadius: 6, borderWidth: 1, overflow: 'hidden' },
-
-  cardHeader: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10 },
-  avatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
-  brandInfo: { flex: 1 },
-  brandNameRow: { flexDirection: 'row', alignItems: 'center' },
-  brandName: { fontSize: 14, fontFamily: 'Inter_700Bold' },
-  brandHandle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 1 },
-  followBtn: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 4, borderWidth: 1 },
-  followText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-
-  productVisual: {
-    flexDirection: 'row', alignItems: 'center', padding: 16,
+  rail: {
+    position: 'absolute', right: 10, bottom: 116, alignItems: 'center', gap: 18,
   },
-  productIcon: { width: 48, height: 48, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  productCardName: { fontSize: 15, fontFamily: 'Inter_700Bold' },
-  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 3 },
-  productCardPrice: { fontSize: 16, fontFamily: 'Inter_700Bold' },
-  originalPrice: { fontSize: 12, fontFamily: 'Inter_400Regular', textDecorationLine: 'line-through' },
-
-  captionBlock: { paddingHorizontal: 14, paddingBottom: 10, gap: 8 },
-  caption: { fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 20 },
-  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  tag: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 },
-  tagText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
-
-  actions: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 14, paddingVertical: 10, borderTopWidth: 1,
+  railAvatarWrap: { alignItems: 'center', marginBottom: 4 },
+  railAvatar: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
+  railAvatarText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  railFollowBadge: {
+    position: 'absolute', bottom: -8, width: 19, height: 19, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000',
   },
-  actionsLeft: { flexDirection: 'row', gap: 4 },
-  actionsRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 6, paddingVertical: 4 },
-  actionCount: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  shopBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    paddingHorizontal: 14, paddingVertical: 7, borderRadius: 6,
+  railBtn: { alignItems: 'center', gap: 3 },
+  railCount: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
+
+  bottomInfo: { position: 'absolute', left: 16, right: 84, bottom: 26, gap: 8 },
+  topRowChips: { flexDirection: 'row' },
+  trendChip: { alignSelf: 'flex-start', backgroundColor: '#FFFFFF26', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
+  trendChipText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
+
+  shopPill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: 12, minHeight: 34, borderRadius: 17 },
+  shopPillText: { fontSize: 12.5, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+
+  caption: { fontSize: 14, fontFamily: 'Inter_400Regular', color: '#FFFFFF', lineHeight: 19 },
+  creatorRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  creatorName: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  soundRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  soundText: { fontSize: 12, fontFamily: 'Inter_400Regular', color: '#FFFFFFCC', flexShrink: 1 },
+
+  topBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 14, paddingBottom: 8 },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  topAvatarBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  topAvatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  unreadDot: { position: 'absolute', top: 4, right: 4, width: 9, height: 9, borderRadius: 4.5, backgroundColor: '#EF4444', borderWidth: 1.5, borderColor: '#000' },
+  topIconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  topTitle: { flex: 1, textAlign: 'center', fontSize: 16, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  searchInput: {
+    flex: 1, height: 40, borderRadius: 20, borderWidth: 1, borderColor: '#FFFFFF40',
+    backgroundColor: '#00000066', paddingHorizontal: 14, fontSize: 14, fontFamily: 'Inter_400Regular', color: '#FFFFFF',
   },
-  shopBtnText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+
+  modalBackdrop: { flex: 1, backgroundColor: '#00000090', justifyContent: 'flex-end' },
+  commentsSheet: {
+    backgroundColor: '#161412', borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingTop: 10, paddingHorizontal: 18,
+  },
+  commentsHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#4A463D', alignSelf: 'center', marginBottom: 10 },
+  commentsTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF', marginBottom: 10 },
+  commentsEmpty: { fontSize: 13, fontFamily: 'Inter_400Regular', color: '#8C8577', paddingVertical: 20, textAlign: 'center' },
+  commentRow: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#26231D' },
+  commentUser: { fontSize: 12.5, fontFamily: 'Inter_700Bold', color: '#C94D1F', marginBottom: 2 },
+  commentText: { fontSize: 13.5, fontFamily: 'Inter_400Regular', color: '#EDE7D9' },
+  commentInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#26231D' },
+  commentInput: {
+    flex: 1, height: 40, borderRadius: 20, backgroundColor: '#221F1A',
+    paddingHorizontal: 14, fontSize: 13.5, fontFamily: 'Inter_400Regular', color: '#FFFFFF',
+  },
+  commentSendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#C94D1F', alignItems: 'center', justifyContent: 'center' },
+
+  notifRow: { fontSize: 13.5, fontFamily: 'Inter_400Regular', color: '#EDE7D9', paddingBottom: 14 },
 });
