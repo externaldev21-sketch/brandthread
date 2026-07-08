@@ -20,11 +20,43 @@ const BRAND_CHECKLIST = [
 
 const STYLE_OPTIONS = ['Minimalist', 'Streetwear', 'Luxury', 'Sporty', 'Vintage', 'Y2K'];
 
+const NAME_PREFIXES = [
+  'Thread', 'Core', 'Moon', 'Raw', 'Grain', 'Silt', 'Nova', 'Ash', 'Bare',
+  'Field', 'Fable', 'Loom', 'Drift', 'Ember', 'Salt', 'Wolf', 'Cinder', 'Marsh',
+  'Halo', 'Grit', 'Fern', 'Slate', 'Dune', 'Birch', 'Wren', 'Mossy', 'Void',
+];
+const NAME_SUFFIXES = [
+  'craft', 'vox', 'wear', 'line', 'haus', 'form', 'works', 'goods', 'co',
+  'field', 'thread', 'label', 'studio', 'supply', 'house', 'made', 'wood', 'stitch',
+];
+
+function generateBrandNames(count: number): string[] {
+  const results = new Set<string>();
+  while (results.size < count) {
+    const prefix = NAME_PREFIXES[Math.floor(Math.random() * NAME_PREFIXES.length)];
+    const suffix = NAME_SUFFIXES[Math.floor(Math.random() * NAME_SUFFIXES.length)];
+    const name = prefix + suffix.charAt(0).toUpperCase() + suffix.slice(1);
+    if (name.toLowerCase() !== prefix.toLowerCase()) results.add(name);
+  }
+  return Array.from(results);
+}
+
 export default function BrandScreen() {
   const colors = useColors();
   const router = useRouter();
   const [nameInput, setNameInput] = useState('Brandthread');
   const [selectedStyle, setSelectedStyle] = useState('Minimalist');
+  const [suggestedNames, setSuggestedNames] = useState<string[]>(['ThreadCraft', 'Corevox', 'Moodwear', 'Rawline', 'Grainhaus']);
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  function handleGenerateNames() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setIsGenerating(true);
+    setTimeout(() => {
+      setSuggestedNames(generateBrandNames(5));
+      setIsGenerating(false);
+    }, 400);
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -66,16 +98,27 @@ export default function BrandScreen() {
           onChangeText={setNameInput}
         />
         <TouchableOpacity
-          style={[styles.generateBtn, { backgroundColor: colors.primary }]}
-          onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)}
+          style={[styles.generateBtn, { backgroundColor: colors.primary, opacity: isGenerating ? 0.7 : 1 }]}
+          onPress={handleGenerateNames}
           activeOpacity={0.8}
+          disabled={isGenerating}
         >
-          <Feather name="zap" size={16} color={colors.primaryForeground} />
-          <Text style={[styles.generateText, { color: colors.primaryForeground }]}>Generate Names</Text>
+          <Feather name={isGenerating ? 'loader' : 'zap'} size={16} color={colors.primaryForeground} />
+          <Text style={[styles.generateText, { color: colors.primaryForeground }]}>
+            {isGenerating ? 'Generating…' : 'Generate Names'}
+          </Text>
         </TouchableOpacity>
         <View style={styles.suggestions}>
-          {['ThreadCraft', 'Corevox', 'Moodwear', 'Rawline', 'Grainhaus'].map((name) => (
-            <TouchableOpacity key={name} style={[styles.namePill, { backgroundColor: colors.secondary, borderColor: colors.border }]} activeOpacity={0.7}>
+          {suggestedNames.map((name) => (
+            <TouchableOpacity
+              key={name}
+              style={[styles.namePill, { backgroundColor: colors.secondary, borderColor: colors.border }]}
+              activeOpacity={0.7}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setNameInput(name);
+              }}
+            >
               <Text style={[styles.namePillText, { color: colors.foreground }]}>{name}</Text>
             </TouchableOpacity>
           ))}
