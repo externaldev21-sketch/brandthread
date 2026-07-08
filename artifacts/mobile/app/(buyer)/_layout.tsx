@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -62,6 +62,13 @@ function BuyerTabLayout() {
             <View style={[StyleSheet.absoluteFill, { borderRadius: 32, backgroundColor: pillBg }]} />
           ),
         tabBarItemStyle: { paddingVertical: 8 },
+        // Ensure the whole tab item (icon + label) is tappable, not just the icon glyph.
+        tabBarButton: (props) => (
+          <Pressable
+            {...props}
+            style={[props.style, { alignItems: 'center', justifyContent: 'center' }]}
+          />
+        ),
       }}
     >
       {/* Inspo */}
