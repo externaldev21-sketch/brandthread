@@ -5,7 +5,7 @@ import {
   KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -261,7 +261,7 @@ function SpotlightPage({
           onPress={() => { onLike(item.id); bumpHeart(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
         >
           <Animated.View style={{ transform: [{ scale: heartScale }] }}>
-            <Feather name="heart" size={30} color={engagement.liked ? '#EF4444' : '#FFFFFF'} />
+            <Ionicons name="heart" size={30} color={engagement.liked ? '#EF4444' : '#FFFFFF'} />
           </Animated.View>
           <Text style={styles.railCount}>{formatCount(engagement.likes)}</Text>
         </TouchableOpacity>
@@ -272,7 +272,7 @@ function SpotlightPage({
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
           onPress={() => onOpenComments(item.id)}
         >
-          <Feather name="message-square" size={28} color="#FFFFFF" />
+          <Ionicons name="chatbubble" size={26} color="#FFFFFF" />
           <Text style={styles.railCount}>{formatCount(engagement.comments.length)}</Text>
         </TouchableOpacity>
 
@@ -285,7 +285,7 @@ function SpotlightPage({
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           }}
         >
-          <Feather name="repeat" size={27} color={engagement.reposted ? item.accentColor : '#FFFFFF'} />
+          <Ionicons name="repeat" size={28} color={engagement.reposted ? item.accentColor : '#FFFFFF'} />
           <Text style={styles.railCount}>{formatCount(engagement.reposts)}</Text>
         </TouchableOpacity>
 
@@ -295,7 +295,7 @@ function SpotlightPage({
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
           onPress={() => { onSave(item.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
         >
-          <Feather name="bookmark" size={27} color={engagement.saved ? item.accentColor : '#FFFFFF'} />
+          <Ionicons name="bookmark" size={27} color={engagement.saved ? item.accentColor : '#FFFFFF'} />
           <Text style={styles.railCount}>Save</Text>
         </TouchableOpacity>
 
@@ -305,7 +305,7 @@ function SpotlightPage({
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
           onPress={() => onShop(item.id)}
         >
-          <Feather name="shopping-bag" size={27} color="#FFFFFF" />
+          <Ionicons name="bag" size={27} color="#FFFFFF" />
           <Text style={styles.railCount}>SHOP</Text>
         </TouchableOpacity>
 
@@ -318,7 +318,7 @@ function SpotlightPage({
             Share.share({ message: `Check out ${item.productName} by ${item.creator} — ${item.productPrice} 🔥 on Brandthread` });
           }}
         >
-          <Feather name="share" size={27} color="#FFFFFF" />
+          <Ionicons name="arrow-redo" size={27} color="#FFFFFF" />
           <Text style={styles.railCount}>{formatCount(item.shares)}</Text>
         </TouchableOpacity>
       </View>
