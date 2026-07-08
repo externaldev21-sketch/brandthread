@@ -1,10 +1,27 @@
 import React, { useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Alert } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+
+type CanvasTile = {
+  id: string;
+  dims: string;
+  ratio: number;
+  dark?: boolean;
+  hasContent?: boolean;
+};
+
+const CANVASES: CanvasTile[] = [
+  { id: 'c1', dims: '1320 \u00d7 2868px', ratio: 1320 / 2868, hasContent: true },
+  { id: 'c2', dims: '11" \u00d7 8.5"',    ratio: 11 / 8.5,     dark: true },
+  { id: 'c3', dims: '6" \u00d7 9.5"',     ratio: 6 / 9.5 },
+  { id: 'c4', dims: '2048 \u00d7 2048px', ratio: 1,            dark: true },
+  { id: 'c5', dims: '210 \u00d7 297mm',   ratio: 210 / 297 },
+  { id: 'c6', dims: '6" \u00d7 4"',       ratio: 6 / 4 },
+];
 
 const STUDIO_TOOLS = [
   { label: 'AI Clothing Mockups', icon: 'image' as const, desc: 'Generate photorealistic product mockups', badge: 'Popular' },
@@ -27,7 +44,9 @@ const RECENT_MOCKUPS = [
 
 export default function AIStudioScreen() {
   const colors = useColors();
+  const router = useRouter();
   const [selected, setSelected] = useState<string | null>(null);
+  const [mode, setMode] = useState<'ai' | 'manual'>('ai');
 
   const aiBadge = (
     <View style={[styles.aiBadge, { backgroundColor: '#C1440E22', borderColor: '#C1440E44' }]}>
@@ -36,9 +55,91 @@ export default function AIStudioScreen() {
     </View>
   );
 
+  function openCanvas(label: string) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push({ pathname: '/design-canvas', params: { label } } as never);
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScreenHeader title="AI Design Studio" subtitle="Powered by generative AI" rightElement={aiBadge} />
+
+      {/* Mode switch */}
+      <View style={styles.modeRow}>
+        <View style={[styles.modeSwitch, { backgroundColor: colors.secondary }]}>
+          <TouchableOpacity
+            style={[styles.modeBtn, mode === 'ai' && { backgroundColor: colors.card }]}
+            activeOpacity={0.8}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode('ai'); }}
+          >
+            <Feather name="zap" size={13} color={mode === 'ai' ? colors.primary : colors.mutedForeground} />
+            <Text style={[styles.modeBtnText, { color: mode === 'ai' ? colors.foreground : colors.mutedForeground }]}>AI Generate</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modeBtn, mode === 'manual' && { backgroundColor: colors.card }]}
+            activeOpacity={0.8}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setMode('manual'); }}
+          >
+            <Feather name="edit-3" size={13} color={mode === 'manual' ? colors.primary : colors.mutedForeground} />
+            <Text style={[styles.modeBtnText, { color: mode === 'manual' ? colors.foreground : colors.mutedForeground }]}>Manual Design</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {mode === 'manual' ? (
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingTop: 4, paddingBottom: 100, paddingHorizontal: 20 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.manualTopRow}>
+            <View style={styles.manualLinks}>
+              <TouchableOpacity onPress={() => Alert.alert('Select', 'Tap artwork tiles to select them for batch actions.')}>
+                <Text style={[styles.manualLink, { color: colors.mutedForeground }]}>Select</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => Alert.alert('Import', 'Import artwork from your device.')}>
+                <Text style={[styles.manualLink, { color: colors.mutedForeground }]}>Import</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => Alert.alert('Photo', 'Start a new canvas from a photo.')}>
+                <Text style={[styles.manualLink, { color: colors.mutedForeground }]}>Photo</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={[styles.newCanvasBtn, { backgroundColor: colors.primary }]}
+              activeOpacity={0.8}
+              onPress={() => openCanvas('Untitled Artwork')}
+            >
+              <Feather name="plus" size={18} color={colors.primaryForeground} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.canvasGrid}>
+            {CANVASES.map((c) => (
+              <TouchableOpacity
+                key={c.id}
+                style={styles.canvasCell}
+                activeOpacity={0.8}
+                onPress={() => openCanvas('Untitled Artwork')}
+              >
+                <View
+                  style={[
+                    styles.canvasTile,
+                    { aspectRatio: c.ratio, backgroundColor: c.dark ? '#1C1C1C' : '#FFFFFF', borderColor: colors.border },
+                  ]}
+                >
+                  {c.hasContent && (
+                    <View style={styles.canvasThumb}>
+                      <Feather name="user" size={22} color="#B8B8B8" />
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.canvasLabel, { color: colors.foreground }]}>Untitled Artwork</Text>
+                <Text style={[styles.canvasDims, { color: colors.mutedForeground }]}>{c.dims}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </ScrollView>
+      ) : (
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
@@ -126,7 +227,8 @@ export default function AIStudioScreen() {
           </View>
         ))}
       </View>
-    </ScrollView>
+      </ScrollView>
+      )}
     </View>
   );
 }
@@ -146,6 +248,23 @@ const styles = StyleSheet.create({
   creditLabel: { fontSize: 11, fontFamily: 'Inter_400Regular' },
   divider: { width: 1 },
   sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
+
+  modeRow: { paddingHorizontal: 20, marginBottom: 16 },
+  modeSwitch: { flexDirection: 'row', borderRadius: 12, padding: 3, gap: 4 },
+  modeBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 9 },
+  modeBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+
+  manualTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
+  manualLinks: { flexDirection: 'row', gap: 18 },
+  manualLink: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  newCanvasBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
+
+  canvasGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: '3%', rowGap: 20 },
+  canvasCell: { width: '31.333%' },
+  canvasTile: { width: '100%', borderRadius: 10, borderWidth: 1, marginBottom: 8, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  canvasThumb: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: '#E8E8E8' },
+  canvasLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  canvasDims: { fontSize: 10, fontFamily: 'Inter_400Regular', marginTop: 2 },
   toolRow: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, padding: 14, borderWidth: 1, marginBottom: 8, gap: 12 },
   toolIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   toolInfo: { flex: 1 },

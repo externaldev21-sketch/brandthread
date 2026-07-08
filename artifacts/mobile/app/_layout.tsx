@@ -112,6 +112,7 @@ function RootLayoutNav() {
         <Stack.Screen name="product-editor" options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
         <Stack.Screen name="plans"          options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
         <Stack.Screen name="settings"       options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
+        <Stack.Screen name="design-canvas"  options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
         <Stack.Screen name="manufacturer"  options={{ headerShown: false }} />
         <Stack.Screen name="finance"       options={{ headerShown: false }} />
         <Stack.Screen name="customers"     options={{ headerShown: false }} />
