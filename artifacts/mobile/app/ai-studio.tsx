@@ -86,7 +86,7 @@ export default function AIStudioScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScreenHeader title="AI Design Studio" subtitle="Powered by generative AI" rightElement={aiBadge} />
+      <ScreenHeader title="Design Studio" subtitle="Powered by generative AI" rightElement={aiBadge} />
 
       {/* Mode switch */}
       <View style={styles.modeRow}>
