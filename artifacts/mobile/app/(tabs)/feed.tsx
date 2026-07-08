@@ -27,7 +27,6 @@ const SPOTLIGHT_ITEMS = [
     videoUri: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4',
     caption: 'New drop just landed 🔥 Oversized canvas jacket — limited run of 50.',
     sound: 'Original Sound · vaultstudio',
-    chip: '🔥 Trending Now',
     productName: 'Canvas Cargo Jacket',
     productPrice: '$189',
     productOriginalPrice: null as string | null,
@@ -50,7 +49,6 @@ const SPOTLIGHT_ITEMS = [
     videoUri: 'https://test-videos.co.uk/vids/sintel/mp4/h264/720/Sintel_720_10s_1MB.mp4',
     caption: 'Clean minimalist tees now in 8 colorways. Basics shouldn\'t be boring.',
     sound: 'Original Sound · meridianclothing',
-    chip: '🆕 Just Dropped',
     productName: 'Essential Relaxed Tee',
     productPrice: '$48',
     productOriginalPrice: null as string | null,
@@ -72,7 +70,6 @@ const SPOTLIGHT_ITEMS = [
     videoUri: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
     caption: 'The cargo trousers everyone\'s been asking about. Back in stock 🙌',
     sound: 'Original Sound · nxgendrops',
-    chip: '📦 Restocked',
     productName: 'Ripstop Cargo Trousers',
     productPrice: '$134',
     productOriginalPrice: '$160',
@@ -95,7 +92,6 @@ const SPOTLIGHT_ITEMS = [
     videoUri: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/friday.mp4',
     caption: 'Sunday hoodies are here. 400gsm French terry, washed finish.',
     sound: 'Original Sound · softwearstudio',
-    chip: '☁️ Cozy Season',
     productName: 'Sunday Washed Hoodie',
     productPrice: '$98',
     productOriginalPrice: null as string | null,
@@ -117,7 +113,6 @@ const SPOTLIGHT_ITEMS = [
     videoUri: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4',
     caption: 'Workwear inspired, streetwear executed. Built for the city.',
     sound: 'Original Sound · atlasgoods',
-    chip: '🧭 New Season',
     productName: 'City Chore Coat',
     productPrice: '$215',
     productOriginalPrice: '$260',
@@ -328,14 +323,8 @@ function SpotlightPage({
         </TouchableOpacity>
       </View>
 
-      {/* ─ Bottom-left overlay: chip, shop pill, creator, sound ─ */}
+      {/* ─ Bottom-left overlay: shop pill, creator, sound ─ */}
       <View style={[styles.bottomInfo, { bottom: tabBarClearance }]} pointerEvents="box-none">
-        <View style={styles.topRowChips}>
-          <View style={styles.trendChip}>
-            <Text style={styles.trendChipText}>{item.chip}</Text>
-          </View>
-        </View>
-
         <TouchableOpacity
           style={[styles.shopPill, { backgroundColor: item.accentColor }]}
           activeOpacity={0.85}
@@ -669,9 +658,6 @@ const styles = StyleSheet.create({
   railCount: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
 
   bottomInfo: { position: 'absolute', left: 16, right: 84, bottom: 26, gap: 8 },
-  topRowChips: { flexDirection: 'row' },
-  trendChip: { alignSelf: 'flex-start', backgroundColor: '#FFFFFF26', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6 },
-  trendChipText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
 
   shopPill: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingHorizontal: 12, minHeight: 34, borderRadius: 17 },
   shopPillText: { fontSize: 12.5, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
