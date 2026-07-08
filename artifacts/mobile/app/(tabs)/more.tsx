@@ -92,7 +92,11 @@ export default function MoreScreen() {
       <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>All Brandthread features</Text>
 
       {/* Plan card */}
-      <View style={[styles.planCard, { backgroundColor: '#17140F', borderColor: '#C1440E33' }]}>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => handleNav('/plans')}
+        style={[styles.planCard, { backgroundColor: '#17140F', borderColor: '#C1440E33' }]}
+      >
         <View style={{ flex: 1 }}>
           <Text style={[styles.planLabel, { color: '#C1440E88' }]}>CURRENT PLAN</Text>
           <Text style={[styles.planName, { color: colors.primary }]}>Brandthread Pro</Text>
@@ -103,7 +107,7 @@ export default function MoreScreen() {
         <View style={[styles.planBadge, { backgroundColor: colors.primary }]}>
           <Text style={[styles.planBadgeText, { color: colors.primaryForeground }]}>PRO</Text>
         </View>
-      </View>
+      </TouchableOpacity>
 
       {/* Feature groups — 3-column icon grid */}
       {FEATURE_GROUPS.map((group) => (
