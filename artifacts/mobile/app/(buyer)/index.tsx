@@ -13,15 +13,6 @@ const { width: W } = Dimensions.get('window');
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
-const BRAND_STORIES = [
-  { id: 's1', name: 'Vault',     initials: 'VS', color: '#B33F1E', hasNew: true  },
-  { id: 's2', name: 'NxGen',     initials: 'NX', color: '#B45309', hasNew: true  },
-  { id: 's3', name: 'Softwear',  initials: 'SW', color: '#BE185D', hasNew: true  },
-  { id: 's4', name: 'Meridian',  initials: 'MC', color: '#0F766E', hasNew: false },
-  { id: 's5', name: 'Atlas',     initials: 'AG', color: '#1D4ED8', hasNew: true  },
-  { id: 's6', name: 'Coldform',  initials: 'CF', color: '#065F46', hasNew: false },
-  { id: 's7', name: 'Rawthread', initials: 'RT', color: '#92400E', hasNew: false },
-];
 
 const HERO_DROP = {
   brand: 'Vault Studio',
@@ -463,42 +454,6 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      {/* ─ Brand story bubbles ─ */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 20, gap: 14, paddingVertical: 16 }}
-      >
-        {BRAND_STORIES.map(brand => (
-          <TouchableOpacity
-            key={brand.id}
-            style={s.storyItem}
-            activeOpacity={0.8}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/feed' as never); }}
-          >
-            {brand.hasNew ? (
-              <LinearGradient
-                colors={['#D9714B', '#C1440E', '#B33F1E']}
-                style={s.storyRing}
-              >
-                <View style={[s.storyRingInner, { backgroundColor: bg }]}>
-                  <View style={[s.storyAvatar, { backgroundColor: brand.color }]}>
-                    <Text style={s.storyInitials}>{brand.initials}</Text>
-                  </View>
-                </View>
-              </LinearGradient>
-            ) : (
-              <View style={[s.storyRingViewed, { borderColor: border }]}>
-                <View style={[s.storyAvatar, { backgroundColor: brand.color }]}>
-                  <Text style={s.storyInitials}>{brand.initials}</Text>
-                </View>
-              </View>
-            )}
-            <Text style={[s.storyLabel, { color: muted }]} numberOfLines={1}>{brand.name}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
       {/* ─ Hero drop ─ */}
       <View style={{ paddingHorizontal: 20, marginBottom: 28 }}>
         <HeroCard isDark={isDark} />
@@ -562,13 +517,6 @@ const s = StyleSheet.create({
   headerBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   notifDot:  { position: 'absolute', top: 9, right: 9, width: 7, height: 7, borderRadius: 4 },
 
-  storyItem:       { alignItems: 'center', gap: 5, width: 60 },
-  storyRing:       { width: 60, height: 60, borderRadius: 30, padding: 2.5, alignItems: 'center', justifyContent: 'center' },
-  storyRingViewed: { width: 60, height: 60, borderRadius: 30, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  storyRingInner:  { width: 53, height: 53, borderRadius: 27, padding: 2, alignItems: 'center', justifyContent: 'center' },
-  storyAvatar:     { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center' },
-  storyInitials:   { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
-  storyLabel:      { fontSize: 10, fontFamily: 'Inter_500Medium', textAlign: 'center', width: 60 },
 
   hero: {
     borderRadius: 6,
