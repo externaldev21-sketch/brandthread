@@ -323,14 +323,15 @@ function SpotlightPage({
         </TouchableOpacity>
       </View>
 
-      {/* ─ Bottom-left overlay: caption, creator, sound ─ */}
+      {/* ─ Bottom-left overlay: creator, caption, sound ─ */}
       <View style={[styles.bottomInfo, { bottom: tabBarClearance }]} pointerEvents="box-none">
-        <Text style={styles.caption} numberOfLines={2}>{item.caption}</Text>
-
         <View style={styles.creatorRow}>
           <Text style={styles.creatorName}>{item.creator}</Text>
           {item.verified && <Feather name="check-circle" size={13} color="#4FA8FF" style={{ marginLeft: 4 }} />}
         </View>
+
+        <Text style={styles.caption} numberOfLines={2}>{item.caption}</Text>
+
         <View style={styles.soundRow}>
           <Feather name="music" size={12} color="#FFFFFF" />
           <Text style={styles.soundText} numberOfLines={1}>{item.sound}</Text>
