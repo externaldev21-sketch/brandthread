@@ -18,7 +18,23 @@ const BRAND_CHECKLIST_ITEMS = [
   'Social handles secured',
 ];
 
-const STYLE_OPTIONS = ['Minimalist', 'Streetwear', 'Luxury', 'Sporty', 'Vintage', 'Y2K'];
+const LOGO_STYLES = ['Minimalist', 'Bold', 'Vintage', 'Luxury', 'Streetwear', 'Playful'];
+
+type LogoConcept = { bg: string; fg: string; shape: 'circle' | 'square' | 'diamond'; style: string };
+
+function generateLogoConcepts(brandName: string, style: string): LogoConcept[] {
+  const palettes: Record<string, { bg: string; fg: string }[]> = {
+    Minimalist: [{ bg: '#1A1A1A', fg: '#FFFFFF' }, { bg: '#F5F0E8', fg: '#1A1A1A' }, { bg: '#2D2D2D', fg: '#C0A060' }],
+    Bold:       [{ bg: '#C94D1F', fg: '#FFFFFF' }, { bg: '#1A1A2E', fg: '#E94560' }, { bg: '#0F3460', fg: '#FFFFFF' }],
+    Vintage:    [{ bg: '#8B4513', fg: '#F5DEB3' }, { bg: '#2F4F2F', fg: '#F5F5DC' }, { bg: '#4A3728', fg: '#D4AF6A' }],
+    Luxury:     [{ bg: '#1A1208', fg: '#C9A96E' }, { bg: '#0D0D0D', fg: '#B8A060' }, { bg: '#1C1410', fg: '#E0C87A' }],
+    Streetwear: [{ bg: '#000000', fg: '#FFFFFF' }, { bg: '#FF4500', fg: '#000000' }, { bg: '#1A1A1A', fg: '#7FFF00' }],
+    Playful:    [{ bg: '#FF6B9D', fg: '#FFFFFF' }, { bg: '#4ECDC4', fg: '#1A1A1A' }, { bg: '#FFE66D', fg: '#1A1A1A' }],
+  };
+  const shapes: LogoConcept['shape'][] = ['circle', 'square', 'diamond'];
+  const chosen = palettes[style] ?? palettes['Minimalist'];
+  return chosen.map((p, i) => ({ ...p, shape: shapes[i % shapes.length], style }));
+}
 
 const NAME_PREFIXES = [
   'Thread', 'Core', 'Moon', 'Raw', 'Grain', 'Silt', 'Nova', 'Ash', 'Bare',
@@ -48,6 +64,21 @@ export default function BrandScreen() {
   const [selectedStyle, setSelectedStyle] = useState('Minimalist');
   const [suggestedNames, setSuggestedNames] = useState<string[]>(['ThreadCraft', 'Corevox', 'Moodwear', 'Rawline', 'Grainhaus']);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [logoStyle, setLogoStyle] = useState('Minimalist');
+  const [logoGenerating, setLogoGenerating] = useState(false);
+  const [logoConcepts, setLogoConcepts] = useState<LogoConcept[]>([]);
+  const [selectedLogo, setSelectedLogo] = useState<number | null>(null);
+
+  function handleGenerateLogo() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setLogoGenerating(true);
+    setSelectedLogo(null);
+    setTimeout(() => {
+      setLogoConcepts(generateLogoConcepts(nameInput || 'Brand', logoStyle));
+      setLogoGenerating(false);
+    }, 1200);
+  }
+
   const [checklist, setChecklist] = useState<boolean[]>(BRAND_CHECKLIST_ITEMS.map(() => false));
 
   const doneCount = checklist.filter(Boolean).length;
@@ -135,48 +166,93 @@ export default function BrandScreen() {
         </View>
       </View>
 
-      {/* Style Guide */}
+      {/* AI Logo Generator */}
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.cardHeader}>
-          <Feather name="sliders" size={16} color={colors.primary} />
-          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Brand Style</Text>
+          <Feather name="aperture" size={16} color={colors.primary} />
+          <Text style={[styles.cardTitle, { color: colors.foreground }]}>AI Logo Generator</Text>
+          <View style={[styles.aiBadge, { backgroundColor: '#C1440E22' }]}>
+            <Text style={[styles.aiText, { color: colors.primary }]}>AI</Text>
+          </View>
         </View>
+
+        {/* Style picker */}
+        <Text style={[styles.subLabel, { color: colors.mutedForeground }]}>Logo Style</Text>
         <View style={styles.styleGrid}>
-          {STYLE_OPTIONS.map((s) => (
+          {LOGO_STYLES.map((s) => (
             <TouchableOpacity
               key={s}
-              onPress={() => setSelectedStyle(s)}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setLogoStyle(s); }}
               activeOpacity={0.7}
               style={[styles.styleChip, {
-                backgroundColor: selectedStyle === s ? colors.primary : colors.secondary,
-                borderColor: selectedStyle === s ? colors.primary : colors.border,
+                backgroundColor: logoStyle === s ? colors.primary : colors.secondary,
+                borderColor: logoStyle === s ? colors.primary : colors.border,
               }]}
             >
-              <Text style={[styles.styleText, { color: selectedStyle === s ? colors.primaryForeground : colors.mutedForeground }]}>{s}</Text>
+              <Text style={[styles.styleText, { color: logoStyle === s ? colors.primaryForeground : colors.mutedForeground }]}>{s}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Color Palette */}
-        <Text style={[styles.subLabel, { color: colors.mutedForeground }]}>Color Palette</Text>
-        <View style={styles.palette}>
-          {['#0D0D0D', '#C94D1F', '#FFFFFF', '#2A2A2A', '#A8853A'].map((c) => (
-            <View key={c} style={[styles.swatch, { backgroundColor: c, borderColor: colors.border }]} />
-          ))}
-          <TouchableOpacity style={[styles.swatchAdd, { borderColor: colors.border }]} activeOpacity={0.7}>
-            <Feather name="plus" size={14} color={colors.mutedForeground} />
-          </TouchableOpacity>
-        </View>
+        {/* Generate button */}
+        <TouchableOpacity
+          style={[styles.generateBtn, { backgroundColor: colors.primary, opacity: logoGenerating ? 0.7 : 1, marginTop: 4 }]}
+          onPress={handleGenerateLogo}
+          activeOpacity={0.85}
+          disabled={logoGenerating}
+        >
+          <Feather name={logoGenerating ? 'loader' : 'aperture'} size={16} color={colors.primaryForeground} />
+          <Text style={[styles.generateText, { color: colors.primaryForeground }]}>
+            {logoGenerating ? 'Generating…' : `Generate Logo for "${nameInput || 'Your Brand'}"`}
+          </Text>
+        </TouchableOpacity>
 
-        {/* Typography */}
-        <Text style={[styles.subLabel, { color: colors.mutedForeground }]}>Typography</Text>
-        <View style={styles.fontRow}>
-          {['Inter', 'Playfair', 'Montserrat'].map((f) => (
-            <View key={f} style={[styles.fontChip, { backgroundColor: f === 'Inter' ? '#C1440E22' : colors.secondary, borderColor: f === 'Inter' ? colors.primary : colors.border }]}>
-              <Text style={[styles.fontText, { color: f === 'Inter' ? colors.primary : colors.mutedForeground }]}>{f}</Text>
+        {/* Logo concepts */}
+        {logoConcepts.length > 0 && (
+          <>
+            <Text style={[styles.subLabel, { color: colors.mutedForeground, marginTop: 16 }]}>Concepts — tap to select</Text>
+            <View style={styles.logoGrid}>
+              {logoConcepts.map((c, i) => {
+                const initials = (nameInput || 'B').slice(0, 2).toUpperCase();
+                const isSelected = selectedLogo === i;
+                return (
+                  <TouchableOpacity
+                    key={i}
+                    activeOpacity={0.8}
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectedLogo(i); }}
+                    style={[styles.logoCard, { borderColor: isSelected ? colors.primary : colors.border, borderWidth: isSelected ? 2 : 1 }]}
+                  >
+                    <View style={[
+                      styles.logoShape,
+                      { backgroundColor: c.bg, borderRadius: c.shape === 'circle' ? 36 : c.shape === 'diamond' ? 8 : 12 },
+                      c.shape === 'diamond' && { transform: [{ rotate: '45deg' }] },
+                    ]}>
+                      <Text style={[styles.logoInitials, { color: c.fg, transform: c.shape === 'diamond' ? [{ rotate: '-45deg' }] : [] }]}>
+                        {initials}
+                      </Text>
+                    </View>
+                    <Text style={[styles.logoStyleLabel, { color: colors.mutedForeground }]}>Style {i + 1}</Text>
+                    {isSelected && (
+                      <View style={[styles.logoCheckBadge, { backgroundColor: colors.primary }]}>
+                        <Feather name="check" size={10} color="#FFF" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-          ))}
-        </View>
+            {selectedLogo !== null && (
+              <TouchableOpacity
+                style={[styles.generateBtn, { backgroundColor: '#4C9A5E22', marginTop: 8 }]}
+                activeOpacity={0.8}
+                onPress={() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)}
+              >
+                <Feather name="download" size={15} color={colors.success} />
+                <Text style={[styles.generateText, { color: colors.success }]}>Use this logo</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
       </View>
 
       {/* Setup Checklist */}
@@ -253,12 +329,12 @@ const styles = StyleSheet.create({
   styleChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
   styleText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
   subLabel: { fontSize: 11, fontFamily: 'Inter_500Medium', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 },
-  palette: { flexDirection: 'row', gap: 10, marginBottom: 16 },
-  swatch: { width: 40, height: 40, borderRadius: 10, borderWidth: 1 },
-  swatchAdd: { width: 40, height: 40, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', borderStyle: 'dashed' },
-  fontRow: { flexDirection: 'row', gap: 8 },
-  fontChip: { flex: 1, paddingVertical: 9, borderRadius: 8, borderWidth: 1, alignItems: 'center' },
-  fontText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  logoGrid: { flexDirection: 'row', gap: 10 },
+  logoCard: { flex: 1, borderRadius: 14, padding: 12, alignItems: 'center', gap: 8, position: 'relative', backgroundColor: '#0D0B08' },
+  logoShape: { width: 72, height: 72, alignItems: 'center', justifyContent: 'center' },
+  logoInitials: { fontSize: 22, fontFamily: 'Inter_700Bold' },
+  logoStyleLabel: { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  logoCheckBadge: { position: 'absolute', top: 8, right: 8, width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   checkRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, gap: 12 },
   checkBox: { width: 24, height: 24, borderRadius: 6, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   checkLabel: { fontSize: 14, fontFamily: 'Inter_400Regular' },
