@@ -170,9 +170,6 @@ export default function SellerDashboard() {
       >
         <View style={[st.header, { paddingHorizontal: 20 }]}>
           <View style={st.brandRow}>
-            <View style={[st.brandIcon, { backgroundColor: primary }]}>
-              <Feather name="dollar-sign" size={18} color="#FFFFFF" />
-            </View>
             <Text style={[st.brand, { color: colors.foreground }]}>Brandthread</Text>
           </View>
           <TouchableOpacity
@@ -361,7 +358,6 @@ const st = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 10 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  brandIcon: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   brand: { fontSize: 22, fontFamily: 'Inter_700Bold', letterSpacing: -0.5 },
   storeLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1, paddingVertical: 6 },
   storeLinkText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
