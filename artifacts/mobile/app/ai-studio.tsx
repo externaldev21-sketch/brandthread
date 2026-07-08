@@ -1,4 +1,17 @@
 import React, { useState } from 'react';
+
+/** Small aspect-ratio preview thumbnail shown next to each size preset row. */
+function SheetThumb({ ratio }: { ratio: number }) {
+  const BOX = 44; // fixed container size
+  const isLandscape = ratio >= 1;
+  const w = isLandscape ? BOX : Math.round(BOX * ratio);
+  const h = isLandscape ? Math.round(BOX / ratio) : BOX;
+  return (
+    <View style={{ width: BOX, height: BOX, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: w, height: h, backgroundColor: '#3A3A3A', borderRadius: 3, borderWidth: 1, borderColor: '#5A5A5A' }} />
+    </View>
+  );
+}
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Alert, Modal } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -253,6 +266,7 @@ export default function AIStudioScreen() {
               activeOpacity={0.7}
               onPress={() => openCanvas(SCREEN_SIZE)}
             >
+              <SheetThumb ratio={SCREEN_SIZE.ratio} />
               <Text style={styles.sheetRowLabel}>{SCREEN_SIZE.label}</Text>
               <Text style={styles.sheetRowDims}>{SCREEN_SIZE.dims}</Text>
             </TouchableOpacity>
@@ -265,7 +279,8 @@ export default function AIStudioScreen() {
                   activeOpacity={0.7}
                   onPress={() => openCanvas(p)}
                 >
-                  <Text style={styles.sheetRowLabel}>{p.label}</Text>
+                  <SheetThumb ratio={p.ratio} />
+                  <Text style={[styles.sheetRowLabel, { flex: 1 }]}>{p.label}</Text>
                   <View style={styles.sheetRowRight}>
                     {p.profile != null && <Text style={styles.sheetRowProfile}>{p.profile}</Text>}
                     <Text style={styles.sheetRowDims}>{p.dims}</Text>
