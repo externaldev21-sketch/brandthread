@@ -109,6 +109,7 @@ function RootLayoutNav() {
         <Stack.Screen name="onboarding"     options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="brand"         options={{ headerShown: false }} />
         <Stack.Screen name="ai-studio"     options={{ headerShown: false }} />
+        <Stack.Screen name="product-editor" options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
         <Stack.Screen name="manufacturer"  options={{ headerShown: false }} />
         <Stack.Screen name="finance"       options={{ headerShown: false }} />
         <Stack.Screen name="customers"     options={{ headerShown: false }} />

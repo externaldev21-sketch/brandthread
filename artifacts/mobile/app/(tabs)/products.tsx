@@ -71,7 +71,7 @@ export default function ProductsScreen() {
             style={styles.headerIconBtn}
             activeOpacity={0.7}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            onPress={() => { haptic(); router.push('/ai-studio'); }}
+            onPress={() => { haptic(); router.push('/product-editor'); }}
           >
             <Feather name="plus" size={20} color="#FFFFFF" />
           </TouchableOpacity>
