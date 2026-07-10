@@ -28,7 +28,7 @@ const FREELANCERS = [
 export default function CommunityScreen() {
   const colors = useColors();
   const router = useRouter();
-  const [tab, setTab] = useState<'forum' | 'events' | 'hire'>('forum');
+  const [tab] = useState<'forum' | 'events' | 'hire'>('hire');
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -49,22 +49,6 @@ export default function CommunityScreen() {
         <View style={[styles.memberBadge, { backgroundColor: colors.primary }]}>
           <Text style={[styles.memberBadgeText, { color: colors.primaryForeground }]}>PRO</Text>
         </View>
-      </View>
-
-      {/* Tabs */}
-      <View style={[styles.tabRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {(['forum', 'events', 'hire'] as const).map((t) => (
-          <TouchableOpacity
-            key={t}
-            onPress={() => setTab(t)}
-            style={[styles.tabBtn, { backgroundColor: tab === t ? colors.primary : 'transparent' }]}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.tabText, { color: tab === t ? colors.primaryForeground : colors.mutedForeground }]}>
-              {t === 'forum' ? 'Forum' : t === 'events' ? 'Events' : 'Hire'}
-            </Text>
-          </TouchableOpacity>
-        ))}
       </View>
 
       {tab === 'forum' && (
