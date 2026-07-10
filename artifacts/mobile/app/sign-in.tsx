@@ -8,7 +8,7 @@ import {
   KeyboardAvoidingView, Platform, ActivityIndicator, useColorScheme, ScrollView,
 } from 'react-native';
 import { useSignIn, useSignUp } from '@clerk/expo';
-import { useRouter, type Href } from 'expo-router';
+import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 
@@ -22,8 +22,9 @@ export default function SignInScreen() {
   const insets  = useSafeAreaInsets();
   const scheme  = useColorScheme();
   const isDark  = scheme !== 'light';
+  const { initialMode } = useLocalSearchParams<{ initialMode?: string }>();
 
-  const [mode, setMode]         = useState<Mode>('sign-in');
+  const [mode, setMode]         = useState<Mode>(initialMode === 'sign-up' ? 'sign-up' : 'sign-in');
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [name, setName]         = useState('');

@@ -74,6 +74,15 @@ export default function BuyerProfileScreen() {
   const muted   = isDark ? '#8C8577' : '#6E6759';
   const primary = isDark ? '#39FF88' : '#00C853';
 
+  function openAccountSwitcher() {
+    Haptics.selectionAsync();
+    Alert.alert('Switch account', 'Sign into another account or create a new one.', [
+      { text: 'Sign into another account', onPress: () => router.push({ pathname: '/sign-in', params: { initialMode: 'sign-in' } } as never) },
+      { text: 'Create another account', onPress: () => router.push({ pathname: '/sign-in', params: { initialMode: 'sign-up' } } as never) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
+
   function openAccountMenu() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert('Account', undefined, [
@@ -111,7 +120,7 @@ export default function BuyerProfileScreen() {
     >
       {/* ─ Top bar ─ */}
       <View style={[s.topBar, { paddingHorizontal: 20 }]}>
-        <TouchableOpacity style={s.usernameRow} activeOpacity={0.7} onPress={() => Haptics.selectionAsync()}>
+        <TouchableOpacity style={s.usernameRow} activeOpacity={0.7} onPress={openAccountSwitcher}>
           <Feather name="lock" size={13} color={muted} />
           <Text style={[s.username, { color: fg }]}>jordan</Text>
           <Feather name="chevron-down" size={16} color={fg} />
