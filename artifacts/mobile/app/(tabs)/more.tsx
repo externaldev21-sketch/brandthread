@@ -60,7 +60,7 @@ const FEATURE_GROUPS: FeatureGroup[] = [
     items: [
       { label: 'Marketing',           icon: 'send',        route: '/marketing', color: '#F43F5E' },
       { label: 'Community Hub',       icon: 'globe',       route: '/community', color: '#3B82F6' },
-      { label: 'Mobile App Builder',  icon: 'smartphone',  route: '/community', color: '#A855F7', badge: 'Pro' },
+      { label: 'Mobile App Builder',  icon: 'smartphone',  route: '/mobile-app-builder', color: '#A855F7', badge: 'Pro' },
     ],
   },
 ];
