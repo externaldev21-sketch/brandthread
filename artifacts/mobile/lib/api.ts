@@ -92,6 +92,22 @@ export function createApi(getToken: GetToken) {
       generate: (referenceImages: string[], productImages: string[], prompt: string) =>
         post<any>('/api/lifestyle/generate', { referenceImages, productImages, prompt }),
     },
+    techpack: {
+      generate: (payload: {
+        productName: string;
+        brandName: string;
+        category: string;
+        season: string;
+        styleNumber: string;
+        description: string;
+        colorways: string[];
+        materialsNotes: string;
+        printPlacementNotes: string;
+        careNotes: string;
+        sizeChart: { sizes: string[]; rows: { point: string; values: Record<string, string> }[] };
+        photos: string[];
+      }) => post<any>('/api/techpack/generate', payload),
+    },
     integrations: {
       klaviyoStatus:      () => get<any>('/api/integrations/klaviyo'),
       klaviyoConnect:     (apiKey: string) => post<any>('/api/integrations/klaviyo/connect', { apiKey }),

@@ -185,6 +185,10 @@ export default function AIStudioScreen() {
               router.push('/lifestyle-images' as never);
               return;
             }
+            if (tool.label === 'Tech Pack Generator') {
+              router.push('/tech-pack-generator' as never);
+              return;
+            }
             setSelected(tool.label);
           }}
           activeOpacity={0.75}
