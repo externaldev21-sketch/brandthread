@@ -72,7 +72,6 @@ const ACCOUNT_ITEMS: Array<{ label: string; icon: keyof typeof Feather.glyphMap;
   { label: 'Two-Factor Auth', icon: 'lock', value: 'On' },
   { label: 'Audit Logs', icon: 'file-text' },
   { label: 'User Permissions', icon: 'shield' },
-  { label: 'Backup & Recovery', icon: 'cloud' },
 ];
 
 type Tab = 'yours' | 'all';
