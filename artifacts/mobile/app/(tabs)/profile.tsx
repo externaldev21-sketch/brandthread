@@ -158,10 +158,10 @@ export default function ProfileScreen() {
         <TouchableOpacity
           style={styles.pillBtn}
           activeOpacity={0.8}
-          onPress={() => nav('/brand')}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/story-creator' as never); }}
         >
-          <Feather name="plus" size={13} color={fg} />
-          <Text style={styles.pillText}>Add category</Text>
+          <Feather name="camera" size={13} color={fg} />
+          <Text style={styles.pillText}>Post on Story</Text>
         </TouchableOpacity>
       </View>
 
