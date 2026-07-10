@@ -222,19 +222,6 @@ export default function ProfileScreen() {
       <Text style={styles.noMore}>No more results</Text>
 
       {/* ─ Post on Story ─ */}
-      <View style={{ paddingHorizontal: 20, marginTop: 28, marginBottom: 24 }}>
-        <TouchableOpacity
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/story-creator' as never); }}
-          activeOpacity={0.85}
-          style={styles.storyBtnWrap}
-        >
-          <LinearGradient colors={['#7C3AED', '#9F7AEA']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.storyBtnGrad}>
-            <Feather name="camera" size={17} color="#FFF" />
-            <Text style={styles.storyBtnText}>Post on Story</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
-
     </ScrollView>
   );
 }
@@ -300,7 +287,4 @@ const styles = StyleSheet.create({
   menuLabel: { flex: 1, fontSize: 14, fontFamily: 'Inter_500Medium' },
 
 
-  storyBtnWrap: { borderRadius: 16, overflow: 'hidden' },
-  storyBtnGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 15 },
-  storyBtnText: { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#FFF' },
 });
