@@ -32,7 +32,7 @@ const GROUPS: SettingsGroup[] = [
       { label: 'General', icon: 'home', route: '/general-settings' },
       { label: 'Plan', icon: 'file-text', route: '/plan-details' },
       { label: 'Billing', icon: 'clipboard' },
-      { label: 'Users', icon: 'users' },
+      { label: 'Users', icon: 'users', route: '/users' },
       { label: 'Roles', icon: 'users' },
       { label: 'Security', icon: 'shield' },
       { label: 'Payments', icon: 'credit-card' },
