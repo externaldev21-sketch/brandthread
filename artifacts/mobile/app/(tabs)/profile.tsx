@@ -48,15 +48,6 @@ const GRID: GridTile[] = [
   { id: 'g5', name: 'Limited Run 002',     caption: 'Only 40 left in stock',         stat: '1.5k', colors: ['#8A2E4A', '#3F1522'] },
 ];
 
-const MENU = [
-  { icon: 'settings'     as const, label: 'Account settings',  route: '/brand'    },
-  { icon: 'users'        as const, label: 'Team members',       route: '/team'     },
-  { icon: 'truck'        as const, label: 'Shipping setup',     route: '/shipping' },
-  { icon: 'bar-chart-2'  as const, label: 'Analytics',          route: '/analytics'},
-  { icon: 'credit-card'  as const, label: 'Payments & billing', route: '/payments' },
-  { icon: 'help-circle'  as const, label: 'Help & support',     route: '__help__'  },
-];
-
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -243,27 +234,6 @@ export default function ProfileScreen() {
             <Text style={styles.storyBtnText}>Post on Story</Text>
           </LinearGradient>
         </TouchableOpacity>
-      </View>
-
-      {/* ─ Menu ─ */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: fg, marginBottom: 12 }]}>Settings</Text>
-        <View style={[styles.card, { backgroundColor: card, borderColor: border }]}>
-          {MENU.map((item, i) => (
-            <TouchableOpacity
-              key={item.label}
-              style={[styles.menuRow, i > 0 && { borderTopWidth: 1, borderTopColor: border }]}
-              onPress={() => nav(item.route)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.menuIcon, { backgroundColor: pillBg }]}>
-                <Feather name={item.icon} size={16} color={primary} />
-              </View>
-              <Text style={[styles.menuLabel, { color: fg }]}>{item.label}</Text>
-              <Feather name="chevron-right" size={16} color={muted} />
-            </TouchableOpacity>
-          ))}
-        </View>
       </View>
 
       {/* ─ Sign out ─ */}
