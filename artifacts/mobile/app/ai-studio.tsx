@@ -29,7 +29,6 @@ const STUDIO_TOOLS = [
   { label: 'Background Removal', icon: 'scissors' as const, desc: 'Clean product cutouts in seconds', badge: null },
   { label: 'Lifestyle Images', icon: 'sun' as const, desc: 'Contextual lifestyle shots for any product', badge: null },
   { label: 'Tech Pack Generator', icon: 'file-text' as const, desc: 'Professional tech packs for manufacturers', badge: 'New' },
-  { label: 'Hang Tag Creator', icon: 'tag' as const, desc: 'Custom branded hangtags & labels', badge: null },
   { label: 'Lookbook Creator', icon: 'book-open' as const, desc: 'Professional brand lookbooks & catalogs', badge: null },
 ];
 
