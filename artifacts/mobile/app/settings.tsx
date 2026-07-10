@@ -44,7 +44,7 @@ const GROUPS: SettingsGroup[] = [
       { label: 'Domains', icon: 'globe' },
       { label: 'Customer events', icon: 'activity' },
       { label: 'Notifications', icon: 'bell', route: '/notifications-settings' },
-      { label: 'Metafields and metaobjects', icon: 'database' },
+      { label: 'Metafields and metaobjects', icon: 'database', route: '/metafields' },
       { label: 'Languages', icon: 'message-square', route: '/languages' },
       { label: 'Customer privacy', icon: 'lock', route: '/customer-privacy' },
       { label: 'Policies', icon: 'file' },
