@@ -48,7 +48,6 @@ const GROUPS: SettingsGroup[] = [
       { label: 'Languages', icon: 'message-square', route: '/languages' },
       { label: 'Customer privacy', icon: 'lock', route: '/customer-privacy' },
       { label: 'Policies', icon: 'file' },
-      { label: 'Acknowledgements', icon: 'code' },
     ],
   },
 ];
