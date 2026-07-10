@@ -88,6 +88,10 @@ export function createApi(getToken: GetToken) {
     bgRemoval: {
       remove: (image: string) => post<any>('/api/bg-removal/remove', { image }),
     },
+    lifestyle: {
+      generate: (referenceImages: string[], productImages: string[], prompt: string) =>
+        post<any>('/api/lifestyle/generate', { referenceImages, productImages, prompt }),
+    },
     integrations: {
       klaviyoStatus:      () => get<any>('/api/integrations/klaviyo'),
       klaviyoConnect:     (apiKey: string) => post<any>('/api/integrations/klaviyo/connect', { apiKey }),

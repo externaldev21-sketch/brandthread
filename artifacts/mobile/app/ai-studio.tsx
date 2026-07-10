@@ -181,6 +181,10 @@ export default function AIStudioScreen() {
               router.push('/bg-removal' as never);
               return;
             }
+            if (tool.label === 'Lifestyle Images') {
+              router.push('/lifestyle-images' as never);
+              return;
+            }
             setSelected(tool.label);
           }}
           activeOpacity={0.75}
