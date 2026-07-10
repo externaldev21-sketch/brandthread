@@ -46,7 +46,7 @@ const GROUPS: SettingsGroup[] = [
       { label: 'Notifications', icon: 'bell', route: '/notifications-settings' },
       { label: 'Metafields and metaobjects', icon: 'database' },
       { label: 'Languages', icon: 'message-square', route: '/languages' },
-      { label: 'Customer privacy', icon: 'lock' },
+      { label: 'Customer privacy', icon: 'lock', route: '/customer-privacy' },
       { label: 'Policies', icon: 'file' },
       { label: 'Acknowledgements', icon: 'code' },
     ],
