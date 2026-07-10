@@ -40,12 +40,6 @@ const FOLLOWED_BRANDS = [
   { initials: 'AG', name: 'Atlas Goods',   color: '#1D4ED8', hasNew: false },
 ];
 
-const HIGHLIGHTS = [
-  { label: 'Delivered',  icon: 'check-circle' as const, color: '#4C9A5E' },
-  { label: 'Shipped',    icon: 'truck'        as const, color: '#4A6FA5' },
-  { label: 'Wishlist',   icon: 'heart'        as const, color: '#00C853' },
-];
-
 const TABS = [
   { key: 'orders',   icon: 'grid'  as const },
   { key: 'brands',   icon: 'users' as const },
@@ -73,6 +67,22 @@ export default function BuyerProfileScreen() {
   const fg      = isDark ? '#EDE7D9' : '#17140F';
   const muted   = isDark ? '#8C8577' : '#6E6759';
   const primary = isDark ? '#39FF88' : '#00C853';
+
+  function openOrderStatus() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const buttons = RECENT_ORDERS.map(o => ({
+      text: `${o.brand} — ${o.name}`,
+      onPress: () => Alert.alert(
+        `${o.brand} · ${o.id}`,
+        `${o.name}\n\nOrder status: ${o.status}\nPrice: ${o.price}`,
+        [{ text: 'OK' }],
+      ),
+    }));
+    Alert.alert('Check Status On Orders', 'Select an order to see its brand and delivery status.', [
+      ...buttons,
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
 
   function openAccountSwitcher() {
     Haptics.selectionAsync();
@@ -204,36 +214,17 @@ export default function BuyerProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ─ Highlights ─ */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 20, gap: 16, paddingVertical: 18 }}
-      >
+      {/* ─ Order status ─ */}
+      <View style={{ paddingHorizontal: 20, paddingVertical: 18 }}>
         <TouchableOpacity
-          style={s.highlightItem}
-          activeOpacity={0.8}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/story-creator' as never); }}
+          style={[s.statusBtn, { backgroundColor: primary }]}
+          activeOpacity={0.85}
+          onPress={openOrderStatus}
         >
-          <View style={[s.highlightRing, { borderColor: border, borderStyle: 'dashed' }]}>
-            <Feather name="plus" size={20} color={muted} />
-          </View>
-          <Text style={[s.highlightLabel, { color: muted }]}>New</Text>
+          <Feather name="truck" size={17} color="#03150B" />
+          <Text style={s.statusBtnText}>Check Status On Orders</Text>
         </TouchableOpacity>
-        {HIGHLIGHTS.map(h => (
-          <TouchableOpacity
-            key={h.label}
-            style={s.highlightItem}
-            activeOpacity={0.8}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setTab(h.label === 'Wishlist' ? 'wishlist' : 'orders'); }}
-          >
-            <View style={[s.highlightRing, { borderColor: border }]}>
-              <Feather name={h.icon} size={18} color={h.color} />
-            </View>
-            <Text style={[s.highlightLabel, { color: muted }]} numberOfLines={1}>{h.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      </View>
 
       {/* ─ Tabs ─ */}
       <View style={[s.tabsRow, { borderTopColor: border, borderBottomColor: border }]}>
@@ -363,9 +354,11 @@ const s = StyleSheet.create({
   actionBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   iconActionBtn: { width: 38, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
 
-  highlightItem:  { alignItems: 'center', gap: 6, width: 66 },
-  highlightRing:  { width: 62, height: 62, borderRadius: 31, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  highlightLabel: { fontSize: 11, fontFamily: 'Inter_500Medium', textAlign: 'center', width: 66 },
+  statusBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    height: 50, borderRadius: 14,
+  },
+  statusBtnText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: '#03150B' },
 
   tabsRow: { flexDirection: 'row', borderTopWidth: 1, borderBottomWidth: 1 },
   tabItem: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: 'transparent' },
