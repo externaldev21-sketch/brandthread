@@ -42,7 +42,7 @@ const GROUPS: SettingsGroup[] = [
       { label: 'Taxes and duties', icon: 'percent', route: '/taxes-duties' },
       { label: 'Locations', icon: 'map-pin', route: '/locations' },
       { label: 'Domains', icon: 'globe' },
-      { label: 'Customer events', icon: 'activity' },
+      { label: 'Customer events', icon: 'activity', route: '/customer-events' },
       { label: 'Notifications', icon: 'bell', route: '/notifications-settings' },
       { label: 'Metafields and metaobjects', icon: 'database', route: '/metafields' },
       { label: 'Languages', icon: 'message-square', route: '/languages' },
