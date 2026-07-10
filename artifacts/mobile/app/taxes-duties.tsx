@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Switch, Platform } from 'react-native';
+import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
@@ -28,7 +28,9 @@ const REGIONS: { name: string; flag: string; kind: TaxKind }[] = [
 export default function TaxesDutiesScreen() {
   const colors = useColors();
   const [search, setSearch] = useState('');
-  const [dutiesEnabled, setDutiesEnabled] = useState(false);
+  const [includeSalesTax, setIncludeSalesTax] = useState(false);
+  const [chargeShippingTax, setChargeShippingTax] = useState(false);
+  const [chargeVat, setChargeVat] = useState(false);
 
   function haptic() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -43,6 +45,93 @@ export default function TaxesDutiesScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScreenHeader title="Taxes and duties" />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+        <View style={styles.section}>
+          <View style={styles.rowStart}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Duties and import taxes</Text>
+            <Feather name="info" size={14} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
+          </View>
+
+          <View style={[styles.dutiesSetupRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Collect duties and import taxes at checkout</Text>
+              <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
+                Prevent surprise fees for international customers at delivery · 0.5% transaction fee
+              </Text>
+            </View>
+            <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.manageBtn, { borderColor: colors.border }]}>
+              <Text style={[styles.manageBtnText, { color: colors.foreground }]}>Set up</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={[styles.infoBox, { backgroundColor: colors.primary + '12' }]}>
+            <Feather name="info" size={15} color={colors.primary} style={{ marginTop: 2 }} />
+            <Text style={[styles.infoText, { color: colors.foreground }]}>
+              <Text style={{ textDecorationLine: 'underline', color: colors.primary }} onPress={haptic}>Delivered duty paid (DDP)</Text>{' '}
+              shipping labels are only available when you ship from some of your fulfillment locations
+            </Text>
+          </View>
+
+          <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 14 }]}>
+            <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.customsHeader, { borderBottomColor: colors.border, borderBottomWidth: 1 }]}>
+              <Text style={[styles.rowLabel, { color: colors.foreground, flex: 1 }]}>Customs information</Text>
+              <Feather name="more-horizontal" size={18} color={colors.mutedForeground} />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.customsRow, { borderBottomColor: colors.border, borderBottomWidth: 1 }]}>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Country of origin</Text>
+              <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>Included in 0 out of 255 variants · No default set</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={styles.customsRow}>
+              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Harmonized System (HS) codes</Text>
+              <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>Managed for 0 variants</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={[styles.divider, { backgroundColor: colors.secondary }]} />
+
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 14 }]}>Additional configuration</Text>
+
+          <Checkbox
+            label="Include sales tax in product price and shipping rate"
+            description={
+              <>
+                Assumes a 0% tax rate, which is adjusted to local tax rates in markets with{' '}
+                <Text style={{ textDecorationLine: 'underline' }} onPress={haptic}>dynamic tax inclusion</Text>.
+              </>
+            }
+            checked={includeSalesTax}
+            onPress={() => { haptic(); setIncludeSalesTax((v) => !v); }}
+            colors={colors}
+          />
+          <Checkbox
+            label="Charge sales tax on shipping"
+            description="Automatically calculated for Canada, European Union, and United States."
+            checked={chargeShippingTax}
+            onPress={() => { haptic(); setChargeShippingTax((v) => !v); }}
+            colors={colors}
+          />
+          <Checkbox
+            label="Charge VAT on digital goods"
+            description={
+              <>
+                Creates a collection of digital goods that will be{' '}
+                <Text style={{ textDecorationLine: 'underline' }} onPress={haptic}>charged VAT</Text> at checkout (for European customers).
+              </>
+            }
+            checked={chargeVat}
+            onPress={() => { haptic(); setChargeVat((v) => !v); }}
+            colors={colors}
+            last
+          />
+
+          <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={{ marginTop: 6 }}>
+            <Text style={[styles.learnMore, { color: colors.mutedForeground }]}>Learn more about sales tax</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={[styles.divider, { backgroundColor: colors.secondary }]} />
+
         <View style={styles.section}>
           <View style={styles.rowBetween}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Tax service</Text>
@@ -125,39 +214,41 @@ export default function TaxesDutiesScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.divider, { backgroundColor: colors.secondary }]} />
-
-        <View style={styles.section}>
-          <View style={styles.rowStart}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Duties and import taxes</Text>
-            <Feather name="info" size={14} color={colors.mutedForeground} style={{ marginLeft: 6 }} />
-          </View>
-
-          <View style={[styles.dutiesRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={[styles.rowLabel, { color: colors.foreground }]}>Collect duties and import taxes at checkout</Text>
-              <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>
-                Prevent surprise costs for customers by collecting duties and import taxes upfront
-              </Text>
-            </View>
-            <Switch
-              value={dutiesEnabled}
-              onValueChange={() => { haptic(); setDutiesEnabled((v) => !v); }}
-              trackColor={{ false: colors.border, true: colors.primary }}
-              thumbColor={Platform.OS === 'android' ? '#FFFFFF' : undefined}
-            />
-          </View>
-
-          <View style={[styles.infoBox, { backgroundColor: colors.primary + '12' }]}>
-            <Feather name="info" size={15} color={colors.primary} style={{ marginTop: 2 }} />
-            <Text style={[styles.infoText, { color: colors.foreground }]}>
-              <Text style={{ textDecorationLine: 'underline', color: colors.primary }} onPress={haptic}>Delivered duty paid (DDP)</Text>{' '}
-              shipping labels are only available when you ship from some countries.
-            </Text>
-          </View>
-        </View>
       </ScrollView>
     </View>
+  );
+}
+
+function Checkbox({
+  label,
+  description,
+  checked,
+  onPress,
+  colors,
+  last,
+}: {
+  label: string;
+  description: React.ReactNode;
+  checked: boolean;
+  onPress: () => void;
+  colors: ReturnType<typeof useColors>;
+  last?: boolean;
+}) {
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.7} style={[styles.checkboxRow, !last && { marginBottom: 16 }]}>
+      <View
+        style={[
+          styles.checkbox,
+          { borderColor: checked ? colors.primary : colors.border, backgroundColor: checked ? colors.primary : 'transparent' },
+        ]}
+      >
+        {checked && <Feather name="check" size={12} color={colors.primaryForeground} />}
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.rowLabel, { color: colors.foreground }]}>{label}</Text>
+        <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>{description}</Text>
+      </View>
+    </TouchableOpacity>
   );
 }
 
@@ -190,6 +281,12 @@ const styles = StyleSheet.create({
   reportRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14, marginTop: 14 },
   rowIcon: { width: 20 },
   dutiesRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14, marginTop: 4 },
+  dutiesSetupRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14, marginTop: 12 },
   infoBox: { flexDirection: 'row', gap: 10, borderRadius: 12, padding: 14, marginTop: 12 },
   infoText: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17, flex: 1 },
+  customsHeader: { flexDirection: 'row', alignItems: 'center', padding: 14 },
+  customsRow: { padding: 14, gap: 3 },
+  checkboxRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  checkbox: { width: 18, height: 18, borderRadius: 4, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  learnMore: { fontSize: 12, fontFamily: 'Inter_500Medium', textAlign: 'center' },
 });
