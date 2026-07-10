@@ -205,7 +205,7 @@ export default function SellerDashboard() {
               </View>
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={st.balanceSubLabelDark}>
-                  Held: <Text style={{ color: '#FFFFFF', fontFamily: 'Inter_600SemiBold' }}>{HELD_BY_PLATFORM}</Text>
+                  Hold: <Text style={{ color: '#FFFFFF', fontFamily: 'Inter_600SemiBold' }}>{HELD_BY_PLATFORM}</Text>
                 </Text>
                 <Text style={[st.balanceSubLabelDark, { marginTop: 3 }]}>
                   Pending: <Text style={{ color: '#FFFFFF', fontFamily: 'Inter_600SemiBold' }}>{PENDING_PAYOUT}</Text>
