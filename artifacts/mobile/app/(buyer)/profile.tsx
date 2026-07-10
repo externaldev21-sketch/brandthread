@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, useColorScheme, Alert, useWindowDimensions,
@@ -6,10 +6,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
 import { readableOn } from '@/lib/color';
+import { loadStyleBadge, DEFAULT_STYLE_BADGE, type StyleBadgeState } from '@/lib/styleBadge';
 
 const PROFILE_EMOJI = '😎';
 
@@ -17,8 +18,6 @@ const GRID_GAP = 2;
 const GRID_COLS = 3;
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
-
-const STYLE_BADGE = { label: 'Archive Fashion', emoji: '🎞️', color: '#00C853' };
 
 const STATS = [
   { label: 'orders',    value: '3'  },
@@ -61,12 +60,20 @@ export default function BuyerProfileScreen() {
   const [tab, setTab] = useState<TabKey>('orders');
   const { width: screenW } = useWindowDimensions();
   const tileSize = (screenW - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
+  const [styleBadge, setStyleBadge] = useState<StyleBadgeState>({ ...DEFAULT_STYLE_BADGE, enabled: true });
+
+  useFocusEffect(
+    useCallback(() => {
+      loadStyleBadge().then(setStyleBadge);
+    }, [])
+  );
 
   const bg      = isDark ? '#121110' : '#F5F1E7';
   const border  = isDark ? '#33302A' : '#E3DCC9';
   const fg      = isDark ? '#EDE7D9' : '#17140F';
   const muted   = isDark ? '#8C8577' : '#6E6759';
   const primary = isDark ? '#39FF88' : '#00C853';
+  const badgeColor = isDark ? '#39FF88' : '#00C853';
 
   function openOrderStatus() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -178,10 +185,12 @@ export default function BuyerProfileScreen() {
       <View style={{ paddingHorizontal: 20, marginTop: 12 }}>
         <Text style={[s.heroName, { color: fg }]}>Jordan</Text>
         <Text style={[s.heroSub, { color: muted }]}>@jordan · Joined Jul 2026</Text>
-        <View style={[s.styleBadge, { backgroundColor: STYLE_BADGE.color + '18', borderColor: STYLE_BADGE.color + '40' }]}>
-          <Text style={s.styleBadgeEmoji}>{STYLE_BADGE.emoji}</Text>
-          <Text style={[s.styleBadgeLabel, { color: STYLE_BADGE.color }]}>{STYLE_BADGE.label}</Text>
-        </View>
+        {styleBadge.enabled && (
+          <View style={[s.styleBadge, { backgroundColor: badgeColor + '18', borderColor: badgeColor + '40' }]}>
+            <Text style={s.styleBadgeEmoji}>{styleBadge.emoji}</Text>
+            <Text style={[s.styleBadgeLabel, { color: badgeColor }]}>{styleBadge.label}</Text>
+          </View>
+        )}
       </View>
 
       {/* ─ Action buttons ─ */}
@@ -189,7 +198,7 @@ export default function BuyerProfileScreen() {
         <TouchableOpacity
           style={[s.actionBtn, { borderColor: border }]}
           activeOpacity={0.75}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/onboarding' as never); }}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/edit-profile' as never); }}
         >
           <Text style={[s.actionBtnText, { color: fg }]}>Edit profile</Text>
         </TouchableOpacity>

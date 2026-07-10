@@ -89,6 +89,7 @@ function BuyerTabLayout() {
       {/* Hidden screens — keep routes alive but off the tab bar */}
       <Tabs.Screen name="following" options={{ href: null }} />
       <Tabs.Screen name="wishlist"  options={{ href: null }} />
+      <Tabs.Screen name="edit-profile" options={{ href: null }} />
 
       {/* Feed — centre gradient pill */}
       <Tabs.Screen
