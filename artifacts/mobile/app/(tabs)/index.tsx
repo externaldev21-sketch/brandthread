@@ -169,59 +169,81 @@ export default function SellerDashboard() {
         showsVerticalScrollIndicator={false}
       >
         <View style={[st.header, { paddingHorizontal: 20 }]}>
-          <View style={st.brandRow}>
-            <Text style={[st.brand, { color: colors.foreground }]}>Brandthread</Text>
+          <View>
+            <Text style={[st.greeting, { color: colors.foreground }]}>Hi Ben! <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular' }}>Welcome back to</Text></Text>
+            <TouchableOpacity
+              style={st.storeLinkRow}
+              hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+              activeOpacity={0.7}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                Clipboard.setStringAsync(`https://${STORE_HANDLE}`);
+                Alert.alert('Link copied', `${STORE_HANDLE} copied to clipboard.`);
+              }}
+            >
+              <Text style={[st.storeLinkText, { color: primary }]} numberOfLines={1}>{STORE_HANDLE}</Text>
+              <Feather name="copy" size={13} color={primary} />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={st.storeLinkRow}
-            hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
-            activeOpacity={0.7}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              Clipboard.setStringAsync(`https://${STORE_HANDLE}`);
-              Alert.alert('Link copied', `${STORE_HANDLE} copied to clipboard.`);
-            }}
-          >
-            <Text style={[st.storeLinkText, { color: primary }]} numberOfLines={1}>{STORE_HANDLE}</Text>
-            <Feather name="copy" size={14} color={primary} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Revenue hero */}
-        <View style={[st.heroRow, { paddingHorizontal: 20 }]}>
-          <LinearGradient colors={[primary, primary + '99']} style={st.heroThumb}>
-            <Feather name="shopping-bag" size={26} color="#FFFFFF" />
-          </LinearGradient>
-          <View style={{ flex: 1 }}>
-            <Text style={[st.heroLabel, { color: colors.mutedForeground }]}>Total Revenue</Text>
-            <Text style={[st.heroAmount, { color: colors.foreground }]}>{rev.amount}</Text>
+          <View style={st.headerIcons}>
+            <TouchableOpacity style={[st.headerIconBtn, { backgroundColor: colors.card, borderColor: colors.border }]} activeOpacity={0.75} onPress={() => nav('/general-settings')}>
+              <Feather name="grid" size={16} color={colors.foreground} />
+            </TouchableOpacity>
+            <TouchableOpacity style={[st.headerIconBtn, { backgroundColor: colors.card, borderColor: colors.border }]} activeOpacity={0.75} onPress={() => nav('/notifications-settings')}>
+              <Feather name="bell" size={16} color={colors.foreground} />
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Account balance */}
-        <View style={{ paddingHorizontal: 20, marginTop: 18 }}>
-          <View style={[st.balanceCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {/* Account balance — wallet-style hero */}
+        <View style={{ paddingHorizontal: 20 }}>
+          <View style={[st.balanceCard, { backgroundColor: isDark ? '#141414' : '#171717' }]}>
             <View style={st.balanceTopRow}>
-              <View>
-                <Text style={[st.balanceLabel, { color: colors.mutedForeground }]}>Account Balance</Text>
-                <Text style={[st.balanceAmount, { color: colors.foreground }]}>{ACCOUNT_BALANCE}</Text>
+              <View style={st.currencyBadge}>
+                <Feather name="dollar-sign" size={11} color="#0B0B0B" />
+                <Text style={st.currencyBadgeText}>USD</Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={[st.balanceSubLabel, { color: colors.mutedForeground }]}>
-                  Held by Brandthread: <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold' }}>{HELD_BY_PLATFORM}</Text>
+                <Text style={st.balanceSubLabelDark}>
+                  Held: <Text style={{ color: '#FFFFFF', fontFamily: 'Inter_600SemiBold' }}>{HELD_BY_PLATFORM}</Text>
                 </Text>
-                <Text style={[st.balanceSubLabel, { color: colors.mutedForeground, marginTop: 3 }]}>
-                  Pending: <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold' }}>{PENDING_PAYOUT}</Text>
+                <Text style={[st.balanceSubLabelDark, { marginTop: 3 }]}>
+                  Pending: <Text style={{ color: '#FFFFFF', fontFamily: 'Inter_600SemiBold' }}>{PENDING_PAYOUT}</Text>
                 </Text>
               </View>
             </View>
+            <Text style={st.balanceLabelDark}>Account Balance</Text>
+            <Text style={st.balanceAmountDark}>{ACCOUNT_BALANCE}</Text>
+            <View style={[st.trendPill, { backgroundColor: '#22C55E' }]}>
+              <Feather name="trending-up" size={12} color="#FFFFFF" />
+              <Text style={st.trendPillText}>+2.3% this month</Text>
+            </View>
+          </View>
+
+          {/* Segmented action row */}
+          <View style={st.segmentRow}>
             <TouchableOpacity
-              style={[st.cashOutBtn, { backgroundColor: primary }]}
-              activeOpacity={0.85}
+              style={[st.segmentBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              activeOpacity={0.8}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); nav('/finance'); }}
             >
-              <Feather name="plus" size={15} color="#FFFFFF" />
-              <Text style={st.cashOutText}>Cash Out</Text>
+              <Feather name="arrow-up" size={15} color={colors.foreground} />
+              <Text style={[st.segmentLabel, { color: colors.foreground }]}>Cash Out</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[st.segmentCenterBtn, { backgroundColor: primary }]}
+              activeOpacity={0.85}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setPickerVisible(true); }}
+            >
+              <Feather name="calendar" size={18} color="#FFFFFF" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[st.segmentBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              activeOpacity={0.8}
+              onPress={() => nav('/analytics')}
+            >
+              <Feather name="arrow-down" size={15} color={colors.foreground} />
+              <Text style={[st.segmentLabel, { color: colors.foreground }]}>Details</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -356,24 +378,28 @@ export default function SellerDashboard() {
 
 const st = StyleSheet.create({
   container: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 10 },
-  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  brand: { fontSize: 22, fontFamily: 'Inter_700Bold', letterSpacing: -0.5 },
-  storeLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1, paddingVertical: 6 },
+  header: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20, gap: 10 },
+  greeting: { fontSize: 18, fontFamily: 'Inter_700Bold', letterSpacing: -0.3, marginBottom: 4 },
+  headerIcons: { flexDirection: 'row', gap: 8 },
+  headerIconBtn: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  storeLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flexShrink: 1, paddingVertical: 2 },
   storeLinkText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  heroRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  heroThumb: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' },
   heroLabel: { fontSize: 12, fontFamily: 'Inter_500Medium' },
   periodPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
   periodText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  heroAmount: { fontSize: 30, fontFamily: 'Inter_700Bold', letterSpacing: -0.8, marginTop: 2 },
-  balanceCard: { borderRadius: 18, borderWidth: 1, padding: 18, gap: 16 },
-  balanceTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  balanceLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', marginBottom: 4 },
-  balanceAmount: { fontSize: 24, fontFamily: 'Inter_700Bold', letterSpacing: -0.5 },
-  balanceSubLabel: { fontSize: 12, fontFamily: 'Inter_400Regular' },
-  cashOutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 14, borderRadius: 14 },
-  cashOutText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  balanceCard: { borderRadius: 24, padding: 22, gap: 4 },
+  balanceTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
+  currencyBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFFFFF', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4, alignSelf: 'flex-start' },
+  currencyBadgeText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#0B0B0B' },
+  balanceLabelDark: { fontSize: 12, fontFamily: 'Inter_500Medium', color: 'rgba(255,255,255,0.6)', marginBottom: 4 },
+  balanceAmountDark: { fontSize: 40, fontFamily: 'Inter_700Bold', letterSpacing: -1, color: '#FFFFFF' },
+  balanceSubLabelDark: { fontSize: 11, fontFamily: 'Inter_400Regular', color: 'rgba(255,255,255,0.55)' },
+  trendPill: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', borderRadius: 20, paddingHorizontal: 11, paddingVertical: 6, marginTop: 14 },
+  trendPillText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  segmentRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, paddingHorizontal: 4 },
+  segmentBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 14, borderRadius: 16, borderWidth: 1 },
+  segmentLabel: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  segmentCenterBtn: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginHorizontal: 10 },
   keyStatsRow: { flexDirection: 'row', gap: 10, marginTop: 2 },
   keyStatCard: { flex: 1, borderRadius: 16, borderWidth: 1, padding: 16, gap: 8 },
   keyStatLabel: { fontSize: 12, fontFamily: 'Inter_500Medium' },
