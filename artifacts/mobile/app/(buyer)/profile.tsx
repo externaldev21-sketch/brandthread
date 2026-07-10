@@ -325,7 +325,7 @@ export default function BuyerProfileScreen() {
       )}
 
       {tab === 'wishlist' && (
-        <EmptyState icon="heart" label="No wishlist items yet" muted={muted} border={border} />
+        <EmptyState icon="heart" label="No liked videos yet" muted={muted} border={border} />
       )}
 
       {tab === 'saved' && (
