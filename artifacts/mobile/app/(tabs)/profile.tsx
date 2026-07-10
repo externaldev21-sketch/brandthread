@@ -128,7 +128,6 @@ export default function ProfileScreen() {
       {/* ─ Name / Edit ─ */}
       <View style={styles.nameRow}>
         <Text style={styles.brandName}>Brandthread</Text>
-        <Text style={styles.badgeEmoji}>💜</Text>
         <TouchableOpacity style={styles.editBtn} activeOpacity={0.8} onPress={() => nav('/edit-profile')}>
           <Text style={styles.editBtnText}>Edit</Text>
         </TouchableOpacity>
@@ -244,7 +243,6 @@ const styles = StyleSheet.create({
 
   nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 14 },
   brandName: { fontSize: 19, fontFamily: 'Inter_700Bold', color: fg },
-  badgeEmoji: { fontSize: 13 },
   editBtn: { backgroundColor: pillBg, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 },
   editBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: fg },
   brandHandle: { fontSize: 13, fontFamily: 'Inter_400Regular', color: muted, textAlign: 'center', marginTop: 4 },
