@@ -44,6 +44,7 @@ const TABS = [
   { key: 'orders',   icon: 'grid'     as const },
   { key: 'brands',   icon: 'users'    as const },
   { key: 'wishlist', icon: 'heart'    as const },
+  { key: 'reposts',  icon: 'repeat'   as const },
   { key: 'saved',    icon: 'bookmark' as const },
 ] as const;
 
@@ -326,6 +327,10 @@ export default function BuyerProfileScreen() {
 
       {tab === 'wishlist' && (
         <EmptyState icon="heart" label="No liked videos yet" muted={muted} border={border} />
+      )}
+
+      {tab === 'reposts' && (
+        <EmptyState icon="repeat" label="No reposts yet" muted={muted} border={border} />
       )}
 
       {tab === 'saved' && (
