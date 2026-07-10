@@ -27,7 +27,7 @@ export function FeatureCard({ title, subtitle, icon, onPress, accent = false, ba
         },
       ]}
     >
-      <View style={[styles.iconWrap, { backgroundColor: accent ? '#C1440E22' : colors.secondary }]}>
+      <View style={[styles.iconWrap, { backgroundColor: accent ? '#00C85322' : colors.secondary }]}>
         <Feather name={icon} size={20} color={accent ? colors.primary : colors.mutedForeground} />
       </View>
       <View style={styles.content}>
@@ -39,7 +39,7 @@ export function FeatureCard({ title, subtitle, icon, onPress, accent = false, ba
         )}
       </View>
       {badge != null && (
-        <View style={[styles.badge, { backgroundColor: '#C1440E22' }]}>
+        <View style={[styles.badge, { backgroundColor: '#00C85322' }]}>
           <Text style={[styles.badgeText, { color: colors.primary }]}>{badge}</Text>
         </View>
       )}

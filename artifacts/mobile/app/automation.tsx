@@ -31,9 +31,9 @@ const AUTOMATIONS: Automation[] = [
 const CATEGORY_COLORS: Record<string, string> = {
   Inventory: '#B98A2E',
   Orders: '#4A6FA5',
-  Marketing: '#C94D1F',
+  Marketing: '#39FF88',
   Fulfillment: '#4C9A5E',
-  CRM: '#8A3A22',
+  CRM: '#0F3822',
 };
 
 const TEMPLATES = [
@@ -133,7 +133,7 @@ export default function AutomationScreen() {
           activeOpacity={0.75}
           style={[styles.templateRow, { backgroundColor: colors.card, borderColor: colors.border }]}
         >
-          <View style={[styles.templateIcon, { backgroundColor: '#C1440E22' }]}>
+          <View style={[styles.templateIcon, { backgroundColor: '#00C85322' }]}>
             <Feather name="cpu" size={16} color={colors.primary} />
           </View>
           <View style={styles.templateInfo}>

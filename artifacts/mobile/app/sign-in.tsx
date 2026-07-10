@@ -34,7 +34,7 @@ export default function SignInScreen() {
   const border  = isDark ? '#33302A' : '#DBD3C0';
   const fg      = isDark ? '#EDE7D9' : '#17140F';
   const muted   = isDark ? '#8C8577' : '#6E6759';
-  const primary = isDark ? '#C94D1F' : '#B33F1E';
+  const primary = isDark ? '#39FF88' : '#00C853';
   const inputBg = isDark ? '#201D18' : '#EDE7D9';
 
   // ─── Sign-in ───────────────────────────────────────────────────────────────
@@ -152,7 +152,7 @@ export default function SignInScreen() {
             activeOpacity={0.85}
           >
             {isSigningUp
-              ? <ActivityIndicator color="#FFF" />
+              ? <ActivityIndicator color="#03150B" />
               : <Text style={styles.btnText}>Verify email</Text>}
           </TouchableOpacity>
 
@@ -260,7 +260,7 @@ export default function SignInScreen() {
             activeOpacity={0.85}
           >
             {(isSigningIn || isSigningUp)
-              ? <ActivityIndicator color="#FFF" />
+              ? <ActivityIndicator color="#03150B" />
               : <Text style={styles.btnText}>{mode === 'sign-in' ? 'Sign in' : 'Create account'}</Text>}
           </TouchableOpacity>
 
@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
   input:      { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: 'Inter_400Regular' },
   error:      { color: '#EF4444', fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 4 },
   btn:        { borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 4 },
-  btnText:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  btnText:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#03150B' },
   switchRow:  { marginTop: 16, alignItems: 'center' },
   switchText: { fontSize: 14, fontFamily: 'Inter_400Regular' },
 });

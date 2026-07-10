@@ -106,13 +106,13 @@ interface DropCardProps {
 }
 
 function DropCard({ drop, colors, isDark, isLast }: DropCardProps) {
-  const primary = isDark ? '#C94D1F' : '#B33F1E';
+  const primary = isDark ? '#39FF88' : '#00C853';
   const isPreOrder = drop.type === 'pre-order';
   const s = statusConfig[drop.status];
 
-  const typeColor   = isPreOrder ? (isDark ? '#E2DDD0' : '#B33F1E') : (isDark ? '#4C9A5E' : '#3F7A4F');
-  const typeBg      = isPreOrder ? (isDark ? '#C94D1F18' : '#E8E1CF') : (isDark ? '#4C9A5E18' : '#DCFCE7');
-  const typeBorder  = isPreOrder ? (isDark ? '#C1440E33' : '#DBD3C0') : (isDark ? '#4C9A5E33' : '#BBF7D0');
+  const typeColor   = isPreOrder ? (isDark ? '#E2DDD0' : '#00C853') : (isDark ? '#4C9A5E' : '#3F7A4F');
+  const typeBg      = isPreOrder ? (isDark ? '#39FF8818' : '#E8E1CF') : (isDark ? '#4C9A5E18' : '#DCFCE7');
+  const typeBorder  = isPreOrder ? (isDark ? '#00C85333' : '#DBD3C0') : (isDark ? '#4C9A5E33' : '#BBF7D0');
   const progressBg  = isDark ? '#33302A' : '#E8E1CF';
 
   return (
@@ -224,7 +224,7 @@ export default function PaymentsScreen() {
   const colors = useColors();
 
   const isDark = colors.background === '#121110' || colors.background.startsWith('#0');
-  const primary = isDark ? '#C94D1F' : '#B33F1E';
+  const primary = isDark ? '#39FF88' : '#00C853';
 
   const preOrderDrops = DROPS.filter((d) => d.type === 'pre-order');
   const preMadeDrops  = DROPS.filter((d) => d.type === 'pre-made');
@@ -244,7 +244,7 @@ export default function PaymentsScreen() {
 
         {/* ── Next payout banner ── */}
         {nextPayout && (
-          <View style={[styles.banner, { backgroundColor: isDark ? '#C1440E22' : '#E8F0FE', borderColor: isDark ? '#C1440E44' : '#C7DBFB' }]}>
+          <View style={[styles.banner, { backgroundColor: isDark ? '#00C85322' : '#E8F0FE', borderColor: isDark ? '#00C85344' : '#C7DBFB' }]}>
             <Feather name="info" size={14} color={isDark ? '#E2DDD0' : '#1A56C4'} />
             <Text style={[styles.bannerText, { color: isDark ? '#E2DDD0' : '#1A3E7A' }]}>
               Next payout on {nextPayout.payoutDate} · ${nextPayout.totalRaw.toLocaleString()} from {nextPayout.name}
@@ -345,11 +345,11 @@ export default function PaymentsScreen() {
 
         {/* ── Pre Order Drops ── */}
         <View style={styles.sectionHeader}>
-          <View style={[styles.sectionDot, { backgroundColor: isDark ? '#E2DDD0' : '#B33F1E' }]} />
+          <View style={[styles.sectionDot, { backgroundColor: isDark ? '#E2DDD0' : '#00C853' }]} />
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Pre Order Drops</Text>
           <Text style={[styles.sectionCount, { color: colors.mutedForeground }]}>{preOrderDrops.length}</Text>
         </View>
-        <View style={[styles.preOrderNote, { backgroundColor: isDark ? '#C94D1F10' : '#E8E1CF', borderColor: isDark ? '#C1440E33' : '#DBD3C0' }]}>
+        <View style={[styles.preOrderNote, { backgroundColor: isDark ? '#39FF8810' : '#E8E1CF', borderColor: isDark ? '#00C85333' : '#DBD3C0' }]}>
           <Feather name="clock" size={13} color={isDark ? '#E2DDD0' : primary} />
           <Text style={[styles.preOrderNoteText, { color: isDark ? '#E2DDD0' : primary }]}>
             Funds collected upfront and held until each drop ships

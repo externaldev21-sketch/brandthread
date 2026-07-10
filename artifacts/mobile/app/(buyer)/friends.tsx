@@ -18,7 +18,7 @@ const FRIENDS = [
   { id: 'f2', name: 'Jordan Lee',   handle: '@jordanlee',   chatId: 'jordan', initials: 'JL', color: '#1D4ED8', hasNew: true  },
   { id: 'f3', name: 'Amir Patel',   handle: '@amirpatel',   chatId: 'amir',   initials: 'AP', color: '#0F766E', hasNew: false },
   { id: 'f4', name: 'Sofia Reyes',  handle: '@sofiareyes',  chatId: 'sofia',  initials: 'SR', color: '#B45309', hasNew: true  },
-  { id: 'f5', name: 'Kai Nakamura', handle: '@kainakamura', chatId: 'kai',    initials: 'KN', color: '#B33F1E', hasNew: false },
+  { id: 'f5', name: 'Kai Nakamura', handle: '@kainakamura', chatId: 'kai',    initials: 'KN', color: '#00C853', hasNew: false },
 ];
 
 const FRIEND_POSTS = [
@@ -422,5 +422,5 @@ const s = StyleSheet.create({
     flex: 1, backgroundColor: '#201D18', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10,
     fontSize: 13, fontFamily: 'Inter_400Regular', color: '#EDE7D9',
   },
-  commentSendBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#C94D1F', alignItems: 'center', justifyContent: 'center' },
+  commentSendBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: '#39FF88', alignItems: 'center', justifyContent: 'center' },
 });

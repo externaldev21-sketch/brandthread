@@ -15,7 +15,7 @@ const FEATURES = [
 export default function MobileAppBuilderScreen() {
   const colors = useColors();
   const isDark = colors.background === '#121110' || colors.background.startsWith('#0');
-  const primary = isDark ? '#C94D1F' : '#B33F1E';
+  const primary = isDark ? '#39FF88' : '#00C853';
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -25,7 +25,7 @@ export default function MobileAppBuilderScreen() {
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.heroCard, { backgroundColor: isDark ? '#17140F' : colors.secondary, borderColor: isDark ? '#C1440E44' : colors.border }]}>
+        <View style={[styles.heroCard, { backgroundColor: isDark ? '#17140F' : colors.secondary, borderColor: isDark ? '#00C85344' : colors.border }]}>
           <View style={styles.heroTop}>
             <View style={[styles.heroIcon, { backgroundColor: primary + '22' }]}>
               <Feather name="smartphone" size={22} color={primary} />
@@ -37,7 +37,7 @@ export default function MobileAppBuilderScreen() {
             Turn your storefront into a fully branded iOS & Android app — no code required.
           </Text>
           <TouchableOpacity style={[styles.ctaBtn, { backgroundColor: primary }]} activeOpacity={0.85}>
-            <Feather name="zap" size={15} color="#FFFFFF" />
+            <Feather name="zap" size={15} color="#03150B" />
             <Text style={styles.ctaText}>Start building</Text>
           </TouchableOpacity>
         </View>
@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
   heroTitle: { fontSize: 20, fontFamily: 'Inter_700Bold', marginTop: 4 },
   heroSub: { fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 19 },
   ctaBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, paddingVertical: 13, marginTop: 6 },
-  ctaText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
+  ctaText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: '#03150B' },
   sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
   section: { borderRadius: 14, borderWidth: 1 },
   featureRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },

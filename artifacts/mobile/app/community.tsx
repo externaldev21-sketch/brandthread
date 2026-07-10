@@ -24,7 +24,7 @@ export default function CommunityScreen() {
       >
 
       {/* Member Badge */}
-      <View style={[styles.memberCard, { backgroundColor: '#17140F', borderColor: '#C1440E44' }]}>
+      <View style={[styles.memberCard, { backgroundColor: '#17140F', borderColor: '#00C85344' }]}>
         <Feather name="award" size={20} color={colors.primary} />
         <View style={{ flex: 1 }}>
           <Text style={[styles.memberTitle, { color: colors.foreground }]}>Member since Jan 2025</Text>
@@ -38,7 +38,7 @@ export default function CommunityScreen() {
       <Text style={[styles.hireSubtitle, { color: colors.mutedForeground }]}>Vetted creatives ready to work on your brand</Text>
       {FREELANCERS.map((f) => (
         <View key={f.name} style={[styles.freelancerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={[styles.freAvatar, { backgroundColor: '#C1440E22' }]}>
+          <View style={[styles.freAvatar, { backgroundColor: '#00C85322' }]}>
             <Text style={[styles.freInitial, { color: colors.primary }]}>{f.name[0]}</Text>
           </View>
           <View style={styles.freInfo}>

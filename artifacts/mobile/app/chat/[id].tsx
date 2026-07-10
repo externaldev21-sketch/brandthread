@@ -64,7 +64,7 @@ function Bubble({ msg, prevMsg, isDark, friendColor }: {
       <View style={[bub.row, isMe ? bub.rowMe : bub.rowThem]}>
         {isMe ? (
           <LinearGradient
-            colors={['#8A3A22', '#B33F1E']}
+            colors={['#0F3822', '#00C853']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[bub.bubble, bub.bubbleMe]}
@@ -116,7 +116,7 @@ function TypingIndicator({ isDark }: { isDark: boolean }) {
   }, []);
   return (
     <View style={[ty.wrap, { backgroundColor: isDark ? '#1D1A15' : '#EDE7D9' }]}>
-      <Text style={[ty.dots, { color: isDark ? '#C94D1F' : '#B33F1E' }]}>{dots}</Text>
+      <Text style={[ty.dots, { color: isDark ? '#39FF88' : '#00C853' }]}>{dots}</Text>
     </View>
   );
 }
@@ -190,7 +190,7 @@ export default function ChatScreen() {
       {/* Header */}
       <View style={[s.header, { backgroundColor: headerBg, borderBottomColor: border, paddingTop: insets.top + 8 }]}>
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
-          <Feather name="chevron-left" size={26} color={isDark ? '#C94D1F' : '#B33F1E'} />
+          <Feather name="chevron-left" size={26} color={isDark ? '#39FF88' : '#00C853'} />
         </TouchableOpacity>
 
         <TouchableOpacity style={s.headerCenter} activeOpacity={0.85}>
@@ -263,7 +263,7 @@ export default function ChatScreen() {
           disabled={!text.trim()}
         >
           <LinearGradient
-            colors={text.trim() ? ['#8A3A22', '#B33F1E'] : [isDark ? '#2A261E' : '#E8E1CF', isDark ? '#2A261E' : '#E8E1CF']}
+            colors={text.trim() ? ['#0F3822', '#00C853'] : [isDark ? '#2A261E' : '#E8E1CF', isDark ? '#2A261E' : '#E8E1CF']}
             style={s.sendBtn}
           >
             <Feather name="send" size={17} color={text.trim() ? '#FFFFFF' : muted} />

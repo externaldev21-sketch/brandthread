@@ -33,7 +33,7 @@ function SellerTabLayout() {
     borderTopWidth: 0,
     backgroundColor: isIOS ? 'transparent' : pillBg,
     elevation: 24,
-    shadowColor: isDark ? '#000000' : '#B33F1E',
+    shadowColor: isDark ? '#000000' : '#00C853',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: isDark ? 0.5 : 0.15,
     shadowRadius: 20,
@@ -146,8 +146,8 @@ function FeedCenterIcon({ focused }: { focused: boolean }) {
   return (
     <LinearGradient
       colors={focused
-        ? ['#D9714B', '#C1440E', '#B33F1E']
-        : ['#D9714B', '#8A3A22', '#B33F1E']}
+        ? ['#39FF88', '#00C853', '#0B3B1F']
+        : ['#1E5B36', '#0F3822', '#0B3B1F']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={feedStyles.pill}
@@ -164,7 +164,7 @@ const feedStyles = StyleSheet.create({
     borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#C1440E',
+    shadowColor: '#00C853',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.7,
     shadowRadius: 10,
@@ -185,7 +185,7 @@ function TabIcon({ name, color, focused }: { name: keyof typeof Feather.glyphMap
     <View style={{ alignItems: 'center', gap: 4 }}>
       <Feather name={name} size={20} color={color} />
       {focused && (
-        <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#C94D1F' }} />
+        <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#39FF88' }} />
       )}
     </View>
   );

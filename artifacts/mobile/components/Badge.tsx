@@ -17,7 +17,7 @@ export function Badge({ label, variant = 'default' }: BadgeProps) {
     warning: { bg: '#B98A2E22', text: colors.warning },
     error: { bg: '#EF444422', text: colors.destructive },
     info: { bg: '#4A6FA522', text: colors.info },
-    gold: { bg: '#C1440E22', text: colors.primary },
+    gold: { bg: '#00C85322', text: colors.primary },
     default: { bg: colors.secondary, text: colors.mutedForeground },
   };
 

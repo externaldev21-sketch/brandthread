@@ -23,7 +23,7 @@ const NOTIF_ITEMS = [
 
 type NotifType = 'drop' | 'order' | 'restock';
 const TYPE_META: Record<NotifType, { icon: keyof typeof Feather.glyphMap; color: string }> = {
-  drop:    { icon: 'zap',        color: '#B33F1E' },
+  drop:    { icon: 'zap',        color: '#00C853' },
   order:   { icon: 'package',    color: '#4C9A5E' },
   restock: { icon: 'refresh-cw', color: '#B98A2E' },
 };
@@ -81,7 +81,7 @@ function DMRow({ friend, last, unread, isDark, onPress }: {
 }) {
   const fg     = isDark ? '#EDE7D9' : '#17140F';
   const muted  = isDark ? '#8C8577' : '#5C5548';
-  const primary = isDark ? '#C94D1F' : '#B33F1E';
+  const primary = isDark ? '#39FF88' : '#00C853';
 
   return (
     <InboxRow
@@ -118,7 +118,7 @@ function NotifRow({ item, isDark, onRead }: {
 }) {
   const fg      = isDark ? '#EDE7D9' : '#17140F';
   const muted   = isDark ? '#8C8577' : '#5C5548';
-  const primary = isDark ? '#C94D1F' : '#B33F1E';
+  const primary = isDark ? '#39FF88' : '#00C853';
   const meta    = TYPE_META[item.type];
   const badgeCountVisible = !item.read && (item.type === 'drop' || item.type === 'restock');
   const badgeDotVisible   = !item.read && !badgeCountVisible;
@@ -176,7 +176,7 @@ export default function InboxScreen() {
   const fg      = isDark ? '#EDE7D9' : '#17140F';
   const muted   = isDark ? '#8C8577' : '#5C5548';
   const border  = isDark ? '#33302A' : '#E3DCC9';
-  const primary = isDark ? '#C94D1F' : '#B33F1E';
+  const primary = isDark ? '#39FF88' : '#00C853';
   const chipBg  = isDark ? '#1B1917' : '#FFFFFF';
 
   // Trigger re-renders when store changes
