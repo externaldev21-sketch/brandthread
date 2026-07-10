@@ -42,7 +42,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [onboardingDone, setOnboardingDone] = useState(false);
   const [storedRole, setStoredRole] = useState<string | null>(null);
 
-  // In dev bypass mode, seed storage as a buyer so the buyer screens are
+  // In dev bypass mode, seed storage as a seller so the seller dashboard is
   // immediately visible for preview. Flip DEV_BYPASS_AUTH to false before shipping.
   useEffect(() => {
     if (!DEV_BYPASS_AUTH) return;
