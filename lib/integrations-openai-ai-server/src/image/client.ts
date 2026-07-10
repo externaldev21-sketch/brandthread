@@ -35,7 +35,8 @@ export async function generateImageBuffer(
 export async function editImages(
   imageFiles: string[],
   prompt: string,
-  outputPath?: string
+  outputPath?: string,
+  options?: { background?: "transparent" | "opaque" | "auto" }
 ): Promise<Buffer> {
   const images = await Promise.all(
     imageFiles.map((file) =>
@@ -49,6 +50,7 @@ export async function editImages(
     model: "gpt-image-1",
     image: images,
     prompt,
+    ...(options?.background ? { background: options.background } : {}),
   });
 
   const imageBase64 = response.data?.[0]?.b64_json ?? "";

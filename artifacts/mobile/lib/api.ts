@@ -85,6 +85,9 @@ export function createApi(getToken: GetToken) {
     photography: {
       generate: (images: string[], prompt: string) => post<any>('/api/photography/generate', { images, prompt }),
     },
+    bgRemoval: {
+      remove: (image: string) => post<any>('/api/bg-removal/remove', { image }),
+    },
     integrations: {
       klaviyoStatus:      () => get<any>('/api/integrations/klaviyo'),
       klaviyoConnect:     (apiKey: string) => post<any>('/api/integrations/klaviyo/connect', { apiKey }),

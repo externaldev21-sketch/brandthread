@@ -177,6 +177,10 @@ export default function AIStudioScreen() {
               router.push('/ai-photography-chat' as never);
               return;
             }
+            if (tool.label === 'Background Removal') {
+              router.push('/bg-removal' as never);
+              return;
+            }
             setSelected(tool.label);
           }}
           activeOpacity={0.75}
