@@ -1,11 +1,12 @@
 import React from 'react';
-import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ProfileTabButton } from '@/components/ProfileTabButton';
 
 // ─── Seller / Both layout ─────────────────────────────────────────────────────
 // Tabs: Dashboard · Products · Feed (centre pill) · More · Profile
@@ -119,6 +120,10 @@ function SellerTabLayout() {
             ) : (
               <TabIcon name="user" color={color} focused={focused} />
             ),
+          // Double-tap swaps to the buyer profile when the account has both sides.
+          tabBarButton: (props: any) => (
+            <ProfileTabButton {...props} otherSidePath="/(buyer)/profile" />
+          ),
         }}
       />
     </Tabs>
