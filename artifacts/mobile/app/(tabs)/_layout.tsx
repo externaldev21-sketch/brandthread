@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
+import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -13,15 +13,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 function SellerTabLayout() {
   const colors = useColors();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const isDark = true;
   const isIOS = Platform.OS === 'ios';
   const isWeb = Platform.OS === 'web';
   const insets = useSafeAreaInsets();
   const bottomOffset = isWeb ? 20 : Math.max(insets.bottom, 8) + 12;
 
-  const pillBg       = isDark ? '#1B1917F0' : '#FAF7EEF0';
-  const inactiveTint = isDark ? '#6E685C'   : '#A69C87';
+  const pillBg       = '#131513F0';
+  const inactiveTint = '#6E7A72';
 
   const tabBarStyle = {
     position: 'absolute' as const,

@@ -7,10 +7,12 @@ type BadgeVariant = 'success' | 'warning' | 'error' | 'info' | 'gold' | 'default
 interface BadgeProps {
   label: string;
   variant?: BadgeVariant;
+  colors?: { success: string; warning: string; destructive: string; info: string; primary: string; secondary: string; mutedForeground: string };
 }
 
-export function Badge({ label, variant = 'default' }: BadgeProps) {
-  const colors = useColors();
+export function Badge({ label, variant = 'default', colors: colorsProp }: BadgeProps) {
+  const themeColors = useColors();
+  const colors = colorsProp ?? themeColors;
 
   const config: Record<BadgeVariant, { bg: string; text: string }> = {
     success: { bg: '#4C9A5E22', text: colors.success },
