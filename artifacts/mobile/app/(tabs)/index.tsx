@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import {
   ScrollView, View, Text, TouchableOpacity, StyleSheet,
-  Platform, useColorScheme, Alert, Dimensions,
+  Platform, Alert, Dimensions,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { useColors } from '@/hooks/useColors';
+import palette from '@/constants/colors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Badge } from '@/components/Badge';
 import { SectionHeader } from '@/components/SectionHeader';
@@ -144,11 +144,10 @@ function defaultRange(): DateRange {
 // ─── Seller Dashboard ─────────────────────────────────────────────────────────
 
 export default function SellerDashboard() {
-  const colors = useColors();
-  const scheme = useColorScheme();
+  const colors = palette.dark;
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const isDark = scheme !== 'light';
+  const isDark = true;
   const [pickerVisible, setPickerVisible] = useState(false);
   const [range, setRange] = useState<DateRange>(defaultRange);
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -250,7 +249,7 @@ export default function SellerDashboard() {
 
         {/* Stats (Last 28 days) */}
         <View style={{ paddingHorizontal: 20, marginTop: 28 }}>
-          <SectionHeader title="Stats (Last 28 days)" action="View All →" onAction={() => nav('/analytics')} />
+          <SectionHeader title="Stats (Last 28 days)" action="View All →" onAction={() => nav('/analytics')} colors={colors} />
         </View>
         <View style={[st.keyStatsRow, { paddingHorizontal: 20 }]}>
           {KEY_STATS.map((s) => (
@@ -296,7 +295,7 @@ export default function SellerDashboard() {
         </ScrollView>
 
         {/* Quick Actions */}
-        <View style={{ paddingHorizontal: 20, marginTop: 28 }}><SectionHeader title="Quick Actions" /></View>
+        <View style={{ paddingHorizontal: 20, marginTop: 28 }}><SectionHeader title="Quick Actions" colors={colors} /></View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.actionsScroll}>
           {QUICK_ACTIONS.map((qa, i) => (
             <TouchableOpacity key={qa.label} style={[st.actionChip, { backgroundColor: colors.card, borderColor: colors.border }, i === 0 && { marginLeft: 20 }, i === QUICK_ACTIONS.length - 1 && { marginRight: 20 }]} onPress={() => nav(qa.route)} activeOpacity={0.75}>
@@ -308,7 +307,7 @@ export default function SellerDashboard() {
 
         {/* My Orders */}
         <View style={{ paddingHorizontal: 20, marginTop: 32 }}>
-          <SectionHeader title="My Orders" action="View All →" onAction={() => nav('/analytics')} />
+          <SectionHeader title="My Orders" action="View All →" onAction={() => nav('/analytics')} colors={colors} />
           <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {RECENT_ORDERS.map((order, i) => {
               const s = statusMap[order.status];
@@ -322,7 +321,7 @@ export default function SellerDashboard() {
                   </View>
                   <View style={st.orderRight}>
                     <Text style={[st.orderAmount, { color: colors.foreground }]}>{order.amount}</Text>
-                    <Badge label={s.label} variant={s.variant} />
+                    <Badge label={s.label} variant={s.variant} colors={colors} />
                   </View>
                 </View>
               );
@@ -332,7 +331,7 @@ export default function SellerDashboard() {
 
         {/* Low Stock */}
         <View style={{ paddingHorizontal: 20, marginTop: 28 }}>
-          <SectionHeader title="Low Stock" action="Manage" onAction={() => nav('/products')} />
+          <SectionHeader title="Low Stock" action="Manage" onAction={() => nav('/products')} colors={colors} />
           <View style={[st.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             {LOW_STOCK.map((item, i) => (
               <View key={item.name} style={[st.stockRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
@@ -350,7 +349,7 @@ export default function SellerDashboard() {
 
         {/* Analytics */}
         <View style={{ paddingHorizontal: 20, marginTop: 28 }}>
-          <SectionHeader title="Analytics" action="View all" onAction={() => nav('/analytics')} />
+          <SectionHeader title="Analytics" action="View all" onAction={() => nav('/analytics')} colors={colors} />
           <View style={st.metricsGrid}>
             {ANALYTICS_METRICS.map((m) => (
               <View key={m.label} style={[st.metricCard, { backgroundColor: colors.card, borderColor: colors.border }]}>

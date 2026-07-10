@@ -6,10 +6,12 @@ interface SectionHeaderProps {
   title: string;
   action?: string;
   onAction?: () => void;
+  colors?: { foreground: string; primary: string };
 }
 
-export function SectionHeader({ title, action, onAction }: SectionHeaderProps) {
-  const colors = useColors();
+export function SectionHeader({ title, action, onAction, colors: colorsProp }: SectionHeaderProps) {
+  const themeColors = useColors();
+  const colors = colorsProp ?? themeColors;
   return (
     <View style={styles.row}>
       <Text style={[styles.title, { color: colors.foreground }]}>{title}</Text>
