@@ -59,7 +59,7 @@ const FEATURE_GROUPS: FeatureGroup[] = [
     title: 'Community & Growth',
     items: [
       { label: 'Marketing',           icon: 'send',        route: '/marketing', color: '#F43F5E' },
-      { label: 'Hire from community.', icon: 'globe',       route: '/community', color: '#3B82F6' },
+      { label: 'Hire',                icon: 'globe',       route: '/community', color: '#3B82F6' },
       { label: 'Build the App', icon: 'smartphone',  route: '/mobile-app-builder', color: '#A855F7', badge: 'Pro' },
     ],
   },
