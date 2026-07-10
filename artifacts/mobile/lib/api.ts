@@ -79,6 +79,9 @@ export function createApi(getToken: GetToken) {
     logo: {
       generate: (brandName: string, style: string) => post<any>('/api/logo/generate', { brandName, style }),
     },
+    mockup: {
+      generate: (prompt: string) => post<any>('/api/mockup/generate', { prompt }),
+    },
     integrations: {
       klaviyoStatus:      () => get<any>('/api/integrations/klaviyo'),
       klaviyoConnect:     (apiKey: string) => post<any>('/api/integrations/klaviyo/connect', { apiKey }),

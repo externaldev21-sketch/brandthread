@@ -8,6 +8,7 @@ import dropsRouter from "./drops";
 import analyticsRouter from "./analytics";
 import integrationsRouter from "./integrations";
 import logoRouter from "./logo";
+import mockupRouter from "./mockup";
 
 const router = Router();
 
@@ -20,5 +21,6 @@ router.use("/drops",       dropsRouter);
 router.use("/analytics",   analyticsRouter);
 router.use("/integrations", integrationsRouter);
 router.use("/logo",         logoRouter);
+router.use("/mockup",       mockupRouter);
 
 export default router;

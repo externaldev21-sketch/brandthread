@@ -169,6 +169,10 @@ export default function AIStudioScreen() {
           key={tool.label}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            if (tool.label === 'AI Clothing Mockups') {
+              router.push('/ai-mockup-chat' as never);
+              return;
+            }
             setSelected(tool.label);
           }}
           activeOpacity={0.75}
