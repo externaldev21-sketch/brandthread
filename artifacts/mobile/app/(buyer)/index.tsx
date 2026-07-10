@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  Animated, Dimensions, Platform, ScrollView, StyleSheet,
+  Animated, Dimensions, Platform, RefreshControl, ScrollView, StyleSheet,
   Text, TouchableOpacity, View, useColorScheme, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,12 +29,42 @@ const HERO_DROP = {
   accentGradient: ['#39FF88', '#00C853'] as [string, string],
 };
 
-const FOR_YOU = [
+type ForYouItem = {
+  id: string; brand: string; name: string; price: string;
+  originalPrice: string | null; color: string; initials: string; tag: string;
+};
+
+const FOR_YOU: ForYouItem[] = [
   { id: 'y1', brand: 'NxGen Drops',  name: 'Archive Hoodie Vol.3',   price: '$135', originalPrice: null,  color: '#B45309', initials: 'NX', tag: 'Archive' },
   { id: 'y2', brand: 'Coldform',     name: 'Raw Denim Jacket',        price: '$310', originalPrice: '$380', color: '#065F46', initials: 'CF', tag: 'Archive' },
   { id: 'y3', brand: 'Atlas Goods',  name: 'Waxed Field Jacket',      price: '$260', originalPrice: null,  color: '#1D4ED8', initials: 'AG', tag: 'Limited' },
   { id: 'y4', brand: 'Softwear__',   name: 'Oversized Crewneck',      price: '$88',  originalPrice: null,  color: '#BE185D', initials: 'SW', tag: 'New' },
 ];
+
+// Brands the buyer does not follow — a discovery pool "For You" can pull fresh picks from on refresh.
+const UNFOLLOWED_BRAND_POOL: ForYouItem[] = [
+  { id: 'u1',  brand: 'Fernweh Supply',  name: 'Selvedge Trucker Jacket', price: '$225', originalPrice: null,  color: '#7C3AED', initials: 'FS', tag: 'New' },
+  { id: 'u2',  brand: 'Northloom',       name: 'Brushed Fleece Half-Zip', price: '$142', originalPrice: null,  color: '#0891B2', initials: 'NL', tag: 'Archive' },
+  { id: 'u3',  brand: 'Palisade',        name: 'Wide-Leg Twill Trouser',  price: '$168', originalPrice: '$210', color: '#9F1239', initials: 'PL', tag: 'Sale' },
+  { id: 'u4',  brand: 'Grainhouse',      name: 'Heavyweight Canvas Tote', price: '$64',  originalPrice: null,  color: '#B45309', initials: 'GH', tag: 'New' },
+  { id: 'u5',  brand: 'Late Bloom Co.',  name: 'Cropped Utility Vest',    price: '$118', originalPrice: null,  color: '#BE185D', initials: 'LB', tag: 'Limited' },
+  { id: 'u6',  brand: 'Static Age',      name: 'Distressed Denim Set',    price: '$196', originalPrice: null,  color: '#334155', initials: 'SA', tag: 'Archive' },
+  { id: 'u7',  brand: 'Overtone',        name: 'Merino Crewneck',         price: '$105', originalPrice: null,  color: '#065F46', initials: 'OT', tag: 'New' },
+  { id: 'u8',  brand: 'Rowhouse',        name: 'Waxed Chore Coat',        price: '$275', originalPrice: '$340', color: '#78350F', initials: 'RH', tag: 'Sale' },
+  { id: 'u9',  brand: 'Field & Fray',    name: 'Ripstop Cargo Shorts',    price: '$92',  originalPrice: null,  color: '#166534', initials: 'FF', tag: 'Limited' },
+  { id: 'u10', brand: 'Amber Route',     name: 'Suede Trucker Cap',       price: '$54',  originalPrice: null,  color: '#92400E', initials: 'AR', tag: 'New' },
+  { id: 'u11', brand: 'Hollow Point',    name: 'Boiled Wool Overshirt',   price: '$210', originalPrice: null,  color: '#1E293B', initials: 'HP', tag: 'Archive' },
+  { id: 'u12', brand: 'Faint Signal',    name: 'Mesh Panel Runner',       price: '$78',  originalPrice: '$98',  color: '#3730A3', initials: 'FSg', tag: 'Sale' },
+];
+
+function shuffle<T>(arr: T[]): T[] {
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
 
 const DROPPING_SOON = [
   { id: 'd1', brand: 'Meridian Co.',  name: 'Essential Tee — Sage',   price: '$48',  color: '#0F766E', initials: 'MC', inHours: 0,  live: true  },
@@ -420,11 +450,26 @@ export default function HomeScreen() {
   const primary = isDark ? '#39FF88' : '#00C853';
   const topPad  = Platform.OS === 'web' ? 67 : insets.top;
 
+  const [discoverItems, setDiscoverItems] = useState<ForYouItem[]>(() => shuffle(UNFOLLOWED_BRAND_POOL).slice(0, 4));
+  const [refreshing, setRefreshing] = useState(false);
+
+  function handleRefresh() {
+    setRefreshing(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setTimeout(() => {
+      setDiscoverItems(shuffle(UNFOLLOWED_BRAND_POOL).slice(0, 4));
+      setRefreshing(false);
+    }, 500);
+  }
+
   return (
     <ScrollView
       style={[s.container, { backgroundColor: bg }]}
       contentContainerStyle={{ paddingBottom: 110 }}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={primary} colors={[primary]} />
+      }
     >
       {/* ─ Header ─ */}
       <View style={[s.header, { paddingTop: topPad + 16, paddingHorizontal: 20 }]}>
@@ -475,6 +520,26 @@ export default function HomeScreen() {
         style={{ marginBottom: 32 }}
       >
         {FOR_YOU.map(item => (
+          <ForYouCard key={item.id} item={item} isDark={isDark} />
+        ))}
+      </ScrollView>
+
+      {/* ─ Discover — brands you don't follow, reshuffled on pull-to-refresh ─ */}
+      <View style={{ paddingHorizontal: 20, marginBottom: 4 }}>
+        <SectionHead
+          title="Discover new brands"
+          sub="Not following yet · pull to refresh"
+          action="See all"
+          onAction={() => router.push('/(buyer)/feed' as never)}
+        />
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 20, gap: 12, paddingBottom: 4 }}
+        style={{ marginBottom: 32 }}
+      >
+        {discoverItems.map(item => (
           <ForYouCard key={item.id} item={item} isDark={isDark} />
         ))}
       </ScrollView>
