@@ -44,7 +44,7 @@ const FEATURE_GROUPS: FeatureGroup[] = [
     items: [
       { label: 'CRM',                icon: 'users',        route: '/customers', color: '#EF4444' },
       { label: 'Finance & Reports',  icon: 'bar-chart-2',  route: '/finance',   color: '#06B6D4', pinned: true },
-      { label: 'Loyalty & Rewards',  icon: 'star',         route: '/customers', color: '#FBBF24', badge: 'New' },
+      { label: 'Loyalty & Rewards',  icon: 'star',         route: '/plans',     color: '#FBBF24', badge: 'New' },
     ],
   },
   {
