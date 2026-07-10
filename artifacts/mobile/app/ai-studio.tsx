@@ -209,18 +209,6 @@ export default function AIStudioScreen() {
         </TouchableOpacity>
       ))}
 
-      {/* Generate CTA */}
-      {selected != null && (
-        <TouchableOpacity
-          style={[styles.generateBtn, { backgroundColor: colors.primary }]}
-          onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)}
-          activeOpacity={0.8}
-        >
-          <Feather name="zap" size={16} color={colors.primaryForeground} />
-          <Text style={[styles.generateText, { color: colors.primaryForeground }]}>Generate with {selected}</Text>
-        </TouchableOpacity>
-      )}
-
       {/* Recent Mockups */}
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent Mockups</Text>
       <View style={styles.mockupsGrid}>
