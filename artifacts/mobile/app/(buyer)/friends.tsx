@@ -264,33 +264,25 @@ export default function FriendsScreen() {
             <Text style={s.storyLabel} numberOfLines={1}>Your story</Text>
           </TouchableOpacity>
 
-          {FRIENDS.map(friend => (
+          {FRIENDS.filter(friend => friend.hasNew).map(friend => (
             <TouchableOpacity
               key={friend.id}
               style={s.storyItem}
               activeOpacity={0.8}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/chat/${friend.chatId}` as never); }}
             >
-              {friend.hasNew ? (
-                <LinearGradient
-                  colors={['#F9CE34', '#EE2A7B', '#6228D7']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={s.storyRing}
-                >
-                  <View style={s.storyRingInner}>
-                    <View style={[s.avatarCircle, { backgroundColor: friend.color }]}>
-                      <Text style={s.avatarInitials}>{friend.initials}</Text>
-                    </View>
-                  </View>
-                </LinearGradient>
-              ) : (
-                <View style={s.storyRingViewed}>
+              <LinearGradient
+                colors={['#F9CE34', '#EE2A7B', '#6228D7']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={s.storyRing}
+              >
+                <View style={s.storyRingInner}>
                   <View style={[s.avatarCircle, { backgroundColor: friend.color }]}>
                     <Text style={s.avatarInitials}>{friend.initials}</Text>
                   </View>
                 </View>
-              )}
+              </LinearGradient>
               <Text style={s.storyLabel} numberOfLines={1}>
                 {friend.name.split(' ')[0].toLowerCase()}
               </Text>
@@ -373,7 +365,6 @@ const s = StyleSheet.create({
   storyItem:  { alignItems: 'center', gap: 5, width: 62 },
   storyRing:  { width: 62, height: 62, borderRadius: 31, padding: 2.5, alignItems: 'center', justifyContent: 'center' },
   storyRingInner: { width: 55, height: 55, borderRadius: 28, padding: 2, alignItems: 'center', justifyContent: 'center', backgroundColor: '#000000' },
-  storyRingViewed: { width: 62, height: 62, borderRadius: 31, borderWidth: 2, borderColor: '#33302A', alignItems: 'center', justifyContent: 'center' },
   yourStoryRing: { width: 62, height: 62, alignItems: 'center', justifyContent: 'center' },
   yourStoryPlus: {
     position: 'absolute', bottom: 0, right: 0, width: 20, height: 20, borderRadius: 10,
