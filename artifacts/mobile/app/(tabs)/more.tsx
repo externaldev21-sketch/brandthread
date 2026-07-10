@@ -163,8 +163,9 @@ export default function MoreScreen() {
         {tab === 'yours' ? (
           <View style={styles.section}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>PINNED TOOLS</Text>
+              <Text style={[styles.sectionTitle, { color: colors.mutedForeground, marginBottom: 0 }]}>PINNED TOOLS</Text>
               <TouchableOpacity
+                style={styles.sectionHeaderIcon}
                 onPress={() => Alert.alert('Manage pinned tools', 'Pin your most-used tools here for quick access. Editable pins coming soon.', [{ text: 'Got it' }])}
               >
                 <Feather name="bookmark" size={16} color={colors.mutedForeground} />
@@ -213,14 +214,16 @@ export default function MoreScreen() {
                   }
                 }}
               >
-                <View style={[styles.listIconWrap, { backgroundColor: colors.secondary }]}>
-                  <Feather name={item.icon} size={16} color={colors.mutedForeground} />
+                <View style={styles.listRowCenterGroup}>
+                  <View style={[styles.listIconWrap, { backgroundColor: colors.secondary }]}>
+                    <Feather name={item.icon} size={16} color={colors.mutedForeground} />
+                  </View>
+                  <Text style={[styles.listLabel, { color: colors.foreground }]}>{item.label}</Text>
+                  {item.value != null && (
+                    <Text style={[styles.listValue, { color: colors.success }]}>{item.value}</Text>
+                  )}
                 </View>
-                <Text style={[styles.listLabel, { color: colors.foreground }]}>{item.label}</Text>
-                {item.value != null && (
-                  <Text style={[styles.listValue, { color: colors.success }]}>{item.value}</Text>
-                )}
-                <Feather name="chevron-right" size={15} color={colors.mutedForeground} />
+                <Feather name="chevron-right" size={15} color={colors.mutedForeground} style={styles.listChevron} />
               </TouchableOpacity>
             ))}
           </View>
@@ -240,34 +243,46 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: H_PAD,
     paddingBottom: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
+    position: 'relative',
   },
-  tabsRow: { flexDirection: 'row', gap: 22 },
-  tabBtn: { paddingBottom: 10 },
-  tabText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
-  tabUnderline: { height: 2, borderRadius: 1, marginTop: 8 },
-  helpBtn: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  tabsRow: { flexDirection: 'row', gap: 22, justifyContent: 'center' },
+  tabBtn: { paddingBottom: 10, alignItems: 'center' },
+  tabText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
+  tabUnderline: { height: 2, borderRadius: 1, marginTop: 8, alignSelf: 'center' },
+  helpBtn: {
+    position: 'absolute',
+    right: H_PAD,
+    bottom: 10,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   planStrip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    gap: 8,
     marginHorizontal: H_PAD,
     borderRadius: 12,
     paddingVertical: 10,
     paddingHorizontal: 14,
     marginBottom: 20,
   },
-  planStripText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  planStripText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
 
-  section: { paddingHorizontal: H_PAD, marginBottom: 20 },
-  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  sectionTitle: { fontSize: 11, fontFamily: 'Inter_600SemiBold', letterSpacing: 1.1, marginBottom: 14 },
+  section: { paddingHorizontal: H_PAD, marginBottom: 20, alignItems: 'center' },
+  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 14, width: '100%', position: 'relative' },
+  sectionHeaderIcon: { position: 'absolute', right: 0 },
+  sectionTitle: { fontSize: 11, fontFamily: 'Inter_600SemiBold', letterSpacing: 1.1, marginBottom: 14, textAlign: 'center', alignSelf: 'center' },
 
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP, rowGap: 18 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP, rowGap: 18, justifyContent: 'center' },
   tile: { width: TILE_W, alignItems: 'center', gap: 8 },
   tileIconWrap: { position: 'relative' },
   tileIconCircle: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
@@ -286,9 +301,11 @@ const styles = StyleSheet.create({
   divider: { height: StyleSheet.hairlineWidth, marginHorizontal: H_PAD, marginBottom: 20 },
 
   // List (account section)
-  listCard: { borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
-  listRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
+  listCard: { borderRadius: 16, borderWidth: 1, overflow: 'hidden', width: '100%' },
+  listRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 14, position: 'relative' },
+  listRowCenterGroup: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   listIconWrap: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  listLabel: { flex: 1, fontSize: 14, fontFamily: 'Inter_500Medium' },
+  listLabel: { fontSize: 14, fontFamily: 'Inter_500Medium', textAlign: 'center' },
   listValue: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  listChevron: { position: 'absolute', right: 14 },
 });
