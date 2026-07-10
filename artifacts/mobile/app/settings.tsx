@@ -29,7 +29,7 @@ const GROUPS: SettingsGroup[] = [
   {
     title: 'Store settings',
     items: [
-      { label: 'General', icon: 'home' },
+      { label: 'General', icon: 'home', route: '/general-settings' },
       { label: 'Plan', icon: 'file-text', route: '/plan-details' },
       { label: 'Billing', icon: 'clipboard' },
       { label: 'Users', icon: 'users' },
