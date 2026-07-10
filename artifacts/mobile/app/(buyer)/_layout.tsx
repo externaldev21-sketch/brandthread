@@ -90,6 +90,7 @@ function BuyerTabLayout() {
       <Tabs.Screen name="following" options={{ href: null }} />
       <Tabs.Screen name="wishlist"  options={{ href: null }} />
       <Tabs.Screen name="edit-profile" options={{ href: null }} />
+      <Tabs.Screen name="search" options={{ href: null }} />
 
       {/* Feed — centre gradient pill */}
       <Tabs.Screen
