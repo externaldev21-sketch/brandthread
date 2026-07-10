@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -236,23 +235,6 @@ export default function ProfileScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ─ Sign out ─ */}
-      <View style={{ paddingHorizontal: 20 }}>
-        <TouchableOpacity
-          style={[styles.signOutBtn, { borderColor: '#EF4444' }]}
-          activeOpacity={0.8}
-          onPress={() => Alert.alert('Sign out', 'Are you sure you want to sign out?', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Sign out', style: 'destructive', onPress: async () => {
-              await AsyncStorage.clear();
-              router.replace('/onboarding' as never);
-            }},
-          ])}
-        >
-          <Feather name="log-out" size={16} color="#EF4444" />
-          <Text style={styles.signOutText}>Sign out</Text>
-        </TouchableOpacity>
-      </View>
     </ScrollView>
   );
 }
@@ -317,8 +299,6 @@ const styles = StyleSheet.create({
   menuIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   menuLabel: { flex: 1, fontSize: 14, fontFamily: 'Inter_500Medium' },
 
-  signOutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 15, borderRadius: 14, borderWidth: 1 },
-  signOutText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: '#EF4444' },
 
   storyBtnWrap: { borderRadius: 16, overflow: 'hidden' },
   storyBtnGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 15 },
