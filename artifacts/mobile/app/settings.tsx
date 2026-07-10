@@ -31,7 +31,7 @@ const GROUPS: SettingsGroup[] = [
     items: [
       { label: 'General', icon: 'home', route: '/general-settings' },
       { label: 'Plan', icon: 'file-text', route: '/plan-details' },
-      { label: 'Billing', icon: 'clipboard' },
+      { label: 'Billing', icon: 'clipboard', route: '/billing' },
       { label: 'Users', icon: 'users', route: '/users' },
       { label: 'Roles', icon: 'users' },
       { label: 'Security', icon: 'shield' },
