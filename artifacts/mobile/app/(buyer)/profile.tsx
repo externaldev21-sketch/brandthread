@@ -41,9 +41,10 @@ const FOLLOWED_BRANDS = [
 ];
 
 const TABS = [
-  { key: 'orders',   icon: 'grid'  as const },
-  { key: 'brands',   icon: 'users' as const },
-  { key: 'wishlist', icon: 'heart' as const },
+  { key: 'orders',   icon: 'grid'     as const },
+  { key: 'brands',   icon: 'users'    as const },
+  { key: 'wishlist', icon: 'heart'    as const },
+  { key: 'saved',    icon: 'bookmark' as const },
 ] as const;
 
 type TabKey = typeof TABS[number]['key'];
@@ -325,6 +326,10 @@ export default function BuyerProfileScreen() {
 
       {tab === 'wishlist' && (
         <EmptyState icon="heart" label="No wishlist items yet" muted={muted} border={border} />
+      )}
+
+      {tab === 'saved' && (
+        <EmptyState icon="bookmark" label="No saved posts yet" muted={muted} border={border} />
       )}
     </ScrollView>
   );
