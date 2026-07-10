@@ -123,6 +123,13 @@ export default function BuyerProfileScreen() {
           { text: 'Contact Us', onPress: () => {} },
           { text: 'Cancel', style: 'cancel' },
         ]) },
+      { text: 'Activity center', onPress: () => Alert.alert('Activity Center', 'Recent likes, comments, and follows will show up here.', [{ text: 'OK' }]) },
+      { text: 'Watch time', onPress: () => Alert.alert('Watch Time', 'You\u2019ve watched 2h 14m today, 11h 05m this week.', [{ text: 'OK' }]) },
+      { text: 'Privacy', onPress: () => Alert.alert('Privacy', 'Manage who can see your profile, orders, and activity.', [
+          { text: 'Private account', onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
+          { text: 'Blocked accounts', onPress: () => {} },
+          { text: 'Cancel', style: 'cancel' },
+        ]) },
       { text: 'Sign out', style: 'destructive', onPress: () => Alert.alert('Sign out', 'Are you sure you want to sign out?', [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Sign out', style: 'destructive', onPress: async () => {
