@@ -11,6 +11,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Clipboard from 'expo-clipboard';
 import { readableOn } from '@/lib/color';
 import { loadStyleBadge, DEFAULT_STYLE_BADGE, type StyleBadgeState } from '@/lib/styleBadge';
+import { loadBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields } from '@/lib/buyerProfile';
 
 const PROFILE_EMOJI = '😎';
 
@@ -61,10 +62,12 @@ export default function BuyerProfileScreen() {
   const { width: screenW } = useWindowDimensions();
   const tileSize = (screenW - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
   const [styleBadge, setStyleBadge] = useState<StyleBadgeState>({ ...DEFAULT_STYLE_BADGE, enabled: true });
+  const [profileFields, setProfileFields] = useState<BuyerProfileFields>({ ...DEFAULT_BUYER_PROFILE });
 
   useFocusEffect(
     useCallback(() => {
       loadStyleBadge().then(setStyleBadge);
+      loadBuyerProfile().then(setProfileFields);
     }, [])
   );
 
@@ -139,7 +142,7 @@ export default function BuyerProfileScreen() {
       <View style={[s.topBar, { paddingHorizontal: 20 }]}>
         <TouchableOpacity style={s.usernameRow} activeOpacity={0.7} onPress={openAccountSwitcher}>
           <Feather name="lock" size={13} color={muted} />
-          <Text style={[s.username, { color: fg }]}>jordan</Text>
+          <Text style={[s.username, { color: fg }]}>{profileFields.username || 'jordan'}</Text>
           <Feather name="chevron-down" size={16} color={fg} />
         </TouchableOpacity>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18 }}>
@@ -183,8 +186,24 @@ export default function BuyerProfileScreen() {
 
       {/* ─ Name + bio ─ */}
       <View style={{ paddingHorizontal: 20, marginTop: 12 }}>
-        <Text style={[s.heroName, { color: fg }]}>Jordan</Text>
-        <Text style={[s.heroSub, { color: muted }]}>@jordan · Joined Jul 2026</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={[s.heroName, { color: fg }]}>{profileFields.name.trim() || 'Jordan'}</Text>
+          {!!profileFields.pronouns.trim() && (
+            <Text style={[s.heroPronouns, { color: muted }]}>({profileFields.pronouns})</Text>
+          )}
+          {profileFields.aiCreator && (
+            <View style={[s.aiPill, { borderColor: border }]}>
+              <Text style={[s.aiPillText, { color: muted }]}>AI creator</Text>
+            </View>
+          )}
+        </View>
+        <Text style={[s.heroSub, { color: muted }]}>@{profileFields.username || 'jordan'} · Joined Jul 2026</Text>
+        {!!profileFields.bio.trim() && (
+          <Text style={[s.heroBio, { color: fg }]}>{profileFields.bio}</Text>
+        )}
+        {!!profileFields.links.trim() && (
+          <Text style={[s.heroLink, { color: primary }]} numberOfLines={1}>{profileFields.links}</Text>
+        )}
         {styleBadge.enabled && (
           <View style={[s.styleBadge, { backgroundColor: badgeColor + '18', borderColor: badgeColor + '40' }]}>
             <Text style={s.styleBadgeEmoji}>{styleBadge.emoji}</Text>
@@ -207,7 +226,7 @@ export default function BuyerProfileScreen() {
           activeOpacity={0.75}
           onPress={async () => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            await Clipboard.setStringAsync('https://brandthread.app/u/jordan');
+            await Clipboard.setStringAsync(`https://brandthread.app/u/${profileFields.username || 'jordan'}`);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             Alert.alert('Link copied', 'Your profile link has been copied to the clipboard.');
           }}
@@ -349,6 +368,11 @@ const s = StyleSheet.create({
 
   heroName:   { fontSize: 14, fontFamily: 'Inter_700Bold' },
   heroSub:    { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 3 },
+  heroBio:    { fontSize: 12.5, fontFamily: 'Inter_400Regular', marginTop: 6 },
+  heroPronouns: { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  heroLink:   { fontSize: 12.5, fontFamily: 'Inter_600SemiBold', marginTop: 4 },
+  aiPill: { borderWidth: 1, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2 },
+  aiPillText: { fontSize: 9.5, fontFamily: 'Inter_600SemiBold' },
 
   styleBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',

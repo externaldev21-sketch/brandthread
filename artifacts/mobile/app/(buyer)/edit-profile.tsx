@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Platform, TextInput, Switch, useColorScheme,
+  Platform, TextInput, Switch, useColorScheme, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { loadStyleBadge, saveStyleBadge, DEFAULT_STYLE_BADGE, type StyleBadgeState } from '@/lib/styleBadge';
+import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields } from '@/lib/buyerProfile';
 
 export default function BuyerEditProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -21,24 +23,51 @@ export default function BuyerEditProfileScreen() {
   const fg      = isDark ? '#EDE7D9' : '#17140F';
   const muted   = isDark ? '#8C8577' : '#6E6759';
   const primary = isDark ? '#39FF88' : '#00C853';
+  const accent  = isDark ? '#7C9CFF' : '#3B5BDB';
 
   const [badge, setBadge] = useState<StyleBadgeState>({ ...DEFAULT_STYLE_BADGE, enabled: true });
+  const [fields, setFields] = useState<BuyerProfileFields>({ ...DEFAULT_BUYER_PROFILE });
   const [loaded, setLoaded] = useState(false);
 
+  function set(key: keyof Omit<BuyerProfileFields, 'aiCreator'>, val: string) {
+    setFields((prev) => ({ ...prev, [key]: val }));
+  }
+
   useEffect(() => {
-    loadStyleBadge().then((state) => { setBadge(state); setLoaded(true); });
+    Promise.all([loadStyleBadge(), loadBuyerProfile()])
+      .then(([badgeState, profileState]) => {
+        setBadge(badgeState);
+        setFields(profileState);
+      })
+      .catch(() => {
+        // Keep the already-seeded defaults if loading fails.
+      })
+      .finally(() => setLoaded(true));
   }, []);
 
   const topPad = Platform.OS === 'web' ? 24 : insets.top;
 
-  function handleSave() {
+  async function handleSave() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const cleaned: StyleBadgeState = {
       label: badge.label.trim() || DEFAULT_STYLE_BADGE.label,
       emoji: badge.emoji.trim() || DEFAULT_STYLE_BADGE.emoji,
       enabled: badge.enabled,
     };
-    saveStyleBadge(cleaned).then(() => router.back());
+    const cleanedFields: BuyerProfileFields = {
+      ...fields,
+      username: fields.username.trim() || DEFAULT_BUYER_PROFILE.username,
+      bio: fields.bio.trim(),
+    };
+    const [badgeOk, profileOk] = await Promise.all([
+      saveStyleBadge(cleaned).then(() => true).catch(() => false),
+      saveBuyerProfile(cleanedFields),
+    ]);
+    if (!badgeOk || !profileOk) {
+      Alert.alert('Save failed', 'Something went wrong saving your profile. Please try again.');
+      return;
+    }
+    router.back();
   }
 
   if (!loaded) return <View style={{ flex: 1, backgroundColor: bg }} />;
@@ -59,6 +88,131 @@ export default function BuyerEditProfileScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
+        {/* ─ Avatar ─ */}
+        <View style={styles.avatarSection}>
+          <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => Alert.alert('Change photo', 'Upload a new photo for your profile.')}
+            >
+              <LinearGradient colors={[primary, isDark ? '#0F5C33' : '#0A8C3D']} style={styles.avatar}>
+                <Text style={styles.avatarText}>😎</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[styles.avatarOutline, { borderColor: border }]}
+              onPress={() => Alert.alert('AI avatar', 'Create an AI-generated avatar.')}
+            >
+              <Feather name="smile" size={24} color={muted} />
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => Alert.alert('Edit picture or avatar', 'Choose a photo or create an AI avatar.')}
+          >
+            <Text style={[styles.editPhotoLink, { color: accent }]}>Edit picture or avatar</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ─ Core fields ─ */}
+        <View style={[styles.card, { backgroundColor: card, borderColor: border, marginBottom: 12 }]}>
+          <EditRow label="Name" value={fields.name} placeholder="Name" onChange={(v) => set('name', v)} colors={{ fg, muted }} />
+          <Divider color={border} />
+          <EditRow label="Username" value={fields.username} placeholder="Username" onChange={(v) => set('username', v)} colors={{ fg, muted }} />
+          <Divider color={border} />
+          <EditRow label="Pronouns" value={fields.pronouns} placeholder="Pronouns" onChange={(v) => set('pronouns', v)} colors={{ fg, muted }} />
+          <Divider color={border} />
+          <EditRow label="Bio" value={fields.bio} placeholder="Bio" onChange={(v) => set('bio', v)} colors={{ fg, muted }} />
+          <Divider color={border} />
+          <EditRow label="Links" value={fields.links} placeholder="Add links" onChange={(v) => set('links', v)} colors={{ fg, muted }} />
+        </View>
+
+        <View style={[styles.card, { backgroundColor: card, borderColor: border, marginBottom: 12 }]}>
+          <TouchableOpacity
+            style={styles.row}
+            activeOpacity={0.7}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); Alert.alert('Banners', 'Add music, profiles and more.'); }}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.rowLabel, { color: fg, width: 'auto' }]}>Banners</Text>
+              <Text style={[styles.rowHint, { color: muted }]}>Add music, profiles and more.</Text>
+            </View>
+            <Text style={[styles.chevronLabel, { color: muted }]}>Add banners</Text>
+            <Feather name="chevron-right" size={17} color={muted} />
+          </TouchableOpacity>
+          <Divider color={border} />
+          <TouchableOpacity
+            style={styles.row}
+            activeOpacity={0.7}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); Alert.alert('Reorder grid', 'Drag to reorder how your posts appear on your grid.'); }}
+          >
+            <Text style={[styles.rowLabel, { color: fg, width: 'auto', flex: 1 }]}>Reorder grid</Text>
+            <Feather name="chevron-right" size={17} color={muted} />
+          </TouchableOpacity>
+          <Divider color={border} />
+          <TouchableOpacity
+            style={styles.row}
+            activeOpacity={0.7}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              Alert.alert('Gender', 'Choose how your gender is displayed.', [
+                { text: 'Woman', onPress: () => set('gender', 'Woman') },
+                { text: 'Man', onPress: () => set('gender', 'Man') },
+                { text: 'Non-binary', onPress: () => set('gender', 'Non-binary') },
+                { text: 'Prefer not to say', onPress: () => set('gender', 'Prefer not to say') },
+                { text: 'Cancel', style: 'cancel' },
+              ]);
+            }}
+          >
+            <Text style={[styles.rowLabel, { color: fg, width: 'auto', flex: 1 }]}>Gender</Text>
+            <Text style={[styles.chevronLabel, { color: muted }]}>{fields.gender || 'Gender'}</Text>
+            <Feather name="chevron-right" size={17} color={muted} />
+          </TouchableOpacity>
+          <Divider color={border} />
+          <View style={styles.row}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.rowLabel, { color: fg, width: 'auto' }]}>AI creator</Text>
+              <Text style={[styles.rowHint, { color: muted }]}>Add this label to your profile if your content often uses AI.</Text>
+            </View>
+            <View style={[styles.newPill, { backgroundColor: accent }]}>
+              <Text style={styles.newPillText}>New</Text>
+            </View>
+            <Switch
+              value={fields.aiCreator}
+              onValueChange={(v) => { Haptics.selectionAsync(); setFields((prev) => ({ ...prev, aiCreator: v })); }}
+              trackColor={{ false: border, true: primary }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+        </View>
+
+        <View style={[styles.card, { backgroundColor: card, borderColor: border, marginBottom: 12 }]}>
+          <TouchableOpacity
+            style={styles.linkRow}
+            activeOpacity={0.7}
+            onPress={() => Alert.alert('Switch to professional account', 'Get access to insights, tools and more for your brand.')}
+          >
+            <Text style={[styles.linkText, { color: accent }]}>Switch to professional account</Text>
+          </TouchableOpacity>
+          <Divider color={border} />
+          <TouchableOpacity
+            style={styles.linkRow}
+            activeOpacity={0.7}
+            onPress={() => Alert.alert('Personal information settings', 'Manage your contact info and account details.')}
+          >
+            <Text style={[styles.linkText, { color: accent }]}>Personal information settings</Text>
+          </TouchableOpacity>
+          <Divider color={border} />
+          <TouchableOpacity
+            style={styles.linkRow}
+            activeOpacity={0.7}
+            onPress={() => Alert.alert('Show your profile is verified', 'Let others know your profile is verified.')}
+          >
+            <Text style={[styles.linkText, { color: accent }]}>Show your profile is verified</Text>
+          </TouchableOpacity>
+        </View>
+
         <Text style={[styles.sectionLabel, { color: muted }]}>Style badge</Text>
         <Text style={[styles.sectionHint, { color: muted }]}>
           Shown next to your name on your profile.
@@ -120,6 +274,32 @@ function Divider({ color }: { color: string }) {
   return <View style={{ height: 1, backgroundColor: color, marginLeft: 16 }} />;
 }
 
+function EditRow({
+  label, value, placeholder, onChange, colors,
+}: {
+  label: string;
+  value: string;
+  placeholder?: string;
+  onChange: (v: string) => void;
+  colors: { fg: string; muted: string };
+}) {
+  return (
+    <View style={styles.row}>
+      <Text style={[styles.rowLabel, { color: colors.fg }]}>{label}</Text>
+      <TextInput
+        style={[styles.rowInput, { color: colors.fg }]}
+        value={value}
+        onChangeText={onChange}
+        placeholder={placeholder}
+        placeholderTextColor={colors.muted}
+        autoCorrect={false}
+        returnKeyType="done"
+      />
+      <Feather name="chevron-right" size={17} color={colors.muted} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
@@ -138,7 +318,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 13, gap: 12,
   },
   rowLabel: { fontSize: 15, fontFamily: 'Inter_400Regular', width: 90 },
+  rowHint: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 3 },
   rowInput: { flex: 1, fontSize: 15, fontFamily: 'Inter_400Regular', padding: 0, textAlign: 'right' },
+  chevronLabel: { fontSize: 13.5, fontFamily: 'Inter_400Regular' },
+  linkRow: { paddingHorizontal: 16, paddingVertical: 14 },
+  linkText: { fontSize: 14.5, fontFamily: 'Inter_500Medium' },
+  newPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10 },
+  newPillText: { fontSize: 10.5, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  avatarSection: { alignItems: 'center', paddingVertical: 20, gap: 10 },
+  avatar: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 32 },
+  avatarOutline: {
+    width: 84, height: 84, borderRadius: 42, borderWidth: 1.5,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  editPhotoLink: { fontSize: 14, fontFamily: 'Inter_500Medium' },
   previewLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', marginBottom: 8 },
   previewBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
