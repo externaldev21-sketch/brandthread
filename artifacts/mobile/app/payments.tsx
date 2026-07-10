@@ -1,13 +1,12 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   ScrollView, View, Text, TouchableOpacity,
-  StyleSheet, Platform, Switch,
+  StyleSheet,
 } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -86,14 +85,6 @@ const DROPS: Drop[] = [
     status: 'held',
     mfgProgress: 0.30,
   },
-];
-
-const PAYMENT_METHODS = [
-  { name: 'Credit / Debit Cards',    desc: 'Visa, Mastercard, Amex',  icon: 'credit-card' as const, on: true  },
-  { name: 'Apple Pay / Google Pay',  desc: 'Digital wallet payments', icon: 'smartphone'  as const, on: true  },
-  { name: 'Buy Now, Pay Later',      desc: 'Klarna, Afterpay, Affirm',icon: 'calendar'    as const, on: true  },
-  { name: 'International Currencies',desc: '135 currencies supported',icon: 'globe'       as const, on: true  },
-  { name: 'Crypto Payments',         desc: 'Bitcoin, Ethereum (Beta)',icon: 'zap'         as const, on: false },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -212,21 +203,33 @@ function DropCard({ drop, colors, isDark, isLast }: DropCardProps) {
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
+const METHOD_CHIPS = [
+  { label: 'Shop', bg: '#5A31F4', text: '#FFFFFF' },
+  { label: 'VISA', bg: '#1A1F71', text: '#FFFFFF' },
+  { label: 'MC',   bg: '#EB5C2E', text: '#FFFFFF' },
+  { label: 'AMEX', bg: '#016FD0', text: '#FFFFFF' },
+];
+
+const CONFIG_ROWS = [
+  { label: 'Payment capture method',        icon: 'zap'      as const },
+  { label: 'Manual payment methods',        icon: 'inbox'    as const },
+  { label: 'Payment method customizations', icon: 'sliders'  as const },
+  { label: 'Payout schedule',               icon: 'calendar' as const },
+  { label: 'Escrow & release rules',        icon: 'shield'   as const },
+];
+
 export default function PaymentsScreen() {
   const colors = useColors();
-  const insets = useSafeAreaInsets();
-  const [methods, setMethods] = useState(PAYMENT_METHODS.map((m) => m.on));
 
   const isDark = colors.background === '#121110' || colors.background.startsWith('#0');
   const primary = isDark ? '#C94D1F' : '#B33F1E';
 
-  // Summary numbers
-  const heldTotal     = DROPS.filter((d) => d.status === 'held').reduce((s, d) => s + d.totalRaw, 0);
-  const availableNow  = DROPS.filter((d) => d.status === 'processing').reduce((s, d) => s + d.totalRaw, 0);
-  const lastPaid      = DROPS.find((d) => d.status === 'paid');
-
   const preOrderDrops = DROPS.filter((d) => d.type === 'pre-order');
   const preMadeDrops  = DROPS.filter((d) => d.type === 'pre-made');
+
+  const nextPayout = [...DROPS]
+    .filter((d) => d.status !== 'paid')
+    .sort((a, b) => new Date(a.payoutDate).getTime() - new Date(b.payoutDate).getTime())[0];
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -237,50 +240,105 @@ export default function PaymentsScreen() {
         showsVerticalScrollIndicator={false}
       >
 
-        {/* ── Balance summary ── */}
-        <View style={[styles.summaryCard, { backgroundColor: isDark ? '#17140F' : colors.secondary, borderColor: isDark ? '#C1440E44' : colors.border }]}>
-          <View style={styles.summaryRow}>
-            {/* Available */}
-            <View style={styles.summaryItem}>
-              <Text style={[styles.summaryLabel, { color: isDark ? '#C1440E88' : colors.mutedForeground }]}>
-                AVAILABLE NOW
-              </Text>
-              <Text style={[styles.summaryAmount, { color: colors.success }]}>
-                ${availableNow.toLocaleString()}
-              </Text>
-              <Text style={[styles.summarySub, { color: colors.mutedForeground }]}>Pre Made drops</Text>
-            </View>
-
-            <View style={[styles.summaryDivider, { backgroundColor: isDark ? '#C1440E22' : colors.border }]} />
-
-            {/* Held */}
-            <View style={styles.summaryItem}>
-              <Text style={[styles.summaryLabel, { color: isDark ? '#C1440E88' : colors.mutedForeground }]}>
-                HELD IN ESCROW
-              </Text>
-              <Text style={[styles.summaryAmount, { color: isDark ? '#E2DDD0' : primary }]}>
-                ${heldTotal.toLocaleString()}
-              </Text>
-              <Text style={[styles.summarySub, { color: colors.mutedForeground }]}>Pre Order drops</Text>
-            </View>
-          </View>
-
-          {/* Info line */}
-          <View style={[styles.summaryInfo, { borderTopColor: isDark ? '#C1440E22' : colors.border }]}>
-            <Feather name="info" size={12} color={colors.mutedForeground} />
-            <Text style={[styles.summaryInfoText, { color: colors.mutedForeground }]}>
-              Pre Order funds are held until your drop ships and customers receive their orders
+        {/* ── Next payout banner ── */}
+        {nextPayout && (
+          <View style={[styles.banner, { backgroundColor: isDark ? '#C1440E22' : '#E8F0FE', borderColor: isDark ? '#C1440E44' : '#C7DBFB' }]}>
+            <Feather name="info" size={14} color={isDark ? '#E2DDD0' : '#1A56C4'} />
+            <Text style={[styles.bannerText, { color: isDark ? '#E2DDD0' : '#1A3E7A' }]}>
+              Next payout on {nextPayout.payoutDate} · ${nextPayout.totalRaw.toLocaleString()} from {nextPayout.name}
             </Text>
           </View>
+        )}
 
-          <TouchableOpacity
-            style={[styles.requestBtn, { backgroundColor: primary, opacity: availableNow > 0 ? 1 : 0.4 }]}
-            activeOpacity={0.8}
-            disabled={availableNow === 0}
-          >
-            <Feather name="arrow-down-circle" size={15} color="#FFFFFF" />
-            <Text style={styles.requestBtnText}>Request Payout  ·  ${availableNow.toLocaleString()}</Text>
+        {/* ── Brandthread Payments card ── */}
+        <View style={styles.cardHeaderRow}>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Brandthread Payments</Text>
+          <TouchableOpacity style={[styles.manageBtn, { borderColor: colors.border }]} activeOpacity={0.7}>
+            <Text style={[styles.manageBtnText, { color: colors.foreground }]}>Manage</Text>
           </TouchableOpacity>
+        </View>
+
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          {/* Status row */}
+          <View style={styles.statusRow}>
+            <View style={styles.statusItem}>
+              <View style={[styles.statusDot, { backgroundColor: colors.success }]} />
+              <Text style={[styles.statusText, { color: colors.foreground }]}>Accepting payments</Text>
+            </View>
+            <View style={[styles.statusDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.statusItem}>
+              <Feather name="credit-card" size={13} color={colors.foreground} />
+              <Text style={[styles.statusText, { color: colors.foreground }]}>Ready for payouts</Text>
+            </View>
+          </View>
+
+          {/* Payment methods row */}
+          <TouchableOpacity style={[styles.listRow, { borderTopColor: colors.border }]} activeOpacity={0.7}>
+            <Feather name="credit-card" size={16} color={colors.mutedForeground} />
+            <Text style={[styles.listRowLabel, { color: colors.foreground }]}>Payment methods</Text>
+            <View style={styles.chipRow}>
+              {METHOD_CHIPS.map((c) => (
+                <View key={c.label} style={[styles.chip, { backgroundColor: c.bg }]}>
+                  <Text style={[styles.chipText, { color: c.text }]}>{c.label}</Text>
+                </View>
+              ))}
+              <View style={[styles.chip, { backgroundColor: colors.secondary }]}>
+                <Text style={[styles.chipText, { color: colors.mutedForeground }]}>+8</Text>
+              </View>
+            </View>
+            <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+          </TouchableOpacity>
+
+          {/* Payout account row */}
+          <View style={[styles.listRow, { borderTopColor: colors.border }]}>
+            <Feather name="home" size={16} color={colors.mutedForeground} />
+            <View style={styles.payoutInfo}>
+              <Text style={[styles.payoutLabel, { color: colors.mutedForeground }]}>Payout account</Text>
+              <Text style={[styles.payoutAccount, { color: colors.foreground }]}>
+                BANK OF AMERICA, N.A. ······1649 · USD
+              </Text>
+            </View>
+            <TouchableOpacity activeOpacity={0.7}>
+              <Text style={[styles.viewPayoutsLink, { color: primary }]}>View payouts</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Upgrade note */}
+          <View style={[styles.upgradeNote, { borderTopColor: colors.border, backgroundColor: isDark ? '#1A1815' : colors.secondary }]}>
+            <Text style={[styles.upgradeNoteText, { color: colors.mutedForeground }]}>
+              You can get improved payout rates by{' '}
+              <Text style={{ color: primary, fontFamily: 'Inter_600SemiBold' }}>upgrading your plan</Text>.
+            </Text>
+          </View>
+        </View>
+
+        {/* ── Additional payment providers ── */}
+        <Text style={[styles.groupTitle, { color: colors.foreground }]}>Additional payment providers</Text>
+        <Text style={[styles.groupSubtitle, { color: colors.mutedForeground }]}>
+          Offer methods processed offsite or through custom checkout integrations
+        </Text>
+        <TouchableOpacity
+          style={[styles.addProviderBtn, { borderColor: colors.border }]}
+          activeOpacity={0.7}
+        >
+          <Feather name="plus-circle" size={16} color={colors.foreground} />
+          <Text style={[styles.addProviderText, { color: colors.foreground }]}>Add provider</Text>
+        </TouchableOpacity>
+
+        {/* ── Payment configuration ── */}
+        <Text style={[styles.groupTitle, { marginTop: 24 }, { color: colors.foreground }]}>Payment configuration</Text>
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 10 }]}>
+          {CONFIG_ROWS.map((row, i) => (
+            <TouchableOpacity
+              key={row.label}
+              style={[styles.configRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
+              activeOpacity={0.7}
+            >
+              <Feather name={row.icon} size={16} color={colors.mutedForeground} />
+              <Text style={[styles.listRowLabel, { color: colors.foreground, flex: 1 }]}>{row.label}</Text>
+              <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          ))}
         </View>
 
         {/* ── Pre Order Drops ── */}
@@ -315,29 +373,6 @@ export default function PaymentsScreen() {
           <DropCard key={d.id} drop={d} colors={colors} isDark={isDark} isLast={i === preMadeDrops.length - 1} />
         ))}
 
-        {/* ── Payment Methods ── */}
-        <Text style={[styles.sectionTitle, { color: colors.foreground, marginTop: 32, marginBottom: 12 }]}>
-          Payment Methods
-        </Text>
-        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          {PAYMENT_METHODS.map((m, i) => (
-            <View key={m.name} style={[styles.methodRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-              <View style={[styles.methodIcon, { backgroundColor: colors.secondary }]}>
-                <Feather name={m.icon} size={16} color={primary} />
-              </View>
-              <View style={styles.methodInfo}>
-                <Text style={[styles.methodName, { color: colors.foreground }]}>{m.name}</Text>
-                <Text style={[styles.methodDesc, { color: colors.mutedForeground }]}>{m.desc}</Text>
-              </View>
-              <Switch
-                value={methods[i] ?? false}
-                onValueChange={(v) => setMethods((p) => p.map((val, idx) => idx === i ? v : val))}
-                trackColor={{ false: colors.secondary, true: primary }}
-                thumbColor="#FFFFFF"
-              />
-            </View>
-          ))}
-        </View>
       </ScrollView>
     </View>
   );
@@ -348,18 +383,46 @@ export default function PaymentsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
 
-  // Summary card
-  summaryCard: { borderRadius: 18, borderWidth: 1, padding: 20, marginBottom: 28 },
-  summaryRow: { flexDirection: 'row', gap: 16 },
-  summaryItem: { flex: 1 },
-  summaryLabel: { fontSize: 10, fontFamily: 'Inter_600SemiBold', letterSpacing: 1, marginBottom: 6 },
-  summaryAmount: { fontSize: 28, fontFamily: 'Inter_700Bold', letterSpacing: -0.5, marginBottom: 2 },
-  summarySub: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  summaryDivider: { width: 1 },
-  summaryInfo: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 16, paddingTop: 14, borderTopWidth: 1 },
-  summaryInfoText: { fontSize: 12, fontFamily: 'Inter_400Regular', flex: 1, lineHeight: 17 },
-  requestBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 14, borderRadius: 12, paddingVertical: 13 },
-  requestBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
+  // Banner
+  banner: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 20 },
+  bannerText: { fontSize: 12, fontFamily: 'Inter_500Medium', flex: 1, lineHeight: 17 },
+
+  // Card header row (title + Manage button)
+  cardHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  cardTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  manageBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, borderWidth: 1 },
+  manageBtnText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+
+  // Status row
+  statusRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
+  statusItem: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  statusText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  statusDivider: { width: 1, height: 16 },
+
+  // Generic list row (used inside cards)
+  listRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderTopWidth: 1 },
+  listRowLabel: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  chipRow: { flexDirection: 'row', gap: 4 },
+  chip: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 5 },
+  chipText: { fontSize: 9, fontFamily: 'Inter_700Bold', letterSpacing: 0.3 },
+
+  payoutInfo: { flex: 1 },
+  payoutLabel: { fontSize: 10, fontFamily: 'Inter_500Medium', marginBottom: 3, letterSpacing: 0.3 },
+  payoutAccount: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  viewPayoutsLink: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+
+  upgradeNote: { padding: 14, borderTopWidth: 1 },
+  upgradeNoteText: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17 },
+
+  // Additional providers
+  groupTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginTop: 28, marginBottom: 4 },
+  groupSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 12, lineHeight: 17 },
+  addProviderBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12, borderWidth: 1, paddingVertical: 14, borderStyle: 'dashed' },
+  addProviderText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+
+  // Payment configuration rows
+  configRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14 },
 
   // Section headers
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
@@ -398,11 +461,6 @@ const styles = StyleSheet.create({
   premadeNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 5, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'transparent' },
   premadeNoteText: { fontSize: 11, fontFamily: 'Inter_400Regular', flex: 1, lineHeight: 16 },
 
-  // Payment methods
+  // Shared card container
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
-  methodRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
-  methodIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  methodInfo: { flex: 1 },
-  methodName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  methodDesc: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
 });
