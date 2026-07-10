@@ -65,6 +65,21 @@ export default function ProfileScreen() {
     router.push(route as never);
   }
 
+  function openAccountMenu() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Alert.alert('Account', undefined, [
+      { text: 'Activity center', onPress: () => Alert.alert('Activity Center', 'Recent likes, comments, and follows will show up here.', [{ text: 'OK' }]) },
+      { text: 'Watch time', onPress: () => Alert.alert('Watch Time', 'You\u2019ve watched 2h 14m today, 11h 05m this week.', [{ text: 'OK' }]) },
+      { text: 'Privacy', onPress: () => Alert.alert('Privacy', 'Manage who can see your profile, products, and activity.', [
+          { text: 'Private account', onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
+          { text: 'Blocked accounts', onPress: () => {} },
+          { text: 'Cancel', style: 'cancel' },
+        ]) },
+      { text: 'Settings', onPress: () => nav('/settings') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
+
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: bg }]}
@@ -101,7 +116,7 @@ export default function ProfileScreen() {
           <TouchableOpacity
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             activeOpacity={0.7}
-            onPress={() => nav('/settings')}
+            onPress={openAccountMenu}
           >
             <Feather name="menu" size={22} color={fg} />
           </TouchableOpacity>
