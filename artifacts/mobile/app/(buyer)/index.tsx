@@ -483,7 +483,7 @@ export default function HomeScreen() {
             activeOpacity={0.75}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              Alert.alert('Search', 'Search for brands and drops coming soon 🔍', [{ text: 'OK' }]);
+              router.push('/(buyer)/search' as never);
             }}
           >
             <Feather name="search" size={18} color={muted} />
