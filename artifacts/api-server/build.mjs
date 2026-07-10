@@ -100,6 +100,11 @@ async function buildAll() {
       "puppeteer",
       "puppeteer-core",
       "electron",
+      // pdfkit's font handling (fontkit -> brotli) does dynamic requires
+      // (e.g. @swc/helpers) that esbuild's bundling breaks at runtime.
+      "pdfkit",
+      "fontkit",
+      "brotli",
     ],
     sourcemap: "linked",
     plugins: [
