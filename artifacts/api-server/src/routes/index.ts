@@ -11,6 +11,7 @@ import logoRouter from "./logo";
 import mockupRouter from "./mockup";
 import photographyRouter from "./photography";
 import bgRemovalRouter from "./bg-removal";
+import lifestyleRouter from "./lifestyle";
 
 const router = Router();
 
@@ -26,5 +27,6 @@ router.use("/logo",         logoRouter);
 router.use("/mockup",       mockupRouter);
 router.use("/photography",  photographyRouter);
 router.use("/bg-removal",   bgRemovalRouter);
+router.use("/lifestyle",    lifestyleRouter);
 
 export default router;
