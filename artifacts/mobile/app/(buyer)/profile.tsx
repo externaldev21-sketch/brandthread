@@ -8,7 +8,10 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Clipboard from 'expo-clipboard';
 import { readableOn } from '@/lib/color';
+
+const PROFILE_EMOJI = '😎';
 
 const GRID_GAP = 2;
 const GRID_COLS = 3;
@@ -134,7 +137,7 @@ export default function BuyerProfileScreen() {
         >
           <View style={[s.avatarRing, { borderColor: border }]}>
             <View style={[s.avatarFill, { backgroundColor: primary }]}>
-              <Text style={s.avatarInitials}>JD</Text>
+              <Text style={s.avatarEmoji}>{PROFILE_EMOJI}</Text>
             </View>
           </View>
           <View style={[s.avatarBadge, { backgroundColor: primary, borderColor: bg }]}>
@@ -174,7 +177,12 @@ export default function BuyerProfileScreen() {
         <TouchableOpacity
           style={[s.actionBtn, { borderColor: border }]}
           activeOpacity={0.75}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); Alert.alert('Share Profile', 'Copy link to @jordan\'s profile?', [{ text: 'Cancel', style: 'cancel' }, { text: 'Copy Link', onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) }]); }}
+          onPress={async () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            await Clipboard.setStringAsync('https://brandthread.app/u/jordan');
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            Alert.alert('Link copied', 'Your profile link has been copied to the clipboard.');
+          }}
         >
           <Text style={[s.actionBtnText, { color: fg }]}>Share profile</Text>
         </TouchableOpacity>
@@ -319,7 +327,7 @@ const s = StyleSheet.create({
   hero: { flexDirection: 'row', alignItems: 'center', gap: 22 },
   avatarRing: { width: 78, height: 78, borderRadius: 39, borderWidth: 1, padding: 3 },
   avatarFill: { flex: 1, borderRadius: 33, alignItems: 'center', justifyContent: 'center' },
-  avatarInitials: { fontSize: 20, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  avatarEmoji: { fontSize: 28 },
   avatarBadge: {
     position: 'absolute', bottom: 0, right: 0, width: 24, height: 24, borderRadius: 12,
     alignItems: 'center', justifyContent: 'center', borderWidth: 2,
