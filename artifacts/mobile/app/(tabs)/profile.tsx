@@ -24,7 +24,6 @@ const STATS = [
 
 const QUICK_LINKS: { icon: keyof typeof Feather.glyphMap; label: string; route: string }[] = [
   { icon: 'star',         label: 'Brand Studio', route: '/ai-studio' },
-  { icon: 'shopping-bag', label: 'Your Orders',  route: '/payments'  },
 ];
 
 const TABS: (keyof typeof Feather.glyphMap)[] = ['grid', 'smile', 'lock', 'repeat', 'bookmark', 'heart'];
