@@ -21,7 +21,7 @@ function SellerTabLayout() {
 
   const tabBarStyle = {
     position: 'relative' as const,
-    height: 56 + insets.bottom,
+    height: 50 + insets.bottom,
     paddingBottom: insets.bottom,
     borderRadius: 0,
     borderTopWidth: 1,
@@ -47,7 +47,7 @@ function SellerTabLayout() {
         tabBarBackground: () => (
           <View style={[StyleSheet.absoluteFill, { backgroundColor: pillBg }]} />
         ),
-        tabBarItemStyle: { paddingVertical: 8 },
+        tabBarItemStyle: { paddingVertical: 4 },
       }}
     >
       {/* Dashboard */}
