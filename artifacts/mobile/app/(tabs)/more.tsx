@@ -65,22 +65,16 @@ const FEATURE_GROUPS: FeatureGroup[] = [
   },
 ];
 
-const ALL_ITEMS: FeatureItem[] = FEATURE_GROUPS.flatMap((g) => g.items);
-const PINNED_ITEMS = ALL_ITEMS.filter((i) => i.pinned);
-
 const ACCOUNT_ITEMS: Array<{ label: string; icon: keyof typeof Feather.glyphMap; value?: string }> = [
   { label: 'Two-Factor Auth', icon: 'lock', value: 'On' },
   { label: 'Audit Logs', icon: 'file-text' },
   { label: 'User Permissions', icon: 'shield' },
 ];
 
-type Tab = 'yours' | 'all';
-
 export default function MoreScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>('all');
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
@@ -121,21 +115,10 @@ export default function MoreScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Tab header */}
+      {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <View style={styles.tabsRow}>
-          <TouchableOpacity onPress={() => setTab('yours')} activeOpacity={0.7} style={styles.tabBtn}>
-            <Text style={[styles.tabText, { color: tab === 'yours' ? colors.foreground : colors.mutedForeground }]}>
-              Your Tools
-            </Text>
-            {tab === 'yours' && <View style={[styles.tabUnderline, { backgroundColor: colors.foreground }]} />}
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => setTab('all')} activeOpacity={0.7} style={styles.tabBtn}>
-            <Text style={[styles.tabText, { color: tab === 'all' ? colors.foreground : colors.mutedForeground }]}>
-              All Tools
-            </Text>
-            {tab === 'all' && <View style={[styles.tabUnderline, { backgroundColor: colors.foreground }]} />}
-          </TouchableOpacity>
+          <Text style={[styles.tabText, { color: colors.foreground }]}>All Tools</Text>
         </View>
         <TouchableOpacity
           activeOpacity={0.7}
@@ -160,34 +143,17 @@ export default function MoreScreen() {
           <Feather name="chevron-right" size={16} color={colors.primary} />
         </TouchableOpacity>
 
-        {tab === 'yours' ? (
-          <View style={styles.section}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={[styles.sectionTitle, { color: colors.mutedForeground, marginBottom: 0 }]}>PINNED TOOLS</Text>
-              <TouchableOpacity
-                style={styles.sectionHeaderIcon}
-                onPress={() => Alert.alert('Manage pinned tools', 'Pin your most-used tools here for quick access. Editable pins coming soon.', [{ text: 'Got it' }])}
-              >
-                <Feather name="bookmark" size={16} color={colors.mutedForeground} />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.grid}>
-              {PINNED_ITEMS.map((item) => <IconTile key={item.label} item={item} />)}
-            </View>
-          </View>
-        ) : (
-          FEATURE_GROUPS.map((group, gi) => (
-            <View key={group.title}>
-              <View style={styles.section}>
-                <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>{group.title.toUpperCase()}</Text>
-                <View style={styles.grid}>
-                  {group.items.map((item) => <IconTile key={item.label} item={item} />)}
-                </View>
+        {FEATURE_GROUPS.map((group, gi) => (
+          <View key={group.title}>
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>{group.title.toUpperCase()}</Text>
+              <View style={styles.grid}>
+                {group.items.map((item) => <IconTile key={item.label} item={item} />)}
               </View>
-              {gi < FEATURE_GROUPS.length - 1 && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
             </View>
-          ))
-        )}
+            {gi < FEATURE_GROUPS.length - 1 && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
+          </View>
+        ))}
 
         <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
