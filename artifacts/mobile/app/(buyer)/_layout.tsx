@@ -2,7 +2,6 @@ import React from 'react';
 import { Platform, Pressable, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -27,7 +26,7 @@ function BuyerTabLayout() {
     borderRadius: 0,
     borderTopWidth: 1,
     borderTopColor: isDark ? '#232823' : '#E6E0D2',
-    backgroundColor: isIOS ? 'transparent' : pillBg,
+    backgroundColor: pillBg,
     elevation: 0,
     shadowOpacity: 0,
   };
@@ -45,16 +44,9 @@ function BuyerTabLayout() {
           marginTop: -2,
         },
         tabBarStyle,
-        tabBarBackground: () =>
-          isIOS ? (
-            <BlurView
-              intensity={70}
-              tint={isDark ? 'dark' : 'light'}
-              style={StyleSheet.absoluteFill}
-            />
-          ) : (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: pillBg }]} />
-          ),
+        tabBarBackground: () => (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: pillBg }]} />
+        ),
         tabBarItemStyle: { paddingVertical: 8 },
         // Ensure the whole tab item (icon + label) is tappable, not just the icon glyph.
         tabBarButton: (props: any) => (
