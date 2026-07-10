@@ -679,21 +679,21 @@ const styles = StyleSheet.create({
 
   modalBackdrop: { flex: 1, backgroundColor: '#00000090', justifyContent: 'flex-end' },
   commentsSheet: {
-    backgroundColor: '#161412', borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    backgroundColor: '#0B0C0B', borderTopLeftRadius: 20, borderTopRightRadius: 20,
     paddingTop: 10, paddingHorizontal: 18,
   },
-  commentsHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#4A463D', alignSelf: 'center', marginBottom: 10 },
-  commentsTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF', marginBottom: 10 },
+  commentsHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#4A463D', alignSelf: 'center', marginBottom: 14 },
+  commentsTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF', marginBottom: 6 },
   commentsEmpty: { fontSize: 13, fontFamily: 'Inter_400Regular', color: '#8C8577', paddingVertical: 20, textAlign: 'center' },
-  commentRow: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#26231D' },
-  commentUser: { fontSize: 12.5, fontFamily: 'Inter_700Bold', color: '#39FF88', marginBottom: 2 },
-  commentText: { fontSize: 13.5, fontFamily: 'Inter_400Regular', color: '#EDE7D9' },
-  commentInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#26231D' },
+  commentRow: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#232823' },
+  commentUser: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#39FF88', marginBottom: 3 },
+  commentText: { fontSize: 14, fontFamily: 'Inter_400Regular', color: '#EDE7D9' },
+  commentInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 14, paddingBottom: 4 },
   commentInput: {
-    flex: 1, height: 40, borderRadius: 20, backgroundColor: '#221F1A',
-    paddingHorizontal: 14, fontSize: 13.5, fontFamily: 'Inter_400Regular', color: '#FFFFFF',
+    flex: 1, height: 44, borderRadius: 22, backgroundColor: '#1B1D1B',
+    paddingHorizontal: 16, fontSize: 14, fontFamily: 'Inter_400Regular', color: '#FFFFFF',
   },
-  commentSendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#39FF88', alignItems: 'center', justifyContent: 'center' },
+  commentSendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#39FF88', alignItems: 'center', justifyContent: 'center' },
 
   notifRow: { fontSize: 13.5, fontFamily: 'Inter_400Regular', color: '#EDE7D9', paddingBottom: 14 },
 });
