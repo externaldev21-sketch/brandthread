@@ -151,7 +151,7 @@ export default function ProfileScreen() {
           onPress={() => nav('/brand')}
         >
           <Feather name="plus" size={13} color={fg} />
-          <Text style={styles.pillText}>Add bio</Text>
+          <Text style={styles.pillText}>Post on Page</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.pillBtn}
