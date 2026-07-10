@@ -50,13 +50,6 @@ const SIZE_PRESETS: SizePreset[] = [
   { label: 'FacePaint',      profile: 'sRGB', dims: '2048 \u00d7 2048px', ratio: 1 },
 ];
 
-const RECENT_MOCKUPS = [
-  { name: 'Classic Tee – White', color: '#E8E8E8', status: 'ready' },
-  { name: 'Hoodie – Black', color: '#1A1A1A', status: 'ready' },
-  { name: 'Cargo Shorts – Khaki', color: '#8A7A5C', status: 'generating' },
-  { name: 'Blazer – Navy', color: '#1A2A4A', status: 'ready' },
-];
-
 export default function AIStudioScreen() {
   const colors = useColors();
   const router = useRouter();
@@ -208,27 +201,6 @@ export default function AIStudioScreen() {
           <Feather name="chevron-right" size={15} color={colors.mutedForeground} />
         </TouchableOpacity>
       ))}
-
-      {/* Recent Mockups */}
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent Mockups</Text>
-      <View style={styles.mockupsGrid}>
-        {RECENT_MOCKUPS.map((m) => (
-          <View key={m.name} style={[styles.mockupCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={[styles.mockupPreview, { backgroundColor: m.color + '44' }]}>
-              <View style={[styles.mockupDot, { backgroundColor: m.color }]} />
-              {m.status === 'generating' && (
-                <View style={[styles.generatingOverlay, { backgroundColor: '#00000088' }]}>
-                  <Feather name="loader" size={16} color="#FFFFFF" />
-                </View>
-              )}
-            </View>
-            <Text style={[styles.mockupName, { color: colors.foreground }]} numberOfLines={2}>{m.name}</Text>
-            <Text style={[styles.mockupStatus, { color: m.status === 'ready' ? colors.success : colors.warning }]}>
-              {m.status === 'ready' ? 'Ready' : 'Generating...'}
-            </Text>
-          </View>
-        ))}
-      </View>
       </ScrollView>
       )}
 
@@ -317,13 +289,6 @@ const styles = StyleSheet.create({
   toolBadgeText: { fontSize: 10, fontFamily: 'Inter_700Bold' },
   generateBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, padding: 16, marginBottom: 28, marginTop: 8 },
   generateText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
-  mockupsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
-  mockupCard: { width: '47.5%', borderRadius: 12, borderWidth: 1, overflow: 'hidden', padding: 12 },
-  mockupPreview: { height: 100, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  mockupDot: { width: 32, height: 32, borderRadius: 16 },
-  generatingOverlay: { ...StyleSheet.absoluteFillObject, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  mockupName: { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginBottom: 3 },
-  mockupStatus: { fontSize: 11, fontFamily: 'Inter_500Medium' },
 
   sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-start' },
   sheetCard: { backgroundColor: '#161616', paddingTop: 60, paddingHorizontal: 20, paddingBottom: 24, borderBottomLeftRadius: 24, borderBottomRightRadius: 24 },
