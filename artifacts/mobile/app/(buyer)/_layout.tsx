@@ -14,28 +14,22 @@ function BuyerTabLayout() {
   const colorScheme = useColorScheme();
   const isDark  = colorScheme === 'dark';
   const isIOS   = Platform.OS === 'ios';
-  const isWeb   = Platform.OS === 'web';
   const insets  = useSafeAreaInsets();
-  const bottomOffset = isWeb ? 20 : Math.max(insets.bottom, 8) + 12;
 
   const pillBg       = isDark ? '#1B1917F0' : '#FAF7EEF0';
   const activeTint   = isDark ? '#39FF88'   : '#00C853';
   const inactiveTint = isDark ? '#6E685C'   : '#A69C87';
 
   const tabBarStyle = {
-    position: 'absolute' as const,
-    bottom: bottomOffset,
-    left: 12,
-    right: 12,
-    height: 72,
-    borderRadius: 32,
-    borderTopWidth: 0,
+    position: 'relative' as const,
+    height: 56 + insets.bottom,
+    paddingBottom: insets.bottom,
+    borderRadius: 0,
+    borderTopWidth: 1,
+    borderTopColor: isDark ? '#232823' : '#E6E0D2',
     backgroundColor: isIOS ? 'transparent' : pillBg,
-    elevation: 24,
-    shadowColor: isDark ? '#000000' : '#00C853',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: isDark ? 0.5 : 0.15,
-    shadowRadius: 20,
+    elevation: 0,
+    shadowOpacity: 0,
   };
 
   return (
@@ -56,10 +50,10 @@ function BuyerTabLayout() {
             <BlurView
               intensity={70}
               tint={isDark ? 'dark' : 'light'}
-              style={[StyleSheet.absoluteFill, { borderRadius: 32, overflow: 'hidden' }]}
+              style={StyleSheet.absoluteFill}
             />
           ) : (
-            <View style={[StyleSheet.absoluteFill, { borderRadius: 32, backgroundColor: pillBg }]} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: pillBg }]} />
           ),
         tabBarItemStyle: { paddingVertical: 8 },
         // Ensure the whole tab item (icon + label) is tappable, not just the icon glyph.
