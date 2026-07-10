@@ -138,7 +138,8 @@ export default function AIAssistantScreen() {
           data={SUGGESTED}
           keyExtractor={(s) => s}
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 8 }}
+          style={styles.suggestionList}
+          contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingBottom: 8, alignItems: 'center' }}
           renderItem={({ item: s }) => (
             <TouchableOpacity
               onPress={() => sendMessage(s)}
@@ -194,7 +195,8 @@ const styles = StyleSheet.create({
   bubbleText: { fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 20 },
   loadingDots: { flexDirection: 'row', gap: 6 },
   loadDot: { width: 7, height: 7, borderRadius: 3.5, opacity: 0.6 },
-  suggestion: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8 },
+  suggestionList: { flexGrow: 0, maxHeight: 40 },
+  suggestion: { borderRadius: 20, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8, alignSelf: 'center' },
   suggestionText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
   inputBar: { borderTopWidth: 1, paddingHorizontal: 16, paddingTop: 10 },
   inputWrap: { flexDirection: 'row', alignItems: 'flex-end', borderRadius: 24, borderWidth: 1, paddingLeft: 16, paddingRight: 6, paddingVertical: 6, gap: 8 },
