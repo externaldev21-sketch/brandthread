@@ -36,7 +36,7 @@ const GROUPS: SettingsGroup[] = [
       { label: 'Roles', icon: 'users', route: '/roles' },
       { label: 'Security', icon: 'shield', route: '/security' },
       { label: 'Payments', icon: 'credit-card', route: '/payments' },
-      { label: 'Checkout', icon: 'shopping-cart' },
+      { label: 'Checkout', icon: 'shopping-cart', route: '/checkout' },
       { label: 'Customer accounts', icon: 'user' },
       { label: 'Shipping and delivery', icon: 'truck' },
       { label: 'Taxes and duties', icon: 'percent' },
