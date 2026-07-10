@@ -41,7 +41,6 @@ const GROUPS: SettingsGroup[] = [
       { label: 'Shipping and delivery', icon: 'truck', route: '/shipping-delivery' },
       { label: 'Taxes and duties', icon: 'percent', route: '/taxes-duties' },
       { label: 'Locations', icon: 'map-pin', route: '/locations' },
-      { label: 'Apps', icon: 'grid' },
       { label: 'Sales channels', icon: 'settings' },
       { label: 'Domains', icon: 'globe' },
       { label: 'Customer events', icon: 'activity' },
