@@ -211,11 +211,13 @@ const METHOD_CHIPS = [
 ];
 
 const CONFIG_ROWS = [
-  { label: 'Payment capture method',        icon: 'zap'      as const },
-  { label: 'Manual payment methods',        icon: 'inbox'    as const },
-  { label: 'Payment method customizations', icon: 'sliders'  as const },
-  { label: 'Payout schedule',               icon: 'calendar' as const },
-  { label: 'Escrow & release rules',        icon: 'shield'   as const },
+  { label: 'Payment capture method',        icon: 'zap'         as const },
+  { label: 'Manual payment methods',        icon: 'inbox'       as const },
+  { label: 'Payment method customizations', icon: 'sliders'     as const },
+  { label: 'Gift card expiration',          icon: 'gift'        as const },
+  { label: 'Apple Wallet passes',           icon: 'credit-card' as const },
+  { label: 'Payout schedule',               icon: 'calendar'    as const },
+  { label: 'Escrow & release rules',        icon: 'shield'      as const },
 ];
 
 export default function PaymentsScreen() {
