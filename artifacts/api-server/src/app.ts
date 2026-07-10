@@ -31,8 +31,10 @@ app.use(
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
 app.use(cors({ credentials: true, origin: true }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Raised from the default 100kb so requests carrying base64-encoded reference
+// photos (e.g. AI product photography uploads) don't get rejected.
+app.use(express.json({ limit: "20mb" }));
+app.use(express.urlencoded({ extended: true, limit: "20mb" }));
 
 // Clerk session middleware — handles both cookie (web) and Bearer token (mobile)
 app.use(

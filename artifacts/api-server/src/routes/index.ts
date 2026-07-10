@@ -9,6 +9,7 @@ import analyticsRouter from "./analytics";
 import integrationsRouter from "./integrations";
 import logoRouter from "./logo";
 import mockupRouter from "./mockup";
+import photographyRouter from "./photography";
 
 const router = Router();
 
@@ -22,5 +23,6 @@ router.use("/analytics",   analyticsRouter);
 router.use("/integrations", integrationsRouter);
 router.use("/logo",         logoRouter);
 router.use("/mockup",       mockupRouter);
+router.use("/photography",  photographyRouter);
 
 export default router;

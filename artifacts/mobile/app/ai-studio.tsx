@@ -173,6 +173,10 @@ export default function AIStudioScreen() {
               router.push('/ai-mockup-chat' as never);
               return;
             }
+            if (tool.label === 'AI Product Photography') {
+              router.push('/ai-photography-chat' as never);
+              return;
+            }
             setSelected(tool.label);
           }}
           activeOpacity={0.75}
