@@ -15,12 +15,120 @@ const PAGES = [
   { name: 'Contact', status: 'Published', views: '640', icon: 'mail' as const },
 ];
 
-const THEMES = ['Minimal', 'Bold', 'Editorial', 'Luxe', 'Street'];
+interface StoreLayout {
+  id: string;
+  name: string;
+  desc: string;
+  heroBg: string;
+  heroTextColor: string;
+  layout: 'centered' | 'split' | 'banner';
+  swatches: string[];
+  gridCols: number;
+}
+
+const LAYOUTS: StoreLayout[] = [
+  {
+    id: 'minimal',
+    name: 'Minimal',
+    desc: 'Clean grid, lots of whitespace',
+    heroBg: '#2A2A1A',
+    heroTextColor: '#C1440E',
+    layout: 'centered',
+    swatches: ['#C94D1F', '#1A1A4A', '#2A3A1A', '#4A2A2A'],
+    gridCols: 4,
+  },
+  {
+    id: 'bold',
+    name: 'Bold',
+    desc: 'Big type, high contrast blocks',
+    heroBg: '#C1440E',
+    heroTextColor: '#0E0E0E',
+    layout: 'banner',
+    swatches: ['#0E0E0E', '#F5EFE6', '#0E0E0E'],
+    gridCols: 3,
+  },
+  {
+    id: 'editorial',
+    name: 'Editorial',
+    desc: 'Magazine-style storytelling',
+    heroBg: '#1E1B16',
+    heroTextColor: '#F5EFE6',
+    layout: 'split',
+    swatches: ['#8A6D3B', '#3A3A3A', '#5C4A2E'],
+    gridCols: 2,
+  },
+  {
+    id: 'luxe',
+    name: 'Luxe',
+    desc: 'Dark, gallery-like showcase',
+    heroBg: '#0B0B0B',
+    heroTextColor: '#C9A96E',
+    layout: 'centered',
+    swatches: ['#C9A96E', '#1A1A1A', '#3A3A3A'],
+    gridCols: 3,
+  },
+  {
+    id: 'street',
+    name: 'Street',
+    desc: 'Punchy color, streetwear energy',
+    heroBg: '#1A1A4A',
+    heroTextColor: '#EF4444',
+    layout: 'banner',
+    swatches: ['#EF4444', '#1A1A4A', '#F5C518', '#111'],
+    gridCols: 4,
+  },
+  {
+    id: 'mono',
+    name: 'Mono',
+    desc: 'Monochrome, typography-first',
+    heroBg: '#141414',
+    heroTextColor: '#EDEDED',
+    layout: 'split',
+    swatches: ['#333', '#666', '#999'],
+    gridCols: 3,
+  },
+];
+
+function LayoutPreview({ layout, colors }: { layout: StoreLayout; colors: ReturnType<typeof useColors> }) {
+  return (
+    <View style={styles.layoutPreviewOuter}>
+      <View style={styles.previewBar}>
+        {[...Array(3)].map((_, i) => (
+          <View key={i} style={[styles.previewDot, { backgroundColor: i === 0 ? '#EF4444' : i === 1 ? '#B98A2E' : '#4C9A5E' }]} />
+        ))}
+      </View>
+      <View style={styles.previewContent}>
+        <View
+          style={[
+            styles.previewHero,
+            { backgroundColor: layout.heroBg },
+            layout.layout === 'split' && { alignItems: 'flex-start', paddingLeft: 12 },
+          ]}
+        >
+          <Text style={[styles.previewHeroText, { color: layout.heroTextColor }]}>BRANDTHREAD</Text>
+          <Text style={[styles.previewHeroSub, { color: layout.heroTextColor + 'AA' }]}>The New Collection</Text>
+        </View>
+        <View style={[styles.previewGrid, { flexWrap: 'wrap' }]}>
+          {layout.swatches.slice(0, layout.gridCols).map((c, i) => (
+            <View
+              key={i}
+              style={[
+                styles.previewProduct,
+                { backgroundColor: c + 'CC', flexBasis: `${100 / layout.gridCols - 2}%` },
+              ]}
+            />
+          ))}
+        </View>
+      </View>
+    </View>
+  );
+}
 
 export default function WebsiteScreen() {
   const colors = useColors();
   const router = useRouter();
-  const [selectedTheme, setSelectedTheme] = useState('Minimal');
+  const [selectedLayoutId, setSelectedLayoutId] = useState('minimal');
+  const selectedLayout = LAYOUTS.find((l) => l.id === selectedLayoutId) ?? LAYOUTS[0];
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -31,33 +139,51 @@ export default function WebsiteScreen() {
         showsVerticalScrollIndicator={false}
       >
 
-      {/* Store Preview */}
-      <View style={[styles.previewCard, { backgroundColor: '#17140F', borderColor: '#C1440E44' }]}>
-        <View style={styles.previewBar}>
-          {[...Array(3)].map((_, i) => (
-            <View key={i} style={[styles.previewDot, { backgroundColor: i === 0 ? '#EF4444' : i === 1 ? '#B98A2E' : '#4C9A5E' }]} />
-          ))}
-          <View style={[styles.urlBar, { backgroundColor: '#1A1A1A' }]}>
-            <Feather name="lock" size={10} color={colors.success} />
-            <Text style={[styles.urlText, { color: colors.mutedForeground }]}>brandthread.com</Text>
-          </View>
-        </View>
-        <View style={styles.previewContent}>
-          <View style={[styles.previewHero, { backgroundColor: '#2A2A1A' }]}>
-            <Text style={[styles.previewHeroText, { color: colors.primary }]}>BRANDTHREAD</Text>
-            <Text style={[styles.previewHeroSub, { color: colors.mutedForeground }]}>The New Collection</Text>
-          </View>
-          <View style={styles.previewGrid}>
-            {['#C94D1F', '#1A1A4A', '#2A3A1A', '#4A2A2A'].map((c, i) => (
-              <View key={i} style={[styles.previewProduct, { backgroundColor: c + '88' }]} />
-            ))}
-          </View>
-        </View>
-        <TouchableOpacity style={[styles.editBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8}>
-          <Feather name="edit-2" size={14} color={colors.primaryForeground} />
-          <Text style={[styles.editBtnText, { color: colors.primaryForeground }]}>Open Editor</Text>
-        </TouchableOpacity>
+      {/* Store Layouts */}
+      <View style={styles.layoutsHeaderRow}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 0 }]}>Store Layouts</Text>
+        <Text style={[styles.layoutsHint, { color: colors.mutedForeground }]}>Tap a layout, then edit it</Text>
       </View>
+      <View style={styles.layoutsGrid}>
+        {LAYOUTS.map((layout) => {
+          const isSelected = layout.id === selectedLayoutId;
+          return (
+            <TouchableOpacity
+              key={layout.id}
+              activeOpacity={0.85}
+              onPress={() => setSelectedLayoutId(layout.id)}
+              style={[
+                styles.layoutCard,
+                {
+                  backgroundColor: '#17140F',
+                  borderColor: isSelected ? colors.primary : '#C1440E33',
+                  borderWidth: isSelected ? 2 : 1,
+                },
+              ]}
+            >
+              <LayoutPreview layout={layout} colors={colors} />
+              <View style={styles.layoutCardFooter}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.layoutName, { color: colors.foreground }]}>{layout.name}</Text>
+                  <Text style={[styles.layoutDesc, { color: colors.mutedForeground }]} numberOfLines={1}>
+                    {layout.desc}
+                  </Text>
+                </View>
+                {isSelected ? (
+                  <View style={[styles.layoutCheck, { backgroundColor: colors.primary }]}>
+                    <Feather name="check" size={11} color={colors.primaryForeground} />
+                  </View>
+                ) : null}
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <TouchableOpacity style={[styles.editBtn, { backgroundColor: colors.primary, marginBottom: 24 }]} activeOpacity={0.8}>
+        <Feather name="edit-2" size={14} color={colors.primaryForeground} />
+        <Text style={[styles.editBtnText, { color: colors.primaryForeground }]}>Edit "{selectedLayout.name}" Layout</Text>
+      </TouchableOpacity>
 
       {/* SEO */}
       <View style={[styles.seoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -71,24 +197,6 @@ export default function WebsiteScreen() {
         </View>
         <Text style={[styles.seoTip, { color: colors.mutedForeground }]}>Tip: Add alt text to 3 product images to boost to 90+</Text>
       </View>
-
-      {/* Theme */}
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Themes</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }} contentContainerStyle={{ gap: 10 }}>
-        {THEMES.map((t) => (
-          <TouchableOpacity
-            key={t}
-            onPress={() => setSelectedTheme(t)}
-            activeOpacity={0.75}
-            style={[styles.themeChip, {
-              backgroundColor: selectedTheme === t ? colors.primary : colors.card,
-              borderColor: selectedTheme === t ? colors.primary : colors.border,
-            }]}
-          >
-            <Text style={[styles.themeText, { color: selectedTheme === t ? colors.primaryForeground : colors.mutedForeground }]}>{t}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
 
       {/* Pages */}
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Pages</Text>
@@ -133,17 +241,23 @@ const styles = StyleSheet.create({
   backText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
   pageTitle: { fontSize: 24, fontFamily: 'Inter_700Bold', marginBottom: 4 },
   pageSubtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 20 },
-  previewCard: { borderRadius: 16, borderWidth: 1, padding: 14, marginBottom: 16 },
-  previewBar: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  previewDot: { width: 8, height: 8, borderRadius: 4 },
-  urlBar: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
-  urlText: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  previewContent: { borderRadius: 10, overflow: 'hidden', marginBottom: 12 },
-  previewHero: { height: 80, alignItems: 'center', justifyContent: 'center' },
-  previewHeroText: { fontSize: 14, fontFamily: 'Inter_700Bold', letterSpacing: 2 },
-  previewHeroSub: { fontSize: 10, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  layoutsHeaderRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 12 },
+  layoutsHint: { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  layoutsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 16 },
+  layoutCard: { width: '47%', borderRadius: 16, padding: 10 },
+  layoutPreviewOuter: { borderRadius: 8, overflow: 'hidden', marginBottom: 8 },
+  layoutCardFooter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  layoutName: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  layoutDesc: { fontSize: 10, fontFamily: 'Inter_400Regular', marginTop: 1 },
+  layoutCheck: { width: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  previewBar: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  previewDot: { width: 6, height: 6, borderRadius: 3 },
+  previewContent: { borderRadius: 8, overflow: 'hidden' },
+  previewHero: { height: 54, alignItems: 'center', justifyContent: 'center' },
+  previewHeroText: { fontSize: 10, fontFamily: 'Inter_700Bold', letterSpacing: 1.5 },
+  previewHeroSub: { fontSize: 8, fontFamily: 'Inter_400Regular', marginTop: 2 },
   previewGrid: { flexDirection: 'row', gap: 2, marginTop: 2 },
-  previewProduct: { flex: 1, height: 40, borderRadius: 4 },
+  previewProduct: { height: 26, borderRadius: 3, marginBottom: 2 },
   editBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 10, paddingVertical: 10 },
   editBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   seoCard: { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 24 },
@@ -155,8 +269,6 @@ const styles = StyleSheet.create({
   seoTip: { fontSize: 12, fontFamily: 'Inter_400Regular' },
   sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
-  themeChip: { paddingHorizontal: 18, paddingVertical: 9, borderRadius: 20, borderWidth: 1 },
-  themeText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   pageRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10 },
   pageIcon: { width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   pageInfo: { flex: 1 },
