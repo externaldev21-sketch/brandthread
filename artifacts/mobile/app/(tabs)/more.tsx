@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Alert, Dimensions } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,7 +14,6 @@ interface FeatureItem {
   route: string;
   color: string;
   badge?: string;
-  pinned?: boolean;
 }
 
 interface FeatureGroup {
@@ -26,8 +25,8 @@ const FEATURE_GROUPS: FeatureGroup[] = [
   {
     title: 'Brand & Design',
     items: [
-      { label: 'Brand Creation',    icon: 'aperture',        route: '/brand',        color: '#EC4899', badge: 'AI', pinned: true },
-      { label: 'AI Design Studio',  icon: 'zap',             route: '/ai-studio',    color: '#F59E0B', badge: 'AI', pinned: true },
+      { label: 'Brand Creation',    icon: 'aperture',        route: '/brand',        color: '#EC4899', badge: 'AI' },
+      { label: 'AI Design Studio',  icon: 'zap',             route: '/ai-studio',    color: '#F59E0B', badge: 'AI' },
       { label: 'Website Builder',   icon: 'layout',          route: '/website',      color: '#0EA5E9', badge: 'Pro' },
     ],
   },
@@ -36,14 +35,14 @@ const FEATURE_GROUPS: FeatureGroup[] = [
     items: [
       { label: 'Manufacturer Hub',       icon: 'tool',         route: '/manufacturer', color: '#8B5CF6' },
       { label: 'Shipping & Fulfillment', icon: 'truck',        route: '/shipping',     color: '#F97316' },
-      { label: 'Payments',               icon: 'credit-card',  route: '/payments',     color: '#10B981', pinned: true },
+      { label: 'Payments',               icon: 'credit-card',  route: '/payments',     color: '#10B981' },
     ],
   },
   {
     title: 'Customers & Finance',
     items: [
       { label: 'CRM',                icon: 'users',        route: '/customers', color: '#EF4444' },
-      { label: 'Finance & Reports',  icon: 'bar-chart-2',  route: '/finance',   color: '#06B6D4', pinned: true },
+      { label: 'Finance & Reports',  icon: 'bar-chart-2',  route: '/finance',   color: '#06B6D4' },
       { label: 'Loyalty & Rewards',  icon: 'star',         route: '/plans',     color: '#FBBF24', badge: 'New' },
     ],
   },
