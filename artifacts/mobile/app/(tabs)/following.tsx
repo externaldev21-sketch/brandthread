@@ -13,13 +13,13 @@ import * as Haptics from 'expo-haptics';
 const FOLLOWING_BRANDS = [
   {
     id: 'b1', name: 'Vault Studio', handle: '@vaultstudio',
-    initials: 'VS', color: '#B33F1E', verified: true,
+    initials: 'VS', color: '#00C853', verified: true,
     followers: '12.4K', hasNew: true,
     latestDrop: {
       name: 'Canvas Cargo Jacket',
       price: '$189',
       tag: 'New Drop',
-      tagColor: '#B33F1E',
+      tagColor: '#00C853',
       desc: 'Oversized canvas jacket — limited run of 50.',
     },
   },
@@ -160,7 +160,7 @@ export default function FollowingScreen() {
   const fg     = isDark ? '#EDE7D9' : '#17140F';
   const muted  = isDark ? '#8C8577' : '#6E6759';
   const border = isDark ? '#33302A' : '#DBD3C0';
-  const primary = isDark ? '#C94D1F' : '#B33F1E';
+  const primary = isDark ? '#39FF88' : '#00C853';
 
   const newCount = FOLLOWING_BRANDS.filter(b => b.hasNew).length;
 
@@ -184,7 +184,7 @@ export default function FollowingScreen() {
             <TouchableOpacity key={brand.id} style={s.avatarItem} activeOpacity={0.8}
               onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}>
               {brand.hasNew ? (
-                <LinearGradient colors={['#D9714B', '#C1440E', '#B33F1E']} style={s.avatarRing}>
+                <LinearGradient colors={['#39FF88', '#00C853', '#00C853']} style={s.avatarRing}>
                   <View style={[s.avatarRingInner, { backgroundColor: bg }]}>
                     <View style={[s.avatarCircle, { backgroundColor: brand.color }]}>
                       <Text style={s.avatarInitials}>{brand.initials}</Text>

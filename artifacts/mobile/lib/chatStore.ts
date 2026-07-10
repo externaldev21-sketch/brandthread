@@ -28,7 +28,7 @@ export const FRIENDS: Record<string, Friend> = {
   jordan: { id: 'jordan', name: 'Jordan Lee',   handle: '@jordanlee',   initials: 'JL', color: '#1D4ED8', online: true  },
   amir:   { id: 'amir',   name: 'Amir Patel',   handle: '@amirpatel',   initials: 'AP', color: '#0F766E', online: false },
   sofia:  { id: 'sofia',  name: 'Sofia Reyes',  handle: '@sofiareyes',  initials: 'SR', color: '#B45309', online: false },
-  kai:    { id: 'kai',    name: 'Kai Nakamura', handle: '@kainakamura', initials: 'KN', color: '#B33F1E', online: true  },
+  kai:    { id: 'kai',    name: 'Kai Nakamura', handle: '@kainakamura', initials: 'KN', color: '#00C853', online: true  },
 };
 
 // ─── Seed conversation data ───────────────────────────────────────────────────

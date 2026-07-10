@@ -32,16 +32,16 @@ const LAYOUTS: StoreLayout[] = [
     name: 'Minimal',
     desc: 'Clean grid, lots of whitespace',
     heroBg: '#2A2A1A',
-    heroTextColor: '#C1440E',
+    heroTextColor: '#00C853',
     layout: 'centered',
-    swatches: ['#C94D1F', '#1A1A4A', '#2A3A1A', '#4A2A2A'],
+    swatches: ['#39FF88', '#1A1A4A', '#2A3A1A', '#4A2A2A'],
     gridCols: 4,
   },
   {
     id: 'bold',
     name: 'Bold',
     desc: 'Big type, high contrast blocks',
-    heroBg: '#C1440E',
+    heroBg: '#00C853',
     heroTextColor: '#0E0E0E',
     layout: 'banner',
     swatches: ['#0E0E0E', '#F5EFE6', '#0E0E0E'],
@@ -156,7 +156,7 @@ export default function WebsiteScreen() {
                 styles.layoutCard,
                 {
                   backgroundColor: '#17140F',
-                  borderColor: isSelected ? colors.primary : '#C1440E33',
+                  borderColor: isSelected ? colors.primary : '#00C85333',
                   borderWidth: isSelected ? 2 : 1,
                 },
               ]}

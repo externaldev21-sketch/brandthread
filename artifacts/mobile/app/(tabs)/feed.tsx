@@ -21,7 +21,7 @@ const SPOTLIGHT_ITEMS = [
     id: '1',
     creator: 'Vault Studio',
     handle: '@vaultstudio',
-    avatarColor: '#B33F1E',
+    avatarColor: '#00C853',
     initials: 'VS',
     verified: true,
     videoUri: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4',
@@ -30,7 +30,7 @@ const SPOTLIGHT_ITEMS = [
     productName: 'Canvas Cargo Jacket',
     productPrice: '$189',
     productOriginalPrice: null as string | null,
-    accentColor: '#C94D1F',
+    accentColor: '#39FF88',
     likes: 1240,
     comments: [
       { id: 'c1', user: '@dropzone', text: 'need this in black 😍' },
@@ -686,14 +686,14 @@ const styles = StyleSheet.create({
   commentsTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF', marginBottom: 10 },
   commentsEmpty: { fontSize: 13, fontFamily: 'Inter_400Regular', color: '#8C8577', paddingVertical: 20, textAlign: 'center' },
   commentRow: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#26231D' },
-  commentUser: { fontSize: 12.5, fontFamily: 'Inter_700Bold', color: '#C94D1F', marginBottom: 2 },
+  commentUser: { fontSize: 12.5, fontFamily: 'Inter_700Bold', color: '#39FF88', marginBottom: 2 },
   commentText: { fontSize: 13.5, fontFamily: 'Inter_400Regular', color: '#EDE7D9' },
   commentInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#26231D' },
   commentInput: {
     flex: 1, height: 40, borderRadius: 20, backgroundColor: '#221F1A',
     paddingHorizontal: 14, fontSize: 13.5, fontFamily: 'Inter_400Regular', color: '#FFFFFF',
   },
-  commentSendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#C94D1F', alignItems: 'center', justifyContent: 'center' },
+  commentSendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#39FF88', alignItems: 'center', justifyContent: 'center' },
 
   notifRow: { fontSize: 13.5, fontFamily: 'Inter_400Regular', color: '#EDE7D9', paddingBottom: 14 },
 });

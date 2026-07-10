@@ -64,7 +64,7 @@ function RolePage({
       title: 'I\'m a Buyer',
       sub: 'I want to discover and shop drops from clothing brands',
       colors: ['#1D140D', '#2A1B12'] as [string, string],
-      accent: '#C94D1F',
+      accent: '#39FF88',
       border: '#4A3423',
     },
     {
@@ -82,7 +82,7 @@ function RolePage({
       title: 'I\'m Both',
       sub: 'I buy from brands and also sell my own clothing line',
       colors: ['#1D140D', '#2A1B12'] as [string, string],
-      accent: '#C1440E',
+      accent: '#00C853',
       border: '#4A3423',
     },
   ];
@@ -143,7 +143,7 @@ const roleStyles = StyleSheet.create({
   heroLogo: {
     fontSize: 14,
     fontFamily: 'Inter_700Bold',
-    color: '#C94D1F',
+    color: '#39FF88',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
     marginBottom: 28,
@@ -204,7 +204,7 @@ function BuyerStylePicker({
   const border  = isDark ? '#33302A' : '#DBD3C0';
   const fg      = isDark ? '#EDE7D9' : '#17140F';
   const muted   = isDark ? '#8C8577' : '#6E6759';
-  const primary = isDark ? '#C94D1F' : '#B33F1E';
+  const primary = isDark ? '#39FF88' : '#00C853';
 
   return (
     <View style={[{ flex: 1 }, { backgroundColor: bg }]}>
@@ -274,7 +274,7 @@ function SellerSetup({
   const border  = isDark ? '#33302A' : '#DBD3C0';
   const fg      = isDark ? '#EDE7D9' : '#17140F';
   const muted   = isDark ? '#8C8577' : '#6E6759';
-  const primary = isDark ? '#C94D1F' : '#B33F1E';
+  const primary = isDark ? '#39FF88' : '#00C853';
 
   function animateTo(next: number, dir: number) {
     Animated.timing(slideAnim, { toValue: dir * -SCREEN_W, duration: 240, useNativeDriver: true }).start(() => {

@@ -154,7 +154,7 @@ export default function SellerDashboard() {
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const rev    = REVENUE_DATA[range.presetId] ?? REVENUE_DATA.last30;
   const spark  = SPARK[range.presetId] ?? SPARK.last30;
-  const primary = isDark ? '#C94D1F' : '#B33F1E';
+  const primary = isDark ? '#39FF88' : '#00C853';
 
   function nav(route: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

@@ -114,15 +114,15 @@ export default function BrandScreen() {
       >
 
       {/* Brand Profile */}
-      <LinearGradient colors={['#180D2E', '#17140F']} style={[styles.profileCard, { borderColor: '#C1440E44' }]}>
+      <LinearGradient colors={['#180D2E', '#17140F']} style={[styles.profileCard, { borderColor: '#00C85344' }]}>
         <View style={[styles.logoCircle, { borderColor: colors.primary }]}>
           <Text style={[styles.logoText, { color: colors.primary }]}>BT</Text>
         </View>
         <View>
           <Text style={[styles.brandName, { color: colors.primary }]}>Brandthread</Text>
-          <Text style={[styles.brandStyle, { color: '#C94D1F77' }]}>Minimalist · Est. 2025</Text>
+          <Text style={[styles.brandStyle, { color: '#39FF8877' }]}>Minimalist · Est. 2025</Text>
         </View>
-        <View style={[styles.completeBadge, { backgroundColor: '#C1440E22' }]}>
+        <View style={[styles.completeBadge, { backgroundColor: '#00C85322' }]}>
           <Text style={[styles.completeText, { color: colors.primary }]}>{completionPct}%</Text>
         </View>
       </LinearGradient>
@@ -132,7 +132,7 @@ export default function BrandScreen() {
         <View style={styles.cardHeader}>
           <Feather name="cpu" size={16} color={colors.primary} />
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>AI Brand Name Generator</Text>
-          <View style={[styles.aiBadge, { backgroundColor: '#C1440E22' }]}>
+          <View style={[styles.aiBadge, { backgroundColor: '#00C85322' }]}>
             <Text style={[styles.aiText, { color: colors.primary }]}>AI</Text>
           </View>
         </View>
@@ -176,7 +176,7 @@ export default function BrandScreen() {
         <View style={styles.cardHeader}>
           <Feather name="aperture" size={16} color={colors.primary} />
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>AI Logo Generator</Text>
-          <View style={[styles.aiBadge, { backgroundColor: '#C1440E22' }]}>
+          <View style={[styles.aiBadge, { backgroundColor: '#00C85322' }]}>
             <Text style={[styles.aiText, { color: colors.primary }]}>AI</Text>
           </View>
         </View>

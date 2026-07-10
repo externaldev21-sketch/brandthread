@@ -18,7 +18,7 @@ const HERO_DROP = {
   brand: 'Vault Studio',
   handle: '@vaultstudio',
   initials: 'VS',
-  brandColor: '#B33F1E',
+  brandColor: '#00C853',
   name: 'Canvas Cargo Jacket',
   tag: 'DROPPING TODAY',
   price: '$189',
@@ -26,7 +26,7 @@ const HERO_DROP = {
   remaining: 14,
   countdown: { h: 2, m: 14, s: 37 },
   gradient: ['#14110D', '#241708', '#0D0520'] as [string, string, string],
-  accentGradient: ['#C94D1F', '#B33F1E'] as [string, string],
+  accentGradient: ['#39FF88', '#00C853'] as [string, string],
 };
 
 const FOR_YOU = [
@@ -40,12 +40,12 @@ const DROPPING_SOON = [
   { id: 'd1', brand: 'Meridian Co.',  name: 'Essential Tee — Sage',   price: '$48',  color: '#0F766E', initials: 'MC', inHours: 0,  live: true  },
   { id: 'd2', brand: 'NxGen Drops',   name: 'Cargo Trouser S/S',      price: '$134', color: '#B45309', initials: 'NX', inHours: 4,  live: false },
   { id: 'd3', brand: 'Rawthread',     name: 'Boxy Flannel Shirt',     price: '$96',  color: '#92400E', initials: 'RT', inHours: 9,  live: false },
-  { id: 'd4', brand: 'Vault Studio',  name: 'Fleece Zip Jacket',      price: '$220', color: '#B33F1E', initials: 'VS', inHours: 23, live: false },
+  { id: 'd4', brand: 'Vault Studio',  name: 'Fleece Zip Jacket',      price: '$220', color: '#00C853', initials: 'VS', inHours: 23, live: false },
 ];
 
 const TRENDING = [
   { id: 't1', rank: 1, brand: 'NxGen Drops',  name: 'Archive Hoodie Vol.3',   price: '$135', color: '#B45309', initials: 'NX', hype: '🔥 Hot'    },
-  { id: 't2', rank: 2, brand: 'Vault Studio',  name: 'Canvas Cargo Jacket',    price: '$189', color: '#B33F1E', initials: 'VS', hype: '⚡ Live'   },
+  { id: 't2', rank: 2, brand: 'Vault Studio',  name: 'Canvas Cargo Jacket',    price: '$189', color: '#00C853', initials: 'VS', hype: '⚡ Live'   },
   { id: 't3', rank: 3, brand: 'Atlas Goods',   name: 'Utility Vest — Slate',   price: '$220', color: '#1D4ED8', initials: 'AG', hype: '⏳ Limited' },
   { id: 't4', rank: 4, brand: 'Coldform',      name: 'Raw Denim Jacket',       price: '$310', color: '#065F46', initials: 'CF', hype: '💎 Grail'  },
 ];
@@ -335,7 +335,7 @@ function TrendingRow({ item, isDark }: { item: typeof TRENDING[0]; isDark: boole
   const border = isDark ? '#33302A' : '#E3DCC9';
   const fg     = isDark ? '#EDE7D9' : '#17140F';
   const muted  = isDark ? '#8C8577' : '#8080A0';
-  const primary = isDark ? '#C94D1F' : '#B33F1E';
+  const primary = isDark ? '#39FF88' : '#00C853';
 
   return (
     <TouchableOpacity
@@ -378,7 +378,7 @@ const tr = StyleSheet.create({
   name:     { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   brand:    { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
   price:    { fontSize: 13, fontFamily: 'Inter_700Bold' },
-  hype:     { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: '#C94D1F' },
+  hype:     { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: '#39FF88' },
 });
 
 // ─── Section header ───────────────────────────────────────────────────────────
@@ -388,7 +388,7 @@ function SectionHead({ title, sub, action, onAction }: { title: string; sub?: st
   const isDark = scheme !== 'light';
   const fg     = isDark ? '#EDE7D9' : '#17140F';
   const muted  = isDark ? '#8C8577' : '#8080A0';
-  const primary = isDark ? '#C94D1F' : '#B33F1E';
+  const primary = isDark ? '#39FF88' : '#00C853';
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -417,7 +417,7 @@ export default function HomeScreen() {
   const fg      = isDark ? '#EDE7D9' : '#17140F';
   const muted   = isDark ? '#8C8577' : '#8080A0';
   const border  = isDark ? '#1A1A28' : '#E3DCC9';
-  const primary = isDark ? '#C94D1F' : '#B33F1E';
+  const primary = isDark ? '#39FF88' : '#00C853';
   const topPad  = Platform.OS === 'web' ? 67 : insets.top;
 
   return (
