@@ -21,7 +21,7 @@ const GROUPS: SettingsGroup[] = [
   {
     title: 'App settings',
     items: [
-      { label: 'Push notifications', icon: 'bell' },
+      { label: 'Push notifications', icon: 'bell', route: '/push-notifications' },
       { label: 'App icon', icon: 'smartphone' },
       { label: 'Biometric unlock', icon: 'unlock' },
     ],
