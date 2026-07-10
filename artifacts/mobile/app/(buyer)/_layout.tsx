@@ -5,6 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { LinearGradient } from 'expo-linear-gradient';
+import { ProfileTabButton } from '@/components/ProfileTabButton';
 
 // ─── Buyer tab layout ─────────────────────────────────────────────────────────
 // Tabs: Home · Friends · Feed (centre pill) · Inbox · Profile
@@ -124,6 +125,10 @@ function BuyerTabLayout() {
             ) : (
               <TabIcon name="user" color={color} focused={focused} />
             ),
+          // Double-tap swaps to the seller profile when the account has both sides.
+          tabBarButton: (props: any) => (
+            <ProfileTabButton {...props} otherSidePath="/(tabs)/profile" />
+          ),
         }}
       />
     </Tabs>

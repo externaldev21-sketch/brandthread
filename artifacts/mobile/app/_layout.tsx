@@ -88,10 +88,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     } else if (onboardingDone && storedRole === 'buyer' && inTabsGroup) {
       // Buyer somehow landed in the seller group — correct it
       router.replace('/(buyer)/' as never);
-    } else if (onboardingDone && storedRole !== 'buyer' && storedRole !== null && inBuyerGroup) {
-      // Seller/both somehow landed in the buyer group — correct it
+    } else if (onboardingDone && storedRole === 'seller' && inBuyerGroup) {
+      // Seller-only somehow landed in the buyer group — correct it
       router.replace('/(tabs)/' as never);
     }
+    // Note: 'both' users are allowed in either group — they can switch sides
+    // (e.g. by double-tapping the Profile tab) without being bounced back.
   }, [isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole]);
 
   return <>{children}</>;
