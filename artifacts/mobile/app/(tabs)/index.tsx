@@ -40,10 +40,10 @@ const SPARK: Record<string, number[]> = {
   custom:    [32, 48, 41, 65, 55, 74, 60, 88, 72, 100],
 };
 const STATS = [
-  { label: 'Sessions',   value: '9,400', change: '+5% today', icon: 'eye'          as const, up: true,  route: '/analytics' },
-  { label: 'Orders',     value: '12',    change: '+3 today',  icon: 'shopping-bag' as const, up: true,  route: '/orders'    },
-  { label: 'Conv. Rate', value: '3.4%',  change: '+0.6%',     icon: 'trending-up'  as const, up: true,  route: '/analytics' },
-  { label: 'Returns',    value: '2',     change: '-1 vs avg', icon: 'refresh-cw'   as const, up: false, route: '/orders'    },
+  { label: 'Sessions',   value: '9,400', change: '+5% today', icon: 'eye'          as const, up: true },
+  { label: 'Orders',     value: '12',    change: '+3 today',  icon: 'shopping-bag' as const, up: true },
+  { label: 'Conv. Rate', value: '3.4%',  change: '+0.6%',     icon: 'trending-up'  as const, up: true },
+  { label: 'Returns',    value: '2',     change: '-1 vs avg', icon: 'refresh-cw'   as const, up: true },
 ];
 const STORE_HANDLE = 'brandthread.store/vaultstudio';
 const ACCOUNT_BALANCE = '$12,678.77';
@@ -290,12 +290,12 @@ export default function SellerDashboard() {
         {/* Stats */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.statsScroll} style={{ marginTop: 16 }}>
           {STATS.map((s, i) => (
-            <TouchableOpacity key={s.label} activeOpacity={0.75} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); nav(s.route); }} style={[st.statCard, { backgroundColor: colors.card, borderColor: colors.border }, i === 0 && { marginLeft: 20 }, i === STATS.length - 1 && { marginRight: 20 }]}>
+            <View key={s.label} style={[st.statCard, { backgroundColor: colors.card, borderColor: colors.border }, i === 0 && { marginLeft: 20 }, i === STATS.length - 1 && { marginRight: 20 }]}>
               <View style={[st.statIcon, { backgroundColor: colors.secondary }]}><Feather name={s.icon} size={16} color={colors.primary} /></View>
               <Text style={[st.statValue, { color: colors.foreground }]}>{s.value}</Text>
               <Text style={[st.statLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
               <Text style={[st.statChange, { color: s.up ? colors.success : colors.destructive }]}>{s.change}</Text>
-            </TouchableOpacity>
+            </View>
           ))}
         </ScrollView>
 
