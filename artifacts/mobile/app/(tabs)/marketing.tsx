@@ -81,8 +81,15 @@ export default function MarketingScreen() {
       contentContainerStyle={{ paddingTop: topPad + 16, paddingBottom: bottomPad + 120, paddingHorizontal: 16 }}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={[styles.pageTitle, { color: colors.foreground }]}>Marketing</Text>
-      <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>Campaigns, discounts & automation</Text>
+      <View style={styles.headerRow}>
+        <TouchableOpacity onPress={() => router.back()} hitSlop={10} activeOpacity={0.7}>
+          <Feather name="chevron-left" size={26} color={colors.foreground} />
+        </TouchableOpacity>
+        <View>
+          <Text style={[styles.pageTitle, { color: colors.foreground }]}>Marketing</Text>
+          <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>Campaigns, discounts & automation</Text>
+        </View>
+      </View>
 
       {/* Stats Row */}
       <View style={styles.statsRow}>
@@ -217,6 +224,7 @@ export default function MarketingScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 2 },
   pageTitle: { fontSize: 24, fontFamily: 'Inter_700Bold', marginBottom: 4 },
   pageSubtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 20 },
   statsRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
