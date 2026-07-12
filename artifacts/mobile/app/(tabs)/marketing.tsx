@@ -82,7 +82,7 @@ export default function MarketingScreen() {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.headerRow}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={10} activeOpacity={0.7}>
+        <TouchableOpacity onPress={() => router.push('/(tabs)/more' as never)} hitSlop={10} activeOpacity={0.7}>
           <Feather name="chevron-left" size={26} color={colors.foreground} />
         </TouchableOpacity>
         <View>
