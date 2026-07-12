@@ -105,7 +105,20 @@ function FriendCard({
             <Text style={s.tagline} numberOfLines={1}>{post.tagline}</Text>
           </View>
         </View>
-        <TouchableOpacity style={s.moreBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity
+          style={s.moreBtn}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          activeOpacity={0.7}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            Alert.alert(post.friend, undefined, [
+              { text: 'Interested',     onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
+              { text: 'Not interested', onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning) },
+              { text: 'Report',         style: 'destructive', onPress: () => Alert.alert('Report submitted', 'Thanks for letting us know.', [{ text: 'OK' }]) },
+              { text: 'Cancel',         style: 'cancel' },
+            ]);
+          }}
+        >
           <Feather name="more-horizontal" size={20} color="#EDE7D9" />
         </TouchableOpacity>
       </View>
