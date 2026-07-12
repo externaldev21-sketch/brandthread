@@ -253,7 +253,12 @@ export default function SellerDashboard() {
         </View>
         <View style={[st.keyStatsRow, { paddingHorizontal: 20 }]}>
           {KEY_STATS.map((s) => (
-            <View key={s.label} style={[st.keyStatCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TouchableOpacity
+              key={s.label}
+              activeOpacity={0.75}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); nav(s.label === 'Leads' ? '/customers' : '/analytics'); }}
+              style={[st.keyStatCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+            >
               <Text style={[st.keyStatLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
               <View style={st.keyStatValueRow}>
                 <Text style={[st.keyStatValue, { color: colors.foreground }]}>{s.value}</Text>
@@ -261,7 +266,7 @@ export default function SellerDashboard() {
                   <Feather name={s.up ? 'arrow-up' : 'arrow-down'} size={11} color="#FFFFFF" />
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
 
