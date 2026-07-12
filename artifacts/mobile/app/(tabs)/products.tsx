@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Alert,
   ScrollView,
   View,
   Text,
@@ -93,16 +92,7 @@ export default function ProductsScreen() {
             style={styles.headerIconBtn}
             activeOpacity={0.7}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            onPress={() => {
-              haptic();
-              Alert.alert('Products', undefined, [
-                { text: 'Import products',  onPress: () => haptic() },
-                { text: 'Export to CSV',    onPress: () => haptic() },
-                { text: 'Bulk edit',        onPress: () => haptic() },
-                { text: 'Archived products', onPress: () => haptic() },
-                { text: 'Cancel', style: 'cancel' },
-              ]);
-            }}
+            onPress={haptic}
           >
             <Feather name="more-horizontal" size={20} color="#FFFFFF" />
           </TouchableOpacity>
