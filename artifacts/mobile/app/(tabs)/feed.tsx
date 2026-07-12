@@ -540,6 +540,8 @@ export default function FeedScreen() {
               placeholder="Search creators, products…"
               placeholderTextColor="#FFFFFF99"
               autoFocus
+              returnKeyType="search"
+              onSubmitEditing={() => setShowSearch(false)}
             />
             <TouchableOpacity
               style={styles.topIconBtn}
