@@ -300,7 +300,7 @@ export default function SellerDashboard() {
         </ScrollView>
 
         {/* Quick Actions */}
-        <View style={{ paddingHorizontal: 20, marginTop: 28 }}><SectionHeader title="Quick Actions" colors={colors} /></View>
+        <View style={{ paddingHorizontal: 20, marginTop: 28 }}><SectionHeader title="Quick Actions" action="See all →" onAction={() => nav('/more')} colors={colors} /></View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.actionsScroll}>
           {QUICK_ACTIONS.map((qa, i) => (
             <TouchableOpacity key={qa.label} style={[st.actionChip, { backgroundColor: colors.card, borderColor: colors.border }, i === 0 && { marginLeft: 20 }, i === QUICK_ACTIONS.length - 1 && { marginRight: 20 }]} onPress={() => nav(qa.route)} activeOpacity={0.75}>
