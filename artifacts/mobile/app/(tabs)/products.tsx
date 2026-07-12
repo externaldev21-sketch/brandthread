@@ -44,18 +44,31 @@ export default function ProductsScreen() {
   const router = useRouter();
   const [filter, setFilter] = useState<Filter>('All');
   const [search, setSearch] = useState('');
+  const [products, setProducts] = useState(PRODUCTS);
+  const [reordering, setReordering] = useState(false);
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPad = Platform.OS === 'web' ? 34 : 0;
 
-  const filtered = PRODUCTS.filter((p) => {
-    if (filter !== 'All' && p.status !== filter) return false;
-    if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
+  const filtered = reordering
+    ? products
+    : products.filter((p) => {
+        if (filter !== 'All' && p.status !== filter) return false;
+        if (search && !p.name.toLowerCase().includes(search.toLowerCase())) return false;
+        return true;
+      });
 
   function haptic() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }
+
+  function moveItem(index: number, direction: -1 | 1) {
+    const next = [...products];
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= next.length) return;
+    [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setProducts(next);
   }
 
   return (
@@ -105,13 +118,18 @@ export default function ProductsScreen() {
             )}
           </View>
           <TouchableOpacity
-            style={[styles.toolBtn, { backgroundColor: colors.secondary }]}
+            style={[styles.toolBtn, { backgroundColor: reordering ? colors.primary : colors.secondary }]}
             activeOpacity={0.7}
-            onPress={haptic}
+            onPress={() => { haptic(); setReordering(r => !r); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Feather name="arrow-up" size={16} color={colors.foreground} style={{ marginBottom: -6 }} />
-            <Feather name="arrow-down" size={16} color={colors.foreground} />
+            {reordering
+              ? <Feather name="check" size={16} color={reordering ? colors.background : colors.foreground} />
+              : <>
+                  <Feather name="arrow-up" size={16} color={colors.foreground} style={{ marginBottom: -6 }} />
+                  <Feather name="arrow-down" size={16} color={colors.foreground} />
+                </>
+            }
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.toolBtn, { backgroundColor: colors.secondary }]}
@@ -158,48 +176,78 @@ export default function ProductsScreen() {
           contentContainerStyle={{ paddingBottom: bottomPad + 130 }}
           showsVerticalScrollIndicator={false}
         >
-          {filtered.map((product, i) => (
-            <TouchableOpacity
-              key={`${product.name}-${i}`}
-              activeOpacity={0.7}
-              onPress={haptic}
-              style={[
-                styles.row,
-                i < filtered.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
-              ]}
-            >
-              <View style={[styles.thumb, { backgroundColor: product.color }]} />
-              <View style={styles.rowInfo}>
-                <Text style={[styles.rowName, { color: colors.foreground }]} numberOfLines={1}>{product.name}</Text>
-                <Text style={[styles.rowSub, { color: colors.mutedForeground }]}>{product.variants} variants</Text>
-              </View>
+          {filtered.map((product, i) => {
+            // In reorder mode, i is the index in `products` (since filtered === products)
+            const productIndex = reordering ? i : products.indexOf(product);
+            return (
               <View
+                key={`${product.name}-${i}`}
                 style={[
-                  styles.statusPill,
-                  {
-                    backgroundColor:
-                      statusKind[product.status] === 'success' ? `${colors.success}22`
-                        : statusKind[product.status] === 'warning' ? `${colors.warning}22`
-                        : colors.secondary,
-                  },
+                  styles.row,
+                  i < filtered.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
                 ]}
               >
-                <Text
-                  style={[
-                    styles.statusText,
-                    {
-                      color:
-                        statusKind[product.status] === 'success' ? colors.success
-                          : statusKind[product.status] === 'warning' ? colors.warning
-                          : colors.mutedForeground,
-                    },
-                  ]}
+                {reordering && (
+                  <View style={styles.reorderBtns}>
+                    <TouchableOpacity
+                      onPress={() => moveItem(productIndex, -1)}
+                      hitSlop={6}
+                      disabled={productIndex === 0}
+                      activeOpacity={0.6}
+                    >
+                      <Feather name="chevron-up" size={18} color={productIndex === 0 ? colors.border : colors.foreground} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => moveItem(productIndex, 1)}
+                      hitSlop={6}
+                      disabled={productIndex === products.length - 1}
+                      activeOpacity={0.6}
+                    >
+                      <Feather name="chevron-down" size={18} color={productIndex === products.length - 1 ? colors.border : colors.foreground} />
+                    </TouchableOpacity>
+                  </View>
+                )}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={haptic}
+                  style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}
                 >
-                  {product.status}
-                </Text>
+                  <View style={[styles.thumb, { backgroundColor: product.color }]} />
+                  <View style={styles.rowInfo}>
+                    <Text style={[styles.rowName, { color: colors.foreground }]} numberOfLines={1}>{product.name}</Text>
+                    <Text style={[styles.rowSub, { color: colors.mutedForeground }]}>{product.variants} variants</Text>
+                  </View>
+                  {!reordering && (
+                    <View
+                      style={[
+                        styles.statusPill,
+                        {
+                          backgroundColor:
+                            statusKind[product.status] === 'success' ? `${colors.success}22`
+                              : statusKind[product.status] === 'warning' ? `${colors.warning}22`
+                              : colors.secondary,
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.statusText,
+                          {
+                            color:
+                              statusKind[product.status] === 'success' ? colors.success
+                                : statusKind[product.status] === 'warning' ? colors.warning
+                                : colors.mutedForeground,
+                          },
+                        ]}
+                      >
+                        {product.status}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
               </View>
-            </TouchableOpacity>
-          ))}
+            );
+          })}
           {filtered.length === 0 && (
             <View style={styles.emptyState}>
               <Feather name="package" size={28} color={colors.mutedForeground} />
@@ -250,6 +298,7 @@ const styles = StyleSheet.create({
   },
   filterText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 12 },
+  reorderBtns: { alignItems: 'center', justifyContent: 'center', gap: 2, paddingRight: 4 },
   thumb: { width: 44, height: 44, borderRadius: 8 },
   rowInfo: { flex: 1, gap: 2 },
   rowName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
