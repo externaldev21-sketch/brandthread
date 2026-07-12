@@ -82,8 +82,13 @@ export default function MarketingScreen() {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.headerRow}>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/more' as never)} hitSlop={10} activeOpacity={0.7}>
-          <Feather name="chevron-left" size={26} color={colors.foreground} />
+        <TouchableOpacity
+          onPress={() => router.push('/(tabs)/more' as never)}
+          hitSlop={10}
+          activeOpacity={0.7}
+          style={[styles.backBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
+        >
+          <Feather name="chevron-left" size={20} color={colors.foreground} />
         </TouchableOpacity>
         <View>
           <Text style={[styles.pageTitle, { color: colors.foreground }]}>Marketing</Text>
@@ -225,6 +230,7 @@ export default function MarketingScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 2 },
+  backBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   pageTitle: { fontSize: 24, fontFamily: 'Inter_700Bold', marginBottom: 4 },
   pageSubtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 20 },
   statsRow: { flexDirection: 'row', gap: 8, marginBottom: 24 },
