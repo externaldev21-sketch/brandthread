@@ -91,7 +91,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     if (!onboardingChecked) return;
 
     // No account type chosen → go to account-type screen
-    if (!storedRole && !inAccountType && !inAuthScreen) {
+    if (!storedRole && !inAccountType && !inAuthScreen && !inOnboarding) {
       router.replace('/account-type');
       return;
     }
