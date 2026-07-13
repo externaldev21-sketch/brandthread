@@ -6,6 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface HealthStatus {
-  status: string;
+export interface Message {
+  id: string;
+  threadId: string;
+  senderRole: string;
+  content: string;
+  sentAt: string;
 }

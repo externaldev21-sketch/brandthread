@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/manufacturers/"
+title = "Brandthread Manufacturer Portal"
+version = "1.0.0"
+id = "artifacts/manufacturer-portal"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/manufacturers/" ]
+localPort = 24728
+
+[services.development]
+run = "pnpm --filter @workspace/manufacturer-portal run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/manufacturer-portal", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/manufacturer-portal/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24728"
+BASE_PATH = "/manufacturers/"

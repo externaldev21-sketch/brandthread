@@ -1,4 +1,5 @@
 import { pgTable, uuid, text, integer, timestamp, json, boolean } from 'drizzle-orm/pg-core';
+export * from './manufacturers';
 import { relations } from 'drizzle-orm';
 
 // ─── Users (brand team members, linked to Clerk) ──────────────────────────────
