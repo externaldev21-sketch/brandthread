@@ -60,6 +60,7 @@
     "zod-validation-error": "^3.4.0"
   },
   "dependencies": {
+    "expo-apple-authentication": "~8.0.8",
     "expo-clipboard": "^8.0.8",
     "expo-file-system": "~19.0.23",
     "expo-media-library": "~18.2.1",
