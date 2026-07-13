@@ -1,23 +1,30 @@
 /**
- * Sign-in / Sign-up screen — follows canonical Clerk Core v3 Signals API
- * Reference: .local/skills/clerk-auth/references/custom-ui/expo-sdk-email-password.md
+ * Sign-in / Sign-up screen — Clerk Core v3 Signals API
+ * Supports: email/password, Google OAuth, Apple OAuth, email verification
  */
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ActivityIndicator, useColorScheme, ScrollView,
+  KeyboardAvoidingView, Platform, ActivityIndicator,
+  useColorScheme, ScrollView,
 } from 'react-native';
-import { useSignIn, useSignUp } from '@clerk/expo';
+import { useSignIn, useSignUp, useOAuth } from '@clerk/expo';
+import * as WebBrowser from 'expo-web-browser';
 import { useRouter, useLocalSearchParams, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 
+// Required for OAuth session completion
+WebBrowser.maybeCompleteAuthSession();
+
 type Mode = 'sign-in' | 'sign-up';
 
 export default function SignInScreen() {
-  // Clerk v3 Signals API — destructure signIn/signUp directly (no isLoaded/setActive)
   const { signIn, errors: signInErrors, fetchStatus: signInFetch } = useSignIn();
   const { signUp, errors: signUpErrors, fetchStatus: signUpFetch } = useSignUp();
+  const { startOAuthFlow: googleOAuth } = useOAuth({ strategy: 'oauth_google' });
+  const { startOAuthFlow: appleOAuth }  = useOAuth({ strategy: 'oauth_apple' });
+
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
   const scheme  = useColorScheme();
@@ -29,87 +36,92 @@ export default function SignInScreen() {
   const [password, setPassword] = useState('');
   const [name, setName]         = useState('');
   const [code, setCode]         = useState('');
+  const [showPw, setShowPw]     = useState(false);
+  const [oauthError, setOAuthError] = useState('');
 
-  const bg      = isDark ? '#121110' : '#F2EEE3';
-  const card    = isDark ? '#1B1917' : '#FFFFFF';
-  const border  = isDark ? '#33302A' : '#DBD3C0';
-  const fg      = isDark ? '#EDE7D9' : '#17140F';
-  const muted   = isDark ? '#8C8577' : '#6E6759';
-  const primary = isDark ? '#39FF88' : '#00C853';
-  const inputBg = isDark ? '#201D18' : '#EDE7D9';
-
-  // ─── Sign-in ───────────────────────────────────────────────────────────────
-
-  const handleSignIn = async () => {
-    const { error } = await signIn.password({ emailAddress: email, password });
-    if (error) {
-      console.error('[sign-in] password error:', JSON.stringify(error, null, 2));
-      return; // errors.fields.* will render below the inputs automatically
-    }
-
-    if (signIn.status === 'complete') {
-      await signIn.finalize({
-        navigate: ({ decorateUrl }) => {
-          const url = decorateUrl('/');
-          if (url.startsWith('http')) {
-            // web path
-            if (typeof window !== 'undefined') window.location.href = url;
-          } else {
-            router.replace(url as Href);
-          }
-        },
-      });
-    } else {
-      // needs_second_factor / needs_client_trust — uncommon for simple setups
-      console.warn('[sign-in] status after password():', signIn.status);
-    }
-  };
-
-  // ─── Sign-up step 1: create account ───────────────────────────────────────
-
-  const handleSignUp = async () => {
-    const nameParts = name.trim().split(/\s+/);
-    const { error } = await signUp.password({
-      emailAddress: email,
-      password,
-      firstName: nameParts[0],
-      lastName: nameParts.slice(1).join(' ') || undefined,
-    });
-    if (error) {
-      console.error('[sign-up] password error:', JSON.stringify(error, null, 2));
-      return;
-    }
-    // Send verification code
-    if (!error) await signUp.verifications.sendEmailCode();
-  };
-
-  // ─── Sign-up step 2: verify email code ────────────────────────────────────
-
-  const handleVerify = async () => {
-    await signUp.verifications.verifyEmailCode({ code });
-
-    if (signUp.status === 'complete') {
-      await signUp.finalize({
-        navigate: ({ decorateUrl }) => {
-          const url = decorateUrl('/onboarding');
-          if (url.startsWith('http')) {
-            if (typeof window !== 'undefined') window.location.href = url;
-          } else {
-            router.replace(url as Href);
-          }
-        },
-      });
-    } else {
-      console.warn('[sign-up] status after verify:', signUp.status, signUp);
-    }
-  };
+  const bg      = isDark ? '#0E0E0E' : '#F5F5F5';
+  const card    = isDark ? '#1A1A1A' : '#FFFFFF';
+  const border  = isDark ? '#2A2A2A' : '#E0E0E0';
+  const fg      = isDark ? '#FFFFFF' : '#0A0A0A';
+  const muted   = isDark ? '#888' : '#666';
+  const primary = '#00C853';
+  const inputBg = isDark ? '#252525' : '#F0F0F0';
 
   const inputStyle  = [styles.input, { backgroundColor: inputBg, borderColor: border, color: fg }];
   const labelStyle  = [styles.label, { color: muted }];
   const isSigningIn = signInFetch === 'fetching';
   const isSigningUp = signUpFetch === 'fetching';
 
-  // ─── Sign-up verification screen ──────────────────────────────────────────
+  // ─── OAuth ──────────────────────────────────────────────────────────────────
+
+  const handleOAuth = async (start: () => Promise<any>, provider: string) => {
+    setOAuthError('');
+    try {
+      const result = await start();
+      if (result?.createdSessionId && result?.setActive) {
+        await result.setActive({ session: result.createdSessionId });
+      }
+    } catch (e: any) {
+      if (e?.message?.includes('cancelled') || e?.message?.includes('cancel')) return;
+      setOAuthError(`${provider} sign-in failed. Please try again.`);
+    }
+  };
+
+  // ─── Email sign-in ──────────────────────────────────────────────────────────
+
+  const handleSignIn = async () => {
+    const { error } = await signIn.password({
+      emailAddress: email.trim().toLowerCase(),
+      password,
+    });
+    if (error) return;
+    if (signIn.status === 'complete') {
+      await signIn.finalize({
+        navigate: ({ decorateUrl }) => {
+          const url = decorateUrl('/');
+          if (url.startsWith('http')) {
+            if (typeof window !== 'undefined') window.location.href = url;
+          } else {
+            router.replace(url as Href);
+          }
+        },
+      });
+    }
+  };
+
+  // ─── Email sign-up step 1 ───────────────────────────────────────────────────
+
+  const handleSignUp = async () => {
+    const nameParts = name.trim().split(/\s+/);
+    const { error } = await signUp.password({
+      emailAddress: email.trim().toLowerCase(),
+      password,
+      firstName: nameParts[0],
+      lastName: nameParts.slice(1).join(' ') || undefined,
+    });
+    if (error) return;
+    await signUp.verifications.sendEmailCode();
+  };
+
+  // ─── Email sign-up step 2 ───────────────────────────────────────────────────
+
+  const handleVerify = async () => {
+    await signUp.verifications.verifyEmailCode({ code });
+    if (signUp.status === 'complete') {
+      await signUp.finalize({
+        navigate: ({ decorateUrl }) => {
+          const url = decorateUrl('/account-type');
+          if (url.startsWith('http')) {
+            if (typeof window !== 'undefined') window.location.href = url;
+          } else {
+            router.replace(url as Href);
+          }
+        },
+      });
+    }
+  };
+
+  // ─── Verification screen ────────────────────────────────────────────────────
 
   if (
     mode === 'sign-up' &&
@@ -122,12 +134,10 @@ export default function SignInScreen() {
         style={[styles.container, { backgroundColor: bg }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={[styles.card, { backgroundColor: card, borderColor: border, marginTop: insets.top + 40, marginBottom: insets.bottom + 24 }]}>
+        <View style={[styles.card, { backgroundColor: card, borderColor: border, marginTop: insets.top + 40 }]}>
           <BrandRow primary={primary} fg={fg} />
           <Text style={[styles.title, { color: fg }]}>Check your email</Text>
-          <Text style={[styles.subtitle, { color: muted }]}>
-            We sent a 6-digit code to {email}
-          </Text>
+          <Text style={[styles.subtitle, { color: muted }]}>We sent a 6-digit code to {email}</Text>
 
           <View style={styles.field}>
             <Text style={labelStyle}>Verification code</Text>
@@ -147,30 +157,17 @@ export default function SignInScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.btn, { backgroundColor: primary }]}
+            style={[styles.btn, { backgroundColor: primary }, (isSigningUp || code.length < 6) && { opacity: 0.6 }]}
             onPress={handleVerify}
             disabled={isSigningUp || code.length < 6}
             activeOpacity={0.85}
           >
-            {isSigningUp
-              ? <ActivityIndicator color="#03150B" />
-              : <Text style={styles.btnText}>Verify email</Text>}
+            {isSigningUp ? <ActivityIndicator color="#021208" /> : <Text style={styles.btnText}>Verify email</Text>}
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.switchRow}
-            onPress={() => signUp.verifications.sendEmailCode()}
-          >
+          <TouchableOpacity style={styles.switchRow} onPress={() => signUp.verifications.sendEmailCode()}>
             <Text style={[styles.switchText, { color: muted }]}>
-              {'Didn\'t get it? '}
-              <Text style={{ color: primary, fontFamily: 'Inter_600SemiBold' }}>Resend code</Text>
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.switchRow} onPress={() => setCode('')}>
-            <Text style={[styles.switchText, { color: muted }]}>
-              {'← '}
-              <Text style={{ color: primary, fontFamily: 'Inter_600SemiBold' }}>Go back</Text>
+              {"Didn't get it? "}<Text style={{ color: primary, fontFamily: 'Inter_600SemiBold' }}>Resend</Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -178,7 +175,7 @@ export default function SignInScreen() {
     );
   }
 
-  // ─── Main sign-in / sign-up form ──────────────────────────────────────────
+  // ─── Main form ──────────────────────────────────────────────────────────────
 
   return (
     <KeyboardAvoidingView
@@ -186,19 +183,55 @@ export default function SignInScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
-        <View style={[styles.card, { backgroundColor: card, borderColor: border, marginTop: insets.top + 40, marginBottom: insets.bottom + 24 }]}>
+        <View style={[styles.card, { backgroundColor: card, borderColor: border, marginTop: insets.top + 32, marginBottom: insets.bottom + 24 }]}>
+
+          {/* Back to welcome */}
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <Feather name="arrow-left" size={20} color={muted} />
+          </TouchableOpacity>
 
           <BrandRow primary={primary} fg={fg} />
 
           <Text style={[styles.title, { color: fg }]}>
-            {mode === 'sign-in' ? 'Welcome back' : 'Join Brandthread'}
+            {mode === 'sign-in' ? 'Welcome back.' : 'CREATE YOUR BRANDTHREAD ACCOUNT'}
           </Text>
           <Text style={[styles.subtitle, { color: muted }]}>
             {mode === 'sign-in'
-              ? 'Sign in to your account'
-              : 'Discover drops. Build your brand.'}
+              ? 'Sign in to continue building your Brandthread.'
+              : 'One account for everything you build.'}
           </Text>
 
+          {/* OAuth buttons */}
+          <TouchableOpacity
+            style={[styles.oauthBtn, { borderColor: border }]}
+            onPress={() => handleOAuth(googleOAuth, 'Google')}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.oauthBtnIcon}>🇬</Text>
+            <Text style={[styles.oauthBtnText, { color: fg }]}>Continue with Google</Text>
+          </TouchableOpacity>
+
+          {Platform.OS === 'ios' && (
+            <TouchableOpacity
+              style={[styles.oauthBtn, { borderColor: border, backgroundColor: isDark ? '#FFF' : '#000', marginTop: 10 }]}
+              onPress={() => handleOAuth(appleOAuth, 'Apple')}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.oauthBtnIcon}>🍎</Text>
+              <Text style={[styles.oauthBtnText, { color: isDark ? '#000' : '#FFF' }]}>Continue with Apple</Text>
+            </TouchableOpacity>
+          )}
+
+          {oauthError ? <Text style={[styles.error, { marginTop: 8 }]}>{oauthError}</Text> : null}
+
+          {/* Divider */}
+          <View style={styles.divider}>
+            <View style={[styles.dividerLine, { backgroundColor: border }]} />
+            <Text style={[styles.dividerText, { color: muted }]}>or</Text>
+            <View style={[styles.dividerLine, { backgroundColor: border }]} />
+          </View>
+
+          {/* Full name (sign-up only) */}
           {mode === 'sign-up' && (
             <View style={styles.field}>
               <Text style={labelStyle}>Full name</Text>
@@ -213,8 +246,9 @@ export default function SignInScreen() {
             </View>
           )}
 
+          {/* Email */}
           <View style={styles.field}>
-            <Text style={labelStyle}>Email</Text>
+            <Text style={labelStyle}>Email address</Text>
             <TextInput
               style={inputStyle}
               placeholder="you@yourbrand.com"
@@ -225,49 +259,72 @@ export default function SignInScreen() {
               keyboardType="email-address"
             />
             {mode === 'sign-in' && signInErrors.fields.identifier && (
-              <Text style={styles.error}>{signInErrors.fields.identifier.message}</Text>
+              <Text style={styles.error}>{friendlyError(signInErrors.fields.identifier.message)}</Text>
             )}
             {mode === 'sign-up' && signUpErrors.fields.emailAddress && (
-              <Text style={styles.error}>{signUpErrors.fields.emailAddress.message}</Text>
+              <Text style={styles.error}>{friendlyError(signUpErrors.fields.emailAddress.message)}</Text>
             )}
           </View>
 
+          {/* Password */}
           <View style={styles.field}>
-            <Text style={labelStyle}>Password</Text>
-            <TextInput
-              style={inputStyle}
-              placeholder="••••••••"
-              placeholderTextColor={muted}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-            />
+            <View style={styles.pwLabelRow}>
+              <Text style={labelStyle}>Password</Text>
+              {mode === 'sign-in' && (
+                <TouchableOpacity onPress={() => router.push('/forgot-password' as never)}>
+                  <Text style={[styles.forgotLink, { color: primary }]}>Forgot password?</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={[styles.pwWrap, { backgroundColor: inputBg, borderColor: border }]}>
+              <TextInput
+                style={[styles.pwInput, { color: fg }]}
+                placeholder="••••••••"
+                placeholderTextColor={muted}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPw}
+              />
+              <TouchableOpacity onPress={() => setShowPw(v => !v)} style={styles.eyeBtn}>
+                <Feather name={showPw ? 'eye-off' : 'eye'} size={18} color={muted} />
+              </TouchableOpacity>
+            </View>
             {mode === 'sign-in' && signInErrors.fields.password && (
-              <Text style={styles.error}>{signInErrors.fields.password.message}</Text>
+              <Text style={styles.error}>{friendlyError(signInErrors.fields.password.message)}</Text>
             )}
             {mode === 'sign-up' && signUpErrors.fields.password && (
-              <Text style={styles.error}>{signUpErrors.fields.password.message}</Text>
+              <Text style={styles.error}>{friendlyError(signUpErrors.fields.password.message)}</Text>
+            )}
+            {mode === 'sign-up' && (
+              <Text style={[styles.pwHint, { color: muted }]}>Use at least 8 characters</Text>
             )}
           </View>
 
+          {/* Submit */}
           <TouchableOpacity
-            style={[
-              styles.btn,
-              { backgroundColor: primary },
-              (isSigningIn || isSigningUp) && { opacity: 0.7 },
-            ]}
+            style={[styles.btn, { backgroundColor: primary }, (isSigningIn || isSigningUp) && { opacity: 0.7 }]}
             onPress={mode === 'sign-in' ? handleSignIn : handleSignUp}
             disabled={!email || !password || isSigningIn || isSigningUp}
             activeOpacity={0.85}
           >
             {(isSigningIn || isSigningUp)
-              ? <ActivityIndicator color="#03150B" />
+              ? <ActivityIndicator color="#021208" />
               : <Text style={styles.btnText}>{mode === 'sign-in' ? 'Sign in' : 'Create account'}</Text>}
           </TouchableOpacity>
 
+          {/* Terms (sign-up only) */}
+          {mode === 'sign-up' && (
+            <Text style={[styles.terms, { color: muted }]}>
+              By continuing, you agree to Brandthread's{' '}
+              <Text style={{ color: primary }}>Terms of Service</Text> and{' '}
+              <Text style={{ color: primary }}>Privacy Policy</Text>.
+            </Text>
+          )}
+
+          {/* Mode switch */}
           <TouchableOpacity
             style={styles.switchRow}
-            onPress={() => setMode(mode === 'sign-in' ? 'sign-up' : 'sign-in')}
+            onPress={() => setMode(m => m === 'sign-in' ? 'sign-up' : 'sign-in')}
           >
             <Text style={[styles.switchText, { color: muted }]}>
               {mode === 'sign-in' ? "Don't have an account? " : 'Already have an account? '}
@@ -277,7 +334,6 @@ export default function SignInScreen() {
             </Text>
           </TouchableOpacity>
 
-          {/* Required: Clerk bot-protection captcha anchor (sign-up flows) */}
           <View nativeID="clerk-captcha" />
         </View>
       </ScrollView>
@@ -285,11 +341,20 @@ export default function SignInScreen() {
   );
 }
 
+function friendlyError(msg: string): string {
+  if (!msg) return msg;
+  if (msg.toLowerCase().includes('identifier')) return 'An account already exists with this email. Try signing in instead.';
+  if (msg.toLowerCase().includes('password') && msg.toLowerCase().includes('weak')) return 'Use a stronger password with at least 8 characters.';
+  if (msg.toLowerCase().includes('email')) return 'Enter a valid email address.';
+  if (msg.toLowerCase().includes('network') || msg.toLowerCase().includes('fetch')) return "We couldn't connect. Check your internet and try again.";
+  return msg;
+}
+
 function BrandRow({ primary, fg }: { primary: string; fg: string }) {
   return (
     <View style={styles.brandRow}>
       <View style={[styles.logoCircle, { backgroundColor: primary }]}>
-        <Feather name="scissors" size={22} color="#FFF" />
+        <Text style={styles.logoLetter}>B</Text>
       </View>
       <Text style={[styles.brandName, { color: fg }]}>Brandthread</Text>
     </View>
@@ -298,18 +363,41 @@ function BrandRow({ primary, fg }: { primary: string; fg: string }) {
 
 const styles = StyleSheet.create({
   container:  { flex: 1, paddingHorizontal: 20 },
-  card:       { borderRadius: 24, padding: 28, borderWidth: 1 },
-  brandRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 28 },
-  logoCircle: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  brandName:  { fontSize: 22, fontFamily: 'Inter_700Bold', letterSpacing: -0.4 },
-  title:      { fontSize: 24, fontFamily: 'Inter_700Bold', marginBottom: 6, letterSpacing: -0.4 },
-  subtitle:   { fontSize: 14, fontFamily: 'Inter_400Regular', marginBottom: 24, lineHeight: 20 },
-  field:      { marginBottom: 16 },
-  label:      { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginBottom: 6 },
-  input:      { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: 'Inter_400Regular' },
-  error:      { color: '#EF4444', fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 4 },
-  btn:        { borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 4 },
-  btnText:    { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#03150B' },
-  switchRow:  { marginTop: 16, alignItems: 'center' },
+  card:       { borderRadius: 24, padding: 28, borderWidth: 1, marginHorizontal: 0 },
+  backBtn:    { marginBottom: 16 },
+  brandRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 },
+  logoCircle: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  logoLetter: { fontSize: 20, fontFamily: 'Inter_700Bold', color: '#FFF' },
+  brandName:  { fontSize: 20, fontFamily: 'Inter_700Bold', letterSpacing: -0.4 },
+  title:      { fontSize: 22, fontFamily: 'Inter_700Bold', marginBottom: 6, letterSpacing: -0.4 },
+  subtitle:   { fontSize: 14, fontFamily: 'Inter_400Regular', marginBottom: 20, lineHeight: 20 },
+
+  oauthBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    borderRadius: 14, borderWidth: 1.5, paddingVertical: 14,
+  },
+  oauthBtnIcon: { fontSize: 18 },
+  oauthBtnText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+
+  divider:     { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 20 },
+  dividerLine: { flex: 1, height: 1 },
+  dividerText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+
+  field:     { marginBottom: 16 },
+  label:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginBottom: 6 },
+  input:     { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: 'Inter_400Regular' },
+  pwLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  forgotLink: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  pwWrap:     { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1 },
+  pwInput:    { flex: 1, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: 'Inter_400Regular' },
+  eyeBtn:     { paddingHorizontal: 14 },
+  pwHint:     { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 4 },
+
+  error:     { color: '#EF4444', fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 4 },
+  btn:       { borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 4 },
+  btnText:   { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#021208' },
+
+  terms:     { fontSize: 12, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 18, marginTop: 12 },
+  switchRow: { marginTop: 16, alignItems: 'center' },
   switchText: { fontSize: 14, fontFamily: 'Inter_400Regular' },
 });

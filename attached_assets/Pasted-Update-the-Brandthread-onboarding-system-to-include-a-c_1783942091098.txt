@@ -1,0 +1,899 @@
+Update the Brandthread onboarding system to include a complete authentication and account-type flow.
+
+Do not remove or simplify any of the onboarding screens already requested. Integrate the following changes into the existing onboarding architecture and make the entire flow work from beginning to end.
+
+==================================================
+UPDATED USER JOURNEY
+====================
+
+The correct application flow should now be:
+
+1. Brandthread animated splash screen
+2. Welcome screen
+3. Sign up or sign in
+4. Choose account type:
+
+   * Buyer
+   * Seller
+   * Both
+5. Continue into personalized onboarding based on the chosen account type
+6. Save onboarding responses to the authenticated user account
+7. Complete onboarding
+8. Enter the personalized Brandthread dashboard
+
+Existing users should be able to sign in without repeating account creation.
+
+Users who started onboarding but did not finish should return to their last completed onboarding step after signing back in.
+
+==================================================
+WELCOME SCREEN CHANGES
+======================
+
+Update the welcome screen buttons.
+
+Primary button:
+“Create my account”
+
+Secondary outlined button:
+“Sign in”
+
+Optional text underneath:
+“Continue with Apple or Google”
+
+The welcome screen should still include the premium Brandthread introduction and visual interface preview.
+
+Button behavior:
+
+“Create my account”
+
+* Opens the account creation screen.
+
+“Sign in”
+
+* Opens the existing-user sign-in screen.
+
+Do not immediately begin the questionnaire before authentication.
+
+==================================================
+ACCOUNT CREATION SCREEN
+=======================
+
+Create a premium account creation screen.
+
+Eyebrow:
+“CREATE YOUR BRANDTHREAD ACCOUNT”
+
+Headline:
+“One account for everything you build.”
+
+Supporting text:
+“Save your designs, manage your business, connect with brands, and access your workspace from any device.”
+
+Include the following authentication options:
+
+1. Continue with Apple
+2. Continue with Google
+3. Continue with email
+
+Button order:
+
+* Continue with Apple
+* Continue with Google
+* Divider with text “or”
+* Email address field
+* Password field
+* Create account button
+
+Include:
+
+* Show/hide password button
+* Password requirements
+* Inline validation
+* Loading state
+* Disabled state
+* Authentication error state
+* Terms and Privacy agreement text
+* Link to sign in for existing users
+
+Suggested footer text:
+“By continuing, you agree to Brandthread’s Terms of Service and Privacy Policy.”
+
+Do not use native alert boxes for normal authentication errors.
+
+==================================================
+APPLE SIGN-IN
+=============
+
+Add Sign in with Apple using the correct authentication system for the existing project.
+
+If the project uses Firebase Authentication:
+
+* Use Firebase Apple authentication.
+* Use expo-apple-authentication for the native Apple authentication interface.
+* Exchange the returned Apple credential with Firebase.
+* Correctly handle nonce generation and credential validation.
+
+If the project uses Supabase:
+
+* Use Supabase OAuth with Apple.
+* Use the correct redirect URL and deep-linking configuration.
+
+If another authentication provider already exists:
+
+* Integrate Apple through that existing provider rather than creating a second authentication system.
+
+Requirements:
+
+* Show Apple sign-in only where supported.
+* On unsupported platforms, hide or disable it gracefully.
+* Use Apple’s approved button appearance and wording.
+* Do not create a fake Apple login button.
+* Handle cancellation without showing an error.
+* Handle credential failure with a useful inline message.
+* Save the user’s Apple authentication provider in the profile.
+* Handle the fact that Apple may only provide the user’s name and email during the first authorization.
+* Do not depend on Apple returning the name again later.
+* Store returned profile information when it is first available.
+
+For Expo, inspect whether the project uses:
+
+* Expo Go
+* Development builds
+* EAS Build
+* Native iOS folders
+
+Configure the implementation appropriately.
+
+Add any required settings to:
+
+* app.json
+* app.config.js
+* app.config.ts
+* entitlements
+* iOS bundle configuration
+
+Do not expose private keys or secrets in client code.
+
+==================================================
+GOOGLE SIGN-IN
+==============
+
+Add Google authentication through the existing authentication provider.
+
+If the project uses Firebase Authentication:
+
+* Use Google OAuth and Firebase credentials.
+* Use the correct Expo authentication flow.
+* Configure web, iOS, and Android client IDs through environment variables.
+
+If the project uses Supabase:
+
+* Use Supabase Google OAuth.
+* Configure the redirect URL and deep linking correctly.
+
+Requirements:
+
+* Do not create a fake Google login screen.
+* Use the correct Google branding.
+* Handle user cancellation gracefully.
+* Handle invalid configuration with a clear development error.
+* Handle account creation and returning-user login with the same button.
+* Save the authentication provider to the user profile.
+* Return users to the correct onboarding or dashboard route after authentication.
+* Avoid creating duplicate accounts when the same email is used through multiple providers, where the provider supports account linking.
+
+Environment variables should use names appropriate to the current stack, such as:
+
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
+EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID
+
+Or the equivalent variables required by the existing authentication provider.
+
+Do not hard-code OAuth credentials in components.
+
+Create or update an `.env.example` file showing which environment variables are required, but do not put real secret values inside it.
+
+==================================================
+EMAIL ACCOUNT CREATION
+======================
+
+Implement email and password account creation.
+
+Fields:
+
+* Email address
+* Password
+* Confirm password
+
+Validation:
+
+* Valid email format
+* Password minimum length
+* Password confirmation must match
+* Trim email whitespace
+* Convert email to lowercase
+* Prevent submission with empty fields
+* Display provider errors in user-friendly language
+
+Suggested error translations:
+
+Existing account:
+“An account already exists with this email. Try signing in instead.”
+
+Weak password:
+“Use a stronger password with at least 8 characters.”
+
+Invalid email:
+“Enter a valid email address.”
+
+Network error:
+“We couldn’t connect. Check your internet connection and try again.”
+
+After successful account creation:
+
+* Create the user profile record.
+* Set onboardingCompleted to false.
+* Set onboardingStep to the account-type screen.
+* Navigate to account-type selection.
+
+Do not mark onboarding complete after account creation.
+
+==================================================
+SIGN-IN SCREEN
+==============
+
+Create a separate premium sign-in screen.
+
+Headline:
+“Welcome back.”
+
+Supporting text:
+“Sign in to continue building your Brandthread.”
+
+Options:
+
+* Continue with Apple
+* Continue with Google
+* Email
+* Password
+* Sign in button
+* Forgot password
+* Create account link
+
+Behavior after sign-in:
+
+If onboardingCompleted is true:
+
+* Navigate directly to the existing dashboard.
+
+If onboardingCompleted is false:
+
+* Restore onboarding data.
+* Navigate to the last saved onboarding step.
+
+If the profile does not have an account type:
+
+* Navigate to the account-type selection screen.
+
+If the user account existed before the new onboarding system:
+
+* Safely create missing onboarding fields.
+* Do not overwrite existing profile or brand information.
+
+==================================================
+FORGOT PASSWORD
+===============
+
+Create a simple forgot-password screen.
+
+Content:
+
+* Email field
+* “Send reset link” button
+* Back to sign in button
+
+Success message:
+“Check your inbox. We sent a password reset link to [email].”
+
+Do not reveal whether an email definitely exists in the database if the authentication system intentionally hides this information.
+
+==================================================
+ACCOUNT TYPE SELECTION
+======================
+
+Add this screen immediately after account creation or after first social authentication.
+
+Eyebrow:
+“HOW WILL YOU USE BRANDTHREAD?”
+
+Headline:
+“Choose your experience.”
+
+Supporting text:
+“Your choice personalizes your tools, navigation, marketplace, and dashboard. You can change this later.”
+
+Create three large premium selection cards.
+
+---
+
+## OPTION 1 — BUYER
+
+Title:
+“Buyer”
+
+Description:
+“Discover brands, shop products, save inspiration, follow creators, and manage your purchases.”
+
+Suggested icon:
+Shopping bag or discovery icon
+
+Buyer features:
+
+* Discover clothing brands
+* Browse products and collections
+* Save products and moodboards
+* Follow brands and designers
+* Message sellers
+* Track orders
+* Manage wishlists
+* Build style inspiration boards
+
+Save value as:
+accountType: "buyer"
+
+---
+
+## OPTION 2 — SELLER
+
+Title:
+“Seller”
+
+Description:
+“Build, operate, launch, and grow your own clothing brand.”
+
+Suggested icon:
+Storefront, garment, or brand icon
+
+Seller features:
+
+* Design products
+* Build tech packs
+* Find manufacturers
+* Manage samples and production
+* Build an online storefront
+* Manage products and inventory
+* Process orders
+* Plan launches
+* Create content
+* Track sales and analytics
+
+Save value as:
+accountType: "seller"
+
+---
+
+## OPTION 3 — BOTH
+
+Title:
+“Both”
+
+Description:
+“Run your own brand while discovering and purchasing from other brands.”
+
+Suggested icon:
+Two connected arrows or combined buyer/seller icon
+
+Both-account features:
+
+* Full buyer experience
+* Full seller experience
+* Switch between shopping and brand-management modes
+* Keep purchases and seller operations organized separately
+* Use one identity and one login
+
+Save value as:
+accountType: "both"
+
+---
+
+Selection behavior:
+
+* Only one account type may be selected.
+* The selected card should animate with a premium outline and glow.
+* Display a check indicator.
+* Continue button remains disabled until a selection is made.
+
+Primary button:
+“Continue”
+
+Secondary text:
+“You can change this later in Settings.”
+
+Persist accountType immediately after continuing.
+
+==================================================
+BUYER ONBOARDING PATH
+=====================
+
+If accountType is “buyer,” do not force the user through seller/business questions.
+
+Create a shorter buyer-specific onboarding path.
+
+BUYER SCREEN 1 — STYLE INTERESTS
+
+Headline:
+“What styles are you into?”
+
+Allow up to five:
+
+* Streetwear
+* Luxury
+* Minimal
+* Vintage
+* Activewear
+* Y2K
+* Technical
+* Casual
+* Avant-garde
+* Sustainable
+* Handmade
+* Accessories
+* Footwear
+* Other
+
+Save as:
+buyerStyleInterests: string[]
+
+BUYER SCREEN 2 — SHOPPING INTERESTS
+
+Headline:
+“What do you usually shop for?”
+
+Options:
+
+* T-shirts
+* Hoodies
+* Pants
+* Denim
+* Jackets
+* Knitwear
+* Activewear
+* Dresses
+* Footwear
+* Bags
+* Hats
+* Jewelry
+* Accessories
+
+Save as:
+buyerProductInterests: string[]
+
+BUYER SCREEN 3 — DISCOVERY PREFERENCES
+
+Headline:
+“What would you like to discover?”
+
+Options:
+
+* Emerging brands
+* Established brands
+* Local brands
+* Independent designers
+* Limited drops
+* Affordable fashion
+* Luxury fashion
+* Sustainable brands
+* Custom clothing
+
+Save as:
+discoveryPreferences: string[]
+
+BUYER SCREEN 4 — PROFILE
+
+Fields:
+
+* Display name
+* Username
+* Profile photo, optional
+* Location, optional
+
+Save as:
+displayName
+username
+profilePhotoUri
+buyerLocation
+
+BUYER COMPLETION
+
+Headline:
+“Your Brandthread is ready.”
+
+Description:
+“Start discovering brands, products, designers, and collections built around your style.”
+
+Primary button:
+“Start exploring”
+
+Navigate to the buyer-facing home or marketplace.
+
+If a buyer dashboard does not yet exist:
+
+* Create a clean placeholder buyer home using actual reusable application components.
+* Do not leave the user on a blank screen.
+* Include Discover, Saved, Orders, Messages, and Profile navigation destinations.
+* Clearly isolate unfinished backend data behind proper empty states.
+
+==================================================
+SELLER ONBOARDING PATH
+======================
+
+If accountType is “seller,” use the complete brand-owner onboarding flow previously requested.
+
+Seller sequence should include:
+
+1. User role
+2. Brand stage
+3. Primary goals
+4. Brand information
+5. Brand aesthetic
+6. Product categories
+7. Current tools
+8. Team and business size
+9. Workspace personalization
+10. Personalized build animation
+11. Completion
+
+Do not ask the user whether they are a buyer, seller, or both again inside this path.
+
+==================================================
+BOTH ONBOARDING PATH
+====================
+
+If accountType is “both,” use the complete seller onboarding path first.
+
+After the seller questions, add a short buyer-preferences section:
+
+1. Buyer style interests
+2. Buyer product interests
+3. Discovery preferences
+
+Then build a combined workspace.
+
+Completion headline:
+“Both sides of your Brandthread are ready.”
+
+Description:
+“Run [brandName], discover other brands, and switch between your business and shopping experiences from one account.”
+
+Primary button:
+“Enter Brandthread”
+
+==================================================
+BUYER / SELLER MODE SWITCHING
+=============================
+
+For users with accountType set to “both,” add a clear mode switcher.
+
+Suggested placement:
+
+* Profile menu
+* Main navigation header
+* Workspace switcher
+
+Modes:
+
+* Shopping
+* My Brand
+
+Behavior:
+
+* Shopping opens the buyer experience.
+* My Brand opens the seller workspace.
+* Preserve the last selected mode.
+* Do not require separate login credentials.
+* Do not mix buyer order history with seller customer orders.
+* Clearly label each experience.
+* Use the same overall Brandthread design system.
+
+Save:
+activeMode: "buyer" | "seller"
+
+Default active mode:
+
+* Use preferredHomeModule or the last-used mode.
+* If no preference exists, default to seller mode for a “both” account after seller onboarding.
+
+==================================================
+UPDATED DATA MODEL
+==================
+
+Extend the onboarding and profile types.
+
+Use a structure similar to:
+
+type AccountType = "buyer" | "seller" | "both";
+
+type ActiveMode = "buyer" | "seller";
+
+type AuthenticationProvider =
+| "email"
+| "google"
+| "apple";
+
+type OnboardingData = {
+accountType: AccountType | null;
+activeMode: ActiveMode | null;
+authenticationProviders: AuthenticationProvider[];
+
+userRole: string | null;
+brandStage: string | null;
+primaryGoals: string[];
+
+brandName: string;
+founderName: string;
+brandWebsite: string;
+brandLocation: string;
+brandLogoUri: string | null;
+
+brandAesthetics: string[];
+customAesthetic: string;
+
+productCategories: string[];
+customProductCategory: string;
+
+currentTools: string[];
+
+teamSize: string | null;
+monthlyOrderVolume: string | null;
+salesModel: string | null;
+preferredHomeModule: string | null;
+
+buyerStyleInterests: string[];
+buyerProductInterests: string[];
+discoveryPreferences: string[];
+
+displayName: string;
+username: string;
+profilePhotoUri: string | null;
+buyerLocation: string;
+
+onboardingCompleted: boolean;
+onboardingPath: "buyer" | "seller" | "both" | null;
+onboardingStep: number;
+
+createdAt?: string;
+updatedAt?: string;
+};
+
+Do not create separate duplicate accounts for buyer and seller modes.
+
+==================================================
+PROFILE DATABASE REQUIREMENTS
+=============================
+
+Inspect the current backend before editing database logic.
+
+The authenticated profile should support:
+
+* userId
+* email
+* displayName
+* username
+* profilePhoto
+* authenticationProviders
+* accountType
+* activeMode
+* onboardingCompleted
+* onboardingStep
+* onboardingPath
+* createdAt
+* updatedAt
+
+Seller profile fields:
+
+* brandName
+* founderName
+* brandLogo
+* brandWebsite
+* brandLocation
+* seller onboarding responses
+
+Buyer profile fields:
+
+* style interests
+* product interests
+* discovery preferences
+
+If database migrations are required:
+
+* Create the migration.
+* Do not delete existing fields.
+* Make new fields nullable or provide safe defaults.
+* Preserve all existing user data.
+* Explain how to apply the migration.
+
+==================================================
+AUTHENTICATION ROUTING GUARD
+============================
+
+Replace the startup routing logic with this order:
+
+1. Load authentication session.
+2. Load the authenticated profile.
+3. Load locally cached onboarding data.
+4. Show a branded loading screen until all required state is known.
+5. If no authenticated user:
+
+   * Open the welcome/authentication flow.
+6. If authenticated and accountType is missing:
+
+   * Open account-type selection.
+7. If authenticated and onboardingCompleted is false:
+
+   * Determine the correct onboarding path.
+   * Restore the last valid step.
+8. If authenticated and onboardingCompleted is true:
+
+   * Buyer account → buyer home
+   * Seller account → seller dashboard
+   * Both account → last active mode
+9. Never briefly show the wrong screen.
+10. Prevent redirect loops.
+
+==================================================
+SETTINGS SUPPORT
+================
+
+Add the following settings options:
+
+* Edit profile
+* Edit brand setup
+* Shopping preferences
+* Account type
+* Connected login methods
+* Switch mode, for “both” accounts
+* Sign out
+* Delete account
+
+Account-type changes:
+
+Buyer to seller:
+
+* Start seller onboarding without deleting buyer preferences.
+
+Seller to buyer:
+
+* Keep the existing seller workspace and data.
+* Ask whether the user wants buyer-only navigation or to change to “both.”
+* Do not automatically delete the seller profile.
+
+Buyer or seller to both:
+
+* Preserve all existing data.
+* Only request missing onboarding information.
+
+Both to buyer or seller:
+
+* Do not delete data.
+* Hide the unused mode unless the user changes back later.
+
+==================================================
+SECURITY REQUIREMENTS
+=====================
+
+* Never store passwords manually.
+* Never save OAuth access tokens in plain AsyncStorage unless the authentication provider’s official SDK requires and securely manages it.
+* Use the current authentication provider’s session management.
+* Do not put OAuth client secrets in the mobile app.
+* Do not commit real secrets.
+* Do not expose service-role keys.
+* Validate protected user data on the backend.
+* Ensure users can only read and update their own private profile.
+* Add or review database security rules or row-level security.
+* Do not trust accountType sent from the client for sensitive seller permissions without backend authorization.
+
+==================================================
+FINAL TESTING REQUIREMENTS
+==========================
+
+Test all of these paths:
+
+NEW EMAIL BUYER:
+
+* Create account
+* Choose Buyer
+* Complete buyer onboarding
+* Reach buyer home
+* Close and reopen app
+* Remain signed in
+* Buyer onboarding does not repeat
+
+NEW GOOGLE SELLER:
+
+* Continue with Google
+* Choose Seller
+* Complete seller onboarding
+* Reach seller dashboard
+* Reopen app
+* Seller onboarding does not repeat
+
+NEW APPLE BOTH USER:
+
+* Continue with Apple
+* Choose Both
+* Complete seller and buyer onboarding
+* Reach the correct dashboard
+* Switch between Shopping and My Brand
+* Reopen app
+* Last-used mode is restored
+
+RETURNING INCOMPLETE USER:
+
+* Sign in
+* Restore saved onboarding step
+* Preserve all prior answers
+
+RETURNING COMPLETE USER:
+
+* Sign in
+* Skip onboarding
+* Open correct experience immediately
+
+AUTHENTICATION ERRORS:
+
+* Invalid email
+* Wrong password
+* Existing account
+* OAuth cancellation
+* OAuth configuration failure
+* Offline state
+
+Also test:
+
+* Sign out
+* Sign back in
+* Forgot password
+* Account-type change
+* Mode switching
+* Editing onboarding answers
+* Google authentication on Android
+* Google authentication on iOS
+* Apple authentication on supported iOS devices
+* Unsupported Apple authentication platform behavior
+
+==================================================
+IMPLEMENTATION INSTRUCTION
+==========================
+
+Do not only describe how to add these features.
+
+Inspect the existing authentication system and directly implement:
+
+* Email account creation
+* Email sign in
+* Google authentication
+* Apple authentication
+* Forgot-password flow
+* Account-type selection
+* Buyer onboarding
+* Seller onboarding
+* Both onboarding
+* Correct route guarding
+* Profile persistence
+* Buyer/seller mode switching
+* Settings integration
+
+Do not remove any existing working authentication, dashboard, marketplace, or onboarding functionality unless it is being replaced by a complete working version.
+
+Run the app and fix all TypeScript, import, configuration, navigation, authentication, and runtime errors before considering the task complete.
+
+At the end, provide:
+
+1. Every file created
+2. Every file modified
+3. Every package installed
+4. Every environment variable required
+5. Any Firebase, Supabase, Google, Apple, Expo, or developer-console configuration I must complete manually
+6. Exact testing instructions
+7. Any feature that could not be completed and the exact reason why
