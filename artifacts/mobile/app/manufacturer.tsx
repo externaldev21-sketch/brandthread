@@ -101,7 +101,9 @@ export default function ManufacturerScreen() {
           <Feather name="arrow-left" size={20} color={FG} />
         </TouchableOpacity>
         <Text style={s.navTitle}>Manufacturer Hub</Text>
-        <View style={s.navIcon} />
+        <TouchableOpacity style={s.navIcon} onPress={() => go('/manufacturer-messages')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Feather name="message-circle" size={20} color={FG} />
+        </TouchableOpacity>
       </View>
 
       {/* ── Search Bar ── */}
