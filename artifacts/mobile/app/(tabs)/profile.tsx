@@ -192,40 +192,6 @@ export default function ProfileScreen() {
         ))}
       </View>
 
-      {/* Brand Health */}
-      <View style={s.section}>
-        <View style={s.sectionHead}>
-          <Text style={s.sectionTitle}>Brand Health</Text>
-          <TouchableOpacity onPress={() => nav('/analytics')} activeOpacity={0.75}>
-            <Text style={s.viewReport}>View Report</Text>
-          </TouchableOpacity>
-        </View>
-        <TouchableOpacity style={s.healthCard} activeOpacity={0.85} onPress={() => nav('/analytics')}>
-          <LinearGradient colors={['#0D2B1A', '#0A1F13']} style={s.healthGradient}>
-            {/* Score circle */}
-            <View style={s.healthCircle}>
-              <Svg width={52} height={52}>
-                <Circle cx={26} cy={26} r={21} stroke={BORDER} strokeWidth={4} fill="none" />
-                <Circle
-                  cx={26} cy={26} r={21}
-                  stroke={GREEN} strokeWidth={4} fill="none"
-                  strokeDasharray={`${2 * Math.PI * 21 * 0.94} ${2 * Math.PI * 21 * 0.06}`}
-                  strokeLinecap="round"
-                  rotation={-90} originX={26} originY={26}
-                />
-              </Svg>
-              <Text style={s.healthScore}>94</Text>
-            </View>
-            {/* Text */}
-            <View style={{ flex: 1 }}>
-              <Text style={s.healthTitle}>Excellent</Text>
-              <Text style={s.healthDesc}>Your brand is performing great.</Text>
-            </View>
-            <Feather name="chevron-right" size={18} color={MUTED} />
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
-
       {/* Content Tabs */}
       <View style={s.tabsBar}>
         {CONTENT_TABS.map((tab, i) => {
