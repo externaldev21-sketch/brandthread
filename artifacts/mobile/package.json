@@ -64,6 +64,7 @@
     "expo-file-system": "~19.0.23",
     "expo-media-library": "~18.2.1",
     "expo-sharing": "~14.0.8",
-    "expo-video": "~3.0.16"
+    "expo-video": "~3.0.16",
+    "react-native-qrcode-svg": "^6.3.21"
   }
 }
