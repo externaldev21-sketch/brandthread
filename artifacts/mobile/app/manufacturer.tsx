@@ -282,7 +282,7 @@ export default function ManufacturerScreen() {
                 <View style={s.actionRow}>
                   <TouchableOpacity
                     style={s.btnOutline}
-                    onPress={() => Alert.alert('Request Sample', `A sample request has been sent to ${m.name}. They will respond within 48 hours.`)}
+                    onPress={() => go('/request-sample?name=' + encodeURIComponent(m.name))}
                     activeOpacity={0.75}
                   >
                     <Text style={s.btnOutlineText}>Request Sample</Text>

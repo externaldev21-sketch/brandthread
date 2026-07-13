@@ -199,6 +199,8 @@ export default function DesignCanvasScreen() {
   const [showLayers,      setShowLayers]      = useState(false);
   const [showBrushPanel,  setShowBrushPanel]  = useState(false);
   const [showTools,       setShowTools]       = useState(false);
+  const [showTextInput,   setShowTextInput]   = useState(false);
+  const [textValue,       setTextValue]       = useState('');
 
   function closeAllPanels() {
     setShowColorPicker(false);
@@ -486,10 +488,10 @@ export default function DesignCanvasScreen() {
         <View style={styles.toolRow}>
           <ToolBtn icon="edit-3"  label="Draw"   active={tool === 'brush'}   onPress={() => { haptic('light'); setTool('brush');   closeAllPanels(); }} />
           <ToolBtn icon="x-circle" label="Erase" active={tool === 'eraser'}  onPress={() => { haptic('light'); setTool('eraser');  closeAllPanels(); }} />
-          <ToolBtn icon="droplet"  label="Fill"  active={tool === 'fill'}    onPress={() => { haptic('light'); setTool('fill');    closeAllPanels(); Alert.alert('Fill', 'Tap inside a closed shape on the canvas to fill it.\n\nFull fill engine coming in next update.'); }} />
-          <ToolBtn icon="type"     label="Text"  active={tool === 'text'}    onPress={() => { haptic('light'); setTool('text');    closeAllPanels(); Alert.alert('Text Tool', 'Tap on the canvas to place text.\n\nFull typography engine coming soon.'); }} />
-          <ToolBtn icon="square"   label="Shapes" active={tool === 'shapes'} onPress={() => { haptic('light'); setTool('shapes'); closeAllPanels(); Alert.alert('Shapes', 'Draw and hold at the end of a stroke to snap it to a shape.'); }} />
-          <ToolBtn icon="move"     label="Select" active={tool === 'select'} onPress={() => { haptic('light'); setTool('select'); closeAllPanels(); Alert.alert('Selection', 'Drag to create a selection. Advanced selection coming soon.'); }} />
+          <ToolBtn icon="droplet"  label="Fill"  active={tool === 'fill'}    onPress={() => { haptic('light'); setTool('fill');    closeAllPanels(); }} />
+          <ToolBtn icon="type"     label="Text"  active={tool === 'text'}    onPress={() => { haptic('light'); setTool('text');    closeAllPanels(); setTextValue(''); setShowTextInput(true); }} />
+          <ToolBtn icon="square"   label="Shapes" active={tool === 'shapes'} onPress={() => { haptic('light'); setTool('shapes'); closeAllPanels(); }} />
+          <ToolBtn icon="move"     label="Select" active={tool === 'select'} onPress={() => { haptic('light'); setTool('select'); closeAllPanels(); }} />
         </View>
 
         {/* Actions row */}
@@ -507,6 +509,64 @@ export default function DesignCanvasScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* ── TEXT TOOL MODAL ──────────────────────────────────────────────── */}
+      <Modal visible={showTextInput} transparent animationType="slide" onRequestClose={() => setShowTextInput(false)}>
+        <View style={styles.textModalOverlay}>
+          <View style={styles.textModalCard}>
+            <Text style={styles.textModalTitle}>Add Text</Text>
+            <TextInput
+              style={[styles.textModalInput, { color: color }]}
+              value={textValue}
+              onChangeText={setTextValue}
+              placeholder="Type something…"
+              placeholderTextColor={MUTED}
+              autoFocus
+              multiline
+            />
+            {/* Color row */}
+            <View style={styles.textColorRow}>
+              {['#FFFFFF','#000000','#FF6B6B','#FFD93D','#6BCB77','#4D96FF','#FF6FC8','#C084FC'].map((c) => (
+                <TouchableOpacity
+                  key={c}
+                  style={[styles.textColorDot, { backgroundColor: c }, color === c && styles.textColorDotActive]}
+                  onPress={() => setColor(c)}
+                />
+              ))}
+            </View>
+            <View style={styles.textModalActions}>
+              <TouchableOpacity style={styles.textModalCancel} onPress={() => setShowTextInput(false)} activeOpacity={0.8}>
+                <Text style={styles.textModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.textModalDone, { backgroundColor: ACCENT }]}
+                onPress={() => {
+                  if (!textValue.trim()) { setShowTextInput(false); return; }
+                  haptic();
+                  const newStroke: Stroke = {
+                    id: uid(),
+                    d: `TEXT:${textValue.trim()}`,
+                    color: color,
+                    width: brushSize,
+                    opacity: opacity / 100,
+                    layerId: activeLayerId,
+                    tool: 'text',
+                  };
+                  pushHistory(layers);
+                  setLayers((prev) => prev.map((l) =>
+                    l.id === activeLayerId ? { ...l, strokes: [...l.strokes, newStroke] } : l
+                  ));
+                  setShowTextInput(false);
+                  setTextValue('');
+                }}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.textModalDoneText}>Place Text</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -636,4 +696,18 @@ const styles = StyleSheet.create({
   canvasInfo:  { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center', flex: 1 },
   saveBtn:     { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: ACCENT, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
   saveBtnText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: BG },
+
+  // Text modal
+  textModalOverlay:    { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+  textModalCard:       { backgroundColor: SURFACE, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, borderColor: BORDER, padding: 20, gap: 14 },
+  textModalTitle:      { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
+  textModalInput:      { backgroundColor: '#0D0E0D', borderRadius: 12, borderWidth: 1, borderColor: BORDER, padding: 14, fontSize: 16, fontFamily: 'Inter_400Regular', minHeight: 80, textAlignVertical: 'top' },
+  textColorRow:        { flexDirection: 'row', gap: 10 },
+  textColorDot:        { width: 28, height: 28, borderRadius: 14 },
+  textColorDotActive:  { borderWidth: 2.5, borderColor: ACCENT },
+  textModalActions:    { flexDirection: 'row', gap: 10 },
+  textModalCancel:     { flex: 1, paddingVertical: 14, borderRadius: 14, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
+  textModalCancelText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: MUTED },
+  textModalDone:       { flex: 2, paddingVertical: 14, borderRadius: 14, alignItems: 'center' },
+  textModalDoneText:   { fontSize: 14, fontFamily: 'Inter_700Bold', color: BG },
 });

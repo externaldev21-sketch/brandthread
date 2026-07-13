@@ -131,12 +131,9 @@ function NotifRow({ item, isDark, onRead }: {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onRead(item.id);
         if (item.cta === 'Track order') {
-          Alert.alert('Order Status', 'Your order is on its way! 📦\n\nEstimated delivery: Tomorrow, 2–5 PM', [{ text: 'OK' }]);
+          router.push('/(buyer)/orders' as never);
         } else {
-          Alert.alert(item.title, item.body, [
-            { text: 'Cancel', style: 'cancel' },
-            { text: item.cta, onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
-          ]);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
       }}
       leading={
@@ -212,12 +209,7 @@ export default function InboxScreen() {
           style={s.headerIconBtn}
           activeOpacity={0.7}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          onPress={() => Alert.alert('New Message', 'Choose a friend to start a conversation', [
-            { text: 'Maya Chen',    onPress: () => openChat('maya')  },
-            { text: 'Kai Nakamura', onPress: () => openChat('kai')   },
-            { text: 'Jordan Lee',   onPress: () => openChat('jordan') },
-            { text: 'Cancel', style: 'cancel' },
-          ])}
+          onPress={() => openChat('maya')}
         >
           <Feather name="users" size={22} color={fg} />
         </TouchableOpacity>
@@ -226,11 +218,7 @@ export default function InboxScreen() {
           style={s.headerTitleRow}
           activeOpacity={0.7}
           hitSlop={{ top: 8, bottom: 8 }}
-          onPress={() => Alert.alert('Inbox', undefined, [
-            { text: 'General', onPress: () => {} },
-            { text: 'Requests', onPress: () => {} },
-            { text: 'Cancel', style: 'cancel' },
-          ])}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
         >
           <Text style={[s.headerTitle, { color: fg }]}>Inbox</Text>
           <View style={[s.headerChevronPill, { backgroundColor: chipBg }]}>
@@ -243,7 +231,7 @@ export default function InboxScreen() {
           style={s.headerIconBtn}
           activeOpacity={0.7}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          onPress={() => Alert.alert('Search', 'Search your inbox for messages and activity.', [{ text: 'OK' }])}
+          onPress={() => router.push('/(buyer)/search' as never)}
         >
           <Feather name="search" size={21} color={fg} />
         </TouchableOpacity>
@@ -305,7 +293,7 @@ export default function InboxScreen() {
         <InboxRow
           fg={fg}
           muted={muted}
-          onPress={() => Alert.alert('New Followers', 'CARD PLUG started following you.', [{ text: 'OK' }])}
+          onPress={() => router.push('/(buyer)/profile' as never)}
           leading={
             <View style={[s.notifAvatar, { backgroundColor: '#1D4ED8' }]}>
               <Feather name="users" size={18} color="#FFF" />
@@ -317,7 +305,7 @@ export default function InboxScreen() {
         <InboxRow
           fg={fg}
           muted={muted}
-          onPress={() => Alert.alert('Activity', 'co.luvsnayy liked photos you reposted.', [{ text: 'OK' }])}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
           leading={
             <View style={[s.notifAvatar, { backgroundColor: '#DB2777' }]}>
               <Feather name="heart" size={18} color="#FFF" />

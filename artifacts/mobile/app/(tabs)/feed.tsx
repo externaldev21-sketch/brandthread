@@ -468,15 +468,7 @@ export default function FeedScreen() {
     const item = SPOTLIGHT_ITEMS.find(i => i.id === id);
     if (!item) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert(
-      item.creator,
-      `${item.productName} · ${item.productPrice}${item.productOriginalPrice ? `\nWas ${item.productOriginalPrice}` : ''}`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: '🔖 Save for later', onPress: () => handleSave(id) },
-        { text: '🛍️ Add to Bag', onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
-      ],
-    );
+    router.push('/checkout' as never);
   }
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -582,7 +574,7 @@ export default function FeedScreen() {
               hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                Alert.alert('Invite Friends', 'Share Brandthread with friends to earn drop invites.', [{ text: 'OK' }]);
+                (async () => { const { Share } = await import('react-native'); Share.share({ message: 'Join me on Brandthread! https://brandthread.app' }); })();
               }}
             >
               <Feather name="user-plus" size={20} color="#FFF" />

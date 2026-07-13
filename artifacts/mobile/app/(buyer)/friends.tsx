@@ -247,11 +247,7 @@ export default function FriendsScreen() {
         <Text style={s.headerTitle}>Friends</Text>
         <TouchableOpacity
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          onPress={() => Alert.alert('Find Friends', 'Connect with friends on Brandthread', [
-            { text: 'Search by Username', onPress: () => {} },
-            { text: 'Sync Contacts',      onPress: () => {} },
-            { text: 'Cancel', style: 'cancel' },
-          ])}
+          onPress={() => router.push('/(buyer)/search' as never)}
         >
           <Feather name="user-plus" size={22} color="#EDE7D9" />
         </TouchableOpacity>

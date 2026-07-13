@@ -5,6 +5,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 
 type CanvasTile = {
   id: string;
@@ -66,6 +67,34 @@ export default function AIStudioScreen() {
     } as never);
   }
 
+  async function importFromLibrary() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo access to import artwork.'); return; }
+    const res = await ImagePicker.launchImageLibraryAsync({ quality: 0.9, allowsEditing: false });
+    if (!res.canceled) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      router.push({
+        pathname: '/design-canvas',
+        params: { label: 'Imported', dims: SCREEN_SIZE.dims, ratio: String(SCREEN_SIZE.ratio), imageUri: res.assets[0].uri },
+      } as never);
+    }
+  }
+
+  async function openFromCamera() {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) { Alert.alert('Permission needed', 'Allow camera access to take a photo.'); return; }
+    const res = await ImagePicker.launchCameraAsync({ quality: 0.9, allowsEditing: true });
+    if (!res.canceled) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      router.push({
+        pathname: '/design-canvas',
+        params: { label: 'Photo', dims: SCREEN_SIZE.dims, ratio: String(SCREEN_SIZE.ratio), imageUri: res.assets[0].uri },
+      } as never);
+    }
+  }
+
+  const [selectMode, setSelectMode] = useState(false);
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScreenHeader title="Design Studio" subtitle="Powered by generative AI" />
@@ -100,13 +129,15 @@ export default function AIStudioScreen() {
         >
           <View style={styles.manualTopRow}>
             <View style={styles.manualLinks}>
-              <TouchableOpacity onPress={() => Alert.alert('Select', 'Tap artwork tiles to select them for batch actions.')}>
-                <Text style={[styles.manualLink, { color: colors.mutedForeground }]}>Select</Text>
+              <TouchableOpacity onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSelectMode((v) => !v); }}>
+                <Text style={[styles.manualLink, { color: selectMode ? colors.primary : colors.mutedForeground }]}>
+                  {selectMode ? 'Done' : 'Select'}
+                </Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => Alert.alert('Import', 'Import artwork from your device.')}>
+              <TouchableOpacity onPress={importFromLibrary}>
                 <Text style={[styles.manualLink, { color: colors.mutedForeground }]}>Import</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => Alert.alert('Photo', 'Start a new canvas from a photo.')}>
+              <TouchableOpacity onPress={openFromCamera}>
                 <Text style={[styles.manualLink, { color: colors.mutedForeground }]}>Photo</Text>
               </TouchableOpacity>
             </View>

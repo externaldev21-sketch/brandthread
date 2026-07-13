@@ -193,15 +193,7 @@ function HeroCard({ isDark }: { isDark: boolean }) {
             activeOpacity={0.85}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              Alert.alert(
-                HERO_DROP.brand,
-                `${HERO_DROP.name} · ${HERO_DROP.price}\n${HERO_DROP.remaining} left of ${HERO_DROP.units} — act fast!`,
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: '🔔 Notify Me',  onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
-                  { text: '🛍️ Shop Now',   onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
-                ],
-              );
+              router.push('/checkout' as never);
             }}
           >
             <Feather name="shopping-bag" size={15} color="#FFF" />
@@ -235,15 +227,7 @@ function ForYouCard({ item, isDark }: { item: typeof FOR_YOU[0]; isDark: boolean
       activeOpacity={0.85}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-        Alert.alert(
-          item.brand,
-          `${item.name} · ${item.price}${item.originalPrice ? `\nWas ${item.originalPrice}` : ''}`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: '🔖 Save',      onPress: () => { setSaved(v => !v); } },
-            { text: '🛍️ Shop Now', onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
-          ],
-        );
+        router.push('/checkout' as never);
       }}
     >
       <View style={[fy.visual, { backgroundColor: item.color }]}>
@@ -312,16 +296,7 @@ function DroppingRow({ item, isDark }: { item: typeof DROPPING_SOON[0]; isDark: 
       activeOpacity={0.8}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        Alert.alert(
-          item.brand,
-          `${item.name} · ${item.price}${item.live ? '\n🔴 Live now!' : `\nDrops in ${item.inHours}h`}`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            item.live
-              ? { text: '🛍️ Shop Now',  onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) }
-              : { text: '🔔 Notify Me', onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
-          ],
-        );
+        router.push('/checkout' as never);
       }}
     >
       <View style={[dr.avatar, { backgroundColor: item.color }]}>
@@ -373,15 +348,7 @@ function TrendingRow({ item, isDark }: { item: typeof TRENDING[0]; isDark: boole
       activeOpacity={0.8}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        Alert.alert(
-          item.brand,
-          `${item.name} · ${item.price}\n${item.hype}`,
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: '🔖 Save',      onPress: () => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light) },
-            { text: '🛍️ Shop Now', onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
-          ],
-        );
+        router.push('/checkout' as never);
       }}
     >
       <Text style={[tr.rank, { color: primary }]}>#{item.rank}</Text>
