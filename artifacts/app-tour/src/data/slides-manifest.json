@@ -1,0 +1,21 @@
+[
+  {"id":"00000000-0000-0000-0000-000000000001","position":1,"filepath":"src/pages/slides/Slide01Cover.tsx","title":"Cover","description":"Brandthread app walkthrough title slide","speakerNotes":""},
+  {"id":"00000000-0000-0000-0000-000000000002","position":2,"filepath":"src/pages/slides/Slide02Splash.tsx","title":"Splash Screen","description":"Animated Brandthread logo on dark background","speakerNotes":""},
+  {"id":"00000000-0000-0000-0000-000000000003","position":3,"filepath":"src/pages/slides/Slide03Welcome.tsx","title":"Welcome","description":"Dark premium welcome screen with two CTAs","speakerNotes":""},
+  {"id":"00000000-0000-0000-0000-000000000004","position":4,"filepath":"src/pages/slides/Slide04SignUp.tsx","title":"Sign Up","description":"Create account with Google, Apple, email/password","speakerNotes":""},
+  {"id":"00000000-0000-0000-0000-000000000005","position":5,"filepath":"src/pages/slides/Slide05SignIn.tsx","title":"Sign In","description":"Sign in with forgot password link","speakerNotes":""},
+  {"id":"00000000-0000-0000-0000-000000000006","position":6,"filepath":"src/pages/slides/Slide06ForgotPassword.tsx","title":"Forgot Password","description":"Two-step password reset flow","speakerNotes":""},
+  {"id":"00000000-0000-0000-0000-000000000007","position":7,"filepath":"src/pages/slides/Slide07AccountType.tsx","title":"Account Type Selection","description":"Choose Buyer, Seller, or Both","speakerNotes":""},
+  {"id":"00000000-0000-0000-0000-000000000008","position":8,"filepath":"src/pages/slides/Slide08SellerStep1.tsx","title":"Seller Onboarding — Step 1","description":"Experience level question with progress dots","speakerNotes":""},
+  {"id":"00000000-0000-0000-0000-000000000009","position":9,"filepath":"src/pages/slides/Slide09SellerBrandInfo.tsx","title":"Seller Onboarding — Brand Info","description":"Brand name, founder, website, location","speakerNotes":""},
+  {"id":"00000000-0000-0000-0000-000000000010","position":10,"filepath":"src/pages/slides/Slide10SellerGoals.tsx","title":"Seller Onboarding — Goals and Aesthetic","description":"Multi-select chips for goals and brand aesthetic","speakerNotes":""},
+  {"id":"00000000-0000-0000-0000-000000000011","position":11,"filepath":"src/pages/slides/Slide11SellerWorkspace.tsx","title":"Seller Onboarding — Workspace Choice","description":"Select preferred first module, step 9 of 9","speakerNotes":""},
+  {"id":"00000000-0000-0000-0000-000000000012","position":12,"filepath":"src/pages/slides/Slide12BuildAnimation.tsx","title":"Build Animation","description":"Animated workspace building progress screen","speakerNotes":""},
+  {"id":"00000000-0000-0000-0000-000000000013","position":13,"filepath":"src/pages/slides/Slide13SellerCompletion.tsx","title":"Seller Completion","description":"Your brand workspace is ready — Enter Brandthread","speakerNotes":""},
+  {"id":"00000000-0000-0000-0000-000000000014","position":14,"filepath":"src/pages/slides/Slide14BuyerStyles.tsx","title":"Buyer Onboarding — Style Interests","description":"Multi-select chip grid for style preferences","speakerNotes":""},
+  {"id":"00000000-0000-0000-0000-000000000015","position":15,"filepath":"src/pages/slides/Slide15BuyerProfile.tsx","title":"Buyer Onboarding — Profile Setup","description":"Display name, username, location fields","speakerNotes":""},
+  {"id":"00000000-0000-0000-0000-000000000016","position":16,"filepath":"src/pages/slides/Slide16BuyerCompletion.tsx","title":"Buyer Completion","description":"Your Brandthread is ready — Start exploring","speakerNotes":""},
+  {"id":"00000000-0000-0000-0000-000000000017","position":17,"filepath":"src/pages/slides/Slide17BothCompletion.tsx","title":"Both Completion","description":"Both sides of your Brandthread are ready","speakerNotes":""},
+  {"id":"00000000-0000-0000-0000-000000000018","position":18,"filepath":"src/pages/slides/Slide18ModeSwitcher.tsx","title":"Seller Dashboard + Mode Switcher","description":"Dashboard with Shopping / My Brand toggle for Both accounts","speakerNotes":""},
+  {"id":"00000000-0000-0000-0000-000000000019","position":19,"filepath":"src/pages/slides/Slide19Settings.tsx","title":"Settings","description":"Full settings screen with account, app, and danger zone groups","speakerNotes":""}
+]

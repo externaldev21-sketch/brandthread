@@ -1,0 +1,27 @@
+kind = "slides"
+previewPath = "/app-tour/"
+title = "Brandthread App Tour"
+version = "1.0.0"
+id = "artifacts/app-tour"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/app-tour/" ]
+localPort = 18205
+
+[services.development]
+run = "pnpm --filter @workspace/app-tour run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/app-tour", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/app-tour/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "18205"
+BASE_PATH = "/app-tour/"
