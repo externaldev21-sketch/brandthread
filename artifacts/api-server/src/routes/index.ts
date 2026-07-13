@@ -13,6 +13,7 @@ import photographyRouter from "./photography";
 import bgRemovalRouter from "./bg-removal";
 import lifestyleRouter from "./lifestyle";
 import techpackRouter from "./techpack";
+import manufacturersRouter from "./manufacturers";
 
 const router = Router();
 
@@ -29,6 +30,7 @@ router.use("/mockup",       mockupRouter);
 router.use("/photography",  photographyRouter);
 router.use("/bg-removal",   bgRemovalRouter);
 router.use("/lifestyle",    lifestyleRouter);
-router.use("/techpack",     techpackRouter);
+router.use("/techpack",         techpackRouter);
+router.use("/manufacturers",    manufacturersRouter);
 
 export default router;

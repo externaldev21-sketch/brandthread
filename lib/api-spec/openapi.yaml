@@ -1,6 +1,5 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
   description: API specification
@@ -10,13 +9,15 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: manufacturers
+    description: Manufacturer portal operations
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +25,211 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ── Manufacturer registration & profile ───────────────────────────────────────
+
+  /manufacturers/me:
+    get:
+      operationId: getMyManufacturerProfile
+      tags: [manufacturers]
+      summary: Get current manufacturer's profile
+      responses:
+        "200":
+          description: Manufacturer profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Manufacturer"
+        "404":
+          description: Not registered yet
+
+    patch:
+      operationId: updateMyManufacturerProfile
+      tags: [manufacturers]
+      summary: Update manufacturer profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ManufacturerUpdate"
+      responses:
+        "200":
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Manufacturer"
+
+  /manufacturers/register:
+    post:
+      operationId: registerManufacturer
+      tags: [manufacturers]
+      summary: Register as a manufacturer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ManufacturerInput"
+      responses:
+        "201":
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Manufacturer"
+
+  /manufacturers/me/dashboard:
+    get:
+      operationId: getManufacturerDashboard
+      tags: [manufacturers]
+      summary: Get dashboard summary stats
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManufacturerDashboard"
+
+  # ── Messages ──────────────────────────────────────────────────────────────────
+
+  /manufacturers/me/threads:
+    get:
+      operationId: listManufacturerThreads
+      tags: [manufacturers]
+      summary: List all message threads
+      responses:
+        "200":
+          description: Message threads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MessageThread"
+
+  /manufacturers/me/threads/{threadId}/messages:
+    get:
+      operationId: getThreadMessages
+      tags: [manufacturers]
+      summary: Get messages in a thread
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+
+    post:
+      operationId: sendThreadMessage
+      tags: [manufacturers]
+      summary: Send a reply in a thread
+      parameters:
+        - name: threadId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageInput"
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+
+  # ── Sample / Production Orders ────────────────────────────────────────────────
+
+  /manufacturers/me/orders:
+    get:
+      operationId: listManufacturerOrders
+      tags: [manufacturers]
+      summary: List all orders for this manufacturer
+      responses:
+        "200":
+          description: Orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ManufacturerOrder"
+
+  /manufacturers/me/orders/{orderId}/status:
+    patch:
+      operationId: updateManufacturerOrderStatus
+      tags: [manufacturers]
+      summary: Update order status (sampling / production / shipping / complete)
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderStatusUpdate"
+      responses:
+        "200":
+          description: Updated order
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManufacturerOrder"
+
+  # ── Payment setup ─────────────────────────────────────────────────────────────
+
+  /manufacturers/me/payment:
+    get:
+      operationId: getManufacturerPayment
+      tags: [manufacturers]
+      summary: Get payment setup status
+      responses:
+        "200":
+          description: Payment info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManufacturerPayment"
+
+    post:
+      operationId: setupManufacturerPayment
+      tags: [manufacturers]
+      summary: Set up payment / payout details
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ManufacturerPaymentInput"
+      responses:
+        "200":
+          description: Payment configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ManufacturerPayment"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +237,160 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    # ── Manufacturer ─────────────────────────────────────────────────────────────
+
+    Manufacturer:
+      type: object
+      required: [id, clerkId, businessName, country, specialty, moq, priceRange, bulkTurnaround, sampleTurnaround, status, createdAt]
+      properties:
+        id:               { type: string }
+        clerkId:          { type: string }
+        businessName:     { type: string }
+        country:          { type: string }
+        specialty:        { type: string }
+        description:      { type: ["string", "null"] }
+        moq:              { type: integer }
+        priceRange:       { type: string }
+        bulkTurnaround:   { type: string }
+        sampleTurnaround: { type: string }
+        photos:
+          type: array
+          items: { type: string }
+        website:          { type: ["string", "null"] }
+        status:           { type: string }
+        verifiedAt:       { type: ["string", "null"] }
+        paymentSetup:     { type: boolean }
+        createdAt:        { type: string }
+
+    ManufacturerInput:
+      type: object
+      required: [businessName, country, specialty, moq, priceRange, bulkTurnaround, sampleTurnaround]
+      properties:
+        businessName:     { type: string }
+        country:          { type: string }
+        specialty:        { type: string }
+        description:      { type: string }
+        moq:              { type: integer }
+        priceRange:       { type: string }
+        bulkTurnaround:   { type: string }
+        sampleTurnaround: { type: string }
+        photos:
+          type: array
+          items: { type: string }
+        website:          { type: string }
+
+    ManufacturerUpdate:
+      type: object
+      properties:
+        businessName:     { type: string }
+        country:          { type: string }
+        specialty:        { type: string }
+        description:      { type: string }
+        moq:              { type: integer }
+        priceRange:       { type: string }
+        bulkTurnaround:   { type: string }
+        sampleTurnaround: { type: string }
+        photos:
+          type: array
+          items: { type: string }
+        website:          { type: string }
+
+    ManufacturerDashboard:
+      type: object
+      required: [activeOrders, pendingMessages, completedOrders, totalRevenueCents, pendingPayoutCents]
+      properties:
+        activeOrders:        { type: integer }
+        pendingMessages:     { type: integer }
+        completedOrders:     { type: integer }
+        totalRevenueCents:   { type: integer }
+        pendingPayoutCents:  { type: integer }
+        recentOrders:
+          type: array
+          items:
+            $ref: "#/components/schemas/ManufacturerOrder"
+
+    # ── Messages ──────────────────────────────────────────────────────────────────
+
+    MessageThread:
+      type: object
+      required: [id, buyerName, subject, lastMessage, lastMessageAt, unreadCount, orderStatus]
+      properties:
+        id:             { type: string }
+        buyerName:      { type: string }
+        buyerAvatar:    { type: ["string", "null"] }
+        subject:        { type: string }
+        lastMessage:    { type: string }
+        lastMessageAt:  { type: string }
+        unreadCount:    { type: integer }
+        orderStatus:    { type: ["string", "null"] }
+
+    Message:
+      type: object
+      required: [id, threadId, senderRole, content, sentAt]
+      properties:
+        id:          { type: string }
+        threadId:    { type: string }
+        senderRole:  { type: string }
+        content:     { type: string }
+        sentAt:      { type: string }
+
+    MessageInput:
+      type: object
+      required: [content]
+      properties:
+        content: { type: string }
+
+    # ── Orders ────────────────────────────────────────────────────────────────────
+
+    ManufacturerOrder:
+      type: object
+      required: [id, orderNumber, buyerName, productType, quantity, status, totalCents, createdAt]
+      properties:
+        id:           { type: string }
+        orderNumber:  { type: string }
+        buyerName:    { type: string }
+        productType:  { type: string }
+        quantity:     { type: integer }
+        colorway:     { type: ["string", "null"] }
+        size:         { type: ["string", "null"] }
+        status:       { type: string }
+        totalCents:   { type: integer }
+        notes:        { type: ["string", "null"] }
+        trackingNumber: { type: ["string", "null"] }
+        createdAt:    { type: string }
+        updatedAt:    { type: string }
+
+    OrderStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status:         { type: string }
+        trackingNumber: { type: string }
+        notes:          { type: string }
+
+    # ── Payment ───────────────────────────────────────────────────────────────────
+
+    ManufacturerPayment:
+      type: object
+      required: [isSetup, method]
+      properties:
+        isSetup:     { type: boolean }
+        method:      { type: ["string", "null"] }
+        bankLast4:   { type: ["string", "null"] }
+        bankName:    { type: ["string", "null"] }
+        currency:    { type: ["string", "null"] }
+        setupAt:     { type: ["string", "null"] }
+
+    ManufacturerPaymentInput:
+      type: object
+      required: [method, accountNumber, routingNumber, bankName, currency]
+      properties:
+        method:        { type: string }
+        accountNumber: { type: string }
+        routingNumber: { type: string }
+        bankName:      { type: string }
+        currency:      { type: string }
+        paypalEmail:   { type: string }
+        wiseEmail:     { type: string }
