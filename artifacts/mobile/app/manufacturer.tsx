@@ -295,13 +295,6 @@ export default function ManufacturerScreen() {
                     <Feather name="message-circle" size={14} color={BG} />
                     <Text style={s.btnPrimaryText}>Message</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={s.btnGhost}
-                    onPress={() => Alert.alert('Send RFQ', `RFQ sent to ${m.name}. Expected response: 24–48 hrs.`)}
-                    activeOpacity={0.75}
-                  >
-                    <Text style={s.btnGhostText}>Send RFQ</Text>
-                  </TouchableOpacity>
                 </View>
               </View>
             ))}
