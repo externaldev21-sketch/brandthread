@@ -3,8 +3,10 @@ import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Alert }
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ONBOARDING_KEY } from './_layout';
 
 interface Plan {
   id: string;
@@ -84,6 +86,8 @@ export default function PlansScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { fromOnboarding } = useLocalSearchParams<{ fromOnboarding?: string }>();
+  const isOnboarding = fromOnboarding === 'true';
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
   const topPad = Platform.OS === 'web' ? 24 : insets.top;
@@ -98,10 +102,18 @@ export default function PlansScreen() {
     router.back();
   }
 
-  function handleSelect(plan: Plan) {
-    if (plan.current) return;
+  async function handleSelect(plan: Plan) {
+    if (plan.current && !isOnboarding) return;
     haptic();
     setLoadingId(plan.id);
+
+    if (isOnboarding) {
+      // Finalise onboarding — mark complete and go to the seller dashboard
+      await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+      router.replace('/(tabs)/' as never);
+      return;
+    }
+
     setTimeout(() => {
       setLoadingId(null);
       Alert.alert(`Switch to ${plan.name}`, `You're now on the ${plan.name} plan.`, [
@@ -115,17 +127,25 @@ export default function PlansScreen() {
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <View style={{ width: 40 }} />
         <View style={styles.headerTitleBlock}>
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>Select a plan</Text>
-          <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>Change anytime, no long-term contract</Text>
+          <Text style={[styles.headerTitle, { color: colors.foreground }]}>
+            {isOnboarding ? 'Choose your plan' : 'Select a plan'}
+          </Text>
+          <Text style={[styles.headerSub, { color: colors.mutedForeground }]}>
+            {isOnboarding ? 'Start free, upgrade anytime' : 'Change anytime, no long-term contract'}
+          </Text>
         </View>
-        <TouchableOpacity
-          style={[styles.closeBtn, { backgroundColor: colors.secondary }]}
-          activeOpacity={0.7}
-          onPress={handleClose}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Feather name="x" size={18} color={colors.foreground} />
-        </TouchableOpacity>
+        {isOnboarding ? (
+          <View style={{ width: 40 }} />
+        ) : (
+          <TouchableOpacity
+            style={[styles.closeBtn, { backgroundColor: colors.secondary }]}
+            activeOpacity={0.7}
+            onPress={handleClose}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <Feather name="x" size={18} color={colors.foreground} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView
@@ -215,7 +235,13 @@ export default function PlansScreen() {
                   { color: plan.current ? colors.primary : colors.primaryForeground },
                 ]}
               >
-                {plan.current ? 'Current Plan' : loadingId === plan.id ? 'Switching…' : `Switch to ${plan.name}`}
+                {isOnboarding
+                  ? (loadingId === plan.id ? 'Starting…' : 'Get started')
+                  : plan.current
+                    ? 'Current Plan'
+                    : loadingId === plan.id
+                      ? 'Switching…'
+                      : `Switch to ${plan.name}`}
               </Text>
             </TouchableOpacity>
           </View>
