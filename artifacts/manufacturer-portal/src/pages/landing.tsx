@@ -56,10 +56,10 @@ export default function Landing() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl w-full mt-24">
           <div className="p-6 border border-border bg-card rounded-lg flex flex-col items-center text-center gap-4">
             <div className="w-12 h-12 bg-secondary border border-border rounded flex items-center justify-center">
-              <ShieldCheck className="w-6 h-6 text-primary" />
+              <Globe2 className="w-6 h-6 text-primary" />
             </div>
-            <h3 className="font-semibold text-lg">Guaranteed Escrow</h3>
-            <p className="text-sm text-muted-foreground">Funds are held safely until production is marked complete. No more chasing invoices.</p>
+            <h3 className="font-semibold text-lg">Earn New Customers</h3>
+            <p className="text-sm text-muted-foreground">Get discovered by serious, vetted brands actively looking for production partners. Your profile works for you 24/7.</p>
           </div>
           <div className="p-6 border border-border bg-card rounded-lg flex flex-col items-center text-center gap-4">
             <div className="w-12 h-12 bg-secondary border border-border rounded flex items-center justify-center">
