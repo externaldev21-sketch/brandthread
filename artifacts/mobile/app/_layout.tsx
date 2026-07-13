@@ -25,10 +25,6 @@ const queryClient = new QueryClient();
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 const proxyUrl = process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;
 
-// Set to true to skip Clerk sign-in while building.
-// Flip back to false before shipping.
-const DEV_BYPASS_AUTH = false;
-
 export const ONBOARDING_KEY = 'onboarding_complete';
 
 // Screens that don't require authentication
@@ -46,12 +42,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [storedRole, setStoredRole]               = useState<string | null>(null);
   const [splashSeen, setSplashSeen]               = useState<boolean | null>(null);
 
-  // Dev bypass — seed seller role + completed onboarding for fast preview
-  useEffect(() => {
-    if (!DEV_BYPASS_AUTH) return;
-    AsyncStorage.multiSet([[ONBOARDING_KEY, 'true'], ['user_role', 'seller']]);
-  }, []);
-
   // Read splash_seen once on mount
   useEffect(() => {
     AsyncStorage.getItem('splash_seen').then(v => setSplashSeen(v === 'true'));
@@ -59,7 +49,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
   // Read AsyncStorage whenever auth state or top segment changes
   useEffect(() => {
-    if (!isSignedIn && !DEV_BYPASS_AUTH) { setOnboardingChecked(false); return; }
+    if (!isSignedIn) { setOnboardingChecked(false); return; }
     setOnboardingChecked(false);
     AsyncStorage.multiGet([ONBOARDING_KEY, 'user_role']).then((pairs) => {
       setOnboardingDone(pairs[0][1] === 'true');
@@ -73,22 +63,22 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const inAuthScreen    = AUTH_SCREENS.includes(segments[0] as string);
     const inOnboarding    = segments[0] === 'onboarding';
     const inAccountType   = segments[0] === 'account-type';
+    const inPlans         = segments[0] === 'plans';
     const inBuyerGroup    = segments[0] === '(buyer)';
     const inTabsGroup     = segments[0] === '(tabs)';
     const inProtectedArea = !inAuthScreen && !inOnboarding && !inAccountType;
 
-    if (!DEV_BYPASS_AUTH) {
-      if (!isLoaded) return;
-      if (splashSeen === null) return; // still reading AsyncStorage
-      // Unauthenticated: show splash first time, then welcome
-      if (!isSignedIn && inProtectedArea) {
-        router.replace(splashSeen ? '/welcome' : '/splash');
-        return;
-      }
-      if (!isSignedIn) return; // Stay on auth screen
-    }
+    if (!isLoaded) return;
+    if (splashSeen === null) return; // still reading AsyncStorage
 
-    if (!onboardingChecked) return;
+    // Unauthenticated: show splash first time, then sign-in
+    if (!isSignedIn && inProtectedArea) {
+      router.replace(splashSeen ? '/sign-in' : '/splash');
+      return;
+    }
+    if (!isSignedIn) return; // stay on auth screen
+
+    if (!onboardingChecked) return; // AsyncStorage still loading — prevent loops
 
     // No account type chosen → go to account-type screen
     if (!storedRole && !inAccountType && !inAuthScreen && !inOnboarding) {
@@ -96,8 +86,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Account type chosen but onboarding not done → go to onboarding
-    if (!onboardingDone && storedRole && !inOnboarding && !inAccountType && !inAuthScreen) {
+    // Account type chosen but onboarding not done → go to onboarding.
+    // Exception: sellers are allowed on /plans after finishing the onboarding
+    // wizard but before picking a subscription plan (onboarding_complete is
+    // only written by plans.tsx after plan selection).
+    if (!onboardingDone && storedRole && !inOnboarding && !inAccountType && !inAuthScreen && !inPlans) {
       router.replace('/onboarding');
       return;
     }

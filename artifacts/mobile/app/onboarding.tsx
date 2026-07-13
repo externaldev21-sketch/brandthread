@@ -708,7 +708,7 @@ export default function OnboardingScreen() {
 
   const handleSellerFinish = async (data: Record<string, any>) => {
     await AsyncStorage.multiSet([
-      [ONBOARDING_KEY, 'true'], ['user_role', 'seller'],
+      ['user_role', 'seller'],
       ['brand_name', data.brandName ?? ''], ['founder_name', data.founderName ?? ''],
       ['brand_website', data.website ?? ''], ['brand_location', data.brandLocation ?? ''],
       ['brand_stage', data.brandStage ?? ''], ['experience_level', data.experienceLevel ?? ''],
