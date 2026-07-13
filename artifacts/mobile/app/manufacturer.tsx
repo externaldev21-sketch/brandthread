@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, Alert, Platform,
+  ScrollView, Alert, Platform, TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -73,12 +73,24 @@ const MESSAGES = [
 export default function ManufacturerScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const [query, setQuery] = useState('');
+  const [searchFocused, setSearchFocused] = useState(false);
+
   function go(route: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(route as never);
   }
 
   const topPad = Platform.OS === 'web' ? 20 : insets.top;
+
+  const filteredMfrs = query.trim()
+    ? MANUFACTURERS.filter(m =>
+        m.name.toLowerCase().includes(query.toLowerCase()) ||
+        m.location.toLowerCase().includes(query.toLowerCase())
+      )
+    : MANUFACTURERS;
+
+  const isSearching = query.trim().length > 0;
 
   return (
     <View style={[s.root, { paddingTop: topPad }]}>
@@ -92,6 +104,29 @@ export default function ManufacturerScreen() {
         <TouchableOpacity style={s.navIcon} onPress={() => go('/chat/manufacturer-ace')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Feather name="message-circle" size={20} color={FG} />
         </TouchableOpacity>
+      </View>
+
+      {/* ── Search Bar ── */}
+      <View style={s.searchRow}>
+        <View style={[s.searchBox, searchFocused && s.searchBoxFocused]}>
+          <Feather name="search" size={15} color={searchFocused ? GREEN : MUTED} />
+          <TextInput
+            style={s.searchInput}
+            placeholder="Search manufacturers by name or location…"
+            placeholderTextColor={MUTED}
+            value={query}
+            onChangeText={setQuery}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
+            returnKeyType="search"
+            autoCorrect={false}
+          />
+          {query.length > 0 && (
+            <TouchableOpacity onPress={() => setQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Feather name="x" size={14} color={MUTED} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* ── Scrollable Body ── */}
@@ -192,19 +227,42 @@ export default function ManufacturerScreen() {
         {/* ── Find Manufacturers ── */}
         <View style={{ gap: 10 }}>
           <View style={[s.cardHeader, { paddingHorizontal: 0 }]}>
-            <Text style={s.cardTitle}>Find Manufacturers</Text>
-            <TouchableOpacity onPress={() => go('/manufacturer-onboard')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                <Text style={[s.viewAllText, { color: GREEN }]}>View All</Text>
-                <Feather name="chevron-right" size={13} color={GREEN} />
-              </View>
-            </TouchableOpacity>
+            <Text style={s.cardTitle}>
+              {isSearching ? `Results for "${query}"` : 'Find Manufacturers'}
+            </Text>
+            {!isSearching && (
+              <TouchableOpacity onPress={() => go('/manufacturer-onboard')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                  <Text style={[s.viewAllText, { color: GREEN }]}>View All</Text>
+                  <Feather name="chevron-right" size={13} color={GREEN} />
+                </View>
+              </TouchableOpacity>
+            )}
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-            {MANUFACTURERS.map((m) => (
-              <MfrCard key={m.id} m={m} onPress={() => go('/chat/manufacturer-' + m.id)} onSample={() => go('/request-sample?name=' + encodeURIComponent(m.name))} />
-            ))}
-          </ScrollView>
+
+          {/* Search results: vertical list */}
+          {isSearching ? (
+            filteredMfrs.length === 0 ? (
+              <View style={s.emptyState}>
+                <Feather name="search" size={28} color={MUTED} />
+                <Text style={s.emptyTitle}>No manufacturers found</Text>
+                <Text style={s.emptySub}>Try a different name or location</Text>
+              </View>
+            ) : (
+              <View style={{ gap: 10 }}>
+                {filteredMfrs.map((m) => (
+                  <MfrRow key={m.id} m={m} onPress={() => go('/chat/manufacturer-' + m.id)} onSample={() => go('/request-sample?name=' + encodeURIComponent(m.name))} />
+                ))}
+              </View>
+            )
+          ) : (
+            /* Default: horizontal scroll */
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+              {MANUFACTURERS.map((m) => (
+                <MfrCard key={m.id} m={m} onPress={() => go('/chat/manufacturer-' + m.id)} onSample={() => go('/request-sample?name=' + encodeURIComponent(m.name))} />
+              ))}
+            </ScrollView>
+          )}
         </View>
 
         {/* ── Recent Messages ── */}
@@ -249,6 +307,54 @@ export default function ManufacturerScreen() {
     </View>
   );
 }
+
+// ─── Manufacturer row (search results — vertical list) ────────────────────────
+function MfrRow({ m, onPress, onSample }: { m: typeof MANUFACTURERS[0]; onPress: () => void; onSample: () => void }) {
+  return (
+    <View style={[mr.row]}>
+      {/* Avatar */}
+      <LinearGradient colors={m.gradient} style={mr.avatar}>
+        <Text style={mr.initials}>{m.initials}</Text>
+      </LinearGradient>
+
+      {/* Info */}
+      <View style={{ flex: 1, gap: 3 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={mr.name}>{m.name}</Text>
+          {m.verified && (
+            <View style={mr.verifiedPill}>
+              <Feather name="check" size={8} color="#000" />
+            </View>
+          )}
+          <Text style={mr.rating}>★ {m.rating}</Text>
+        </View>
+        <Text style={mr.location}>{m.location}</Text>
+        <View style={{ flexDirection: 'row', gap: 12, marginTop: 2 }}>
+          <Text style={mr.spec}>MOQ {m.moq}</Text>
+          <Text style={mr.spec}>From {m.price}</Text>
+          <Text style={mr.spec}>{m.lead}</Text>
+        </View>
+      </View>
+
+      {/* Action */}
+      <TouchableOpacity style={mr.msgBtn} onPress={onPress} activeOpacity={0.8}>
+        <Feather name="message-circle" size={15} color={GREEN} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const mr = StyleSheet.create({
+  row:         { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, padding: 14 },
+  avatar:      { width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  initials:    { fontSize: 12, fontFamily: 'Inter_700Bold', color: GREEN },
+  name:        { fontSize: 13, fontFamily: 'Inter_700Bold', color: FG },
+  verifiedPill:{ width: 14, height: 14, borderRadius: 7, backgroundColor: GREEN, alignItems: 'center', justifyContent: 'center' },
+  rating:      { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: '#FBBF24', marginLeft: 'auto' },
+  location:    { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
+  spec:        { fontSize: 10, fontFamily: 'Inter_500Medium', color: MUTED },
+  msgBtn:      { width: 34, height: 34, borderRadius: 10, backgroundColor: GREEN_D, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: GREEN + '40' },
+});
 
 // ─── Manufacturer card (horizontal scroll) ────────────────────────────────────
 function MfrCard({ m, onPress, onSample }: { m: typeof MANUFACTURERS[0]; onPress: () => void; onSample: () => void }) {
@@ -344,6 +450,17 @@ const s = StyleSheet.create({
   pipeDot:     { width: 6, height: 6, borderRadius: 3 },
   pipeLabel:   { fontSize: 9, fontFamily: 'Inter_500Medium', textAlign: 'center', width: 52 },
   pipeLine:    { flex: 1, height: 1.5, marginBottom: 14 },
+
+  // Search bar
+  searchRow:        { paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: BORDER },
+  searchBox:        { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 13, paddingVertical: 10 },
+  searchBoxFocused: { borderColor: GREEN + '70' },
+  searchInput:      { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: FG, padding: 0 },
+
+  // Empty state
+  emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 36, gap: 8 },
+  emptyTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: FG },
+  emptySub:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
 
   // Messages
   msgRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingTop: 12 },
