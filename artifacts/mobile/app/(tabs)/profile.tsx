@@ -24,7 +24,7 @@ const GREEN_DIM = '#0D2B1A';
 const PROFILE_STATS = [
   { label: 'Following', value: '53'      },
   { label: 'Followers', value: '2,842'   },
-  { label: 'Revenue',   value: '$83,491' },
+  { label: 'Likes',     value: '142.3K'  },
 ];
 
 const QUICK_ACTIONS: { icon: keyof typeof Feather.glyphMap; label: string; route: string }[] = [
