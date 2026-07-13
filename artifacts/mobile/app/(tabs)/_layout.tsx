@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -20,7 +20,9 @@ function SellerTabLayout() {
   const pillBg       = '#131513F0';
   const inactiveTint = '#6E7A72';
 
-  const tabBarStyle = Platform.OS === 'web' ? { display: 'none' as const } : {
+  const { width } = useWindowDimensions();
+  const isDesktopWeb = Platform.OS === 'web' && width >= 768;
+  const tabBarStyle = isDesktopWeb ? { display: 'none' as const } : {
     position: 'relative' as const,
     height: 50 + insets.bottom,
     paddingBottom: insets.bottom,
