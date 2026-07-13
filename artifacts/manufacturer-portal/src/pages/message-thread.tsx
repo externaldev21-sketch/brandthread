@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { Message } from "@workspace/api-client-react";
 
 export default function MessageThread({ threadId }: { threadId: string }) {
-  const { data: messages, isLoading: messagesLoading } = useGetThreadMessages(threadId, { query: { enabled: !!threadId } });
+  const { data: messages, isLoading: messagesLoading } = useGetThreadMessages(threadId, { query: { enabled: !!threadId, queryKey: getGetThreadMessagesQueryKey(threadId) } });
   const { data: threads } = useListManufacturerThreads();
   const sendMutation = useSendThreadMessage();
   const queryClient = useQueryClient();
