@@ -31,7 +31,7 @@ const QUICK_ACTIONS: { icon: keyof typeof Feather.glyphMap; label: string; route
   { icon: 'tag',        label: 'Add Product',   route: '/products'  },
   { icon: 'box',        label: 'Create Drop',   route: '/products'  },
   { icon: 'send',       label: 'New Campaign',  route: '/marketing' },
-  { icon: 'share',      label: 'Share Store',   route: '/more'      },
+  { icon: 'share',      label: 'Share Store',   route: '/share-store' },
 ];
 
 const CONTENT_TABS = ['Posts', 'Drafts', 'Scheduled', 'Analytics'];
