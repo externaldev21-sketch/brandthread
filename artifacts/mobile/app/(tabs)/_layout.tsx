@@ -20,7 +20,7 @@ function SellerTabLayout() {
   const pillBg       = '#131513F0';
   const inactiveTint = '#6E7A72';
 
-  const tabBarStyle = {
+  const tabBarStyle = Platform.OS === 'web' ? { display: 'none' as const } : {
     position: 'relative' as const,
     height: 50 + insets.bottom,
     paddingBottom: insets.bottom,
