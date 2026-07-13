@@ -192,29 +192,6 @@ export default function ProfileScreen() {
         ))}
       </View>
 
-      {/* Brand Performance */}
-      <View style={s.section}>
-        <View style={s.sectionHead}>
-          <Text style={s.sectionTitle}>Brand Performance</Text>
-          <TouchableOpacity style={s.weekPill} activeOpacity={0.8}>
-            <Text style={s.weekPillText}>This Week</Text>
-            <Feather name="chevron-down" size={12} color={FG} />
-          </TouchableOpacity>
-        </View>
-        <View style={s.perfGrid}>
-          {PERF_STATS.map((p) => (
-            <View key={p.label} style={s.perfCard}>
-              <Text style={s.perfLabel}>{p.label}</Text>
-              <View style={s.perfValueRow}>
-                <Text style={s.perfValue}>{p.value}</Text>
-                <Text style={s.perfChange}> ↑ {p.change}</Text>
-              </View>
-              <MiniSparkline data={p.spark} color={GREEN} width={148} />
-            </View>
-          ))}
-        </View>
-      </View>
-
       {/* Brand Health */}
       <View style={s.section}>
         <View style={s.sectionHead}>
@@ -307,6 +284,28 @@ export default function ProfileScreen() {
             )}
           </TouchableOpacity>
         ))}
+      </View>
+      {/* Brand Performance */}
+      <View style={[s.section, { marginTop: 20 }]}>
+        <View style={s.sectionHead}>
+          <Text style={s.sectionTitle}>Brand Performance</Text>
+          <TouchableOpacity style={s.weekPill} activeOpacity={0.8}>
+            <Text style={s.weekPillText}>This Week</Text>
+            <Feather name="chevron-down" size={12} color={FG} />
+          </TouchableOpacity>
+        </View>
+        <View style={s.perfGrid}>
+          {PERF_STATS.map((p) => (
+            <View key={p.label} style={s.perfCard}>
+              <Text style={s.perfLabel}>{p.label}</Text>
+              <View style={s.perfValueRow}>
+                <Text style={s.perfValue}>{p.value}</Text>
+                <Text style={s.perfChange}> ↑ {p.change}</Text>
+              </View>
+              <MiniSparkline data={p.spark} color={GREEN} width={148} />
+            </View>
+          ))}
+        </View>
       </View>
     </ScrollView>
   );
