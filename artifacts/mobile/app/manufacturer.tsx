@@ -1,524 +1,428 @@
-/**
- * Manufacturer Hub
- * - Invite banner with copyable onboarding link
- * - Escrow payment protection badge on each order
- * - Manufacturer listing with Message button
- */
 import React, { useState } from 'react';
 import {
-  ScrollView, View, Text, TouchableOpacity,
-  StyleSheet, Platform, Alert,
+  View, Text, TouchableOpacity, StyleSheet,
+  ScrollView, Alert, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
+import { LinearGradient } from 'expo-linear-gradient';
 
-// ─── Theme ────────────────────────────────────────────────────────────────────
+// ─── Tokens ───────────────────────────────────────────────────────────────────
 const BG      = '#0A0B0A';
-const CARD    = '#111311';
+const CARD    = '#131713';
+const CARD2   = '#111211';
 const BORDER  = '#1E221E';
 const FG      = '#EAF2ED';
-const MUTED   = '#5A6B5C';
+const MUTED   = '#5C6B5E';
 const GREEN   = '#39FF88';
-const GREEN_D = '#0D2B1A';
-const ORANGE  = '#F97316';
-const BLUE    = '#0EA5E9';
-const PURPLE  = '#8B5CF6';
-const YELLOW  = '#FBBF24';
+const GREEN_D = '#0C2418';
 
-const INVITE_LINK = 'https://brandthread.app/manufacturer/join?ref=BT-MFR-2026';
+// ─── Data ─────────────────────────────────────────────────────────────────────
+const PROD_STATS = [
+  { value: '12', label: 'In Production', icon: 'package'   as const, color: GREEN },
+  { value: '7',  label: 'Sampling',      icon: 'scissors'  as const, color: '#F97316' },
+  { value: '3',  label: 'Shipped',       icon: 'truck'     as const, color: '#0EA5E9' },
+  { value: '2',  label: 'Needs Approval',icon: 'alert-circle' as const, color: '#EF4444' },
+];
 
-// ─── Mock manufacturers (approved + pending) ──────────────────────────────────
+const PIPELINE = [
+  { key: 'design',     label: 'Design',     done: true,  active: false },
+  { key: 'sample',     label: 'Sample',     done: true,  active: false },
+  { key: 'production', label: 'Production', done: false, active: true  },
+  { key: 'qc',         label: 'QC',         done: false, active: false },
+  { key: 'shipping',   label: 'Shipping',   done: false, active: false },
+];
+
 const MANUFACTURERS = [
   {
-    id: 'm1', name: 'Apex Garment Co.', location: 'Guangzhou, CN',
-    moq: 50, rating: 4.9, verified: true,
-    specialty: 'T-Shirts, Hoodies', productionModes: ['Screen Print', 'Embroidery'],
-    leadTime: '18 days', priceFrom: '$4.20/unit', status: 'approved',
-    initials: 'AG', color: ORANGE,
+    id: 'm1', name: 'Ace Apparel Co.', location: 'Pakistan', initials: 'ACE',
+    rating: 4.9, verified: true, moq: 100, price: '$7.80', lead: '18-22 Days',
+    gradient: ['#1A2C1A', '#0F1F0F'] as [string,string],
+    factorColor: '#2C3E2C',
   },
   {
-    id: 'm2', name: 'EcoThread Factory', location: 'Mumbai, IN',
-    moq: 100, rating: 4.7, verified: true,
-    specialty: 'Sustainable Fabrics', productionModes: ['DTG', 'DTF'],
-    leadTime: '22 days', priceFrom: '$6.50/unit', status: 'approved',
-    initials: 'ET', color: GREEN,
+    id: 'm2', name: 'Stitch Labs', location: 'Portugal', initials: 'SL',
+    rating: 4.8, verified: true, moq: 100, price: '$9.20', lead: '15-18 Days',
+    gradient: ['#1A1F2C', '#0F1520'] as [string,string],
+    factorColor: '#2C3040',
   },
   {
-    id: 'm3', name: 'CraftWear Studio', location: 'Dhaka, BD',
-    moq: 30, rating: 4.5, verified: false,
-    specialty: 'Knitwear, Denim', productionModes: ['Screen Print', 'Puff Print'],
-    leadTime: '14 days', priceFrom: '$3.80/unit', status: 'approved',
-    initials: 'CW', color: PURPLE,
+    id: 'm3', name: 'Elite Garments', location: 'Turkey', initials: 'EG',
+    rating: 4.5, verified: true, moq: 200, price: '$8.50', lead: '20-25 Days',
+    gradient: ['#2C1A1A', '#200F0F'] as [string,string],
+    factorColor: '#3C2020',
   },
   {
-    id: 'm4', name: 'Milano Couture', location: 'Milan, IT',
-    moq: 200, rating: 5.0, verified: true,
-    specialty: 'Luxury, Tailoring', productionModes: ['Woven Labels', 'Embroidery'],
-    leadTime: '35 days', priceFrom: '$18.00/unit', status: 'approved',
-    initials: 'MC', color: YELLOW,
-  },
-  {
-    id: 'm5', name: 'Vertex Apparel', location: 'Ho Chi Minh, VN',
-    moq: 75, rating: 0, verified: false,
-    specialty: 'Activewear, Shorts', productionModes: ['Sublimation', 'DTF'],
-    leadTime: '16 days', priceFrom: '$5.10/unit', status: 'pending',
-    initials: 'VA', color: BLUE,
+    id: 'm4', name: 'Apex Garment Co.', location: 'Guangzhou, CN', initials: 'AG',
+    rating: 4.9, verified: true, moq: 50, price: '$4.20', lead: '18 Days',
+    gradient: ['#1E2A1E', '#121A12'] as [string,string],
+    factorColor: '#253025',
   },
 ];
 
-const ORDERS = [
-  {
-    id: 'PO-2041', mfr: 'Apex Garment Co.', items: 400,
-    status: 'In Production', delivery: 'Aug 15', progress: 65,
-    escrowHeld: '$8,400', escrowStatus: 'held',
-  },
-  {
-    id: 'PO-2040', mfr: 'EcoThread Factory', items: 150,
-    status: 'QC Review', delivery: 'Jul 28', progress: 88,
-    escrowHeld: '$2,925', escrowStatus: 'releasing',
-  },
-  {
-    id: 'PO-2039', mfr: 'CraftWear Studio', items: 60,
-    status: 'Sampling', delivery: 'Sep 1', progress: 20,
-    escrowHeld: '$570', escrowStatus: 'held',
-  },
+const MESSAGES = [
+  { id: 'msg1', name: 'Ace Apparel Co.',  initials: 'ACE', online: true,  preview: 'We have received your tech pack. Sample will be ready in 5 days.', time: '2m ago', unread: 2 },
+  { id: 'msg2', name: 'Stitch Labs',      initials: 'SL',  online: true,  preview: 'Can you confirm the pantone colors?',                               time: '1h ago', unread: 0 },
+  { id: 'msg3', name: 'Elite Garments',   initials: 'EG',  online: true,  preview: 'Production update: 60% completed.',                                 time: '3h ago', unread: 0 },
 ];
 
-type Tab = 'hub' | 'orders';
-
+// ─── Screen ───────────────────────────────────────────────────────────────────
 export default function ManufacturerScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>('hub');
-  const [linkCopied, setLinkCopied] = useState(false);
-
-  const topPad = Platform.OS === 'web' ? 20 : insets.top;
-
-  function haptic(t: 'light' | 'medium' = 'medium') {
-    Haptics.impactAsync(t === 'light' ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Medium);
-  }
-
-  async function copyInviteLink() {
-    haptic();
-    await Clipboard.setStringAsync(INVITE_LINK);
-    setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 2500);
-  }
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'find' | 'orders' | 'messages'>('dashboard');
 
   function go(route: string) {
-    haptic('light');
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(route as never);
   }
 
-  const approved = MANUFACTURERS.filter((m) => m.status === 'approved');
-  const pending  = MANUFACTURERS.filter((m) => m.status === 'pending');
+  const topPad = Platform.OS === 'web' ? 20 : insets.top;
+  const btmPad = Platform.OS === 'web' ? 20 : insets.bottom;
 
   return (
     <View style={[s.root, { paddingTop: topPad }]}>
-      {/* ── Header ── */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+
+      {/* ── Top Nav ── */}
+      <View style={s.topNav}>
+        <TouchableOpacity onPress={() => router.back()} style={s.navIcon} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Feather name="arrow-left" size={20} color={FG} />
         </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={s.headerTitle}>Manufacturer Hub</Text>
-          <Text style={s.headerSub}>Find, connect & manage production partners</Text>
-        </View>
+        <Text style={s.navTitle}>Manufacturer Hub</Text>
+        <TouchableOpacity style={s.navIcon} onPress={() => go('/chat/manufacturer-ace')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Feather name="message-circle" size={20} color={FG} />
+        </TouchableOpacity>
       </View>
 
-      {/* ── Tab row ── */}
-      <View style={s.tabRow}>
-        {(['hub', 'orders'] as Tab[]).map((t) => (
-          <TouchableOpacity
-            key={t}
-            style={[s.tabBtn, tab === t && s.tabBtnActive]}
-            onPress={() => { haptic('light'); setTab(t); }}
-            activeOpacity={0.8}
-          >
-            <Text style={[s.tabText, tab === t && s.tabTextActive]}>
-              {t === 'hub' ? 'Manufacturer Hub' : 'My Orders'}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
+      {/* ── Scrollable Body ── */}
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: 16, paddingBottom: 120, gap: 14 }}
+        contentContainerStyle={{ paddingBottom: 100, gap: 14, padding: 14 }}
         showsVerticalScrollIndicator={false}
       >
-        {tab === 'hub' ? (
-          <>
-            {/* ── Invite Banner ── */}
-            <View style={s.inviteBanner}>
-              <View style={s.inviteTop}>
-                <View style={s.inviteIconWrap}>
-                  <Feather name="link" size={18} color={GREEN} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.inviteTitle}>Add a Manufacturer</Text>
-                  <Text style={s.inviteSub}>
-                    Send this link to any manufacturer. They fill out their profile, upload photos & pricing — then they appear here for your brand owners to browse.
-                  </Text>
-                </View>
-              </View>
-              <View style={s.linkRow}>
-                <Text style={s.linkText} numberOfLines={1}>{INVITE_LINK}</Text>
-              </View>
-              <View style={s.inviteActions}>
-                <TouchableOpacity
-                  style={[s.inviteBtn, { backgroundColor: linkCopied ? '#22C55E' : GREEN }]}
-                  onPress={copyInviteLink}
-                  activeOpacity={0.85}
-                >
-                  <Feather name={linkCopied ? 'check' : 'copy'} size={14} color={BG} />
-                  <Text style={s.inviteBtnText}>{linkCopied ? 'Copied!' : 'Copy Link'}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={s.inviteBtnOutline}
-                  onPress={() => go('/manufacturer-onboard')}
-                  activeOpacity={0.85}
-                >
-                  <Feather name="user-plus" size={14} color={GREEN} />
-                  <Text style={s.inviteBtnOutlineText}>Apply as Manufacturer</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
 
-            {/* ── Escrow notice ── */}
-            <View style={s.escrowBanner}>
-              <Feather name="shield" size={15} color={GREEN} />
-              <Text style={s.escrowText}>
-                <Text style={{ color: GREEN, fontFamily: 'Inter_600SemiBold' }}>Escrow Protection: </Text>
-                Payments from brand owners are held securely and only released to manufacturers after production is confirmed complete.
-              </Text>
-            </View>
-
-            {/* ── Stats ── */}
-            <View style={s.statsRow}>
-              {[
-                { label: 'Verified', value: '2,400+', icon: 'check-circle' as const },
-                { label: 'Countries', value: '38', icon: 'globe' as const },
-                { label: 'Avg. MOQ', value: '50 pcs', icon: 'package' as const },
-              ].map((st) => (
-                <View key={st.label} style={s.statCard}>
-                  <Text style={s.statVal}>{st.value}</Text>
-                  <Text style={s.statLabel}>{st.label}</Text>
-                </View>
-              ))}
-            </View>
-
-            {/* ── Pending manufacturers ── */}
-            {pending.length > 0 && (
-              <View style={s.pendingSection}>
-                <Text style={s.sectionLabel}>⏳ Pending Review ({pending.length})</Text>
-                {pending.map((m) => (
-                  <View key={m.id} style={[s.mfCard, s.pendingCard]}>
-                    <View style={s.mfCardTop}>
-                      <View style={[s.avatar, { backgroundColor: m.color + '22' }]}>
-                        <Text style={[s.avatarText, { color: m.color }]}>{m.initials}</Text>
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={s.mfName}>{m.name}</Text>
-                        <Text style={s.mfLocation}>{m.location}</Text>
-                      </View>
-                      <View style={s.pendingPill}>
-                        <Text style={s.pendingPillText}>Pending</Text>
-                      </View>
-                    </View>
-                    <Text style={s.mfSpecialty}>{m.specialty} · MOQ {m.moq}</Text>
+        {/* ── Production Overview ── */}
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <Text style={s.cardTitle}>Production Overview</Text>
+            <TouchableOpacity onPress={() => go('/payments')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Text style={s.viewAllText}>View All</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={s.statsGrid}>
+            {PROD_STATS.map((st) => (
+              <View key={st.label} style={[s.statChip, { borderColor: BORDER }]}>
+                <View style={s.statTopRow}>
+                  <View style={[s.statIconBox, { backgroundColor: st.color + '22' }]}>
+                    <Feather name={st.icon} size={13} color={st.color} />
                   </View>
-                ))}
-              </View>
-            )}
-
-            {/* ── Approved manufacturers ── */}
-            <Text style={s.sectionLabel}>✅ Approved Partners</Text>
-            {approved.map((m) => (
-              <View key={m.id} style={s.mfCard}>
-                {/* Card header */}
-                <View style={s.mfCardTop}>
-                  <View style={[s.avatar, { backgroundColor: m.color + '22' }]}>
-                    <Text style={[s.avatarText, { color: m.color }]}>{m.initials}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={s.nameRow}>
-                      <Text style={s.mfName}>{m.name}</Text>
-                      {m.verified && <Feather name="check-circle" size={13} color={GREEN} />}
-                    </View>
-                    <Text style={s.mfLocation}>{m.location}</Text>
-                  </View>
-                  {m.rating > 0 && (
-                    <View style={s.ratingRow}>
-                      <Feather name="star" size={11} color={YELLOW} />
-                      <Text style={s.ratingText}>{m.rating}</Text>
-                    </View>
-                  )}
+                  <Text style={[s.statValue, { color: st.color }]}>{st.value}</Text>
                 </View>
-
-                {/* Specs row */}
-                <View style={s.specsRow}>
-                  <SpecPill icon="package" label={`MOQ ${m.moq}`} />
-                  <SpecPill icon="clock"   label={m.leadTime} />
-                  <SpecPill icon="tag"     label={m.priceFrom} />
-                </View>
-
-                {/* Specialty + production modes */}
-                <Text style={s.mfSpecialty}>{m.specialty}</Text>
-                <View style={s.modeRow}>
-                  {m.productionModes.map((mode) => (
-                    <View key={mode} style={s.modePill}>
-                      <Text style={s.modePillText}>{mode}</Text>
-                    </View>
-                  ))}
-                </View>
-
-                <View style={s.divider} />
-
-                {/* Actions */}
-                <View style={s.actionRow}>
-                  <TouchableOpacity
-                    style={s.btnOutline}
-                    onPress={() => go('/request-sample?name=' + encodeURIComponent(m.name))}
-                    activeOpacity={0.75}
-                  >
-                    <Text style={s.btnOutlineText}>Request Sample</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={s.btnPrimary}
-                    onPress={() => go('/chat/manufacturer-' + m.id)}
-                    activeOpacity={0.8}
-                  >
-                    <Feather name="message-circle" size={14} color={BG} />
-                    <Text style={s.btnPrimaryText}>Message</Text>
-                  </TouchableOpacity>
-                </View>
+                <Text style={s.statLabel} numberOfLines={2}>{st.label}</Text>
               </View>
             ))}
-          </>
-        ) : (
-          <>
-            {/* ── Escrow summary ── */}
-            <View style={s.escrowSummary}>
-              <View style={s.escrowSummaryTop}>
-                <Feather name="shield" size={18} color={GREEN} />
-                <Text style={s.escrowSummaryTitle}>Escrow Funds</Text>
-              </View>
-              <Text style={s.escrowSummaryAmt}>$11,895</Text>
-              <Text style={s.escrowSummaryLabel}>held across {ORDERS.length} active orders</Text>
-              <Text style={s.escrowSummaryNote}>
-                Funds are released automatically when you confirm receipt of completed production. You can also dispute within 7 days of delivery.
-              </Text>
+          </View>
+        </View>
+
+        {/* ── Active Order ── */}
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={s.cardTitle}>Active Order</Text>
+              <Text style={[s.orderTag, { color: MUTED }]}>#BT-78291</Text>
             </View>
-
-            {/* ── Orders ── */}
-            {ORDERS.map((order) => (
-              <View key={order.id} style={s.orderCard}>
-                {/* Order header */}
-                <View style={s.orderTop}>
-                  <View>
-                    <Text style={s.orderId}>{order.id}</Text>
-                    <Text style={s.orderMfr}>{order.mfr}</Text>
-                    <Text style={s.orderItems}>{order.items} units · Due {order.delivery}</Text>
-                  </View>
-                  <View style={[s.statusPill, {
-                    backgroundColor:
-                      order.status === 'QC Review'   ? YELLOW + '22' :
-                      order.status === 'Sampling'    ? BLUE   + '22' :
-                                                       GREEN  + '22',
-                  }]}>
-                    <Text style={[s.statusText, {
-                      color:
-                        order.status === 'QC Review'  ? YELLOW :
-                        order.status === 'Sampling'   ? BLUE :
-                                                        GREEN,
-                    }]}>{order.status}</Text>
-                  </View>
-                </View>
-
-                {/* Progress */}
-                <View style={s.progressTrack}>
-                  <View style={[s.progressFill, { width: `${order.progress}%` as any }]} />
-                </View>
-                <Text style={s.progressLabel}>{order.progress}% complete</Text>
-
-                {/* Escrow */}
-                <View style={[s.escrowRow, {
-                  backgroundColor: order.escrowStatus === 'releasing' ? YELLOW + '15' : GREEN + '10',
-                  borderColor:     order.escrowStatus === 'releasing' ? YELLOW + '44' : GREEN + '33',
-                }]}>
-                  <Feather name="shield" size={13} color={order.escrowStatus === 'releasing' ? YELLOW : GREEN} />
-                  <Text style={[s.escrowRowText, { color: order.escrowStatus === 'releasing' ? YELLOW : GREEN }]}>
-                    {order.escrowHeld} in escrow
-                  </Text>
-                  <Text style={s.escrowRowStatus}>
-                    {order.escrowStatus === 'releasing' ? '· Releasing on confirmation' : '· Protected until delivery'}
-                  </Text>
-                </View>
-
-                {/* Actions */}
-                <View style={s.orderActions}>
-                  <TouchableOpacity
-                    style={s.btnOutline}
-                    onPress={() => go('/chat/manufacturer-' + order.id)}
-                    activeOpacity={0.75}
-                  >
-                    <Feather name="message-circle" size={13} color={FG} />
-                    <Text style={s.btnOutlineText}>Message</Text>
-                  </TouchableOpacity>
-                  {order.escrowStatus === 'releasing' && (
-                    <TouchableOpacity
-                      style={[s.btnPrimary, { flex: 1 }]}
-                      onPress={() => Alert.alert(
-                        'Release Payment?',
-                        `Are you satisfied with the order from ${order.mfr}? Releasing funds is irreversible.`,
-                        [
-                          { text: 'Cancel', style: 'cancel' },
-                          { text: 'Release Funds', style: 'default', onPress: () => Alert.alert('✅ Funds Released', `${order.escrowHeld} has been released to ${order.mfr}.`) },
-                        ]
-                      )}
-                      activeOpacity={0.85}
-                    >
-                      <Feather name="unlock" size={13} color={BG} />
-                      <Text style={s.btnPrimaryText}>Release Payment</Text>
-                    </TouchableOpacity>
-                  )}
-                  {order.escrowStatus === 'held' && (
-                    <TouchableOpacity
-                      style={[s.btnGhost, { flex: 1 }]}
-                      onPress={() => Alert.alert('Dispute', 'File a dispute if production does not meet your specifications. Our team reviews within 48 hours.')}
-                      activeOpacity={0.75}
-                    >
-                      <Text style={s.btnGhostText}>File Dispute</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
+            <TouchableOpacity onPress={() => go('/payments')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                <Text style={[s.viewAllText, { color: GREEN }]}>View Details</Text>
+                <Feather name="chevron-right" size={13} color={GREEN} />
               </View>
+            </TouchableOpacity>
+          </View>
+
+          {/* Product row */}
+          <View style={s.productRow}>
+            <LinearGradient colors={['#1E2A1E', '#0E160E']} style={s.productThumb}>
+              <Feather name="shopping-bag" size={22} color={GREEN + '99'} />
+            </LinearGradient>
+            <View style={{ flex: 1, gap: 3 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <Text style={s.productName}>Heavyweight Hoodie</Text>
+                <Text style={[s.productStatus, { color: GREEN }]}>In Production</Text>
+              </View>
+              <Text style={s.productSpec}>500 GSM • Puff Print</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text style={[s.productQty, { color: GREEN }]}>Quantity: 250</Text>
+                <Text style={[s.productPct, { color: GREEN }]}>60%</Text>
+              </View>
+              <View style={s.progressTrack}>
+                <View style={[s.progressFill, { width: '60%' }]} />
+              </View>
+            </View>
+          </View>
+
+          {/* Pipeline steps */}
+          <View style={s.pipeline}>
+            {PIPELINE.map((step, i) => (
+              <React.Fragment key={step.key}>
+                <View style={s.pipeStep}>
+                  <View style={[
+                    s.pipeCircle,
+                    step.done   && { backgroundColor: GREEN, borderColor: GREEN },
+                    step.active && { borderColor: GREEN },
+                    !step.done && !step.active && { borderColor: BORDER },
+                  ]}>
+                    {step.done ? (
+                      <Feather name="check" size={10} color="#000" />
+                    ) : step.active ? (
+                      <Feather name="settings" size={10} color={GREEN} />
+                    ) : (
+                      <View style={[s.pipeDot, { backgroundColor: MUTED }]} />
+                    )}
+                  </View>
+                  <Text style={[s.pipeLabel, { color: step.done || step.active ? FG : MUTED }]}>{step.label}</Text>
+                </View>
+                {i < PIPELINE.length - 1 && (
+                  <View style={[s.pipeLine, { backgroundColor: step.done ? GREEN + '60' : BORDER }]} />
+                )}
+              </React.Fragment>
             ))}
-          </>
-        )}
+          </View>
+        </View>
+
+        {/* ── Find Manufacturers ── */}
+        <View style={{ gap: 10 }}>
+          <View style={[s.cardHeader, { paddingHorizontal: 0 }]}>
+            <Text style={s.cardTitle}>Find Manufacturers</Text>
+            <TouchableOpacity onPress={() => go('/manufacturer-onboard')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                <Text style={[s.viewAllText, { color: GREEN }]}>View All</Text>
+                <Feather name="chevron-right" size={13} color={GREEN} />
+              </View>
+            </TouchableOpacity>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+            {MANUFACTURERS.map((m) => (
+              <MfrCard key={m.id} m={m} onPress={() => go('/chat/manufacturer-' + m.id)} onSample={() => go('/request-sample?name=' + encodeURIComponent(m.name))} />
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* ── Recent Messages ── */}
+        <View style={s.card}>
+          <View style={s.cardHeader}>
+            <Text style={s.cardTitle}>Recent Messages</Text>
+            <TouchableOpacity onPress={() => go('/chat/manufacturer-m1')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                <Text style={[s.viewAllText, { color: GREEN }]}>View All</Text>
+                <Feather name="chevron-right" size={13} color={GREEN} />
+              </View>
+            </TouchableOpacity>
+          </View>
+          {MESSAGES.map((msg, i) => (
+            <TouchableOpacity
+              key={msg.id}
+              style={[s.msgRow, i > 0 && { borderTopWidth: 1, borderTopColor: BORDER }]}
+              onPress={() => go('/chat/manufacturer-' + msg.id)}
+              activeOpacity={0.8}
+            >
+              <View style={s.msgAvatar}>
+                <Text style={s.msgAvatarText}>{msg.initials}</Text>
+                {msg.online && <View style={s.onlineDot} />}
+              </View>
+              <View style={{ flex: 1, gap: 3 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Text style={s.msgName}>{msg.name}</Text>
+                  <Text style={s.msgTime}>{msg.time}</Text>
+                </View>
+                <Text style={s.msgPreview} numberOfLines={2}>{msg.preview}</Text>
+              </View>
+              {msg.unread > 0 && (
+                <View style={s.unreadBadge}>
+                  <Text style={s.unreadText}>{msg.unread}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+
       </ScrollView>
+
+      {/* ── Bottom Tab Bar ── */}
+      <View style={[s.tabBar, { paddingBottom: btmPad + 8 }]}>
+        <TabBtn icon="grid" label="Dashboard"         active={activeTab === 'dashboard'} onPress={() => setActiveTab('dashboard')} />
+        <TabBtn icon="search" label="Find Manufacturers" active={activeTab === 'find'}      onPress={() => { setActiveTab('find'); go('/manufacturer-onboard'); }} />
+        <TouchableOpacity style={s.fabBtn} onPress={() => go('/request-sample')} activeOpacity={0.9}>
+          <Feather name="plus" size={26} color="#000" />
+        </TouchableOpacity>
+        <TabBtn icon="file-text" label="Orders"      active={activeTab === 'orders'}    onPress={() => { setActiveTab('orders'); go('/payments'); }} />
+        <TabBtnBadge icon="message-circle" label="Messages" active={activeTab === 'messages'} badge={3} onPress={() => { setActiveTab('messages'); go('/chat/manufacturer-m1'); }} />
+      </View>
     </View>
   );
 }
 
-// ─── Spec pill ────────────────────────────────────────────────────────────────
-function SpecPill({ icon, label }: { icon: keyof typeof Feather.glyphMap; label: string }) {
+// ─── Manufacturer card (horizontal scroll) ────────────────────────────────────
+function MfrCard({ m, onPress, onSample }: { m: typeof MANUFACTURERS[0]; onPress: () => void; onSample: () => void }) {
   return (
-    <View style={s.specPill}>
-      <Feather name={icon} size={11} color={MUTED} />
-      <Text style={s.specPillText}>{label}</Text>
+    <View style={mc.card}>
+      {/* Factory photo placeholder */}
+      <LinearGradient colors={m.gradient} style={mc.photo}>
+        {/* Simulated factory floor rows */}
+        {[0,1,2,3].map(row => (
+          <View key={row} style={[mc.factoryRow, { top: 20 + row * 18, opacity: 0.35 }]}>
+            {[0,1,2,3,4,5].map(col => (
+              <View key={col} style={[mc.factoryDesk, { backgroundColor: m.factorColor }]} />
+            ))}
+          </View>
+        ))}
+        {/* Rating badge */}
+        <View style={mc.ratingBadge}>
+          <Feather name="star" size={9} color="#FBBF24" />
+          <Text style={mc.ratingText}>{m.rating}</Text>
+        </View>
+        {/* Verified badge */}
+        <View style={mc.verifiedBadge}>
+          <Feather name="check" size={9} color="#000" />
+          <Text style={mc.verifiedText}>Verified</Text>
+        </View>
+      </LinearGradient>
+
+      {/* Card body */}
+      <View style={mc.body}>
+        <Text style={mc.name}>{m.name}</Text>
+        <Text style={mc.location}>{m.location}</Text>
+        <View style={mc.specRow}>
+          <Text style={mc.spec}>MOQ {m.moq}</Text>
+          <Text style={mc.spec}>From {m.price}</Text>
+        </View>
+        <Text style={mc.lead}>{m.lead}</Text>
+        {/* Icon buttons */}
+        <View style={mc.iconRow}>
+          <TouchableOpacity style={mc.iconBtn} onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}>
+            <Feather name="globe" size={14} color={MUTED} />
+          </TouchableOpacity>
+          <TouchableOpacity style={mc.iconBtn} onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}>
+            <Feather name="shield" size={14} color={MUTED} />
+          </TouchableOpacity>
+          <TouchableOpacity style={mc.iconBtn} onPress={onPress}>
+            <Feather name="message-circle" size={14} color={MUTED} />
+          </TouchableOpacity>
+        </View>
+      </View>
     </View>
+  );
+}
+
+// ─── Tab button ───────────────────────────────────────────────────────────────
+function TabBtn({ icon, label, active, onPress }: { icon: keyof typeof Feather.glyphMap; label: string; active: boolean; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={tb.btn} onPress={onPress} activeOpacity={0.75}>
+      <Feather name={icon} size={20} color={active ? GREEN : MUTED} />
+      <Text style={[tb.label, { color: active ? GREEN : MUTED }]} numberOfLines={1}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function TabBtnBadge({ icon, label, active, badge, onPress }: { icon: keyof typeof Feather.glyphMap; label: string; active: boolean; badge: number; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={tb.btn} onPress={onPress} activeOpacity={0.75}>
+      <View>
+        <Feather name={icon} size={20} color={active ? GREEN : MUTED} />
+        {badge > 0 && (
+          <View style={tb.badge}>
+            <Text style={tb.badgeText}>{badge}</Text>
+          </View>
+        )}
+      </View>
+      <Text style={[tb.label, { color: active ? GREEN : MUTED }]} numberOfLines={1}>{label}</Text>
+    </TouchableOpacity>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: BG },
+  root:    { flex: 1, backgroundColor: BG },
 
-  // Header
-  header:      { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
-  backBtn:     { width: 36, height: 36, borderRadius: 10, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: FG },
-  headerSub:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 1 },
+  topNav:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: BORDER },
+  navIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  navTitle:{ fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
 
-  // Tabs
-  tabRow:       { flexDirection: 'row', backgroundColor: CARD, borderBottomWidth: 1, borderBottomColor: BORDER },
-  tabBtn:       { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabBtnActive: { borderBottomColor: GREEN },
-  tabText:      { fontSize: 13, fontFamily: 'Inter_500Medium', color: MUTED },
-  tabTextActive:{ color: GREEN, fontFamily: 'Inter_600SemiBold' },
+  card:        { backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, padding: 16, gap: 14 },
+  cardHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  cardTitle:   { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+  viewAllText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: MUTED },
 
-  // Invite banner
-  inviteBanner:   { backgroundColor: GREEN_D, borderRadius: 18, borderWidth: 1, borderColor: GREEN + '44', padding: 16, gap: 12 },
-  inviteTop:      { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  inviteIconWrap: { width: 38, height: 38, borderRadius: 10, backgroundColor: GREEN + '22', borderWidth: 1, borderColor: GREEN + '55', alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  inviteTitle:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 4 },
-  inviteSub:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 18 },
-  linkRow:        { backgroundColor: '#0A0B0A', borderRadius: 10, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 10 },
-  linkText:       { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
-  inviteActions:  { flexDirection: 'row', gap: 8 },
-  inviteBtn:      { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12, paddingVertical: 11 },
-  inviteBtnText:  { fontSize: 13, fontFamily: 'Inter_700Bold', color: BG },
-  inviteBtnOutline:     { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12, paddingVertical: 11, borderWidth: 1, borderColor: GREEN + '66' },
-  inviteBtnOutlineText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: GREEN },
+  // Production stats
+  statsGrid:   { flexDirection: 'row', gap: 8 },
+  statChip:    { flex: 1, backgroundColor: CARD2, borderRadius: 12, borderWidth: 1, padding: 10, gap: 6 },
+  statTopRow:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  statIconBox: { width: 22, height: 22, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
+  statValue:   { fontSize: 16, fontFamily: 'Inter_700Bold' },
+  statLabel:   { fontSize: 9, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 12 },
 
-  // Escrow banner
-  escrowBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: GREEN + '0D', borderRadius: 12, borderWidth: 1, borderColor: GREEN + '33', padding: 12 },
-  escrowText:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, flex: 1, lineHeight: 18 },
+  // Order ID
+  orderTag:    { fontSize: 12, fontFamily: 'Inter_500Medium' },
 
-  // Stats
-  statsRow: { flexDirection: 'row', gap: 8 },
-  statCard: { flex: 1, backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, padding: 14, alignItems: 'center', gap: 4 },
-  statVal:  { fontSize: 18, fontFamily: 'Inter_700Bold', color: FG },
-  statLabel: { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
+  // Product row
+  productRow:   { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+  productThumb: { width: 72, height: 72, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  productName:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: FG },
+  productStatus:{ fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  productSpec:  { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
+  productQty:   { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  productPct:   { fontSize: 12, fontFamily: 'Inter_700Bold' },
+  progressTrack:{ height: 5, backgroundColor: '#1A2A1A', borderRadius: 3, overflow: 'hidden', marginTop: 4 },
+  progressFill: { height: 5, backgroundColor: GREEN, borderRadius: 3 },
 
-  // Section labels
-  sectionLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.5 },
-  pendingSection: { gap: 8 },
+  // Pipeline
+  pipeline:    { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  pipeStep:    { alignItems: 'center', gap: 5 },
+  pipeCircle:  { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
+  pipeDot:     { width: 6, height: 6, borderRadius: 3 },
+  pipeLabel:   { fontSize: 9, fontFamily: 'Inter_500Medium', textAlign: 'center', width: 52 },
+  pipeLine:    { flex: 1, height: 1.5, marginBottom: 14 },
 
-  // Manufacturer cards
-  mfCard:   { backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: BORDER, padding: 16, gap: 10 },
-  pendingCard: { opacity: 0.7, borderStyle: 'dashed' },
-  mfCardTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatar:    { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: 15, fontFamily: 'Inter_700Bold' },
-  nameRow:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  mfName:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: FG },
-  mfLocation: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 1 },
-  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  ratingText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: FG },
+  // Messages
+  msgRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingTop: 12 },
+  msgAvatar:  { width: 42, height: 42, borderRadius: 12, backgroundColor: '#1A2A1A', alignItems: 'center', justifyContent: 'center' },
+  msgAvatarText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: GREEN },
+  onlineDot:  { position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: 5, backgroundColor: GREEN, borderWidth: 1.5, borderColor: CARD },
+  msgName:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: FG },
+  msgTime:    { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
+  msgPreview: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 17 },
+  unreadBadge:{ width: 20, height: 20, borderRadius: 10, backgroundColor: GREEN, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  unreadText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: '#000' },
 
-  // Specs
-  specsRow:  { flexDirection: 'row', gap: 6 },
-  specPill:  { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#1A1E1A', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
-  specPillText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: MUTED },
+  // Bottom tab
+  tabBar:  { backgroundColor: CARD, borderTopWidth: 1, borderTopColor: BORDER, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingTop: 10, paddingHorizontal: 8 },
+  fabBtn:  { width: 52, height: 52, borderRadius: 26, backgroundColor: GREEN, alignItems: 'center', justifyContent: 'center', marginBottom: 10, shadowColor: GREEN, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 },
+});
 
-  mfSpecialty: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
-  modeRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  modePill:  { backgroundColor: '#1A1E1A', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
-  modePillText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: MUTED },
+const mc = StyleSheet.create({
+  card:     { width: 160, backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
+  photo:    { height: 110, overflow: 'hidden', position: 'relative', alignItems: 'center', justifyContent: 'center' },
+  factoryRow: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', gap: 6, paddingHorizontal: 8 },
+  factoryDesk:{ flex: 1, height: 10, borderRadius: 2 },
+  ratingBadge:{ position: 'absolute', top: 8, left: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 3 },
+  ratingText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: '#FBBF24' },
+  verifiedBadge: { position: 'absolute', bottom: 8, left: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: GREEN, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
+  verifiedText:  { fontSize: 9, fontFamily: 'Inter_700Bold', color: '#000' },
+  body:     { padding: 10, gap: 4 },
+  name:     { fontSize: 13, fontFamily: 'Inter_700Bold', color: FG },
+  location: { fontSize: 10, fontFamily: 'Inter_400Regular', color: MUTED },
+  specRow:  { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
+  spec:     { fontSize: 10, fontFamily: 'Inter_500Medium', color: MUTED },
+  lead:     { fontSize: 10, fontFamily: 'Inter_400Regular', color: MUTED },
+  iconRow:  { flexDirection: 'row', gap: 8, marginTop: 6 },
+  iconBtn:  { width: 28, height: 28, borderRadius: 8, backgroundColor: '#1A2A1A', alignItems: 'center', justifyContent: 'center' },
+});
 
-  pendingPill: { backgroundColor: '#F9731622', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
-  pendingPillText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: '#F97316' },
-
-  divider: { height: 1, backgroundColor: BORDER },
-
-  actionRow: { flexDirection: 'row', gap: 8 },
-  btnOutline:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: BORDER },
-  btnOutlineText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
-  btnPrimary:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, backgroundColor: GREEN },
-  btnPrimaryText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: BG },
-  btnGhost:       { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 12, backgroundColor: '#1A1E1A' },
-  btnGhostText:   { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: MUTED },
-
-  // Orders
-  orderCard:  { backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: BORDER, padding: 16, gap: 12 },
-  orderTop:   { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  orderId:    { fontSize: 12, fontFamily: 'Inter_700Bold', color: GREEN, marginBottom: 2 },
-  orderMfr:   { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
-  orderItems: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 2 },
-  statusPill: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
-  statusText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-
-  progressTrack: { height: 5, borderRadius: 3, backgroundColor: '#1A1E1A', overflow: 'hidden' },
-  progressFill:  { height: 5, borderRadius: 3, backgroundColor: GREEN },
-  progressLabel: { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
-
-  escrowRow:     { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 8 },
-  escrowRowText: { fontSize: 12, fontFamily: 'Inter_700Bold' },
-  escrowRowStatus: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
-
-  orderActions: { flexDirection: 'row', gap: 8 },
-
-  // Escrow summary
-  escrowSummary:     { backgroundColor: GREEN_D, borderRadius: 18, borderWidth: 1, borderColor: GREEN + '44', padding: 20, gap: 4 },
-  escrowSummaryTop:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  escrowSummaryTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: FG },
-  escrowSummaryAmt:  { fontSize: 32, fontFamily: 'Inter_700Bold', color: GREEN },
-  escrowSummaryLabel: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
-  escrowSummaryNote: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 18, marginTop: 8 },
+const tb = StyleSheet.create({
+  btn:      { alignItems: 'center', gap: 4, minWidth: 56 },
+  label:    { fontSize: 9, fontFamily: 'Inter_500Medium' },
+  badge:    { position: 'absolute', top: -4, right: -8, width: 16, height: 16, borderRadius: 8, backgroundColor: GREEN, alignItems: 'center', justifyContent: 'center' },
+  badgeText:{ fontSize: 9, fontFamily: 'Inter_700Bold', color: '#000' },
 });
