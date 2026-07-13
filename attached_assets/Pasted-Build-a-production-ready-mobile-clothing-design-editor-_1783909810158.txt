@@ -1,0 +1,955 @@
+Build a production-ready mobile clothing design editor called “Brandthread Studio.”
+
+IMPORTANT:
+Do not copy Procreate’s exact interface, icons, branding, brush names, preset assets, source code, or screen layouts. Create an original Brandthread interface with comparable professional drawing and garment-design capabilities.
+
+PURPOSE:
+This editor opens when the user taps “Brand Studio” or “Create Design” inside the Brandthread mobile app. It should let clothing-brand owners draw artwork, create graphics, edit imported images, add typography, build garment mockups, and export production-ready files without leaving Brandthread.
+
+TARGET PLATFORMS:
+- Primary: iPhone and Android phones
+- Secondary: iPad and Android tablets
+- Responsive desktop/web fallback
+- Touch-first
+- Stylus support where available
+- Apple Pencil support on iPad
+- Samsung S Pen support where available
+
+RECOMMENDED STACK:
+- React Native with Expo and TypeScript for the application
+- React Native Skia for the high-performance canvas and brush rendering
+- React Native Gesture Handler for gestures
+- Reanimated for fluid animations
+- Zustand for editor state
+- MMKV or SQLite for local persistence
+- FileSystem for project storage
+- Native image libraries for decoding and exporting
+- Optional Metal-backed rendering on iOS
+- Optional Vulkan/OpenGL-backed rendering on Android
+- Supabase or Firebase for cloud backup and collaboration
+- Do not build the drawing engine using basic HTML canvas if targeting a native mobile app
+
+EDITOR ARCHITECTURE:
+Use a non-destructive document model.
+
+Document:
+{
+  id,
+  name,
+  width,
+  height,
+  dpi,
+  colorProfile,
+  backgroundColor,
+  createdAt,
+  updatedAt,
+  layers,
+  guides,
+  symmetrySettings,
+  history,
+  timeLapseEvents,
+  garmentTemplateId
+}
+
+Layer:
+{
+  id,
+  name,
+  type,
+  visible,
+  locked,
+  opacity,
+  blendMode,
+  transform,
+  clippingMask,
+  alphaLock,
+  parentGroupId,
+  maskId,
+  rasterData,
+  vectorData,
+  textData,
+  adjustmentData
+}
+
+Supported layer types:
+- Raster layer
+- Vector shape layer
+- Text layer
+- Image layer
+- Adjustment layer
+- Mask
+- Group
+- Garment template layer
+- Smart object / linked artwork layer
+
+MAIN MOBILE WORKSPACE:
+The canvas must occupy nearly the entire screen.
+
+Top toolbar:
+- Back to gallery
+- Undo
+- Redo
+- Project name
+- Transform
+- Selection
+- Adjustments
+- Layers
+- Color
+
+Floating side controls:
+- Brush size slider
+- Brush opacity slider
+- Current tool indicator
+- Eyedropper shortcut
+
+Bottom contextual toolbar:
+Changes depending on the selected tool.
+
+Primary tools:
+- Draw
+- Erase
+- Smudge
+- Fill
+- Select
+- Transform
+- Text
+- Shapes
+- Images
+- Garment preview
+
+Use Brandthread’s black interface with green accent lighting. Controls should fade or minimize while drawing. Do not make it look like TikTok or a social-media feed.
+
+CANVAS ENGINE:
+Implement:
+- Smooth pan
+- Pinch zoom
+- Canvas rotation
+- Reset rotation
+- Fit canvas to screen
+- Pixel-perfect zoom
+- High-resolution rendering
+- Transparent background
+- Custom background color
+- Configurable canvas dimensions
+- Configurable DPI
+- Autosave
+- Crash recovery
+- Tiled rendering for very large documents
+- GPU-accelerated compositing
+- Offscreen layer caching
+- Lazy loading of hidden layers
+- Memory-aware maximum layer count
+- Progressive preview rendering
+- Full-resolution export separate from screen preview
+
+GESTURES:
+- One-finger draw
+- Two-finger tap: undo
+- Three-finger tap: redo
+- Two-finger pinch: zoom
+- Two-finger twist: rotate canvas
+- Quick pinch inward: fit canvas
+- Three-finger swipe down: copy/paste menu
+- Long press canvas: eyedropper
+- Long press layer: layer actions
+- Drag layer: reorder
+- Swipe layer left: lock, duplicate, delete
+- Two-finger swipe on layer: alpha lock
+- Pinch layers together: merge selected layers
+- Double tap numeric slider: reset value
+- Hold slider and move sideways: fine adjustment
+- Stylus input draws while finger input moves the canvas
+- Make gesture shortcuts customizable in Settings
+
+DRAWING ENGINE:
+Each stroke must store:
+- Position
+- Timestamp
+- Pressure
+- Tilt
+- Azimuth
+- Velocity
+- Direction
+- Predicted points
+- Coalesced touch points
+
+Stroke processing:
+- Interpolate points
+- Smooth jitter
+- Pressure-based width
+- Pressure-based opacity
+- Tilt-based texture
+- Velocity response
+- Stabilization
+- Streamline smoothing
+- Tapering
+- Stamp spacing
+- Rotation
+- Scatter
+- Randomization
+- Wet-edge simulation
+- Texture grain
+- Anti-aliasing
+- Optional symmetry replication
+- Optional assisted straightening
+
+BRUSH LIBRARY:
+Create original Brandthread brush categories:
+- Sketching
+- Inking
+- Lettering
+- Markers
+- Paint
+- Airbrush
+- Texture
+- Distress
+- Halftone
+- Spray
+- Stamps
+- Stitching
+- Fabric
+- Embroidery
+- Rhinestone
+- Screen Print
+- Puff Print
+- Custom
+
+Provide original default brushes, not copied Procreate brushes.
+
+Every brush preset should support:
+1. Stroke path
+   - Spacing
+   - Jitter
+   - Falloff
+   - Stroke stabilization
+   - Motion filtering
+   - Taper
+
+2. Shape source
+   - Shape image
+   - Scatter
+   - Rotation
+   - Count
+   - Random orientation
+   - Azimuth response
+   - Shape filtering
+
+3. Grain source
+   - Grain image
+   - Scale
+   - Zoom
+   - Rotation
+   - Movement
+   - Depth
+   - Brightness
+   - Contrast
+   - Texture filtering
+
+4. Rendering
+   - Normal
+   - Glazed
+   - Wet
+   - Heavy blend
+   - Uniform blend
+   - Burnt edges
+   - Edge intensity
+
+5. Wet media
+   - Dilution
+   - Charge
+   - Attack
+   - Pull
+   - Grade
+   - Wetness blur
+
+6. Color dynamics
+   - Hue jitter
+   - Saturation jitter
+   - Brightness jitter
+   - Secondary-color mixing
+   - Stroke color variation
+   - Stamp color variation
+   - Pressure color response
+
+7. Dynamics
+   - Speed to size
+   - Speed to opacity
+   - Jitter
+   - Pressure response
+   - Tilt response
+
+8. Stylus
+   - Pressure curve
+   - Opacity response
+   - Size response
+   - Flow response
+   - Bleed response
+   - Tilt angle
+   - Tilt size
+   - Tilt opacity
+   - Tilt graduation
+
+9. Brush properties
+   - Minimum size
+   - Maximum size
+   - Minimum opacity
+   - Maximum opacity
+   - Preview size
+   - Smudge strength
+   - Orientation
+   - Use stamp preview
+
+10. Brush metadata
+   - Name
+   - Creator
+   - Category
+   - Reset point
+   - Version
+   - Thumbnail
+   - Favorite status
+
+BRUSH STUDIO:
+Create a full-screen brush editor with:
+- Live drawing preview
+- Brush preview pad
+- Every brush setting above
+- Import custom shape texture
+- Import custom grain texture
+- Duplicate brush
+- Reset brush
+- Rename brush
+- Organize brush sets
+- Drag-and-drop ordering
+- Favorite brushes
+- Recent brushes
+- Search brushes
+- Export custom brush format
+- Import Brandthread brush format
+- Combine two brush engines into a dual brush
+- Independent settings for both components
+- Blend modes between dual brushes
+
+PAINT, ERASE, AND SMUDGE:
+- The same brush library must be usable for drawing, erasing, and smudging
+- Preserve separate recent brush choices for each mode
+- Allow tap-and-hold tool switching
+- Smudge strength slider
+- Eraser opacity and size controls
+- Clear layer action
+
+COLORS:
+Create these color interfaces:
+- Color wheel
+- Square saturation/value picker
+- Compact color picker
+- RGB sliders
+- HSB/HSV sliders
+- HSL sliders
+- CMYK preview values
+- Hex input
+- Grayscale slider
+- Color history
+- Saved palettes
+- Import palette
+- Export palette
+- Generate palette from image
+- Complementary harmony
+- Split complementary
+- Analogous
+- Triadic
+- Tetradic
+- Monochromatic
+- Primary and secondary colors
+- Swap colors
+- Eyedropper
+- Average sampled color
+- Configurable eyedropper delay
+- Drag color onto enclosed area to fill
+- Adjustable fill threshold
+- Continue filling multiple regions
+
+LAYERS:
+Layers panel must support:
+- Add layer
+- Delete layer
+- Duplicate layer
+- Rename layer
+- Reorder layer
+- Multi-select
+- Group
+- Ungroup
+- Merge down
+- Merge selected
+- Flatten group
+- Flatten image
+- Lock
+- Unlock
+- Hide/show
+- Solo layer
+- Opacity
+- Blend mode
+- Alpha lock
+- Clipping mask
+- Raster mask
+- Invert
+- Clear
+- Select contents
+- Copy
+- Cut
+- Paste
+- Fill layer
+- Reference layer
+- Drawing-assist layer
+- Background layer
+- Thumbnail previews
+- Color labels
+- Search layers
+- Filter by layer type
+
+BLEND MODES:
+Include:
+- Normal
+- Darken
+- Multiply
+- Color Burn
+- Linear Burn
+- Darker Color
+- Lighten
+- Screen
+- Color Dodge
+- Add
+- Lighter Color
+- Overlay
+- Soft Light
+- Hard Light
+- Vivid Light
+- Linear Light
+- Pin Light
+- Hard Mix
+- Difference
+- Exclusion
+- Subtract
+- Divide
+- Hue
+- Saturation
+- Color
+- Luminosity
+
+SELECTION TOOLS:
+- Automatic region selection
+- Freehand lasso
+- Rectangle
+- Ellipse
+- Polygon
+- Select all
+- Invert selection
+- Feather
+- Expand
+- Contract
+- Smooth
+- Add selection
+- Remove selection
+- Intersect selection
+- Save selection
+- Load saved selection
+- Selection mask overlay
+- Copy and paste
+- Cut and paste
+- Fill selection
+- Clear selection
+
+TRANSFORM TOOLS:
+- Uniform scale
+- Freeform scale
+- Distort
+- Perspective
+- Warp
+- Mesh warp
+- Rotate
+- Flip horizontal
+- Flip vertical
+- Fit to canvas
+- Reset transform
+- Numerical transform values
+- Snapping
+- Magnetics
+- Alignment guides
+- Bounding-box handles
+- Move in one-pixel increments
+- Duplicate while transforming
+- Interpolation options:
+  - Nearest neighbor
+  - Bilinear
+  - Bicubic
+
+QUICK SHAPES:
+When the user draws and holds at the end:
+- Straighten line
+- Arc
+- Circle
+- Ellipse
+- Rectangle
+- Square
+- Triangle
+- Polygon
+- Polyline
+
+Allow:
+- Edit shape nodes
+- Snap to perfect shape
+- Adjust angle
+- Set stroke width
+- Fill or outline
+- Convert to vector shape layer
+
+DRAWING GUIDES:
+- 2D grid
+- Isometric grid
+- Perspective grid
+- One-point perspective
+- Two-point perspective
+- Three-point perspective
+- Horizontal symmetry
+- Vertical symmetry
+- Quadrant symmetry
+- Radial symmetry
+- Rotational symmetry
+- Kaleidoscope mode
+- Adjustable grid size
+- Adjustable opacity
+- Adjustable thickness
+- Adjustable guide color
+- Assisted drawing toggle per layer
+
+TYPOGRAPHY:
+- Add editable text
+- Use installed system fonts
+- Import fonts
+- Font search
+- Font favorites
+- Font size
+- Weight
+- Italic
+- Underline
+- Alignment
+- Tracking
+- Kerning
+- Leading
+- Baseline shift
+- Uppercase
+- Lowercase
+- Curved text
+- Text on path
+- Warp text
+- Outline
+- Stroke
+- Shadow
+- Gradient fill
+- Texture fill
+- Convert text to editable vector paths
+- Preserve editable text until rasterized
+
+IMAGE TOOLS:
+- Import from camera
+- Import from photo library
+- Import from Files
+- Paste from clipboard
+- Remove background
+- Crop
+- Straighten
+- Perspective correction
+- Resize
+- Rotate
+- Flip
+- Cutout
+- Magic selection
+- Edge refinement
+- Color-key removal
+- Replace color
+- Image trace into vector
+- Non-destructive smart-image layer
+- Linked image updates
+
+ADJUSTMENTS:
+All adjustments should support full-layer mode and brush-painted local mode.
+
+Include:
+- Hue, saturation, brightness
+- Color balance
+- Curves
+- Gradient map
+- Levels
+- White balance
+- Grayscale
+- Invert
+- Posterize
+- Threshold
+- Gaussian blur
+- Motion blur
+- Perspective blur
+- Sharpen
+- Noise
+- Film grain
+- Bloom/glow
+- Halftone
+- Chromatic aberration
+- Glitch
+- Liquify
+- Clone
+- Vignette
+- Lens distortion
+- Color replacement
+- Selective color
+- Shadows/highlights
+
+LIQUIFY:
+- Push
+- Twirl clockwise
+- Twirl counterclockwise
+- Pinch
+- Expand
+- Crystals
+- Edge
+- Reconstruct
+- Adjust size
+- Pressure
+- Distortion
+- Momentum
+- Reconstruct amount
+
+UNDO AND HISTORY:
+- Unlimited logical undo until memory/storage limit
+- Undo after reopening a project when possible
+- Redo
+- Visual history panel
+- Named checkpoints
+- Restore checkpoint
+- Duplicate project before destructive operation
+- Efficient delta-based history
+- Merge rapid brush events into one undo step
+- Save history to project file
+
+TIME-LAPSE:
+- Record drawing actions
+- Replay creation process
+- Pause recording
+- Private layer exclusion
+- Export 1080p
+- Export 4K where supported
+- Export full length
+- Export 30-second cut
+- Include or exclude interface
+- Adjustable playback speed
+
+ANIMATION:
+- Frame-by-frame animation
+- Timeline
+- Onion skin
+- Onion-skin frame count
+- Onion-skin opacity
+- Primary-frame emphasis
+- Loop playback
+- Ping-pong playback
+- One-shot playback
+- Frames per second
+- Hold frame
+- Duplicate frame
+- Background frame
+- Foreground frame
+- Group layers as frame
+- Export GIF
+- Export MP4
+- Export PNG sequence
+- Export animated PNG where supported
+
+GARMENT-SPECIFIC FEATURES:
+This is what makes Brandthread different.
+
+Garment templates:
+- Front
+- Back
+- Left sleeve
+- Right sleeve
+- Neck label
+- Care label
+- Hang tag
+- Packaging
+- Hoodie
+- T-shirt
+- Long sleeve
+- Sweatpants
+- Shorts
+- Hat
+- Beanie
+- Jacket
+
+Mockup system:
+- Place artwork on garment
+- Realistic fabric displacement
+- Fabric folds
+- Multiply/shadow mapping
+- Editable print area
+- Print-size measurements
+- Front/back switching
+- Garment color switching
+- Model preview
+- Flat-lay preview
+- Transparent product preview
+- Save mockup variants
+
+Production modes:
+- Screen print
+- DTG
+- DTF
+- Embroidery
+- Puff print
+- Vinyl
+- Sublimation
+- Rhinestones
+- Distressed print
+- Woven label
+
+Production warnings:
+- Too many screen-print colors
+- Resolution too low
+- Artwork outside print boundary
+- Lines too thin
+- Transparency unsupported
+- Embroidery detail too small
+- Incorrect color space
+- Missing bleed
+- Poor contrast
+- Unsupported export format
+
+TECH PACK:
+- Garment measurements
+- Artwork placement
+- Print dimensions
+- Pantone references
+- Fabric
+- GSM
+- Stitching notes
+- Trim notes
+- Label placement
+- Packaging notes
+- Manufacturer notes
+- Version history
+- Export PDF tech pack
+
+AI FEATURES:
+- Generate graphic from text
+- Generate seamless pattern
+- Remove background
+- Upscale
+- Vectorize
+- Generate colorways
+- Recolor garment
+- Create matching back graphic
+- Generate typography layout
+- Suggest design placement
+- Produce mockup automatically
+- Detect low-resolution artwork
+- Generate product description
+- Generate social post from design
+- Always require user approval before replacing artwork
+
+PROJECT GALLERY:
+- Grid and list views
+- Project thumbnails
+- Folders
+- Tags
+- Search
+- Sort by modified date, created date, and name
+- Duplicate
+- Rename
+- Delete with recovery bin
+- Import
+- Export
+- Local projects
+- Cloud projects
+- Shared projects
+- Version history
+- Templates
+- Recent projects
+
+IMPORT:
+- PNG
+- JPG/JPEG
+- WEBP
+- SVG
+- PDF
+- PSD with layers when possible
+- TIFF
+- GIF
+- Brandthread project format
+- Font files
+- Brush files
+- Palette files
+
+EXPORT:
+- PNG
+- Transparent PNG
+- JPG
+- WEBP
+- SVG for vector content
+- PDF
+- PSD with layers where supported
+- TIFF
+- GIF
+- MP4
+- PNG sequence
+- Print-ready 300 DPI
+- CMYK-ready PDF preview
+- Separate front/back artwork
+- Mockup image
+- Tech-pack PDF
+- Brandthread editable project package
+
+SETTINGS:
+- Interface handedness
+- Left-side or right-side sliders
+- Light, dark, and pure-black themes
+- Accent color
+- Brush cursor
+- Project autosave frequency
+- Gesture controls
+- Stylus pressure curve
+- Palm rejection
+- Finger drawing toggle
+- Rotation with pinch toggle
+- Undo delay
+- Rapid undo speed
+- Selection-mask color
+- Canvas background
+- Time-lapse quality
+- Cloud backup
+- Storage usage
+- Accessibility
+- Haptic feedback
+- Sound feedback
+- Reduce motion
+- High-contrast interface
+- Larger controls
+
+PERFORMANCE REQUIREMENTS:
+- Draw latency should feel immediate
+- Aim for 60 FPS minimum
+- Support 120 FPS devices where available
+- Use predicted and coalesced touch events
+- Never rerender the entire React component tree during a stroke
+- Perform stroke rendering on the graphics/UI thread
+- Commit completed strokes to persistent layer textures
+- Use tile-based rendering for oversized canvases
+- Use GPU shaders for blend modes and effects
+- Cancel stale rendering jobs
+- Compress inactive layer data
+- Autosave asynchronously
+- Never freeze the UI during export
+- Display export progress
+- Recover temporary project files after crashes
+
+DATA SAFETY:
+- Offline-first
+- Autosave after meaningful changes
+- Keep recovery snapshots
+- Confirm destructive deletion
+- Store projects locally by default
+- Optional encrypted cloud backup
+- Never upload artwork without explicit permission
+- Provide manual backup export
+
+ACCESSIBILITY:
+- Screen-reader labels
+- Large touch targets
+- Dynamic text support where practical
+- Adjustable contrast
+- Color-blind-safe indicators
+- Haptic confirmation
+- Left-handed interface
+- Reduced-motion mode
+
+DEVELOPMENT PHASES:
+
+PHASE 1 — WORKING MVP:
+- Project gallery
+- New canvas
+- GPU drawing canvas
+- Draw, erase, smudge
+- Brush size and opacity
+- 12 original brushes
+- Color picker
+- Layers
+- Undo/redo
+- Pan, zoom, and rotate
+- Import image
+- Text
+- Basic transform
+- PNG/JPG export
+- Autosave
+- Garment front/back template
+
+PHASE 2 — PROFESSIONAL EDITOR:
+- Full brush studio
+- Masks and clipping masks
+- Blend modes
+- Advanced selection
+- Warp and liquify
+- Adjustments
+- Guides and symmetry
+- PSD import/export
+- Time-lapse
+- Custom brushes and palettes
+- Better mockup rendering
+
+PHASE 3 — BRAND PRODUCTION:
+- Tech packs
+- Print-area validation
+- Embroidery preview
+- Production warnings
+- Manufacturer-ready exports
+- Colorways
+- Advanced garment mockups
+- AI design features
+
+PHASE 4 — COLLABORATION:
+- Cloud synchronization
+- Shared projects
+- Comments
+- Roles and permissions
+- Version history
+- Team libraries
+- Approval workflow
+
+DO NOT:
+- Build every feature in one giant file
+- Use fake buttons
+- Use static screenshots as the editor
+- Simulate drawing with pre-rendered images
+- put canvas state entirely inside React component state
+- claim PSD support unless layer fidelity is actually tested
+- copy Procreate’s proprietary assets or interface exactly
+
+FIRST DELIVERABLE:
+Before writing the whole app, generate:
+1. Technical architecture
+2. Folder structure
+3. Document and layer data models
+4. Canvas rendering strategy
+5. Gesture-conflict strategy
+6. Autosave and recovery design
+7. MVP milestone plan
+8. Then implement Phase 1 with real working controls
+
+ACCEPTANCE TESTS:
+- A user can create a 3000 × 3000 canvas
+- Draw continuously without visible lag
+- Change brush size and opacity
+- Undo and redo strokes
+- Create, hide, reorder, duplicate, and delete layers
+- Zoom, rotate, and pan without marking the canvas
+- Import a PNG
+- Add editable text
+- Place artwork on the front of a shirt
+- Save, close, and reopen the project
+- Export a transparent PNG
+- No toolbar buttons may be nonfunctional
