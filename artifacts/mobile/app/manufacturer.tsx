@@ -73,15 +73,12 @@ const MESSAGES = [
 export default function ManufacturerScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'find' | 'orders' | 'messages'>('dashboard');
-
   function go(route: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(route as never);
   }
 
   const topPad = Platform.OS === 'web' ? 20 : insets.top;
-  const btmPad = Platform.OS === 'web' ? 20 : insets.bottom;
 
   return (
     <View style={[s.root, { paddingTop: topPad }]}>
@@ -249,17 +246,6 @@ export default function ManufacturerScreen() {
         </View>
 
       </ScrollView>
-
-      {/* ── Bottom Tab Bar ── */}
-      <View style={[s.tabBar, { paddingBottom: btmPad + 8 }]}>
-        <TabBtn icon="grid" label="Dashboard"         active={activeTab === 'dashboard'} onPress={() => setActiveTab('dashboard')} />
-        <TabBtn icon="search" label="Find Manufacturers" active={activeTab === 'find'}      onPress={() => { setActiveTab('find'); go('/manufacturer-onboard'); }} />
-        <TouchableOpacity style={s.fabBtn} onPress={() => go('/request-sample')} activeOpacity={0.9}>
-          <Feather name="plus" size={26} color="#000" />
-        </TouchableOpacity>
-        <TabBtn icon="file-text" label="Orders"      active={activeTab === 'orders'}    onPress={() => { setActiveTab('orders'); go('/payments'); }} />
-        <TabBtnBadge icon="message-circle" label="Messages" active={activeTab === 'messages'} badge={3} onPress={() => { setActiveTab('messages'); go('/chat/manufacturer-m1'); }} />
-      </View>
     </View>
   );
 }
@@ -316,32 +302,6 @@ function MfrCard({ m, onPress, onSample }: { m: typeof MANUFACTURERS[0]; onPress
   );
 }
 
-// ─── Tab button ───────────────────────────────────────────────────────────────
-function TabBtn({ icon, label, active, onPress }: { icon: keyof typeof Feather.glyphMap; label: string; active: boolean; onPress: () => void }) {
-  return (
-    <TouchableOpacity style={tb.btn} onPress={onPress} activeOpacity={0.75}>
-      <Feather name={icon} size={20} color={active ? GREEN : MUTED} />
-      <Text style={[tb.label, { color: active ? GREEN : MUTED }]} numberOfLines={1}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
-function TabBtnBadge({ icon, label, active, badge, onPress }: { icon: keyof typeof Feather.glyphMap; label: string; active: boolean; badge: number; onPress: () => void }) {
-  return (
-    <TouchableOpacity style={tb.btn} onPress={onPress} activeOpacity={0.75}>
-      <View>
-        <Feather name={icon} size={20} color={active ? GREEN : MUTED} />
-        {badge > 0 && (
-          <View style={tb.badge}>
-            <Text style={tb.badgeText}>{badge}</Text>
-          </View>
-        )}
-      </View>
-      <Text style={[tb.label, { color: active ? GREEN : MUTED }]} numberOfLines={1}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   root:    { flex: 1, backgroundColor: BG },
@@ -395,10 +355,6 @@ const s = StyleSheet.create({
   msgPreview: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 17 },
   unreadBadge:{ width: 20, height: 20, borderRadius: 10, backgroundColor: GREEN, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
   unreadText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: '#000' },
-
-  // Bottom tab
-  tabBar:  { backgroundColor: CARD, borderTopWidth: 1, borderTopColor: BORDER, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingTop: 10, paddingHorizontal: 8 },
-  fabBtn:  { width: 52, height: 52, borderRadius: 26, backgroundColor: GREEN, alignItems: 'center', justifyContent: 'center', marginBottom: 10, shadowColor: GREEN, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 },
 });
 
 const mc = StyleSheet.create({
@@ -418,11 +374,4 @@ const mc = StyleSheet.create({
   lead:     { fontSize: 10, fontFamily: 'Inter_400Regular', color: MUTED },
   iconRow:  { flexDirection: 'row', gap: 8, marginTop: 6 },
   iconBtn:  { width: 28, height: 28, borderRadius: 8, backgroundColor: '#1A2A1A', alignItems: 'center', justifyContent: 'center' },
-});
-
-const tb = StyleSheet.create({
-  btn:      { alignItems: 'center', gap: 4, minWidth: 56 },
-  label:    { fontSize: 9, fontFamily: 'Inter_500Medium' },
-  badge:    { position: 'absolute', top: -4, right: -8, width: 16, height: 16, borderRadius: 8, backgroundColor: GREEN, alignItems: 'center', justifyContent: 'center' },
-  badgeText:{ fontSize: 9, fontFamily: 'Inter_700Bold', color: '#000' },
 });
