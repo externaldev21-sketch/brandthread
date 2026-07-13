@@ -1,195 +1,259 @@
 import React from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Alert, Dimensions } from 'react-native';
-import { useColors } from '@/hooks/useColors';
+import {
+  ScrollView, View, Text, TouchableOpacity,
+  StyleSheet, Platform, Alert,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
-const { width: SCREEN_W } = Dimensions.get('window');
+// ─── Theme ────────────────────────────────────────────────────────────────────
+const BG      = '#0A0B0A';
+const CARD    = '#111311';
+const BORDER  = '#1E221E';
+const FG      = '#EAF2ED';
+const MUTED   = '#5A6B5C';
+const GREEN   = '#39FF88';
+const GREEN_D = '#0D2B1A';
 
-interface FeatureItem {
+// ─── Data ─────────────────────────────────────────────────────────────────────
+interface ToolItem {
   label: string;
+  desc: string;
   icon: keyof typeof Feather.glyphMap;
   route: string;
-  color: string;
-  badge?: string;
+  iconColor: string;
+  iconBg: string;
+  badge?: 'AI' | 'Pro' | 'New';
 }
 
-interface FeatureGroup {
+interface ToolGroup {
   title: string;
-  items: FeatureItem[];
+  items: ToolItem[];
 }
 
-const FEATURE_GROUPS: FeatureGroup[] = [
+const GROUPS: ToolGroup[] = [
   {
     title: 'Brand & Design',
     items: [
-      { label: 'Brand Creation',    icon: 'aperture',        route: '/brand',        color: '#EC4899', badge: 'AI' },
-      { label: 'AI Design Studio',  icon: 'zap',             route: '/ai-studio',    color: '#F59E0B', badge: 'AI' },
-      { label: 'Website Builder',   icon: 'layout',          route: '/website',      color: '#0EA5E9', badge: 'Pro' },
+      {
+        label: 'Brand Creation', desc: 'Create your brand identity with AI.',
+        icon: 'aperture', route: '/brand',
+        iconColor: '#EC4899', iconBg: '#EC489920', badge: 'AI',
+      },
+      {
+        label: 'AI Design Studio', desc: 'Generate stunning designs in seconds.',
+        icon: 'zap', route: '/ai-studio',
+        iconColor: '#F97316', iconBg: '#F9731620', badge: 'AI',
+      },
+      {
+        label: 'Website Builder', desc: 'Build your store with no code.',
+        icon: 'layout', route: '/website',
+        iconColor: '#0EA5E9', iconBg: '#0EA5E920', badge: 'Pro',
+      },
     ],
   },
   {
     title: 'Operations',
     items: [
-      { label: 'Manufacturer Hub',       icon: 'tool',         route: '/manufacturer', color: '#8B5CF6' },
-      { label: 'Shipping & Fulfillment', icon: 'truck',        route: '/shipping',     color: '#F97316' },
-      { label: 'Payments',               icon: 'credit-card',  route: '/payments',     color: '#10B981' },
+      {
+        label: 'Manufacturer Hub', desc: 'Find and connect with trusted manufacturers.',
+        icon: 'tool', route: '/manufacturer',
+        iconColor: '#8B5CF6', iconBg: '#8B5CF620',
+      },
+      {
+        label: 'Shipping & Fulfillment', desc: 'Manage orders and delivery seamlessly.',
+        icon: 'truck', route: '/shipping',
+        iconColor: '#F97316', iconBg: '#F9731620',
+      },
+      {
+        label: 'Payments', desc: 'Track payouts and manage your transactions.',
+        icon: 'credit-card', route: '/payments',
+        iconColor: '#10B981', iconBg: '#10B98120',
+      },
     ],
   },
   {
     title: 'Customers & Finance',
     items: [
-      { label: 'CRM',                icon: 'users',        route: '/customers', color: '#EF4444' },
-      { label: 'Finance & Reports',  icon: 'bar-chart-2',  route: '/finance',   color: '#06B6D4' },
-      { label: 'Loyalty & Rewards',  icon: 'star',         route: '/plans',     color: '#FBBF24', badge: 'New' },
+      {
+        label: 'CRM', desc: 'Manage customer relationships and interactions.',
+        icon: 'users', route: '/customers',
+        iconColor: '#EF4444', iconBg: '#EF444420',
+      },
+      {
+        label: 'Finance & Reports', desc: 'Track revenue, profit and other key financials.',
+        icon: 'bar-chart-2', route: '/finance',
+        iconColor: '#06B6D4', iconBg: '#06B6D420',
+      },
+      {
+        label: 'Loyalty & Rewards', desc: 'Reward customers and build brand loyalty.',
+        icon: 'star', route: '/plans',
+        iconColor: '#FBBF24', iconBg: '#FBBF2420', badge: 'New',
+      },
     ],
   },
   {
     title: 'Business Tools',
     items: [
-      { label: 'AI Assistant', icon: 'message-circle', route: '/ai-assistant', color: '#6366F1', badge: 'AI' },
-      { label: 'Automation',   icon: 'cpu',             route: '/automation',   color: '#14B8A6' },
-      { label: 'Team & Security', icon: 'shield',       route: '/team',         color: '#DC2626' },
-    ],
-  },
-  {
-    title: 'Community & Growth',
-    items: [
-      { label: 'Marketing',           icon: 'send',        route: '/marketing', color: '#F43F5E' },
-      { label: 'Hire',                icon: 'globe',       route: '/community', color: '#3B82F6' },
-      { label: 'Build the App', icon: 'smartphone',  route: '/mobile-app-builder', color: '#A855F7', badge: 'Pro' },
-      { label: 'Community Chat', icon: 'message-circle', route: '/community-chat', color: '#14B8A6' },
+      {
+        label: 'AI Assistant', desc: 'Your smart assistant for everything Brandthread.',
+        icon: 'message-circle', route: '/ai-assistant',
+        iconColor: '#8B5CF6', iconBg: '#8B5CF620', badge: 'AI',
+      },
+      {
+        label: 'Automation', desc: 'Automate tasks and scale your brand effortlessly.',
+        icon: 'cpu', route: '/automation',
+        iconColor: '#14B8A6', iconBg: '#14B8A620',
+      },
+      {
+        label: 'Team & Security', desc: 'Manage your team and keep your brand secure.',
+        icon: 'shield', route: '/team',
+        iconColor: '#EF4444', iconBg: '#EF444420',
+      },
     ],
   },
 ];
 
-const ACCOUNT_ITEMS: Array<{ label: string; icon: keyof typeof Feather.glyphMap; value?: string }> = [
-  { label: 'Two-Factor Auth', icon: 'lock', value: 'On' },
-  { label: 'Audit Logs', icon: 'file-text' },
-  { label: 'User Permissions', icon: 'shield' },
+const ACCOUNT_ITEMS = [
+  { label: 'Two-Factor Authentication', icon: 'lock' as const, value: 'On' },
+  { label: 'Audit Logs',                icon: 'file-text' as const },
+  { label: 'User Permissions',          icon: 'users' as const },
 ];
 
+// ─────────────────────────────────────────────────────────────────────────────
 export default function MoreScreen() {
-  const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const topPad = Platform.OS === 'web' ? 20 : insets.top;
 
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
-
-  function handleNav(route: string) {
+  function go(route: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(route as never);
   }
 
-  function IconTile({ item }: { item: FeatureItem }) {
-    return (
-      <TouchableOpacity
-        key={item.label}
-        onPress={() => handleNav(item.route)}
-        activeOpacity={0.7}
-        style={styles.tile}
-      >
-        <View style={styles.tileIconWrap}>
-          {item.badge != null && (
-            <View
-              style={[
-                styles.badgeDot,
-                { backgroundColor: item.badge === 'AI' ? colors.primary : item.badge === 'New' ? colors.success : colors.mutedForeground },
-              ]}
-            >
-              <Text style={styles.badgeDotText}>{item.badge}</Text>
-            </View>
-          )}
-          <View style={[styles.tileIconCircle, { backgroundColor: item.color + '1F' }]}>
-            <Feather name={item.icon} size={22} color={item.color} />
-          </View>
-        </View>
-        <Text style={[styles.tileLabel, { color: colors.foreground }]} numberOfLines={2}>
-          {item.label}
-        </Text>
-      </TouchableOpacity>
-    );
-  }
-
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
-        <View style={styles.tabsRow}>
-          <Text style={[styles.tabText, { color: colors.foreground }]}>All Tools</Text>
+    <View style={[s.root, { paddingTop: topPad }]}>
+      {/* ── Header ── */}
+      <View style={s.header}>
+        <View style={{ flex: 1 }}>
+          <Text style={s.headerTitle}>All Tools</Text>
+          <Text style={s.headerSub}>Everything you need to build, scale, and run your brand.</Text>
         </View>
         <TouchableOpacity
-          activeOpacity={0.7}
-          style={[styles.helpBtn, { borderColor: colors.border }]}
+          style={s.helpBtn}
           onPress={() => Alert.alert('Need help?', 'Browse Brandthread help articles or contact support.', [{ text: 'Got it' }])}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Feather name="help-circle" size={20} color={colors.mutedForeground} />
+          <Feather name="help-circle" size={22} color={MUTED} />
         </TouchableOpacity>
       </View>
 
       <ScrollView
-        contentContainerStyle={{ paddingTop: 20, paddingBottom: 140 }}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 140, paddingTop: 16, gap: 20 }}
       >
-        {/* Plan strip */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => handleNav('/plans')}
-          style={[styles.planStrip, { backgroundColor: colors.primary + '14' }]}
-        >
-          <Text style={[styles.planStripText, { color: colors.primary }]}>Brandthread Pro · all features unlocked</Text>
-          <Feather name="chevron-right" size={16} color={colors.primary} />
-        </TouchableOpacity>
-
-        {FEATURE_GROUPS.map((group, gi) => (
-          <View key={group.title}>
-            <View style={styles.section}>
-              <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>{group.title.toUpperCase()}</Text>
-              <View style={styles.grid}>
-                {group.items.map((item) => <IconTile key={item.label} item={item} />)}
+        {/* ── Pro Banner ── */}
+        <TouchableOpacity style={s.proBanner} activeOpacity={0.85} onPress={() => go('/plans')}>
+          <View style={s.proBannerLeft}>
+            <View style={s.proIconWrap}>
+              <Feather name="award" size={20} color={GREEN} />
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <View style={s.proTitleRow}>
+                <Text style={s.proTitle}>Brandthread Pro</Text>
+                <View style={s.proPill}>
+                  <Text style={s.proPillText}>Pro</Text>
+                </View>
+              </View>
+              <Text style={s.proSub}>All features unlocked.</Text>
+              <View style={s.proLinkRow}>
+                <Text style={s.proLink}>View Pro Benefits</Text>
+                <Feather name="arrow-right" size={12} color={GREEN} />
               </View>
             </View>
-            {gi < FEATURE_GROUPS.length - 1 && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
+          </View>
+          {/* Crown glow graphic */}
+          <View style={s.crownWrap}>
+            <View style={s.crownGlow} />
+            <Feather name="star" size={40} color={GREEN} style={{ opacity: 0.9 }} />
+          </View>
+        </TouchableOpacity>
+
+        {/* ── Tool Groups ── */}
+        {GROUPS.map((group) => (
+          <View key={group.title} style={s.group}>
+            {/* Section header */}
+            <View style={s.groupHeader}>
+              <View style={s.groupHeaderLeft}>
+                <View style={s.greenDot} />
+                <Text style={s.groupTitle}>{group.title}</Text>
+              </View>
+              <TouchableOpacity onPress={() => Alert.alert(group.title, 'Full category view coming soon.')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Text style={s.viewAll}>View All</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* 3-col card grid */}
+            <View style={s.cardGrid}>
+              {group.items.map((item) => (
+                <TouchableOpacity
+                  key={item.label}
+                  style={s.toolCard}
+                  activeOpacity={0.75}
+                  onPress={() => go(item.route)}
+                >
+                  {/* Badge */}
+                  {item.badge && (
+                    <View style={[s.badge, {
+                      backgroundColor:
+                        item.badge === 'AI'  ? GREEN + 'CC' :
+                        item.badge === 'Pro' ? '#0EA5E9CC' :
+                                              '#FBBF24CC',
+                    }]}>
+                      <Text style={s.badgeText}>{item.badge}</Text>
+                    </View>
+                  )}
+                  {/* Icon */}
+                  <View style={[s.cardIconWrap, { backgroundColor: item.iconBg }]}>
+                    <Feather name={item.icon} size={20} color={item.iconColor} />
+                  </View>
+                  {/* Text */}
+                  <Text style={s.cardLabel} numberOfLines={2}>{item.label}</Text>
+                  <Text style={s.cardDesc}  numberOfLines={3}>{item.desc}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         ))}
 
-        <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-        {/* Account & Security — list style */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.mutedForeground }]}>ACCOUNT & SECURITY</Text>
-          <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {/* ── Account & Security ── */}
+        <View style={s.group}>
+          <View style={s.groupHeader}>
+            <View style={s.groupHeaderLeft}>
+              <Feather name="lock" size={13} color={MUTED} />
+              <Text style={s.groupTitle}>Account & Security</Text>
+            </View>
+          </View>
+          <View style={s.listCard}>
             {ACCOUNT_ITEMS.map((item, i) => (
               <TouchableOpacity
                 key={item.label}
+                style={[s.listRow, i > 0 && s.listRowBorder]}
                 activeOpacity={0.75}
-                style={[styles.listRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  if (item.label === 'Two-Factor Auth') {
-                    Alert.alert('Two-Factor Auth', '2FA is currently enabled on your account.', [
-                      { text: 'Disable 2FA', style: 'destructive', onPress: () => {} },
-                      { text: 'OK', style: 'cancel' },
-                    ]);
-                  } else if (item.label === 'User Permissions') {
-                    handleNav('/team');
-                  } else {
-                    Alert.alert(item.label, 'This feature is coming soon in a future update.', [{ text: 'Got it' }]);
-                  }
+                  if (item.label === 'User Permissions') go('/team');
+                  else Alert.alert(item.label, item.value ? '2FA is currently enabled on your account.' : 'This feature is coming soon.', [{ text: 'OK' }]);
                 }}
               >
-                <View style={styles.listRowCenterGroup}>
-                  <View style={[styles.listIconWrap, { backgroundColor: colors.secondary }]}>
-                    <Feather name={item.icon} size={16} color={colors.mutedForeground} />
-                  </View>
-                  <Text style={[styles.listLabel, { color: colors.foreground }]}>{item.label}</Text>
-                  {item.value != null && (
-                    <Text style={[styles.listValue, { color: colors.success }]}>{item.value}</Text>
-                  )}
+                <View style={s.listIconWrap}>
+                  <Feather name={item.icon} size={15} color={MUTED} />
                 </View>
-                <Feather name="chevron-right" size={15} color={colors.mutedForeground} style={styles.listChevron} />
+                <Text style={s.listLabel}>{item.label}</Text>
+                {item.value && <Text style={s.listValue}>{item.value}</Text>}
+                <Feather name="chevron-right" size={15} color={MUTED} style={{ marginLeft: 'auto' }} />
               </TouchableOpacity>
             ))}
           </View>
@@ -199,79 +263,70 @@ export default function MoreScreen() {
   );
 }
 
-const H_PAD = 20;
-const GAP = 8;
-const TILE_W = (SCREEN_W - H_PAD * 2 - GAP * 3) / 4;
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const s = StyleSheet.create({
+  root:   { flex: 1, backgroundColor: BG },
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
+  // Header
+  header:     { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 16, paddingBottom: 12, paddingTop: 6, gap: 12 },
+  headerTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', color: FG },
+  headerSub:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 2, lineHeight: 17 },
+  helpBtn:     { marginTop: 4 },
 
-  header: {
+  // Pro banner
+  proBanner: {
+    backgroundColor: '#0D1A12',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: GREEN + '33',
+    padding: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: H_PAD,
-    paddingBottom: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    position: 'relative',
+    overflow: 'hidden',
   },
-  tabsRow: { flexDirection: 'row', gap: 22, justifyContent: 'center' },
-  tabBtn: { paddingBottom: 10, alignItems: 'center' },
-  tabText: { fontSize: 16, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
-  tabUnderline: { height: 2, borderRadius: 1, marginTop: 8, alignSelf: 'center' },
-  helpBtn: {
-    position: 'absolute',
-    right: H_PAD,
-    bottom: 10,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  proBannerLeft: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, flex: 1 },
+  proIconWrap:   { width: 38, height: 38, borderRadius: 10, backgroundColor: GREEN_D, borderWidth: 1, borderColor: GREEN + '44', alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  proTitleRow:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  proTitle:      { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+  proPill:       { backgroundColor: GREEN + 'CC', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2 },
+  proPillText:   { fontSize: 10, fontFamily: 'Inter_700Bold', color: '#0A0B0A' },
+  proSub:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
+  proLinkRow:    { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  proLink:       { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: GREEN },
+  crownWrap:     { width: 60, height: 60, alignItems: 'center', justifyContent: 'center' },
+  crownGlow:     { position: 'absolute', width: 70, height: 70, borderRadius: 35, backgroundColor: GREEN, opacity: 0.12 },
 
-  planStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+  // Groups
+  group:       { gap: 12 },
+  groupHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  groupHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  greenDot:    { width: 8, height: 8, borderRadius: 4, backgroundColor: GREEN },
+  groupTitle:  { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
+  viewAll:     { fontSize: 12, fontFamily: 'Inter_500Medium', color: MUTED },
+
+  // Tool cards — 3-col grid
+  cardGrid: { flexDirection: 'row', gap: 10 },
+  toolCard: {
+    flex: 1,
+    backgroundColor: CARD,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: 12,
     gap: 8,
-    marginHorizontal: H_PAD,
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    marginBottom: 20,
+    minHeight: 130,
   },
-  planStripText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
+  badge:        { position: 'absolute', top: 10, right: 10, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  badgeText:    { fontSize: 9, fontFamily: 'Inter_700Bold', color: '#0A0B0A' },
+  cardIconWrap: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  cardLabel:    { fontSize: 12, fontFamily: 'Inter_700Bold', color: FG, lineHeight: 16 },
+  cardDesc:     { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 15 },
 
-  section: { paddingHorizontal: H_PAD, marginBottom: 20, alignItems: 'center' },
-  sectionHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 14, width: '100%', position: 'relative' },
-  sectionHeaderIcon: { position: 'absolute', right: 0 },
-  sectionTitle: { fontSize: 11, fontFamily: 'Inter_600SemiBold', letterSpacing: 1.1, marginBottom: 14, textAlign: 'center', alignSelf: 'center' },
-
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP, rowGap: 18, justifyContent: 'center' },
-  tile: { width: TILE_W, alignItems: 'center', gap: 8 },
-  tileIconWrap: { position: 'relative' },
-  tileIconCircle: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  badgeDot: {
-    position: 'absolute',
-    top: -4,
-    right: -6,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 6,
-    zIndex: 1,
-  },
-  badgeDotText: { fontSize: 8, fontFamily: 'Inter_700Bold', color: '#0D0D0D' },
-  tileLabel: { fontSize: 11, fontFamily: 'Inter_500Medium', textAlign: 'center', lineHeight: 15 },
-
-  divider: { height: StyleSheet.hairlineWidth, marginHorizontal: H_PAD, marginBottom: 20 },
-
-  // List (account section)
-  listCard: { borderRadius: 16, borderWidth: 1, overflow: 'hidden', width: '100%' },
-  listRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 14, position: 'relative' },
-  listRowCenterGroup: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  listIconWrap: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  listLabel: { fontSize: 14, fontFamily: 'Inter_500Medium', textAlign: 'center' },
-  listValue: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  listChevron: { position: 'absolute', right: 14 },
+  // Account list
+  listCard:    { backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
+  listRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14 },
+  listRowBorder: { borderTopWidth: 1, borderTopColor: BORDER },
+  listIconWrap: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#1A1E1A', alignItems: 'center', justifyContent: 'center' },
+  listLabel:   { fontSize: 14, fontFamily: 'Inter_500Medium', color: FG, flex: 1 },
+  listValue:   { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: GREEN },
 });
