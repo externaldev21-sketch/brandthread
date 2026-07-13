@@ -28,7 +28,7 @@ const proxyUrl = process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;
 
 // Set to true to skip Clerk sign-in while building (onboarding still runs).
 // Flip back to false before shipping.
-const DEV_BYPASS_AUTH = true;
+const DEV_BYPASS_AUTH = false;
 
 export const ONBOARDING_KEY = 'onboarding_complete';
 
