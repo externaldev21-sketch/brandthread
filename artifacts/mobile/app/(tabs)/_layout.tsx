@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +7,8 @@ import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ProfileTabButton } from '@/components/ProfileTabButton';
+import ModeSwitcher from '@/components/ModeSwitcher';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─── Seller / Both layout ─────────────────────────────────────────────────────
 // Tabs: Dashboard · Products · Feed (centre pill) · More · Profile
@@ -184,5 +186,14 @@ function TabIcon({ name, color, focused }: { name: keyof typeof Feather.glyphMap
 }
 
 export default function TabLayout() {
-  return <SellerTabLayout />;
+  const [isBoth, setIsBoth] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem('user_role').then(r => setIsBoth(r === 'both'));
+  }, []);
+  return (
+    <View style={{ flex: 1 }}>
+      {isBoth && <ModeSwitcher currentMode="seller" />}
+      <SellerTabLayout />
+    </View>
+  );
 }

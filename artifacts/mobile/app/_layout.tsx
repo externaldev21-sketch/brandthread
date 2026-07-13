@@ -32,7 +32,7 @@ const DEV_BYPASS_AUTH = true;
 export const ONBOARDING_KEY = 'onboarding_complete';
 
 // Screens that don't require authentication
-const AUTH_SCREENS = ['welcome', 'sign-in', 'forgot-password'];
+const AUTH_SCREENS = ['welcome', 'sign-in', 'forgot-password', 'splash'];
 
 // ─── Auth gate ────────────────────────────────────────────────────────────────
 function AuthGate({ children }: { children: React.ReactNode }) {
@@ -44,11 +44,17 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [onboardingDone, setOnboardingDone]       = useState(false);
   const [storedRole, setStoredRole]               = useState<string | null>(null);
+  const [splashSeen, setSplashSeen]               = useState<boolean | null>(null);
 
   // Dev bypass — seed seller role + completed onboarding for fast preview
   useEffect(() => {
     if (!DEV_BYPASS_AUTH) return;
     AsyncStorage.multiSet([[ONBOARDING_KEY, 'true'], ['user_role', 'seller']]);
+  }, []);
+
+  // Read splash_seen once on mount
+  useEffect(() => {
+    AsyncStorage.getItem('splash_seen').then(v => setSplashSeen(v === 'true'));
   }, []);
 
   // Read AsyncStorage whenever auth state or top segment changes
@@ -73,8 +79,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
     if (!DEV_BYPASS_AUTH) {
       if (!isLoaded) return;
-      // Unauthenticated → welcome
-      if (!isSignedIn && inProtectedArea) { router.replace('/welcome'); return; }
+      if (splashSeen === null) return; // still reading AsyncStorage
+      // Unauthenticated: show splash first time, then welcome
+      if (!isSignedIn && inProtectedArea) {
+        router.replace(splashSeen ? '/welcome' : '/splash');
+        return;
+      }
       if (!isSignedIn) return; // Stay on auth screen
     }
 
@@ -106,7 +116,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       router.replace('/(tabs)/' as never);
     }
     // 'both' users can be in either group — no correction needed
-  }, [isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole]);
+  }, [isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole, splashSeen]);
 
   return <>{children}</>;
 }
@@ -116,6 +126,7 @@ function RootLayoutNav() {
     <AuthGate>
       <Stack screenOptions={{ headerShown: false }}>
         {/* Auth & onboarding */}
+        <Stack.Screen name="splash"         options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="welcome"        options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="sign-in"        options={{ headerShown: false }} />
         <Stack.Screen name="forgot-password" options={{ headerShown: false, animation: 'slide_from_right' }} />

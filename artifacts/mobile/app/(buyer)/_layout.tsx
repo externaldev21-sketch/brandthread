@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -6,6 +6,8 @@ import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ProfileTabButton } from '@/components/ProfileTabButton';
+import ModeSwitcher from '@/components/ModeSwitcher';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─── Buyer tab layout ─────────────────────────────────────────────────────────
 // Tabs: Home · Friends · Feed (centre pill) · Inbox · Profile
@@ -195,5 +197,14 @@ function TabIcon({
 }
 
 export default function BuyerLayout() {
-  return <BuyerTabLayout />;
+  const [isBoth, setIsBoth] = useState(false);
+  useEffect(() => {
+    AsyncStorage.getItem('user_role').then(r => setIsBoth(r === 'both'));
+  }, []);
+  return (
+    <View style={{ flex: 1 }}>
+      {isBoth && <ModeSwitcher currentMode="buyer" />}
+      <BuyerTabLayout />
+    </View>
+  );
 }

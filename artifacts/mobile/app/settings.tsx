@@ -1,15 +1,19 @@
-import React, { useMemo, useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, Alert } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useAuth } from '@clerk/expo';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface SettingsItem {
   label: string;
   icon: keyof typeof Feather.glyphMap;
   route?: string;
+  action?: string;
+  destructive?: boolean;
 }
 
 interface SettingsGroup {
@@ -17,63 +21,121 @@ interface SettingsGroup {
   items: SettingsItem[];
 }
 
-const GROUPS: SettingsGroup[] = [
+const STATIC_GROUPS: SettingsGroup[] = [
+  {
+    title: 'Account',
+    items: [
+      { label: 'Edit profile',         icon: 'user',        route: '/edit-profile' },
+      { label: 'Edit brand setup',     icon: 'briefcase',   route: '/general-settings' },
+      { label: 'Shopping preferences', icon: 'shopping-bag', route: '/shopping-preferences' },
+      { label: 'Account type',         icon: 'layers',      route: '/account-type-settings' },
+      { label: 'Connected login methods', icon: 'link',     route: '/login-methods' },
+    ],
+  },
   {
     title: 'App settings',
     items: [
-      { label: 'Push notifications', icon: 'bell', route: '/push-notifications' },
-      { label: 'App icon', icon: 'smartphone', route: '/app-icon' },
-      { label: 'Biometric unlock', icon: 'unlock', route: '/biometric-unlock' },
+      { label: 'Push notifications', icon: 'bell',       route: '/push-notifications' },
+      { label: 'App icon',           icon: 'smartphone', route: '/app-icon' },
+      { label: 'Biometric unlock',   icon: 'unlock',     route: '/biometric-unlock' },
     ],
   },
   {
     title: 'Store settings',
     items: [
-      { label: 'General', icon: 'home', route: '/general-settings' },
-      { label: 'Plan', icon: 'file-text', route: '/plan-details' },
-      { label: 'Billing', icon: 'clipboard', route: '/billing' },
-      { label: 'Users', icon: 'users', route: '/users' },
-      { label: 'Roles', icon: 'users', route: '/roles' },
-      { label: 'Security', icon: 'shield', route: '/security' },
-      { label: 'Payments', icon: 'credit-card', route: '/payments' },
-      { label: 'Checkout', icon: 'shopping-cart', route: '/checkout' },
-      { label: 'Customer accounts', icon: 'user', route: '/customer-accounts' },
-      { label: 'Shipping and delivery', icon: 'truck', route: '/shipping-delivery' },
-      { label: 'Taxes and duties', icon: 'percent', route: '/taxes-duties' },
-      { label: 'Locations', icon: 'map-pin', route: '/locations' },
-      { label: 'Domains', icon: 'globe' },
-      { label: 'Integrations', icon: 'link', route: '/integrations' },
-      { label: 'Customer events', icon: 'activity', route: '/customer-events' },
-      { label: 'Notifications', icon: 'bell', route: '/notifications-settings' },
-      { label: 'Metafields and metaobjects', icon: 'database', route: '/metafields' },
-      { label: 'Languages', icon: 'message-square', route: '/languages' },
-      { label: 'Customer privacy', icon: 'lock', route: '/customer-privacy' },
-      { label: 'Policies', icon: 'file' },
+      { label: 'General',                    icon: 'home',          route: '/general-settings' },
+      { label: 'Plan',                       icon: 'file-text',     route: '/plan-details' },
+      { label: 'Billing',                    icon: 'clipboard',     route: '/billing' },
+      { label: 'Users',                      icon: 'users',         route: '/users' },
+      { label: 'Roles',                      icon: 'users',         route: '/roles' },
+      { label: 'Security',                   icon: 'shield',        route: '/security' },
+      { label: 'Payments',                   icon: 'credit-card',   route: '/payments' },
+      { label: 'Checkout',                   icon: 'shopping-cart', route: '/checkout' },
+      { label: 'Customer accounts',          icon: 'user',          route: '/customer-accounts' },
+      { label: 'Shipping and delivery',      icon: 'truck',         route: '/shipping-delivery' },
+      { label: 'Taxes and duties',           icon: 'percent',       route: '/taxes-duties' },
+      { label: 'Locations',                  icon: 'map-pin',       route: '/locations' },
+      { label: 'Domains',                    icon: 'globe' },
+      { label: 'Integrations',              icon: 'link',          route: '/integrations' },
+      { label: 'Customer events',            icon: 'activity',      route: '/customer-events' },
+      { label: 'Notifications',             icon: 'bell',          route: '/notifications-settings' },
+      { label: 'Metafields and metaobjects', icon: 'database',      route: '/metafields' },
+      { label: 'Languages',                  icon: 'message-square', route: '/languages' },
+      { label: 'Customer privacy',           icon: 'lock',          route: '/customer-privacy' },
+      { label: 'Policies',                   icon: 'file' },
+    ],
+  },
+  {
+    title: 'Danger zone',
+    items: [
+      { label: 'Sign out',      icon: 'log-out',  action: 'sign-out', destructive: true },
+      { label: 'Delete account', icon: 'trash-2', action: 'delete-account', destructive: true },
     ],
   },
 ];
 
 export default function SettingsScreen() {
-  const colors = useColors();
-  const insets = useSafeAreaInsets();
-  const router = useRouter();
-  const [query, setQuery] = useState('');
+  const colors  = useColors();
+  const insets  = useSafeAreaInsets();
+  const router  = useRouter();
+  const { signOut } = useAuth();
+  const [query, setQuery]       = useState('');
+  const [userRole, setUserRole] = useState<string | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem('user_role').then(setUserRole);
+  }, []);
 
   const topPad = Platform.OS === 'web' ? 24 : insets.top;
 
-  function haptic() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }
+  function haptic() { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }
+  function handleClose() { haptic(); router.back(); }
 
-  function handleClose() {
+  async function handleItem(item: SettingsItem) {
     haptic();
-    router.back();
-  }
-
-  function handleItem(item: SettingsItem) {
-    haptic();
+    if (item.action === 'sign-out') {
+      Alert.alert('Sign out', 'Are you sure you want to sign out?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign out', style: 'destructive',
+          onPress: async () => {
+            await signOut();
+            router.replace('/welcome' as never);
+          },
+        },
+      ]);
+      return;
+    }
+    if (item.action === 'delete-account') {
+      Alert.alert('Delete account', 'This is permanent and cannot be undone. Contact support to delete your account.', [
+        { text: 'OK' },
+      ]);
+      return;
+    }
+    if (item.action === 'switch-mode') {
+      const current = await AsyncStorage.getItem('active_mode');
+      const next = current === 'buyer' ? 'seller' : 'buyer';
+      await AsyncStorage.setItem('active_mode', next);
+      router.replace(next === 'buyer' ? '/(buyer)/' : '/(tabs)/' as never);
+      return;
+    }
     if (item.route) router.push(item.route as never);
   }
+
+  // Build dynamic groups — inject "Switch mode" for "both" accounts
+  const GROUPS = useMemo<SettingsGroup[]>(() => {
+    if (userRole !== 'both') return STATIC_GROUPS;
+    return STATIC_GROUPS.map((g) => {
+      if (g.title !== 'Account') return g;
+      return {
+        ...g,
+        items: [
+          ...g.items,
+          { label: 'Switch mode', icon: 'repeat' as const, action: 'switch-mode' },
+        ],
+      };
+    });
+  }, [userRole]);
 
   const filteredGroups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -82,7 +144,7 @@ export default function SettingsScreen() {
       ...g,
       items: g.items.filter((i) => i.label.toLowerCase().includes(q)),
     })).filter((g) => g.items.length > 0);
-  }, [query]);
+  }, [query, GROUPS]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -131,11 +193,19 @@ export default function SettingsScreen() {
                     i !== group.items.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
                   ]}
                 >
-                  <Feather name={item.icon} size={17} color={colors.foreground} style={{ width: 22 }} />
-                  <Text style={[styles.rowLabel, { color: colors.foreground }]} numberOfLines={1}>
+                  <Feather
+                    name={item.icon}
+                    size={17}
+                    color={item.destructive ? '#EF4444' : colors.foreground}
+                    style={{ width: 22 }}
+                  />
+                  <Text
+                    style={[styles.rowLabel, { color: item.destructive ? '#EF4444' : colors.foreground }]}
+                    numberOfLines={1}
+                  >
                     {item.label}
                   </Text>
-                  <Feather name="chevron-right" size={18} color={colors.mutedForeground} />
+                  {!item.destructive && <Feather name="chevron-right" size={18} color={colors.mutedForeground} />}
                 </TouchableOpacity>
               ))}
             </View>
