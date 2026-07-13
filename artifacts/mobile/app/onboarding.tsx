@@ -495,11 +495,15 @@ export default function OnboardingScreen() {
 
   async function handleFinish(overrideRole?: Role) {
     const finalRole = overrideRole ?? role;
-    await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
-    if (finalRole) await AsyncStorage.setItem('user_role', finalRole);
-    // Route buyers to their dedicated group; sellers/both go to the dashboard
-    const dest = finalRole === 'buyer' ? '/(buyer)/' : '/(tabs)/';
-    router.replace(dest as never);
+    if (finalRole === 'buyer') {
+      // Buyers are free — mark onboarding done and go straight to the feed
+      await AsyncStorage.multiSet([[ONBOARDING_KEY, 'true'], ['user_role', 'buyer']]);
+      router.replace('/(buyer)/' as never);
+    } else {
+      // Sellers / Both pick a plan before landing on the dashboard
+      if (finalRole) await AsyncStorage.setItem('user_role', finalRole);
+      router.push('/plans?fromOnboarding=true' as never);
+    }
   }
 
   const bg = isDark ? '#121110' : '#F2EEE3';
