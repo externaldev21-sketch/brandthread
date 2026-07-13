@@ -109,7 +109,7 @@ export default function PlanDetailsScreen() {
           </Text>
 
           <TouchableOpacity
-            onPress={() => { haptic(); Alert.alert('Subscriptions', 'No additional recurring items yet.', [{ text: 'Got it' }]); }}
+            onPress={() => { haptic(); router.push('/billing' as never); }}
             activeOpacity={0.7}
             style={[styles.listRow, { backgroundColor: colors.card, borderColor: colors.border }]}
           >

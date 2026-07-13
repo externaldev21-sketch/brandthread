@@ -92,10 +92,6 @@ export default function StoryPickerScreen() {
 
   function onModePress(m: Mode) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (m !== 'story') {
-      Alert.alert('Coming soon', `${m === 'post' ? 'Feed posts' : m === 'reel' ? 'Reels' : 'Live video'} aren't available yet — story creation is ready to use.`);
-      return;
-    }
     setMode(m);
   }
 
@@ -110,7 +106,7 @@ export default function StoryPickerScreen() {
         <TouchableOpacity
           style={s.iconBtn}
           activeOpacity={0.7}
-          onPress={() => Alert.alert('Story settings', 'Save to camera roll, allow sharing, and more will live here.', [{ text: 'OK' }])}
+          onPress={() => router.push('/notifications-settings' as never)}
         >
           <Feather name="settings" size={21} color="#FFF" />
         </TouchableOpacity>
@@ -121,7 +117,7 @@ export default function StoryPickerScreen() {
         <TouchableOpacity
           style={s.templatesChip}
           activeOpacity={0.75}
-          onPress={() => Alert.alert('Templates', 'Story templates are coming soon.')}
+          onPress={() => router.push('/story-creator' as never)}
         >
           <Feather name="copy" size={13} color="#FFF" />
           <Text style={s.templatesText}>Templates</Text>

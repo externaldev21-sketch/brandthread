@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, Platform, TextInput,
+  Alert, Platform, TextInput, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 
 const bg     = '#000000';
 const card   = '#161616';
@@ -45,6 +46,14 @@ export default function EditProfileScreen() {
   });
 
   const [order, setOrder] = useState(DRAG_ROWS.map((r) => r.label));
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+
+  async function pickAvatar() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo access to update your brand avatar.'); return; }
+    const res = await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.85 });
+    if (!res.canceled) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setAvatarUri(res.assets[0].uri); }
+  }
 
   function set(key: string, val: string) {
     setFields((prev) => ({ ...prev, [key]: val }));
@@ -84,23 +93,21 @@ export default function EditProfileScreen() {
       >
         {/* Avatar */}
         <View style={styles.avatarSection}>
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={() => Alert.alert('Change photo', 'Upload a new brand avatar or choose an AI avatar.')}
-          >
+          <TouchableOpacity activeOpacity={0.8} onPress={pickAvatar}>
             <View style={styles.avatarWrap}>
-              <LinearGradient colors={['#9F7AEA', '#5B3FA0']} style={styles.avatar}>
-                <Text style={styles.avatarText}>BT</Text>
-              </LinearGradient>
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={styles.avatar} />
+              ) : (
+                <LinearGradient colors={['#9F7AEA', '#5B3FA0']} style={styles.avatar}>
+                  <Text style={styles.avatarText}>BT</Text>
+                </LinearGradient>
+              )}
               <View style={styles.cameraOverlay}>
                 <Feather name="camera" size={18} color={fg} />
               </View>
             </View>
           </TouchableOpacity>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => Alert.alert('Edit photo or avatar', 'Choose a photo or create an AI avatar.')}
-          >
+          <TouchableOpacity activeOpacity={0.7} onPress={pickAvatar}>
             <Text style={styles.editPhotoLink}>Edit photo or avatar</Text>
           </TouchableOpacity>
         </View>

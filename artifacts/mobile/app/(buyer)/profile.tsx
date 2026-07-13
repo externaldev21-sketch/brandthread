@@ -82,18 +82,7 @@ export default function BuyerProfileScreen() {
 
   function openOrderStatus() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const buttons = RECENT_ORDERS.map(o => ({
-      text: `${o.brand} — ${o.name}`,
-      onPress: () => Alert.alert(
-        `${o.brand} · ${o.id}`,
-        `${o.name}\n\nOrder status: ${o.status}\nPrice: ${o.price}`,
-        [{ text: 'OK' }],
-      ),
-    }));
-    Alert.alert('Check Status On Orders', 'Select an order to see its brand and delivery status.', [
-      ...buttons,
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    router.push('/(buyer)/orders' as never);
   }
 
   function openAccountSwitcher() {
@@ -108,21 +97,10 @@ export default function BuyerProfileScreen() {
   function openAccountMenu() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert('Account', undefined, [
-      { text: 'My orders',         onPress: () => Alert.alert('My Orders', '#2041 · Canvas Cargo Jacket — ✅ Delivered\n#1988 · Archive Hoodie Vol.3 — 📦 Shipped\n#1740 · Relaxed Tee — ⏳ Processing', [{ text: 'OK' }]) },
-      { text: 'Style preferences', onPress: () => Alert.alert('Style Preferences', 'Your current taste profile: Archive Fashion 🎞️', [
-          { text: 'Update Profile', onPress: () => router.push('/onboarding' as never) },
-          { text: 'Cancel', style: 'cancel' },
-        ]) },
-      { text: 'Drop notifications', onPress: () => Alert.alert('Drop Notifications', 'Choose what to be notified about:', [
-          { text: 'All Drops',      onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
-          { text: 'Following Only', onPress: () => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success) },
-          { text: 'Cancel', style: 'cancel' },
-        ]) },
-      { text: 'Help & support', onPress: () => Alert.alert('Help & Support', 'How can we help?', [
-          { text: 'Browse FAQ', onPress: () => {} },
-          { text: 'Contact Us', onPress: () => {} },
-          { text: 'Cancel', style: 'cancel' },
-        ]) },
+      { text: 'My orders',         onPress: () => router.push('/(buyer)/orders' as never) },
+      { text: 'Style preferences', onPress: () => router.push('/onboarding' as never) },
+      { text: 'Drop notifications', onPress: () => router.push('/notifications-settings' as never) },
+      { text: 'Help & support',    onPress: () => router.push('/help' as never) },
       { text: 'Sign out', style: 'destructive', onPress: () => Alert.alert('Sign out', 'Are you sure you want to sign out?', [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Sign out', style: 'destructive', onPress: async () => {
@@ -238,7 +216,11 @@ export default function BuyerProfileScreen() {
         <TouchableOpacity
           style={[s.iconActionBtn, { borderColor: border }]}
           activeOpacity={0.75}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); Alert.alert('Invite Friends', 'Share Brandthread with friends to earn drop invites.', [{ text: 'OK' }]); }}
+          onPress={async () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            const { Share } = await import('react-native');
+            Share.share({ message: 'Join me on Brandthread! https://brandthread.app' });
+          }}
         >
           <Feather name="user-plus" size={16} color={fg} />
         </TouchableOpacity>
@@ -281,7 +263,7 @@ export default function BuyerProfileScreen() {
                   key={order.id}
                   style={[s.tile, { width: tileSize, height: tileSize, backgroundColor: order.color }]}
                   activeOpacity={0.85}
-                  onPress={() => Alert.alert(order.brand, `${order.name} · ${order.price}\n${order.id} — ${order.status}`, [{ text: 'OK' }])}
+                  onPress={() => router.push('/(buyer)/orders' as never)}
                 >
                   <Text style={[s.tileInitials, { color: onColor }]}>{order.initials}</Text>
                   <Text style={[s.tileName, { color: onColor }]} numberOfLines={2}>{order.name}</Text>

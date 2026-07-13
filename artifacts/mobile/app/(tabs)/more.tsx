@@ -143,7 +143,7 @@ export default function MoreScreen() {
         </View>
         <TouchableOpacity
           style={s.helpBtn}
-          onPress={() => Alert.alert('Need help?', 'Browse Brandthread help articles or contact support.', [{ text: 'Got it' }])}
+          onPress={() => go('/help')}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Feather name="help-circle" size={22} color={MUTED} />
@@ -190,7 +190,7 @@ export default function MoreScreen() {
                 <View style={s.greenDot} />
                 <Text style={s.groupTitle}>{group.title}</Text>
               </View>
-              <TouchableOpacity onPress={() => Alert.alert(group.title, 'Full category view coming soon.')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <TouchableOpacity onPress={() => go(group.items[0].route)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Text style={s.viewAll}>View All</Text>
               </TouchableOpacity>
             </View>
@@ -244,8 +244,10 @@ export default function MoreScreen() {
                 activeOpacity={0.75}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  if (item.label === 'User Permissions') go('/team');
-                  else Alert.alert(item.label, item.value ? '2FA is currently enabled on your account.' : 'This feature is coming soon.', [{ text: 'OK' }]);
+                  if (item.label === 'User Permissions')              go('/team');
+                  else if (item.label === 'Two-Factor Authentication') go('/security');
+                  else if (item.label === 'Audit Logs')               go('/settings');
+                  else go('/settings');
                 }}
               >
                 <View style={s.listIconWrap}>

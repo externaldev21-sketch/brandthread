@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Platform, TextInput, Switch, useColorScheme, Alert,
+  Platform, TextInput, Switch, useColorScheme, Alert, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import { loadStyleBadge, saveStyleBadge, DEFAULT_STYLE_BADGE, type StyleBadgeState } from '@/lib/styleBadge';
 import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields } from '@/lib/buyerProfile';
 
@@ -28,9 +29,20 @@ export default function BuyerEditProfileScreen() {
   const [badge, setBadge] = useState<StyleBadgeState>({ ...DEFAULT_STYLE_BADGE, enabled: true });
   const [fields, setFields] = useState<BuyerProfileFields>({ ...DEFAULT_BUYER_PROFILE });
   const [loaded, setLoaded] = useState(false);
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
 
   function set(key: keyof Omit<BuyerProfileFields, 'aiCreator'>, val: string) {
     setFields((prev) => ({ ...prev, [key]: val }));
+  }
+
+  async function pickAvatar() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo access to update your profile picture.'); return; }
+    const res = await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.85 });
+    if (!res.canceled) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setAvatarUri(res.assets[0].uri);
+    }
   }
 
   useEffect(() => {
@@ -91,26 +103,24 @@ export default function BuyerEditProfileScreen() {
         {/* ─ Avatar ─ */}
         <View style={styles.avatarSection}>
           <View style={{ flexDirection: 'row', gap: 16, alignItems: 'center' }}>
-            <TouchableOpacity
-              activeOpacity={0.8}
-              onPress={() => Alert.alert('Change photo', 'Upload a new photo for your profile.')}
-            >
-              <LinearGradient colors={[primary, isDark ? '#0F5C33' : '#0A8C3D']} style={styles.avatar}>
-                <Text style={styles.avatarText}>😎</Text>
-              </LinearGradient>
+            <TouchableOpacity activeOpacity={0.8} onPress={pickAvatar}>
+              {avatarUri ? (
+                <Image source={{ uri: avatarUri }} style={styles.avatar} />
+              ) : (
+                <LinearGradient colors={[primary, isDark ? '#0F5C33' : '#0A8C3D']} style={styles.avatar}>
+                  <Text style={styles.avatarText}>😎</Text>
+                </LinearGradient>
+              )}
             </TouchableOpacity>
             <TouchableOpacity
               activeOpacity={0.8}
               style={[styles.avatarOutline, { borderColor: border }]}
-              onPress={() => Alert.alert('AI avatar', 'Create an AI-generated avatar.')}
+              onPress={pickAvatar}
             >
-              <Feather name="smile" size={24} color={muted} />
+              <Feather name="camera" size={24} color={muted} />
             </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => Alert.alert('Edit picture or avatar', 'Choose a photo or create an AI avatar.')}
-          >
+          <TouchableOpacity activeOpacity={0.7} onPress={pickAvatar}>
             <Text style={[styles.editPhotoLink, { color: accent }]}>Edit picture or avatar</Text>
           </TouchableOpacity>
         </View>
@@ -132,7 +142,7 @@ export default function BuyerEditProfileScreen() {
           <TouchableOpacity
             style={styles.row}
             activeOpacity={0.7}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); Alert.alert('Banners', 'Add music, profiles and more.'); }}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/story-creator' as never); }}
           >
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowLabel, { color: fg, width: 'auto' }]}>Banners</Text>
@@ -145,7 +155,7 @@ export default function BuyerEditProfileScreen() {
           <TouchableOpacity
             style={styles.row}
             activeOpacity={0.7}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); Alert.alert('Reorder grid', 'Drag to reorder how your posts appear on your grid.'); }}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/ai-studio' as never); }}
           >
             <Text style={[styles.rowLabel, { color: fg, width: 'auto', flex: 1 }]}>Reorder grid</Text>
             <Feather name="chevron-right" size={17} color={muted} />
@@ -191,7 +201,7 @@ export default function BuyerEditProfileScreen() {
           <TouchableOpacity
             style={styles.linkRow}
             activeOpacity={0.7}
-            onPress={() => Alert.alert('Switch to professional account', 'Get access to insights, tools and more for your brand.')}
+            onPress={() => router.push('/(tabs)/profile' as never)}
           >
             <Text style={[styles.linkText, { color: accent }]}>Switch to professional account</Text>
           </TouchableOpacity>
@@ -199,7 +209,7 @@ export default function BuyerEditProfileScreen() {
           <TouchableOpacity
             style={styles.linkRow}
             activeOpacity={0.7}
-            onPress={() => Alert.alert('Personal information settings', 'Manage your contact info and account details.')}
+            onPress={() => router.push('/settings' as never)}
           >
             <Text style={[styles.linkText, { color: accent }]}>Personal information settings</Text>
           </TouchableOpacity>
@@ -207,7 +217,7 @@ export default function BuyerEditProfileScreen() {
           <TouchableOpacity
             style={styles.linkRow}
             activeOpacity={0.7}
-            onPress={() => Alert.alert('Show your profile is verified', 'Let others know your profile is verified.')}
+            onPress={() => router.push('/settings' as never)}
           >
             <Text style={[styles.linkText, { color: accent }]}>Show your profile is verified</Text>
           </TouchableOpacity>

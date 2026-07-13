@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 
 // ─── Design tokens ─────────────────────────────────────────────────────────
 
@@ -103,13 +104,7 @@ export default function ProfileScreen() {
 
   function openSettings() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert('Settings', undefined, [
-      { text: 'Activity center', onPress: () => {} },
-      { text: 'Watch time',      onPress: () => {} },
-      { text: 'Privacy',         onPress: () => {} },
-      { text: 'Settings',        onPress: () => nav('/general-settings') },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    nav('/settings');
   }
 
   return (
@@ -148,7 +143,12 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={s.cameraBtn}
             activeOpacity={0.8}
-            onPress={() => Alert.alert('Change photo', 'Upload a new brand avatar.')}
+            onPress={async () => {
+              const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo access to update your brand avatar.'); return; }
+              await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.85 });
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            }}
           >
             <Feather name="camera" size={12} color={FG} />
           </TouchableOpacity>
@@ -230,11 +230,7 @@ export default function ProfileScreen() {
               </View>
             ) : (
               <LinearGradient colors={(tile as any).colors} style={s.gridInner}>
-                <TouchableOpacity style={s.gridMenuBtn} activeOpacity={0.7} onPress={() => Alert.alert('Post options', undefined, [
-                  { text: 'Edit', onPress: () => {} },
-                  { text: 'Delete', style: 'destructive', onPress: () => {} },
-                  { text: 'Cancel', style: 'cancel' },
-                ])}>
+                <TouchableOpacity style={s.gridMenuBtn} activeOpacity={0.7} onPress={() => router.push('/product-editor' as never)}>
                   <Feather name="more-horizontal" size={14} color="#FFF" />
                 </TouchableOpacity>
                 <Text style={s.gridCaption} numberOfLines={3}>{(tile as any).caption}</Text>
