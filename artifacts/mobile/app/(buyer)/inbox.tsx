@@ -116,6 +116,7 @@ function NotifRow({ item, isDark, onRead }: {
   isDark: boolean;
   onRead: (id: string) => void;
 }) {
+  const router  = useRouter();
   const fg      = isDark ? '#EDE7D9' : '#17140F';
   const muted   = isDark ? '#8C8577' : '#5C5548';
   const primary = isDark ? '#39FF88' : '#00C853';

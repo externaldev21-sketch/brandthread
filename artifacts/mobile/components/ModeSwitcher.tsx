@@ -32,7 +32,7 @@ export default function ModeSwitcher({ currentMode }: ModeSwitcherProps) {
       useNativeDriver: true,
     }).start();
     setTimeout(() => {
-      router.replace(mode === 'buyer' ? '/(buyer)/' : '/(tabs)/' as never);
+      router.replace((mode === 'buyer' ? '/(buyer)/' : '/(tabs)/') as never);
     }, 150);
   };
 

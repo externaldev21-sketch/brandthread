@@ -12,7 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ONBOARDING_KEY } from './_layout';
 
 const { width: SCREEN_W } = Dimensions.get('window');
-type AccountType = 'buyer' | 'seller' | 'both';
+type AccountType = 'buyer' | 'seller';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
@@ -676,8 +676,6 @@ export default function OnboardingScreen() {
 
   const [accountType, setAccountType] = useState<AccountType | null>(null);
   const [loading, setLoading]         = useState(true);
-  const [bothPhase, setBothPhase]     = useState<'seller' | 'buyer' | 'completion'>('seller');
-  const [sellerData, setSellerData]   = useState<Record<string, any>>({});
 
   useEffect(() => {
     AsyncStorage.getItem('user_role').then((r) => {
@@ -723,42 +721,8 @@ export default function OnboardingScreen() {
     router.push('/plans?fromOnboarding=true' as never);
   };
 
-  const handleBothSellerPhase = (data: Record<string, any>) => {
-    setSellerData(data);
-    setBothPhase('buyer');
-  };
-
-  const handleBothBuyerFinish = (buyerData: Record<string, any>) => {
-    setSellerData(prev => ({ ...prev, buyerData }));
-    setBothPhase('completion');
-  };
-
-  const handleBothComplete = async () => {
-    const { buyerData = {}, ...sData } = sellerData;
-    await AsyncStorage.multiSet([
-      [ONBOARDING_KEY, 'true'], ['user_role', 'both'], ['active_mode', 'seller'],
-      ['brand_name', sData.brandName ?? ''], ['founder_name', sData.founderName ?? ''],
-      ['brand_website', sData.website ?? ''], ['brand_location', sData.brandLocation ?? ''],
-      ['brand_stage', sData.brandStage ?? ''], ['experience_level', sData.experienceLevel ?? ''],
-      ['brand_aesthetics', JSON.stringify(sData.aesthetics ?? [])],
-      ['product_categories', JSON.stringify(sData.categories ?? [])],
-      ['current_tools', JSON.stringify(sData.tools ?? [])],
-      ['team_size', sData.teamSize ?? ''], ['monthly_orders', sData.monthlyOrders ?? ''],
-      ['pref_module', sData.prefModule ?? ''],
-      ['buyer_styles', JSON.stringify(buyerData.styles ?? [])],
-      ['buyer_products', JSON.stringify(buyerData.products ?? [])],
-      ['buyer_discovery', JSON.stringify(buyerData.discovery ?? [])],
-    ]);
-    router.push('/plans?fromOnboarding=true' as never);
-  };
-
   if (accountType === 'buyer') return <BuyerOnboarding isDark={isDark} onFinish={handleBuyerFinish} showProfile />;
   if (accountType === 'seller') return <SellerSetup isDark={isDark} onFinish={handleSellerFinish} isBoth={false} />;
-  if (accountType === 'both') {
-    if (bothPhase === 'seller') return <SellerSetup isDark={isDark} onFinish={handleBothSellerPhase} isBoth />;
-    if (bothPhase === 'buyer') return <BuyerOnboarding isDark={isDark} onFinish={handleBothBuyerFinish} showProfile={false} />;
-    if (bothPhase === 'completion') return <BothCompletion isDark={isDark} brandName={sellerData.brandName ?? ''} onFinish={handleBothComplete} />;
-  }
 
   router.replace('/account-type' as never);
   return null;

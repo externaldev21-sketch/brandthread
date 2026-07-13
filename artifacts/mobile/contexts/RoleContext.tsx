@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export type UserRole = 'buyer' | 'seller' | 'both' | null;
+export type UserRole = 'buyer' | 'seller' | null;
 
 export const ROLE_KEY = 'user_role';
 
@@ -23,7 +23,7 @@ export function RoleProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     AsyncStorage.getItem(ROLE_KEY).then((val) => {
-      if (val === 'buyer' || val === 'seller' || val === 'both') {
+      if (val === 'buyer' || val === 'seller') {
         setRoleState(val);
       }
       setIsLoaded(true);

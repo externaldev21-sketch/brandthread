@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Platform, Pressable, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,9 +6,6 @@ import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ProfileTabButton } from '@/components/ProfileTabButton';
-import ModeSwitcher from '@/components/ModeSwitcher';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─── Seller / Both layout ─────────────────────────────────────────────────────
 // Tabs: Dashboard · Products · Feed (centre pill) · More · Profile
@@ -124,10 +121,6 @@ function SellerTabLayout() {
             ) : (
               <TabIcon name="user" color={color} focused={focused} />
             ),
-          // Double-tap swaps to the buyer profile when the account has both sides.
-          tabBarButton: (props: any) => (
-            <ProfileTabButton {...props} otherSidePath="/(buyer)/profile" />
-          ),
         }}
       />
     </Tabs>
@@ -186,14 +179,5 @@ function TabIcon({ name, color, focused }: { name: keyof typeof Feather.glyphMap
 }
 
 export default function TabLayout() {
-  const [isBoth, setIsBoth] = useState(false);
-  useEffect(() => {
-    AsyncStorage.getItem('user_role').then(r => setIsBoth(r === 'both'));
-  }, []);
-  return (
-    <View style={{ flex: 1 }}>
-      {isBoth && <ModeSwitcher currentMode="seller" />}
-      <SellerTabLayout />
-    </View>
-  );
+  return <SellerTabLayout />;
 }

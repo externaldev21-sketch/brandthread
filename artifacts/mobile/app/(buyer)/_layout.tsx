@@ -1,16 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, TouchableOpacity, useColorScheme, View } from 'react-native';
+import React from 'react';
+import { Platform, Pressable, StyleSheet, View, useColorScheme } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { LinearGradient } from 'expo-linear-gradient';
-import { ProfileTabButton } from '@/components/ProfileTabButton';
-import ModeSwitcher from '@/components/ModeSwitcher';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─── Buyer tab layout ─────────────────────────────────────────────────────────
-// Tabs: Home · Friends · Feed (centre pill) · Inbox · Profile
+// Tabs: Thread · Discover · Friends · Inbox · Profile
 
 function BuyerTabLayout() {
   const colorScheme = useColorScheme();
@@ -51,7 +47,6 @@ function BuyerTabLayout() {
           <View style={[StyleSheet.absoluteFill, { backgroundColor: pillBg }]} />
         ),
         tabBarItemStyle: { paddingVertical: 4 },
-        // Ensure the whole tab item (icon + label) is tappable, not just the icon glyph.
         tabBarButton: (props: any) => (
           <Pressable
             {...props}
@@ -60,16 +55,30 @@ function BuyerTabLayout() {
         ),
       }}
     >
-      {/* Home */}
+      {/* Thread — buyer home: seller videos, product tagging, likes, comments, purchase */}
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: 'Thread',
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
-              <SymbolView name={focused ? 'house.fill' : 'house'} tintColor={color} size={20} />
+              <SymbolView name={focused ? 'play.rectangle.fill' : 'play.rectangle'} tintColor={color} size={20} />
             ) : (
-              <TabIcon name="home" color={color} focused={focused} />
+              <TabIcon name="play-circle" color={color} focused={focused} />
+            ),
+        }}
+      />
+
+      {/* Discover — curated drops, for-you picks, trending brands */}
+      <Tabs.Screen
+        name="discover"
+        options={{
+          title: 'Discover',
+          tabBarIcon: ({ color, focused }) =>
+            isIOS ? (
+              <SymbolView name={focused ? 'safari.fill' : 'safari'} tintColor={color} size={20} />
+            ) : (
+              <TabIcon name="compass" color={color} focused={focused} />
             ),
         }}
       />
@@ -85,22 +94,6 @@ function BuyerTabLayout() {
             ) : (
               <TabIcon name="users" color={color} focused={focused} />
             ),
-        }}
-      />
-
-      {/* Hidden screens — keep routes alive but off the tab bar */}
-      <Tabs.Screen name="following" options={{ href: null }} />
-      <Tabs.Screen name="wishlist"  options={{ href: null }} />
-      <Tabs.Screen name="edit-profile" options={{ href: null }} />
-      <Tabs.Screen name="search" options={{ href: null }} />
-
-      {/* Feed — centre gradient pill */}
-      <Tabs.Screen
-        name="feed"
-        options={{
-          title: 'Feed',
-          tabBarLabel: () => null,
-          tabBarIcon: ({ focused }) => <FeedCenterIcon focused={focused} />,
         }}
       />
 
@@ -129,53 +122,19 @@ function BuyerTabLayout() {
             ) : (
               <TabIcon name="user" color={color} focused={focused} />
             ),
-          // Double-tap swaps to the seller profile when the account has both sides.
-          tabBarButton: (props: any) => (
-            <ProfileTabButton {...props} otherSidePath="/(tabs)/profile" />
-          ),
         }}
       />
+
+      {/* Hidden — keep routes alive but off the tab bar */}
+      <Tabs.Screen name="following"    options={{ href: null }} />
+      <Tabs.Screen name="wishlist"     options={{ href: null }} />
+      <Tabs.Screen name="edit-profile" options={{ href: null }} />
+      <Tabs.Screen name="search"       options={{ href: null }} />
+      {/* feed re-export kept for deep-link compatibility; Thread is now the index */}
+      <Tabs.Screen name="feed"         options={{ href: null }} />
     </Tabs>
   );
 }
-
-// ─── Feed centre gradient pill ────────────────────────────────────────────────
-
-function FeedCenterIcon({ focused }: { focused: boolean }) {
-  return (
-    <LinearGradient
-      colors={focused
-        ? ['#39FF88', '#00C853', '#00C853']
-        : ['#39FF88', '#0F3822', '#00C853']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={feedStyles.pill}
-    >
-      <Text style={feedStyles.label}>Feed</Text>
-    </LinearGradient>
-  );
-}
-
-const feedStyles = StyleSheet.create({
-  pill: {
-    width: 62,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#00C853',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.7,
-    shadowRadius: 10,
-    elevation: 12,
-  },
-  label: {
-    fontSize: 12,
-    fontFamily: 'Inter_700Bold',
-    color: '#FFFFFF',
-    letterSpacing: 0.2,
-  },
-});
 
 // ─── Regular tab icon ─────────────────────────────────────────────────────────
 
@@ -197,14 +156,5 @@ function TabIcon({
 }
 
 export default function BuyerLayout() {
-  const [isBoth, setIsBoth] = useState(false);
-  useEffect(() => {
-    AsyncStorage.getItem('user_role').then(r => setIsBoth(r === 'both'));
-  }, []);
-  return (
-    <View style={{ flex: 1 }}>
-      {isBoth && <ModeSwitcher currentMode="buyer" />}
-      <BuyerTabLayout />
-    </View>
-  );
+  return <BuyerTabLayout />;
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Platform, Alert } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -6,7 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
 
 interface SettingsItem {
   label: string;
@@ -80,11 +80,6 @@ export default function SettingsScreen() {
   const router  = useRouter();
   const { signOut } = useAuth();
   const [query, setQuery]       = useState('');
-  const [userRole, setUserRole] = useState<string | null>(null);
-
-  useEffect(() => {
-    AsyncStorage.getItem('user_role').then(setUserRole);
-  }, []);
 
   const topPad = Platform.OS === 'web' ? 24 : insets.top;
 
@@ -112,39 +107,17 @@ export default function SettingsScreen() {
       ]);
       return;
     }
-    if (item.action === 'switch-mode') {
-      const current = await AsyncStorage.getItem('active_mode');
-      const next = current === 'buyer' ? 'seller' : 'buyer';
-      await AsyncStorage.setItem('active_mode', next);
-      router.replace(next === 'buyer' ? '/(buyer)/' : '/(tabs)/' as never);
-      return;
-    }
     if (item.route) router.push(item.route as never);
   }
 
-  // Build dynamic groups — inject "Switch mode" for "both" accounts
-  const GROUPS = useMemo<SettingsGroup[]>(() => {
-    if (userRole !== 'both') return STATIC_GROUPS;
-    return STATIC_GROUPS.map((g) => {
-      if (g.title !== 'Account') return g;
-      return {
-        ...g,
-        items: [
-          ...g.items,
-          { label: 'Switch mode', icon: 'repeat' as const, action: 'switch-mode' },
-        ],
-      };
-    });
-  }, [userRole]);
-
   const filteredGroups = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return GROUPS;
-    return GROUPS.map((g) => ({
+    if (!q) return STATIC_GROUPS;
+    return STATIC_GROUPS.map((g) => ({
       ...g,
       items: g.items.filter((i) => i.label.toLowerCase().includes(q)),
     })).filter((g) => g.items.length > 0);
-  }, [query, GROUPS]);
+  }, [query]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

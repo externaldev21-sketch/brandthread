@@ -115,7 +115,6 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     } else if (onboardingDone && storedRole === 'seller' && inBuyerGroup) {
       router.replace('/(tabs)/' as never);
     }
-    // 'both' users can be in either group — no correction needed
   }, [isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole, splashSeen]);
 
   return <>{children}</>;

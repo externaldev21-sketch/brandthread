@@ -156,7 +156,7 @@ export default function ChatScreen() {
       setTyping(isTyping(id ?? ''));
     });
     markRead(id ?? '');
-    return unsub;
+    return () => { unsub(); };
   }, [id]);
 
   // Scroll to bottom when messages change

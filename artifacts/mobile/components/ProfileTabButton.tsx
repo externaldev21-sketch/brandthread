@@ -34,11 +34,8 @@ export function ProfileTabButton({ otherSidePath, onPress, style, href, ...rest 
     const isDoubleTap = now - lastTap.current < DOUBLE_TAP_WINDOW_MS;
     lastTap.current = now;
 
-    if (isDoubleTap && role === 'both') {
-      lastTap.current = 0;
-      router.replace(otherSidePath as never);
-      return;
-    }
+    // Double-tap profile switching was only for 'both' accounts which no longer exist.
+    void isDoubleTap;
 
     if (Platform.OS === 'web') {
       router.push(ownPath as never);

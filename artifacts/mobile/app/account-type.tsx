@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ONBOARDING_KEY } from './_layout';
 
-type AccountType = 'buyer' | 'seller' | 'both';
+type AccountType = 'buyer' | 'seller';
 
 const CARDS: {
   type: AccountType;
@@ -36,14 +36,6 @@ const CARDS: {
     description: 'Build, operate, launch, and grow your own clothing brand.',
     features: ['Design products & tech packs', 'Find manufacturers', 'Manage your storefront', 'Track sales & analytics'],
     accent: '#4A90E2',
-  },
-  {
-    type: 'both',
-    emoji: '⚡',
-    title: 'Both',
-    description: 'Run your own brand while discovering and purchasing from other brands.',
-    features: ['Full buyer experience', 'Full seller experience', 'Switch between modes', 'One account, one login'],
-    accent: '#9B59B6',
   },
 ];
 

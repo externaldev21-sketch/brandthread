@@ -1,0 +1,67 @@
+Work only inside the existing `artifacts/mobile` Expo app. Do not create a new app, new artifact, demo project, or replacement starter.
+
+First, inspect these existing files before changing anything:
+
+* `artifacts/mobile/app/_layout.tsx`
+* `artifacts/mobile/app/onboarding.tsx`
+* `artifacts/mobile/app/sign-in.tsx`
+* `artifacts/mobile/app/(buyer)`
+* `artifacts/mobile/app/(tabs)`
+* `artifacts/mobile/contexts`
+* `artifacts/mobile/constants`
+* `artifacts/mobile/package.json`
+
+The app must support only two account types:
+
+1. Buyer
+2. Seller
+
+Create one reliable app-entry flow:
+
+* Brandthread splash screen
+* Welcome screen
+* Sign in or create account
+* Choose Buyer or Seller
+* Complete role-specific onboarding
+* Save onboarding completion and account type
+* Buyer enters the Buyer Thread
+* Seller enters the Seller Dashboard
+* Returning users skip onboarding and open their correct home automatically
+
+Do not delete working feature screens. Reconnect and organize the existing screens instead.
+
+Seller home must always be Dashboard, not a social feed.
+
+Buyer home must be called Thread. Thread contains seller-created videos and slideshows, product tagging, likes, comments, reposting, sharing, and direct product purchasing.
+
+Buyer posts do not appear in the main Thread. Buyer posts appear only on the buyer's own profile and follow public/private and friendship permissions.
+
+Messaging between buyers is allowed only after friendship is accepted.
+
+Stories expire after 24 hours.
+
+Use the existing Brandthread visual direction:
+
+* Premium black and off-white interface
+* Light and dark mode
+* Rounded but not childish cards
+* Strong readable typography
+* Smooth page transitions
+* Minimal purple gradient accents
+* No TikTok clone layout
+* No Shopify clone layout
+* No generic Expo template appearance
+
+Before writing code, map the current navigation and identify duplicate, broken, unfinished, or unreachable routes.
+
+Then implement the new onboarding and routing directly in the existing files.
+
+After implementation:
+
+* Run TypeScript checking
+* Fix every introduced error
+* Run the Expo app
+* Verify Buyer onboarding reaches Thread
+* Verify Seller onboarding reaches Dashboard
+* Verify returning users skip onboarding
+* Do not stop at visual mockups or placeholders
