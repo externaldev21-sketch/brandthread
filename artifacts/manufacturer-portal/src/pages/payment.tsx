@@ -58,7 +58,7 @@ export default function Payment() {
 
   const onSubmit = (data: FormValues) => {
     setupMutation.mutate(
-      { data },
+      { data: { ...data, accountNumber: data.accountNumber ?? '', routingNumber: data.routingNumber ?? '', bankName: data.bankName ?? '' } },
       {
         onSuccess: (updatedPayment) => {
           toast.success("Payment details saved securely");
