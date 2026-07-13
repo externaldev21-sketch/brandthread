@@ -191,12 +191,12 @@ export default function SignInScreen() {
           <BrandRow primary={primary} fg={fg} />
 
           <Text style={[styles.title, { color: fg }]}>
-            {mode === 'sign-in' ? 'Welcome back' : 'Create your account'}
+            {mode === 'sign-in' ? 'Welcome back' : 'Join Brandthread'}
           </Text>
           <Text style={[styles.subtitle, { color: muted }]}>
             {mode === 'sign-in'
-              ? 'Sign in to manage your brand'
-              : 'Start building your clothing brand'}
+              ? 'Sign in to your account'
+              : 'Discover drops. Build your brand.'}
           </Text>
 
           {mode === 'sign-up' && (
