@@ -46,7 +46,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // immediately visible for preview. Flip DEV_BYPASS_AUTH to false before shipping.
   useEffect(() => {
     if (!DEV_BYPASS_AUTH) return;
-    AsyncStorage.multiSet([[ONBOARDING_KEY, 'true'], ['user_role', 'seller']]);
+    // Don't touch ONBOARDING_KEY — let it be set only after the user completes onboarding
+    AsyncStorage.setItem('user_role', 'seller');
   }, []);
 
   // Re-read AsyncStorage whenever the user signs in OR navigates to a new
