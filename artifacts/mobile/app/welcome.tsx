@@ -4,6 +4,7 @@ import {
   Animated, Dimensions, StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -52,14 +53,7 @@ export default function WelcomeScreen() {
 
       {/* Logo */}
       <View style={styles.logoRow}>
-        <LinearGradient
-          colors={[PURPLE, CYAN]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.logoBox}
-        >
-          <Text style={styles.logoLetter}>B</Text>
-        </LinearGradient>
+        <BrandthreadLogo size={38} />
         <Text style={styles.logoText}>BRANDTHREAD</Text>
       </View>
 
@@ -157,14 +151,6 @@ const styles = StyleSheet.create({
     gap: 10,
     marginBottom: 48,
   },
-  logoBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoLetter: { fontSize: 22, fontFamily: 'Inter_700Bold', color: '#FFF' },
   logoText: {
     fontSize: 13,
     fontFamily: 'Inter_700Bold',

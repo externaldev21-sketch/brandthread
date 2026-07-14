@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, TouchableOpacity, Share, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -58,7 +59,7 @@ export default function ShareStoreScreen() {
           {/* Store badge */}
           <View style={s.storeBadge}>
             <View style={s.storeLogoBox}>
-              <Text style={s.storeLogoText}>B</Text>
+              <BrandthreadLogo size={28} />
             </View>
             <View>
               <Text style={s.storeName}>Brandthread</Text>
@@ -117,7 +118,6 @@ const s = StyleSheet.create({
 
   storeBadge:    { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 28, alignSelf: 'flex-start' },
   storeLogoBox:  { width: 42, height: 42, borderRadius: 12, backgroundColor: GREEN_DIM, borderWidth: 1, borderColor: GREEN + '44', alignItems: 'center', justifyContent: 'center' },
-  storeLogoText: { fontSize: 20, fontFamily: 'Inter_700Bold', color: GREEN },
   storeName:     { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
   storeHandle:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 1 },
 

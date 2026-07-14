@@ -9,6 +9,7 @@ import {
   ScrollView, StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { useSignIn, useOAuth, useAuth, useUser } from '@clerk/expo';
 import * as WebBrowser from 'expo-web-browser';
 import { useRouter, type Href } from 'expo-router';
@@ -133,9 +134,7 @@ export default function SignInScreen() {
 
           {/* Logo */}
           <View style={s.logoRow}>
-            <LinearGradient colors={[PURPLE, CYAN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.logoBox}>
-              <Text style={s.logoLetter}>B</Text>
-            </LinearGradient>
+            <BrandthreadLogo size={36} />
             <Text style={s.logoText}>BRANDTHREAD</Text>
           </View>
 
@@ -218,14 +217,7 @@ export default function SignInScreen() {
 
           {/* Logo */}
           <View style={s.logoRow}>
-            <LinearGradient
-              colors={[PURPLE, CYAN]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={s.logoBox}
-            >
-              <Text style={s.logoLetter}>B</Text>
-            </LinearGradient>
+            <BrandthreadLogo size={36} />
             <Text style={s.logoText}>BRANDTHREAD</Text>
           </View>
 
@@ -405,11 +397,6 @@ const s = StyleSheet.create({
   backBtn: { width: 40, height: 40, justifyContent: 'center', marginBottom: 20 },
 
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 36 },
-  logoBox: {
-    width: 36, height: 36, borderRadius: 10,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  logoLetter: { fontSize: 20, fontFamily: 'Inter_700Bold', color: FG },
   logoText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: 2.5 },
 
   headline: {

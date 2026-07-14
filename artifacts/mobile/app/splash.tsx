@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
+import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 
 const { width: W } = Dimensions.get('window');
 
@@ -59,14 +60,7 @@ export default function SplashScreen() {
 
       {/* Logo mark */}
       <Animated.View style={[styles.logoWrap, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
-        <LinearGradient
-          colors={[PURPLE, CYAN]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.logoSquare}
-        >
-          <Text style={styles.logoLetter}>B</Text>
-        </LinearGradient>
+        <BrandthreadLogo size={110} showGlow glowColor={PURPLE} />
       </Animated.View>
 
       {/* Wordmark + tagline */}
@@ -100,24 +94,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: PURPLE,
   },
-  logoWrap:   { alignItems: 'center', marginBottom: 36 },
-  logoSquare: {
-    width: 90,
-    height: 90,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: PURPLE,
-    shadowOpacity: 0.8,
-    shadowRadius: 32,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 20,
-  },
-  logoLetter: {
-    fontSize: 52,
-    fontFamily: 'Inter_700Bold',
-    color: '#FFF',
-  },
+  logoWrap: { alignItems: 'center', marginBottom: 36 },
   textWrap: { alignItems: 'center', gap: 8 },
   wordmark: {
     fontSize: 15,

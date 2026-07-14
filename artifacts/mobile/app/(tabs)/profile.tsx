@@ -9,6 +9,7 @@ import Svg, { Path, Circle } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 
 // ─── Design tokens ─────────────────────────────────────────────────────────
 
@@ -136,7 +137,7 @@ export default function ProfileScreen() {
           <View style={s.avatarGlow}>
             <View style={s.avatarRing}>
               <View style={s.avatar}>
-                <Text style={s.avatarText}>B</Text>
+                <BrandthreadLogo size={48} />
               </View>
             </View>
           </View>

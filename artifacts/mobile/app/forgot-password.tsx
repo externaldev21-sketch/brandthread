@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 
 type Step = 'email' | 'code' | 'done';
 
@@ -117,14 +118,7 @@ export default function ForgotPasswordScreen() {
 
           {/* Logo */}
           <View style={s.logoRow}>
-            <LinearGradient
-              colors={[PURPLE, CYAN]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={s.logoBox}
-            >
-              <Text style={s.logoLetter}>B</Text>
-            </LinearGradient>
+            <BrandthreadLogo size={36} />
             <Text style={s.logoText}>BRANDTHREAD</Text>
           </View>
 
@@ -365,11 +359,6 @@ const s = StyleSheet.create({
   backBtn: { width: 40, height: 40, justifyContent: 'center', marginBottom: 20 },
 
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 36 },
-  logoBox: {
-    width: 36, height: 36, borderRadius: 10,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  logoLetter: { fontSize: 20, fontFamily: 'Inter_700Bold', color: FG },
   logoText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: 2.5 },
 
   headline: {

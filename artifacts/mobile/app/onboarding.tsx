@@ -29,6 +29,7 @@ import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
 import { ONBOARDING_KEY } from './_layout';
+import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 
 // ─── Palette ────────────────────────────────────────────────────────────────
 const BG      = '#07070F';
@@ -269,9 +270,7 @@ function LoadingAnimation({ steps, onDone }: { steps: string[]; onDone: () => vo
 
       {/* Logo */}
       <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }], marginBottom: 52 }}>
-        <LinearGradient colors={[PURPLE, CYAN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={sl.logoBox}>
-          <Text style={sl.logoLetter}>B</Text>
-        </LinearGradient>
+        <BrandthreadLogo size={72} showGlow glowColor={PURPLE} />
       </Animated.View>
 
       {/* Steps */}
@@ -317,12 +316,6 @@ const sl = StyleSheet.create({
     position: 'absolute', width: 300, height: 300, borderRadius: 150,
     backgroundColor: '#8B5CF610',
   },
-  logoBox: {
-    width: 80, height: 80, borderRadius: 22,
-    alignItems: 'center', justifyContent: 'center',
-    shadowColor: PURPLE, shadowOpacity: 0.6, shadowRadius: 24, shadowOffset: { width: 0, height: 0 }, elevation: 16,
-  },
-  logoLetter: { fontSize: 46, fontFamily: 'Inter_700Bold', color: FG },
   stepsList: { width: '100%', gap: 18, marginBottom: 48 },
   stepRow:   { flexDirection: 'row', alignItems: 'center', gap: 14 },
   stepIcon:  {
