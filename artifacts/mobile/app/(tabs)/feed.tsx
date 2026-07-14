@@ -488,7 +488,8 @@ export default function FeedScreen() {
   function handleShop(item: SpotlightItem) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const productId = (item as any).productId ?? item.id;
-    router.push(('/product-store?id=' + productId) as never);
+    const productName = (item as any).productName ?? '';
+    router.push(('/buyer-product-detail?productId=' + productId + '&productName=' + encodeURIComponent(productName ?? '') + '&sourcePostId=' + item.id) as never);
   }
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {

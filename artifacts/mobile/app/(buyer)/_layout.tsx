@@ -83,6 +83,20 @@ function BuyerTabLayout() {
         }}
       />
 
+      {/* Cart */}
+      <Tabs.Screen
+        name="cart"
+        options={{
+          title: 'Cart',
+          tabBarIcon: ({ color, focused }) =>
+            isIOS ? (
+              <SymbolView name={focused ? 'cart.fill' : 'cart'} tintColor={color} size={20} />
+            ) : (
+              <TabIcon name="shopping-bag" color={color} focused={focused} />
+            ),
+        }}
+      />
+
       {/* Friends */}
       <Tabs.Screen
         name="friends"
@@ -130,6 +144,7 @@ function BuyerTabLayout() {
       <Tabs.Screen name="wishlist"     options={{ href: null }} />
       <Tabs.Screen name="edit-profile" options={{ href: null }} />
       <Tabs.Screen name="search"       options={{ href: null }} />
+      <Tabs.Screen name="orders"       options={{ href: null }} />
       {/* feed re-export kept for deep-link compatibility; Thread is now the index */}
       <Tabs.Screen name="feed"         options={{ href: null }} />
     </Tabs>

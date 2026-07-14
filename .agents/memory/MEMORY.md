@@ -11,3 +11,4 @@
 - [Store Builder Architecture](store-builder-architecture.md) — storeTypes.ts + storeService.ts; 20 screens; bt:store:v1 key; no dynamic imports in service; StoreValidationResult from storeService not storeTypes.
 - [Design Studio Architecture](design-studio-architecture.md) — designTypes.ts + designService.ts; 17 screens; bt:design:*:v1 keys; mock AI in service; textColor/fillColor field names; no local color names.
 - [Analytics System Architecture](analytics-system-architecture.md) — 10 screens, 2 service files, all 9 nav entry points wired; no chart library (custom View bars); useColors() avoided; bt:analytics:*:v1 keys.
+- [Cart & Checkout Architecture](cart-checkout-architecture.md) — cartTypes.ts + cartService.ts; 6 screens; Cart is 6th buyer tab; demo payment (test 0002/0003); AsyncStorage bt:cart:v1 + bt:checkout:v1.

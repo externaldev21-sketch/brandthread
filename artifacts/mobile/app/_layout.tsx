@@ -237,6 +237,14 @@ function RootLayoutNav() {
         <Stack.Screen name="analytics-inventory"   options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="analytics-production"  options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="analytics-profit"      options={{ headerShown: false, animation: 'slide_from_right' }} />
+        {/* Buyer commerce screens */}
+        <Stack.Screen name="buyer-product-detail"  options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
+        <Stack.Screen name="buyer-checkout"        options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-return-request"  options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-refund-request"  options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-problem-report"  options={{ headerShown: false, animation: 'slide_from_right' }} />
+        {/* return-request is an alias used by existing buyer-order-detail */}
+        <Stack.Screen name="return-request"        options={{ headerShown: false, animation: 'slide_from_right' }} />
         {/* Design Studio screens */}
         <Stack.Screen name="design"                   options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="design-project"           options={{ headerShown: false, animation: 'slide_from_right' }} />

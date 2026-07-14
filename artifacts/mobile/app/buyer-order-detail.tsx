@@ -173,25 +173,8 @@ export default function BuyerOrderDetailScreen() {
   }
 
   function handleReportProblem() {
-    Alert.alert(
-      'Report a Problem',
-      "What's the issue?",
-      [
-        {
-          text: 'Item not received',
-          onPress: () => Alert.alert('Report Submitted', 'We\'ve noted that your item was not received. Our team will follow up shortly. (Demo)'),
-        },
-        {
-          text: 'Item damaged',
-          onPress: () => Alert.alert('Report Submitted', 'We\'ve noted that your item arrived damaged. Our team will follow up shortly. (Demo)'),
-        },
-        {
-          text: 'Other',
-          onPress: () => Alert.alert('Report Submitted', 'We\'ve received your report. Our team will follow up shortly. (Demo)'),
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+    if (!order) return;
+    router.push(('/buyer-problem-report?orderId=' + order.id) as never);
   }
 
   if (loading) {
