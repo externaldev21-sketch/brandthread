@@ -12,7 +12,9 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { DEMO_SOUNDS, DEMO_PRODUCTS_FOR_TAG, SUGGESTED_HASHTAGS } from '@/services/sellerContent';
+import { DEMO_SOUNDS, SUGGESTED_HASHTAGS } from '@/services/sellerContent';
+import { getTaggableProducts } from '@/services/productService';
+import type { Product } from '@/services/productTypes';
 import type {
   Sound, PostProductTag, PostHashtag, PostVisibility,
   AspectRatio, MaxVideoDuration, ContentType, TransitionStyle,
@@ -155,6 +157,9 @@ export default function CreatePostScreen() {
   // ── Product modal state ──
   const [productSearch, setProductSearch] = useState('');
 
+  // ── Taggable products ──
+  const [taggableProducts, setTaggableProducts] = useState<Product[]>([]);
+
   // ── Hashtag input ──
   const [hashtagInput, setHashtagInput] = useState('');
 
@@ -163,6 +168,11 @@ export default function CreatePostScreen() {
 
   const topPad = Platform.OS === 'web' ? 20 : insets.top;
   const botPad = Platform.OS === 'web' ? 20 : insets.bottom;
+
+  // ─── Load taggable products on mount ─────────────────────────────────────
+  useEffect(() => {
+    getTaggableProducts().then(setTaggableProducts).catch(() => {});
+  }, []);
 
   // ─── Publishing animation + auto-advance ─────────────────────────────────
   useEffect(() => {
@@ -290,7 +300,7 @@ export default function CreatePostScreen() {
     setShowTextModal(false);
   }
 
-  function tagProduct(p: typeof DEMO_PRODUCTS_FOR_TAG[0]) {
+  function tagProduct(p: Product) {
     const already = productTags.find(t => t.productId === p.id);
     if (already) {
       setProductTags(prev => prev.filter(t => t.productId !== p.id));
@@ -298,7 +308,7 @@ export default function CreatePostScreen() {
       setProductTags(prev => [...prev, {
         productId: p.id,
         productName: p.name,
-        price: p.price,
+        price: p.pricing.price,
       }]);
     }
   }
@@ -683,6 +693,7 @@ export default function CreatePostScreen() {
           setProductSearch={setProductSearch}
           productTags={productTags}
           onTag={tagProduct}
+          taggableProducts={taggableProducts}
           insets={insets}
         />
       </View>
@@ -965,6 +976,7 @@ export default function CreatePostScreen() {
           setProductSearch={setProductSearch}
           productTags={productTags}
           onTag={tagProduct}
+          taggableProducts={taggableProducts}
           insets={insets}
         />
       </View>
@@ -1001,22 +1013,30 @@ export default function CreatePostScreen() {
           </View>
           <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 60 }}>
             {/* Mini preview */}
-            <View style={s.miniPreviewCard}>
-              <LinearGradient
-                colors={[typeColor[ct] + '33', typeColor[ct] + '11']}
-                style={s.miniPreviewGrad}
-              >
-                <Feather name="file" size={28} color={typeColor[ct]} />
-              </LinearGradient>
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={s.miniPreviewType}>{typeLabel[ct]}</Text>
-                <Text style={s.miniPreviewSub}>
-                  {ct === 'video' ? `${videoClips.length} clip(s)` : ct === 'slideshow' ? `${slidePhotos.length} photo(s)` : 'Ready to publish'}
-                </Text>
+            <View style={{ position: 'relative' }}>
+              <View style={s.miniPreviewCard}>
+                <LinearGradient
+                  colors={[typeColor[ct] + '33', typeColor[ct] + '11']}
+                  style={s.miniPreviewGrad}
+                >
+                  <Feather name="file" size={28} color={typeColor[ct]} />
+                </LinearGradient>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={s.miniPreviewType}>{typeLabel[ct]}</Text>
+                  <Text style={s.miniPreviewSub}>
+                    {ct === 'video' ? `${videoClips.length} clip(s)` : ct === 'slideshow' ? `${slidePhotos.length} photo(s)` : 'Ready to publish'}
+                  </Text>
+                </View>
+                <View style={[s.typeBadge, { backgroundColor: typeColor[ct] + '22', borderColor: typeColor[ct] + '44' }]}>
+                  <Text style={[s.typeBadgeText, { color: typeColor[ct] }]}>{typeLabel[ct]}</Text>
+                </View>
               </View>
-              <View style={[s.typeBadge, { backgroundColor: typeColor[ct] + '22', borderColor: typeColor[ct] + '44' }]}>
-                <Text style={[s.typeBadgeText, { color: typeColor[ct] }]}>{typeLabel[ct]}</Text>
-              </View>
+              {productTags.length > 0 && (
+                <View style={{ position: 'absolute', bottom: 12, left: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 8, padding: 6, gap: 4 }}>
+                  <Feather name="shopping-bag" size={12} color="#fff" />
+                  <Text style={{ color: '#fff', fontSize: 11, fontFamily: 'System' }}>{productTags[0].productName}</Text>
+                </View>
+              )}
             </View>
 
             {/* Caption */}
@@ -1181,6 +1201,7 @@ export default function CreatePostScreen() {
             setProductSearch={setProductSearch}
             productTags={productTags}
             onTag={tagProduct}
+            taggableProducts={taggableProducts}
             insets={insets}
           />
         </View>
@@ -1425,14 +1446,15 @@ interface ProductModalProps {
   productSearch: string;
   setProductSearch: (v: string) => void;
   productTags: PostProductTag[];
-  onTag: (p: typeof DEMO_PRODUCTS_FOR_TAG[0]) => void;
+  onTag: (p: Product) => void;
+  taggableProducts: Product[];
   insets: { top: number; bottom: number };
 }
-function ProductModal({ visible, onClose, productSearch, setProductSearch, productTags, onTag, insets }: ProductModalProps) {
-  const filtered = DEMO_PRODUCTS_FOR_TAG.filter(p =>
+function ProductModal({ visible, onClose, productSearch, setProductSearch, productTags, onTag, taggableProducts, insets }: ProductModalProps) {
+  const filtered = taggableProducts.filter(p =>
     productSearch === '' || p.name.toLowerCase().includes(productSearch.toLowerCase())
   );
-  const statusColor = (st: string) => st === 'active' ? GREEN : st === 'pre-order' ? ORANGE : MUTED;
+  const statusColor = (st: string) => st === 'active' ? GREEN : st === 'scheduled' ? ORANGE : MUTED;
 
   return (
     <Modal
@@ -1452,14 +1474,17 @@ function ProductModal({ visible, onClose, productSearch, setProductSearch, produ
         {productTags.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ maxHeight: 44, paddingHorizontal: 16 }}>
             <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-              {productTags.map((pt) => (
-                <View key={pt.productId} style={sm.taggedChip}>
-                  <Text style={sm.taggedChipText}>{pt.productName}</Text>
-                  <TouchableOpacity onPress={() => onTag(DEMO_PRODUCTS_FOR_TAG.find(p => p.id === pt.productId) ?? DEMO_PRODUCTS_FOR_TAG[0])}>
-                    <Feather name="x" size={11} color={GREEN} style={{ marginLeft: 4 }} />
-                  </TouchableOpacity>
-                </View>
-              ))}
+              {productTags.map((pt) => {
+                const prod = taggableProducts.find(p => p.id === pt.productId);
+                return (
+                  <View key={pt.productId} style={sm.taggedChip}>
+                    <Text style={sm.taggedChipText}>{pt.productName}</Text>
+                    <TouchableOpacity onPress={() => prod && onTag(prod)}>
+                      <Feather name="x" size={11} color={GREEN} style={{ marginLeft: 4 }} />
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
             </View>
           </ScrollView>
         )}
@@ -1476,12 +1501,13 @@ function ProductModal({ visible, onClose, productSearch, setProductSearch, produ
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 20 }}>
           {filtered.map((p) => {
             const isTagged = productTags.some(t => t.productId === p.id);
+            const coverMedia = p.media.find(m => m.isCover) ?? p.media[0];
             return (
               <View key={p.id} style={sm.productRow}>
-                <View style={[sm.productSwatch, { backgroundColor: p.colors[0] }]} />
+                <View style={[sm.productSwatch, { backgroundColor: coverMedia ? MUTED : BORDER }]} />
                 <View style={{ flex: 1 }}>
                   <Text style={sm.productName}>{p.name}</Text>
-                  <Text style={sm.productPrice}>${p.price.toFixed(2)}</Text>
+                  <Text style={sm.productPrice}>${p.pricing.price.toFixed(2)}</Text>
                 </View>
                 <View style={[sm.statusBadge, { backgroundColor: statusColor(p.status) + '22' }]}>
                   <Text style={[sm.statusBadgeText, { color: statusColor(p.status) }]}>{p.status}</Text>

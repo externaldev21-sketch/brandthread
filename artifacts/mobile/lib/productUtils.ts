@@ -20,20 +20,35 @@ export interface PricingResult {
   discountPercent: number | undefined;
 }
 
-export function calcPricing(p: ProductPricing): PricingResult {
+export function calcPricing(pricing: ProductPricing): PricingResult {
+  // Normalize: treat compareAtPrice of 0 as not set
+  const p: ProductPricing = (pricing.compareAtPrice === 0)
+    ? { ...pricing, compareAtPrice: undefined }
+    : pricing;
+
   const retail  = p.price;
   const compare = p.compareAtPrice;
   const cost    = p.cost;
   const ship    = p.estimatedShippingCost ?? 0;
   const fees    = p.estimatedFees ?? 0;
 
+  // grossProfit: retail - cost (defined only when cost is defined)
   const grossProfit = cost !== undefined ? retail - cost : undefined;
-  const netProfit   = cost !== undefined ? retail - cost - ship - fees : undefined;
-  const margin      = netProfit !== undefined ? (netProfit / retail) * 100 : undefined;
-  const breakEven   = cost !== undefined ? cost + ship + fees : undefined;
 
-  const isOnSale     = compare !== undefined && compare > retail;
-  const discountPct  = isOnSale && compare ? Math.round(((compare - retail) / compare) * 100) : undefined;
+  // netProfit: retail - cost - shipping - fees (defined only when cost is defined)
+  const netProfit = cost !== undefined ? retail - cost - ship - fees : undefined;
+
+  // margin: guard against division by zero when retail === 0
+  const margin = (netProfit !== undefined && retail > 0)
+    ? (netProfit / retail) * 100
+    : undefined;
+
+  const breakEven = cost !== undefined ? cost + ship + fees : undefined;
+
+  const isOnSale    = compare !== undefined && compare > retail;
+  const discountPct = isOnSale && compare
+    ? Math.round(((compare - retail) / compare) * 100)
+    : undefined;
 
   return {
     retailPrice:    retail,

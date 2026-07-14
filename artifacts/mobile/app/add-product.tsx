@@ -144,9 +144,36 @@ export default function AddProductScreen() {
   const [prodDeadline, setProdDeadline] = useState('');
   const [featuredHome, setFeaturedHome] = useState(false);
   const [dismissedTips, setDismissedTips] = useState<string[]>([]);
+  // Fix #2: loading state to prevent double-publish
+  const [publishing, setPublishing] = useState(false);
 
   const draftId = useRef('draft_' + uid());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Fix #1: Draft loading on mount
+  useEffect(() => {
+    const editId = params.editId as string | undefined;
+    if (editId) {
+      loadDraft(editId).then(draft => {
+        if (!draft) return;
+        setDraftData(draft as Partial<Product>);
+        setStep(draft.currentStep ?? 1);
+        // restore pricing strings from draft
+        if (draft.pricing) {
+          setPriceStr(draft.pricing.price?.toString() ?? '');
+          setCompareAtStr(draft.pricing.compareAtPrice?.toString() ?? '');
+          setCostStr(draft.pricing.cost?.toString() ?? '');
+          setShippingStr(draft.pricing.estimatedShippingCost?.toString() ?? '');
+          setFeesStr(draft.pricing.estimatedFees?.toString() ?? '');
+        }
+        // restore tags
+        if (draft.tags) setTagsInput(draft.tags.join(', '));
+        // restore options/variants — store them as localOptions/localVariants
+        // For simplicity, just restore draftData; user will re-generate combos
+        draftId.current = editId;
+      });
+    }
+  }, []);
 
   // ── Auto-save draft ──
   useEffect(() => {
@@ -189,7 +216,8 @@ export default function AddProductScreen() {
     ]);
   }
 
-  function handleSaveDraft() {
+  // Fix #9: Split into two save-draft functions
+  function handleSaveDraftAndExit() {
     const draft: ProductDraft = {
       ...draftData,
       id: draftId.current,
@@ -200,6 +228,18 @@ export default function AddProductScreen() {
     saveDraft(draft);
     Alert.alert('Draft saved', 'You can continue editing later.');
     router.back();
+  }
+
+  function handleSaveDraftInPlace() {
+    const draft: ProductDraft = {
+      ...draftData,
+      id: draftId.current,
+      isDraft: true,
+      currentStep: step,
+      lastSavedAt: new Date().toISOString(),
+    };
+    saveDraft(draft);
+    Alert.alert('Draft saved', 'Your progress has been saved.');
   }
 
   function goNext() {
@@ -305,13 +345,63 @@ export default function AddProductScreen() {
       );
       return;
     }
+
+    // Fix #2: prevent double-publish
+    if (publishing) return;
+    setPublishing(true);
+
+    // Fix #4: pricing validation
+    const retailPrice = parseFloat(priceStr) || 0;
+    if (retailPrice < 0) {
+      Alert.alert('Invalid price', 'Price cannot be negative.');
+      setPublishing(false);
+      return;
+    }
+    const compareAt = parseFloat(compareAtStr);
+    if (compareAtStr && !isNaN(compareAt) && compareAt <= retailPrice) {
+      Alert.alert('Compare-at price', 'Compare-at price should be higher than the retail price.');
+      setPublishing(false);
+      return;
+    }
+
+    // Fix #6: date validation
+    const ps = draftData.preorderSettings;
+    const salesModel = draftData.salesModel;
+    if ((salesModel === 'pre-order' || salesModel === 'both') && ps && ps.openDate && ps.closeDate && ps.closeDate <= ps.openDate) {
+      Alert.alert('Invalid dates', 'Pre-order close date must be after the open date.');
+      setPublishing(false);
+      return;
+    }
+
+    // Fix #7: duplicate SKU check
+    const skus = productVariants.map(v => v.sku).filter(Boolean);
+    const uniqueSkus = new Set(skus);
+    if (skus.length !== uniqueSkus.size) {
+      Alert.alert('Duplicate SKU', 'Each variant must have a unique SKU.');
+      setPublishing(false);
+      return;
+    }
+
+    // Fix #3: total stock from variant quantities
+    const totalStock = productVariants.reduce((sum, v) => sum + v.inventoryQuantity, 0);
+
     try {
-      await createProduct({
+      const newProduct = await createProduct({
         ...draftData,
         pricing,
         options: productOptions,
         variants: productVariants,
         status: 'active',
+        inventory: {
+          ...(draftData.inventory ?? { productId: '', trackQuantity: true, allowOverselling: false, policy: 'deny', lowStockThreshold: 5, reservedStock: 0, incomingStock: 0, locationStock: [], variantStock: [] }),
+          productId: '',
+          totalStock,
+          availableStock: totalStock,
+          trackQuantity: trackInventory,
+          allowOverselling: allowOversell,
+          policy: allowOversell ? 'continue' : 'deny',
+          lowStockThreshold: parseInt(lowStockStr) || 5,
+        },
         storeSettings: {
           ...(draftData.storeSettings ?? { collectionIds: [], featuredOnHomepage: false, relatedProductIds: [], seo: { searchVisible: true } }),
           status: 'active',
@@ -325,10 +415,16 @@ export default function AddProductScreen() {
           productionDeadline: prodDeadline || undefined,
         },
       });
-      Alert.alert('Published!', `"${draftData.name}" is now live.`);
-      router.back();
+      // Fix #2: success alert with view/done options
+      const name = draftData.name ?? 'Product';
+      Alert.alert('Product published!', name + ' is now live.', [
+        { text: 'View product', onPress: () => router.replace('/product-detail?id=' + newProduct.id as never) },
+        { text: 'Done', onPress: () => router.back() },
+      ]);
     } catch {
       Alert.alert('Error', 'Could not publish. Please try again.');
+    } finally {
+      setPublishing(false);
     }
   }
 
@@ -721,6 +817,10 @@ export default function AddProductScreen() {
                     placeholderTextColor={SUBTLE}
                     keyboardType="decimal-pad"
                   />
+                  {/* Fix #8: variant delete button */}
+                  <TouchableOpacity onPress={() => setLocalVariants(prev => prev.filter(x => x.id !== v.id))} style={{ padding: 4 }}>
+                    <Feather name="trash-2" size={14} color={RED} />
+                  </TouchableOpacity>
                 </View>
               </BrandthreadCard>
             ))}
@@ -860,6 +960,25 @@ export default function AddProductScreen() {
               value={ps.fundingGoalUnits?.toString() ?? ''}
               onChange={v => patchDraft({ preorderSettings: { ...ps, fundingGoalUnits: parseInt(v) || 0 } })}
               keyboardType="numeric"
+            />
+            {/* Fix #5: min/max order qty and production date fields */}
+            <FormInput
+              label="Min order qty"
+              keyboardType="numeric"
+              value={ps.minOrderQty?.toString() ?? ''}
+              onChange={v => patchDraft({ preorderSettings: { ...ps, minOrderQty: parseInt(v) || 1 } })}
+            />
+            <FormInput
+              label="Max order qty"
+              keyboardType="numeric"
+              value={ps.maxOrderQty?.toString() ?? ''}
+              onChange={v => patchDraft({ preorderSettings: { ...ps, maxOrderQty: parseInt(v) || 0 } })}
+            />
+            <FormInput
+              label="Est. production date"
+              value={ps.productionStartDate ?? ''}
+              onChange={v => patchDraft({ preorderSettings: { ...ps, productionStartDate: v } })}
+              placeholder="YYYY-MM-DD"
             />
             <FormInput
               label="Pre-order disclaimer"
@@ -1199,13 +1318,16 @@ export default function AddProductScreen() {
         )}
 
         <View style={s.publishButtons}>
+          {/* Fix #9: Step 10 save draft uses handleSaveDraftAndExit */}
           <SecondaryButton
             label="Save draft"
-            onPress={handleSaveDraft}
+            onPress={handleSaveDraftAndExit}
             style={{ flex: 1 }}
           />
+          {/* Fix #2: Publish button shows loading state */}
           <PrimaryButton
-            label="Publish"
+            label={publishing ? 'Publishing...' : 'Publish'}
+            disabled={publishing}
             onPress={handlePublish}
             style={{ flex: 1 }}
           />
@@ -1248,7 +1370,8 @@ export default function AddProductScreen() {
           <Text style={s.stepIndicator}>Step {step} of 10</Text>
           <Text style={s.stepTitle}>{STEP_TITLES[step - 1]}</Text>
         </View>
-        <TouchableOpacity onPress={handleSaveDraft} style={s.headerSave}>
+        {/* Fix #9: Header save draft uses handleSaveDraftInPlace */}
+        <TouchableOpacity onPress={handleSaveDraftInPlace} style={s.headerSave}>
           <Text style={s.headerSaveText}>Save draft</Text>
         </TouchableOpacity>
       </View>
@@ -1280,8 +1403,10 @@ export default function AddProductScreen() {
         ) : (
           <View style={s.navBack} />
         )}
+        {/* Fix #2: Bottom nav Publish button shows loading state */}
         <PrimaryButton
-          label={step === 10 ? 'Publish' : 'Next'}
+          label={step === 10 ? (publishing ? 'Publishing...' : 'Publish') : 'Next'}
+          disabled={publishing && step === 10}
           onPress={goNext}
           style={s.navNext}
         />
@@ -1549,6 +1674,7 @@ const s = StyleSheet.create({
   variantFields: {
     flexDirection: 'row',
     gap: SP.sm,
+    alignItems: 'center',
   },
   variantInput: {
     flex: 1,

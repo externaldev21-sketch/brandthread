@@ -57,20 +57,6 @@ function statusLabel(status: string): string {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
-// ─── Filter chips ─────────────────────────────────────────────────────────────
-
-const FILTER_CHIPS: { label: string; value: ProductFilter }[] = [
-  { label: 'All',          value: 'all' },
-  { label: 'Active',       value: 'active' },
-  { label: 'Draft',        value: 'draft' },
-  { label: 'Scheduled',    value: 'scheduled' },
-  { label: 'Archived',     value: 'archived' },
-  { label: 'Pre-order',    value: 'pre-order' },
-  { label: 'Pre-made',     value: 'pre-made' },
-  { label: 'Low Stock',    value: 'low-stock' },
-  { label: 'Out of Stock', value: 'out-of-stock' },
-];
-
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Stats {
@@ -112,7 +98,7 @@ function ProductCard({ product, onEdit, onDuplicate, onMore }: ProductCardProps)
       <View style={s.cardRow}>
         {/* Thumbnail */}
         <View style={s.thumbWrap}>
-          {coverUri ? (
+          {coverUri && coverUri.startsWith('http') ? (
             <Image source={{ uri: coverUri }} style={s.thumb} resizeMode="cover" />
           ) : (
             <LinearGradient colors={gradColors} style={s.thumb} />
@@ -206,20 +192,24 @@ function ActionSheet({ product, visible, onClose, onRefresh }: ActionSheetProps)
   const p = product as Product; // non-nullable alias for closure capture
   const isArchived = p.status === 'archived';
 
-  async function handleArchive() {
+  function closeSheet() {
     onClose();
+  }
+
+  async function handleArchive() {
+    closeSheet();
     await archiveProduct(p.id);
     onRefresh();
   }
 
   async function handleUnarchive() {
-    onClose();
+    closeSheet();
     await unarchiveProduct(p.id);
     onRefresh();
   }
 
   async function handleDelete() {
-    onClose();
+    closeSheet();
     Alert.alert(
       'Delete product?',
       'This cannot be undone.',
@@ -238,14 +228,14 @@ function ActionSheet({ product, visible, onClose, onRefresh }: ActionSheetProps)
   }
 
   async function handleDuplicate() {
-    onClose();
+    closeSheet();
     await duplicateProduct(p.id);
     Alert.alert('Duplicated', `"${p.name}" was duplicated as a draft.`);
     onRefresh();
   }
 
   async function handleShare() {
-    onClose();
+    closeSheet();
     await Share.share({ message: p.name + ' on Brandthread' });
   }
 
@@ -257,16 +247,17 @@ function ActionSheet({ product, visible, onClose, onRefresh }: ActionSheetProps)
   }
 
   const actions: ActionItem[] = [
-    { label: 'Edit', icon: 'edit-2', onPress: () => { onClose(); router.push(`/product-detail?id=${p.id}` as any); } },
-    { label: 'View store page', icon: 'eye', onPress: () => { onClose(); router.push(`/product-store?id=${p.id}` as any); } },
-    { label: 'Create content', icon: 'video', onPress: () => { onClose(); router.push(`/create-post?productId=${p.id}` as any); } },
+    { label: 'Edit', icon: 'edit-2', onPress: () => { closeSheet(); router.push(('/product-detail?id=' + p.id) as never); } },
+    { label: 'View store page', icon: 'eye', onPress: () => { closeSheet(); router.push(('/product-store?id=' + p.id) as never); } },
+    { label: 'Create content', icon: 'video', onPress: () => { closeSheet(); router.push(('/create-post?productId=' + p.id) as never); } },
+    { label: 'Tag in post', icon: 'tag', onPress: () => { router.push(('/create-post?productId=' + p.id) as never); closeSheet(); } },
     { label: 'Duplicate', icon: 'copy', onPress: handleDuplicate },
     { label: 'Share', icon: 'share', onPress: handleShare },
     {
       label: 'Send to manufacturer', icon: 'tool', accent: ORANGE,
-      onPress: () => { onClose(); Alert.alert('Manufacturer', 'Send to manufacturer coming soon.'); },
+      onPress: () => { closeSheet(); Alert.alert('Manufacturer', 'Send to manufacturer coming soon.'); },
     },
-    { label: 'View analytics', icon: 'bar-chart-2', onPress: () => { onClose(); router.push(`/product-detail?id=${p.id}&tab=analytics` as any); } },
+    { label: 'View analytics', icon: 'bar-chart-2', onPress: () => { closeSheet(); router.push(('/product-detail?id=' + p.id + '&tab=analytics') as never); } },
     isArchived
       ? { label: 'Unarchive', icon: 'rotate-ccw', onPress: handleUnarchive }
       : { label: 'Archive', icon: 'archive', onPress: handleArchive },
@@ -279,13 +270,13 @@ function ActionSheet({ product, visible, onClose, onRefresh }: ActionSheetProps)
       transparent
       animationType="slide"
       presentationStyle="overFullScreen"
-      onRequestClose={onClose}
+      onRequestClose={closeSheet}
     >
-      <Pressable style={as.overlay} onPress={onClose} />
+      <Pressable style={as.overlay} onPress={closeSheet} />
       <View style={as.sheet}>
         <View style={as.handle} />
         <Text style={as.sheetTitle} numberOfLines={1}>{p.name}</Text>
-        <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
+        <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
           {actions.map((item, idx) => (
             <TouchableOpacity key={idx} style={as.actionItem} onPress={item.onPress} activeOpacity={0.7}>
               <View style={[as.actionIcon, { backgroundColor: (item.accent ?? PURPLE) + '18' }]}>
@@ -315,6 +306,19 @@ function FilterModal({ visible, current, onApply, onClose }: FilterModalProps) {
 
   useEffect(() => { setSelected(current); }, [current, visible]);
 
+  // Use static chips for filter modal (no counts needed here)
+  const staticChips: { label: string; value: ProductFilter }[] = [
+    { label: 'All',          value: 'all' },
+    { label: 'Active',       value: 'active' },
+    { label: 'Draft',        value: 'draft' },
+    { label: 'Scheduled',    value: 'scheduled' },
+    { label: 'Archived',     value: 'archived' },
+    { label: 'Pre-order',    value: 'pre-order' },
+    { label: 'Pre-made',     value: 'pre-made' },
+    { label: 'Low Stock',    value: 'low-stock' },
+    { label: 'Out of Stock', value: 'out-of-stock' },
+  ];
+
   return (
     <Modal
       visible={visible}
@@ -328,7 +332,7 @@ function FilterModal({ visible, current, onApply, onClose }: FilterModalProps) {
         <View style={as.handle} />
         <Text style={as.sheetTitle}>Filter Products</Text>
         <View style={fm.chips}>
-          {FILTER_CHIPS.map(chip => (
+          {staticChips.map(chip => (
             <FilterChip
               key={chip.value}
               label={chip.label}
@@ -354,9 +358,7 @@ export default function ProductsScreen() {
   const router = useRouter();
 
   const [products, setProducts] = useState<Product[]>([]);
-  const [stats, setStats] = useState<Stats>({
-    active: 0, draft: 0, lowStock: 0, outOfStock: 0, preOrder: 0, totalInventoryValue: 0,
-  });
+  const [stats, setStats] = useState<Stats | null>(null);
   const [filter, setFilter] = useState<ProductFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchActive, setSearchActive] = useState(false);
@@ -365,18 +367,6 @@ export default function ProductsScreen() {
   const [actionSheetVisible, setActionSheetVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  const loadProducts = useCallback(async () => {
-    setLoading(true);
-    try {
-      const result = await getProducts({ filter, text: searchQuery || undefined });
-      setProducts(result);
-    } catch {
-      setProducts(DEMO_FULL_PRODUCTS);
-    } finally {
-      setLoading(false);
-    }
-  }, [filter, searchQuery]);
 
   const loadStats = useCallback(async () => {
     try {
@@ -392,17 +382,26 @@ export default function ProductsScreen() {
     } catch { /* use defaults */ }
   }, []);
 
+  const loadProducts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await getProducts({ filter, text: searchQuery || undefined });
+      setProducts(result);
+      // Always refresh stats after products refresh
+      await loadStats();
+    } catch {
+      setProducts(DEMO_FULL_PRODUCTS);
+    } finally {
+      setLoading(false);
+    }
+  }, [filter, searchQuery, loadStats]);
+
   useEffect(() => {
     loadProducts();
   }, [loadProducts]);
 
-  useEffect(() => {
-    loadStats();
-  }, [loadStats]);
-
   function refresh() {
     loadProducts();
-    loadStats();
   }
 
   async function handleDuplicate(id: string) {
@@ -435,16 +434,31 @@ export default function ProductsScreen() {
     setActionSheetVisible(true);
   }
 
+  // Computed filter chips with count badges from stats
+  const filterChips: { label: string; value: ProductFilter }[] = [
+    { label: 'All', value: 'all' as ProductFilter },
+    { label: stats ? `Active (${stats.active})` : 'Active', value: 'active' as ProductFilter },
+    { label: stats ? `Draft (${stats.draft})` : 'Draft', value: 'draft' as ProductFilter },
+    { label: 'Scheduled', value: 'scheduled' as ProductFilter },
+    { label: 'Archived', value: 'archived' as ProductFilter },
+    { label: stats ? `Pre-order (${stats.preOrder})` : 'Pre-order', value: 'pre-order' as ProductFilter },
+    { label: 'Pre-made', value: 'pre-made' as ProductFilter },
+    { label: stats ? `Low stock (${stats.lowStock})` : 'Low stock', value: 'low-stock' as ProductFilter },
+    { label: stats ? `Out of stock (${stats.outOfStock})` : 'Out of stock', value: 'out-of-stock' as ProductFilter },
+  ];
+
   const renderProduct = useCallback(({ item }: { item: Product }) => (
     <ProductCard
       product={item}
-      onEdit={() => router.push(`/product-detail?id=${item.id}` as any)}
+      onEdit={() => router.push(('/product-detail?id=' + item.id) as never)}
       onDuplicate={() => handleDuplicate(item.id)}
       onMore={() => openActionSheet(item)}
     />
   ), [router]);
 
   const keyExtractor = useCallback((item: Product) => item.id, []);
+
+  const statsForDisplay = stats ?? { active: 0, draft: 0, lowStock: 0, outOfStock: 0, preOrder: 0, totalInventoryValue: 0 };
 
   const ListHeader = useMemo(() => (
     <>
@@ -455,12 +469,12 @@ export default function ProductsScreen() {
         contentContainerStyle={s.statsRow}
         style={{ marginBottom: SP.md }}
       >
-        <StatCard label="Active" value={String(stats.active)} icon="check-circle" accent={SUCCESS} style={s.statCard} />
-        <StatCard label="Draft" value={String(stats.draft)} icon="edit-3" accent={ORANGE} style={s.statCard} />
-        <StatCard label="Low Stock" value={String(stats.lowStock)} icon="alert-triangle" accent={RED} style={s.statCard} />
-        <StatCard label="Out of Stock" value={String(stats.outOfStock)} icon="x-circle" accent={RED} style={s.statCard} />
-        <StatCard label="Pre-orders" value={String(stats.preOrder)} icon="clock" accent={PURPLE} style={s.statCard} />
-        <StatCard label="Value" value={formatCurrency(stats.totalInventoryValue)} icon="dollar-sign" accent={GOLD} style={s.statCard} />
+        <StatCard label="Active" value={String(statsForDisplay.active)} icon="check-circle" accent={SUCCESS} style={s.statCard} />
+        <StatCard label="Draft" value={String(statsForDisplay.draft)} icon="edit-3" accent={ORANGE} style={s.statCard} />
+        <StatCard label="Low Stock" value={String(statsForDisplay.lowStock)} icon="alert-triangle" accent={RED} style={s.statCard} />
+        <StatCard label="Out of Stock" value={String(statsForDisplay.outOfStock)} icon="x-circle" accent={RED} style={s.statCard} />
+        <StatCard label="Pre-orders" value={String(statsForDisplay.preOrder)} icon="clock" accent={PURPLE} style={s.statCard} />
+        <StatCard label="Value" value={formatCurrency(statsForDisplay.totalInventoryValue)} icon="dollar-sign" accent={GOLD} style={s.statCard} />
       </ScrollView>
 
       {/* Filter chips */}
@@ -470,7 +484,7 @@ export default function ProductsScreen() {
         contentContainerStyle={s.filterRow}
         style={{ marginBottom: SP.md }}
       >
-        {FILTER_CHIPS.map(chip => (
+        {filterChips.map(chip => (
           <FilterChip
             key={chip.value}
             label={chip.label}
@@ -491,7 +505,7 @@ export default function ProductsScreen() {
 
       {/* Section header */}
       <SectionHeader
-        title={filter === 'all' ? 'All Products' : FILTER_CHIPS.find(c => c.value === filter)?.label ?? 'Products'}
+        title={filter === 'all' ? 'All Products' : filterChips.find(c => c.value === filter)?.label ?? 'Products'}
         action={{ label: 'Sort', onPress: () => {} }}
         style={{ marginBottom: SP.sm }}
       />
@@ -503,7 +517,7 @@ export default function ProductsScreen() {
       icon="package"
       title="Your first product starts here."
       description="Add product details, media, pricing, variants and inventory."
-      action={{ label: 'Create product', icon: 'plus', onPress: () => router.push('/add-product' as any) }}
+      action={{ label: 'Create product', icon: 'plus', onPress: () => router.push('/add-product' as never) }}
     />
   ), [router]);
 
@@ -526,11 +540,11 @@ export default function ProductsScreen() {
             />
             <IconButton
               name="download"
-              onPress={() => router.push('/product-import' as any)}
+              onPress={() => router.push('/product-import' as never)}
             />
             <IconButton
               name="plus"
-              onPress={() => router.push('/add-product' as any)}
+              onPress={() => router.push('/add-product' as never)}
               color={PURPLE_LIGHT}
             />
           </View>

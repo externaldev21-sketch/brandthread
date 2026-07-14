@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -24,7 +25,9 @@ import {
   DEMO_PRODUCTS,
   getPublishedPosts,
 } from '@/services/sellerContent';
-import type { SellerPost, Product } from '@/services/types';
+import type { SellerPost } from '@/services/types';
+import { getProducts } from '@/services/productService';
+import type { Product } from '@/services/productTypes';
 
 // ─── Design Tokens ─────────────────────────────────────────────────────────────
 const BG        = '#0A0B0A';
@@ -150,14 +153,21 @@ interface ProductCardProps {
 
 function ProductCard({ product, index, onPress }: ProductCardProps) {
   const gradColors = GRADIENT_PAIRS[index % GRADIENT_PAIRS.length];
-  const isLowStock = product.totalInventory > 0 && product.totalInventory <= product.lowStockThreshold;
-  const isOutOfStock = product.totalInventory === 0 && product.status !== 'pre-order';
+  const totalInventory = product.inventory.totalStock;
+  const lowStockThreshold = product.inventory.lowStockThreshold;
+  const isLowStock = totalInventory > 0 && totalInventory <= lowStockThreshold;
+  const isOutOfStock = totalInventory === 0 && product.salesModel !== 'pre-order';
 
   let stockLabel = 'In stock';
   let stockColor = GREEN;
-  if (product.status === 'pre-order') { stockLabel = 'Pre-order'; stockColor = PURPLE; }
+  if (product.salesModel === 'pre-order') { stockLabel = 'Pre-order'; stockColor = PURPLE; }
   else if (isOutOfStock) { stockLabel = 'Out of stock'; stockColor = MUTED; }
   else if (isLowStock) { stockLabel = 'Low stock'; stockColor = ORANGE; }
+
+  const coverMedia = product.media && product.media[0];
+  const hasCoverImage = coverMedia && coverMedia.uri && coverMedia.uri.startsWith('http');
+
+  const isDraftOrArchived = product.status === 'draft' || product.status === 'archived';
 
   return (
     <TouchableOpacity
@@ -165,18 +175,35 @@ function ProductCard({ product, index, onPress }: ProductCardProps) {
       onPress={() => onPress(product.id)}
       activeOpacity={0.85}
     >
-      <LinearGradient
-        colors={gradColors}
-        style={styles.productImagePlaceholder}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      />
+      <View style={styles.productImageContainer}>
+        {hasCoverImage ? (
+          <Image
+            source={{ uri: coverMedia.uri }}
+            style={styles.productImagePlaceholder}
+            resizeMode="cover"
+          />
+        ) : (
+          <LinearGradient
+            colors={gradColors}
+            style={styles.productImagePlaceholder}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          />
+        )}
+        {isDraftOrArchived && (
+          <View style={styles.productStatusBadge}>
+            <Text style={styles.productStatusBadgeText}>
+              {product.status === 'draft' ? 'Draft' : 'Archived'}
+            </Text>
+          </View>
+        )}
+      </View>
       <View style={styles.productInfo}>
         <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
         <View style={styles.productPriceRow}>
-          <Text style={styles.productPrice}>${product.price.toFixed(2)}</Text>
-          {product.compareAtPrice != null && (
-            <Text style={styles.productCompare}>${product.compareAtPrice.toFixed(2)}</Text>
+          <Text style={styles.productPrice}>${product.pricing.price.toFixed(2)}</Text>
+          {product.pricing.compareAtPrice != null && (
+            <Text style={styles.productCompare}>${product.pricing.compareAtPrice.toFixed(2)}</Text>
           )}
         </View>
         <View style={styles.productBadgeRow}>
@@ -220,6 +247,15 @@ export default function SellerProfileScreen() {
   const [selectedPost, setSelectedPost] = useState<SellerPost | null>(null);
   const [showActionSheet, setShowActionSheet] = useState(false);
   const [bioExpanded, setBioExpanded] = useState(false);
+  const [liveProducts, setLiveProducts] = useState<Product[]>([]);
+  const [productsLoading, setProductsLoading] = useState(true);
+
+  useEffect(() => {
+    getProducts({ filter: 'active' })
+      .then(setLiveProducts)
+      .catch(() => {})
+      .finally(() => setProductsLoading(false));
+  }, []);
 
   const posts = isOwner ? DEMO_SELLER_POSTS : getPublishedPosts();
 
@@ -258,6 +294,8 @@ export default function SellerProfileScreen() {
   // Layout in ScrollView: [0] Cover, [1] ProfileInfo, [2] StatsRow, [3] ShopBtn (if !isOwner), [N] TabBar
   // We need tabBarIndex:
   const tabBarIndex = isOwner ? 3 : 4;
+
+  const displayProducts = liveProducts.length > 0 ? liveProducts : DEMO_PRODUCTS;
 
   return (
     <View style={styles.root}>
@@ -493,14 +531,18 @@ export default function SellerProfileScreen() {
           {/* ── PRODUCTS TAB ─────────────────────────────────────────────── */}
           {activeTab === 1 && (
             <View style={styles.productsGrid}>
-              {DEMO_PRODUCTS.map((product, i) => (
-                <ProductCard
-                  key={product.id}
-                  product={product}
-                  index={i}
-                  onPress={(id) => router.push(('/product-detail?id=' + id) as never)}
-                />
-              ))}
+              {productsLoading ? (
+                <ActivityIndicator color={GREEN} style={{ marginTop: 40, alignSelf: 'center' }} />
+              ) : (
+                displayProducts.map((product, i) => (
+                  <ProductCard
+                    key={product.id}
+                    product={product as Product}
+                    index={i}
+                    onPress={(id) => router.push((isOwner ? '/product-detail?id=' : '/product-store?id=') + id as never)}
+                  />
+                ))
+              )}
             </View>
           )}
 
@@ -1011,9 +1053,31 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     overflow: 'hidden',
   },
+  productImageContainer: {
+    position: 'relative',
+    height: 80,
+    width: '100%',
+  },
   productImagePlaceholder: {
     height: 80,
     width: '100%',
+  },
+  productStatusBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: ORANGE,
+  },
+  productStatusBadgeText: {
+    color: ORANGE,
+    fontSize: 9,
+    fontWeight: '700',
+    textTransform: 'capitalize',
   },
   productInfo: {
     padding: 10,

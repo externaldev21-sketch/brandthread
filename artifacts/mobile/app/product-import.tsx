@@ -27,6 +27,9 @@ import {
   FormInput,
 } from '@/components/BrandthreadUI';
 
+import { saveDraft } from '@/services/productService';
+import { ProductDraft } from '@/services/productTypes';
+
 // ─── Import History Demo Data ─────────────────────────────────────────────────
 
 const IMPORT_HISTORY = [
@@ -53,21 +56,46 @@ export default function ProductImportScreen() {
   const [bulkNames, setBulkNames] = useState('');
   const [bulkCategory, setBulkCategory] = useState('');
   const [bulkPrice, setBulkPrice] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [csvUploading, setCsvUploading] = useState(false);
 
   function selectMethod(method: 'csv' | 'shopify' | 'manual') {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedMethod(prev => (prev === method ? null : method));
   }
 
-  function handleCreateProducts() {
-    const lines = bulkNames.split('\n').filter(l => l.trim().length > 0);
-    const count = lines.length;
-    Alert.alert(
-      'Create Products',
-      `${count} draft product${count !== 1 ? 's' : ''} will be created. You can add details to each one after creation.`,
-      [{ text: 'OK' }],
-    );
+  async function handleBulkCreate() {
+    if (!bulkNames.trim()) return;
+    const names = bulkNames.split('\n').map(s => s.trim()).filter(Boolean);
+    if (names.length === 0) return;
+    setImporting(true);
+    try {
+      for (const name of names) {
+        const draft: ProductDraft = {
+          id: 'draft_' + Math.random().toString(36).slice(2, 11),
+          name,
+          isDraft: true,
+          currentStep: 1,
+          lastSavedAt: new Date().toISOString(),
+          status: 'draft',
+          media: [],
+          tags: [],
+          pricing: { price: 0, currency: 'USD' },
+          options: [],
+          variants: [],
+        };
+        await saveDraft(draft);
+      }
+      setBulkNames('');
+      Alert.alert('Drafts created', names.length + ' product drafts were created. Find them in Products → Draft.');
+    } catch (e) {
+      Alert.alert('Error', 'Some drafts could not be saved. Please try again.');
+    } finally {
+      setImporting(false);
+    }
   }
+
+  const bulkCount = bulkNames.split('\n').filter(l => l.trim().length > 0).length;
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
@@ -124,15 +152,16 @@ export default function ProductImportScreen() {
               </BrandthreadCard>
               <PrimaryButton
                 label="Download template"
-                onPress={() => Alert.alert('Template', 'CSV template download coming soon')}
+                onPress={() => Alert.alert('CSV Template', 'name,description,price,cost,category\n"Product Name","Description",0,0,"Other"\n\nCopy this format for your import file.')}
                 icon="download"
                 style={s.expandedBtn}
               />
               <SecondaryButton
-                label="Upload CSV"
+                label={csvUploading ? 'Importing...' : 'Upload CSV'}
                 onPress={() => Alert.alert('Upload', 'File upload coming soon in production build')}
                 icon="upload"
                 style={s.expandedBtn}
+                disabled={csvUploading}
               />
             </View>
           )}
@@ -210,10 +239,11 @@ export default function ProductImportScreen() {
                 style={s.formInput}
               />
               <PrimaryButton
-                label="Create products"
-                onPress={handleCreateProducts}
+                label={importing ? 'Creating...' : 'Create ' + bulkCount + ' Drafts'}
+                onPress={handleBulkCreate}
                 icon="plus"
                 style={s.expandedBtn}
+                disabled={importing}
               />
             </View>
           )}

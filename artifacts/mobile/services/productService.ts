@@ -228,10 +228,29 @@ export async function getProduct(id: string): Promise<Product | undefined> {
   return _products.find(p => p.id === id);
 }
 
+// Convenience alias
+export const getProductById = getProduct;
+
 export async function createProduct(data: Partial<Product>): Promise<Product> {
   await ensureInitialized();
+
+  const id = uid();
+  const defaultInventory = {
+    productId: id,
+    trackQuantity: true,
+    allowOverselling: false,
+    policy: 'deny' as const,
+    lowStockThreshold: 5,
+    totalStock: 0,
+    availableStock: 0,
+    reservedStock: 0,
+    incomingStock: 0,
+    locationStock: [],
+    variantStock: [],
+  };
+
   const product: Product = {
-    id: uid(),
+    id,
     sellerId: 'seller_001',
     name: data.name ?? 'Untitled Product',
     description: data.description ?? '',
@@ -241,19 +260,25 @@ export async function createProduct(data: Partial<Product>): Promise<Product> {
     pricing: data.pricing ?? { price: 0, currency: 'USD' },
     options: data.options ?? [],
     variants: data.variants ?? [],
-    inventory: data.inventory ?? { productId: '', trackQuantity: true, allowOverselling: false, policy: 'deny', lowStockThreshold: 5, totalStock: 0, availableStock: 0, reservedStock: 0, incomingStock: 0, locationStock: [], variantStock: [] },
+    inventory: data.inventory
+      ? { ...defaultInventory, ...data.inventory, productId: id }
+      : defaultInventory,
     salesModel: data.salesModel ?? 'pre-made',
     fulfillment: data.fulfillment ?? { type: 'seller' },
     manufacturing: data.manufacturing ?? { stage: 'none' },
     storeSettings: data.storeSettings ?? { status: 'draft', collectionIds: [], featuredOnHomepage: false, relatedProductIds: [], seo: { searchVisible: false } },
-    totalSales: 0,
-    totalRevenue: 0,
+    totalSales: data.totalSales ?? 0,
+    totalRevenue: data.totalRevenue ?? 0,
     status: data.status ?? 'draft',
-    createdAt: now,
-    updatedAt: now,
-    ...data,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    // Spread remaining data fields (publishedAt, preorderSettings, etc.)
+    ...(data.publishedAt !== undefined ? { publishedAt: data.publishedAt } : {}),
+    ...(data.preorderSettings !== undefined ? { preorderSettings: data.preorderSettings } : {}),
+    ...(data.productType !== undefined ? { productType: data.productType } : {}),
+    ...(data.vendor !== undefined ? { vendor: data.vendor } : {}),
   };
-  product.inventory.productId = product.id;
+
   _products.unshift(product);
   await persist();
   return product;
@@ -299,16 +324,15 @@ export async function duplicateProduct(id: string): Promise<Product | undefined>
   if (!src) return undefined;
   const copy: Partial<Product> = {
     ...src,
-    id: uid(),
     name: src.name + ' (Copy)',
     status: 'draft',
     totalSales: 0,
     totalRevenue: 0,
     publishedAt: undefined,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
     storeSettings: { ...src.storeSettings, status: 'draft' },
   };
+  // Remove id so createProduct generates a fresh one
+  delete (copy as any).id;
   return createProduct(copy);
 }
 

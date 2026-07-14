@@ -164,7 +164,7 @@ function SpotlightPage({
   onRepost: (id: string) => void;
   onFollow: (id: string) => void;
   onOpenComments: (id: string) => void;
-  onShop: (id: string) => void;
+  onShop: (item: SpotlightItem) => void;
 }) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -332,7 +332,7 @@ function SpotlightPage({
           style={[styles.shopBtn, { backgroundColor: item.accentColor }]}
           activeOpacity={0.85}
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
-          onPress={() => onShop(item.id)}
+          onPress={() => onShop(item)}
         >
           <Ionicons name="bag" size={18} color="#FFFFFF" />
           <Text style={styles.shopBtnText}>SHOP</Text>
@@ -485,11 +485,10 @@ export default function FeedScreen() {
     update(id, e => ({ comments: [...e.comments, { id: `c${Date.now()}`, user: '@you', text }] }));
   }, []);
 
-  function handleShop(id: string) {
-    const item = SPOTLIGHT_ITEMS.find(i => i.id === id);
-    if (!item) return;
+  function handleShop(item: SpotlightItem) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push('/checkout' as never);
+    const productId = (item as any).productId ?? item.id;
+    router.push(('/product-store?id=' + productId) as never);
   }
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {

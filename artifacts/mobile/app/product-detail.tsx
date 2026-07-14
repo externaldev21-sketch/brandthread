@@ -29,7 +29,7 @@ import {
   LoadingSkeleton, EmptyState, FilterChip,
 } from '@/components/BrandthreadUI';
 
-import { getProduct, updateProduct, getProductAnalytics, archiveProduct, publishProduct } from '@/services/productService';
+import { getProduct, updateProduct, getProductAnalytics, archiveProduct, publishProduct, adjustInventory } from '@/services/productService';
 import { Product, ProductVariant, ProductStatus } from '@/services/productTypes';
 import { calcPricing, formatCurrency, isLowStock, isOutOfStock } from '@/lib/productUtils';
 
@@ -53,11 +53,12 @@ const TABS: { key: Tab; label: string }[] = [
 export default function ProductDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id, tab: initialTab } = useLocalSearchParams<{ id: string; tab?: string }>();
+  const params = useLocalSearchParams<{ id: string; tab?: string }>();
+  const id = params.id;
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<Tab>((initialTab as Tab) || 'overview');
+  const [activeTab, setActiveTab] = useState<Tab>('overview');
 
   // Analytics state
   const [analytics, setAnalytics] = useState<Awaited<ReturnType<typeof getProductAnalytics>> | null>(null);
@@ -71,6 +72,10 @@ export default function ProductDetailScreen() {
     getProduct(id).then(p => {
       setProduct(p ?? null);
       setLoading(false);
+      // Fix 4: set initial tab from params after loading
+      if (params.tab && TABS.some(t => t.key === params.tab)) {
+        setActiveTab(params.tab as Tab);
+      }
     });
   }, [id]);
 
@@ -125,6 +130,7 @@ export default function ProductDetailScreen() {
     <View style={[s.root, { paddingTop: insets.top }]}>
       {/* ── Fixed Header ── */}
       <View style={s.header}>
+        {/* Fix 3: back button uses router.back() */}
         <TouchableOpacity
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
           style={s.backBtn}
@@ -136,8 +142,9 @@ export default function ProductDetailScreen() {
         <Text style={s.headerTitle} numberOfLines={1}>{product.name}</Text>
 
         <View style={s.headerRight}>
+          {/* Fix 7: edit button navigates to /add-product with editId param */}
           <TouchableOpacity
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/add-product' as never); }}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(('/add-product?editId=' + id) as never); }}
             style={s.headerBtn}
           >
             <Text style={s.editBtnText}>Edit</Text>
@@ -199,8 +206,8 @@ export default function ProductDetailScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
       >
         {activeTab === 'overview'   && <OverviewTab   product={product} pricing={pricing} coverImage={coverImage} />}
-        {activeTab === 'variants'   && <VariantsTab   product={product} setProduct={setProduct} />}
-        {activeTab === 'inventory'  && <InventoryTab  product={product} setProduct={setProduct} />}
+        {activeTab === 'variants'   && <VariantsTab   product={product} setProduct={setProduct} id={id!} />}
+        {activeTab === 'inventory'  && <InventoryTab  product={product} setProduct={setProduct} id={id!} />}
         {activeTab === 'orders'     && <OrdersTab     product={product} router={router} />}
         {activeTab === 'production' && <ProductionTab product={product} router={router} />}
         {activeTab === 'content'    && <ContentTab    product={product} router={router} id={id!} />}
@@ -211,7 +218,7 @@ export default function ProductDetailScreen() {
       {/* ── Floating Action Button ── */}
       <TouchableOpacity
         style={[s.fab, { bottom: insets.bottom + SP.lg }]}
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/add-product' as never); }}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push(('/add-product?editId=' + id) as never); }}
         activeOpacity={0.85}
       >
         <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.fabGrad}>
@@ -230,6 +237,11 @@ function OverviewTab({ product, pricing, coverImage }: {
   coverImage: Product['media'][0] | undefined;
 }) {
   const statusVariant = product.status === 'active' ? 'success' : product.status === 'draft' ? 'warning' : product.status === 'archived' ? 'neutral' : 'info';
+
+  // Fix 8: show '—' if price is 0 or undefined; show '—' for margin if cost is undefined
+  const priceDisplay = pricing.retailPrice ? formatCurrency(pricing.retailPrice) : '—';
+  const marginDisplay = pricing.marginPercent !== undefined ? `${pricing.marginPercent.toFixed(0)}%` : '—';
+  const profitDisplay = pricing.netProfit !== undefined ? formatCurrency(pricing.netProfit) : '—';
 
   return (
     <View style={{ gap: SP.md, paddingTop: SP.md }}>
@@ -251,7 +263,7 @@ function OverviewTab({ product, pricing, coverImage }: {
         </View>
         <View style={ov.heroPriceSection}>
           <View style={ov.heroPriceRow}>
-            <Text style={ov.heroPrice}>{formatCurrency(pricing.retailPrice)}</Text>
+            <Text style={ov.heroPrice}>{priceDisplay}</Text>
             {pricing.compareAtPrice && (
               <Text style={ov.heroCompare}>{formatCurrency(pricing.compareAtPrice)}</Text>
             )}
@@ -259,11 +271,13 @@ function OverviewTab({ product, pricing, coverImage }: {
               <StatusBadge label={`-${pricing.discountPercent}%`} variant="error" small />
             )}
           </View>
-          {pricing.marginPercent !== undefined && (
+          {pricing.marginPercent !== undefined ? (
             <Text style={ov.heroMargin}>
-              Profit: {formatCurrency(pricing.netProfit ?? 0)} · Margin: {pricing.marginPercent.toFixed(1)}%
+              Profit: {profitDisplay} · Margin: {pricing.marginPercent.toFixed(1)}%
             </Text>
-          )}
+          ) : pricing.cost === undefined ? (
+            <Text style={ov.heroMargin}>Margin: — (add cost to calculate)</Text>
+          ) : null}
         </View>
       </GradientCard>
 
@@ -274,7 +288,7 @@ function OverviewTab({ product, pricing, coverImage }: {
         <StatCard label="Stock" value={String(product.inventory.totalStock)} icon="layers" accent={CYAN} style={ov.statCard} />
         <StatCard
           label="Margin"
-          value={pricing.marginPercent !== undefined ? `${pricing.marginPercent.toFixed(0)}%` : 'N/A'}
+          value={marginDisplay}
           icon="trending-up"
           accent={SUCCESS}
           style={ov.statCard}
@@ -370,7 +384,63 @@ const ov = StyleSheet.create({
 
 // ─── Variants Tab ─────────────────────────────────────────────────────────────
 
-function VariantsTab({ product, setProduct }: { product: Product; setProduct: (p: Product) => void }) {
+function VariantsTab({ product, setProduct, id }: { product: Product; setProduct: (p: Product) => void; id: string }) {
+  // Fix 2: bulk edit price handler
+  const handleBulkPrice = () => {
+    const currentPrice = product.pricing.price;
+    Alert.alert('Bulk Edit Price', `Current price: ${formatCurrency(currentPrice)}`, [
+      {
+        text: `Set all to ${formatCurrency(currentPrice)}`,
+        onPress: () => {
+          const updatedVariants = product.variants.map(v => ({ ...v, price: currentPrice }));
+          updateProduct(id, { variants: updatedVariants }).then(p => {
+            if (p) setProduct(p);
+          });
+        },
+      },
+      {
+        text: 'Edit individually',
+        onPress: () => Alert.alert('Individual Edit', 'Tap a variant to edit its price.'),
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  // Fix 2: bulk edit inventory handler
+  const handleBulkInventory = () => {
+    const totalStock = product.inventory.totalStock;
+    Alert.alert('Bulk Edit Inventory', 'Choose an adjustment for all variants', [
+      {
+        text: 'Add 5 to all',
+        onPress: () => {
+          const updatedVariants = product.variants.map(v => ({ ...v, inventoryQuantity: v.inventoryQuantity + 5 }));
+          updateProduct(id, { variants: updatedVariants }).then(p => {
+            if (p) setProduct(p);
+          });
+        },
+      },
+      {
+        text: 'Remove 5 from all',
+        onPress: () => {
+          const updatedVariants = product.variants.map(v => ({ ...v, inventoryQuantity: Math.max(0, v.inventoryQuantity - 5) }));
+          updateProduct(id, { variants: updatedVariants }).then(p => {
+            if (p) setProduct(p);
+          });
+        },
+      },
+      {
+        text: 'Reset all to 0',
+        onPress: () => {
+          const updatedVariants = product.variants.map(v => ({ ...v, inventoryQuantity: 0 }));
+          updateProduct(id, { variants: updatedVariants }).then(p => {
+            if (p) setProduct(p);
+          });
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   return (
     <View style={{ gap: SP.md, paddingTop: SP.md }}>
       <SectionHeader
@@ -382,11 +452,11 @@ function VariantsTab({ product, setProduct }: { product: Product; setProduct: (p
       <BrandthreadCard style={{ marginHorizontal: SP.md }}>
         <Text style={vt.bulkTitle}>Bulk Edit</Text>
         <View style={vt.bulkRow}>
-          <TouchableOpacity style={vt.bulkBtn} onPress={() => Alert.alert('Bulk Price Edit', 'Set price for all variants.')}>
+          <TouchableOpacity style={vt.bulkBtn} onPress={handleBulkPrice}>
             <Feather name="dollar-sign" size={ICON.sm} color={PURPLE_LIGHT} />
             <Text style={vt.bulkBtnText}>Price</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={vt.bulkBtn} onPress={() => Alert.alert('Bulk Inventory Edit', 'Set inventory for all variants.')}>
+          <TouchableOpacity style={vt.bulkBtn} onPress={handleBulkInventory}>
             <Feather name="layers" size={ICON.sm} color={CYAN} />
             <Text style={vt.bulkBtnText}>Inventory</Text>
           </TouchableOpacity>
@@ -486,7 +556,7 @@ const vt = StyleSheet.create({
 
 // ─── Inventory Tab ────────────────────────────────────────────────────────────
 
-function InventoryTab({ product, setProduct }: { product: Product; setProduct: (p: Product) => void }) {
+function InventoryTab({ product, setProduct, id }: { product: Product; setProduct: (p: Product) => void; id: string }) {
   const inv = product.inventory;
 
   const demoHistory = [
@@ -494,6 +564,23 @@ function InventoryTab({ product, setProduct }: { product: Product; setProduct: (
     { id: '2', date: '2025-01-08', reason: 'Orders fulfilled', delta: -12 },
     { id: '3', date: '2025-01-05', reason: 'Manual adjustment', delta: +3 },
   ];
+
+  // Fix 1: doAdjust calls adjustInventory then reloads product
+  const doAdjust = async (delta: number, reason: string) => {
+    await adjustInventory(product.id, undefined, delta, reason);
+    const refreshed = await getProduct(id);
+    if (refreshed) setProduct(refreshed);
+  };
+
+  // Fix 1: Adjust Stock button with Alert options
+  const handleAdjustStock = () => {
+    Alert.alert('Adjust stock', 'Enter adjustment (+/- units)', [
+      { text: 'Add 5', onPress: () => doAdjust(5, 'Manual add') },
+      { text: 'Remove 5', onPress: () => doAdjust(-5, 'Manual remove') },
+      { text: 'Set to 0', onPress: () => doAdjust(-product.inventory.totalStock, 'Reset to zero') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
 
   return (
     <View style={{ gap: SP.md, paddingTop: SP.md }}>
@@ -512,7 +599,7 @@ function InventoryTab({ product, setProduct }: { product: Product; setProduct: (
         <PrimaryButton
           label="Adjust Stock"
           icon="plus-circle"
-          onPress={() => Alert.alert('Adjust Stock', 'Enter adjustment amount and reason to update inventory.')}
+          onPress={handleAdjustStock}
         />
       </View>
 
@@ -531,14 +618,14 @@ function InventoryTab({ product, setProduct }: { product: Product; setProduct: (
                   </View>
                   <TouchableOpacity
                     style={invS.adjBtn}
-                    onPress={() => Alert.alert('Decrease', `Decrease ${variant.title} stock`)}
+                    onPress={() => doAdjust(-1, `Decrease ${variant.title}`)}
                   >
                     <Feather name="minus" size={12} color={RED} />
                   </TouchableOpacity>
                   <Text style={invS.qty}>{variant.inventoryQuantity}</Text>
                   <TouchableOpacity
                     style={invS.adjBtn}
-                    onPress={() => Alert.alert('Increase', `Increase ${variant.title} stock`)}
+                    onPress={() => doAdjust(1, `Increase ${variant.title}`)}
                   >
                     <Feather name="plus" size={12} color={SUCCESS} />
                   </TouchableOpacity>
@@ -855,7 +942,8 @@ function AnalyticsTab({
     );
   }
 
-  const maxRevenue = Math.max(...analytics.revenueByDay.map(d => d.revenue), 1);
+  // Fix 5: use revenueByDay data for bar chart with proper max revenue scaling
+  const maxRev = Math.max(...analytics.revenueByDay.map(d => d.revenue), 1);
 
   return (
     <View style={{ gap: SP.md, paddingTop: SP.md }}>
@@ -875,13 +963,13 @@ function AnalyticsTab({
         <StatCard label="Sell-Through" value={`${(analytics.sellThroughRate * 100).toFixed(0)}%`} icon="bar-chart-2" accent={CYAN} style={{ minWidth: 120 }} />
       </ScrollView>
 
-      {/* Bar chart */}
+      {/* Bar chart — Fix 5: bars scaled by maxRev, height = (day.revenue / maxRev) * 60 */}
       <View style={{ paddingHorizontal: SP.md }}>
         <SectionHeader title="Revenue — Last 14 Days" style={{ paddingHorizontal: 0 }} />
         <BrandthreadCard>
           <View style={an.chartRow}>
             {analytics.revenueByDay.map((day, idx) => {
-              const barH = Math.max(4, (day.revenue / maxRevenue) * 60);
+              const barH = Math.max(4, (day.revenue / maxRev) * 60);
               return (
                 <View key={day.date} style={an.barWrap}>
                   <View style={an.barContainer}>
@@ -1111,12 +1199,12 @@ function StoreTab({
         </View>
       </BrandthreadCard>
 
-      {/* Open full preview */}
+      {/* Fix 6: Open full preview routes to /product-store with id param */}
       <View style={{ paddingHorizontal: SP.md }}>
         <PrimaryButton
           label="Open Full Preview"
           icon="external-link"
-          onPress={() => router.push('/product-store' as never)}
+          onPress={() => router.push(('/product-store?id=' + id) as never)}
         />
       </View>
     </View>
