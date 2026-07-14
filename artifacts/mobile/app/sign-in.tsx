@@ -9,7 +9,7 @@ import {
   ScrollView, StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSignIn, useOAuth } from '@clerk/expo';
+import { useSignIn, useOAuth, useAuth, useUser } from '@clerk/expo';
 import * as WebBrowser from 'expo-web-browser';
 import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,6 +33,8 @@ const ERR      = '#F87171';
 
 export default function SignInScreen() {
   const { signIn, fetchStatus } = useSignIn();
+  const { isSignedIn, signOut } = useAuth();
+  const { user }                = useUser();
   const { startOAuthFlow: googleOAuth } = useOAuth({ strategy: 'oauth_google' });
   const { startOAuthFlow: appleOAuth }  = useOAuth({ strategy: 'oauth_apple' });
 
@@ -45,9 +47,11 @@ export default function SignInScreen() {
   const [oauthLoading, setOAuth]    = useState('');
   const [error, setError]           = useState('');
   const [loading, setLoading]       = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
-  const isFetching = fetchStatus === 'fetching' || loading;
-  const canSubmit  = email.includes('@') && password.length >= 1;
+  const isFetching   = fetchStatus === 'fetching' || loading;
+  const canSubmit    = email.includes('@') && password.length >= 1;
+  const currentEmail = user?.primaryEmailAddress?.emailAddress ?? '';
 
   // ─── Email sign-in ───────────────────────────────────────────────────────────
   async function handleSignIn() {
@@ -80,6 +84,13 @@ export default function SignInScreen() {
     }
   }
 
+  // ─── Sign out ─────────────────────────────────────────────────────────────────
+  async function handleSignOut() {
+    setSigningOut(true);
+    try { await signOut(); } catch {}
+    setSigningOut(false);
+  }
+
   // ─── OAuth ────────────────────────────────────────────────────────────────────
   async function handleOAuth(start: () => Promise<any>, provider: string) {
     setOAuth(provider);
@@ -97,6 +108,86 @@ export default function SignInScreen() {
     } finally {
       setOAuth('');
     }
+  }
+
+  // ─── Active session screen ────────────────────────────────────────────────────
+  if (isSignedIn) {
+    return (
+      <View style={[s.root, { paddingTop: insets.top }]}>
+        <StatusBar barStyle="light-content" />
+        <View style={s.glowTop} />
+
+        <ScrollView
+          contentContainerStyle={[s.scroll, s.sessionScroll, { paddingBottom: insets.bottom + 36 }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Back */}
+          <TouchableOpacity
+            style={s.backBtn}
+            onPress={() => { Haptics.selectionAsync(); router.back(); }}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Feather name="arrow-left" size={20} color={MUTED} />
+          </TouchableOpacity>
+
+          {/* Logo */}
+          <View style={s.logoRow}>
+            <LinearGradient colors={[PURPLE, CYAN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.logoBox}>
+              <Text style={s.logoLetter}>B</Text>
+            </LinearGradient>
+            <Text style={s.logoText}>BRANDTHREAD</Text>
+          </View>
+
+          <Text style={s.headline}>You're already{'\n'}signed in.</Text>
+          <Text style={s.subtitle}>
+            {currentEmail
+              ? `You are currently signed in as ${currentEmail}.`
+              : 'You have an active session.'}
+          </Text>
+
+          {/* Info card */}
+          <View style={s.sessionCard}>
+            <View style={s.sessionAvatarRow}>
+              <LinearGradient colors={[PURPLE, CYAN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.sessionAvatar}>
+                <Text style={s.sessionAvatarText}>
+                  {(currentEmail[0] ?? 'B').toUpperCase()}
+                </Text>
+              </LinearGradient>
+              <View style={{ flex: 1 }}>
+                <Text style={s.sessionName} numberOfLines={1}>
+                  {user?.firstName ? `${user.firstName}${user.lastName ? ' ' + user.lastName : ''}` : 'Your account'}
+                </Text>
+                <Text style={s.sessionEmail} numberOfLines={1}>{currentEmail}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Continue */}
+          <TouchableOpacity
+            style={s.primaryWrap}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.replace('/' as never); }}
+            activeOpacity={0.88}
+          >
+            <LinearGradient colors={[PURPLE, CYAN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.primaryBtn}>
+              <Text style={s.primaryBtnText}>Continue with this account</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Sign out */}
+          <TouchableOpacity
+            style={[s.secondaryBtn, signingOut && { opacity: 0.5 }]}
+            onPress={handleSignOut}
+            disabled={signingOut}
+            activeOpacity={0.85}
+          >
+            {signingOut
+              ? <ActivityIndicator color={FG} size="small" />
+              : <Text style={s.secondaryBtnText}>Sign out</Text>}
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    );
   }
 
   return (
@@ -380,4 +471,26 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: BORDER,
   },
   secondaryBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+
+  // Active session screen
+  sessionScroll: { justifyContent: 'flex-start' },
+  sessionCard: {
+    backgroundColor: CARD, borderRadius: 18,
+    borderWidth: 1, borderColor: BORDER,
+    padding: 18, marginBottom: 24,
+  },
+  sessionAvatarRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+  },
+  sessionAvatar: {
+    width: 48, height: 48, borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  sessionAvatarText: { fontSize: 20, fontFamily: 'Inter_700Bold', color: FG },
+  sessionName: {
+    fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG, marginBottom: 2,
+  },
+  sessionEmail: {
+    fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED,
+  },
 });
