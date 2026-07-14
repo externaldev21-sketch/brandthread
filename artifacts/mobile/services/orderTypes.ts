@@ -400,6 +400,9 @@ export interface PreOrderInfo {
 export interface Order {
   id: string;
   orderNumber: string;
+  sellerId: string;
+  sellerName: string;
+  sellerHandle: string;
   source: string;
   salesChannel: string;
   status: OrderStatus;
@@ -436,6 +439,7 @@ export interface Order {
 export interface BuyerOrderView {
   id: string;
   orderNumber: string;
+  sellerId: string;
   sellerName: string;
   sellerHandle: string;
   status: OrderStatus;

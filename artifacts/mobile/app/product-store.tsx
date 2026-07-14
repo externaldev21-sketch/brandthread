@@ -196,24 +196,37 @@ export default function ProductStoreScreen() {
   }, [product, selectedVariant, router]);
 
   const handleMessageSeller = useCallback(() => {
+    if (!product) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const sellerName = product.vendor ?? 'Seller';
+    const sellerHandle = '@' + sellerName.toLowerCase().replace(/[^a-z0-9]+/g, '');
+    const sellerInitials = sellerName
+      .split(/\s+/)
+      .map(w => w[0] ?? '')
+      .slice(0, 2)
+      .join('')
+      .toUpperCase();
     router.push((
-      '/buyer-conversation?participantId=u_vault' +
-      '&participantName=Vault%20Studio' +
-      '&participantHandle=%40vaultstudio' +
-      '&participantInitials=VS' +
-      '&participantColor=%2339FF88' +
+      '/buyer-conversation?participantId=' + encodeURIComponent(product.sellerId) +
+      '&participantName=' + encodeURIComponent(sellerName) +
+      '&participantHandle=' + encodeURIComponent(sellerHandle) +
+      '&participantInitials=' + encodeURIComponent(sellerInitials) +
+      '&participantColor=' + encodeURIComponent(PURPLE) +
       '&participantAccountType=seller' +
       '&type=buyer_to_seller_product' +
-      (product ? '&contextProductName=' + encodeURIComponent(product.name) + '&contextSellerName=Vault%20Studio' : '')
+      '&contextProductName=' + encodeURIComponent(product.name) +
+      '&contextSellerName=' + encodeURIComponent(sellerName)
     ) as never);
   }, [router, product]);
 
   const handleReportSeller = useCallback(() => {
-    router.push(
-      '/buyer-report?targetType=seller&targetId=u_vault&targetLabel=Vault%20Studio' as never
-    );
-  }, [router]);
+    if (!product) return;
+    const sellerName = product.vendor ?? 'Seller';
+    router.push((
+      '/buyer-report?targetType=seller&targetId=' + encodeURIComponent(product.sellerId) +
+      '&targetLabel=' + encodeURIComponent(sellerName)
+    ) as never);
+  }, [router, product]);
 
   const handleBuyNow = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -312,42 +325,48 @@ export default function ProductStoreScreen() {
         </View>
 
         {/* 3. Seller row */}
-        <View style={s.sellerRow}>
-          <View style={s.avatarCircle}>
-            <Text style={s.avatarInitial}>V</Text>
-          </View>
-          <View style={s.sellerInfo}>
-            <View style={s.sellerNameRow}>
-              <Text style={s.sellerName}>Vault Studio</Text>
-              <Feather name="check-circle" size={ICON.xs} color={BLUE} />
+        {(() => {
+          const sellerName = product.vendor ?? 'Seller';
+          const sellerInitial = sellerName[0]?.toUpperCase() ?? 'S';
+          return (
+            <View style={s.sellerRow}>
+              <View style={s.avatarCircle}>
+                <Text style={s.avatarInitial}>{sellerInitial}</Text>
+              </View>
+              <View style={s.sellerInfo}>
+                <View style={s.sellerNameRow}>
+                  <Text style={s.sellerName}>{sellerName}</Text>
+                  <Feather name="check-circle" size={ICON.xs} color={BLUE} />
+                </View>
+                <Text style={s.sellerSub}>Verified Seller</Text>
+              </View>
+              <SecondaryButton
+                label="Follow"
+                onPress={() => Alert.alert('Follow', 'This is a buyer-side preview.')}
+                small
+                style={s.followBtn}
+              />
+              <TouchableOpacity style={s.msgIconBtn} onPress={handleMessageSeller} activeOpacity={0.75}>
+                <Feather name="mail" size={ICON.sm} color={PURPLE_LIGHT} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={s.msgIconBtn}
+                onPress={() => Alert.alert(
+                  sellerName,
+                  '',
+                  [
+                    { text: 'Message seller', onPress: handleMessageSeller },
+                    { text: 'Report seller', style: 'destructive', onPress: handleReportSeller },
+                    { text: 'Cancel', style: 'cancel' },
+                  ]
+                )}
+                activeOpacity={0.75}
+              >
+                <Feather name="more-horizontal" size={ICON.sm} color={MUTED} />
+              </TouchableOpacity>
             </View>
-            <Text style={s.sellerSub}>Verified Seller</Text>
-          </View>
-          <SecondaryButton
-            label="Follow"
-            onPress={() => Alert.alert('Follow', 'This is a buyer-side preview.')}
-            small
-            style={s.followBtn}
-          />
-          <TouchableOpacity style={s.msgIconBtn} onPress={handleMessageSeller} activeOpacity={0.75}>
-            <Feather name="mail" size={ICON.sm} color={PURPLE_LIGHT} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={s.msgIconBtn}
-            onPress={() => Alert.alert(
-              'Vault Studio',
-              '',
-              [
-                { text: 'Message seller', onPress: handleMessageSeller },
-                { text: 'Report seller', style: 'destructive', onPress: handleReportSeller },
-                { text: 'Cancel', style: 'cancel' },
-              ]
-            )}
-            activeOpacity={0.75}
-          >
-            <Feather name="more-horizontal" size={ICON.sm} color={MUTED} />
-          </TouchableOpacity>
-        </View>
+          );
+        })()}
 
         {/* 4. Product info */}
         <View style={s.productInfo}>

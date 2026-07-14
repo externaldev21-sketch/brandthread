@@ -145,6 +145,7 @@ const DEMO_ORDERS_DATA: Order[] = [
         { type: 'payment_confirmed', message: 'Payment of $148.00 confirmed', customerVisible: true },
       ]),
       notes: [], hasUnreadMessage: true, isPreOrder: false, isManufacturerFulfilled: false,
+      sellerId: 'u_threadhaus', sellerName: 'Threadhaus', sellerHandle: '@threadhaus',
       currency: 'USD', tags: [], createdAt: daysAgo(1), updatedAt: now(),
     } as Order;
   })(),
@@ -172,6 +173,7 @@ const DEMO_ORDERS_DATA: Order[] = [
         { type: 'processing_started', message: 'Order marked processing' },
       ]),
       notes: [], hasUnreadMessage: false, isPreOrder: false, isManufacturerFulfilled: false,
+      sellerId: 'u_threadhaus', sellerName: 'Threadhaus', sellerHandle: '@threadhaus',
       currency: 'USD', tags: [], createdAt: daysAgo(2), updatedAt: now(),
     } as Order;
   })(),
@@ -216,6 +218,7 @@ const DEMO_ORDERS_DATA: Order[] = [
         { type: 'shipped', message: `Shipped via USPS · Tracking: 9400111899223512345671`, customerVisible: true },
       ]),
       notes: [], hasUnreadMessage: false, isPreOrder: false, isManufacturerFulfilled: false,
+      sellerId: 'u_threadhaus', sellerName: 'Threadhaus', sellerHandle: '@threadhaus',
       currency: 'USD', tags: [], createdAt: daysAgo(4), updatedAt: now(),
     } as Order;
   })(),
@@ -251,6 +254,7 @@ const DEMO_ORDERS_DATA: Order[] = [
         { type: 'production_update', message: 'Production started at Apex Apparel Co.' },
       ]),
       notes: [], hasUnreadMessage: false, isPreOrder: true, isManufacturerFulfilled: true,
+      sellerId: 'u_threadhaus', sellerName: 'Threadhaus', sellerHandle: '@threadhaus',
       currency: 'USD', tags: ['pre-order'], createdAt: daysAgo(7), updatedAt: now(),
     } as Order;
   })(),
@@ -291,6 +295,7 @@ const DEMO_ORDERS_DATA: Order[] = [
         { type: 'return_requested', message: 'Customer requested return — Wrong size', customerVisible: true },
       ]),
       notes: [], hasUnreadMessage: true, isPreOrder: false, isManufacturerFulfilled: false,
+      sellerId: 'u_threadhaus', sellerName: 'Threadhaus', sellerHandle: '@threadhaus',
       currency: 'USD', tags: [], createdAt: daysAgo(14), updatedAt: now(),
     } as Order;
   })(),
@@ -330,6 +335,7 @@ const DEMO_ORDERS_DATA: Order[] = [
         { type: 'dispute_opened', message: 'Customer dispute opened — Product not received', customerVisible: true },
       ]),
       notes: [], hasUnreadMessage: true, isPreOrder: false, isManufacturerFulfilled: false,
+      sellerId: 'u_threadhaus', sellerName: 'Threadhaus', sellerHandle: '@threadhaus',
       currency: 'USD', tags: ['high-risk'], createdAt: daysAgo(18), updatedAt: now(),
     } as Order;
   })(),
@@ -339,8 +345,9 @@ const DEMO_ORDERS_DATA: Order[] = [
 const DEMO_BUYER_ORDERS: BuyerOrderView[] = DEMO_ORDERS_DATA.map(o => ({
   id: o.id,
   orderNumber: o.orderNumber,
-  sellerName: 'Threadhaus',
-  sellerHandle: '@threadhaus',
+  sellerId: o.sellerId,
+  sellerName: o.sellerName,
+  sellerHandle: o.sellerHandle,
   status: o.status,
   paymentStatus: o.paymentStatus,
   fulfillmentStatus: o.fulfillmentStatus,
@@ -370,6 +377,13 @@ async function ensureInitialized() {
     const [[, raw], [, rawBuyer]] = await AsyncStorage.multiGet([KEYS.orders, KEYS.buyer]);
     _orders = raw ? JSON.parse(raw) : DEMO_ORDERS_DATA;
     _buyerOrders = rawBuyer ? JSON.parse(rawBuyer) : DEMO_BUYER_ORDERS;
+    // Backfill sellerId/sellerHandle for records persisted before these fields were added
+    _buyerOrders = _buyerOrders.map(o => ({
+      ...o,
+      sellerId:     o.sellerId     ?? 'u_threadhaus',
+      sellerName:   o.sellerName   ?? 'Threadhaus',
+      sellerHandle: o.sellerHandle ?? '@threadhaus',
+    }));
     if (!raw) await AsyncStorage.setItem(KEYS.orders, JSON.stringify(_orders));
     if (!rawBuyer) await AsyncStorage.setItem(KEYS.buyer, JSON.stringify(_buyerOrders));
   } catch {

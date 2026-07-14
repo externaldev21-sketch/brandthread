@@ -278,17 +278,19 @@ export default function SellerProfileScreen() {
 
   const handleMessageSeller = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const sellerId = params.id ?? profile.sellerId;
     router.push((
-      '/buyer-conversation?participantId=u_vault' +
+      '/buyer-conversation?participantId=' + encodeURIComponent(sellerId) +
       '&participantName=' + encodeURIComponent(profile.brandName) +
       '&participantHandle=%40' + encodeURIComponent(profile.username) +
       '&participantInitials=' + encodeURIComponent(profile.initials) +
       '&participantColor=' + encodeURIComponent(profile.avatarColor) +
       '&participantAccountType=seller&type=buyer_to_seller'
     ) as never);
-  }, [router, profile]);
+  }, [router, profile, params.id]);
 
   const handleMoreOptions = useCallback(() => {
+    const sellerId = params.id ?? profile.sellerId;
     Alert.alert(
       profile.brandName,
       'What would you like to do?',
@@ -298,14 +300,14 @@ export default function SellerProfileScreen() {
           text: 'Report seller',
           style: 'destructive',
           onPress: () => router.push((
-            '/buyer-report?targetType=seller&targetId=u_vault&targetLabel=' +
-            encodeURIComponent(profile.brandName)
+            '/buyer-report?targetType=seller&targetId=' + encodeURIComponent(sellerId) +
+            '&targetLabel=' + encodeURIComponent(profile.brandName)
           ) as never),
         },
         { text: 'Cancel', style: 'cancel' },
       ]
     );
-  }, [profile, handleShare, router]);
+  }, [profile, handleShare, router, params.id]);
 
   const handlePostPress = useCallback((post: SellerPost) => {
     setSelectedPost(post);

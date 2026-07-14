@@ -163,7 +163,6 @@ export default function BuyerOrderDetailScreen() {
   function handleContactSeller() {
     if (!order) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const sellerId = 'u_' + order.sellerName.toLowerCase().replace(/[^a-z0-9]+/g, '_');
     const initials = order.sellerName
       .split(/\s+/)
       .map(w => w[0] ?? '')
@@ -171,9 +170,9 @@ export default function BuyerOrderDetailScreen() {
       .join('')
       .toUpperCase();
     router.push((
-      '/buyer-conversation?participantId=' + encodeURIComponent(sellerId) +
+      '/buyer-conversation?participantId=' + encodeURIComponent(order.sellerId) +
       '&participantName=' + encodeURIComponent(order.sellerName) +
-      '&participantHandle=%40' + encodeURIComponent(order.sellerName.toLowerCase().replace(/\s+/g, '')) +
+      '&participantHandle=' + encodeURIComponent(order.sellerHandle) +
       '&participantInitials=' + encodeURIComponent(initials) +
       '&participantColor=' + encodeURIComponent(PURPLE) +
       '&participantAccountType=seller' +
@@ -188,8 +187,7 @@ export default function BuyerOrderDetailScreen() {
   function handleReportSeller() {
     if (!order) return;
     router.push((
-      '/buyer-report?targetType=seller&targetId=' +
-      encodeURIComponent('u_' + order.sellerName.toLowerCase().replace(/[^a-z0-9]+/g, '_')) +
+      '/buyer-report?targetType=seller&targetId=' + encodeURIComponent(order.sellerId) +
       '&targetLabel=' + encodeURIComponent(order.sellerName)
     ) as never);
   }
