@@ -178,6 +178,8 @@ function RootLayoutNav() {
         <Stack.Screen name="order-detail"     options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="add-product"      options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="product-detail"   options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="product-store"    options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="product-import"   options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
         <Stack.Screen name="inventory"        options={{ headerShown: false }} />
         <Stack.Screen name="store-builder"    options={{ headerShown: false }} />
         <Stack.Screen name="content"          options={{ headerShown: false }} />

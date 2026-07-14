@@ -1,6 +1,12 @@
-import React, { useState, useMemo } from 'react';
+/**
+ * Brandthread — Seller Products Tab
+ * Main catalog management screen.
+ */
+
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Dimensions,
+  View, Text, ScrollView, FlatList, TouchableOpacity,
+  StyleSheet, Alert, Share, Modal, Pressable, Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -8,289 +14,587 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, SURFACE, CARD, BORDER, BORDER_ACTIVE,
+  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
-  ORANGE, ORANGE_DIM, RED, RED_DIM,
+  CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
+  ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
   GRAD_PRIMARY, GRAD_CARD_GLOW,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
 import {
-  BrandthreadScreen, BrandthreadCard, GradientCard,
-  PrimaryButton, SecondaryButton, IconButton,
-  SearchBar, FilterChip, StatusBadge,
+  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
+  IconButton, SearchBar, FilterChip, StatusBadge,
   EmptyState, SectionHeader, StatCard, GuidedTip,
 } from '@/components/BrandthreadUI';
-import { DEMO_PRODUCTS } from '@/services/data';
+import {
+  getProducts, getProductStats, archiveProduct, unarchiveProduct,
+  deleteProduct, duplicateProduct, DEMO_FULL_PRODUCTS,
+} from '@/services/productService';
+import { Product, ProductFilter, ProductCategory } from '@/services/productTypes';
 
-// ─── Category gradient map ────────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function formatCurrency(n: number): string {
+  return '$' + n.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
+}
+
 function categoryGradient(category: string): [string, string] {
-  const cat = category.toLowerCase();
-  if (cat === 'tops' || cat.includes('shirt') || cat.includes('tee')) return ['#8B5CF6', '#22D3EE'];
-  if (cat.includes('bottom') || cat.includes('pant')) return ['#3B82F6', '#22D3EE'];
-  if (cat.includes('outer') || cat.includes('jacket')) return ['#F59E0B', '#F97316'];
-  if (cat.includes('accessory') || cat.includes('accessories')) return ['#F59E0B', '#F97316'];
-  if (cat.includes('footwear') || cat.includes('shoe')) return ['#3B82F6', '#22D3EE'];
+  if (category === 'T-shirt' || category === 'Sweatshirt') return ['#8B5CF6', '#22D3EE'];
+  if (category === 'Hoodie' || category === 'Sweatpants') return ['#3B82F6', '#8B5CF6'];
+  if (category === 'Jacket' || category === 'Shorts') return ['#F97316', '#F59E0B'];
+  if (category === 'Denim' || category === 'Dress' || category === 'Skirt') return ['#22D3EE', '#3B82F6'];
   return ['#8B5CF6', '#3B82F6'];
 }
 
-// ─── Filter chip labels ───────────────────────────────────────────────────────
-const FILTER_OPTIONS = ['All', 'Active', 'Draft', 'Pre-order', 'Low Stock'] as const;
-type FilterOption = typeof FILTER_OPTIONS[number];
+function statusVariant(status: string): 'success' | 'warning' | 'purple' | 'neutral' {
+  if (status === 'active') return 'success';
+  if (status === 'draft') return 'warning';
+  if (status === 'scheduled') return 'purple';
+  return 'neutral';
+}
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
+function statusLabel(status: string): string {
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+// ─── Filter chips ─────────────────────────────────────────────────────────────
+
+const FILTER_CHIPS: { label: string; value: ProductFilter }[] = [
+  { label: 'All',          value: 'all' },
+  { label: 'Active',       value: 'active' },
+  { label: 'Draft',        value: 'draft' },
+  { label: 'Scheduled',    value: 'scheduled' },
+  { label: 'Archived',     value: 'archived' },
+  { label: 'Pre-order',    value: 'pre-order' },
+  { label: 'Pre-made',     value: 'pre-made' },
+  { label: 'Low Stock',    value: 'low-stock' },
+  { label: 'Out of Stock', value: 'out-of-stock' },
+];
+
+// ─── Types ───────────────────────────────────────────────────────────────────
+
+interface Stats {
+  active: number;
+  draft: number;
+  lowStock: number;
+  outOfStock: number;
+  preOrder: number;
+  totalInventoryValue: number;
+}
+
+// ─── Product Card ─────────────────────────────────────────────────────────────
+
+interface ProductCardProps {
+  product: Product;
+  onEdit: () => void;
+  onDuplicate: () => void;
+  onMore: () => void;
+}
+
+function ProductCard({ product, onEdit, onDuplicate, onMore }: ProductCardProps) {
+  const coverUri = product.media.find(m => m.isCover)?.uri ?? product.media[0]?.uri;
+  const gradColors = categoryGradient(product.category);
+
+  const stock = product.inventory.totalStock;
+  const threshold = product.inventory.lowStockThreshold;
+  const stockColor = stock === 0 ? RED : stock <= threshold ? ORANGE : SUCCESS;
+  const stockLabel = stock === 0 ? 'Out of stock' : `${stock} in stock`;
+
+  const price = product.pricing.price;
+  const compare = product.pricing.compareAtPrice;
+  const discountPct = compare && compare > price
+    ? Math.round((1 - price / compare) * 100)
+    : null;
+
+  return (
+    <BrandthreadCard style={[s.productCard, { padding: 0, overflow: 'hidden' }]}>
+      {/* Main row */}
+      <View style={s.cardRow}>
+        {/* Thumbnail */}
+        <View style={s.thumbWrap}>
+          {coverUri ? (
+            <Image source={{ uri: coverUri }} style={s.thumb} resizeMode="cover" />
+          ) : (
+            <LinearGradient colors={gradColors} style={s.thumb} />
+          )}
+        </View>
+
+        {/* Content */}
+        <View style={s.cardContent}>
+          {/* Name + status */}
+          <View style={s.cardTopRow}>
+            <Text style={s.productName} numberOfLines={1}>{product.name}</Text>
+            <StatusBadge label={statusLabel(product.status)} variant={statusVariant(product.status)} small />
+          </View>
+
+          {/* Category + sales model */}
+          <View style={s.cardMetaRow}>
+            <Text style={s.categoryText}>{product.category}</Text>
+            {product.salesModel === 'pre-order' && (
+              <StatusBadge label="Pre-order" variant="purple" small />
+            )}
+            {product.salesModel === 'pre-made' && (
+              <StatusBadge label="Pre-made" variant="neutral" small />
+            )}
+          </View>
+
+          {/* Price row */}
+          <View style={s.priceRow}>
+            <Text style={s.price}>{formatCurrency(price)}</Text>
+            {compare && compare > price && (
+              <Text style={s.comparePrice}>{formatCurrency(compare)}</Text>
+            )}
+            {discountPct && (
+              <Text style={s.discount}>-{discountPct}%</Text>
+            )}
+          </View>
+
+          {/* Inventory row */}
+          <View style={s.infoRow}>
+            <Feather name="layers" size={11} color={MUTED} />
+            <Text style={s.infoText}>
+              {product.variants.length} variant{product.variants.length !== 1 ? 's' : ''}
+            </Text>
+            <Text style={s.bullet}>·</Text>
+            <Text style={[s.infoText, { color: stockColor }]}>{stockLabel}</Text>
+          </View>
+
+          {/* Sales row */}
+          <View style={s.infoRow}>
+            <Feather name="bar-chart-2" size={11} color={MUTED} />
+            <Text style={s.infoText}>{product.totalSales} sold</Text>
+            <Text style={s.bullet}> · </Text>
+            <Text style={[s.infoText, { color: SUBTLE }]}>{formatCurrency(product.totalRevenue)} revenue</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Action row */}
+      <View style={s.actionRow}>
+        <TouchableOpacity style={s.actionBtn} onPress={onEdit} activeOpacity={0.7}>
+          <Feather name="edit-2" size={13} color={PURPLE_LIGHT} />
+          <Text style={[s.actionLabel, { color: PURPLE_LIGHT }]}>Edit</Text>
+        </TouchableOpacity>
+        <View style={s.actionDivider} />
+        <TouchableOpacity style={s.actionBtn} onPress={onDuplicate} activeOpacity={0.7}>
+          <Feather name="copy" size={13} color={MUTED} />
+          <Text style={s.actionLabel}>Duplicate</Text>
+        </TouchableOpacity>
+        <View style={s.actionDivider} />
+        <TouchableOpacity style={s.actionBtn} onPress={onMore} activeOpacity={0.7}>
+          <Feather name="more-horizontal" size={13} color={MUTED} />
+          <Text style={s.actionLabel}>More</Text>
+        </TouchableOpacity>
+      </View>
+    </BrandthreadCard>
+  );
+}
+
+// ─── Action Sheet ─────────────────────────────────────────────────────────────
+
+interface ActionSheetProps {
+  product: Product | null;
+  visible: boolean;
+  onClose: () => void;
+  onRefresh: () => void;
+}
+
+function ActionSheet({ product, visible, onClose, onRefresh }: ActionSheetProps) {
+  const router = useRouter();
+  if (!product) return null;
+
+  const p = product as Product; // non-nullable alias for closure capture
+  const isArchived = p.status === 'archived';
+
+  async function handleArchive() {
+    onClose();
+    await archiveProduct(p.id);
+    onRefresh();
+  }
+
+  async function handleUnarchive() {
+    onClose();
+    await unarchiveProduct(p.id);
+    onRefresh();
+  }
+
+  async function handleDelete() {
+    onClose();
+    Alert.alert(
+      'Delete product?',
+      'This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteProduct(p.id);
+            onRefresh();
+          },
+        },
+      ]
+    );
+  }
+
+  async function handleDuplicate() {
+    onClose();
+    await duplicateProduct(p.id);
+    Alert.alert('Duplicated', `"${p.name}" was duplicated as a draft.`);
+    onRefresh();
+  }
+
+  async function handleShare() {
+    onClose();
+    await Share.share({ message: p.name + ' on Brandthread' });
+  }
+
+  interface ActionItem {
+    label: string;
+    icon: keyof typeof Feather.glyphMap;
+    accent?: string;
+    onPress: () => void;
+  }
+
+  const actions: ActionItem[] = [
+    { label: 'Edit', icon: 'edit-2', onPress: () => { onClose(); router.push(`/product-detail?id=${p.id}` as any); } },
+    { label: 'View store page', icon: 'eye', onPress: () => { onClose(); router.push(`/product-store?id=${p.id}` as any); } },
+    { label: 'Create content', icon: 'video', onPress: () => { onClose(); router.push(`/create-post?productId=${p.id}` as any); } },
+    { label: 'Duplicate', icon: 'copy', onPress: handleDuplicate },
+    { label: 'Share', icon: 'share', onPress: handleShare },
+    {
+      label: 'Send to manufacturer', icon: 'tool', accent: ORANGE,
+      onPress: () => { onClose(); Alert.alert('Manufacturer', 'Send to manufacturer coming soon.'); },
+    },
+    { label: 'View analytics', icon: 'bar-chart-2', onPress: () => { onClose(); router.push(`/product-detail?id=${p.id}&tab=analytics` as any); } },
+    isArchived
+      ? { label: 'Unarchive', icon: 'rotate-ccw', onPress: handleUnarchive }
+      : { label: 'Archive', icon: 'archive', onPress: handleArchive },
+    { label: 'Delete', icon: 'trash-2', accent: RED, onPress: handleDelete },
+  ];
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      presentationStyle="overFullScreen"
+      onRequestClose={onClose}
+    >
+      <Pressable style={as.overlay} onPress={onClose} />
+      <View style={as.sheet}>
+        <View style={as.handle} />
+        <Text style={as.sheetTitle} numberOfLines={1}>{p.name}</Text>
+        <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
+          {actions.map((item, idx) => (
+            <TouchableOpacity key={idx} style={as.actionItem} onPress={item.onPress} activeOpacity={0.7}>
+              <View style={[as.actionIcon, { backgroundColor: (item.accent ?? PURPLE) + '18' }]}>
+                <Feather name={item.icon} size={ICON.sm} color={item.accent ?? MUTED} />
+              </View>
+              <Text style={[as.actionLabel, item.accent ? { color: item.accent } : {}]}>{item.label}</Text>
+              <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Filter Modal ─────────────────────────────────────────────────────────────
+
+interface FilterModalProps {
+  visible: boolean;
+  current: ProductFilter;
+  onApply: (f: ProductFilter) => void;
+  onClose: () => void;
+}
+
+function FilterModal({ visible, current, onApply, onClose }: FilterModalProps) {
+  const [selected, setSelected] = useState<ProductFilter>(current);
+
+  useEffect(() => { setSelected(current); }, [current, visible]);
+
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="slide"
+      presentationStyle="overFullScreen"
+      onRequestClose={onClose}
+    >
+      <Pressable style={as.overlay} onPress={onClose} />
+      <View style={[as.sheet, { paddingBottom: SP.xl }]}>
+        <View style={as.handle} />
+        <Text style={as.sheetTitle}>Filter Products</Text>
+        <View style={fm.chips}>
+          {FILTER_CHIPS.map(chip => (
+            <FilterChip
+              key={chip.value}
+              label={chip.label}
+              active={selected === chip.value}
+              onPress={() => setSelected(chip.value)}
+            />
+          ))}
+        </View>
+        <PrimaryButton
+          label="Apply"
+          onPress={() => { onApply(selected); onClose(); }}
+          style={{ marginTop: SP.md, marginHorizontal: SP.md }}
+        />
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Main Screen ─────────────────────────────────────────────────────────────
+
 export default function ProductsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const [search, setSearch] = useState('');
-  const [activeFilter, setActiveFilter] = useState<FilterOption>('All');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [stats, setStats] = useState<Stats>({
+    active: 0, draft: 0, lowStock: 0, outOfStock: 0, preOrder: 0, totalInventoryValue: 0,
+  });
+  const [filter, setFilter] = useState<ProductFilter>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchActive, setSearchActive] = useState(false);
+  const [dismissedTips, setDismissedTips] = useState<string[]>([]);
+  const [actionProduct, setActionProduct] = useState<Product | null>(null);
+  const [actionSheetVisible, setActionSheetVisible] = useState(false);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // ─── Summary counts ─────────────────────────────────────────────────────────
-  const activeCount   = useMemo(() => DEMO_PRODUCTS.filter(p => p.status === 'active').length, []);
-  const draftCount    = useMemo(() => DEMO_PRODUCTS.filter(p => p.status === 'draft').length, []);
-  const lowStockCount = useMemo(() => DEMO_PRODUCTS.filter(p => p.totalInventory > 0 && p.totalInventory <= p.lowStockThreshold).length, []);
-  const preOrderCount = useMemo(() => DEMO_PRODUCTS.filter(p => p.status === 'pre-order').length, []);
-
-  // ─── Filtered list ──────────────────────────────────────────────────────────
-  const filteredProducts = useMemo(() => {
-    let list = [...DEMO_PRODUCTS];
-
-    if (activeFilter === 'Active')    list = list.filter(p => p.status === 'active');
-    if (activeFilter === 'Draft')     list = list.filter(p => p.status === 'draft');
-    if (activeFilter === 'Pre-order') list = list.filter(p => p.status === 'pre-order');
-    if (activeFilter === 'Low Stock') list = list.filter(p => p.totalInventory > 0 && p.totalInventory <= p.lowStockThreshold);
-
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
-      list = list.filter(p =>
-        p.name.toLowerCase().includes(q) ||
-        p.category.toLowerCase().includes(q) ||
-        p.productType.toLowerCase().includes(q)
-      );
+  const loadProducts = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await getProducts({ filter, text: searchQuery || undefined });
+      setProducts(result);
+    } catch {
+      setProducts(DEMO_FULL_PRODUCTS);
+    } finally {
+      setLoading(false);
     }
+  }, [filter, searchQuery]);
 
-    return list;
-  }, [activeFilter, search]);
+  const loadStats = useCallback(async () => {
+    try {
+      const s = await getProductStats();
+      setStats({
+        active: s.active,
+        draft: s.draft,
+        lowStock: s.lowStock,
+        outOfStock: s.outOfStock,
+        preOrder: s.preOrder,
+        totalInventoryValue: s.totalInventoryValue,
+      });
+    } catch { /* use defaults */ }
+  }, []);
 
-  function handleAddProduct() {
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
+
+  useEffect(() => {
+    loadStats();
+  }, [loadStats]);
+
+  function refresh() {
+    loadProducts();
+    loadStats();
+  }
+
+  async function handleDuplicate(id: string) {
+    await duplicateProduct(id);
+    Alert.alert('Duplicated', 'Product duplicated as a draft.');
+    refresh();
+  }
+
+  async function handleDelete(id: string, name: string) {
+    Alert.alert(
+      'Delete product?',
+      'This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteProduct(id);
+            refresh();
+          },
+        },
+      ]
+    );
+  }
+
+  function openActionSheet(product: Product) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert('Add Product', 'Coming soon');
+    setActionProduct(product);
+    setActionSheetVisible(true);
   }
 
-  function handleProductPress() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert('Product', 'Detail coming soon');
-  }
+  const renderProduct = useCallback(({ item }: { item: Product }) => (
+    <ProductCard
+      product={item}
+      onEdit={() => router.push(`/product-detail?id=${item.id}` as any)}
+      onDuplicate={() => handleDuplicate(item.id)}
+      onMore={() => openActionSheet(item)}
+    />
+  ), [router]);
 
-  function handleMorePress(productName: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert(productName, 'Choose an action', [
-      { text: 'Edit',           onPress: () => {} },
-      { text: 'Duplicate',      onPress: () => {} },
-      { text: 'Create Content', onPress: () => {} },
-      { text: 'Archive',        style: 'destructive', onPress: () => {} },
-      { text: 'Cancel',         style: 'cancel' },
-    ]);
-  }
+  const keyExtractor = useCallback((item: Product) => item.id, []);
+
+  const ListHeader = useMemo(() => (
+    <>
+      {/* Summary stats */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.statsRow}
+        style={{ marginBottom: SP.md }}
+      >
+        <StatCard label="Active" value={String(stats.active)} icon="check-circle" accent={SUCCESS} style={s.statCard} />
+        <StatCard label="Draft" value={String(stats.draft)} icon="edit-3" accent={ORANGE} style={s.statCard} />
+        <StatCard label="Low Stock" value={String(stats.lowStock)} icon="alert-triangle" accent={RED} style={s.statCard} />
+        <StatCard label="Out of Stock" value={String(stats.outOfStock)} icon="x-circle" accent={RED} style={s.statCard} />
+        <StatCard label="Pre-orders" value={String(stats.preOrder)} icon="clock" accent={PURPLE} style={s.statCard} />
+        <StatCard label="Value" value={formatCurrency(stats.totalInventoryValue)} icon="dollar-sign" accent={GOLD} style={s.statCard} />
+      </ScrollView>
+
+      {/* Filter chips */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.filterRow}
+        style={{ marginBottom: SP.md }}
+      >
+        {FILTER_CHIPS.map(chip => (
+          <FilterChip
+            key={chip.value}
+            label={chip.label}
+            active={filter === chip.value}
+            onPress={() => setFilter(chip.value)}
+          />
+        ))}
+      </ScrollView>
+
+      {/* Guided tip */}
+      <GuidedTip
+        id="products-tip"
+        text="Products you create here can be tagged in Seller posts. Only active and scheduled products appear in the Thread."
+        dismissedIds={dismissedTips}
+        onDismiss={(id) => setDismissedTips(prev => [...prev, id])}
+        style={{ marginBottom: SP.md, marginHorizontal: 0 }}
+      />
+
+      {/* Section header */}
+      <SectionHeader
+        title={filter === 'all' ? 'All Products' : FILTER_CHIPS.find(c => c.value === filter)?.label ?? 'Products'}
+        action={{ label: 'Sort', onPress: () => {} }}
+        style={{ marginBottom: SP.sm }}
+      />
+    </>
+  ), [stats, filter, dismissedTips]);
+
+  const ListEmpty = useMemo(() => (
+    <EmptyState
+      icon="package"
+      title="Your first product starts here."
+      description="Add product details, media, pricing, variants and inventory."
+      action={{ label: 'Create product', icon: 'plus', onPress: () => router.push('/add-product' as any) }}
+    />
+  ), [router]);
 
   return (
-    <BrandthreadScreen noSafeTop>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[s.scrollContent, { paddingBottom: COMP.tabBarH + SP.xl }]}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* ── Header ── */}
-        <View style={[s.header, { paddingTop: insets.top + 8 }]}>
+    <View style={s.root}>
+      {/* Fixed header */}
+      <View style={[s.header, { paddingTop: insets.top + 8 }]}>
+        <View style={s.headerRow}>
           <Text style={s.headerTitle}>Products</Text>
-          <IconButton
-            name="plus"
-            onPress={handleAddProduct}
-            color={FG}
-          />
-        </View>
-
-        {/* ── Guided Tip ── */}
-        <GuidedTip
-          id="products-tip"
-          text="Products you create here can be tagged in Seller posts on the Thread."
-          dismissedIds={[]}
-          onDismiss={() => {}}
-          style={s.tip}
-        />
-
-        {/* ── Summary Stat Cards ── */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.statsRow}
-          style={s.statsScroll}
-        >
-          <StatCard
-            label="Active"
-            value={String(activeCount)}
-            icon="check-circle"
-            accent={SUCCESS}
-            style={s.statCard}
-          />
-          <StatCard
-            label="Draft"
-            value={String(draftCount)}
-            icon="edit"
-            accent={ORANGE}
-            style={s.statCard}
-          />
-          <StatCard
-            label="Low Stock"
-            value={String(lowStockCount)}
-            icon="alert-triangle"
-            accent={RED}
-            style={s.statCard}
-          />
-          <StatCard
-            label="Pre-order"
-            value={String(preOrderCount)}
-            icon="clock"
-            accent={BLUE}
-            style={s.statCard}
-          />
-        </ScrollView>
-
-        {/* ── Search Bar ── */}
-        <SearchBar
-          value={search}
-          onChange={setSearch}
-          placeholder="Search products…"
-          style={s.search}
-        />
-
-        {/* ── Filter Chips ── */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={s.filtersRow}
-          style={s.filtersScroll}
-        >
-          {FILTER_OPTIONS.map(opt => (
-            <FilterChip
-              key={opt}
-              label={opt}
-              active={activeFilter === opt}
-              onPress={() => setActiveFilter(opt)}
+          <View style={s.headerActions}>
+            <IconButton
+              name="search"
+              onPress={() => setSearchActive(v => !v)}
+              color={searchActive ? PURPLE_LIGHT : FG}
             />
-          ))}
-        </ScrollView>
-
-        {/* ── Product List ── */}
-        <View style={s.listContainer}>
-          {filteredProducts.length === 0 ? (
-            <EmptyState
-              icon="package"
-              title="Your first product starts here."
-              description="Add details, pricing, media and inventory."
-              action={{
-                label: 'Create product',
-                icon: 'plus',
-                onPress: handleAddProduct,
-              }}
-              style={s.emptyState}
+            <IconButton
+              name="filter"
+              onPress={() => setFilterModalVisible(true)}
+              color={filter !== 'all' ? PURPLE_LIGHT : FG}
             />
-          ) : (
-            filteredProducts.map(product => {
-              const isLowStock = product.totalInventory > 0 && product.totalInventory <= product.lowStockThreshold;
-              const isPreOrder = product.status === 'pre-order';
-              const isOutOfStock = product.totalInventory === 0 && !isPreOrder;
-              const initial = product.name.charAt(0).toUpperCase();
-              const gradColors = categoryGradient(product.category);
-
-              let statusVariant: 'success' | 'warning' | 'neutral' | 'info' | 'purple' = 'neutral';
-              let statusLabel = 'Draft';
-              if (product.status === 'active')    { statusVariant = 'success'; statusLabel = 'Active'; }
-              if (product.status === 'draft')      { statusVariant = 'warning'; statusLabel = 'Draft'; }
-              if (product.status === 'archived')   { statusVariant = 'neutral'; statusLabel = 'Archived'; }
-              if (product.status === 'pre-order')  { statusVariant = 'info';    statusLabel = 'Pre-order'; }
-
-              let inventoryColor = SUCCESS;
-              let inventoryText = `${product.totalInventory} in stock`;
-              if (isLowStock)    { inventoryColor = RED;    inventoryText = 'Low stock'; }
-              if (isOutOfStock)  { inventoryColor = MUTED;  inventoryText = 'Out of stock'; }
-              if (isPreOrder)    { inventoryColor = BLUE;   inventoryText = 'Pre-order'; }
-
-              return (
-                <BrandthreadCard
-                  key={product.id}
-                  style={s.productCard}
-                  onPress={handleProductPress}
-                >
-                  <View style={s.productRow}>
-                    {/* Left: gradient avatar */}
-                    <LinearGradient
-                      colors={gradColors}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={s.productAvatar}
-                    >
-                      <Text style={s.productInitial}>{initial}</Text>
-                    </LinearGradient>
-
-                    {/* Center: info */}
-                    <View style={s.productInfo}>
-                      {/* Name + status badge */}
-                      <View style={s.productNameRow}>
-                        <Text style={s.productName} numberOfLines={1}>{product.name}</Text>
-                        <StatusBadge label={statusLabel} variant={statusVariant} small />
-                      </View>
-
-                      {/* Category */}
-                      <Text style={s.productCategory}>{product.category} · {product.productType}</Text>
-
-                      {/* Price row */}
-                      <View style={s.priceRow}>
-                        <Text style={s.price}>${product.price.toFixed(2)}</Text>
-                        {product.compareAtPrice != null && (
-                          <Text style={s.comparePrice}>${product.compareAtPrice.toFixed(2)}</Text>
-                        )}
-                      </View>
-
-                      {/* Inventory status */}
-                      <Text style={[s.inventoryText, { color: inventoryColor }]}>
-                        {inventoryText}
-                      </Text>
-                    </View>
-
-                    {/* Far right: more button */}
-                    <TouchableOpacity
-                      onPress={() => handleMorePress(product.name)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      style={s.moreBtn}
-                    >
-                      <Feather name="more-horizontal" size={ICON.md} color={MUTED} />
-                    </TouchableOpacity>
-                  </View>
-                </BrandthreadCard>
-              );
-            })
-          )}
+            <IconButton
+              name="download"
+              onPress={() => router.push('/product-import' as any)}
+            />
+            <IconButton
+              name="plus"
+              onPress={() => router.push('/add-product' as any)}
+              color={PURPLE_LIGHT}
+            />
+          </View>
         </View>
-      </ScrollView>
-    </BrandthreadScreen>
+        {searchActive && (
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search products…"
+            style={{ marginBottom: SP.sm }}
+          />
+        )}
+      </View>
+
+      {/* Product list */}
+      <FlatList
+        data={products}
+        keyExtractor={keyExtractor}
+        renderItem={renderProduct}
+        ListHeaderComponent={ListHeader}
+        ListEmptyComponent={ListEmpty}
+        contentContainerStyle={s.listContent}
+        showsVerticalScrollIndicator={false}
+        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
+      />
+
+      {/* Action sheet */}
+      <ActionSheet
+        product={actionProduct}
+        visible={actionSheetVisible}
+        onClose={() => setActionSheetVisible(false)}
+        onRefresh={refresh}
+      />
+
+      {/* Filter modal */}
+      <FilterModal
+        visible={filterModalVisible}
+        current={filter}
+        onApply={(f) => setFilter(f)}
+        onClose={() => setFilterModalVisible(false)}
+      />
+    </View>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const s = StyleSheet.create({
-  scrollContent: {
-    gap: 0,
-  },
 
-  // Header
+const s = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: BG,
+  },
   header: {
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.sm,
+    backgroundColor: BG,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+  },
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
+    marginBottom: SP.sm,
   },
   headerTitle: {
     fontSize: FS.xl,
@@ -298,102 +602,78 @@ const s = StyleSheet.create({
     color: FG,
     letterSpacing: -0.3,
   },
-
-  // Guided tip
-  tip: {
-    marginTop: SP.sm,
-    marginBottom: SP.sm,
-  },
-
-  // Stats
-  statsScroll: {
-    flexGrow: 0,
-    marginBottom: SP.sm,
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
   },
   statsRow: {
-    flexDirection: 'row',
-    gap: SP.sm,
     paddingHorizontal: SP.md,
+    gap: SP.sm,
+    paddingTop: SP.sm,
   },
   statCard: {
-    minWidth: 100,
+    minWidth: 90,
   },
-
-  // Search
-  search: {
-    marginHorizontal: SP.md,
-    marginBottom: SP.sm,
-  },
-
-  // Filters
-  filtersScroll: {
-    flexGrow: 0,
-    marginBottom: SP.md,
-  },
-  filtersRow: {
-    flexDirection: 'row',
+  filterRow: {
+    paddingHorizontal: SP.md,
     gap: SP.sm,
-    paddingHorizontal: SP.md,
   },
-
-  // Product list
-  listContainer: {
+  listContent: {
     paddingHorizontal: SP.md,
-    gap: 10,
+    paddingTop: SP.md,
+    paddingBottom: COMP.tabBarH + SP.xl,
   },
   productCard: {
-    marginBottom: 10,
-    padding: SP.md,
+    marginBottom: 0,
   },
-  productRow: {
+  cardRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
   },
-
-  // Avatar
-  productAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
+  thumbWrap: {
+    width: 80,
+    height: 80,
+    overflow: 'hidden',
+    borderTopLeftRadius: RADIUS.lg,
   },
-  productInitial: {
-    fontSize: FS.xl,
-    fontFamily: FONT.bold,
-    color: '#FFFFFF',
-    letterSpacing: -0.5,
+  thumb: {
+    width: 80,
+    height: 80,
   },
-
-  // Info
-  productInfo: {
+  cardContent: {
     flex: 1,
+    paddingHorizontal: SP.sm,
+    paddingTop: SP.sm,
+    paddingBottom: SP.xs,
     gap: 3,
-    marginLeft: SP.xs,
   },
-  productNameRow: {
+  cardTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: SP.sm,
+    gap: SP.xs,
   },
   productName: {
+    flex: 1,
     fontSize: FS.base,
     fontFamily: FONT.bold,
     color: FG,
-    flex: 1,
+    letterSpacing: -0.2,
   },
-  productCategory: {
+  cardMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
+  },
+  categoryText: {
     fontSize: FS.xs,
-    fontFamily: FONT.regular,
+    fontFamily: FONT.medium,
     color: MUTED,
   },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SP.sm,
+    gap: SP.xs,
     marginTop: 1,
   },
   price: {
@@ -407,19 +687,113 @@ const s = StyleSheet.create({
     color: SUBTLE,
     textDecorationLine: 'line-through',
   },
-  inventoryText: {
+  discount: {
     fontSize: FS.xs,
-    fontFamily: FONT.medium,
+    fontFamily: FONT.bold,
+    color: RED,
   },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  infoText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: MUTED,
+  },
+  bullet: {
+    fontSize: FS.xs,
+    color: SUBTLE,
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: BORDER,
+    marginTop: SP.xs,
+  },
+  actionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 10,
+  },
+  actionDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: BORDER,
+  },
+  actionLabel: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: MUTED,
+  },
+});
 
-  // More button
-  moreBtn: {
-    padding: SP.xs,
+const as = StyleSheet.create({
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+  },
+  sheet: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: SURFACE,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    paddingTop: SP.sm,
+    paddingBottom: SP.xxl,
+    paddingHorizontal: SP.md,
+  },
+  handle: {
+    width: 40,
+    height: 4,
+    borderRadius: RADIUS.pill,
+    backgroundColor: BORDER,
     alignSelf: 'center',
+    marginBottom: SP.md,
   },
+  sheetTitle: {
+    fontSize: FS.md,
+    fontFamily: FONT.bold,
+    color: FG,
+    marginBottom: SP.md,
+    letterSpacing: -0.2,
+  },
+  actionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.md,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+  },
+  actionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionLabel: {
+    flex: 1,
+    fontSize: FS.base,
+    fontFamily: FONT.medium,
+    color: FG,
+  },
+});
 
-  // Empty
-  emptyState: {
-    marginTop: SP.xl,
+const fm = StyleSheet.create({
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SP.sm,
+    paddingHorizontal: SP.xs,
+    marginBottom: SP.sm,
   },
 });

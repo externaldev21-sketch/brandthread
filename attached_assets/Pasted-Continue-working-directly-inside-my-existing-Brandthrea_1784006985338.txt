@@ -1,0 +1,963 @@
+Continue working directly inside my existing Brandthread Expo React Native project.
+
+Do not explain the code to me.
+
+Inspect the current project, edit it directly, run it, test it, and fix all errors.
+
+Build the complete Brandthread Inventory system.
+
+Do not redesign onboarding.
+
+Do not break the Seller Dashboard, Products system, Manufacturer Hub, Orders, Seller Profile, Content Creator, Buyer Thread, authentication, Storefront, or navigation.
+
+CORE GOAL
+
+Create one shared inventory system that connects:
+
+* Products
+* Variants
+* Orders
+* Returns
+* Refunds
+* Manufacturer production
+* Incoming stock
+* Storefront availability
+* Pre-orders
+* Seller fulfillment
+* Manufacturer fulfillment
+* Low-stock alerts
+* Analytics
+
+Inventory must never be stored separately in multiple conflicting places.
+
+The app must use one source of truth for inventory quantities and inventory events.
+
+INVENTORY NAVIGATION
+
+Create a premium Inventory hub matching the Brandthread onboarding and Seller design system.
+
+Inventory must be reachable from:
+
+* More
+* Seller Dashboard quick actions
+* Products
+* Product details
+* Orders
+* Manufacturer Hub
+* Global search
+* Go To menu
+* Low-stock alerts
+
+INVENTORY HOME
+
+Show a clear overview with:
+
+* Total units in stock
+* Available units
+* Reserved units
+* Incoming units
+* Committed pre-order units
+* Low-stock variants
+* Out-of-stock variants
+* Inventory value
+* Inventory locations
+* Recent adjustments
+
+SUMMARY CARDS
+
+Create cards for:
+
+* Available stock
+* Reserved stock
+* Incoming stock
+* Low stock
+* Out of stock
+* Pre-order commitments
+* Inventory value
+* Units in production
+
+Each card should open the relevant filtered view.
+
+INVENTORY DEFINITIONS
+
+Use these definitions consistently:
+
+Available:
+Units that can currently be sold.
+
+On hand:
+Physical units currently at a location.
+
+Reserved:
+Units assigned to paid or confirmed orders but not yet shipped.
+
+Incoming:
+Units expected from production, transfer, return inspection, or restock.
+
+Committed pre-order:
+Units promised to customers but not yet available as physical inventory.
+
+Damaged:
+Units that cannot be sold normally.
+
+Unavailable:
+Units blocked for quality review, internal use, or another reason.
+
+Available quantity should be calculated safely using the correct stock state.
+
+Do not let the Seller manually create impossible combinations such as negative on-hand stock without a valid reason or override.
+
+PRODUCT INVENTORY LIST
+
+Show every product and variant with:
+
+* Product image
+* Product name
+* Variant
+* SKU
+* Barcode
+* Location
+* On-hand quantity
+* Available quantity
+* Reserved quantity
+* Incoming quantity
+* Low-stock threshold
+* Status
+* Inventory value
+* Last updated
+
+Allow grouping by:
+
+* Product
+* Variant
+* Location
+* Status
+* Manufacturer
+* Collection
+
+INVENTORY FILTERS
+
+Include:
+
+* All
+* Available
+* Low stock
+* Out of stock
+* Incoming
+* Reserved
+* Pre-order
+* Damaged
+* Unavailable
+* Overselling enabled
+* Seller fulfilled
+* Manufacturer fulfilled
+
+INVENTORY SEARCH
+
+Search by:
+
+* Product name
+* Variant
+* SKU
+* Barcode
+* Collection
+* Location
+* Manufacturer
+* Inventory status
+
+PRODUCT INVENTORY DETAILS
+
+Create a detailed inventory page for each product.
+
+Include:
+
+* Product
+* Total on hand
+* Total available
+* Total reserved
+* Total incoming
+* Total committed pre-order
+* Total damaged
+* Inventory value
+* Variant list
+* Locations
+* Recent activity
+* Production links
+* Order links
+* Restock recommendations
+
+VARIANT INVENTORY DETAILS
+
+Each variant page must show:
+
+* Variant image
+* Product
+* Size
+* Color
+* SKU
+* Barcode
+* Cost
+* Retail price
+* On hand
+* Available
+* Reserved
+* Incoming
+* Committed pre-order
+* Damaged
+* Unavailable
+* Low-stock threshold
+* Overselling status
+* Location breakdown
+* Adjustment history
+* Orders using the variant
+* Incoming production
+* Returns awaiting inspection
+
+INVENTORY LOCATIONS
+
+Support multiple locations in the data model.
+
+Location types:
+
+* Seller warehouse
+* Seller home or studio
+* Manufacturer
+* Third-party fulfillment
+* Retail location
+* Pop-up
+* Returns location
+* Other
+
+LOCATION CARD
+
+Show:
+
+* Location name
+* Type
+* Address
+* Total units
+* Available units
+* Reserved units
+* Incoming units
+* Low-stock count
+* Fulfillment enabled
+* Primary location status
+
+LOCATION DETAILS
+
+Include:
+
+* Inventory by product
+* Inventory by variant
+* Incoming transfers
+* Outgoing transfers
+* Recent adjustments
+* Fulfillment activity
+* Location settings
+
+Allow:
+
+* Add location
+* Edit location
+* Archive location
+* Set primary location
+* Enable fulfillment
+* Disable fulfillment
+* Transfer stock
+
+Do not allow archiving a location with active inventory or fulfillment responsibilities without a warning and reassignment flow.
+
+STOCK ADJUSTMENT
+
+Create a safe stock-adjustment flow.
+
+Adjustment types:
+
+* Received stock
+* Manual count
+* Correction
+* Damage
+* Lost
+* Found
+* Internal use
+* Sample use
+* Promotional use
+* Return restock
+* Return damaged
+* Production received
+* Transfer received
+* Transfer sent
+* Other
+
+Adjustment fields:
+
+* Product
+* Variant
+* Location
+* Adjustment type
+* Quantity change
+* Reason
+* Note
+* Cost impact
+* Reference number
+* Attachment
+* Team member
+* Date and time
+
+Before confirming, show:
+
+* Current quantity
+* Quantity change
+* New quantity
+* Available quantity impact
+* Inventory value impact
+
+Require confirmation for destructive adjustments.
+
+Do not allow accidental duplicate submissions.
+
+INVENTORY HISTORY
+
+Create a chronological inventory event log.
+
+Each event should show:
+
+* Product
+* Variant
+* Location
+* Event type
+* Quantity before
+* Quantity changed
+* Quantity after
+* Reason
+* Source
+* Related order
+* Related return
+* Related production job
+* Related transfer
+* Team member
+* Timestamp
+
+Allow filtering by:
+
+* Product
+* Variant
+* Location
+* Event type
+* Date range
+* Source
+
+Inventory history must be immutable from the standard Seller interface.
+
+Allow correction by creating a new adjustment event, not editing history.
+
+STOCK TRANSFERS
+
+Create a full transfer flow.
+
+Transfer steps:
+
+1. Choose source location
+2. Choose destination location
+3. Add products and variants
+4. Enter quantities
+5. Review transfer
+6. Start transfer
+7. Mark shipped
+8. Mark received
+9. Resolve discrepancies
+
+TRANSFER STATUSES
+
+* Draft
+* Ready
+* In transit
+* Partially received
+* Received
+* Cancelled
+* Discrepancy
+* Closed
+
+TRANSFER CARD
+
+Show:
+
+* Transfer number
+* Source
+* Destination
+* Product count
+* Unit count
+* Status
+* Created date
+* Shipped date
+* Expected arrival
+* Received date
+* Discrepancy indicator
+
+TRANSFER DETAILS
+
+Include:
+
+* Source
+* Destination
+* Products
+* Variants
+* Quantities sent
+* Quantities received
+* Damaged quantities
+* Missing quantities
+* Tracking
+* Notes
+* Timeline
+* Attachments
+
+Do not increase destination inventory until the transfer is received.
+
+Do not make in-transit stock available for sale unless explicitly supported.
+
+RESTOCK WORKFLOWS
+
+Create restock actions from:
+
+* Inventory Home
+* Product Inventory
+* Variant Inventory
+* Low-stock alerts
+* Manufacturer Hub
+* Product Details
+
+Restock options:
+
+* Create manual incoming stock
+* Start manufacturer quote
+* Start production order
+* Transfer from another location
+* Increase pre-order availability
+* Mark production incoming
+
+RESTOCK RECOMMENDATIONS
+
+Show suggested restock quantity using:
+
+* Recent sales
+* Current available units
+* Reserved units
+* Incoming units
+* Lead time
+* Low-stock threshold
+* Pre-order commitments
+
+Keep the recommendation calculation in a reusable service.
+
+Clearly label recommendations as estimates.
+
+Do not present estimates as guarantees.
+
+INCOMING INVENTORY
+
+Create an Incoming Inventory view.
+
+Incoming sources:
+
+* Manufacturer production
+* Purchase order
+* Stock transfer
+* Return restock
+* Manual incoming
+* Third-party fulfillment receipt
+
+Each incoming record must show:
+
+* Source
+* Product
+* Variant
+* Quantity
+* Expected date
+* Destination location
+* Status
+* Tracking
+* Related manufacturer
+* Related production job
+* Related transfer
+
+INCOMING STATUSES
+
+* Planned
+* Ordered
+* In production
+* Ready to ship
+* In transit
+* Partially received
+* Received
+* Delayed
+* Cancelled
+
+RECEIVE INVENTORY
+
+Create a receiving flow.
+
+Allow:
+
+* Scan or enter SKU
+* Scan or enter barcode if supported
+* Choose product manually
+* Enter received quantity
+* Enter damaged quantity
+* Enter missing quantity
+* Add notes
+* Add photos
+* Confirm location
+* Confirm cost
+
+Update stock only after receipt is confirmed.
+
+Handle partial receipts.
+
+Maintain discrepancy records.
+
+LOW-STOCK ALERTS
+
+Create low-stock alerts based on variant thresholds.
+
+Show:
+
+* Product
+* Variant
+* Available units
+* Reserved units
+* Incoming units
+* Threshold
+* Recent sales rate
+* Suggested restock
+* Days of stock estimate
+* Restock action
+
+Alert levels:
+
+* Attention
+* Low
+* Critical
+* Out of stock
+
+Allow:
+
+* Restock
+* Adjust threshold
+* Dismiss temporarily
+* Mark reviewed
+* Transfer stock
+
+Do not permanently dismiss an unresolved out-of-stock condition.
+
+OUT-OF-STOCK BEHAVIOR
+
+Connect inventory status to:
+
+* Seller Products
+* Seller Profile
+* Storefront
+* Buyer product page
+* Cart
+* Checkout
+* Seller content product tags
+
+When a variant is out of stock:
+
+* Disable purchase unless overselling or pre-order is allowed
+* Show clear Buyer messaging
+* Preserve product visibility unless the Seller hides it
+* Allow notification signup if implemented
+* Prevent invalid checkout
+
+OVERSELLING
+
+Allow a per-product or per-variant setting:
+
+* Do not sell when unavailable
+* Continue selling
+* Convert to pre-order when unavailable
+
+Show a warning when overselling is enabled.
+
+Do not silently create negative stock.
+
+Track backordered quantity separately where appropriate.
+
+RESERVED INVENTORY
+
+Reserve inventory when the correct order event occurs according to the existing checkout and payment flow.
+
+Release reservations when:
+
+* Order is cancelled
+* Payment fails
+* Reservation expires
+* Refund and restock rules require it
+* Fulfillment is changed
+
+Reduce on-hand stock at the correct fulfillment or shipment milestone based on the project’s inventory policy.
+
+Do not count the same unit as both available and reserved.
+
+PRE-ORDER INVENTORY
+
+Separate physical inventory from pre-order commitments.
+
+Show:
+
+* Units ordered
+* Funding target
+* Production target
+* Units in production
+* Expected available units
+* Expected ship date
+* Oversold commitment warning
+
+Do not treat pre-order commitments as on-hand inventory.
+
+MANUFACTURER INTEGRATION
+
+Connect Manufacturer Hub production to Inventory.
+
+When production is started:
+
+* Create incoming inventory records
+* Link product and variants
+* Link quantity
+* Link expected completion
+* Link destination location
+
+When production is ready to ship:
+
+* Update incoming status
+* Add tracking
+
+When received:
+
+* Add physical inventory
+* Close or partially close incoming record
+* Record discrepancies
+* Update product inventory
+* Update dashboard alerts
+
+ORDERS INTEGRATION
+
+Connect Orders to Inventory.
+
+Order events must update:
+
+* Reservations
+* Available stock
+* Fulfilled quantities
+* Returned quantities
+* Damaged quantities
+* Restocked quantities
+
+Test:
+
+* Full fulfillment
+* Partial fulfillment
+* Mixed fulfillment
+* Cancellation
+* Return
+* Refund
+* Exchange
+* Pre-order
+* Manufacturer fulfillment
+
+RETURNS INTEGRATION
+
+When a return is received, allow inspection results:
+
+* Restock
+* Damaged
+* Unavailable
+* Return to manufacturer
+* Discard
+* Internal use
+
+Do not automatically restock before inspection unless the Seller chooses that policy.
+
+PRODUCTS INTEGRATION
+
+From Product Details, allow:
+
+* View inventory
+* Adjust stock
+* Transfer stock
+* Set threshold
+* Enable or disable tracking
+* Enable or disable overselling
+* Open incoming production
+* Open inventory history
+
+SELLER HOME INTEGRATION
+
+Update Seller Home with:
+
+* Low-stock alerts
+* Out-of-stock alerts
+* Incoming inventory
+* Delayed production
+* Transfer discrepancies
+* Returns awaiting inspection
+* Inventory count issues
+
+Add these to:
+
+* Today’s priorities
+* Recent activity
+* Notifications
+* Next best action
+
+INVENTORY VALUE
+
+Calculate inventory value using product or variant cost.
+
+Show:
+
+* Total inventory cost value
+* Available inventory value
+* Reserved inventory value
+* Incoming inventory value
+* Damaged inventory value
+
+Do not confuse inventory cost value with retail revenue value.
+
+Use reusable calculation utilities.
+
+COUNTING
+
+Create an inventory count workflow.
+
+Count types:
+
+* Full count
+* Location count
+* Product count
+* Cycle count
+* Spot check
+
+COUNT FLOW
+
+Allow:
+
+* Select location
+* Select products
+* Enter or scan counted quantities
+* Compare expected and actual
+* Review discrepancies
+* Add notes
+* Confirm adjustments
+
+COUNT STATUSES
+
+* Draft
+* In progress
+* Review needed
+* Completed
+* Cancelled
+
+BARCODE AND SKU SUPPORT
+
+Where device support and current dependencies allow:
+
+* Scan barcode
+* Search SKU
+* Receive inventory
+* Count inventory
+* Transfer inventory
+
+If camera barcode scanning is unavailable, provide a stable manual entry fallback.
+
+Do not install incompatible dependencies.
+
+EXPORT
+
+Allow inventory export by:
+
+* All inventory
+* Location
+* Product
+* Variant
+* Low stock
+* Out of stock
+* Date range
+* Inventory history
+
+Use CSV export where supported.
+
+DATA MODELS
+
+Create or update typed models for:
+
+* InventoryItem
+* InventoryLevel
+* InventoryLocation
+* InventoryAdjustment
+* InventoryEvent
+* InventoryTransfer
+* InventoryTransferItem
+* IncomingInventory
+* InventoryReceipt
+* InventoryDiscrepancy
+* InventoryAlert
+* InventoryReservation
+* PreorderCommitment
+* InventoryCount
+* InventoryCountItem
+* RestockRecommendation
+* InventoryValuation
+
+SERVICES
+
+Use the existing backend.
+
+Do not install a second backend.
+
+Create or update strongly typed services for:
+
+* Get inventory overview
+* Search inventory
+* Filter inventory
+* Adjust stock
+* Create inventory event
+* Create transfer
+* Ship transfer
+* Receive transfer
+* Create incoming inventory
+* Receive inventory
+* Generate low-stock alerts
+* Generate restock recommendations
+* Reserve inventory
+* Release inventory
+* Commit pre-order units
+* Process return inventory
+* Calculate inventory valuation
+* Create inventory count
+* Complete inventory count
+* Export inventory
+
+Keep mock services separated from screen components.
+
+Do not duplicate inventory logic across Products, Orders, or Manufacturer Hub.
+
+DESIGN CONSISTENCY
+
+Every Inventory screen must match onboarding and the current Seller design system.
+
+Use:
+
+* Deep black and charcoal backgrounds
+* Purple and blue primary accents
+* Controlled cyan and green status accents
+* Rounded cards
+* Rounded buttons
+* Premium typography
+* Consistent spacing
+* Subtle borders
+* Smooth transitions
+* Styled loading states
+* Styled empty states
+* Styled error states
+* No old green and gray layouts
+* No white flashes
+
+EMPTY STATES
+
+Inventory:
+“Your inventory will appear here.”
+
+Locations:
+“Add a location to track where your products are stored.”
+
+Transfers:
+“Move stock between your inventory locations.”
+
+Incoming:
+“Production and restock shipments will appear here.”
+
+Counts:
+“Create a count to verify your physical inventory.”
+
+Each empty state must include a useful action.
+
+TESTING
+
+Test these exact paths:
+
+1. Open Inventory.
+2. Search inventory.
+3. Apply every major filter.
+4. Open Product Inventory.
+5. Open Variant Inventory.
+6. Add a location.
+7. Edit a location.
+8. Set a primary location.
+9. Adjust stock upward.
+10. Adjust stock downward.
+11. Test damage adjustment.
+12. Test manual correction.
+13. Confirm inventory history.
+14. Create a transfer.
+15. Mark transfer ready.
+16. Mark transfer in transit.
+17. Partially receive transfer.
+18. Receive remaining transfer.
+19. Create a discrepancy.
+20. Resolve a discrepancy.
+21. Create incoming stock.
+22. Link incoming stock to manufacturer production.
+23. Receive full incoming stock.
+24. Receive partial incoming stock.
+25. Record damaged incoming units.
+26. Trigger low-stock alert.
+27. Trigger out-of-stock alert.
+28. Change low-stock threshold.
+29. Test suggested restock quantity.
+30. Start manufacturer restock flow.
+31. Start transfer restock flow.
+32. Create an order.
+33. Confirm inventory reservation.
+34. Cancel the order.
+35. Confirm reservation release.
+36. Fulfill an order.
+37. Confirm inventory reduction.
+38. Partially fulfill an order.
+39. Process a return.
+40. Restock the returned item.
+41. Mark returned item damaged.
+42. Test a pre-order product.
+43. Confirm pre-order commitment is separate from on-hand stock.
+44. Enable overselling.
+45. Confirm Buyer messaging.
+46. Disable overselling.
+47. Confirm invalid purchase is blocked.
+48. Create inventory count.
+49. Record a discrepancy.
+50. Complete count.
+51. Export inventory.
+52. Restart the app.
+53. Confirm inventory persists.
+54. Confirm transfers persist.
+55. Confirm incoming stock persists.
+56. Confirm history persists.
+57. Confirm Seller Home updates.
+58. Confirm Products shows correct stock.
+59. Confirm Orders uses correct inventory.
+60. Confirm Manufacturer Hub uses incoming inventory.
+61. Confirm Buyer product pages show correct availability.
+62. Fix all TypeScript errors.
+63. Fix all routing errors.
+64. Fix all runtime errors.
+65. Fix all console errors caused by this system.
+66. Confirm onboarding remains unchanged.
+67. Confirm Buyer and Seller accounts still work.
+
+Do not stop after creating static inventory screens.
+
+Build the working shared inventory system, typed models, services, locations, stock adjustments, history, transfers, incoming inventory, low-stock alerts, reservations, returns, pre-orders, counts, and full integrations.
+
+When complete, respond with only:
+
+“The Brandthread Inventory system is installed and working.”

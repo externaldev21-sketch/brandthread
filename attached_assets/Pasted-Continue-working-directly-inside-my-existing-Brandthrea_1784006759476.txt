@@ -1,0 +1,985 @@
+Continue working directly inside my existing Brandthread Expo React Native project.
+
+Do not explain the code to me.
+
+Inspect the current project, edit it directly, run it, test it, and fix all errors.
+
+Build the complete Brandthread Orders, Fulfillment, Returns, Refunds, Held Funds, and Payouts system.
+
+Do not redesign onboarding.
+
+Do not break the Seller Dashboard, Products system, Manufacturer Hub, Seller Profile, Content Creator, Buyer Thread, authentication, Storefront, or navigation.
+
+CORE GOAL
+
+A Seller must be able to:
+
+* View every order
+* Understand payment and fulfillment status
+* Process orders
+* Buy or create shipping labels
+* Add tracking
+* Mark orders shipped
+* Handle pre-orders
+* Handle manufacturer-fulfilled orders
+* Manage returns
+* Issue refunds
+* Resolve disputes
+* Track held funds
+* See payout status
+* Understand exactly when funds are released
+
+ORDERS TAB
+
+Create a premium Orders home screen matching the Brandthread onboarding and Seller design system.
+
+Include:
+
+* Search
+* Filters
+* Sort
+* Export
+* New order indicator
+* Bulk actions where safe
+
+ORDER SUMMARY CARDS
+
+Show:
+
+* New
+* Processing
+* Ready to ship
+* Shipped
+* Delivered
+* Returns
+* Refunds
+* Disputes
+* Pre-orders
+* High-risk orders
+
+ORDER FILTERS
+
+Include:
+
+* All
+* New
+* Unfulfilled
+* Partially fulfilled
+* Processing
+* Ready to ship
+* Shipped
+* Delivered
+* Cancelled
+* Refunded
+* Returned
+* Pre-order
+* Manufacturer fulfilled
+* Seller fulfilled
+* High risk
+* Disputed
+
+SORT OPTIONS
+
+Include:
+
+* Newest
+* Oldest
+* Highest value
+* Lowest value
+* Customer name
+* Fulfillment status
+* Payment status
+
+ORDER LIST
+
+Each order card must show:
+
+* Order number
+* Customer name
+* Order date
+* Order total
+* Product count
+* Payment status
+* Fulfillment status
+* Delivery method
+* Pre-order badge when applicable
+* Manufacturer-fulfilled badge when applicable
+* Risk status
+* Tracking status
+* Unread customer message indicator
+
+ORDER DETAILS PAGE
+
+Create a complete Order Details screen.
+
+Include sections for:
+
+1. Order summary
+2. Customer
+3. Products
+4. Payment
+5. Fulfillment
+6. Shipping
+7. Held funds
+8. Timeline
+9. Notes
+10. Returns and refunds
+11. Disputes
+
+ORDER SUMMARY
+
+Show:
+
+* Order number
+* Date
+* Total
+* Currency
+* Payment status
+* Fulfillment status
+* Order source
+* Sales channel
+* Pre-order status
+* Risk level
+* Seller responsible
+* Manufacturer responsible where applicable
+
+CUSTOMER SECTION
+
+Show:
+
+* Customer name
+* Email
+* Phone
+* Shipping address
+* Billing address
+* Customer tags
+* Order count
+* Lifetime value
+* Message customer button
+* Open customer profile button
+
+PRODUCTS SECTION
+
+Each line item must show:
+
+* Product image
+* Product name
+* Variant
+* Quantity
+* Unit price
+* Discount
+* Tax
+* Fulfillment source
+* Production status if pre-order
+* Product tag source if attributed to content
+
+Allow opening Product Details.
+
+PAYMENT SECTION
+
+Show:
+
+* Subtotal
+* Discounts
+* Shipping
+* Taxes
+* Total
+* Amount paid
+* Amount refunded
+* Amount held
+* Amount pending
+* Seller allocation
+* Manufacturer allocation
+* Shipping-label allocation
+* Brandthread fees
+* Payout status
+
+Do not claim real money movement unless confirmed by the real payment provider.
+
+HELD FUNDS RULES
+
+Create a clear held-funds system.
+
+For supported orders, show:
+
+* Customer payment received
+* Funds currently held
+* Manufacturer amount reserved
+* Shipping-label amount reserved
+* Seller amount pending
+* Payout release milestone
+* Expected release date when available
+* Delay or dispute hold reason
+
+Explain that funds are released based on the configured order and delivery milestones.
+
+Do not present held funds as legally guaranteed escrow unless the real payment structure supports that.
+
+PAYOUT RELEASE MILESTONES
+
+Support configurable milestones such as:
+
+* Payment confirmed
+* Manufacturer deposit approved
+* Production started
+* Product shipped
+* Tracking verified
+* Delivered
+* Return window completed
+* Dispute resolved
+
+Display which milestones are complete and which remain.
+
+FULFILLMENT TYPES
+
+Support:
+
+* Fulfilled by Seller
+* Fulfilled by Manufacturer
+* Mixed fulfillment
+* Digital or non-shipping item if supported later
+
+SELLER FULFILLMENT FLOW
+
+Allow the Seller to:
+
+* Mark processing
+* Pick items
+* Pack items
+* Mark ready to ship
+* Buy shipping label
+* Add tracking manually
+* Mark shipped
+* Mark delivered only when appropriate
+* Contact customer
+* Print packing slip
+* Cancel fulfillment
+* Partially fulfill an order
+
+MANUFACTURER FULFILLMENT FLOW
+
+Allow:
+
+* Send fulfillment request to manufacturer
+* Show product and quantity
+* Show customer shipping details securely
+* Show production status
+* Show packaging requirements
+* Show shipping deadline
+* Add tracking
+* Confirm handoff
+* Track manufacturer shipment
+* Report delay
+* Reassign fulfillment when possible
+
+Do not expose unnecessary customer data.
+
+MIXED FULFILLMENT
+
+Allow separate fulfillment groups in one order.
+
+Example:
+
+* Hoodie fulfilled by Seller
+* Hat fulfilled by Manufacturer
+
+Each group must have:
+
+* Its own status
+* Its own tracking
+* Its own shipping label
+* Its own timeline
+* Its own payout milestones where applicable
+
+SHIPPING LABEL FLOW
+
+Create a working shipping-label interface.
+
+Include:
+
+* Ship-from address
+* Ship-to address
+* Package type
+* Package dimensions
+* Weight
+* Carrier
+* Service
+* Estimated delivery
+* Insurance
+* Signature requirement
+* Label price
+* Funds source
+* Buy label
+* Download label
+* Print label
+* Share label
+* Void label
+
+Show carrier options such as demo rates if no shipping API exists.
+
+Do not claim a real label was purchased unless the shipping provider confirms it.
+
+Use a clearly separated mock shipping service when necessary.
+
+SHIPPING RATE CARD
+
+Each option should show:
+
+* Carrier
+* Service
+* Price
+* Estimated delivery
+* Tracking included
+* Insurance included
+* Recommended badge when appropriate
+
+PACKING SLIP
+
+Create a packing-slip preview with:
+
+* Brand name
+* Order number
+* Customer
+* Products
+* Quantities
+* Gift note
+* Return instructions
+* Seller contact
+
+Allow print or share if supported.
+
+TRACKING
+
+Show:
+
+* Carrier
+* Tracking number
+* Current status
+* Latest scan
+* Estimated delivery
+* Tracking timeline
+
+Statuses:
+
+* Label created
+* Accepted
+* In transit
+* Out for delivery
+* Delivered
+* Exception
+* Returned to sender
+
+PRE-ORDER ORDERS
+
+Create a dedicated pre-order view.
+
+Show:
+
+* Product
+* Units ordered
+* Funding goal
+* Production status
+* Manufacturer
+* Estimated production date
+* Estimated ship date
+* Customer notification status
+* Delay notice status
+* Refund eligibility
+
+Allow the Seller to:
+
+* Update estimated dates
+* Notify customers
+* Mark production started
+* Mark production delayed
+* Begin fulfillment
+* Cancel pre-order with warnings
+* Issue refund
+
+PARTIAL FULFILLMENT
+
+Allow an order to be fulfilled in multiple shipments.
+
+Track:
+
+* Quantity fulfilled
+* Quantity remaining
+* Shipment count
+* Tracking per shipment
+* Delivery per shipment
+
+Do not mark the full order fulfilled until all required items are fulfilled.
+
+ORDER TIMELINE
+
+Create a full chronological timeline.
+
+Include:
+
+* Order created
+* Payment confirmed
+* Risk review
+* Processing started
+* Manufacturer assigned
+* Production update
+* Label purchased
+* Tracking added
+* Shipped
+* Delivered
+* Return requested
+* Refund issued
+* Dispute opened
+* Payout released
+
+Allow internal notes.
+
+Clearly distinguish:
+
+* Customer-visible events
+* Seller-only events
+* System events
+
+ORDER NOTES
+
+Allow:
+
+* Internal note
+* Customer note
+* Manufacturer note
+* Pin important note
+* Attach file
+* Add timestamp
+* Add team member name
+
+CANCELLATIONS
+
+Create a cancellation flow.
+
+Reasons:
+
+* Customer request
+* Out of stock
+* Production issue
+* Fraud risk
+* Shipping restriction
+* Duplicate order
+* Seller decision
+* Other
+
+Before cancelling, show:
+
+* Refund amount
+* Inventory impact
+* Manufacturer impact
+* Payout impact
+* Customer notification
+* Active shipment warning
+
+RETURNS
+
+Create a complete Returns hub.
+
+RETURN STATUSES
+
+* Requested
+* Under review
+* Approved
+* Denied
+* Label issued
+* In transit
+* Received
+* Inspected
+* Refund pending
+* Refunded
+* Exchange completed
+* Closed
+
+RETURN REQUEST CARD
+
+Show:
+
+* Order
+* Customer
+* Product
+* Quantity
+* Reason
+* Request date
+* Return deadline
+* Status
+* Requested resolution
+
+RETURN REASONS
+
+Include:
+
+* Wrong size
+* Wrong item
+* Damaged
+* Defective
+* Not as described
+* Changed mind
+* Late delivery
+* Missing item
+* Other
+
+RETURN DETAILS
+
+Show:
+
+* Customer explanation
+* Photos
+* Videos
+* Product
+* Variant
+* Quantity
+* Purchase price
+* Return eligibility
+* Policy
+* Shipping status
+* Inspection result
+* Resolution
+
+SELLER ACTIONS
+
+Allow:
+
+* Approve return
+* Deny return
+* Request more information
+* Issue return label
+* Offer exchange
+* Offer store credit
+* Partial refund
+* Full refund
+* Close request
+
+RETURN LABEL
+
+Allow the Seller to create or attach a return label.
+
+Show label price and who pays:
+
+* Seller
+* Customer
+* Manufacturer
+* Brandthread protection, only if truly supported
+
+REFUNDS
+
+Create a Refunds hub.
+
+Support:
+
+* Full refund
+* Partial refund
+* Shipping refund
+* Item-level refund
+* Store credit
+* Refund without return
+* Refund after return inspection
+
+REFUND FLOW
+
+Show:
+
+* Original payment
+* Previous refunds
+* Maximum refundable amount
+* Selected items
+* Quantity
+* Shipping
+* Taxes
+* Refund total
+* Inventory restock option
+* Customer notification
+* Refund reason
+
+Do not claim a refund succeeded unless confirmed by the payment provider.
+
+Show:
+
+* Processing
+* Completed
+* Failed
+* Cancelled
+
+DISPUTES
+
+Create a complete Disputes hub.
+
+DISPUTE STATUSES
+
+* Open
+* Evidence needed
+* Evidence submitted
+* Under review
+* Won
+* Lost
+* Closed
+
+DISPUTE TYPES
+
+* Product not received
+* Product not as described
+* Unauthorized payment
+* Duplicate charge
+* Refund not received
+* Damaged product
+* Other
+
+DISPUTE DETAILS
+
+Show:
+
+* Customer claim
+* Amount
+* Deadline
+* Order
+* Payment
+* Tracking
+* Delivery proof
+* Customer messages
+* Product description
+* Store policies
+* Uploaded evidence
+* Timeline
+* Potential payout hold
+
+SELLER ACTIONS
+
+Allow:
+
+* Add evidence
+* Upload tracking proof
+* Upload product photos
+* Upload policy
+* Add written response
+* Submit evidence
+* Accept dispute
+* Message support
+* Add internal note
+
+Do not fabricate dispute outcomes.
+
+RISK FLAGS
+
+Add visual risk indicators.
+
+Examples:
+
+* Billing and shipping mismatch
+* High order value
+* Multiple failed attempts
+* Unusual order pattern
+* Expedited shipping
+* New customer
+* Address verification issue
+
+Do not automatically cancel solely based on a demo risk flag.
+
+BULK ORDER ACTIONS
+
+Allow safe bulk actions:
+
+* Mark processing
+* Mark ready to ship
+* Print packing slips
+* Export
+* Add tag
+* Archive completed orders
+
+Do not allow dangerous bulk refunds or cancellations without strict confirmation.
+
+ORDER SEARCH
+
+Search by:
+
+* Order number
+* Customer name
+* Email
+* Product
+* SKU
+* Tracking number
+* Payment status
+* Fulfillment status
+* Manufacturer
+
+ORDER EXPORT
+
+Create export options for:
+
+* All orders
+* Filtered orders
+* Date range
+* Fulfillment status
+* Payment status
+
+Use CSV export where supported.
+
+DASHBOARD INTEGRATION
+
+Update Seller Home with:
+
+* New orders
+* Orders to process
+* Orders ready to ship
+* Pre-order updates
+* Return requests
+* Refund requests
+* Disputes
+* Shipping exceptions
+* Payout updates
+
+Add these to:
+
+* Today’s priorities
+* Recent activity
+* Next best action
+* Notifications
+
+PRODUCT INTEGRATION
+
+From a Product, show:
+
+* Orders containing the product
+* Units sold
+* Units pending fulfillment
+* Return count
+* Refund count
+* Revenue
+* Pre-order units
+* Manufacturer fulfillment status
+
+MANUFACTURER HUB INTEGRATION
+
+From a production order, allow:
+
+* Convert finished production into fulfillable inventory
+* Send manufacturer fulfillment request
+* View manufacturer shipment
+* Add tracking
+* Confirm customer delivery
+* Link payout milestone
+
+BUYER ORDER EXPERIENCE
+
+Create or update Buyer order pages.
+
+BUYER ORDER LIST
+
+Show:
+
+* Order number
+* Seller
+* Product preview
+* Order date
+* Total
+* Status
+* Tracking
+* Pre-order badge
+
+BUYER ORDER DETAILS
+
+Show:
+
+* Products
+* Variants
+* Seller
+* Shipping address
+* Payment summary
+* Order status
+* Tracking
+* Estimated delivery
+* Pre-order timeline
+* Contact Seller
+* Request return
+* Request refund when eligible
+* Report a problem
+
+Do not expose Seller-only held-funds or internal notes to Buyers.
+
+CUSTOMER COMMUNICATION
+
+Create styled templates or flows for:
+
+* Order confirmation
+* Processing update
+* Shipping confirmation
+* Delivery confirmation
+* Delay notice
+* Pre-order update
+* Return approved
+* Return denied
+* Refund issued
+* Dispute response
+
+Do not claim messages were delivered unless the real messaging or email service confirms it.
+
+DATA MODELS
+
+Create or update typed models for:
+
+* Order
+* OrderLineItem
+* OrderCustomer
+* OrderAddress
+* PaymentSummary
+* HeldFundsRecord
+* PayoutMilestone
+* Fulfillment
+* FulfillmentGroup
+* Shipment
+* ShippingRate
+* ShippingLabel
+* TrackingEvent
+* OrderTimelineEvent
+* OrderNote
+* Cancellation
+* ReturnRequest
+* ReturnItem
+* ReturnInspection
+* Refund
+* RefundLineItem
+* Dispute
+* DisputeEvidence
+* RiskFlag
+* BuyerOrderView
+
+SERVICES
+
+Use the existing backend.
+
+Do not install a second backend.
+
+Create or update strongly typed services for:
+
+* Search orders
+* Filter orders
+* Read order
+* Update fulfillment status
+* Create fulfillment
+* Create partial fulfillment
+* Get shipping rates
+* Buy demo or real shipping label
+* Add tracking
+* Void label
+* Cancel order
+* Create return
+* Approve return
+* Deny return
+* Create refund
+* Track refund
+* Create dispute
+* Submit dispute evidence
+* Track held funds
+* Track payout milestones
+* Export orders
+* Send order communication
+
+Keep mock services separated from UI components.
+
+DESIGN CONSISTENCY
+
+Every screen must match the Brandthread onboarding and Seller design system.
+
+Use:
+
+* Deep black and charcoal backgrounds
+* Purple and blue primary accents
+* Controlled cyan and green status accents
+* Rounded cards
+* Rounded buttons
+* Premium typography
+* Consistent spacing
+* Subtle borders
+* Smooth transitions
+* Styled loading states
+* Styled empty states
+* Styled error states
+* No old green and gray layouts
+* No white flashes
+
+EMPTY STATES
+
+Orders:
+“Your first orders will appear here.”
+
+Returns:
+“Return requests will appear here.”
+
+Refunds:
+“Refund activity will appear here.”
+
+Disputes:
+“Customer disputes will appear here.”
+
+Payouts:
+“Your payout activity will appear here.”
+
+Each empty state must include a useful description and action where appropriate.
+
+TESTING
+
+Test these exact paths:
+
+1. Open Orders.
+2. Search orders.
+3. Apply every major filter.
+4. Open Order Details.
+5. Mark an order processing.
+6. Mark it ready to ship.
+7. Get shipping rates.
+8. Select a rate.
+9. Buy a demo or real label.
+10. Download or share label.
+11. Add tracking.
+12. Mark shipped.
+13. Test partial fulfillment.
+14. Test mixed fulfillment.
+15. Test manufacturer fulfillment.
+16. Test a pre-order order.
+17. Update estimated ship date.
+18. Send a delay notice.
+19. Cancel an order.
+20. Confirm refund impact.
+21. Create a return request.
+22. Approve the return.
+23. Issue a return label.
+24. Mark return received.
+25. Inspect returned item.
+26. Issue partial refund.
+27. Issue full refund.
+28. Create a dispute.
+29. Add dispute evidence.
+30. Submit dispute evidence.
+31. Test held-funds display.
+32. Test payout milestones.
+33. Test shipment delivery.
+34. Confirm payout status updates safely.
+35. Open Buyer Orders.
+36. Open Buyer Order Details.
+37. Test Buyer return request.
+38. Test Buyer problem report.
+39. Restart the app.
+40. Confirm order updates persist.
+41. Confirm returns persist.
+42. Confirm refunds persist.
+43. Confirm disputes persist.
+44. Confirm held-funds records persist.
+45. Confirm Seller Home updates.
+46. Confirm Product Details order data updates.
+47. Confirm Manufacturer Hub integration works.
+48. Fix all TypeScript errors.
+49. Fix all routing errors.
+50. Fix all runtime errors.
+51. Fix all console errors caused by this system.
+52. Confirm onboarding remains unchanged.
+53. Confirm Buyer and Seller accounts still work.
+
+Do not stop after creating static screens.
+
+Build the working Orders and Fulfillment system, typed models, routes, state, demo services where necessary, shipping-label flow, returns, refunds, disputes, held funds, payouts, Buyer order views, and full testing.
+
+When complete, respond with only:
+
+“The Brandthread Orders and Fulfillment system is installed and working.”

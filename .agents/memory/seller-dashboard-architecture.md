@@ -13,9 +13,17 @@ Single source of truth — all seller screens MUST import from here, no local co
 - GRAD_PRIMARY=['#8B5CF6','#22D3EE'] — primary button gradient
 - GRAD_CARD_GLOW=['rgba(139,92,246,0.12)','rgba(34,211,238,0.04)'] — card glow
 
+**Why:** Do NOT redeclare any theme constant locally — Metro bundler throws "Duplicate declaration" at runtime even if TypeScript doesn't catch it (Babel scope check). Always import from '@/lib/theme'.
+
 ## Shared Components (components/BrandthreadUI.tsx)
 All screens must use these — never create one-off buttons or cards in screens.
-Components exported: BrandthreadScreen, BrandthreadHeader, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SearchBar, FilterChip, StatusBadge, EmptyState, SectionHeader, StatCard, QuickActionCard, GuidedTip, NewFeatureBadge, FormInput, ProgressCard, NavigationCard, LoadingSkeleton, Toast, SheetHandle
+Components: BrandthreadScreen, BrandthreadHeader, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SearchBar, FilterChip, StatusBadge, EmptyState, SectionHeader, StatCard, QuickActionCard, GuidedTip, NewFeatureBadge, FormInput, ProgressCard, NavigationCard, LoadingSkeleton, Toast, SheetHandle
+style props accept StyleProp<ViewStyle> (not ViewStyle) — arrays work fine.
+
+## Products System (services/productTypes.ts + services/productService.ts + lib/productUtils.ts)
+- **productTypes.ts** — all Product data model types: Product, ProductMedia, ProductVariant, ProductOption, OptionValue, ProductInventory, InventoryLocation, InventoryAdjustment, ProductPricing, ProductPreorderSettings, ProductFulfillment, ProductManufacturing, ProductStoreSettings, ProductSEO, ProductAnalytics, ProductCollection, ProductTag, ProductDraft, ProductFilter, ProductSearchQuery
+- **productService.ts** — demo CRUD: getProducts, getProduct, createProduct, updateProduct, publishProduct, scheduleProduct, archiveProduct, unarchiveProduct, deleteProduct, duplicateProduct, adjustInventory, getProductAnalytics, getCollections, saveDraft, loadDraft, getTaggableProducts, getProductStats. AsyncStorage-backed with realistic DEMO_FULL_PRODUCTS (4 products).
+- **productUtils.ts** — pricing calculations: calcPricing, formatCurrency, formatPercent, generateVariantCombinations, buildVariantTitle, calcTotalInventory, isLowStock, isOutOfStock, validateForPublish
 
 ## Setup Store (lib/setupStore.ts)
 AsyncStorage-backed seller setup progress. 12 tasks from brand_profile → publish_store.
@@ -28,42 +36,42 @@ Tab bar: purple active indicator, PURPLE accent for active tab, dark BG '#07070F
 ## Screen inventory (seller-specific)
 - `(tabs)/index.tsx` — Seller home: welcome card, next-best-action, setup progress, stats, quick actions, "Go to" command menu, global search modal
 - `(tabs)/studio.tsx` — Creative hub: tool cards (Design, Content, AI Photoshoot, Mockup to Model, BG Removal, Brand Kit), recent projects, templates
-- `(tabs)/products.tsx` — Products: search/filter, stat strip, product list with status badges
+- `(tabs)/products.tsx` — Products tab: 9-filter strip, 6 summary stat cards, full product cards (image/status/price/variants/sales/action menu), action sheet with 10 actions, search, import, add
 - `(tabs)/orders.tsx` — Orders: stat strip, search/filter, order cards with status actions
 - `(tabs)/more.tsx` — Organized sections: Operations · Growth · Store · Account + sign out
-- `(tabs)/profile.tsx` — "My Brand" dashboard (uses OLD green tokens — if updating, migrate to theme.ts)
+- `(tabs)/profile.tsx` — "My Brand" dashboard (uses OLD green tokens — migrate to theme.ts when updating)
 - `app/setup.tsx` — Guided setup: 12-task checklist, progress bar, skip/complete/save-and-exit
+- `app/add-product.tsx` — 10-step product creation: Basic Info · Media · Pricing · Variants · Inventory · Sales Model · Fulfillment · Manufacturing · Storefront · Review & Publish
+- `app/product-detail.tsx` — 8-tab detail: Overview · Variants · Inventory · Orders · Production · Content · Analytics · Store page
+- `app/product-store.tsx` — Buyer product page preview: media gallery, variant selector, pre-order info, CTA, description accordion, related products
+- `app/product-import.tsx` — Import: CSV · Shopify placeholder · Manual bulk entry + import history
 - `app/seller-profile.tsx` — PUBLIC brand profile (buyers see this; sellers via isOwner=true)
 - `app/create-post.tsx` — Full content creation flow (10 steps)
 - `app/post-analytics.tsx` — Per-post analytics with animated charts
-- `app/content.tsx` — Content management hub (routes to create-post for creation)
+- `app/content.tsx` — Content management hub
 - `app/edit-profile.tsx` — Edit seller brand profile
-- `app/brand.tsx` — AI Brand Creation tool — NOT the public profile
-
-## Navigation entry points
-- Home quick actions: Create Post, Add Product, View Orders, Studio
-- Home "Go to" command menu: 9 destinations in one tap
-- Seller Quick Actions in `(tabs)/profile.tsx`: "Create Post" → `/create-post`, "My Profile" → `/seller-profile?isOwner=true`
-- Thread feed: tapping creator avatar or name → `/seller-profile?id=xxx`
-- More tab: Content → `/content`, Analytics → `/(tabs)/analytics`, Marketing → `/(tabs)/marketing`
-- `app/setup.tsx` registered in `app/_layout.tsx` as modal (slide_from_bottom)
+- `app/brand.tsx` — AI Brand Creation tool
 
 ## Registered routes in _layout.tsx (seller)
 - seller-profile (slide_from_right)
-- create-post (fullScreenModal from bottom)  
+- create-post (fullScreenModal from bottom)
 - post-analytics (slide_from_right)
 - setup (modal from bottom)
+- add-product (slide_from_right)
+- product-detail (slide_from_right)
+- product-store (slide_from_right)
+- product-import (modal from bottom)
 
 ## Thread eligibility rule
 `getThreadEligiblePosts()` in sellerContent.ts filters: status=published + isSellerContent=true + scheduled date ≤ now. Buyer posts must NEVER appear in Thread.
 
 ## Navigation gotchas
+- `router.push('/dynamic-string' as never)` — use `as never` for dynamically constructed paths to satisfy expo-router's typed routes. Otherwise TS2345 errors.
 - `router.back()` triggers GO_BACK warning in dev when no stack history — dev-only, not a crash.
-- `SpotlightPage` in feed.tsx is a function component; needs its own `useRouter()` call.
 - Route groups: `/(tabs)/` for seller, `/(buyer)/` for buyer — do not mix them.
-- `(tabs)/profile.tsx` still uses OLD green (#39FF88) design tokens — next migration: update to use theme.ts + BrandthreadUI components.
+- `(tabs)/profile.tsx` still uses OLD green design tokens — next migration: update to use theme.ts + BrandthreadUI.
 
 ## Key design rule
 Seller tabs use PURPLE/CYAN as primary (matches onboarding). GREEN is ONLY for: success states, revenue growth, completed tasks, available status, positive analytics. Never use green as a button color or tab bar color.
 
-**Why:** July 2026 full visual unification of seller app with onboarding design system. Keeping these patterns consistent prevents future regressions to old green-first design.
+**Why:** July 2026 full visual unification of seller app with onboarding design system.

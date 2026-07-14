@@ -1,564 +1,1696 @@
-import React, { useState } from 'react';
+/**
+ * Add Product — 10-step product creation flow
+ */
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  ScrollView, View, Text, TouchableOpacity, StyleSheet,
-  TextInput, Platform, Alert,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
+  TextInput, KeyboardAvoidingView, Platform, Switch,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
-// ─── Theme ────────────────────────────────────────────────────────────────────
-const BG     = '#0A0B0A';
-const CARD   = '#111311';
-const BORDER = '#1E221E';
-const FG     = '#EAF2ED';
-const MUTED  = '#5A6B5C';
-const GREEN  = '#39FF88';
-const BLUE   = '#3B82F6';
-const RED    = '#EF4444';
+import {
+  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
+  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
+  CYAN, SUCCESS, BLUE, ORANGE, RED, GOLD, ON_DARK,
+  GRAD_PRIMARY, GRAD_CARD_GLOW,
+  FONT, FS, SP, RADIUS, COMP, ICON, ANIM,
+} from '@/lib/theme';
 
-// ─── Steps ────────────────────────────────────────────────────────────────────
-const STEPS = [
-  { label: 'Basic Info',  icon: 'type'        as const },
-  { label: 'Media',       icon: 'image'       as const },
-  { label: 'Pricing',     icon: 'dollar-sign' as const },
-  { label: 'Variants',    icon: 'layers'      as const },
-  { label: 'Inventory',   icon: 'box'         as const },
-  { label: 'Fulfillment', icon: 'truck'       as const },
-  { label: 'Sales Model', icon: 'tag'         as const },
-  { label: 'Visibility',  icon: 'eye'         as const },
-  { label: 'Review',      icon: 'check-circle'as const },
+import {
+  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
+  IconButton, FilterChip, StatusBadge, SectionHeader, FormInput,
+  ProgressCard, EmptyState, GuidedTip,
+} from '@/components/BrandthreadUI';
+
+import {
+  createProduct, saveDraft, loadDraft, getCollections, DEMO_FULL_PRODUCTS,
+} from '@/services/productService';
+
+import {
+  Product, ProductDraft, ProductCategory, PRODUCT_CATEGORIES,
+  SIZE_PRESETS, COLOR_PRESETS, SalesModel, OptionType,
+  ProductOption, OptionValue, ProductVariant, ProductMedia,
+} from '@/services/productTypes';
+
+import {
+  calcPricing, generateVariantCombinations, buildVariantTitle, validateForPublish,
+} from '@/lib/productUtils';
+
+// ─── Step definitions ─────────────────────────────────────────────────────────
+
+const STEP_TITLES = [
+  'Basic Information',
+  'Media',
+  'Pricing',
+  'Variants',
+  'Inventory',
+  'Sales Model',
+  'Fulfillment',
+  'Manufacturing',
+  'Storefront',
+  'Review & Publish',
 ];
 
-const CATEGORIES = ['Tops', 'Bottoms', 'Outerwear', 'Accessories', 'Footwear', 'Bags'];
-const PRODUCT_TYPES = ['T-Shirt', 'Hoodie', 'Sweatpants', 'Jacket', 'Tank', 'Crewneck', 'Shorts', 'Cap', 'Bag'];
-const SIZES   = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', 'One Size'];
-const COLORS  = ['Black', 'White', 'Navy', 'Grey', 'Olive', 'Sage', 'Cream', 'Slate', 'Red'];
-const SHIPPING_PROFILES = ['Standard Shipping', 'Free Shipping', 'Express Shipping', 'Custom'];
+// ─── Local state interfaces ───────────────────────────────────────────────────
 
-// ─── Form state ───────────────────────────────────────────────────────────────
-interface FormData {
-  name:         string;
-  description:  string;
-  category:     string;
-  productType:  string;
-  vendor:       string;
-  tags:         string;
-  price:        string;
-  compareAt:    string;
-  cost:         string;
-  sizes:        string[];
-  colors:       string[];
-  trackQty:     boolean;
-  sku:          string;
-  inventory:    string;
-  lowStock:     string;
-  weight:       string;
-  shippingProfile: string;
-  fulfillment:  'seller' | 'manufacturer';
-  salesModel:   'pre-made' | 'pre-order' | 'both';
-  status:       'active' | 'draft' | 'scheduled';
-  seoTitle:     string;
-  seoDesc:      string;
+interface LocalOption {
+  id: string;
+  type: OptionType;
+  name: string;
+  values: { id: string; value: string; colorHex?: string }[];
+  customInput: string;
 }
 
-const DEFAULT_FORM: FormData = {
-  name: '', description: '', category: '', productType: '', vendor: '', tags: '',
-  price: '', compareAt: '', cost: '',
-  sizes: [], colors: [],
-  trackQty: true, sku: '', inventory: '', lowStock: '10',
-  weight: '', shippingProfile: 'Standard Shipping', fulfillment: 'seller',
-  salesModel: 'pre-made',
-  status: 'draft', seoTitle: '', seoDesc: '',
-};
+interface LocalVariant {
+  id: string;
+  title: string;
+  optionValues: { optionId: string; valueId: string }[];
+  sku: string;
+  price: string;
+  qty: string;
+}
+
+function uid() { return Math.random().toString(36).slice(2, 11); }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
+
 export default function AddProductScreen() {
-  const insets  = useSafeAreaInsets();
-  const router  = useRouter();
-  const topPad  = Platform.OS === 'web' ? 20 : insets.top;
+  const router = useRouter();
+  const params = useLocalSearchParams();
+  const insets = useSafeAreaInsets();
 
-  const [step,    setStep]    = useState(0);
-  const [form,    setForm]    = useState<FormData>(DEFAULT_FORM);
+  const [step, setStep] = useState(1);
+  const [draftData, setDraftData] = useState<Partial<Product>>({
+    name: '',
+    description: '',
+    tags: [],
+    media: [],
+    pricing: { price: 0, currency: 'USD' },
+    options: [],
+    variants: [],
+    inventory: {
+      productId: '',
+      trackQuantity: true,
+      allowOverselling: false,
+      policy: 'deny',
+      lowStockThreshold: 5,
+      totalStock: 0,
+      availableStock: 0,
+      reservedStock: 0,
+      incomingStock: 0,
+      locationStock: [],
+      variantStock: [],
+    },
+    salesModel: 'pre-made',
+    preorderSettings: {
+      unitsOrdered: 0,
+      isFunded: false,
+    },
+    fulfillment: { type: 'seller' },
+    manufacturing: { stage: 'none' },
+    storeSettings: {
+      status: 'draft',
+      collectionIds: [],
+      featuredOnHomepage: false,
+      relatedProductIds: [],
+      seo: { searchVisible: true },
+    },
+  });
 
-  function back()  { step > 0 ? setStep(s => s - 1) : router.back(); }
-  function next()  {
-    if (step < STEPS.length - 1) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      setStep(s => s + 1);
-    } else {
-      publish();
-    }
-  }
-  function set<K extends keyof FormData>(key: K, value: FormData[K]) {
-    setForm(prev => ({ ...prev, [key]: value }));
-  }
-  function toggleArray<K extends keyof FormData>(key: K, value: string) {
-    const arr = form[key] as string[];
-    set(key, (arr.includes(value) ? arr.filter(v => v !== value) : [...arr, value]) as FormData[K]);
+  // ── Step-specific local state ──
+  const [tagsInput, setTagsInput] = useState('');
+  const [mediaUrlInput, setMediaUrlInput] = useState('');
+  const [priceStr, setPriceStr] = useState('');
+  const [compareAtStr, setCompareAtStr] = useState('');
+  const [costStr, setCostStr] = useState('');
+  const [shippingStr, setShippingStr] = useState('');
+  const [feesStr, setFeesStr] = useState('');
+  const [localOptions, setLocalOptions] = useState<LocalOption[]>([]);
+  const [localVariants, setLocalVariants] = useState<LocalVariant[]>([]);
+  const [trackInventory, setTrackInventory] = useState(true);
+  const [allowOversell, setAllowOversell] = useState(false);
+  const [stockStr, setStockStr] = useState('');
+  const [lowStockStr, setLowStockStr] = useState('5');
+  const [variantQtys, setVariantQtys] = useState<Record<string, string>>({});
+  const [mfgMode, setMfgMode] = useState<'none' | 'existing' | 'quote'>('none');
+  const [mfgName, setMfgName] = useState('');
+  const [targetCost, setTargetCost] = useState('');
+  const [reqQty, setReqQty] = useState('');
+  const [prodDeadline, setProdDeadline] = useState('');
+  const [featuredHome, setFeaturedHome] = useState(false);
+  const [dismissedTips, setDismissedTips] = useState<string[]>([]);
+
+  const draftId = useRef('draft_' + uid());
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Auto-save draft ──
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      const draft: ProductDraft = {
+        ...draftData,
+        id: draftId.current,
+        isDraft: true,
+        currentStep: step,
+        lastSavedAt: new Date().toISOString(),
+      };
+      saveDraft(draft);
+    }, 2000);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [draftData, step]);
+
+  // ── Helpers ──
+  function patchDraft(patch: Partial<Product>) {
+    setDraftData(prev => ({ ...prev, ...patch }));
   }
 
-  function publish() {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert('Product Saved', `"${form.name || 'New Product'}" has been saved as a ${form.status}.`, [
-      { text: 'View Products', onPress: () => router.back() },
+  function handleExit() {
+    Alert.alert('Exit product creation?', 'Your progress will be saved as a draft.', [
+      {
+        text: 'Save draft', onPress: () => {
+          const draft: ProductDraft = {
+            ...draftData,
+            id: draftId.current,
+            isDraft: true,
+            currentStep: step,
+            lastSavedAt: new Date().toISOString(),
+          };
+          saveDraft(draft);
+          router.back();
+        },
+      },
+      { text: 'Discard', style: 'destructive', onPress: () => router.back() },
+      { text: 'Cancel', style: 'cancel' },
     ]);
   }
 
-  const margin = parseFloat(form.price || '0') - parseFloat(form.cost || '0');
-  const marginPct = parseFloat(form.price || '0') > 0
-    ? Math.round((margin / parseFloat(form.price)) * 100)
-    : 0;
+  function handleSaveDraft() {
+    const draft: ProductDraft = {
+      ...draftData,
+      id: draftId.current,
+      isDraft: true,
+      currentStep: step,
+      lastSavedAt: new Date().toISOString(),
+    };
+    saveDraft(draft);
+    Alert.alert('Draft saved', 'You can continue editing later.');
+    router.back();
+  }
 
-  return (
-    <View style={[s.root, { paddingTop: topPad }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity style={s.backBtn} onPress={back}>
-          <Feather name={step === 0 ? 'x' : 'arrow-left'} size={20} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.headerTitle}>Add Product</Text>
-        <TouchableOpacity style={s.draftBtn} onPress={() => { set('status', 'draft'); publish(); }}>
-          <Text style={s.draftText}>Save Draft</Text>
-        </TouchableOpacity>
-      </View>
+  function goNext() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (step < 10) {
+      setStep(s => s + 1);
+    } else {
+      handlePublish();
+    }
+  }
 
-      {/* Step progress */}
-      <View style={s.progressWrap}>
-        <View style={s.progressTrack}>
-          <View style={[s.progressFill, { width: `${((step + 1) / STEPS.length) * 100}%` as any }]} />
-        </View>
-        <Text style={s.stepLabel}>{STEPS[step].label} · Step {step + 1} of {STEPS.length}</Text>
-      </View>
+  function goBack() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (step > 1) setStep(s => s - 1);
+  }
 
-      {/* Step tabs */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabScroll}>
-        <View style={s.tabRow}>
-          {STEPS.map((st, i) => (
-            <TouchableOpacity
-              key={st.label}
-              style={[s.stepTab, i === step && s.stepTabActive, i < step && s.stepTabDone]}
-              onPress={() => setStep(i)}
-              activeOpacity={0.8}
-            >
-              <Feather
-                name={i < step ? 'check' : st.icon}
-                size={12}
-                color={i === step ? '#0A0B0A' : i < step ? GREEN : MUTED}
-              />
-              <Text style={[s.stepTabText, i === step && s.stepTabTextActive, i < step && { color: GREEN }]}>
-                {st.label}
-              </Text>
-            </TouchableOpacity>
+  // ── Pricing helpers ──
+  function getPricing() {
+    return calcPricing({
+      price: parseFloat(priceStr) || 0,
+      compareAtPrice: parseFloat(compareAtStr) || undefined,
+      cost: parseFloat(costStr) || undefined,
+      estimatedShippingCost: parseFloat(shippingStr) || 0,
+      estimatedFees: parseFloat(feesStr) || 0,
+      currency: 'USD',
+    });
+  }
+
+  // ── Variant generation ──
+  function generateVariants() {
+    if (localOptions.length === 0) {
+      Alert.alert('No options', 'Add at least one option with values first.');
+      return;
+    }
+    const opts = localOptions.map(o => ({
+      id: o.id,
+      name: o.name,
+      values: o.values,
+    }));
+    const combos = generateVariantCombinations(opts);
+    const variants: LocalVariant[] = combos.map(combo => ({
+      id: uid(),
+      title: buildVariantTitle(combo.map(c => c.value)),
+      optionValues: combo.map(c => ({ optionId: c.optionId, valueId: c.valueId })),
+      sku: '',
+      price: '',
+      qty: '',
+    }));
+    setLocalVariants(variants);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
+
+  // ── Publish ──
+  async function handlePublish() {
+    const pricing = {
+      price: parseFloat(priceStr) || 0,
+      compareAtPrice: parseFloat(compareAtStr) || undefined,
+      cost: parseFloat(costStr) || undefined,
+      estimatedShippingCost: parseFloat(shippingStr) || 0,
+      estimatedFees: parseFloat(feesStr) || 0,
+      currency: 'USD',
+    };
+    const productOptions: ProductOption[] = localOptions.map((o, i) => ({
+      id: o.id,
+      type: o.type,
+      name: o.name,
+      values: o.values.map(v => ({
+        id: v.id,
+        value: v.value,
+        colorHex: v.colorHex,
+      })),
+      sortOrder: i,
+    }));
+    const productVariants: ProductVariant[] = localVariants.map(v => ({
+      id: v.id,
+      productId: '',
+      title: v.title,
+      optionValues: v.optionValues,
+      sku: v.sku,
+      price: parseFloat(v.price) || undefined,
+      inventoryQuantity: parseInt(variantQtys[v.id] || v.qty) || 0,
+      reservedQuantity: 0,
+      incomingQuantity: 0,
+      status: 'active' as const,
+      requiresShipping: true,
+      taxable: true,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }));
+    const forValidation = {
+      name: draftData.name ?? '',
+      description: draftData.description ?? '',
+      pricing,
+      media: draftData.media ?? [],
+      variants: productVariants,
+    };
+    const warnings = validateForPublish(forValidation);
+    if (warnings.length > 0) {
+      Alert.alert(
+        'Cannot publish',
+        'Please fix the following:\n\n' + warnings.map(w => '• ' + w).join('\n'),
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+    try {
+      await createProduct({
+        ...draftData,
+        pricing,
+        options: productOptions,
+        variants: productVariants,
+        status: 'active',
+        storeSettings: {
+          ...(draftData.storeSettings ?? { collectionIds: [], featuredOnHomepage: false, relatedProductIds: [], seo: { searchVisible: true } }),
+          status: 'active',
+          featuredOnHomepage: featuredHome,
+        },
+        manufacturing: {
+          stage: mfgMode === 'quote' ? 'quote_requested' : 'none',
+          manufacturerName: mfgName || undefined,
+          targetCostPerUnit: parseFloat(targetCost) || undefined,
+          requiredQuantity: parseInt(reqQty) || undefined,
+          productionDeadline: prodDeadline || undefined,
+        },
+      });
+      Alert.alert('Published!', `"${draftData.name}" is now live.`);
+      router.back();
+    } catch {
+      Alert.alert('Error', 'Could not publish. Please try again.');
+    }
+  }
+
+  // ─── Render steps ──────────────────────────────────────────────────────────
+
+  function renderStep1() {
+    return (
+      <View style={s.stepContent}>
+        <FormInput
+          label="Product name *"
+          value={draftData.name ?? ''}
+          onChange={v => patchDraft({ name: v })}
+          placeholder="e.g. Vintage Washed Tee"
+        />
+        <FormInput
+          label="Description"
+          value={draftData.description ?? ''}
+          onChange={v => patchDraft({ description: v })}
+          placeholder="Describe your product, materials, fit and care..."
+          multiline
+        />
+        <SectionHeader title="Category" style={s.sectionHdr} />
+        <View style={s.chipGrid}>
+          {PRODUCT_CATEGORIES.map(cat => (
+            <FilterChip
+              key={cat}
+              label={cat}
+              active={draftData.category === cat}
+              onPress={() => patchDraft({ category: cat })}
+            />
           ))}
         </View>
-      </ScrollView>
+        <FormInput
+          label="Product type"
+          value={draftData.productType ?? ''}
+          onChange={v => patchDraft({ productType: v })}
+          placeholder="Apparel, Accessories..."
+        />
+        <FormInput
+          label="Vendor"
+          value={draftData.vendor ?? ''}
+          onChange={v => patchDraft({ vendor: v })}
+          placeholder="Your brand or supplier"
+        />
+        <FormInput
+          label="Tags"
+          value={tagsInput}
+          onChange={v => {
+            setTagsInput(v);
+            patchDraft({ tags: v.split(',').map(t => t.trim()).filter(Boolean) });
+          }}
+          placeholder="streetwear, hoodie, oversized"
+        />
+      </View>
+    );
+  }
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingBottom: 140 }}>
-
-        {/* ── Step 0: Basic Info ── */}
-        {step === 0 && (
-          <View style={s.stepContent}>
-            <StepTitle title="Basic information" desc="Start with the core product details." />
-            <FormField label="Product name *" placeholder="e.g. Vintage Washed Tee" value={form.name} onChange={v => set('name', v)} />
-            <FormField label="Description" placeholder="Describe your product…" value={form.description} onChange={v => set('description', v)} multiline />
-            <Label text="Category" />
-            <View style={s.chipGrid}>
-              {CATEGORIES.map(c => (
-                <Chip key={c} label={c} active={form.category === c} onPress={() => set('category', c)} />
-              ))}
-            </View>
-            <Label text="Product type" />
-            <View style={s.chipGrid}>
-              {PRODUCT_TYPES.map(t => (
-                <Chip key={t} label={t} active={form.productType === t} onPress={() => set('productType', t)} />
-              ))}
-            </View>
-            <FormField label="Vendor" placeholder="e.g. Ace Apparel Co." value={form.vendor} onChange={v => set('vendor', v)} />
-            <FormField label="Tags (comma separated)" placeholder="streetwear, tee, drop" value={form.tags} onChange={v => set('tags', v)} />
+  function renderStep2() {
+    const media = draftData.media ?? [];
+    return (
+      <View style={s.stepContent}>
+        <SectionHeader title="Product media" style={s.sectionHdr} />
+        <GradientCard
+          onPress={() => Alert.alert('Upload', 'Media upload coming soon — add a URL for now')}
+          style={s.uploadZone}
+        >
+          <View style={s.uploadInner}>
+            <Feather name="camera" size={32} color={PURPLE_LIGHT} />
+            <Text style={s.uploadLabel}>Tap to add photos and videos</Text>
+            <Text style={s.uploadHint}>JPG, PNG, MP4 · Max 100MB</Text>
           </View>
-        )}
+        </GradientCard>
 
-        {/* ── Step 1: Media ── */}
-        {step === 1 && (
-          <View style={s.stepContent}>
-            <StepTitle title="Product media" desc="Upload photos and videos of your product." />
-            <TouchableOpacity style={s.uploadZone} activeOpacity={0.8} onPress={() => {}}>
-              <View style={s.uploadIcon}><Feather name="upload-cloud" size={28} color={MUTED} /></View>
-              <Text style={s.uploadTitle}>Upload product images</Text>
-              <Text style={s.uploadDesc}>JPG, PNG or WEBP · Up to 20MB each</Text>
-              <View style={s.uploadBtn}><Text style={s.uploadBtnText}>Choose files</Text></View>
-            </TouchableOpacity>
-            <TouchableOpacity style={[s.uploadZone, { marginTop: 12 }]} activeOpacity={0.8} onPress={() => {}}>
-              <View style={s.uploadIcon}><Feather name="video" size={24} color={MUTED} /></View>
-              <Text style={s.uploadTitle}>Upload product video (optional)</Text>
-              <Text style={s.uploadDesc}>MP4 · Up to 100MB</Text>
-            </TouchableOpacity>
-            <View style={[s.uploadZone, { marginTop: 12 }]}>
-              <Feather name="zap" size={20} color={GREEN} style={{ marginBottom: 6 }} />
-              <Text style={[s.uploadTitle, { color: FG }]}>Generate mockups with AI</Text>
-              <Text style={s.uploadDesc}>Skip the photoshoot. Add a design and we'll generate realistic mockups.</Text>
-              <TouchableOpacity style={[s.uploadBtn, { backgroundColor: GREEN }]} onPress={() => {}}>
-                <Text style={[s.uploadBtnText, { color: '#0A0B0A' }]}>Generate Mockups</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        {/* ── Step 2: Pricing ── */}
-        {step === 2 && (
-          <View style={s.stepContent}>
-            <StepTitle title="Pricing" desc="Set your retail price, cost and compare-at price." />
-            <FormField label="Retail price *" placeholder="59.99" value={form.price} onChange={v => set('price', v)} keyboardType="decimal-pad" prefix="$" />
-            <FormField label="Compare-at price" placeholder="79.99" value={form.compareAt} onChange={v => set('compareAt', v)} keyboardType="decimal-pad" prefix="$" />
-            <FormField label="Product cost" placeholder="14.50" value={form.cost} onChange={v => set('cost', v)} keyboardType="decimal-pad" prefix="$" />
-            {parseFloat(form.price) > 0 && parseFloat(form.cost) > 0 && (
-              <View style={s.profitCard}>
-                <View style={s.profitRow}>
-                  <Text style={s.profitLabel}>Estimated profit per unit</Text>
-                  <Text style={[s.profitValue, { color: GREEN }]}>${margin.toFixed(2)}</Text>
+        {media.length > 0 && (
+          <View style={s.mediaGrid}>
+            {media.map(m => (
+              <View key={m.id} style={s.mediaThumbnail}>
+                <View style={s.mediaThumbImg}>
+                  <Feather name="image" size={24} color={PURPLE_LIGHT} />
                 </View>
-                <View style={s.profitRow}>
-                  <Text style={s.profitLabel}>Margin</Text>
-                  <Text style={[s.profitValue, { color: marginPct >= 50 ? GREEN : marginPct >= 30 ? '#F97316' : RED }]}>{marginPct}%</Text>
-                </View>
+                <TouchableOpacity
+                  style={s.mediaDeleteBtn}
+                  onPress={() => patchDraft({ media: media.filter(x => x.id !== m.id) })}
+                >
+                  <Feather name="x" size={12} color={ON_DARK} />
+                </TouchableOpacity>
               </View>
-            )}
+            ))}
           </View>
         )}
 
-        {/* ── Step 3: Variants ── */}
-        {step === 3 && (
-          <View style={s.stepContent}>
-            <StepTitle title="Variants" desc="Choose the sizes and colors you offer." />
-            <Label text="Sizes" />
-            <View style={s.chipGrid}>
-              {SIZES.map(sz => (
-                <Chip key={sz} label={sz} active={form.sizes.includes(sz)} onPress={() => toggleArray('sizes', sz)} />
-              ))}
-            </View>
-            <Label text="Colors" />
-            <View style={s.chipGrid}>
-              {COLORS.map(c => (
-                <Chip key={c} label={c} active={form.colors.includes(c)} onPress={() => toggleArray('colors', c)} />
-              ))}
-            </View>
-            {form.sizes.length > 0 && form.colors.length > 0 && (
-              <View style={s.variantPreview}>
-                <Text style={s.profitLabel}>
-                  {form.sizes.length * form.colors.length} variants will be created
-                </Text>
-                <Text style={s.uploadDesc}>You can set individual pricing and inventory per variant on the next steps.</Text>
-              </View>
-            )}
-          </View>
-        )}
+        <FormInput
+          label="Image URL (demo)"
+          value={mediaUrlInput}
+          onChange={setMediaUrlInput}
+          placeholder="https://..."
+          returnKeyType="done"
+          onSubmitEditing={() => {
+            if (!mediaUrlInput.trim()) return;
+            const newMedia: ProductMedia = {
+              id: uid(),
+              type: 'image',
+              uri: mediaUrlInput.trim(),
+              isCover: media.length === 0,
+              sortOrder: media.length,
+              createdAt: new Date().toISOString(),
+            };
+            patchDraft({ media: [...media, newMedia] });
+            setMediaUrlInput('');
+          }}
+        />
 
-        {/* ── Step 4: Inventory ── */}
-        {step === 4 && (
-          <View style={s.stepContent}>
-            <StepTitle title="Inventory" desc="Track your stock levels and set restock thresholds." />
-            <View style={s.toggleRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.toggleLabel}>Track quantity</Text>
-                <Text style={s.toggleDesc}>Get alerts when stock runs low.</Text>
-              </View>
-              <TouchableOpacity
-                style={[s.toggle, form.trackQty && s.toggleActive]}
-                onPress={() => { set('trackQty', !form.trackQty); Haptics.selectionAsync(); }}
-              >
-                <View style={[s.toggleKnob, form.trackQty && s.toggleKnobActive]} />
-              </TouchableOpacity>
+        <SectionHeader title="Media tips" style={s.sectionHdr} />
+        <BrandthreadCard>
+          <Text style={s.tipText}>
+            Your cover image is the first thing buyers see. Use a clean background or lifestyle shot.
+          </Text>
+        </BrandthreadCard>
+      </View>
+    );
+  }
+
+  function renderStep3() {
+    const pricing = getPricing();
+    const fmt = (v: number | undefined) =>
+      v !== undefined ? `$${v.toFixed(2)}` : '—';
+
+    return (
+      <View style={s.stepContent}>
+        <FormInput
+          label="Retail price *"
+          value={priceStr}
+          onChange={setPriceStr}
+          placeholder="0.00"
+          keyboardType="decimal-pad"
+        />
+        <FormInput
+          label="Compare-at price"
+          value={compareAtStr}
+          onChange={setCompareAtStr}
+          placeholder="Original price if on sale"
+          keyboardType="decimal-pad"
+        />
+        <FormInput
+          label="Product cost"
+          value={costStr}
+          onChange={setCostStr}
+          placeholder="What it costs to make"
+          keyboardType="decimal-pad"
+        />
+        <FormInput
+          label="Est. shipping cost"
+          value={shippingStr}
+          onChange={setShippingStr}
+          placeholder="per unit"
+          keyboardType="decimal-pad"
+        />
+        <FormInput
+          label="Est. fees"
+          value={feesStr}
+          onChange={setFeesStr}
+          placeholder="Platform + payment fees"
+          keyboardType="decimal-pad"
+        />
+
+        <GradientCard glow style={s.pricingCard}>
+          <Text style={s.pricingTitle}>Pricing Summary</Text>
+          <View style={s.pricingRow}>
+            <Text style={s.pricingLabel}>Gross profit</Text>
+            <Text style={[s.pricingValue, { color: pricing.grossProfit !== undefined && pricing.grossProfit >= 0 ? SUCCESS : RED }]}>
+              {fmt(pricing.grossProfit)}
+            </Text>
+          </View>
+          <View style={s.pricingRow}>
+            <Text style={s.pricingLabel}>Net profit</Text>
+            <Text style={[s.pricingValue, { color: pricing.netProfit !== undefined && pricing.netProfit >= 0 ? SUCCESS : RED }]}>
+              {fmt(pricing.netProfit)}
+            </Text>
+          </View>
+          <View style={s.pricingRow}>
+            <Text style={s.pricingLabel}>Margin</Text>
+            <Text style={[s.pricingValue, { color: PURPLE_LIGHT }]}>
+              {pricing.marginPercent !== undefined ? `${pricing.marginPercent.toFixed(1)}%` : '—'}
+            </Text>
+          </View>
+          <View style={s.pricingRow}>
+            <Text style={s.pricingLabel}>Break-even</Text>
+            <Text style={s.pricingValue}>{fmt(pricing.breakEvenPrice)}</Text>
+          </View>
+        </GradientCard>
+      </View>
+    );
+  }
+
+  function renderStep4() {
+    return (
+      <View style={s.stepContent}>
+        <SectionHeader
+          title="Options"
+          action={{
+            label: 'Add option',
+            onPress: () => {
+              setLocalOptions(prev => [...prev, {
+                id: uid(),
+                type: 'size',
+                name: 'Size',
+                values: [],
+                customInput: '',
+              }]);
+            },
+          }}
+          style={s.sectionHdr}
+        />
+
+        {localOptions.map((opt, idx) => (
+          <BrandthreadCard key={opt.id} style={s.optionCard}>
+            {/* Option type selector */}
+            <Text style={s.optionLabel}>Option type</Text>
+            <View style={s.chipRow}>
+              {(['size', 'color', 'material', 'style', 'custom'] as OptionType[]).map(t => (
+                <FilterChip
+                  key={t}
+                  label={t.charAt(0).toUpperCase() + t.slice(1)}
+                  active={opt.type === t}
+                  onPress={() => {
+                    const updated = [...localOptions];
+                    updated[idx] = { ...opt, type: t, name: t === 'custom' ? '' : t.charAt(0).toUpperCase() + t.slice(1) };
+                    setLocalOptions(updated);
+                  }}
+                />
+              ))}
             </View>
-            {form.trackQty && (
+
+            <FormInput
+              label="Option name"
+              value={opt.name}
+              onChange={v => {
+                const updated = [...localOptions];
+                updated[idx] = { ...opt, name: v };
+                setLocalOptions(updated);
+              }}
+              placeholder="e.g. Size, Color..."
+            />
+
+            {opt.type === 'size' && (
               <>
-                <FormField label="SKU" placeholder="VWT-BLK-M" value={form.sku} onChange={v => set('sku', v)} />
-                <FormField label="Barcode (optional)" placeholder="012345678901" value={''} onChange={() => {}} />
-                <FormField label="Current stock" placeholder="100" value={form.inventory} onChange={v => set('inventory', v)} keyboardType="number-pad" />
-                <FormField label="Low-stock threshold" placeholder="10" value={form.lowStock} onChange={v => set('lowStock', v)} keyboardType="number-pad" />
+                <Text style={[s.optionLabel, { marginTop: SP.sm }]}>Size presets</Text>
+                <View style={s.chipRow}>
+                  {SIZE_PRESETS.map(sz => (
+                    <FilterChip
+                      key={sz}
+                      label={sz}
+                      active={opt.values.some(v => v.value === sz)}
+                      onPress={() => {
+                        const updated = [...localOptions];
+                        const already = opt.values.some(v => v.value === sz);
+                        updated[idx] = {
+                          ...opt,
+                          values: already
+                            ? opt.values.filter(v => v.value !== sz)
+                            : [...opt.values, { id: uid(), value: sz }],
+                        };
+                        setLocalOptions(updated);
+                      }}
+                    />
+                  ))}
+                </View>
               </>
             )}
-          </View>
-        )}
 
-        {/* ── Step 5: Fulfillment ── */}
-        {step === 5 && (
-          <View style={s.stepContent}>
-            <StepTitle title="Fulfillment" desc="Set shipping preferences and dimensions." />
-            <FormField label="Weight (kg)" placeholder="0.35" value={form.weight} onChange={v => set('weight', v)} keyboardType="decimal-pad" />
-            <Label text="Shipping profile" />
-            <View style={s.chipGrid}>
-              {SHIPPING_PROFILES.map(sp => (
-                <Chip key={sp} label={sp} active={form.shippingProfile === sp} onPress={() => set('shippingProfile', sp)} />
-              ))}
-            </View>
-            <Label text="Fulfilled by" />
-            {(['seller', 'manufacturer'] as const).map(opt => (
-              <TouchableOpacity
-                key={opt}
-                style={[s.radioRow, form.fulfillment === opt && s.radioRowActive]}
-                onPress={() => { set('fulfillment', opt); Haptics.selectionAsync(); }}
-                activeOpacity={0.8}
-              >
-                <View style={[s.radioCircle, form.fulfillment === opt && s.radioCircleActive]}>
-                  {form.fulfillment === opt && <View style={s.radioInner} />}
-                </View>
-                <View>
-                  <Text style={s.radioLabel}>{opt === 'seller' ? 'Seller (me)' : 'Manufacturer'}</Text>
-                  <Text style={s.radioDesc}>{opt === 'seller' ? 'You ship directly to the customer.' : 'The manufacturer ships to the customer.'}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {/* ── Step 6: Sales model ── */}
-        {step === 6 && (
-          <View style={s.stepContent}>
-            <StepTitle title="Sales model" desc="Choose how customers can purchase this product." />
-            {(['pre-made', 'pre-order', 'both'] as const).map(model => (
-              <TouchableOpacity
-                key={model}
-                style={[s.modelCard, form.salesModel === model && s.modelCardActive]}
-                onPress={() => { set('salesModel', model); Haptics.selectionAsync(); }}
-                activeOpacity={0.8}
-              >
-                <View style={s.modelTop}>
-                  <Text style={s.modelTitle}>
-                    {model === 'pre-made' ? 'Pre-made inventory' : model === 'pre-order' ? 'Pre-order' : 'Both'}
-                  </Text>
-                  {form.salesModel === model && <Feather name="check-circle" size={16} color={GREEN} />}
-                </View>
-                <Text style={s.modelDesc}>
-                  {model === 'pre-made'  ? 'Ship from existing stock. Orders fulfilled immediately.' :
-                   model === 'pre-order' ? 'Accept orders before production. Collect payments upfront.' :
-                   'Offer both pre-made and pre-order options.'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-            {(form.salesModel === 'pre-order' || form.salesModel === 'both') && (
+            {opt.type === 'color' && (
               <>
-                <FormField label="Pre-order opening date" placeholder="2026-07-01" value={''} onChange={() => {}} />
-                <FormField label="Pre-order closing date" placeholder="2026-07-31" value={''} onChange={() => {}} />
-                <FormField label="Minimum order quantity" placeholder="50" value={''} onChange={() => {}} keyboardType="number-pad" />
-                <FormField label="Expected ship date" placeholder="2026-09-01" value={''} onChange={() => {}} />
+                <Text style={[s.optionLabel, { marginTop: SP.sm }]}>Color presets</Text>
+                <View style={s.colorGrid}>
+                  {COLOR_PRESETS.map(c => {
+                    const selected = opt.values.some(v => v.value === c.name);
+                    return (
+                      <TouchableOpacity
+                        key={c.name}
+                        onPress={() => {
+                          const updated = [...localOptions];
+                          const already = opt.values.some(v => v.value === c.name);
+                          updated[idx] = {
+                            ...opt,
+                            values: already
+                              ? opt.values.filter(v => v.value !== c.name)
+                              : [...opt.values, { id: uid(), value: c.name, colorHex: c.hex }],
+                          };
+                          setLocalOptions(updated);
+                        }}
+                        style={[s.colorSwatch, { backgroundColor: c.hex, borderColor: selected ? PURPLE : BORDER, borderWidth: selected ? 2 : 1 }]}
+                      >
+                        {selected && <Feather name="check" size={12} color={c.hex === '#FFFFFF' || c.hex === '#F5F0E8' ? '#000' : '#fff'} />}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </>
             )}
-          </View>
-        )}
 
-        {/* ── Step 7: Store visibility ── */}
-        {step === 7 && (
-          <View style={s.stepContent}>
-            <StepTitle title="Store visibility" desc="Control when and how this product appears in your store." />
-            <Label text="Status" />
-            {(['active', 'draft', 'scheduled'] as const).map(st => (
+            {/* Current values as chips */}
+            {opt.values.length > 0 && (
+              <View style={[s.chipRow, { marginTop: SP.sm }]}>
+                {opt.values.map(v => (
+                  <TouchableOpacity
+                    key={v.id}
+                    style={s.valueChip}
+                    onPress={() => {
+                      const updated = [...localOptions];
+                      updated[idx] = { ...opt, values: opt.values.filter(x => x.id !== v.id) };
+                      setLocalOptions(updated);
+                    }}
+                  >
+                    {v.colorHex && <View style={[s.valueDot, { backgroundColor: v.colorHex }]} />}
+                    <Text style={s.valueChipText}>{v.value}</Text>
+                    <Feather name="x" size={10} color={MUTED} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {/* Custom value input */}
+            <View style={s.customValueRow}>
+              <TextInput
+                style={s.customValueInput}
+                value={opt.customInput}
+                onChangeText={v => {
+                  const updated = [...localOptions];
+                  updated[idx] = { ...opt, customInput: v };
+                  setLocalOptions(updated);
+                }}
+                placeholder="Add value..."
+                placeholderTextColor={SUBTLE}
+              />
               <TouchableOpacity
-                key={st}
-                style={[s.radioRow, form.status === st && s.radioRowActive]}
-                onPress={() => { set('status', st); Haptics.selectionAsync(); }}
-                activeOpacity={0.8}
+                style={s.customValueAdd}
+                onPress={() => {
+                  if (!opt.customInput.trim()) return;
+                  const updated = [...localOptions];
+                  updated[idx] = {
+                    ...opt,
+                    values: [...opt.values, { id: uid(), value: opt.customInput.trim() }],
+                    customInput: '',
+                  };
+                  setLocalOptions(updated);
+                }}
               >
-                <View style={[s.radioCircle, form.status === st && s.radioCircleActive]}>
-                  {form.status === st && <View style={s.radioInner} />}
-                </View>
-                <View>
-                  <Text style={s.radioLabel}>{st.charAt(0).toUpperCase() + st.slice(1)}</Text>
-                  <Text style={s.radioDesc}>{
-                    st === 'active' ? 'Visible in your store now.' :
-                    st === 'draft'  ? 'Hidden from your store.' :
-                    'Goes live on a scheduled date.'
-                  }</Text>
-                </View>
+                <Feather name="plus" size={16} color={PURPLE_LIGHT} />
               </TouchableOpacity>
-            ))}
-            <FormField label="SEO title" placeholder={form.name || 'Product name for search engines'} value={form.seoTitle} onChange={v => set('seoTitle', v)} />
-            <FormField label="SEO description" placeholder="Brief product summary for search results." value={form.seoDesc} onChange={v => set('seoDesc', v)} multiline />
-          </View>
+            </View>
+
+            <TouchableOpacity
+              style={s.deleteOptionBtn}
+              onPress={() => setLocalOptions(prev => prev.filter((_, i) => i !== idx))}
+            >
+              <Feather name="trash-2" size={14} color={RED} />
+              <Text style={s.deleteOptionText}>Remove option</Text>
+            </TouchableOpacity>
+          </BrandthreadCard>
+        ))}
+
+        {localOptions.length > 0 && (
+          <PrimaryButton
+            label={`Generate combinations${localVariants.length > 0 ? ` (${localVariants.length} existing)` : ''}`}
+            onPress={generateVariants}
+            icon="zap"
+            style={{ marginTop: SP.sm }}
+          />
         )}
 
-        {/* ── Step 8: Review ── */}
-        {step === 8 && (
-          <View style={s.stepContent}>
-            <StepTitle title="Review & publish" desc="Check your product details before publishing." />
-            {[
-              { label: 'Name',       value: form.name        || '—' },
-              { label: 'Category',   value: form.category    || '—' },
-              { label: 'Type',       value: form.productType || '—' },
-              { label: 'Price',      value: form.price ? `$${form.price}` : '—' },
-              { label: 'Cost',       value: form.cost  ? `$${form.cost}`  : '—' },
-              { label: 'Sizes',      value: form.sizes.join(', ') || '—' },
-              { label: 'Colors',     value: form.colors.join(', ') || '—' },
-              { label: 'Status',     value: form.status },
-              { label: 'Sales model',value: form.salesModel },
-              { label: 'Fulfillment',value: form.fulfillment },
-            ].map(row => (
-              <View key={row.label} style={s.reviewRow}>
-                <Text style={s.reviewLabel}>{row.label}</Text>
-                <Text style={s.reviewValue} numberOfLines={2}>{row.value}</Text>
+        {localVariants.length > 0 && (
+          <>
+            <Text style={s.variantCount}>{localVariants.length} variants will be created</Text>
+            {localVariants.map(v => (
+              <BrandthreadCard key={v.id} style={s.variantRow}>
+                <Text style={s.variantTitle}>{v.title}</Text>
+                <View style={s.variantFields}>
+                  <TextInput
+                    style={s.variantInput}
+                    value={v.sku}
+                    onChangeText={txt => setLocalVariants(prev => prev.map(x => x.id === v.id ? { ...x, sku: txt } : x))}
+                    placeholder="SKU"
+                    placeholderTextColor={SUBTLE}
+                  />
+                  <TextInput
+                    style={s.variantInput}
+                    value={v.price}
+                    onChangeText={txt => setLocalVariants(prev => prev.map(x => x.id === v.id ? { ...x, price: txt } : x))}
+                    placeholder="Price override"
+                    placeholderTextColor={SUBTLE}
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+              </BrandthreadCard>
+            ))}
+          </>
+        )}
+      </View>
+    );
+  }
+
+  function renderStep5() {
+    return (
+      <View style={s.stepContent}>
+        <View style={s.switchRow}>
+          <Text style={s.switchLabel}>Track inventory</Text>
+          <Switch
+            value={trackInventory}
+            onValueChange={v => {
+              setTrackInventory(v);
+              patchDraft({ inventory: { ...(draftData.inventory!), trackQuantity: v } });
+            }}
+            trackColor={{ false: BORDER, true: PURPLE }}
+            thumbColor={ON_DARK}
+          />
+        </View>
+
+        {trackInventory && (
+          <>
+            <FormInput
+              label="Current stock"
+              value={stockStr}
+              onChange={setStockStr}
+              placeholder="0"
+              keyboardType="numeric"
+            />
+            <FormInput
+              label="Low-stock threshold"
+              value={lowStockStr}
+              onChange={setLowStockStr}
+              placeholder="5"
+              keyboardType="numeric"
+            />
+          </>
+        )}
+
+        <View style={s.switchRow}>
+          <Text style={s.switchLabel}>Allow overselling</Text>
+          <Switch
+            value={allowOversell}
+            onValueChange={v => {
+              setAllowOversell(v);
+              patchDraft({ inventory: { ...(draftData.inventory!), allowOverselling: v, policy: v ? 'continue' : 'deny' } });
+            }}
+            trackColor={{ false: BORDER, true: PURPLE }}
+            thumbColor={ON_DARK}
+          />
+        </View>
+
+        {localVariants.length > 0 && (
+          <>
+            <SectionHeader title="By variant" style={s.sectionHdr} />
+            {localVariants.map(v => (
+              <View key={v.id} style={s.variantQtyRow}>
+                <Text style={s.variantQtyLabel}>{v.title}</Text>
+                <TextInput
+                  style={s.variantQtyInput}
+                  value={variantQtys[v.id] ?? ''}
+                  onChangeText={txt => setVariantQtys(prev => ({ ...prev, [v.id]: txt }))}
+                  placeholder="0"
+                  placeholderTextColor={SUBTLE}
+                  keyboardType="numeric"
+                />
               </View>
             ))}
-          </View>
+          </>
         )}
+      </View>
+    );
+  }
 
-      </ScrollView>
+  function renderStep6() {
+    const sm = draftData.salesModel ?? 'pre-made';
+    const ps = draftData.preorderSettings ?? { unitsOrdered: 0, isFunded: false };
 
-      {/* Footer buttons */}
-      <View style={[s.footer, { paddingBottom: insets.bottom + 16 }]}>
-        {step > 0 && (
-          <TouchableOpacity style={s.prevBtn} onPress={back} activeOpacity={0.8}>
-            <Feather name="arrow-left" size={16} color={FG} />
-            <Text style={s.prevText}>Back</Text>
+    const models: { key: SalesModel; title: string; desc: string }[] = [
+      { key: 'pre-made', title: 'Pre-made', desc: 'Sell from existing inventory. Ship when ordered.' },
+      { key: 'pre-order', title: 'Pre-order', desc: 'Accept orders before production. Set open/close dates.' },
+      { key: 'both', title: 'Both', desc: 'Sell stock until empty, then take pre-orders.' },
+    ];
+
+    return (
+      <View style={s.stepContent}>
+        <SectionHeader title="How will you sell this product?" style={s.sectionHdr} />
+        {models.map(m => (
+          <TouchableOpacity
+            key={m.key}
+            onPress={() => {
+              Haptics.selectionAsync();
+              patchDraft({ salesModel: m.key });
+            }}
+            activeOpacity={0.8}
+          >
+            <BrandthreadCard
+              style={[s.modelCard, sm === m.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}
+            >
+              <View style={s.modelCardHeader}>
+                <Text style={s.modelTitle}>{m.title}</Text>
+                {sm === m.key && <Feather name="check-circle" size={18} color={PURPLE_LIGHT} />}
+              </View>
+              <Text style={s.modelDesc}>{m.desc}</Text>
+            </BrandthreadCard>
           </TouchableOpacity>
+        ))}
+
+        {(sm === 'pre-order' || sm === 'both') && (
+          <>
+            <SectionHeader title="Pre-order settings" style={s.sectionHdr} />
+            <FormInput
+              label="Pre-order opens"
+              value={ps.openDate ?? ''}
+              onChange={v => patchDraft({ preorderSettings: { ...ps, openDate: v } })}
+              placeholder="YYYY-MM-DD"
+            />
+            <FormInput
+              label="Pre-order closes"
+              value={ps.closeDate ?? ''}
+              onChange={v => patchDraft({ preorderSettings: { ...ps, closeDate: v } })}
+              placeholder="YYYY-MM-DD"
+            />
+            <FormInput
+              label="Est. shipping date"
+              value={ps.estimatedShippingDate ?? ''}
+              onChange={v => patchDraft({ preorderSettings: { ...ps, estimatedShippingDate: v } })}
+              placeholder="YYYY-MM-DD"
+            />
+            <FormInput
+              label="Funding goal (units)"
+              value={ps.fundingGoalUnits?.toString() ?? ''}
+              onChange={v => patchDraft({ preorderSettings: { ...ps, fundingGoalUnits: parseInt(v) || 0 } })}
+              keyboardType="numeric"
+            />
+            <FormInput
+              label="Pre-order disclaimer"
+              value={ps.disclaimer ?? ''}
+              onChange={v => patchDraft({ preorderSettings: { ...ps, disclaimer: v } })}
+              placeholder="e.g. Production begins when funding goal is reached."
+              multiline
+            />
+          </>
         )}
-        <TouchableOpacity style={[s.nextBtn, { flex: step > 0 ? 0.65 : 1 }]} onPress={next} activeOpacity={0.85}>
-          <LinearGradient colors={[GREEN, '#00C853']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.nextGrad}>
-            <Text style={s.nextText}>{step === STEPS.length - 1 ? 'Publish Product' : 'Continue'}</Text>
-            <Feather name={step === STEPS.length - 1 ? 'check' : 'arrow-right'} size={16} color="#0A0B0A" />
-          </LinearGradient>
+      </View>
+    );
+  }
+
+  function renderStep7() {
+    const ff = draftData.fulfillment ?? { type: 'seller' };
+    const types: { key: 'seller' | 'manufacturer' | 'mixed'; label: string }[] = [
+      { key: 'seller', label: 'Fulfilled by me' },
+      { key: 'manufacturer', label: 'Fulfilled by manufacturer' },
+      { key: 'mixed', label: 'Mixed' },
+    ];
+
+    return (
+      <View style={s.stepContent}>
+        <SectionHeader title="Fulfillment type" style={s.sectionHdr} />
+        <View style={s.chipRow}>
+          {types.map(t => (
+            <FilterChip
+              key={t.key}
+              label={t.label}
+              active={ff.type === t.key}
+              onPress={() => patchDraft({ fulfillment: { ...ff, type: t.key } })}
+            />
+          ))}
+        </View>
+
+        <FormInput
+          label="Weight (grams)"
+          value={ff.weightGrams?.toString() ?? ''}
+          onChange={v => patchDraft({ fulfillment: { ...ff, weightGrams: parseInt(v) || undefined } })}
+          keyboardType="numeric"
+          placeholder="280"
+        />
+        <FormInput
+          label="Length (cm)"
+          value={ff.packageLengthCm?.toString() ?? ''}
+          onChange={v => patchDraft({ fulfillment: { ...ff, packageLengthCm: parseFloat(v) || undefined } })}
+          keyboardType="numeric"
+          placeholder="30"
+        />
+        <FormInput
+          label="Width (cm)"
+          value={ff.packageWidthCm?.toString() ?? ''}
+          onChange={v => patchDraft({ fulfillment: { ...ff, packageWidthCm: parseFloat(v) || undefined } })}
+          keyboardType="numeric"
+          placeholder="25"
+        />
+        <FormInput
+          label="Height (cm)"
+          value={ff.packageHeightCm?.toString() ?? ''}
+          onChange={v => patchDraft({ fulfillment: { ...ff, packageHeightCm: parseFloat(v) || undefined } })}
+          keyboardType="numeric"
+          placeholder="4"
+        />
+        <FormInput
+          label="Processing time (days)"
+          value={ff.processingTimeDays?.toString() ?? ''}
+          onChange={v => patchDraft({ fulfillment: { ...ff, processingTimeDays: parseInt(v) || undefined } })}
+          keyboardType="numeric"
+          placeholder="2"
+        />
+        <FormInput
+          label="Country of origin"
+          value={ff.countryOfOrigin ?? ''}
+          onChange={v => patchDraft({ fulfillment: { ...ff, countryOfOrigin: v } })}
+          placeholder="US"
+        />
+      </View>
+    );
+  }
+
+  function renderStep8() {
+    const modes: { key: 'none' | 'existing' | 'quote'; label: string; desc: string }[] = [
+      { key: 'none', label: 'No manufacturer yet', desc: 'Skip for now, assign later.' },
+      { key: 'existing', label: 'Assign existing', desc: 'Link an existing manufacturer to this product.' },
+      { key: 'quote', label: 'Request quote', desc: 'Submit production details and request pricing.' },
+    ];
+
+    return (
+      <View style={s.stepContent}>
+        <SectionHeader title="Manufacturer" style={s.sectionHdr} />
+        {modes.map(m => (
+          <TouchableOpacity
+            key={m.key}
+            onPress={() => { Haptics.selectionAsync(); setMfgMode(m.key); }}
+            activeOpacity={0.8}
+          >
+            <BrandthreadCard
+              style={[s.modelCard, mfgMode === m.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}
+            >
+              <View style={s.modelCardHeader}>
+                <Text style={s.modelTitle}>{m.label}</Text>
+                {mfgMode === m.key && <Feather name="check-circle" size={18} color={PURPLE_LIGHT} />}
+              </View>
+              <Text style={s.modelDesc}>{m.desc}</Text>
+            </BrandthreadCard>
+          </TouchableOpacity>
+        ))}
+
+        {mfgMode === 'existing' && (
+          <FormInput
+            label="Manufacturer name"
+            value={mfgName}
+            onChange={setMfgName}
+            placeholder="e.g. Euro Stitch Ltd"
+          />
+        )}
+
+        {mfgMode === 'quote' && (
+          <>
+            <FormInput
+              label="Target cost per unit"
+              value={targetCost}
+              onChange={setTargetCost}
+              placeholder="0.00"
+              keyboardType="decimal-pad"
+            />
+            <FormInput
+              label="Required quantity"
+              value={reqQty}
+              onChange={setReqQty}
+              placeholder="50"
+              keyboardType="numeric"
+            />
+            <FormInput
+              label="Production deadline"
+              value={prodDeadline}
+              onChange={setProdDeadline}
+              placeholder="YYYY-MM-DD"
+            />
+            <SecondaryButton
+              label="Upload tech pack (coming soon)"
+              onPress={() => Alert.alert('Coming soon', 'Tech pack upload will be available in a future update.')}
+              icon="upload"
+              disabled
+            />
+          </>
+        )}
+      </View>
+    );
+  }
+
+  function renderStep9() {
+    const ss = draftData.storeSettings ?? {
+      status: 'draft',
+      collectionIds: [],
+      featuredOnHomepage: false,
+      relatedProductIds: [],
+      seo: { searchVisible: true },
+    };
+    const seo = ss.seo ?? { searchVisible: true };
+
+    const statuses: { key: 'active' | 'draft' | 'scheduled' | 'hidden' | 'archived'; label: string; desc: string }[] = [
+      { key: 'active', label: 'Active', desc: 'Visible and purchasable on your storefront.' },
+      { key: 'draft', label: 'Draft', desc: 'Not visible. Continue editing before publishing.' },
+      { key: 'scheduled', label: 'Scheduled', desc: 'Goes live automatically at a set date.' },
+      { key: 'hidden', label: 'Hidden', desc: 'Only accessible via direct link.' },
+      { key: 'archived', label: 'Archived', desc: 'Removed from storefront, data retained.' },
+    ];
+
+    return (
+      <View style={s.stepContent}>
+        <SectionHeader title="Store visibility" style={s.sectionHdr} />
+        {statuses.map(st => (
+          <TouchableOpacity
+            key={st.key}
+            onPress={() => { Haptics.selectionAsync(); patchDraft({ storeSettings: { ...ss, status: st.key }, status: st.key }); }}
+            activeOpacity={0.8}
+          >
+            <BrandthreadCard
+              style={[s.modelCard, ss.status === st.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}
+            >
+              <View style={s.modelCardHeader}>
+                <Text style={s.modelTitle}>{st.label}</Text>
+                {ss.status === st.key && <Feather name="check-circle" size={18} color={PURPLE_LIGHT} />}
+              </View>
+              <Text style={s.modelDesc}>{st.desc}</Text>
+            </BrandthreadCard>
+          </TouchableOpacity>
+        ))}
+
+        {ss.status === 'scheduled' && (
+          <FormInput
+            label="Publish date"
+            value={ss.scheduledPublishDate ?? ''}
+            onChange={v => patchDraft({ storeSettings: { ...ss, scheduledPublishDate: v } })}
+            placeholder="YYYY-MM-DD HH:MM"
+          />
+        )}
+
+        <View style={s.switchRow}>
+          <Text style={s.switchLabel}>Featured on homepage</Text>
+          <Switch
+            value={featuredHome}
+            onValueChange={v => {
+              setFeaturedHome(v);
+              patchDraft({ storeSettings: { ...ss, featuredOnHomepage: v } });
+            }}
+            trackColor={{ false: BORDER, true: PURPLE }}
+            thumbColor={ON_DARK}
+          />
+        </View>
+
+        <SectionHeader title="SEO & URL" style={s.sectionHdr} />
+        <FormInput
+          label="URL handle"
+          value={seo.urlHandle ?? ''}
+          onChange={v => patchDraft({ storeSettings: { ...ss, seo: { ...seo, urlHandle: v } } })}
+          placeholder="my-product-name"
+        />
+        <FormInput
+          label="SEO title"
+          value={seo.title ?? ''}
+          onChange={v => patchDraft({ storeSettings: { ...ss, seo: { ...seo, title: v } } })}
+          placeholder="Product name — Brand"
+        />
+        <FormInput
+          label="SEO description"
+          value={seo.description ?? ''}
+          onChange={v => patchDraft({ storeSettings: { ...ss, seo: { ...seo, description: v } } })}
+          multiline
+        />
+      </View>
+    );
+  }
+
+  function renderStep10() {
+    const pricing = getPricing();
+    const ss = draftData.storeSettings ?? { status: 'draft', collectionIds: [], featuredOnHomepage: false, relatedProductIds: [], seo: { searchVisible: true } };
+    const seo = ss.seo ?? { searchVisible: true };
+    const ff = draftData.fulfillment ?? { type: 'seller' };
+    const media = draftData.media ?? [];
+    const tags = draftData.tags ?? [];
+
+    const forValidation = {
+      name: draftData.name ?? '',
+      description: draftData.description ?? '',
+      pricing: { price: parseFloat(priceStr) || 0, currency: 'USD' },
+      media,
+      variants: localVariants,
+    };
+    const warnings = validateForPublish(forValidation);
+
+    function ReviewRow({ label, value }: { label: string; value: string }) {
+      return (
+        <View style={s.reviewRow}>
+          <Text style={s.reviewLabel}>{label}</Text>
+          <Text style={s.reviewValue}>{value}</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={s.stepContent}>
+        <BrandthreadCard style={s.reviewCard}>
+          <Text style={s.reviewSection}>Basic</Text>
+          <ReviewRow label="Name" value={draftData.name || '—'} />
+          <ReviewRow label="Category" value={draftData.category || '—'} />
+          <ReviewRow label="Tags" value={tags.length > 0 ? tags.join(', ') : '—'} />
+        </BrandthreadCard>
+
+        <BrandthreadCard style={s.reviewCard}>
+          <Text style={s.reviewSection}>Media</Text>
+          <ReviewRow label="Images" value={media.length > 0 ? `${media.length} image${media.length !== 1 ? 's' : ''}` : 'None added'} />
+          {media[0] && <ReviewRow label="Cover" value={media[0].uri.slice(0, 40) + '...'} />}
+        </BrandthreadCard>
+
+        <BrandthreadCard style={s.reviewCard}>
+          <Text style={s.reviewSection}>Pricing</Text>
+          <ReviewRow label="Retail" value={priceStr ? `$${priceStr}` : '—'} />
+          <ReviewRow label="Cost" value={costStr ? `$${costStr}` : '—'} />
+          <ReviewRow label="Net margin" value={pricing.marginPercent !== undefined ? `${pricing.marginPercent.toFixed(1)}%` : '—'} />
+        </BrandthreadCard>
+
+        <BrandthreadCard style={s.reviewCard}>
+          <Text style={s.reviewSection}>Variants</Text>
+          <ReviewRow label="Options" value={localOptions.length > 0 ? localOptions.map(o => o.name).join(', ') : 'None'} />
+          <ReviewRow label="Variants" value={localVariants.length > 0 ? `${localVariants.length} variants` : 'None generated'} />
+        </BrandthreadCard>
+
+        <BrandthreadCard style={s.reviewCard}>
+          <Text style={s.reviewSection}>Inventory</Text>
+          <ReviewRow label="Track inventory" value={trackInventory ? 'Yes' : 'No'} />
+          <ReviewRow label="Current stock" value={stockStr || '0'} />
+          <ReviewRow label="Allow overselling" value={allowOversell ? 'Yes' : 'No'} />
+        </BrandthreadCard>
+
+        <BrandthreadCard style={s.reviewCard}>
+          <Text style={s.reviewSection}>Sales model</Text>
+          <ReviewRow label="Model" value={draftData.salesModel ?? 'pre-made'} />
+          {(draftData.salesModel === 'pre-order' || draftData.salesModel === 'both') && (
+            <>
+              <ReviewRow label="Opens" value={draftData.preorderSettings?.openDate ?? '—'} />
+              <ReviewRow label="Closes" value={draftData.preorderSettings?.closeDate ?? '—'} />
+            </>
+          )}
+        </BrandthreadCard>
+
+        <BrandthreadCard style={s.reviewCard}>
+          <Text style={s.reviewSection}>Fulfillment</Text>
+          <ReviewRow label="Type" value={ff.type} />
+          <ReviewRow label="Weight" value={ff.weightGrams ? `${ff.weightGrams}g` : '—'} />
+        </BrandthreadCard>
+
+        <BrandthreadCard style={s.reviewCard}>
+          <Text style={s.reviewSection}>Manufacturing</Text>
+          <ReviewRow label="Stage" value={mfgMode === 'quote' ? 'Quote requested' : mfgMode === 'existing' ? `Assigned: ${mfgName || '—'}` : 'None'} />
+        </BrandthreadCard>
+
+        <BrandthreadCard style={s.reviewCard}>
+          <Text style={s.reviewSection}>Storefront</Text>
+          <ReviewRow label="Status" value={ss.status} />
+          <ReviewRow label="SEO title" value={seo.title || '—'} />
+          <ReviewRow label="Featured" value={featuredHome ? 'Yes' : 'No'} />
+        </BrandthreadCard>
+
+        {warnings.length > 0 && (
+          <BrandthreadCard style={[s.reviewCard, { borderColor: RED + '55' }]}>
+            <Text style={[s.reviewSection, { color: RED }]}>Warnings</Text>
+            {warnings.map((w, i) => (
+              <View key={i} style={s.warningRow}>
+                <Feather name="alert-circle" size={14} color={RED} />
+                <Text style={s.warningText}>{w}</Text>
+              </View>
+            ))}
+          </BrandthreadCard>
+        )}
+
+        <View style={s.publishButtons}>
+          <SecondaryButton
+            label="Save draft"
+            onPress={handleSaveDraft}
+            style={{ flex: 1 }}
+          />
+          <PrimaryButton
+            label="Publish"
+            onPress={handlePublish}
+            style={{ flex: 1 }}
+          />
+          <SecondaryButton
+            label="Schedule"
+            onPress={() => Alert.alert('Schedule', 'Scheduling coming soon')}
+            style={{ flex: 1 }}
+          />
+        </View>
+      </View>
+    );
+  }
+
+  function renderCurrentStep() {
+    switch (step) {
+      case 1:  return renderStep1();
+      case 2:  return renderStep2();
+      case 3:  return renderStep3();
+      case 4:  return renderStep4();
+      case 5:  return renderStep5();
+      case 6:  return renderStep6();
+      case 7:  return renderStep7();
+      case 8:  return renderStep8();
+      case 9:  return renderStep9();
+      case 10: return renderStep10();
+      default: return null;
+    }
+  }
+
+  const progressPct = (step / 10) * 100;
+
+  return (
+    <View style={[s.root, { paddingTop: insets.top }]}>
+      {/* ── Fixed header ── */}
+      <View style={s.header}>
+        <TouchableOpacity onPress={handleExit} style={s.headerBack}>
+          <Feather name="x" size={ICON.md} color={FG} />
+        </TouchableOpacity>
+        <View style={s.headerCenter}>
+          <Text style={s.stepIndicator}>Step {step} of 10</Text>
+          <Text style={s.stepTitle}>{STEP_TITLES[step - 1]}</Text>
+        </View>
+        <TouchableOpacity onPress={handleSaveDraft} style={s.headerSave}>
+          <Text style={s.headerSaveText}>Save draft</Text>
         </TouchableOpacity>
       </View>
-    </View>
-  );
-}
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-function StepTitle({ title, desc }: { title: string; desc: string }) {
-  return (
-    <View style={{ marginBottom: 24 }}>
-      <Text style={s.stepTitle}>{title}</Text>
-      <Text style={s.stepDesc}>{desc}</Text>
-    </View>
-  );
-}
+      {/* ── Progress bar ── */}
+      <View style={s.progressTrack}>
+        <View style={[s.progressFill, { width: `${progressPct}%` }]} />
+      </View>
 
-function Label({ text }: { text: string }) {
-  return <Text style={s.label}>{text}</Text>;
-}
+      {/* ── Step content ── */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          style={s.scrollView}
+          contentContainerStyle={[s.scrollContent, { paddingBottom: insets.bottom + 100 }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {renderCurrentStep()}
+        </ScrollView>
+      </KeyboardAvoidingView>
 
-function FormField({
-  label, placeholder, value, onChange, multiline, keyboardType, prefix,
-}: {
-  label: string; placeholder: string; value: string; onChange: (v: string) => void;
-  multiline?: boolean; keyboardType?: 'default' | 'decimal-pad' | 'number-pad'; prefix?: string;
-}) {
-  return (
-    <View style={s.fieldWrap}>
-      <Text style={s.label}>{label}</Text>
-      <View style={s.inputWrap}>
-        {prefix && <Text style={s.inputPrefix}>{prefix}</Text>}
-        <TextInput
-          style={[s.input, multiline && s.inputMulti]}
-          placeholder={placeholder}
-          placeholderTextColor={MUTED}
-          value={value}
-          onChangeText={onChange}
-          multiline={multiline}
-          keyboardType={keyboardType ?? 'default'}
+      {/* ── Bottom nav ── */}
+      <View style={[s.bottomNav, { paddingBottom: insets.bottom + SP.sm }]}>
+        {step > 1 ? (
+          <SecondaryButton label="Back" onPress={goBack} style={s.navBack} />
+        ) : (
+          <View style={s.navBack} />
+        )}
+        <PrimaryButton
+          label={step === 10 ? 'Publish' : 'Next'}
+          onPress={goNext}
+          style={s.navNext}
         />
       </View>
     </View>
   );
 }
 
-function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  return (
-    <TouchableOpacity
-      style={[s.chip, active && s.chipActive]}
-      onPress={() => { Haptics.selectionAsync(); onPress(); }}
-      activeOpacity={0.8}
-    >
-      {active && <Feather name="check" size={10} color="#0A0B0A" style={{ marginRight: 3 }} />}
-      <Text style={[s.chipText, active && s.chipTextActive]}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
 // ─── Styles ───────────────────────────────────────────────────────────────────
+
 const s = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: BG },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
-  backBtn:{ width: 36, height: 36, borderRadius: 10, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { flex: 1, fontSize: 17, fontFamily: 'Inter_700Bold', color: FG },
-  draftBtn:    { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: BORDER },
-  draftText:   { fontSize: 13, fontFamily: 'Inter_500Medium', color: MUTED },
-
-  progressWrap: { paddingHorizontal: 20, marginBottom: 4 },
-  progressTrack:{ height: 2, backgroundColor: BORDER, borderRadius: 1, overflow: 'hidden' },
-  progressFill: { height: 2, backgroundColor: GREEN, borderRadius: 1 },
-  stepLabel:    { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 6 },
-
-  tabScroll: { flexGrow: 0, marginBottom: 4 },
-  tabRow:    { flexDirection: 'row', gap: 6, paddingHorizontal: 16 },
-  stepTab:   { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: CARD, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: BORDER },
-  stepTabActive: { backgroundColor: GREEN, borderColor: GREEN },
-  stepTabDone:   { backgroundColor: GREEN + '15', borderColor: GREEN + '44' },
-  stepTabText:   { fontSize: 11, fontFamily: 'Inter_500Medium', color: MUTED },
-  stepTabTextActive: { color: '#0A0B0A', fontFamily: 'Inter_700Bold' },
-
-  stepContent: { gap: 16 },
-  stepTitle:   { fontSize: 22, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.3 },
-  stepDesc:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 4 },
-
-  fieldWrap: { gap: 6 },
-  label:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, letterSpacing: 0.2 },
-  inputWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER },
-  inputPrefix:{ fontSize: 14, fontFamily: 'Inter_600SemiBold', color: MUTED, paddingLeft: 14 },
-  input:     { flex: 1, paddingVertical: 13, paddingHorizontal: 14, fontSize: 14, fontFamily: 'Inter_400Regular', color: FG },
-  inputMulti:{ height: 90, textAlignVertical: 'top', paddingTop: 13 },
-
-  chipGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip:      { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: BORDER },
-  chipActive:{ backgroundColor: GREEN, borderColor: GREEN },
-  chipText:  { fontSize: 13, fontFamily: 'Inter_500Medium', color: MUTED },
-  chipTextActive: { color: '#0A0B0A', fontFamily: 'Inter_700Bold' },
-
-  profitCard: { backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, padding: 14, gap: 8 },
-  profitRow:  { flexDirection: 'row', justifyContent: 'space-between' },
-  profitLabel:{ fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED },
-  profitValue:{ fontSize: 13, fontFamily: 'Inter_700Bold', color: FG },
-
-  uploadZone: { backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, borderStyle: 'dashed', padding: 24, alignItems: 'center', gap: 8 },
-  uploadIcon: { width: 56, height: 56, borderRadius: 14, backgroundColor: '#1A1E1A', alignItems: 'center', justifyContent: 'center' },
-  uploadTitle:{ fontSize: 14, fontFamily: 'Inter_600SemiBold', color: MUTED },
-  uploadDesc: { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center' },
-  uploadBtn:  { backgroundColor: CARD, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9, borderWidth: 1, borderColor: BORDER, marginTop: 4 },
-  uploadBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
-
-  variantPreview: { backgroundColor: BLUE + '15', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: BLUE + '33', gap: 4 },
-
-  toggleRow:    { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, padding: 14, gap: 12 },
-  toggleLabel:  { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: FG },
-  toggleDesc:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 2 },
-  toggle:       { width: 44, height: 26, borderRadius: 13, backgroundColor: BORDER, padding: 3 },
-  toggleActive: { backgroundColor: GREEN },
-  toggleKnob:   { width: 20, height: 20, borderRadius: 10, backgroundColor: MUTED },
-  toggleKnobActive: { backgroundColor: '#0A0B0A', transform: [{ translateX: 18 }] },
-
-  radioRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: 12, backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, padding: 14 },
-  radioRowActive:{ borderColor: GREEN, backgroundColor: GREEN + '08' },
-  radioCircle:   { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  radioCircleActive: { borderColor: GREEN },
-  radioInner:    { width: 8, height: 8, borderRadius: 4, backgroundColor: GREEN },
-  radioLabel:    { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: FG },
-  radioDesc:     { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 2 },
-
-  modelCard:      { backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, padding: 16, gap: 6 },
-  modelCardActive:{ borderColor: GREEN, backgroundColor: GREEN + '08' },
-  modelTop:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  modelTitle:     { fontSize: 14, fontFamily: 'Inter_700Bold', color: FG },
-  modelDesc:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 18 },
-
-  reviewRow:   { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: BORDER },
-  reviewLabel: { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED },
-  reviewValue: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG, flex: 1, textAlign: 'right' },
-
-  footer:   { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: BG, borderTopWidth: 1, borderTopColor: BORDER, paddingHorizontal: 16, paddingTop: 12, flexDirection: 'row', gap: 10 },
-  prevBtn:  { flex: 0.32, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: CARD, borderRadius: 14, paddingVertical: 15, borderWidth: 1, borderColor: BORDER },
-  prevText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
-  nextBtn:  { borderRadius: 14, overflow: 'hidden' },
-  nextGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15, paddingHorizontal: 20 },
-  nextText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#0A0B0A' },
+  root: {
+    flex: 1,
+    backgroundColor: BG,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+    minHeight: COMP.headerH,
+  },
+  headerBack: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.sm,
+    backgroundColor: CARD,
+    borderWidth: 1,
+    borderColor: BORDER,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+  },
+  stepIndicator: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: MUTED,
+  },
+  stepTitle: {
+    fontSize: FS.base,
+    fontFamily: FONT.bold,
+    color: FG,
+  },
+  headerSave: {
+    paddingHorizontal: SP.sm,
+    paddingVertical: SP.xs,
+  },
+  headerSaveText: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    color: PURPLE_LIGHT,
+  },
+  progressTrack: {
+    height: 4,
+    backgroundColor: BORDER,
+  },
+  progressFill: {
+    height: 4,
+    backgroundColor: PURPLE,
+    borderRadius: RADIUS.pill,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingTop: SP.md,
+  },
+  stepContent: {
+    paddingHorizontal: SP.md,
+    gap: SP.md,
+  },
+  sectionHdr: {
+    paddingHorizontal: 0,
+  },
+  chipGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SP.sm,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SP.sm,
+  },
+  // Media
+  uploadZone: {
+    minHeight: 140,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  uploadInner: {
+    alignItems: 'center',
+    gap: SP.sm,
+    paddingVertical: SP.lg,
+  },
+  uploadLabel: {
+    fontSize: FS.base,
+    fontFamily: FONT.medium,
+    color: MUTED,
+  },
+  uploadHint: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: SUBTLE,
+  },
+  mediaGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SP.sm,
+  },
+  mediaThumbnail: {
+    width: 80,
+    height: 80,
+    borderRadius: RADIUS.sm,
+    backgroundColor: CARD,
+    borderWidth: 1,
+    borderColor: BORDER,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  mediaThumbImg: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mediaDeleteBtn: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tipText: {
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    color: MUTED,
+    lineHeight: 20,
+  },
+  // Pricing
+  pricingCard: {
+    gap: SP.sm,
+  },
+  pricingTitle: {
+    fontSize: FS.base,
+    fontFamily: FONT.bold,
+    color: FG,
+    marginBottom: SP.xs,
+  },
+  pricingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  pricingLabel: {
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    color: MUTED,
+  },
+  pricingValue: {
+    fontSize: FS.sm,
+    fontFamily: FONT.bold,
+    color: FG,
+  },
+  // Options
+  optionCard: {
+    gap: SP.sm,
+  },
+  optionLabel: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    color: MUTED,
+  },
+  colorGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SP.sm,
+  },
+  colorSwatch: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  valueChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: CARD_ELEVATED,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: BORDER_ACTIVE,
+  },
+  valueDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  valueChipText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: PURPLE_LIGHT,
+  },
+  customValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    backgroundColor: CARD,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: SP.md,
+    height: COMP.inputH,
+  },
+  customValueInput: {
+    flex: 1,
+    fontSize: FS.base,
+    fontFamily: FONT.regular,
+    color: FG,
+  },
+  customValueAdd: {
+    padding: SP.xs,
+  },
+  deleteOptionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
+    alignSelf: 'flex-start',
+    marginTop: SP.xs,
+  },
+  deleteOptionText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: RED,
+  },
+  variantCount: {
+    fontSize: FS.sm,
+    fontFamily: FONT.medium,
+    color: MUTED,
+    textAlign: 'center',
+    marginTop: SP.xs,
+  },
+  variantRow: {
+    gap: SP.sm,
+  },
+  variantTitle: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    color: FG,
+  },
+  variantFields: {
+    flexDirection: 'row',
+    gap: SP.sm,
+  },
+  variantInput: {
+    flex: 1,
+    height: 40,
+    backgroundColor: SURFACE,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: SP.sm,
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    color: FG,
+  },
+  // Inventory
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: CARD,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: SP.md,
+    height: COMP.inputH,
+  },
+  switchLabel: {
+    fontSize: FS.base,
+    fontFamily: FONT.medium,
+    color: FG,
+  },
+  variantQtyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: CARD,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: SP.md,
+    height: COMP.inputH,
+  },
+  variantQtyLabel: {
+    fontSize: FS.sm,
+    fontFamily: FONT.medium,
+    color: FG,
+    flex: 1,
+  },
+  variantQtyInput: {
+    width: 80,
+    height: 36,
+    backgroundColor: SURFACE,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: SP.sm,
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    color: FG,
+    textAlign: 'right',
+  },
+  // Model cards
+  modelCard: {
+    gap: SP.xs,
+  },
+  modelCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  modelTitle: {
+    fontSize: FS.base,
+    fontFamily: FONT.semibold,
+    color: FG,
+  },
+  modelDesc: {
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    color: MUTED,
+    lineHeight: 18,
+  },
+  // Review
+  reviewCard: {
+    gap: SP.xs,
+  },
+  reviewSection: {
+    fontSize: FS.sm,
+    fontFamily: FONT.bold,
+    color: PURPLE_LIGHT,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: SP.xs,
+  },
+  reviewRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  reviewLabel: {
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    color: MUTED,
+  },
+  reviewValue: {
+    fontSize: FS.sm,
+    fontFamily: FONT.medium,
+    color: FG,
+    maxWidth: '60%',
+    textAlign: 'right',
+  },
+  warningRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SP.xs,
+    paddingVertical: 2,
+  },
+  warningText: {
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    color: RED,
+    flex: 1,
+    lineHeight: 18,
+  },
+  publishButtons: {
+    flexDirection: 'row',
+    gap: SP.sm,
+    marginTop: SP.sm,
+  },
+  // Bottom nav
+  bottomNav: {
+    flexDirection: 'row',
+    gap: SP.sm,
+    paddingHorizontal: SP.md,
+    paddingTop: SP.md,
+    borderTopWidth: 1,
+    borderTopColor: BORDER,
+    backgroundColor: BG,
+  },
+  navBack: {
+    flex: 1,
+  },
+  navNext: {
+    flex: 2,
+  },
 });
