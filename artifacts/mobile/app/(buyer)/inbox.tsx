@@ -1,376 +1,605 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity,
-  useColorScheme, ScrollView, Alert,
+  View, Text, FlatList, ScrollView, TouchableOpacity,
+  TextInput, Alert, StyleSheet, Dimensions,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect, useRouter } from 'expo-router';
 import {
-  FRIENDS, Friend, Message,
-  getLastMessage, getUnread, markRead, subscribe,
-} from '@/lib/chatStore';
+  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
+  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
+  CYAN, CYAN_DIM, SURFACE, FONT, FS, SP, RADIUS, COMP, ICON,
+  GRAD_PRIMARY,
+} from '@/lib/theme';
+import {
+  getConversations, getStories, markConversationRead, archiveConversation,
+  subscribeSocial, MY_USER_ID, MY_COLOR, MY_INITIALS, MY_NAME,
+  getNotifications,
+} from '@/services/socialService';
+import type { Conversation, Story } from '@/services/socialTypes';
 
-// ─── Notification mock data ───────────────────────────────────────────────────
-
-const NOTIF_ITEMS = [
-  { id: 'n1', type: 'drop'    as const, read: false, title: 'Vault Studio drop is live', body: 'Canvas Cargo Jacket is now available — only 50 units.', time: '2h', cta: 'Shop now' },
-  { id: 'n2', type: 'restock' as const, read: false, title: 'Back in stock', body: 'Archive Hoodie Vol.3 by NxGen Drops — 8 units remaining.', time: '6h', cta: 'Buy now' },
-  { id: 'n3', type: 'order'   as const, read: true,  title: 'Order shipped', body: 'Your Essential Relaxed Tee from Meridian Co. is on its way.', time: '1d', cta: 'Track order' },
-  { id: 'n4', type: 'drop'    as const, read: true,  title: 'Atlas Goods — new drop', body: 'City Chore Coat now available in sand and slate.', time: '1d', cta: 'Shop now' },
-];
-
-type NotifType = 'drop' | 'order' | 'restock';
-const TYPE_META: Record<NotifType, { icon: keyof typeof Feather.glyphMap; color: string }> = {
-  drop:    { icon: 'zap',        color: '#00C853' },
-  order:   { icon: 'package',    color: '#4C9A5E' },
-  restock: { icon: 'refresh-cw', color: '#B98A2E' },
-};
-
-// ─── Time helper ──────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function timeAgo(ts: number): string {
   const diff = Date.now() - ts;
   const mins = Math.floor(diff / 60_000);
-  if (mins < 1)  return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}m`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24)  return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
+  if (hrs < 24) return `${hrs}h`;
+  return `${Math.floor(hrs / 24)}d`;
 }
 
-// ─── Flat list row shell ──────────────────────────────────────────────────────
-// Instagram-style inbox row: no card/border chrome, just icon + text + trailing glyph.
-
-function InboxRow({ leading, title, titleBold, subtitle, cta, ctaColor, trailing, onPress, fg, muted }: {
-  leading: React.ReactNode;
-  title: string;
-  titleBold?: boolean;
-  subtitle: string;
-  cta?: string;
-  ctaColor?: string;
-  trailing?: React.ReactNode;
-  onPress: () => void;
-  fg: string;
-  muted: string;
-}) {
-  return (
-    <TouchableOpacity style={s.row} onPress={onPress} activeOpacity={0.75} hitSlop={{ top: 4, bottom: 4 }}>
-      {leading}
-      <View style={{ flex: 1 }}>
-        <Text style={[s.rowTitle, { color: fg }, titleBold && { fontFamily: 'Inter_700Bold' }]} numberOfLines={1}>
-          {title}
-        </Text>
-        <Text style={[s.rowSubtitle, { color: muted }]} numberOfLines={1}>{subtitle}</Text>
-        {cta && <Text style={[s.rowCta, { color: ctaColor ?? muted }]}>{cta}</Text>}
-      </View>
-      {trailing}
-    </TouchableOpacity>
-  );
+function getParticipant(conv: Conversation) {
+  return conv.participants[0];
 }
 
-// ─── DM thread row ────────────────────────────────────────────────────────────
+// ─── Segment tabs ─────────────────────────────────────────────────────────────
 
-function DMRow({ friend, last, unread, isDark, onPress }: {
-  friend: Friend;
-  last: Message | null;
-  unread: number;
-  isDark: boolean;
-  onPress: () => void;
-}) {
-  const fg     = isDark ? '#EDE7D9' : '#17140F';
-  const muted  = isDark ? '#8C8577' : '#5C5548';
-  const primary = isDark ? '#39FF88' : '#00C853';
+const TABS = ['All', 'Friends', 'Sellers', 'Orders', 'Requests', 'Archived'] as const;
+type Tab = typeof TABS[number];
 
-  return (
-    <InboxRow
-      fg={fg}
-      muted={muted}
-      onPress={onPress}
-      leading={
-        <View style={[s.dmAvatar, { backgroundColor: friend.color }]}>
-          <Text style={s.dmInitials}>{friend.initials}</Text>
-        </View>
-      }
-      title={friend.name}
-      titleBold={unread > 0}
-      subtitle={last ? `${last.fromMe ? 'You: ' : ''}${last.text} · ${timeAgo(last.ts)}` : 'Start a conversation'}
-      trailing={
-        unread > 0 ? (
-          <View style={[s.unreadBadge, { backgroundColor: primary }]}>
-            <Text style={s.unreadText}>{unread}</Text>
-          </View>
-        ) : (
-          <Feather name="camera" size={19} color={muted} />
-        )
-      }
-    />
-  );
-}
-
-// ─── Notification row ─────────────────────────────────────────────────────────
-
-function NotifRow({ item, isDark, onRead }: {
-  item: typeof NOTIF_ITEMS[number];
-  isDark: boolean;
-  onRead: (id: string) => void;
-}) {
-  const router  = useRouter();
-  const fg      = isDark ? '#EDE7D9' : '#17140F';
-  const muted   = isDark ? '#8C8577' : '#5C5548';
-  const primary = isDark ? '#39FF88' : '#00C853';
-  const meta    = TYPE_META[item.type];
-  const badgeCountVisible = !item.read && (item.type === 'drop' || item.type === 'restock');
-  const badgeDotVisible   = !item.read && !badgeCountVisible;
-
-  return (
-    <InboxRow
-      fg={fg}
-      muted={muted}
-      onPress={() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        onRead(item.id);
-        if (item.cta === 'Track order') {
-          router.push('/(buyer)/orders' as never);
-        } else {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }
-      }}
-      leading={
-        <View style={[s.notifAvatar, { backgroundColor: meta.color }]}>
-          <Feather name={meta.icon} size={18} color="#FFF" />
-        </View>
-      }
-      title={item.title}
-      titleBold={!item.read}
-      subtitle={`${item.body} · ${item.time}`}
-      cta={item.cta}
-      ctaColor={primary}
-      trailing={
-        badgeCountVisible ? (
-          <View style={[s.unreadBadge, { backgroundColor: primary }]}>
-            <Text style={s.unreadText}>1</Text>
-          </View>
-        ) : badgeDotVisible ? (
-          <View style={[s.unreadDot, { backgroundColor: primary }]} />
-        ) : undefined
-      }
-    />
-  );
-}
+const EMPTY_MESSAGES: Record<Tab, { icon: keyof typeof Feather.glyphMap; title: string; subtitle: string }> = {
+  All:      { icon: 'message-circle', title: 'No conversations yet',     subtitle: 'Start a conversation' },
+  Friends:  { icon: 'message-circle', title: 'No friend messages',       subtitle: 'Message a friend to get started' },
+  Sellers:  { icon: 'message-circle', title: 'No seller conversations',  subtitle: 'Message a brand to get started' },
+  Orders:   { icon: 'package',        title: 'No order messages',         subtitle: 'Order messages will appear here' },
+  Requests: { icon: 'mail',           title: 'No message requests',       subtitle: 'Requests from new senders appear here' },
+  Archived: { icon: 'archive',        title: 'No archived conversations', subtitle: 'Archived chats appear here' },
+};
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
-const FRIEND_ORDER = ['maya', 'kai', 'jordan', 'sofia', 'amir'];
-
 export default function InboxScreen() {
-  const insets  = useSafeAreaInsets();
-  const scheme  = useColorScheme();
-  const router  = useRouter();
-  const isDark  = scheme !== 'light';
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
 
-  const bg      = isDark ? '#121110' : '#F5F1E7';
-  const fg      = isDark ? '#EDE7D9' : '#17140F';
-  const muted   = isDark ? '#8C8577' : '#5C5548';
-  const border  = isDark ? '#33302A' : '#E3DCC9';
-  const primary = isDark ? '#39FF88' : '#00C853';
-  const chipBg  = isDark ? '#1B1917' : '#FFFFFF';
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [stories, setStories] = useState<Story[]>([]);
+  const [activeTab, setActiveTab] = useState<Tab>('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
-  // Trigger re-renders when store changes
-  const [, forceUpdate] = useState(0);
-  useEffect(() => {
-    const unsub = subscribe(() => forceUpdate(n => n + 1));
-    return () => { unsub(); };
+  const loadData = useCallback(async () => {
+    const [convs, strs, notifs] = await Promise.all([
+      getConversations(),
+      getStories(),
+      getNotifications(),
+    ]);
+    setConversations(convs);
+    setStories(strs);
+    setUnreadNotifCount(notifs.filter(n => !n.isRead).length);
   }, []);
 
-  // Notification read state
-  const [notifItems, setNotifItems] = useState(NOTIF_ITEMS);
-  function markNotifRead(id: string) {
-    setNotifItems(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+  useFocusEffect(useCallback(() => {
+    loadData();
+  }, [loadData]));
+
+  useEffect(() => {
+    const unsub = subscribeSocial(() => { loadData(); });
+    return unsub;
+  }, [loadData]);
+
+  // ── Filter logic ────────────────────────────────────────────────────────────
+
+  const filteredConvs = conversations.filter(conv => {
+    // Tab filter
+    let tabMatch = false;
+    switch (activeTab) {
+      case 'All':      tabMatch = !conv.isArchived; break;
+      case 'Friends':  tabMatch = conv.type === 'buyer_to_buyer' && !conv.isArchived && !conv.isRequest; break;
+      case 'Sellers':  tabMatch = (conv.type === 'buyer_to_seller' || conv.type === 'buyer_to_seller_product') && !conv.isArchived && !conv.isRequest; break;
+      case 'Orders':   tabMatch = conv.type === 'buyer_to_seller_order' && !conv.isArchived; break;
+      case 'Requests': tabMatch = conv.isRequest === true && !conv.isArchived; break;
+      case 'Archived': tabMatch = conv.isArchived === true; break;
+    }
+    if (!tabMatch) return false;
+    // Search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const participant = getParticipant(conv);
+      return participant?.name.toLowerCase().includes(q) || participant?.handle.toLowerCase().includes(q);
+    }
+    return true;
+  });
+
+  const myStories = stories.filter(s => s.authorId === MY_USER_ID);
+  const otherStories = stories.filter(s => s.authorId !== MY_USER_ID);
+  const allStoryIds = stories.map(s => s.id);
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
+
+  function openConversation(conv: Conversation) {
+    markConversationRead(conv.id);
+    router.push(`/buyer-conversation?id=${conv.id}` as never);
   }
 
-  const totalUnread = FRIEND_ORDER.reduce((acc, id) => acc + getUnread(id), 0);
-
-  function openChat(friendId: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    markRead(friendId);
-    router.push(`/chat/${friendId}`);
+  function longPressConversation(conv: Conversation) {
+    Alert.alert('Options', undefined, [
+      { text: 'Archive', onPress: () => archiveConversation(conv.id), style: 'destructive' },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   }
+
+  function openCompose() {
+    Alert.alert(
+      'New Conversation',
+      'Start a conversation with:',
+      [{ text: 'Cancel', style: 'cancel' }],
+    );
+  }
+
+  // ── Render helpers ──────────────────────────────────────────────────────────
+
+  function renderConvRow({ item: conv }: { item: Conversation }) {
+    const participant = getParticipant(conv);
+    if (!participant) return null;
+    const isUnread = conv.unreadCount > 0;
+
+    return (
+      <TouchableOpacity
+        style={s.convRow}
+        onPress={() => openConversation(conv)}
+        onLongPress={() => longPressConversation(conv)}
+        activeOpacity={0.75}
+      >
+        {/* Avatar with unread dot */}
+        <View style={s.avatarContainer}>
+          <View style={[s.avatar48, { backgroundColor: participant.color }]}>
+            <Text style={s.avatarInitials}>{participant.initials}</Text>
+          </View>
+          {isUnread && <View style={s.unreadDot} />}
+        </View>
+
+        {/* Center content */}
+        <View style={s.convCenter}>
+          <View style={s.convNameRow}>
+            <Text
+              style={[s.convName, { fontFamily: isUnread ? FONT.bold : FONT.semibold }]}
+              numberOfLines={1}
+            >
+              {participant.name}
+            </Text>
+            {conv.lastMessageTs ? (
+              <Text style={s.convTime}>{timeAgo(conv.lastMessageTs)}</Text>
+            ) : null}
+          </View>
+          {conv.contextOrderNumber ? (
+            <View style={s.orderPill}>
+              <Text style={s.orderPillText}>{conv.contextOrderNumber}</Text>
+            </View>
+          ) : null}
+          <Text
+            style={[s.convPreview, isUnread && { color: FG }]}
+            numberOfLines={1}
+          >
+            {conv.lastMessage ?? 'No messages yet'}
+          </Text>
+        </View>
+
+        {/* Trailing */}
+        {isUnread ? (
+          <View style={s.unreadBadge}>
+            <Text style={s.unreadBadgeText}>{conv.unreadCount > 99 ? '99+' : conv.unreadCount}</Text>
+          </View>
+        ) : (
+          <Feather name="camera" size={ICON.sm} color={MUTED} />
+        )}
+      </TouchableOpacity>
+    );
+  }
+
+  function renderEmptyState() {
+    const { icon, title, subtitle } = EMPTY_MESSAGES[activeTab];
+    return (
+      <View style={s.emptyState}>
+        <Feather name={icon} size={48} color={MUTED} />
+        <Text style={s.emptyTitle}>{title}</Text>
+        <Text style={s.emptySubtitle}>{subtitle}</Text>
+      </View>
+    );
+  }
+
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <ScrollView
-      style={[s.container, { backgroundColor: bg }]}
-      contentContainerStyle={{ paddingBottom: 110 }}
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={s.root}>
       {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + 16 }]}>
-        <TouchableOpacity
-          style={s.headerIconBtn}
-          activeOpacity={0.7}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          onPress={() => openChat('maya')}
-        >
-          <Feather name="users" size={22} color={fg} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={s.headerTitleRow}
-          activeOpacity={0.7}
-          hitSlop={{ top: 8, bottom: 8 }}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
-        >
-          <Text style={[s.headerTitle, { color: fg }]}>Inbox</Text>
-          <View style={[s.headerChevronPill, { backgroundColor: chipBg }]}>
-            {totalUnread > 0 && <View style={[s.headerDot, { backgroundColor: primary }]} />}
-            <Feather name="chevron-down" size={13} color={muted} />
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={s.headerIconBtn}
-          activeOpacity={0.7}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          onPress={() => router.push('/(buyer)/search' as never)}
-        >
-          <Feather name="search" size={21} color={fg} />
-        </TouchableOpacity>
-      </View>
-
-      {/* ── Stories row ── */}
-      <View style={{ marginTop: 6 }}>
-        <TouchableOpacity
-          style={[s.thoughtsChip, { backgroundColor: chipBg, borderColor: border }]}
-          activeOpacity={0.75}
-          hitSlop={{ top: 8, bottom: 8 }}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/story-creator' as never); }}
-        >
-          <Text style={[s.thoughtsText, { color: muted }]}>Thoughts?</Text>
-        </TouchableOpacity>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 20, gap: 16, paddingTop: 10, paddingBottom: 4 }}
-        >
+      <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
+        <Text style={s.headerTitle}>Inbox</Text>
+        <View style={s.headerRight}>
+          {/* Notifications bell */}
           <TouchableOpacity
-            style={s.storyItem}
-            activeOpacity={0.8}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/story-picker' as never); }}
+            style={s.headerIconBtn}
+            onPress={() => router.push('/buyer-notifications' as never)}
+            activeOpacity={0.7}
           >
-            <View style={[s.createRing, { backgroundColor: border }]}>
-              <Feather name="user" size={24} color={muted} />
-              <View style={[s.createBadge, { backgroundColor: primary, borderColor: bg }]}>
-                <Feather name="plus" size={11} color="#FFF" />
+            <Feather name="bell" size={ICON.lg} color={FG} />
+            {unreadNotifCount > 0 && (
+              <View style={s.notifBadge}>
+                <Text style={s.notifBadgeText}>
+                  {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
+                </Text>
               </View>
-            </View>
-            <Text style={[s.storyLabel, { color: fg }]}>Create</Text>
+            )}
           </TouchableOpacity>
+          {/* Compose */}
+          <TouchableOpacity
+            style={s.headerIconBtn}
+            onPress={openCompose}
+            activeOpacity={0.7}
+          >
+            <Feather name="edit-2" size={ICON.lg} color={MUTED} />
+          </TouchableOpacity>
+        </View>
+      </View>
 
-          {FRIEND_ORDER.map(id => {
-            const friend = FRIENDS[id];
-            return (
-              <TouchableOpacity
-                key={id}
-                style={s.storyItem}
-                activeOpacity={0.8}
-                onPress={() => openChat(id)}
-              >
-                <View style={[s.storyRing, { borderColor: friend.color }]}>
-                  <View style={[s.storyAvatar, { backgroundColor: friend.color }]}>
-                    <Text style={s.storyInitials}>{friend.initials}</Text>
-                  </View>
+      {/* Stories row */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.storiesContent}
+        style={s.storiesRow}
+      >
+        {/* Your story circle */}
+        <TouchableOpacity
+          style={s.storyItem}
+          onPress={() => router.push('/buyer-story-create' as never)}
+          activeOpacity={0.8}
+        >
+          <View style={[s.storyCircle, { backgroundColor: MY_COLOR }]}>
+            <Text style={s.storyInitials}>{MY_INITIALS}</Text>
+            <View style={s.storyAddBadge}>
+              <Feather name="plus" size={10} color={FG} />
+            </View>
+          </View>
+          <Text style={s.storyLabel} numberOfLines={1}>Your story</Text>
+        </TouchableOpacity>
+
+        {/* Other stories */}
+        {otherStories.map(story => {
+          const viewed = story.viewers.some(v => v.userId === MY_USER_ID);
+          return (
+            <TouchableOpacity
+              key={story.id}
+              style={s.storyItem}
+              onPress={() => {
+                const allIds = allStoryIds.join(',');
+                router.push(`/buyer-story-viewer?storyId=${story.id}&allStoryIds=${allIds}` as never);
+              }}
+              activeOpacity={0.8}
+            >
+              <View style={[s.storyRing, { borderColor: viewed ? MUTED : PURPLE }]}>
+                <View style={[s.storyCircleInner, { backgroundColor: story.authorColor }]}>
+                  <Text style={s.storyInitials}>{story.authorInitials}</Text>
                 </View>
-                <Text style={[s.storyLabel, { color: fg }]} numberOfLines={1}>{friend.handle.replace('@', '')}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+              </View>
+              <Text style={s.storyLabel} numberOfLines={1}>
+                {story.authorName.split(' ')[0]}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {/* Search bar */}
+      <View style={s.searchBar}>
+        <Feather name="search" size={ICON.sm} color={SUBTLE} style={{ marginRight: SP.sm }} />
+        <TextInput
+          style={s.searchInput}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          placeholder="Search conversations..."
+          placeholderTextColor={SUBTLE}
+          returnKeyType="search"
+          autoCorrect={false}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Feather name="x" size={ICON.sm} color={MUTED} />
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* ── Unified flat feed ── */}
-      <View style={{ marginTop: 14 }}>
-        <InboxRow
-          fg={fg}
-          muted={muted}
-          onPress={() => router.push('/(buyer)/profile' as never)}
-          leading={
-            <View style={[s.notifAvatar, { backgroundColor: '#1D4ED8' }]}>
-              <Feather name="users" size={18} color="#FFF" />
-            </View>
-          }
-          title="New followers"
-          subtitle="CARD PLUG started following you."
-        />
-        <InboxRow
-          fg={fg}
-          muted={muted}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
-          leading={
-            <View style={[s.notifAvatar, { backgroundColor: '#DB2777' }]}>
-              <Feather name="heart" size={18} color="#FFF" />
-            </View>
-          }
-          title="Activity"
-          subtitle="co.luvsnayy liked photos you reposted."
-        />
+      {/* Segment tabs */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.tabsContent}
+        style={s.tabsRow}
+      >
+        {TABS.map(tab => {
+          const isActive = activeTab === tab;
+          return (
+            <TouchableOpacity
+              key={tab}
+              style={[
+                s.tabPill,
+                isActive
+                  ? { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE }
+                  : { backgroundColor: CARD, borderColor: BORDER },
+              ]}
+              onPress={() => setActiveTab(tab)}
+              activeOpacity={0.75}
+            >
+              <Text style={[s.tabText, { color: isActive ? PURPLE : MUTED }]}>{tab}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
 
-        {FRIEND_ORDER.map(id => (
-          <DMRow
-            key={id}
-            friend={FRIENDS[id]}
-            last={getLastMessage(id)}
-            unread={getUnread(id)}
-            isDark={isDark}
-            onPress={() => openChat(id)}
-          />
-        ))}
-
-        {notifItems.map(item => (
-          <NotifRow key={item.id} item={item} isDark={isDark} onRead={markNotifRead} />
-        ))}
-      </View>
-    </ScrollView>
+      {/* Conversations list */}
+      <FlatList
+        data={filteredConvs}
+        keyExtractor={item => item.id}
+        renderItem={renderConvRow}
+        ListEmptyComponent={renderEmptyState}
+        contentContainerStyle={filteredConvs.length === 0 ? s.listEmptyContainer : undefined}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      />
+    </View>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  container: { flex: 1 },
+  root: { flex: 1, backgroundColor: BG },
 
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 10 },
-  headerIconBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  headerTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minHeight: 44 },
-  headerTitle: { fontSize: 17, fontFamily: 'Inter_700Bold' },
-  headerChevronPill: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 10, paddingHorizontal: 5, paddingVertical: 3 },
-  headerDot: { width: 6, height: 6, borderRadius: 3 },
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.sm,
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: FS.lg,
+    fontFamily: FONT.bold,
+    color: FG,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
+  },
+  headerIconBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  notifBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: PURPLE,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  notifBadgeText: {
+    fontSize: 9,
+    fontFamily: FONT.bold,
+    color: FG,
+  },
 
-  // Stories row
-  thoughtsChip: { alignSelf: 'flex-start', marginLeft: 20, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 16, borderWidth: 1 },
-  thoughtsText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
-  storyItem: { alignItems: 'center', gap: 6, width: 62 },
-  createRing: { width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' },
-  createBadge: { position: 'absolute', bottom: -2, right: -2, width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 2 },
-  storyRing: { width: 58, height: 58, borderRadius: 29, borderWidth: 2, alignItems: 'center', justifyContent: 'center', padding: 2 },
-  storyAvatar: { flex: 1, width: '100%', borderRadius: 25, alignItems: 'center', justifyContent: 'center' },
-  storyInitials: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#FFF' },
-  storyLabel: { fontSize: 11, fontFamily: 'Inter_400Regular', width: 62, textAlign: 'center' },
+  // Stories
+  storiesRow: { flexGrow: 0 },
+  storiesContent: {
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+    gap: SP.md,
+  },
+  storyItem: {
+    alignItems: 'center',
+    gap: SP.xs,
+    width: 60,
+  },
+  storyCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  storyInitials: {
+    fontSize: FS.sm,
+    fontFamily: FONT.bold,
+    color: '#FFFFFF',
+  },
+  storyAddBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: PURPLE,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: BG,
+  },
+  storyRing: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 2,
+  },
+  storyCircleInner: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  storyLabel: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: MUTED,
+    textAlign: 'center',
+  },
 
-  // Flat row shell
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 10 },
-  rowTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginBottom: 2 },
-  rowSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular' },
-  rowCta: { fontSize: 12, fontFamily: 'Inter_700Bold', marginTop: 3 },
+  // Search
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: SP.md,
+    marginBottom: SP.sm,
+    height: 40,
+    backgroundColor: CARD,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: SP.md,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    color: FG,
+    height: '100%',
+  },
 
-  // DM row
-  dmAvatar:   { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-  dmInitials: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFF' },
-  unreadBadge:{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, minWidth: 20, alignItems: 'center' },
-  unreadText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#FFF' },
+  // Tabs
+  tabsRow: { flexGrow: 0, marginBottom: SP.sm },
+  tabsContent: {
+    paddingHorizontal: SP.md,
+    gap: SP.sm,
+  },
+  tabPill: {
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.xs,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+  },
+  tabText: {
+    fontSize: FS.sm,
+    fontFamily: FONT.medium,
+  },
 
-  // Notif row
-  notifAvatar:    { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  unreadDot:      { width: 8, height: 8, borderRadius: 4 },
+  // Conversation row
+  convRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.md,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+  },
+  avatarContainer: {
+    position: 'relative',
+  },
+  avatar48: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitials: {
+    fontSize: FS.base,
+    fontFamily: FONT.bold,
+    color: '#FFFFFF',
+  },
+  unreadDot: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: PURPLE,
+    borderWidth: 2,
+    borderColor: BG,
+  },
+  convCenter: {
+    flex: 1,
+    marginLeft: SP.md,
+  },
+  convNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
+  convName: {
+    flex: 1,
+    fontSize: FS.base,
+    color: FG,
+  },
+  convTime: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: MUTED,
+    marginLeft: SP.xs,
+  },
+  orderPill: {
+    alignSelf: 'flex-start',
+    backgroundColor: PURPLE_DIM,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.xs,
+    paddingVertical: 2,
+    marginBottom: SP.xs,
+  },
+  orderPillText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: PURPLE,
+  },
+  convPreview: {
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    color: MUTED,
+  },
+  unreadBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: PURPLE,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SP.xs,
+    marginLeft: SP.sm,
+  },
+  unreadBadgeText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.bold,
+    color: '#FFFFFF',
+  },
+
+  // Empty state
+  listEmptyContainer: {
+    flex: 1,
+  },
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 60,
+    gap: SP.sm,
+  },
+  emptyTitle: {
+    fontSize: FS.base,
+    fontFamily: FONT.semibold,
+    color: MUTED,
+    marginTop: SP.sm,
+  },
+  emptySubtitle: {
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    color: SUBTLE,
+  },
 });

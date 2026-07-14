@@ -1,0 +1,511 @@
+Perform a complete end-to-end audit of my entire existing Brandthread Expo React Native project.
+
+Do not build new major features during this task.
+
+Do not explain the code to me.
+Do not give me an outline.
+Do not ask me to manually edit files.
+
+Inspect the full project, run it, test it on mobile, identify every incomplete or broken system, and fix as much as possible.
+
+CORE GOAL
+
+Determine what is actually working, what is only visual, what is using mock data, what is disconnected, what is broken, and what is not production-ready.
+
+Do not assume a feature works because a screen exists.
+
+Do not claim the app is finished.
+
+AUDIT THESE SYSTEMS
+
+- Splash
+- Welcome
+- Sign in
+- Sign up
+- Forgot password
+- Email verification
+- Buyer onboarding
+- Seller onboarding
+- Buyer Thread
+- Buyer Profile
+- Seller Dashboard
+- Seller Profile
+- Buyer posts
+- Seller posts
+- Stories
+- Messaging
+- Friend requests
+- Notifications
+- Products
+- Product creation
+- Product details
+- Product tagging
+- Cart
+- Checkout
+- Payments
+- Buyer Orders
+- Seller Orders
+- Returns
+- Refunds
+- Disputes
+- Inventory
+- Manufacturer Hub
+- Quotes
+- Samples
+- Production
+- Store Builder
+- Theme Library
+- Store publishing
+- Design Studio
+- AI tools
+- Customers
+- Marketing
+- Analytics
+- Payouts
+- Subscription
+- Settings
+- Search
+- Global navigation
+- Brandthread logo integration
+
+FOR EVERY SCREEN AND FEATURE, VERIFY
+
+1. Route exists
+2. Route opens
+3. Back button works
+4. Main buttons work
+5. Loading states work
+6. Empty states work
+7. Error states work
+8. Data saves
+9. Data reloads after app restart
+10. Buyer and Seller permissions are correct
+11. No duplicate routes
+12. No dead buttons
+13. No fake success states
+14. No broken imports
+15. No console errors
+16. No TypeScript errors
+17. No white flashes
+18. No text overflow
+19. No cards compressed into unreadable widths
+20. Design matches the current premium Brandthread system
+
+REAL VS MOCK AUDIT
+
+Create an internal checklist identifying whether each major system uses:
+
+- Real backend
+- Local storage
+- Mock service
+- Hardcoded demo data
+- Placeholder UI
+- Missing service
+- Partially connected service
+
+Do not show fake “success” when a mock service is being used.
+
+Where a feature is not real, label it clearly in development mode.
+
+Do not label demo data to Buyers or Sellers in production-facing screens unless necessary.
+
+AUTHENTICATION AUDIT
+
+Verify:
+
+- New email signup works
+- Existing email sign-in works
+- Active session restore works
+- Logout works
+- Password reset works
+- Verification works
+- Buyer role routing works
+- Seller role routing works
+- No false “email already exists” errors
+- No duplicate profile creation
+- No redirect loops
+- No stale local session bugs
+
+BACKEND AUDIT
+
+Identify the actual backend in use.
+
+Verify:
+
+- User profiles
+- Products
+- Orders
+- Inventory
+- Posts
+- Messages
+- Stories
+- Notifications
+- Customers
+- Storefront
+- Manufacturer data
+- Analytics
+- Payout records
+
+Do not install a second backend.
+
+Fix missing service connections where possible.
+
+STORAGE AUDIT
+
+Verify all uploads and saved media:
+
+- Profile images
+- Brand logos
+- Product images
+- Product videos
+- Seller posts
+- Buyer posts
+- Stories
+- Design assets
+- Manufacturer files
+- Store media
+- Return evidence
+- Message attachments
+
+Confirm:
+
+- Upload succeeds
+- Upload failure retries
+- File URLs persist
+- Deleted files are handled safely
+- No broken local-only references
+- No giant Base64 values in app state
+
+PAYMENT AUDIT
+
+Identify the actual payment provider.
+
+Verify:
+
+- Payment provider is configured
+- Secret keys are not in the Expo client
+- Card collection uses secure provider components
+- Apple Pay appears only when configured
+- Google Pay appears only when configured
+- Failed payment does not clear cart
+- Duplicate payment attempts do not create duplicate orders
+- Refund flow is connected
+- Payout status is not fabricated
+- Held funds are not falsely described as escrow
+
+If payment is not truly connected, do not pretend checkout is production-ready.
+
+MARK ALL FAKE PAYMENT ACTIONS AS DEVELOPMENT-ONLY.
+
+CONTENT AUDIT
+
+Verify:
+
+- Seller videos are always 9:16
+- Seller slideshow ratios work
+- Buyer posts never appear in Thread
+- Seller posts can appear in Thread
+- Product tags open correct products
+- Scheduled posts do not appear early
+- Drafts remain private
+- Archived posts disappear publicly
+- Deleted posts do not crash old links
+
+VIDEO AUDIT
+
+Verify what is actually implemented:
+
+- Upload
+- Trim
+- Split
+- Reorder clips
+- Duration limits
+- Sound selection
+- Beat sync
+- Text overlays
+- Export or processing
+- Publishing
+
+Do not claim video rendering works if only edit instructions are saved.
+
+DESIGN STUDIO AUDIT
+
+Verify:
+
+- Canvas works
+- Gestures work
+- Text works
+- Image upload works
+- Layers work
+- Undo and redo work
+- Save and reopen works
+- Export works
+- Product handoff works
+- Manufacturer handoff works
+- Content handoff works
+
+Identify any AI tool that is only a form with no real provider.
+
+STORE BUILDER AUDIT
+
+Verify:
+
+- AI generator
+- Theme selection
+- Live mobile preview
+- Section editing
+- Product integration
+- Seller content integration
+- Collections
+- Navigation
+- Policies
+- Autosave
+- Publish
+- Public storefront
+- Version history
+
+Do not claim custom domains work unless DNS verification is real.
+
+MESSAGING AUDIT
+
+Verify:
+
+- Buyer-to-Buyer requires friendship
+- Buyer-to-Seller works
+- Order conversations preserve context
+- Message persistence works
+- Attachments work
+- Failed messages retry
+- Blocking works
+- Removed friends cannot send new messages
+
+Do not show read receipts unless backend confirms them.
+
+INVENTORY AUDIT
+
+Verify one source of truth.
+
+Confirm:
+
+- Product stock
+- Variant stock
+- Reserved stock
+- Incoming stock
+- Pre-order commitments
+- Returns
+- Damaged stock
+- Transfers
+- Manufacturer production
+- Order fulfillment
+
+Do not allow contradictory values across screens.
+
+ANALYTICS AUDIT
+
+Verify analytics come from stable data.
+
+Do not generate random values on every render.
+
+Confirm:
+
+- Revenue excludes cancelled orders
+- Refunds reduce revenue
+- Profit differs from revenue
+- Inventory value uses cost
+- Content attribution is not double-counted
+- Marketing attribution is not double-counted
+
+AI AUDIT
+
+Identify the actual AI provider.
+
+Verify:
+
+- API keys are server-side
+- Context builders are typed
+- AI actions require confirmation
+- Destructive actions cannot auto-run
+- Mock AI is clearly separated
+- AI does not expose unrelated private data
+- AI does not slow the entire app
+
+NAVIGATION AUDIT
+
+Verify:
+
+Seller tabs:
+- Home
+- Studio
+- Products
+- Orders
+- More
+
+Buyer tabs:
+- Thread
+- Search
+- Create
+- Messages
+- Profile
+
+Confirm:
+
+- No duplicate tab bars
+- No old routes
+- No hidden unreachable screens
+- No back-button loops
+- No route that opens old design
+
+DESIGN CONSISTENCY AUDIT
+
+Use onboarding as the visual source of truth.
+
+Find and fix:
+
+- Old green and gray layouts
+- Inconsistent card radii
+- Inconsistent typography
+- Wrong button styles
+- Tiny unreadable text
+- Narrow compressed cards
+- Old logos
+- White backgrounds
+- Default system-looking forms
+- Inconsistent spacing
+- Broken safe areas
+
+PERFORMANCE AUDIT
+
+Check:
+
+- Slow startup
+- Excessive rerenders
+- Large images
+- Unoptimized lists
+- Memory-heavy video screens
+- Huge local state
+- Unbounded message history
+- Unbounded analytics data
+- Missing pagination
+- Missing lazy loading
+- Duplicate network requests
+
+Fix:
+
+- Image caching
+- Lazy loading
+- FlatList virtualization
+- Pagination
+- Memoization
+- Request cancellation
+- Debouncing
+- Safe media resizing
+
+SECURITY AUDIT
+
+Check:
+
+- API keys in client
+- Secrets in environment files exposed to app bundle
+- Raw card data
+- Unauthorized route access
+- Seller accessing another Seller’s private data
+- Buyer accessing Seller-only tools
+- Missing permission checks
+- Insecure direct database writes
+- Sensitive logs
+- Weak session handling
+
+Remove sensitive logging.
+
+Do not rely only on hidden buttons for security.
+
+FULL END-TO-END TESTS
+
+Test these complete flows:
+
+SELLER FLOW
+
+1. Create Seller account
+2. Complete onboarding
+3. Edit Seller Profile
+4. Create Product
+5. Add variants
+6. Add inventory
+7. Create Seller post
+8. Tag Product
+9. Publish post
+10. Confirm post appears in Thread
+11. Open Store Builder
+12. Publish storefront
+13. Receive test order
+14. Process order
+15. Fulfill order
+16. Add tracking
+17. Handle return
+18. Handle refund
+19. View analytics
+20. Logout and sign back in
+
+BUYER FLOW
+
+1. Create Buyer account
+2. Complete onboarding
+3. Browse Thread
+4. Open Seller Profile
+5. Open Product
+6. Select variant
+7. Add to cart
+8. Complete checkout
+9. Open Buyer Order
+10. Track order
+11. Message Seller
+12. Request return
+13. Create Buyer profile post
+14. Confirm Buyer post stays off Thread
+15. Send friend request
+16. Message accepted friend
+17. Logout and sign back in
+
+RESTART TESTS
+
+Restart the app during:
+
+- Onboarding
+- Product draft
+- Content draft
+- Store editing
+- Design editing
+- Cart
+- Checkout
+- Message composition
+
+Confirm data safely restores.
+
+FINAL OUTPUT
+
+Create an internal categorized audit with:
+
+- Working
+- Partially working
+- Mock only
+- Broken
+- Missing backend
+- Production blocker
+- Visual inconsistency
+- Security issue
+- Performance issue
+
+Then fix every issue possible during this task.
+
+Do not respond with “everything works” unless every tested flow truly works.
+
+When finished, respond with:
+
+1. A concise list of systems that are fully working.
+2. A concise list of systems still using mock or demo services.
+3. A concise list of remaining production blockers.
+4. The exact next highest-priority task.
+
+Do not hide incomplete systems.
+
+Do not claim Brandthread is launch-ready unless the audit proves it.

@@ -245,6 +245,18 @@ function RootLayoutNav() {
         <Stack.Screen name="buyer-problem-report"  options={{ headerShown: false, animation: 'slide_from_right' }} />
         {/* return-request is an alias used by existing buyer-order-detail */}
         <Stack.Screen name="return-request"        options={{ headerShown: false, animation: 'slide_from_right' }} />
+        {/* Buyer social screens */}
+        <Stack.Screen name="buyer-conversation"      options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-other-profile"     options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-post-create"       options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
+        <Stack.Screen name="buyer-friend-requests"   options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-story-viewer"      options={{ headerShown: false, animation: 'fade', presentation: 'fullScreenModal' }} />
+        <Stack.Screen name="buyer-story-create"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
+        <Stack.Screen name="buyer-notifications"     options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-privacy-settings"  options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-saved"             options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-blocked"           options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-report"            options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
         {/* Design Studio screens */}
         <Stack.Screen name="design"                   options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="design-project"           options={{ headerShown: false, animation: 'slide_from_right' }} />

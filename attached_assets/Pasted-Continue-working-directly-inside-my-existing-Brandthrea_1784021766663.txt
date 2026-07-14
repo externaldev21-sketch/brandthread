@@ -1,0 +1,954 @@
+Continue working directly inside my existing Brandthread Expo React Native project.
+
+Do not explain the code to me.
+Do not give me an outline.
+Do not give me sample code.
+Do not ask me to manually edit files.
+
+Inspect the existing project, edit it directly, run the app, test the full system, and fix every error.
+
+Build the complete Brandthread AI Brain.
+
+Do not redesign onboarding.
+
+Do not break:
+
+- Authentication
+- Buyer Thread
+- Buyer Profiles
+- Buyer messaging
+- Buyer cart and checkout
+- Seller Dashboard
+- Seller Profile
+- Seller content creation
+- Products
+- Orders
+- Inventory
+- Manufacturer Hub
+- Store Builder
+- Design Studio
+- Customers
+- Marketing
+- Analytics
+- Notifications
+- Existing navigation
+- Official Brandthread logo integration
+
+CORE GOAL
+
+Create one unified Brandthread AI system that understands the Seller’s entire business and helps across every major screen.
+
+The AI must not feel like a separate chatbot app.
+
+It should feel built into Brandthread.
+
+The AI should understand and use context from:
+
+- Seller profile
+- Brand identity
+- Brand colors
+- Brand fonts
+- Products
+- Variants
+- Inventory
+- Orders
+- Revenue
+- Profit
+- Customers
+- Customer segments
+- Content
+- Seller posts
+- Storefront
+- Store themes
+- Marketing campaigns
+- Discounts
+- Manufacturers
+- Quotes
+- Samples
+- Production
+- Payouts
+- Analytics
+- Design projects
+- Brand assets
+- Current screen
+- Current selected product
+- Current selected order
+- Current selected post
+- Current selected manufacturer
+
+Do not give the AI unrestricted direct access to private data.
+
+Use controlled typed context builders and permission checks.
+
+GLOBAL AI ENTRY
+
+Create one floating Brandthread AI button accessible throughout the Seller app.
+
+The button must:
+
+- Use the official Brandthread logo
+- Match the onboarding design system
+- Stay visually subtle
+- Avoid covering important controls
+- Move or hide when the keyboard is open
+- Respect safe areas
+- Open a premium bottom sheet or full-screen assistant
+- Preserve the current page context
+
+Add the AI entry point to:
+
+- Seller Home
+- Studio
+- Products
+- Product Details
+- Orders
+- Order Details
+- Manufacturer Hub
+- Production
+- Inventory
+- Store Builder
+- Customers
+- Marketing
+- Analytics
+- Seller Profile
+- Content Creator
+- Settings where appropriate
+
+Do not add the Seller AI Brain to Buyer-only screens unless a separate limited Buyer assistant already exists.
+
+AI ASSISTANT INTERFACE
+
+Create a premium Brandthread AI interface.
+
+Include:
+
+- Brandthread logo
+- Current context label
+- Input field
+- Send button
+- Suggested prompts
+- Recent actions
+- Loading state
+- Streaming-style response state where supported
+- Retry
+- Cancel generation
+- Copy response
+- Apply action
+- Preview action
+- Undo applied action
+- Clear conversation
+- New conversation
+
+Do not create a generic white chatbot layout.
+
+Use:
+
+- Deep black and charcoal background
+- Purple and blue accents
+- Rounded cards
+- Soft glow
+- Premium typography
+- Consistent spacing
+- Smooth animations
+- Styled errors
+- Styled confirmations
+
+CONTEXT AWARENESS
+
+The AI must know which screen the Seller opened it from.
+
+Examples:
+
+From Product Details:
+- Understand the current product
+- Understand variants
+- Understand pricing
+- Understand inventory
+- Understand product analytics
+- Understand linked content
+- Understand linked manufacturer
+
+From Order Details:
+- Understand order status
+- Understand customer
+- Understand products
+- Understand fulfillment
+- Understand shipping
+- Understand returns
+- Understand payout status
+
+From Analytics:
+- Understand selected date range
+- Understand selected metric
+- Understand selected chart
+- Explain performance changes
+
+From Store Builder:
+- Understand current theme
+- Understand current section
+- Understand current page
+- Understand current preview state
+
+From Design Studio:
+- Understand current project
+- Understand current garment
+- Understand current layers
+- Understand linked product
+- Understand current selected asset
+
+Do not send the entire database to the AI.
+
+Build minimal relevant context for each request.
+
+AI ACTION SAFETY
+
+Separate AI responses into:
+
+1. Advice
+2. Suggested change
+3. Previewable action
+4. Confirmed action
+
+The AI must never automatically perform destructive actions.
+
+Require confirmation before:
+
+- Deleting product
+- Archiving product
+- Cancelling order
+- Issuing refund
+- Changing price
+- Changing inventory
+- Publishing store
+- Publishing content
+- Sending marketing campaign
+- Sending manufacturer message
+- Accepting quote
+- Starting production
+- Changing payout settings
+- Removing customer
+- Editing policies
+- Applying broad bulk changes
+
+Show a clear confirmation card before sensitive actions.
+
+Do not allow prompt text to bypass confirmation.
+
+UNIFIED AI COMMAND SYSTEM
+
+Create a typed AI command layer.
+
+Commands may include:
+
+- Navigate
+- Search
+- Explain
+- Recommend
+- Generate
+- Edit
+- Preview
+- Apply
+- Create draft
+- Duplicate
+- Filter
+- Compare
+- Summarize
+- Export
+- Schedule
+- Analyze
+
+Each command should have:
+
+- Command type
+- Context
+- Required permissions
+- Required confirmation
+- Payload schema
+- Result schema
+- Error state
+- Undo support where possible
+
+Do not let free-form AI output directly mutate app state.
+
+Convert approved AI actions into validated typed commands.
+
+AI HOME SUGGESTIONS
+
+On Seller Home, show personalized AI suggestions such as:
+
+- Restock low inventory
+- Review delayed production
+- Create content for a strong product
+- Improve a low-converting product page
+- Follow up with an at-risk customer segment
+- Send a launch campaign
+- Review a manufacturer quote
+- Improve storefront conversion
+
+Each suggestion must include:
+
+- Why it matters
+- Expected impact
+- Open action
+- Dismiss
+- Mark completed
+
+Do not generate random suggestions unsupported by available data.
+
+NEXT BEST ACTION
+
+Connect the AI Brain to the existing Next Best Action card.
+
+The card must use:
+
+- Orders
+- Inventory
+- Content
+- Marketing
+- Store performance
+- Production
+- Customer activity
+- Analytics
+
+Examples:
+
+- “Ship three orders before 5 PM.”
+- “Black medium hoodies may sell out in six days.”
+- “Your highest-viewed product has a low add-to-cart rate.”
+- “Your latest Seller video is driving product clicks.”
+- “A manufacturer quote expires tomorrow.”
+
+DESIGN AI
+
+Connect AI to Design Studio.
+
+Support:
+
+- Generate design ideas
+- Generate design prompts
+- Create colorways
+- Create matching products
+- Suggest print placements
+- Suggest embroidery placements
+- Prepare design notes
+- Generate manufacturer-ready specifications
+- Improve artwork
+- Remove background
+- Replace background
+- Create campaign direction
+- Create mockup direction
+- Create photoshoot direction
+
+Example commands:
+
+- “Create five colorways for this hoodie.”
+- “Make a matching pair of sweatpants.”
+- “Turn this graphic into an embroidery concept.”
+- “Create a puff-print version.”
+- “Make this design more luxury.”
+- “Generate a front and back placement plan.”
+
+Do not claim files are manufacturer-ready unless the output includes the required real specifications.
+
+PRODUCT AI
+
+Connect AI to Products.
+
+Support:
+
+- Write product title
+- Write description
+- Write materials section
+- Write care instructions
+- Generate SEO title
+- Generate SEO description
+- Recommend price
+- Estimate margin
+- Suggest variants
+- Suggest colorways
+- Suggest bundles
+- Suggest related products
+- Duplicate product into draft
+- Generate matching product concepts
+- Identify missing product data
+- Explain low conversion
+
+Example commands:
+
+- “Write premium copy for this hoodie.”
+- “What price should I test?”
+- “Create five color options.”
+- “Duplicate this product as a draft.”
+- “Why is this product not converting?”
+
+Pricing recommendations must clearly show:
+
+- Data used
+- Assumptions
+- Estimated impact
+- Seller confirmation
+
+Do not automatically change pricing.
+
+CONTENT AI
+
+Connect AI to Seller Content Creator.
+
+Support:
+
+- Generate hooks
+- Generate captions
+- Generate hashtags
+- Suggest sounds from available licensed or demo library
+- Suggest video length
+- Suggest thumbnail
+- Suggest first frame
+- Suggest posting time
+- Suggest product tags
+- Rewrite caption
+- Create content series
+- Turn product into content idea
+- Turn analytics into content recommendations
+- Create post draft
+
+Example commands:
+
+- “Give me five hooks for this hoodie.”
+- “Make this caption sound more premium.”
+- “What video length performs best for my account?”
+- “Which product should I post next?”
+- “Create a seven-day content plan.”
+
+Do not claim trending sounds are current unless connected to a real licensed provider.
+
+STORE AI
+
+Connect AI to Store Builder.
+
+Allow natural-language storefront editing.
+
+Examples:
+
+- “Make my homepage more luxurious.”
+- “Move best sellers above the brand story.”
+- “Make the hero taller.”
+- “Add a countdown for Friday.”
+- “Make buttons more rounded.”
+- “Use my brand colors.”
+- “Add a Seller posts section.”
+- “Improve mobile conversion.”
+- “Simplify the navigation.”
+
+Every store change must support:
+
+- Suggested change
+- Before preview
+- After preview
+- Apply
+- Dismiss
+- Undo
+
+Do not publish changes automatically.
+
+ANALYTICS AI
+
+Connect AI to Analytics.
+
+Support:
+
+- Explain revenue changes
+- Explain conversion changes
+- Identify best products
+- Identify worst products
+- Identify best content
+- Identify inventory risks
+- Explain customer behavior
+- Explain campaign performance
+- Explain refund trends
+- Explain production delays
+- Recommend next action
+
+Example commands:
+
+- “Why did sales drop this week?”
+- “Which post made the most money?”
+- “What should I restock?”
+- “Which campaign performed best?”
+- “What is hurting conversion?”
+- “Which manufacturer is most reliable?”
+
+Every explanation must show:
+
+- Relevant metrics
+- Date range
+- Comparison period
+- Confidence or limitation
+- Recommended action
+
+Do not invent causes that are unsupported by data.
+
+MARKETING AI
+
+Connect AI to Marketing.
+
+Support:
+
+- Generate email campaign
+- Generate SMS campaign
+- Generate subject lines
+- Generate preview text
+- Generate campaign sections
+- Generate discount ideas
+- Recommend segment
+- Recommend send time
+- Create abandoned-cart sequence
+- Create win-back automation
+- Create product launch plan
+- Create influencer brief
+- Create referral campaign
+
+Require confirmation before:
+
+- Scheduling
+- Sending
+- Activating automation
+- Creating active discount
+
+CUSTOMER AI
+
+Connect AI to Customers.
+
+Support:
+
+- Explain customer behavior
+- Identify VIP customers
+- Identify at-risk customers
+- Suggest customer segments
+- Suggest retention campaigns
+- Summarize customer history
+- Suggest support response
+- Explain lifetime value
+- Recommend win-back actions
+
+Do not expose unrelated customer data.
+
+Respect permissions and privacy.
+
+MANUFACTURER AI
+
+Connect AI to Manufacturer Hub.
+
+Support:
+
+- Compare quotes
+- Explain quote differences
+- Recommend manufacturer
+- Identify risk
+- Summarize messages
+- Draft manufacturer reply
+- Create quote request
+- Create sample revision notes
+- Summarize production status
+- Explain delays
+- Suggest negotiation points
+- Estimate production impact
+
+Example commands:
+
+- “Which quote is best?”
+- “Draft a counteroffer.”
+- “Summarize this manufacturer conversation.”
+- “What should I ask before accepting?”
+- “Why is production delayed?”
+
+Do not accept quotes or send messages without confirmation.
+
+ORDER AI
+
+Connect AI to Orders.
+
+Support:
+
+- Summarize order
+- Identify fulfillment priority
+- Explain payout status
+- Draft customer response
+- Draft delay message
+- Suggest return resolution
+- Summarize dispute
+- Suggest evidence checklist
+- Identify shipping issue
+- Filter urgent orders
+
+Do not issue refunds, cancel orders, or mark shipped without confirmation.
+
+INVENTORY AI
+
+Connect AI to Inventory.
+
+Support:
+
+- Recommend restock quantity
+- Predict stockout risk
+- Identify dead stock
+- Suggest transfer
+- Explain discrepancies
+- Recommend low-stock thresholds
+- Summarize incoming inventory
+- Compare inventory locations
+
+Clearly label forecasts as estimates.
+
+AI SEARCH
+
+Allow natural-language search across Seller systems.
+
+Examples:
+
+- “Show my best-selling hoodie.”
+- “Find low inventory.”
+- “Show delayed production.”
+- “Show orders ready to ship.”
+- “Which post made the most money?”
+- “Find customers who have not ordered in 90 days.”
+- “Show campaigns with the highest revenue.”
+- “Open my highest-converting product.”
+
+Search results must include:
+
+- Result title
+- Result type
+- Short explanation
+- Open result
+- Relevant action
+
+AI CONVERSATION MEMORY
+
+Support session-level conversation memory.
+
+The AI should remember:
+
+- Current task
+- Current product
+- Current post
+- Current order
+- Current store section
+- Recent approved action
+- Recent rejected action
+
+Do not store unlimited raw conversations locally.
+
+Create configurable retention.
+
+Allow the Seller to:
+
+- Clear conversation
+- Clear AI history
+- Disable AI history
+- Export conversation where supported
+
+Do not use private AI history for marketing.
+
+BRAND MEMORY
+
+Create a Seller-controlled Brand Memory section.
+
+It may contain:
+
+- Brand description
+- Brand voice
+- Target audience
+- Brand colors
+- Typography
+- Preferred words
+- Avoided words
+- Product categories
+- Price position
+- Visual style
+- Marketing tone
+- Manufacturer preferences
+- Store style
+
+Allow the Seller to:
+
+- View memory
+- Edit memory
+- Disable specific memory
+- Clear memory
+- Rebuild memory from approved brand data
+
+Do not silently store highly sensitive personal data.
+
+AI SETTINGS
+
+Create settings for:
+
+- Enable AI assistant
+- Enable suggestions
+- Enable session memory
+- Enable Brand Memory
+- Data sources AI may use
+- Confirmation preferences
+- Clear AI history
+- Clear Brand Memory
+- AI provider status
+- Demo mode status
+- Privacy explanation
+
+AI PROVIDER
+
+Inspect the project for an existing AI provider.
+
+Look for:
+
+- OpenAI
+- Anthropic
+- Google
+- Replicate
+- Custom AI backend
+- Existing server functions
+
+Use the provider already configured.
+
+Do not install a second AI provider unless no provider exists and the project owner explicitly chooses one.
+
+Keep API keys on a secure server.
+
+Never put secret AI keys in the Expo client.
+
+If no AI backend exists:
+
+- Build the complete UI
+- Build typed command handling
+- Build context builders
+- Build a separated mock AI service
+- Clearly label demo AI responses internally
+- Do not pretend a real provider is connected
+
+AI OUTPUT VALIDATION
+
+Validate every structured AI response.
+
+Handle:
+
+- Missing fields
+- Invalid command
+- Unsupported action
+- Wrong data type
+- Unsafe action
+- Stale context
+- Missing permission
+- Network failure
+- Provider failure
+- Rate limit
+- Timeout
+- Cancelled request
+
+Never execute malformed output.
+
+AUDIT LOG
+
+Create a private AI action log.
+
+Track:
+
+- Suggested action
+- Approved action
+- Rejected action
+- Timestamp
+- Screen context
+- Affected record
+- Undo status
+- User who approved
+
+Do not store sensitive prompt content unnecessarily.
+
+UNDO
+
+Support undo for safe reversible AI actions such as:
+
+- Store section change
+- Product-copy update
+- Caption update
+- Draft creation
+- Color change
+- Layout change
+- Tag change
+- Non-destructive settings change
+
+Do not claim undo is available for:
+
+- Sent campaign
+- Issued refund
+- Deleted backend record
+- Completed payment
+- Published irreversible external action
+
+PERMISSIONS
+
+Respect Seller team permissions.
+
+Examples:
+
+- Viewer may ask questions but cannot apply changes
+- Designer may modify design drafts
+- Marketer may create campaign drafts
+- Operations may update fulfillment drafts
+- Admin may approve sensitive actions
+
+Do not rely only on hidden UI.
+
+Validate permissions in services and backend.
+
+PERFORMANCE
+
+The AI must not slow down the entire app.
+
+Use:
+
+- Lazy loading
+- Request cancellation
+- Cached safe summaries
+- Minimal context payloads
+- Debounced suggestions
+- Background-safe updates
+- Streaming where available
+- Pagination for history
+
+Do not repeatedly resend large image files or entire datasets.
+
+IMAGE INPUT
+
+Where supported, allow the AI to use:
+
+- Uploaded design
+- Product image
+- Logo
+- Mood board
+- Mockup
+- Campaign image
+- Store preview screenshot
+
+Use the existing secure file-upload flow.
+
+Do not embed huge Base64 files in requests.
+
+VOICE PREPARATION
+
+Prepare typed architecture for future voice input.
+
+Do not build fake voice calling.
+
+Where device support exists, allow speech-to-text only through a properly configured provider.
+
+DESIGN CONSISTENCY
+
+Every AI interface must match Brandthread onboarding and Seller design.
+
+Use:
+
+- Deep black and charcoal
+- Purple and blue primary accents
+- Controlled cyan
+- Controlled green for success
+- Controlled orange or red for warnings
+- Rounded cards
+- Premium typography
+- Smooth transitions
+- Official Brandthread logo
+- Styled loading
+- Styled errors
+- No old green and gray design
+- No white flashes
+
+EMPTY STATES
+
+AI Assistant:
+“Ask Brandthread AI about your brand, products, content, store, or performance.”
+
+AI History:
+“Your recent AI conversations will appear here.”
+
+Brand Memory:
+“Teach Brandthread how your brand should look, sound, and operate.”
+
+AI Suggestions:
+“Suggestions will appear as Brandthread learns from your approved business data.”
+
+TESTING
+
+Test these exact paths:
+
+1. Open AI from Seller Home.
+2. Ask for next best action.
+3. Open AI from Product Details.
+4. Generate product description.
+5. Preview product-copy update.
+6. Apply update.
+7. Undo update.
+8. Ask for pricing recommendation.
+9. Confirm no price changes automatically.
+10. Open AI from Content Creator.
+11. Generate hooks.
+12. Generate caption.
+13. Create post draft.
+14. Confirm post is not published automatically.
+15. Open AI from Store Builder.
+16. Request layout change.
+17. Preview before and after.
+18. Apply change.
+19. Undo change.
+20. Open AI from Analytics.
+21. Ask why revenue changed.
+22. Confirm response uses selected date range.
+23. Ask which post made the most money.
+24. Open resulting post.
+25. Open AI from Marketing.
+26. Generate email campaign draft.
+27. Confirm it does not send.
+28. Open AI from Manufacturer Hub.
+29. Compare quotes.
+30. Draft counteroffer.
+31. Confirm it does not send.
+32. Open AI from Order Details.
+33. Draft customer response.
+34. Confirm refund and cancellation require confirmation.
+35. Open AI from Inventory.
+36. Request restock recommendation.
+37. Confirm estimate is labeled.
+38. Use natural-language search.
+39. Open returned result.
+40. Test Brand Memory.
+41. Edit Brand Memory.
+42. Disable one memory source.
+43. Clear AI conversation.
+44. Disable session memory.
+45. Test team permission restriction.
+46. Test malformed AI output.
+47. Test provider timeout.
+48. Test rate limit.
+49. Test cancellation.
+50. Test stale context.
+51. Test action confirmation.
+52. Test audit log.
+53. Restart app.
+54. Confirm approved Brand Memory persists.
+55. Confirm disabled memory stays disabled.
+56. Confirm session history follows settings.
+57. Confirm no API keys exist in client code.
+58. Fix all TypeScript errors.
+59. Fix all routing errors.
+60. Fix all runtime errors.
+61. Fix all console errors caused by this system.
+62. Confirm onboarding remains unchanged.
+63. Confirm Buyer and Seller accounts still work.
+64. Confirm official Brandthread logo still works.
+65. Confirm existing systems still work without AI enabled.
+
+Do not stop after creating a chatbot screen.
+
+Build the unified AI command layer, context builders, action confirmations, Brand Memory, assistant UI, screen integrations, safe actions, provider abstraction, mock service where necessary, audit log, permissions, and full testing.
+
+When complete, respond with only:
+
+“The Brandthread AI Brain is installed and connected across the app.”
