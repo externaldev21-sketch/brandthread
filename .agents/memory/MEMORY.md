@@ -7,3 +7,4 @@
 - [Seller Dashboard Architecture](seller-dashboard-architecture.md) — tabs (Home·Studio·Products·Orders·More), services layer at @/services/, screen inventory, color system, navigation gotchas.
 - [Manufacturer Hub Architecture](manufacturer-hub-architecture.md) — 9 screens, types+service files, route list, no-local-const rule, null-safety-in-handlers rule, demo behavior.
 - [Orders System Architecture](orders-system-architecture.md) — orderTypes.ts + orderService.ts; 7 new screens; routes in _layout.tsx; AsyncStorage v1 keys; demo data seeds 6 orders.
+- [Inventory System Architecture](inventory-system-architecture.md) — inventoryTypes.ts + inventoryService.ts; 7 screens (hub + 6 detail); AsyncStorage inv:*:v1 keys; demo seeds 6 items + 2 locations.

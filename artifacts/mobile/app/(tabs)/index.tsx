@@ -17,6 +17,7 @@ import {
 import { DEMO_ORDERS, DEMO_PRODUCTS } from '@/services/data';
 import { getHubStats } from '@/services/manufacturerService';
 import { getOrderStats } from '@/services/orderService';
+import { getInventoryStats } from '@/services/inventoryService';
 import {
   BrandthreadScreen, BrandthreadCard, GradientCard,
   PrimaryButton, SecondaryButton, IconButton, SearchBar,
@@ -131,6 +132,12 @@ export default function SellerHomeScreen() {
     returnRequests: number;
     disputes: number;
   } | null>(null);
+  const [invStats, setInvStats] = useState<{
+    lowStockCount: number;
+    outOfStockCount: number;
+    incomingCount: number;
+    delayedCount: number;
+  } | null>(null);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
 
@@ -167,6 +174,13 @@ export default function SellerHomeScreen() {
       readyToShip: s.readyToShip,
       returnRequests: s.returnRequests,
       disputes: s.disputes,
+    })).catch(() => {});
+    // Load inventory stats
+    getInventoryStats().then(s => setInvStats({
+      lowStockCount: s.lowStockCount,
+      outOfStockCount: s.outOfStockCount,
+      incomingCount: s.incomingCount,
+      delayedCount: s.delayedCount,
     })).catch(() => {});
     return () => { clearTimeout(timer); clearTimeout(minLoad); };
   }, []);
@@ -520,6 +534,44 @@ export default function SellerHomeScreen() {
                   accent={RED}
                   badge
                   onPress={() => nav('/(tabs)/orders')}
+                  style={{ width: '48.5%' }}
+                />
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* ── Inventory Alerts ─────────────────────────────────────────── */}
+        {invStats && (invStats.outOfStockCount > 0 || invStats.lowStockCount > 0 || invStats.incomingCount > 0) && (
+          <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
+            <SectionHeader title="Inventory" style={{ paddingHorizontal: 0, marginBottom: SP.sm }} action={{ label: 'View all', onPress: () => nav('/inventory') }} />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              {(invStats.outOfStockCount > 0) && (
+                <QuickActionCard
+                  label={`${invStats.outOfStockCount} out of stock`}
+                  icon="alert-circle"
+                  accent={RED}
+                  badge
+                  onPress={() => nav('/inventory')}
+                  style={{ width: '48.5%' }}
+                />
+              )}
+              {(invStats.lowStockCount > 0) && (
+                <QuickActionCard
+                  label={`${invStats.lowStockCount} low stock`}
+                  icon="trending-down"
+                  accent={ORANGE}
+                  badge
+                  onPress={() => nav('/inventory')}
+                  style={{ width: '48.5%' }}
+                />
+              )}
+              {(invStats.incomingCount > 0) && (
+                <QuickActionCard
+                  label={`${invStats.incomingCount} incoming`}
+                  icon="truck"
+                  accent={CYAN}
+                  onPress={() => nav('/inventory')}
                   style={{ width: '48.5%' }}
                 />
               )}

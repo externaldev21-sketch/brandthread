@@ -31,6 +31,8 @@ import {
 
 import { getProduct, updateProduct, getProductAnalytics, archiveProduct, publishProduct, adjustInventory } from '@/services/productService';
 import { Product, ProductVariant, ProductStatus } from '@/services/productTypes';
+import { getItemsByProduct, adjustStock } from '@/services/inventoryService';
+import { InventoryItem } from '@/services/inventoryTypes';
 import { calcPricing, formatCurrency, isLowStock, isOutOfStock } from '@/lib/productUtils';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -557,19 +559,25 @@ const vt = StyleSheet.create({
 // ─── Inventory Tab ────────────────────────────────────────────────────────────
 
 function InventoryTab({ product, setProduct, id }: { product: Product; setProduct: (p: Product) => void; id: string }) {
+  const router = useRouter();
   const inv = product.inventory;
+  const [invItems, setInvItems] = useState<InventoryItem[]>([]);
 
-  const demoHistory = [
-    { id: '1', date: '2025-01-10', reason: 'Purchase order received', delta: +48 },
-    { id: '2', date: '2025-01-08', reason: 'Orders fulfilled', delta: -12 },
-    { id: '3', date: '2025-01-05', reason: 'Manual adjustment', delta: +3 },
-  ];
+  useEffect(() => {
+    getItemsByProduct(product.id).then(setInvItems).catch(() => {});
+  }, [product.id]);
+
+  const totalOnHand   = invItems.reduce((s, i) => s + i.onHand, 0);
+  const totalAvail    = invItems.reduce((s, i) => s + i.available, 0);
+  const totalReserved = invItems.reduce((s, i) => s + i.reserved, 0);
 
   // Fix 1: doAdjust calls adjustInventory then reloads product
   const doAdjust = async (delta: number, reason: string) => {
     await adjustInventory(product.id, undefined, delta, reason);
     const refreshed = await getProduct(id);
     if (refreshed) setProduct(refreshed);
+    // Reload inv items
+    getItemsByProduct(product.id).then(setInvItems).catch(() => {});
   };
 
   // Fix 1: Adjust Stock button with Alert options
@@ -582,29 +590,102 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
     ]);
   };
 
+  const invOnHand   = invItems.length > 0 ? totalOnHand   : inv.totalStock;
+  const invAvail    = invItems.length > 0 ? totalAvail    : inv.availableStock;
+  const invReserved = invItems.length > 0 ? totalReserved : inv.reservedStock;
+
+  function invItemStatusVariant(item: InventoryItem): 'success' | 'warning' | 'error' | 'neutral' {
+    if (item.status === 'available') return 'success';
+    if (item.status === 'low_stock') return 'warning';
+    if (item.status === 'out_of_stock') return 'error';
+    return 'neutral';
+  }
+
+  function invItemStatusLabel(item: InventoryItem): string {
+    switch (item.status) {
+      case 'available':    return 'In Stock';
+      case 'low_stock':    return 'Low Stock';
+      case 'out_of_stock': return 'Out of Stock';
+      case 'reserved':     return 'Reserved';
+      case 'incoming':     return 'Incoming';
+      case 'pre_order':    return 'Pre-Order';
+      default:             return item.status;
+    }
+  }
+
   return (
     <View style={{ gap: SP.md, paddingTop: SP.md }}>
       <SectionHeader title="Inventory Summary" />
 
       {/* Stat strip */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: SP.sm, paddingHorizontal: SP.md }}>
-        <StatCard label="Total" value={String(inv.totalStock)} icon="layers" accent={CYAN} style={{ minWidth: 100 }} />
-        <StatCard label="Available" value={String(inv.availableStock)} icon="check-circle" accent={SUCCESS} style={{ minWidth: 100 }} />
-        <StatCard label="Reserved" value={String(inv.reservedStock)} icon="lock" accent={ORANGE} style={{ minWidth: 100 }} />
-        <StatCard label="Incoming" value={String(inv.incomingStock)} icon="truck" accent={BLUE} style={{ minWidth: 100 }} />
+        <StatCard label="On Hand"   value={String(invOnHand)}        icon="layers"       accent={CYAN}    style={{ minWidth: 100 }} />
+        <StatCard label="Available" value={String(invAvail)}          icon="check-circle" accent={SUCCESS} style={{ minWidth: 100 }} />
+        <StatCard label="Reserved"  value={String(invReserved)}       icon="lock"         accent={ORANGE}  style={{ minWidth: 100 }} />
+        <StatCard label="Incoming"  value={String(inv.incomingStock)} icon="truck"        accent={BLUE}    style={{ minWidth: 100 }} />
       </ScrollView>
 
-      {/* Adjust stock */}
-      <View style={{ paddingHorizontal: SP.md }}>
+      {/* Actions */}
+      <View style={{ paddingHorizontal: SP.md, flexDirection: 'row', gap: SP.sm }}>
         <PrimaryButton
           label="Adjust Stock"
           icon="plus-circle"
           onPress={handleAdjustStock}
+          style={{ flex: 1 }}
+        />
+        <SecondaryButton
+          label="View Full Inventory"
+          onPress={() => router.push('/inventory' as never)}
+          style={{ flex: 1 }}
         />
       </View>
 
-      {/* By variant */}
-      {product.variants.length > 0 && (
+      {/* Inventory items from inventoryService */}
+      {invItems.length > 0 && (
+        <View style={{ paddingHorizontal: SP.md }}>
+          <SectionHeader title="Inventory by Variant" style={{ paddingHorizontal: 0 }} />
+          <BrandthreadCard>
+            {invItems.map((item, idx) => (
+              <View key={item.id}>
+                {idx > 0 && <View style={invS.divider} />}
+                <View style={invS.variantRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={invS.variantName}>{item.variantLabel}</Text>
+                    <Text style={invS.variantSku}>SKU: {item.sku}</Text>
+                  </View>
+                  <StatusBadge label={invItemStatusLabel(item)} variant={invItemStatusVariant(item)} small />
+                  <TouchableOpacity
+                    style={[invS.adjBtn, { marginLeft: SP.sm }]}
+                    onPress={() => router.push(('/inventory-adjust?itemId=' + item.id) as never)}
+                  >
+                    <Feather name="sliders" size={12} color={PURPLE} />
+                  </TouchableOpacity>
+                </View>
+                <View style={invS.itemStatsRow}>
+                  <Text style={invS.itemStat}>{item.available} avail</Text>
+                  <Text style={invS.itemStatDot}>·</Text>
+                  <Text style={invS.itemStat}>{item.onHand} on hand</Text>
+                  {item.reserved > 0 && (
+                    <>
+                      <Text style={invS.itemStatDot}>·</Text>
+                      <Text style={invS.itemStat}>{item.reserved} reserved</Text>
+                    </>
+                  )}
+                  {item.incoming > 0 && (
+                    <>
+                      <Text style={invS.itemStatDot}>·</Text>
+                      <Text style={[invS.itemStat, { color: BLUE }]}>{item.incoming} incoming</Text>
+                    </>
+                  )}
+                </View>
+              </View>
+            ))}
+          </BrandthreadCard>
+        </View>
+      )}
+
+      {/* Fallback: by product variant when no inventory items */}
+      {invItems.length === 0 && product.variants.length > 0 && (
         <View style={{ paddingHorizontal: SP.md }}>
           <SectionHeader title="Inventory by Variant" style={{ paddingHorizontal: 0 }} />
           <BrandthreadCard>
@@ -635,42 +716,25 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
           </BrandthreadCard>
         </View>
       )}
-
-      {/* History */}
-      <View style={{ paddingHorizontal: SP.md }}>
-        <SectionHeader title="Inventory History" style={{ paddingHorizontal: 0 }} />
-        <View style={{ gap: SP.sm }}>
-          {demoHistory.map(item => (
-            <BrandthreadCard key={item.id}>
-              <View style={invS.historyRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={invS.historyReason}>{item.reason}</Text>
-                  <Text style={invS.historyDate}>{item.date}</Text>
-                </View>
-                <Text style={[invS.historyDelta, { color: item.delta > 0 ? SUCCESS : RED }]}>
-                  {item.delta > 0 ? '+' : ''}{item.delta}
-                </Text>
-              </View>
-            </BrandthreadCard>
-          ))}
-        </View>
-      </View>
     </View>
   );
 }
 
 const invS = StyleSheet.create({
-  variantRow:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm },
-  variantName:  { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
-  variantSku:   { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  adjBtn:       { width: 28, height: 28, borderRadius: RADIUS.sm, backgroundColor: CARD_ELEVATED,
-                  borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  qty:          { fontSize: FS.base, fontFamily: FONT.bold, color: FG, minWidth: 32, textAlign: 'center' },
-  divider:      { height: 1, backgroundColor: BORDER },
-  historyRow:   { flexDirection: 'row', alignItems: 'center' },
-  historyReason:{ fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
-  historyDate:  { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
-  historyDelta: { fontSize: FS.lg, fontFamily: FONT.bold },
+  variantRow:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm },
+  variantName:   { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
+  variantSku:    { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  adjBtn:        { width: 28, height: 28, borderRadius: RADIUS.sm, backgroundColor: CARD_ELEVATED,
+                   borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  qty:           { fontSize: FS.base, fontFamily: FONT.bold, color: FG, minWidth: 32, textAlign: 'center' },
+  divider:       { height: 1, backgroundColor: BORDER },
+  historyRow:    { flexDirection: 'row', alignItems: 'center' },
+  historyReason: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
+  historyDate:   { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  historyDelta:  { fontSize: FS.lg, fontFamily: FONT.bold },
+  itemStatsRow:  { flexDirection: 'row', alignItems: 'center', gap: 4, paddingBottom: SP.sm, flexWrap: 'wrap' },
+  itemStat:      { fontSize: FS.xs, fontFamily: FONT.medium, color: SUBTLE },
+  itemStatDot:   { fontSize: FS.xs, color: SUBTLE },
 });
 
 // ─── Orders Tab ───────────────────────────────────────────────────────────────

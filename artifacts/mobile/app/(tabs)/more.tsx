@@ -41,7 +41,7 @@ interface NavItem {
 
 const OPERATIONS: NavItem[] = [
   { icon: 'tool',        label: 'Manufacturer Hub', desc: 'Find and manage manufacturers',  accent: PURPLE,       badge: true, route: '/manufacturer-hub' },
-  { icon: 'archive',     label: 'Inventory',         desc: 'Track stock levels',             accent: BLUE },
+  { icon: 'archive',     label: 'Inventory',         desc: 'Track stock levels',             accent: BLUE,   route: '/inventory' },
   { icon: 'truck',       label: 'Shipping',          desc: 'Rates, zones and carriers',      accent: ORANGE },
   { icon: 'credit-card', label: 'Payouts',           desc: 'Bank accounts and earnings',     accent: SUCCESS },
 ];

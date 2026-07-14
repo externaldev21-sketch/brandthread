@@ -202,6 +202,12 @@ function RootLayoutNav() {
         <Stack.Screen name="refund-detail"       options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="dispute-detail"      options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-order-detail"  options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="inventory-detail"   options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="inventory-adjust"   options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="inventory-transfer" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="inventory-incoming" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="inventory-count"    options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="inventory-location" options={{ headerShown: false, animation: 'slide_from_right' }} />
       </Stack>
     </AuthGate>
   );
