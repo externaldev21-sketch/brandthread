@@ -343,10 +343,22 @@ export default function SignInScreen() {
 
 function friendlyError(msg: string): string {
   if (!msg) return msg;
-  if (msg.toLowerCase().includes('identifier')) return 'An account already exists with this email. Try signing in instead.';
-  if (msg.toLowerCase().includes('password') && msg.toLowerCase().includes('weak')) return 'Use a stronger password with at least 8 characters.';
-  if (msg.toLowerCase().includes('email')) return 'Enter a valid email address.';
-  if (msg.toLowerCase().includes('network') || msg.toLowerCase().includes('fetch')) return "We couldn't connect. Check your internet and try again.";
+  const m = msg.toLowerCase();
+  // Only match specific patterns — broad 'identifier' matching misclassifies session errors
+  if (m.includes('that email address is taken') || (m.includes('email') && m.includes('already exists') && !m.includes('session')))
+    return 'An account already exists with this email. Try signing in instead.';
+  if (m.includes('password') && (m.includes('weak') || m.includes('pwned')))
+    return 'Use a stronger password with at least 8 characters.';
+  if ((m.includes('invalid') || m.includes('format')) && m.includes('email'))
+    return 'Enter a valid email address.';
+  if (m.includes('already signed in') || (m.includes('session') && m.includes('exists')))
+    return 'You are already signed in. Sign out to create another account.';
+  if (m.includes('network') || m.includes('fetch') || m.includes('timeout'))
+    return "We couldn't connect. Check your internet and try again.";
+  if (m.includes('incorrect') || m.includes('wrong password') || m.includes('invalid password'))
+    return 'Incorrect email or password.';
+  if (m.includes('rate limit') || m.includes('too many'))
+    return 'Too many attempts. Please wait a moment and try again.';
   return msg;
 }
 

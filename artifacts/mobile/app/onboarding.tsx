@@ -23,7 +23,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useAuth, useOAuth, useSignIn, useSignUp } from '@clerk/expo';
+import { useAuth, useOAuth, useSignIn, useSignUp, useUser } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -79,16 +79,61 @@ const DRAFT_KEY = 'onboarding_draft';
 
 type Flow = 'buyer' | 'seller';
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-function friendlyError(msg: string): string {
-  if (!msg) return 'Something went wrong. Please try again.';
-  const m = msg.toLowerCase();
-  if (m.includes('identifier') || m.includes('already exists')) return 'An account already exists with this email. Try signing in instead.';
-  if (m.includes('password') && m.includes('weak')) return 'Use a stronger password (8+ characters).';
-  if (m.includes('email') && (m.includes('invalid') || m.includes('format'))) return 'Enter a valid email address.';
-  if (m.includes('network') || m.includes('fetch')) return "Couldn't connect. Check your internet and try again.";
-  if (m.includes('incorrect') || m.includes('wrong')) return 'Incorrect email or password.';
-  return msg;
+// ─── Clerk error mapper ──────────────────────────────────────────────────────
+// Maps Clerk error objects to user-facing strings.
+// Uses .code first (most reliable), then conservative message matching.
+function mapClerkError(err: any): string {
+  if (!err) return 'Something went wrong. Please try again.';
+
+  // Clerk may wrap errors: err.errors[0] or err directly
+  const inner = err?.errors?.[0] ?? err;
+  const code  = (inner?.code ?? '').toLowerCase();
+  const msg   = (inner?.message ?? inner?.longMessage ?? err?.message ?? '').toLowerCase();
+
+  // ── Code-based mapping ───────────────────────────────────────────────────
+  if (code === 'form_identifier_exists')
+    return 'An account already exists with this email. Sign in instead.';
+  if (code === 'session_exists' || code === 'identifier_already_signed_in')
+    return 'You are already signed in. Sign out to create another account.';
+  if (code === 'form_password_pwned' || code === 'form_password_strength_insufficient')
+    return 'This password is too common or weak. Choose a stronger one.';
+  if (code === 'form_password_length_too_short')
+    return 'Use at least 8 characters.';
+  if (code === 'form_param_format_invalid' || code === 'form_param_nil')
+    return msg.includes('email') ? 'Enter a valid email address.' : 'One of your entries is not in the right format.';
+  if (code === 'form_code_incorrect')
+    return 'Invalid code. Please check and try again.';
+  if (code === 'verification_expired')
+    return 'Code expired. Request a new one.';
+  if (code === 'request_rate_limited')
+    return 'Too many attempts. Please wait a moment and try again.';
+  if (code === 'network_failure' || code === 'request_timeout')
+    return "Couldn't connect. Check your internet and try again.";
+  if (code === 'missing_publishable_key' || code === 'publishable_key_invalid')
+    return 'Authentication configuration error. Please contact support.';
+  if (code === 'form_identifier_not_found' || code === 'form_password_incorrect')
+    return 'Incorrect email or password.';
+
+  // ── Conservative message-string fallback ─────────────────────────────────
+  // Only match unambiguous phrases — avoids false-positives from the word
+  // "identifier" appearing in session-related errors.
+  if (msg.includes('that email address is taken') || (msg.includes('email') && msg.includes('already exists') && !msg.includes('session')))
+    return 'An account already exists with this email. Sign in instead.';
+  if (msg.includes('already signed in') || (msg.includes('session') && msg.includes('exists')))
+    return 'You are already signed in. Sign out to create another account.';
+  if (msg.includes('password') && (msg.includes('weak') || msg.includes('pwned')))
+    return 'Use a stronger password (8+ characters).';
+  if ((msg.includes('invalid') || msg.includes('format')) && msg.includes('email'))
+    return 'Enter a valid email address.';
+  if (msg.includes('network') || msg.includes('fetch') || msg.includes('timeout'))
+    return "Couldn't connect. Check your internet and try again.";
+  if (msg.includes('incorrect') || msg.includes('wrong password') || msg.includes('invalid password'))
+    return 'Incorrect email or password.';
+  if (msg.includes('rate limit') || msg.includes('too many'))
+    return 'Too many attempts. Please wait and try again.';
+
+  // Return raw message as last resort — always better than hiding the error
+  return inner?.message || err?.message || 'Something went wrong. Please try again.';
 }
 
 // ─── Shared UI ───────────────────────────────────────────────────────────────
@@ -696,24 +741,61 @@ interface AuthStepProps {
   startGoogleOAuth: () => Promise<any>;
   startAppleOAuth: () => Promise<any>;
   onAuthComplete: () => void;
+  onDevClear: () => Promise<void>;
 }
 
-function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGoogleOAuth, startAppleOAuth, onAuthComplete }: AuthStepProps) {
+function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGoogleOAuth, startAppleOAuth, onAuthComplete, onDevClear }: AuthStepProps) {
   const router = useRouter();
-  const [phase, setPhase]         = useState<AuthPhase>('form');
-  const [email, setEmail]         = useState('');
-  const [password, setPassword]   = useState('');
-  const [code, setCode]           = useState('');
-  const [showPw, setShowPw]       = useState(false);
-  const [loading, setLoading]     = useState(false);
-  const [oauthLoading, setOAuth]  = useState('');
-  const [error, setError]         = useState('');
+  const { isSignedIn, signOut } = useAuth();
+  const { user } = useUser();
+
+  const [phase, setPhase]               = useState<AuthPhase>('form');
+  const [email, setEmail]               = useState('');
+  const [password, setPassword]         = useState('');
+  const [code, setCode]                 = useState('');
+  const [showPw, setShowPw]             = useState(false);
+  const [loading, setLoading]           = useState(false);
+  const [oauthLoading, setOAuth]        = useState('');
+  const [error, setError]               = useState('');
+  const [clearingSession, setClearSession] = useState(false);
 
   const canSubmit = email.includes('@') && password.length >= 8;
   const canVerify = code.length === 6;
+  const currentEmail = user?.primaryEmailAddress?.emailAddress ?? '';
 
+  // ── Clear local test session ─────────────────────────────────────────────────
+  async function handleClearSession() {
+    setClearSession(true);
+    setError('');
+    try {
+      if (isSignedIn) await signOut();
+      await onDevClear();
+    } catch (e) {
+      console.warn('[Auth] Clear session error:', e);
+    } finally {
+      setClearSession(false);
+    }
+  }
+
+  // ── Sign-up ──────────────────────────────────────────────────────────────────
   async function handleSignUp() {
     if (!canSubmit || loading) return;
+
+    // DEV LOGGING ─────────────────────────────────────────────────────────────
+    console.log('[Auth] ── handleSignUp ──────────────────────────────────────');
+    console.log('[Auth] Email submitted  :', email.trim().toLowerCase());
+    console.log('[Auth] Session exists   :', isSignedIn);
+    console.log('[Auth] Provider         : Clerk email/password');
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // CRITICAL: if a session already exists Clerk returns session_exists, which
+    // the old code misclassified as "email already taken". Block this early.
+    if (isSignedIn) {
+      const who = currentEmail ? `as ${currentEmail}` : 'with another account';
+      setError(`You are currently signed in ${who}. Tap "Sign out and create another account" below.`);
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
@@ -722,25 +804,45 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
         emailAddress: email.trim().toLowerCase(),
         password,
         firstName: nameParts[0] || undefined,
-        lastName: nameParts.slice(1).join(' ') || undefined,
+        lastName:  nameParts.slice(1).join(' ') || undefined,
       });
-      if (err) { setError(friendlyError((err as any).message || 'Sign up failed.')); return; }
+
+      // DEV LOGGING ───────────────────────────────────────────────────────────
+      if (err) {
+        console.log('[Auth] Sign-up error code       :', (err as any).code);
+        console.log('[Auth] Sign-up error message    :', (err as any).message);
+        console.log('[Auth] Sign-up error longMessage:', (err as any).longMessage);
+      } else {
+        console.log('[Auth] Sign-up password step succeeded — sending verification code');
+      }
+      // ───────────────────────────────────────────────────────────────────────
+
+      if (err) { setError(mapClerkError(err)); return; }
+
       await signUp.verifications.sendEmailCode();
       setPhase('verify');
     } catch (e: any) {
-      setError(friendlyError(e?.message || 'Sign up failed. Please try again.'));
+      console.log('[Auth] Sign-up exception code   :', e?.code);
+      console.log('[Auth] Sign-up exception message:', e?.message);
+      setError(mapClerkError(e));
     } finally {
       setLoading(false);
     }
   }
 
+  // ── Verify email code ────────────────────────────────────────────────────────
   async function handleVerify() {
     if (!canVerify || loading) return;
     setLoading(true);
     setError('');
     try {
       await signUp.verifications.verifyEmailCode({ code });
+
+      console.log('[Auth] Verification status:', signUp.status);
+      console.log('[Auth] Profile creation ran: true');
+
       if (signUp.status === 'complete') {
+        console.log('[Auth] Finalizing session…');
         await signUp.finalize({
           navigate: ({ decorateUrl }: { decorateUrl: (url: string) => string }) => {
             const url = decorateUrl('/onboarding');
@@ -751,16 +853,17 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
             }
           },
         });
-        // If finalize doesn't navigate (native, session already active)
         onAuthComplete();
       }
     } catch (e: any) {
-      setError(friendlyError(e?.message || 'Invalid code. Try again.'));
+      console.log('[Auth] Verify exception:', e?.code, e?.message);
+      setError(mapClerkError(e));
     } finally {
       setLoading(false);
     }
   }
 
+  // ── OAuth ────────────────────────────────────────────────────────────────────
   async function handleOAuth(startFlow: () => Promise<any>, provider: string) {
     setOAuth(provider);
     setError('');
@@ -778,6 +881,41 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
     }
   }
 
+  // ── Active session warning ───────────────────────────────────────────────────
+  if (isSignedIn && phase === 'form') {
+    return (
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={sa.scroll} keyboardShouldPersistTaps="handled">
+          <Text style={sa.headline}>Already signed in</Text>
+          <Text style={sa.sub}>
+            {currentEmail
+              ? `You are currently signed in as ${currentEmail}.`
+              : 'You are currently signed in.'}
+            {'\n\n'}Sign out first to create a new account, or continue with your current account.
+          </Text>
+
+          <TouchableOpacity
+            style={sa.sessionBtn}
+            onPress={handleClearSession}
+            disabled={clearingSession}
+            activeOpacity={0.85}
+          >
+            <LinearGradient colors={[PURPLE, CYAN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sa.sessionBtnGrad}>
+              {clearingSession
+                ? <ActivityIndicator color={FG} size="small" />
+                : <Text style={sa.sessionBtnText}>Sign out and create another account</Text>}
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={sa.continueBtn} onPress={onAuthComplete} activeOpacity={0.8}>
+            <Text style={sa.continueBtnText}>Continue with current account →</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  // ── Email verification ───────────────────────────────────────────────────────
   if (phase === 'verify') {
     return (
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
@@ -816,6 +954,7 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
     );
   }
 
+  // ── Sign-up form ─────────────────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={sa.scroll} keyboardShouldPersistTaps="handled">
@@ -908,6 +1047,18 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
           {' and '}
           <Text style={{ color: MUTED }}>Privacy Policy</Text>.
         </Text>
+
+        {/* Developer: clear local test session */}
+        <TouchableOpacity
+          style={sa.devClearBtn}
+          onPress={handleClearSession}
+          disabled={clearingSession}
+          activeOpacity={0.7}
+        >
+          {clearingSession
+            ? <ActivityIndicator color={MUTED2} size="small" />
+            : <Text style={sa.devClearText}>Clear local test session</Text>}
+        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -935,13 +1086,22 @@ const sa = StyleSheet.create({
   resendBtn: { paddingVertical: 12, alignItems: 'center', marginTop: 8 },
   resendText:{ fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED },
   legal:     { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED2, textAlign: 'center', lineHeight: 18, marginTop: 14 },
+  // Active-session warning
+  sessionBtn:     { marginTop: 8, marginBottom: 12, borderRadius: 16, overflow: 'hidden' },
+  sessionBtnGrad: { paddingVertical: 17, alignItems: 'center', paddingHorizontal: 20 },
+  sessionBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+  continueBtn:    { paddingVertical: 14, alignItems: 'center' },
+  continueBtnText:{ fontSize: 14, fontFamily: 'Inter_500Medium', color: MUTED },
+  // Developer reset
+  devClearBtn:    { paddingVertical: 12, alignItems: 'center', marginTop: 10 },
+  devClearText:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED2, textDecorationLine: 'underline' },
 });
 
 // ─── Main onboarding component ────────────────────────────────────────────────
 export default function OnboardingScreen() {
-  const { isSignedIn } = useAuth();
-  const { signUp }     = useSignUp();
-  const { signIn }     = useSignIn();
+  const { isSignedIn, signOut } = useAuth();
+  const { signUp }              = useSignUp();
+  const { signIn }              = useSignIn();
   const { startOAuthFlow: startGoogleOAuth } = useOAuth({ strategy: 'oauth_google' });
   const { startOAuthFlow: startAppleOAuth }  = useOAuth({ strategy: 'oauth_apple' });
 
@@ -1072,8 +1232,14 @@ export default function OnboardingScreen() {
   }
 
   // ── Developer reset ─────────────────────────────────────────────────────────
+  // Signs out of Clerk, wipes all local test state. Does NOT delete backend accounts.
   async function devReset() {
-    await AsyncStorage.multiRemove([ONBOARDING_KEY, 'user_role', DRAFT_KEY, 'onboarding_first_name', 'onboarding_brand_name', 'onboarding_style_interests', 'splash_seen']);
+    try { if (isSignedIn) await signOut(); } catch {}
+    await AsyncStorage.multiRemove([
+      ONBOARDING_KEY, 'user_role', DRAFT_KEY,
+      'onboarding_first_name', 'onboarding_brand_name',
+      'onboarding_style_interests', 'splash_seen',
+    ]);
     router.replace('/splash' as never);
   }
 
@@ -1170,6 +1336,7 @@ export default function OnboardingScreen() {
           startGoogleOAuth={startGoogleOAuth}
           startAppleOAuth={startAppleOAuth}
           onAuthComplete={handleAuthComplete}
+          onDevClear={devReset}
         />
       );
 
@@ -1330,6 +1497,7 @@ export default function OnboardingScreen() {
           startGoogleOAuth={startGoogleOAuth}
           startAppleOAuth={startAppleOAuth}
           onAuthComplete={handleAuthComplete}
+          onDevClear={devReset}
         />
       );
 

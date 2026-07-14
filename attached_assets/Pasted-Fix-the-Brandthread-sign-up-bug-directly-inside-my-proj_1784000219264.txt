@@ -1,0 +1,158 @@
+Fix the Brandthread sign-up bug directly inside my project.
+
+The email I am entering does NOT already have an account.
+
+Current bug:
+When I enter a brand-new email and press Create Account, the app incorrectly says the email is already signed in, already registered, or already being used.
+
+Do not just change the error message. Find the actual cause and fix it.
+
+Inspect the entire authentication and onboarding flow, including:
+
+* Current authentication provider
+* Sign-up function
+* Sign-in function
+* Session restoration
+* AsyncStorage
+* SecureStore
+* Local development authentication
+* Saved onboarding data
+* Existing user profile checks
+* Email existence checks
+* Navigation guards
+* Redirect logic
+* Demo accounts
+* Hardcoded authentication state
+* Mock authentication services
+
+Do not install a second authentication system.
+
+The likely causes you must check for include:
+
+1. The app is checking whether ANY user session exists instead of checking whether the entered email exists.
+
+2. A previously signed-in test user is still stored locally.
+
+3. The app is confusing:
+
+* already signed in
+* already registered
+* active session exists
+* profile already exists
+
+4. A fake local authentication service automatically marks every email as registered.
+
+5. A hardcoded demo account or cached user is being returned.
+
+6. The sign-up function is accidentally calling sign-in or session-check logic.
+
+7. The app creates a profile before the authentication account is successfully created.
+
+8. The app checks the local profile table by account type or device instead of by the new authenticated user ID.
+
+9. AsyncStorage onboarding data is being mistaken for an existing account.
+
+10. The app is reusing an old email value from state instead of the email currently entered.
+
+Fix the flow so it works like this:
+
+NEW EMAIL:
+
+* User enters a brand-new email and password.
+* App calls the real sign-up function once.
+* Loading state appears.
+* Account is created.
+* Profile is created only after authentication succeeds.
+* Buyer or Seller account type is saved correctly.
+* User continues to the proper next screen.
+
+ACTIVE SESSION:
+
+* If another user is already signed in, do not incorrectly say the new email already exists.
+* Show:
+  “You are currently signed in as [current email]. Sign out to create another account.”
+* Add a working:
+  “Sign out and create another account”
+  button.
+
+EXISTING EMAIL:
+
+* Only show:
+  “An account already exists with this email. Sign in instead.”
+  when the authentication provider specifically returns an existing-email or duplicate-user error.
+
+ERROR HANDLING:
+Map each real provider error separately.
+
+Do not use one generic error for every failure.
+
+Handle:
+
+* Existing email
+* Invalid email
+* Weak password
+* Incorrect password
+* Network error
+* Active session already exists
+* Email verification required
+* Rate limit
+* Missing authentication configuration
+* Unknown server error
+
+Also add temporary developer logging around sign-up that prints:
+
+* The exact email being submitted
+* Whether a session already exists
+* The authentication provider being used
+* The exact provider error code
+* The exact provider error message
+* Whether the profile creation step ran
+
+Do not print the password.
+
+Remove or disable fake duplicate-email logic.
+
+Do not determine whether an email exists by searching the local profile table from the mobile client.
+
+Do not create duplicate profiles.
+
+Do not treat saved onboarding data as an authenticated account.
+
+Add a developer-only reset button that clears:
+
+* Current auth session
+* AsyncStorage authentication test data
+* SecureStore authentication test data
+* Cached onboarding test data
+* Mock user state
+
+The button must not delete real backend accounts.
+
+Name the button:
+“Clear local test session”
+
+After fixing it, test these exact cases:
+
+1. Clear the local test session.
+2. Enter a completely new email.
+3. Create the account successfully.
+4. Log out.
+5. Sign back in with that account.
+6. Try another completely new email.
+7. Confirm it creates another account only after signing out.
+8. Try the first email again.
+9. Confirm it correctly says the account already exists.
+10. Close and reopen the app.
+11. Confirm session restoration works.
+12. Confirm Buyer routes to Thread.
+13. Confirm Seller routes to Dashboard.
+
+Fix all TypeScript errors, runtime errors, route errors and console errors.
+
+Do not stop after changing text.
+
+Find the real authentication-state bug, fix it, run the app and verify that a truly new email can create an account.
+
+When everything is working, respond with only:
+
+“Brandthread new-email sign-up is fixed and working.”
