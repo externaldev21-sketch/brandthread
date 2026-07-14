@@ -71,10 +71,10 @@ const QUICK_ACTIONS = [
   { label: 'Add Product',   icon: 'plus-circle'   as const, color: GREEN,  route: '/add-product'  },
   { label: 'Manufacturer',  icon: 'tool'          as const, color: CYAN,   route: '/manufacturer' },
   { label: 'Create Content',icon: 'video'         as const, color: ORANGE, route: '/content'      },
-  { label: 'View Orders',   icon: 'shopping-bag'  as const, color: BLUE,   route: '/orders'       },
+  { label: 'View Orders',   icon: 'shopping-bag'  as const, color: BLUE,   route: '/(tabs)/orders'   },
   { label: 'Store Builder', icon: 'layout'        as const, color: '#EC4899', route: '/store-builder' },
-  { label: 'Ship Label',    icon: 'truck'         as const, color: GOLD,   route: '/shipping-label' },
-  { label: 'Discount',      icon: 'tag'           as const, color: RED,    route: '/marketing'    },
+  { label: 'Ship Label',    icon: 'truck'         as const, color: GOLD,   route: '/shipping'        },
+  { label: 'Discount',      icon: 'tag'           as const, color: RED,    route: '/(tabs)/marketing'},
 ];
 
 // ─── Order snapshot ───────────────────────────────────────────────────────────
@@ -326,7 +326,7 @@ export default function DashboardScreen() {
               key={s.label}
               style={[d.statCard, { width: cardW }]}
               activeOpacity={0.8}
-              onPress={() => nav(s.label === 'Orders' ? '/orders' : '/analytics')}
+              onPress={() => nav(s.label === 'Orders' ? '/(tabs)/orders' : '/(tabs)/analytics')}
             >
               <View style={d.statTop}>
                 <Text style={d.statLabel}>{s.label}</Text>
@@ -348,7 +348,7 @@ export default function DashboardScreen() {
       <View style={d.section}>
         <View style={d.sectionHead}>
           <Text style={d.sectionTitle}>Revenue</Text>
-          <TouchableOpacity onPress={() => nav('/analytics')}><Text style={d.viewAll}>Analytics →</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => nav('/(tabs)/analytics')}><Text style={d.viewAll}>Analytics →</Text></TouchableOpacity>
         </View>
         <View style={d.card}>
           <Text style={d.chartAmt}>$83,491.23</Text>
@@ -407,14 +407,14 @@ export default function DashboardScreen() {
       <View style={d.section}>
         <View style={d.sectionHead}>
           <Text style={d.sectionTitle}>Orders</Text>
-          <TouchableOpacity onPress={() => nav('/orders')}><Text style={d.viewAll}>View All</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => nav('/(tabs)/orders')}><Text style={d.viewAll}>View All</Text></TouchableOpacity>
         </View>
         <View style={d.snapRow}>
           {snap.map(item => (
             <TouchableOpacity
               key={item.label}
               style={d.snapCard}
-              onPress={() => nav('/orders')}
+              onPress={() => nav('/(tabs)/orders')}
               activeOpacity={0.8}
             >
               <Text style={[d.snapCount, { color: item.color }]}>{item.count}</Text>

@@ -31,7 +31,7 @@ const PROFILE_STATS = [
 const QUICK_ACTIONS: { icon: keyof typeof Feather.glyphMap; label: string; route: string }[] = [
   { icon: 'tag',        label: 'Add Product',   route: '/products'  },
   { icon: 'box',        label: 'Create Drop',   route: '/products'  },
-  { icon: 'send',       label: 'New Campaign',  route: '/marketing' },
+  { icon: 'send',       label: 'New Campaign',  route: '/(tabs)/marketing' },
   { icon: 'share',      label: 'Share Store',   route: '/share-store' },
 ];
 
