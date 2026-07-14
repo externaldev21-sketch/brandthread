@@ -1,0 +1,337 @@
+Integrate the new transparent Brandthread B logo throughout my entire existing Expo React Native project.
+
+Do not explain anything to me.
+Do not give me sample code.
+Do not ask me to edit files manually.
+Inspect the project, edit it directly, run it, and fix every error.
+
+The official logo file is:
+
+assets/images/brandthread-logo.png
+
+This transparent B logo is now the single official Brandthread logo.
+
+Do not redesign the logo.
+Do not recolor the logo.
+Do not stretch it.
+Do not crop it.
+Do not place a black square behind it.
+Always preserve its exact shape and proportions.
+
+CREATE ONE REUSABLE LOGO COMPONENT
+
+Create:
+
+components/branding/BrandthreadLogo.tsx
+
+The component must support:
+
+- size
+- width
+- height
+- opacity
+- animated
+- showGlow
+- glowColor
+- accessibilityLabel
+- testID
+
+Use React Native Image with:
+
+- resizeMode="contain"
+- perfect aspect ratio
+- transparent background
+- no forced border radius
+- no image distortion
+
+Use the logo through the reusable component instead of repeating raw Image components.
+
+Example component behavior:
+
+- Default size: 52
+- Small icon: 24–32
+- Header logo: 36–48
+- Authentication logo: 72–96
+- Splash logo: 110–150
+- Empty-state logo: 56–72
+- Profile fallback: 48–96
+
+CREATE A CENTRAL ASSET EXPORT
+
+Create or update a central branding asset file such as:
+
+constants/branding.ts
+
+Export:
+
+- official logo source
+- standard logo sizes
+- accessibility label
+- optional glow settings
+
+Do not hardcode the asset path throughout random screens.
+
+REPLACE ALL OLD BRANDTHREAD LOGOS
+
+Search the full project for all active references to:
+
+- BrandthreadLogo
+- BrandLogo
+- AppLogo
+- BLogo
+- Logo
+- SellerLogo
+- BuyerLogo
+- DefaultLogo
+- PlaceholderLogo
+- BrandMark
+- AppMark
+- BrandthreadMark
+- Temporary B icons
+- Text-based B logos
+- Gradient B shapes
+- Old chrome logos
+- Old green logos
+- Old onboarding logos
+- Hardcoded letter “B” used as the Brandthread mark
+
+Replace active Brandthread branding with the new BrandthreadLogo component.
+
+Do not replace a Seller’s own uploaded brand logo.
+
+Use this rule:
+
+1. If a Seller uploaded their own brand logo, show the Seller’s logo.
+2. If the Seller has no uploaded logo, use the official Brandthread logo as the fallback.
+3. For Brandthread-owned screens and system branding, always use the official Brandthread logo.
+
+INTEGRATE THE OFFICIAL LOGO INTO
+
+- Splash screen
+- Welcome screen
+- Sign-in screen
+- Sign-up screen
+- Forgot-password screen
+- Email-verification screen
+- Buyer onboarding
+- Seller onboarding
+- Authentication loading screens
+- Session restoration screen
+- Seller Dashboard
+- Buyer Thread
+- Seller navigation
+- Buyer navigation where system branding is shown
+- Seller Profile fallback image
+- Buyer Profile fallback image
+- Store Builder
+- Design Studio
+- Brand Assets
+- Manufacturer Hub
+- Products
+- Orders
+- Inventory
+- Customers
+- Marketing
+- Analytics
+- Payouts
+- Notifications
+- Settings
+- Subscription
+- Help
+- Search
+- Empty states
+- Error screens
+- Loading screens
+- Confirmation screens
+- Success screens
+- AI generation screens
+- AI Assistant
+- Public storefront fallback branding
+- Checkout system branding
+- Order confirmation
+- Email previews where Brandthread system branding is intended
+- PDF or share exports where supported
+- App loading placeholders
+- System modals
+- Developer tools
+
+APP ICON AND SPLASH ASSETS
+
+Create proper app icon assets from the official logo without changing the logo itself.
+
+Generate or configure:
+
+- app icon
+- adaptive Android icon
+- iOS icon
+- splash icon
+- notification icon where compatible
+- web favicon
+
+For the app icon only:
+
+- Center the transparent logo inside a premium black rounded-square icon background.
+- Keep safe padding around the logo.
+- Do not crop the B.
+- Do not add text.
+- Do not add THREAD.
+- Do not distort it.
+- Use a subtle dark charcoal gradient or near-black background.
+- Do not add a bright green glow.
+- Make it look premium and consistent with onboarding.
+
+For in-app usage:
+
+- Keep the logo background transparent.
+- Let the screen or card background show behind it.
+
+Update app.json or app.config only as needed.
+
+Do not break Expo Go compatibility.
+
+ONBOARDING
+
+Preserve the current onboarding flow and layout.
+
+Replace only the old Brandthread mark with the new official logo.
+
+Make sure the logo appears correctly on:
+
+- Splash
+- Welcome
+- Sign in
+- Sign up
+- Loading
+- Success
+- Verification
+- Existing-account
+- Active-session screens
+
+Do not let any authentication route show an old logo.
+
+SELLER PROFILE RULE
+
+On Seller Profile:
+
+- Use the Seller’s uploaded logo when available.
+- Use BrandthreadLogo only as the fallback.
+- Do not overwrite a Seller’s custom profile image.
+- Preserve camera/edit-logo controls.
+- Keep the fallback centered and properly sized.
+
+STOREFRONT RULE
+
+On public storefronts:
+
+- Use the Seller’s uploaded brand logo first.
+- Use the official Brandthread logo only as a fallback.
+- Do not make every Seller storefront appear to be owned by Brandthread.
+
+THREAD RULE
+
+On Thread posts:
+
+- Show the Seller’s profile or brand logo.
+- Use the official logo only when that Seller has no profile logo.
+- Do not replace all Seller avatars with the Brandthread logo.
+
+DESIGN CONSISTENCY
+
+The logo must look clean on:
+
+- black backgrounds
+- charcoal cards
+- light backgrounds
+- gradient backgrounds
+- small icons
+- large splash screens
+
+If contrast is weak on a specific background:
+
+- Add a subtle shadow or soft glow behind the logo.
+- Do not recolor the image.
+- Do not add a solid square behind in-app logo usage.
+
+ACCESSIBILITY
+
+Add:
+
+- accessibilityRole="image"
+- accessibilityLabel="Brandthread logo"
+
+Decorative logo instances may be excluded from screen readers only when appropriate.
+
+PERFORMANCE
+
+- Use one imported asset.
+- Avoid loading duplicate logo files.
+- Avoid unnecessary Base64 images.
+- Avoid remote URLs for the official logo.
+- Cache or reuse the local asset normally.
+- Do not render huge image dimensions for tiny icons.
+
+CLEANUP
+
+After replacement:
+
+- Remove unused old logo imports.
+- Remove unused old logo components.
+- Remove obsolete placeholder Brandthread logo assets only after confirming they are no longer referenced.
+- Do not delete Seller-uploaded assets.
+- Do not delete unrelated product or content images.
+
+TEST EVERY LOCATION
+
+Test:
+
+1. Launch app.
+2. Confirm splash logo.
+3. Confirm welcome logo.
+4. Open sign in.
+5. Open sign up.
+6. Open forgot password.
+7. Open email verification.
+8. Complete Buyer onboarding.
+9. Complete Seller onboarding.
+10. Open Seller Dashboard.
+11. Open Buyer Thread.
+12. Open Seller Profile without a custom logo.
+13. Open Seller Profile with a custom logo.
+14. Open public storefront.
+15. Open Design Studio.
+16. Open Store Builder.
+17. Open Manufacturer Hub.
+18. Open Products.
+19. Open Orders.
+20. Open Inventory.
+21. Open Customers.
+22. Open Marketing.
+23. Open Settings.
+24. Restart app.
+25. Confirm no old logo appears.
+26. Confirm the logo never stretches.
+27. Confirm transparent background works.
+28. Confirm Seller custom logos still work.
+29. Confirm app icon renders correctly.
+30. Confirm splash icon renders correctly.
+
+Fix all:
+
+- TypeScript errors
+- Broken imports
+- Missing asset paths
+- Route errors
+- Expo configuration errors
+- Image sizing issues
+- Image clipping
+- White boxes around transparency
+- Duplicate logo components
+- Console warnings caused by this work
+
+Do not stop after changing only the splash screen.
+
+Integrate the official transparent Brandthread logo throughout every active system and preserve Seller-owned branding.
+
+When complete, respond with only:
+
+“The official Brandthread logo is integrated throughout the app.”
