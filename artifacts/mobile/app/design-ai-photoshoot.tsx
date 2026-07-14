@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
-  StyleSheet, ActivityIndicator, Alert, Dimensions,
+  StyleSheet, ActivityIndicator, Alert, Dimensions, Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
@@ -29,6 +29,8 @@ import {
 import {
   generatePhotoshoot, GeneratePhotoshootResult,
 } from '@/services/designService';
+import { File, Paths } from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
 
 const { width: SW } = Dimensions.get('window');
 const COL_W = (SW - SP.lg * 2 - SP.sm) / 2;
@@ -95,6 +97,50 @@ export default function AIPhotoshootScreen() {
   }
 
   const counterRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  async function saveDataUriToDevice(dataUri: string): Promise<void> {
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission required', 'Please allow photo library access to save images.');
+      return;
+    }
+    const b64 = dataUri.replace(/^data:image\/[a-z]+;base64,/, '');
+    const file = new File(Paths.cache, `photoshoot_${Date.now()}.png`);
+    file.write(b64, { encoding: 'base64' });
+    await MediaLibrary.saveToLibraryAsync(file.uri);
+  }
+
+  async function handleSaveAll(imageUris: string[]): Promise<void> {
+    const realUris = imageUris.filter(u => u.startsWith('data:'));
+    if (realUris.length === 0) {
+      Alert.alert('Nothing to save', 'Generate images first.');
+      return;
+    }
+    try {
+      await Promise.all(realUris.map(uri => saveDataUriToDevice(uri)));
+      Alert.alert('Saved', `${realUris.length} photo${realUris.length !== 1 ? 's' : ''} saved to your photo library.`);
+    } catch {
+      Alert.alert('Save failed', 'Could not save all images. Please try again.');
+    }
+  }
+
+  async function handleSaveSelected(imageUris: string[], selectedSet: Set<number>): Promise<void> {
+    if (selectedSet.size === 0) {
+      Alert.alert('Nothing selected', 'Tap photos to select them first.');
+      return;
+    }
+    const toSave = Array.from(selectedSet).map(i => imageUris[i]).filter(u => u?.startsWith('data:'));
+    if (toSave.length === 0) {
+      Alert.alert('Nothing to save', 'Selected images are not yet generated.');
+      return;
+    }
+    try {
+      await Promise.all(toSave.map(uri => saveDataUriToDevice(uri)));
+      Alert.alert('Saved', `${toSave.length} photo${toSave.length !== 1 ? 's' : ''} saved to your photo library.`);
+    } catch {
+      Alert.alert('Save failed', 'Could not save images. Please try again.');
+    }
+  }
 
   async function handleGenerate() {
     setIsGenerating(true);
@@ -178,15 +224,19 @@ export default function AIPhotoshootScreen() {
                   onPress={() => toggleSelect(idx)}
                   activeOpacity={0.85}
                 >
-                  <LinearGradient
-                    colors={GRAD_PALETTES[idx % 4]}
-                    style={s.resultGradient}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                  >
-                    <Feather name="user" size={32} color="rgba(255,255,255,0.5)" />
-                    <Text style={s.resultLabel}>Photo {idx + 1}</Text>
-                  </LinearGradient>
+                  {uri.startsWith('data:') ? (
+                    <Image source={{ uri }} style={s.resultGradient} resizeMode="cover" />
+                  ) : (
+                    <LinearGradient
+                      colors={GRAD_PALETTES[idx % 4]}
+                      style={s.resultGradient}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                    >
+                      <Feather name="user" size={32} color="rgba(255,255,255,0.5)" />
+                      <Text style={s.resultLabel}>Photo {idx + 1}</Text>
+                    </LinearGradient>
+                  )}
                   {/* Checkbox */}
                   <View style={[s.checkbox, isSelected && s.checkboxActive]}>
                     {isSelected && <Feather name="check" size={ICON.xs} color="#fff" />}
@@ -203,13 +253,13 @@ export default function AIPhotoshootScreen() {
             </Text>
             <View style={s.actionsGrid}>
               {[
-                { label: 'Save all', icon: 'save', onPress: () => Alert.alert('All saved') },
-                { label: 'Save selected', icon: 'bookmark', onPress: () => selected.size ? Alert.alert(`${selected.size} saved`) : Alert.alert('Select photos first') },
+                { label: 'Save all', icon: 'save', onPress: () => handleSaveAll(results!.imageUris) },
+                { label: 'Save selected', icon: 'bookmark', onPress: () => handleSaveSelected(results!.imageUris, selected) },
                 { label: 'Retry', icon: 'refresh-cw', onPress: handleGenerate },
-                { label: 'Add to Product', icon: 'package', onPress: () => Alert.alert('Added to product') },
-                { label: 'Seller post', icon: 'send', onPress: () => Alert.alert('Added to seller post') },
-                { label: 'Store Builder', icon: 'shopping-bag', onPress: () => Alert.alert('Added to store') },
-                { label: 'Campaign', icon: 'trending-up', onPress: () => Alert.alert('Added to campaign') },
+                { label: 'Add to Product', icon: 'package', onPress: () => Alert.alert('Coming Soon', 'Adding AI photos to a product requires image upload infrastructure — available in a future update.') },
+                { label: 'Seller post', icon: 'send', onPress: () => Alert.alert('Coming Soon', 'Creating a Thread post from AI photos is available in a future update.') },
+                { label: 'Store Builder', icon: 'shopping-bag', onPress: () => Alert.alert('Coming Soon', 'Adding photos to Store Builder is available in a future update.') },
+                { label: 'Campaign', icon: 'trending-up', onPress: () => Alert.alert('Coming Soon', 'Campaign integration is available in a future update.') },
               ].map(a => (
                 <TouchableOpacity key={a.label} style={s.actionItem} onPress={a.onPress}>
                   <View style={s.actionItemIcon}>
@@ -224,7 +274,7 @@ export default function AIPhotoshootScreen() {
           <View style={s.disclaimer}>
             <Feather name="info" size={ICON.sm} color={MUTED} />
             <Text style={s.disclaimerText}>
-              Preview shown. Connect an AI provider to generate real photos.
+              Images generated by AI. Results may vary — refine your prompt for best quality.
             </Text>
           </View>
         </ScrollView>

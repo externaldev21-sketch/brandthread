@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image,
 } from 'react-native';
@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { getSellerPosts, subscribeSocial, type SellerThreadPost } from '@/services/socialService';
 
 // ─── Design tokens ─────────────────────────────────────────────────────────
 
@@ -31,7 +32,7 @@ const PROFILE_STATS = [
 
 const QUICK_ACTIONS: { icon: keyof typeof Feather.glyphMap; label: string; route: string }[] = [
   { icon: 'video',      label: 'Create Post',   route: '/create-post' },
-  { icon: 'tag',        label: 'Add Product',   route: '/products'  },
+  { icon: 'tag',        label: 'Add Product',   route: '/add-product' },
   { icon: 'send',       label: 'New Campaign',  route: '/(tabs)/marketing' },
   { icon: 'user',       label: 'My Profile',    route: '/seller-profile?isOwner=true' },
 ];
@@ -97,6 +98,20 @@ export default function ProfileScreen() {
   const insets  = useSafeAreaInsets();
   const router  = useRouter();
   const [activeTab, setActiveTab] = useState(0);
+  const [sellerPosts, setSellerPosts] = useState<SellerThreadPost[]>([]);
+
+  const loadPosts = useCallback(async () => {
+    try {
+      const posts = await getSellerPosts();
+      setSellerPosts(posts);
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    loadPosts();
+    const unsub = subscribeSocial(loadPosts);
+    return unsub;
+  }, [loadPosts]);
 
   function nav(route: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -214,39 +229,65 @@ export default function ProfileScreen() {
 
       {/* Content grid */}
       <View style={s.grid}>
-        {GRID.map((tile) => (
-          <TouchableOpacity
-            key={tile.id}
-            style={s.gridTile}
-            activeOpacity={0.85}
-            onPress={() => nav('/products')}
-          >
-            {tile.id === 'create' ? (
-              <View style={s.createTile}>
-                <View style={s.createPlus}>
-                  <Feather name="plus" size={20} color={MUTED} />
+        {/* Create Post tile — always first */}
+        <TouchableOpacity
+          style={s.gridTile}
+          activeOpacity={0.85}
+          onPress={() => nav('/create-post')}
+        >
+          <View style={s.createTile}>
+            <View style={s.createPlus}>
+              <Feather name="plus" size={20} color={MUTED} />
+            </View>
+            <Text style={s.createTitle}>Create Post</Text>
+            <Text style={s.createSub}>Share something with{'\n'}your audience</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Real seller posts — filtered by tab */}
+        {sellerPosts
+          .filter(p => {
+            if (activeTab === 0) return !p.isDraft && !p.isArchived;
+            if (activeTab === 1) return p.isDraft && !p.isArchived;
+            if (activeTab === 2) return !p.isDraft && !p.isArchived && !!p.scheduledAt;
+            return false; // Analytics tab has no grid items
+          })
+          .map(post => (
+            <TouchableOpacity
+              key={post.id}
+              style={s.gridTile}
+              activeOpacity={0.85}
+            >
+              <LinearGradient colors={['#4A3B7A', '#1E1540']} style={s.gridInner}>
+                <View style={[s.gridMenuBtn, { opacity: 0.7 }]}>
+                  <Feather name={post.contentType === 'video' ? 'video' : 'image'} size={11} color="#FFF" />
                 </View>
-                <Text style={s.createTitle}>Create Post</Text>
-                <Text style={s.createSub}>Share something with{'\n'}your audience</Text>
-              </View>
-            ) : (
-              <LinearGradient colors={(tile as any).colors} style={s.gridInner}>
-                <TouchableOpacity style={s.gridMenuBtn} activeOpacity={0.7} onPress={() => router.push('/product-editor' as never)}>
-                  <Feather name="more-horizontal" size={14} color="#FFF" />
-                </TouchableOpacity>
-                <Text style={s.gridCaption} numberOfLines={3}>{(tile as any).caption}</Text>
+                <Text style={s.gridCaption} numberOfLines={3}>{post.caption || '(No caption)'}</Text>
                 <View style={s.gridStatRow}>
-                  <Feather name="heart" size={10} color="#FFFFFF99" />
-                  <Text style={s.gridStat}>{(tile as any).likes}</Text>
-                  <Feather name="message-circle" size={10} color="#FFFFFF99" style={{ marginLeft: 4 }} />
-                  <Text style={s.gridStat}>{(tile as any).comments}</Text>
-                  <Feather name="play" size={10} color="#FFFFFF99" style={{ marginLeft: 4 }} />
-                  <Text style={s.gridStat}>{(tile as any).views}</Text>
+                  <Feather name="clock" size={10} color="#FFFFFF99" />
+                  <Text style={s.gridStat}>{new Date(post.createdAt).toLocaleDateString()}</Text>
                 </View>
               </LinearGradient>
-            )}
-          </TouchableOpacity>
-        ))}
+            </TouchableOpacity>
+          ))
+        }
+
+        {/* Empty state for tabs when no posts */}
+        {activeTab !== 3 && sellerPosts.filter(p => {
+          if (activeTab === 0) return !p.isDraft && !p.isArchived;
+          if (activeTab === 1) return p.isDraft && !p.isArchived;
+          if (activeTab === 2) return !p.isDraft && !p.isArchived && !!p.scheduledAt;
+          return false;
+        }).length === 0 && (
+          <View style={s.emptyState}>
+            <Feather name="inbox" size={24} color={MUTED} />
+            <Text style={s.emptyText}>
+              {activeTab === 0 ? 'No posts yet. Create your first post!' :
+               activeTab === 1 ? 'No drafts saved.' :
+               'No scheduled posts.'}
+            </Text>
+          </View>
+        )}
       </View>
     </ScrollView>
   );
@@ -339,4 +380,6 @@ const s = StyleSheet.create({
   gridCaption:    { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#FFF', lineHeight: 14, marginTop: 4 },
   gridStatRow:    { flexDirection: 'row', alignItems: 'center', gap: 3 },
   gridStat:       { fontSize: 10, fontFamily: 'Inter_500Medium', color: '#FFFFFF99' },
+  emptyState:     { width: '100%', alignItems: 'center', padding: 24, gap: 8 },
+  emptyText:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center' },
 });

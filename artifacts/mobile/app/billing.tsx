@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
@@ -24,6 +24,11 @@ export default function BillingScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
 
+  function comingSoon(feature = 'This feature') {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Alert.alert('Coming Soon', `${feature} is not yet available — check back in a future update.`);
+  }
+
   const filteredBills = BILLS.filter((b) => {
     if (filter === 'all') return true;
     return b.status.toLowerCase() === filter;
@@ -34,7 +39,7 @@ export default function BillingScreen() {
       <ScreenHeader
         title="Billing"
         rightElement={
-          <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <TouchableOpacity onPress={() => comingSoon('Billing options')} activeOpacity={0.7} style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name="more-horizontal" size={17} color={colors.foreground} />
           </TouchableOpacity>
         }
@@ -59,7 +64,7 @@ export default function BillingScreen() {
         <View style={styles.section}>
           <View style={styles.rowBetween}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Upcoming bill</Text>
-            <TouchableOpacity onPress={haptic} activeOpacity={0.7}>
+            <TouchableOpacity onPress={() => comingSoon('Bill details')} activeOpacity={0.7}>
               <Text style={[styles.linkText, { color: colors.foreground }]}>View bill</Text>
             </TouchableOpacity>
           </View>
@@ -74,13 +79,13 @@ export default function BillingScreen() {
             <Feather name="info" size={15} color={colors.primary} style={{ marginTop: 2 }} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.infoText, { color: colors.foreground }]}>$20.00 in discounts may apply to relevant charges on your next bill.</Text>
-              <TouchableOpacity onPress={haptic} activeOpacity={0.7}>
+              <TouchableOpacity onPress={() => comingSoon('Discount breakdown')} activeOpacity={0.7}>
                 <Text style={[styles.infoLink, { color: colors.primary }]}>View breakdown</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <TouchableOpacity onPress={() => comingSoon('Payment method management')} activeOpacity={0.7} style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.cardBrand}>
               <Feather name="credit-card" size={18} color="#FFFFFF" />
             </View>
@@ -99,7 +104,7 @@ export default function BillingScreen() {
         <View style={styles.section}>
           <View style={styles.rowBetween}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Past bills</Text>
-            <TouchableOpacity onPress={haptic} activeOpacity={0.7}>
+            <TouchableOpacity onPress={() => comingSoon('Bill export')} activeOpacity={0.7}>
               <Feather name="more-horizontal" size={18} color={colors.mutedForeground} />
             </TouchableOpacity>
           </View>
@@ -119,10 +124,10 @@ export default function BillingScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.iconBtn, { borderColor: colors.border }]}>
+            <TouchableOpacity onPress={() => comingSoon('Bill search')} activeOpacity={0.7} style={[styles.iconBtn, { borderColor: colors.border }]}>
               <Feather name="search" size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.iconBtn, { borderColor: colors.border }]}>
+            <TouchableOpacity onPress={() => comingSoon('Bill filters')} activeOpacity={0.7} style={[styles.iconBtn, { borderColor: colors.border }]}>
               <Feather name="sliders" size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
           </View>
@@ -131,7 +136,7 @@ export default function BillingScreen() {
             {filteredBills.map((bill, i) => (
               <TouchableOpacity
                 key={bill.id}
-                onPress={haptic}
+                onPress={() => comingSoon('Bill detail')}
                 activeOpacity={0.7}
                 style={[styles.billRow, i !== filteredBills.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
               >
@@ -150,10 +155,10 @@ export default function BillingScreen() {
           </View>
 
           <View style={styles.pagerRow}>
-            <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.pagerBtn, { borderColor: colors.border }]}>
+            <TouchableOpacity onPress={() => comingSoon('Older bills')} activeOpacity={0.7} style={[styles.pagerBtn, { borderColor: colors.border }]}>
               <Feather name="chevron-left" size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
-            <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.pagerBtn, { borderColor: colors.border }]}>
+            <TouchableOpacity onPress={() => comingSoon('Older bills')} activeOpacity={0.7} style={[styles.pagerBtn, { borderColor: colors.border }]}>
               <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
           </View>

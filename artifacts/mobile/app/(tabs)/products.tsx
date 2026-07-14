@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import {
@@ -400,6 +400,9 @@ export default function ProductsScreen() {
   useEffect(() => {
     loadProducts();
   }, [loadProducts]);
+
+  // Reload when the tab comes back into focus (e.g. after creating a product)
+  useFocusEffect(useCallback(() => { loadProducts(); }, [loadProducts]));
 
   function refresh() {
     loadProducts();

@@ -5,13 +5,14 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
-  TextInput, KeyboardAvoidingView, Platform, Switch,
+  TextInput, KeyboardAvoidingView, Platform, Switch, Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
@@ -488,13 +489,36 @@ export default function AddProductScreen() {
       <View style={s.stepContent}>
         <SectionHeader title="Product media" style={s.sectionHdr} />
         <GradientCard
-          onPress={() => Alert.alert('Upload', 'Media upload coming soon — add a URL for now')}
+          onPress={async () => {
+            const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!perm.granted) {
+              Alert.alert('Permission required', 'Please allow access to your photo library in Settings.');
+              return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              allowsMultipleSelection: true,
+              quality: 0.9,
+            });
+            if (!result.canceled && result.assets.length > 0) {
+              const existingMedia = draftData.media ?? [];
+              const newItems: ProductMedia[] = result.assets.map((a, i) => ({
+                id: `${Date.now()}-${i}`,
+                type: 'image' as const,
+                uri: a.uri,
+                isCover: existingMedia.length + i === 0,
+                sortOrder: existingMedia.length + i,
+                createdAt: new Date().toISOString(),
+              }));
+              patchDraft({ media: [...existingMedia, ...newItems] });
+            }
+          }}
           style={s.uploadZone}
         >
           <View style={s.uploadInner}>
             <Feather name="camera" size={32} color={PURPLE_LIGHT} />
-            <Text style={s.uploadLabel}>Tap to add photos and videos</Text>
-            <Text style={s.uploadHint}>JPG, PNG, MP4 · Max 100MB</Text>
+            <Text style={s.uploadLabel}>Tap to add photos</Text>
+            <Text style={s.uploadHint}>JPG, PNG · Select multiple</Text>
           </View>
         </GradientCard>
 
@@ -502,9 +526,13 @@ export default function AddProductScreen() {
           <View style={s.mediaGrid}>
             {media.map(m => (
               <View key={m.id} style={s.mediaThumbnail}>
-                <View style={s.mediaThumbImg}>
-                  <Feather name="image" size={24} color={PURPLE_LIGHT} />
-                </View>
+                {m.uri && (m.uri.startsWith('http') || m.uri.startsWith('file') || m.uri.startsWith('ph://') || m.uri.startsWith('asset-library://') || m.uri.startsWith('content://')) ? (
+                  <Image source={{ uri: m.uri }} style={s.mediaThumbImg} resizeMode="cover" />
+                ) : (
+                  <View style={s.mediaThumbImg}>
+                    <Feather name="image" size={24} color={PURPLE_LIGHT} />
+                  </View>
+                )}
                 <TouchableOpacity
                   style={s.mediaDeleteBtn}
                   onPress={() => patchDraft({ media: media.filter(x => x.id !== m.id) })}

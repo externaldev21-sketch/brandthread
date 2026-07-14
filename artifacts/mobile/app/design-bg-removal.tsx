@@ -7,6 +7,8 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, ActivityIndicator, Image,
 } from 'react-native';
+import { File, Paths } from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -24,39 +26,83 @@ import {
   BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
   GradientCard, PrimaryButton, SecondaryButton, SectionHeader,
 } from '@/components/BrandthreadUI';
-import { removeBackgroundFromImage, createBrandAsset } from '@/services/designService';
+import { createBrandAsset } from '@/services/designService';
 
 export default function DesignBgRemovalScreen() {
   const router = useRouter();
   const [imageUri, setImageUri] = useState<string | null>(null);
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [imageMime, setImageMime] = useState('image/jpeg');
   const [resultUri, setResultUri] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showCheckerboard, setShowCheckerboard] = useState(true);
 
   async function pickImage() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission required', 'Please allow photo library access.');
+      return;
+    }
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       quality: 0.9,
+      base64: true,   // request base64 so we can send to API without FileSystem read
     });
-    if (!res.canceled && res.assets[0]) {
+    if (!res.canceled && res.assets[0]?.base64) {
       setImageUri(res.assets[0].uri);
+      setImageBase64(res.assets[0].base64);
+      setImageMime(res.assets[0].mimeType ?? 'image/jpeg');
       setResultUri(null);
     }
   }
 
   async function handleRemove() {
-    if (!imageUri) {
+    if (!imageBase64) {
       Alert.alert('No image', 'Please upload an image first.');
       return;
     }
     setIsProcessing(true);
     try {
-      const uri = await removeBackgroundFromImage(imageUri);
-      setResultUri(uri);
-    } catch {
-      Alert.alert('Error', 'Background removal failed. Please try again.');
+      const dataUrl = `data:${imageMime};base64,${imageBase64}`;
+      const apiBase = (process.env.EXPO_PUBLIC_API_BASE_URL as string | undefined ?? '').replace(/\/$/, '');
+      const resp = await fetch(`${apiBase}/bg-removal/remove`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: dataUrl }),
+      });
+      if (!resp.ok) {
+        const errText = await resp.text().catch(() => '');
+        throw new Error(`API ${resp.status}: ${errText}`);
+      }
+      const data: { b64_json: string } = await resp.json();
+      setResultUri(`data:image/png;base64,${data.b64_json}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      Alert.alert('Error', `Background removal failed: ${msg}`);
     } finally {
       setIsProcessing(false);
+    }
+  }
+
+  async function handleExportPNG() {
+    if (!resultUri || !resultUri.startsWith('data:')) {
+      Alert.alert('Nothing to export', 'Process an image first.');
+      return;
+    }
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission required', 'Please allow access to save photos.');
+        return;
+      }
+      const b64 = resultUri.replace(/^data:image\/png;base64,/, '');
+      const file = new File(Paths.cache, `bg_removed_${Date.now()}.png`);
+      file.write(b64, { encoding: 'base64' });
+      await MediaLibrary.saveToLibraryAsync(file.uri);
+      Alert.alert('Saved', 'Transparent PNG saved to your photo library.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      Alert.alert('Export failed', msg);
     }
   }
 
@@ -120,16 +166,24 @@ export default function DesignBgRemovalScreen() {
             <SectionHeader title="Result" style={s.sectionHdr} />
             <View style={s.ph}>
               <View style={[s.resultContainer, showCheckerboard && s.checkerboard]}>
-                <LinearGradient
-                  colors={['rgba(139,92,246,0.20)', 'rgba(34,211,238,0.10)']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={s.resultGrad}
-                >
-                  <Feather name="check-circle" size={ICON.xl} color={SUCCESS} />
-                  <Text style={s.resultLabel}>Background removed</Text>
-                  <Text style={s.resultSub}>Transparent PNG ready</Text>
-                </LinearGradient>
+                {resultUri.startsWith('data:') ? (
+                  <Image
+                    source={{ uri: resultUri }}
+                    style={s.resultImage}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <LinearGradient
+                    colors={['rgba(139,92,246,0.20)', 'rgba(34,211,238,0.10)']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={s.resultGrad}
+                  >
+                    <Feather name="check-circle" size={ICON.xl} color={SUCCESS} />
+                    <Text style={s.resultLabel}>Background removed</Text>
+                    <Text style={s.resultSub}>Transparent PNG ready</Text>
+                  </LinearGradient>
+                )}
               </View>
               <TouchableOpacity onPress={() => setShowCheckerboard((v) => !v)} style={s.checkerToggle} activeOpacity={0.8}>
                 <View style={[s.checkerDot, showCheckerboard && s.checkerDotActive]} />
@@ -140,10 +194,10 @@ export default function DesignBgRemovalScreen() {
             {/* Toolbar */}
             <SectionHeader title="Refine" style={s.sectionHdr} />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.toolbarScroll}>
-              <ToolButton label="Refine edges" icon="sliders" accent={PURPLE} onPress={() => Alert.alert('Refine Edges', 'AI refinement coming soon.')} />
-              <ToolButton label="Restore area" icon="rotate-ccw" accent={CYAN} onPress={() => Alert.alert('Restore', 'Brush to restore removed areas.')} />
-              <ToolButton label="Erase area" icon="minus-circle" accent="#F87171" onPress={() => Alert.alert('Erase', 'Brush to erase additional areas.')} />
-              <ToolButton label="New background" icon="layers" accent={CYAN} onPress={() => router.push('/design-bg-replace?sourceUri=mock')} />
+              <ToolButton label="New background" icon="layers" accent={CYAN} onPress={() => router.push(`/design-bg-replace?sourceUri=${encodeURIComponent(resultUri ?? 'mock')}` as any)} />
+              <ToolButton label="Refine edges" icon="sliders" accent={PURPLE} onPress={() => Alert.alert('Coming Soon', 'AI edge refinement requires a brush canvas — available in a future update.')} />
+              <ToolButton label="Restore area" icon="rotate-ccw" accent={CYAN} onPress={() => Alert.alert('Coming Soon', 'Area restore brush available in a future update.')} />
+              <ToolButton label="Erase area" icon="minus-circle" accent="#F87171" onPress={() => Alert.alert('Coming Soon', 'Area erase brush available in a future update.')} />
             </ScrollView>
 
             {/* Export actions */}
@@ -151,10 +205,7 @@ export default function DesignBgRemovalScreen() {
             <View style={s.exportActions}>
               <PrimaryButton
                 label="Export transparent PNG"
-                onPress={() => Alert.alert('Export', 'Save transparent PNG to your device?', [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Save', onPress: () => Alert.alert('Saved', 'PNG exported.') },
-                ])}
+                onPress={handleExportPNG}
                 icon="download"
                 style={s.exportBtn}
               />
@@ -167,7 +218,7 @@ export default function DesignBgRemovalScreen() {
         <View style={s.disclaimer}>
           <Feather name="info" size={ICON.xs} color={MUTED} />
           <Text style={s.disclaimerText}>
-            Background removal preview. Connect a processing service for real results.
+            Background is removed by AI. Results may vary by image quality and complexity.
           </Text>
         </View>
 
@@ -218,6 +269,7 @@ const s = StyleSheet.create({
   removeBtnText:   { fontSize: FS.base, fontFamily: FONT.bold, color: '#FFF' },
   resultContainer: { borderRadius: RADIUS.lg, overflow: 'hidden', borderWidth: 1, borderColor: BORDER_ACTIVE },
   checkerboard:    { backgroundColor: '#999' },
+  resultImage:     { width: '100%', height: 280 },
   resultGrad:      { height: 220, alignItems: 'center', justifyContent: 'center', gap: SP.sm },
   resultLabel:     { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
   resultSub:       { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },

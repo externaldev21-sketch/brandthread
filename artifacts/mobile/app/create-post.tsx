@@ -14,6 +14,7 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { DEMO_SOUNDS, SUGGESTED_HASHTAGS } from '@/services/sellerContent';
 import { getTaggableProducts } from '@/services/productService';
+import { createSellerPost } from '@/services/socialService';
 import type { Product } from '@/services/productTypes';
 import type {
   Sound, PostProductTag, PostHashtag, PostVisibility,
@@ -174,7 +175,7 @@ export default function CreatePostScreen() {
     getTaggableProducts().then(setTaggableProducts).catch(() => {});
   }, []);
 
-  // ─── Publishing animation + auto-advance ─────────────────────────────────
+  // ─── Publishing animation (animation only — actual save happens in handlePublishNow) ──
   useEffect(() => {
     if (step === 'publishing') {
       const loop = Animated.loop(
@@ -184,8 +185,7 @@ export default function CreatePostScreen() {
         ])
       );
       loop.start();
-      const t = setTimeout(() => { loop.stop(); setStep('done'); }, 2000);
-      return () => { loop.stop(); clearTimeout(t); };
+      return () => { loop.stop(); };
     }
   }, [step]);
 
@@ -1173,9 +1173,20 @@ export default function CreatePostScreen() {
             <TouchableOpacity
               style={[s.outlineBtn, { marginTop: 24 }]}
               activeOpacity={0.8}
-              onPress={() => {
+              onPress={async () => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                Alert.alert('Draft saved', 'Saved as draft', [{ text: 'OK', onPress: () => router.back() }]);
+                try {
+                  await createSellerPost({
+                    contentType: contentType ?? 'video',
+                    caption,
+                    hashtags: hashtags.map(h => h.tag),
+                    productTagIds: productTags.map(p => p.productId),
+                    isDraft: true,
+                  });
+                  Alert.alert('Draft saved', 'Your draft has been saved.', [{ text: 'OK', onPress: () => router.back() }]);
+                } catch {
+                  Alert.alert('Error', 'Could not save draft. Please try again.');
+                }
               }}
             >
               <Feather name="save" size={16} color={FG} style={{ marginRight: 8 }} />
@@ -1185,7 +1196,28 @@ export default function CreatePostScreen() {
             <TouchableOpacity
               style={{ marginTop: 10 }}
               activeOpacity={0.85}
-              onPress={() => hapticNav(() => setStep('publishing'))}
+              onPress={async () => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                if (isPublishing) return;
+                setIsPublishing(true);
+                setStep('publishing');
+                try {
+                  await createSellerPost({
+                    contentType: contentType ?? 'video',
+                    caption,
+                    hashtags: hashtags.map(h => h.tag),
+                    productTagIds: productTags.map(p => p.productId),
+                    isDraft: false,
+                    scheduledAt: scheduleMode === 'schedule' ? scheduledAt : null,
+                  });
+                  setStep('done');
+                } catch {
+                  setStep('post-details');
+                  Alert.alert('Publish failed', 'Something went wrong. Your post was not saved. Please try again.');
+                } finally {
+                  setIsPublishing(false);
+                }
+              }}
             >
               <LinearGradient colors={[GREEN, '#20C060']} style={s.publishBtn}>
                 <Feather name="send" size={16} color="#0A0B0A" style={{ marginRight: 8 }} />
@@ -1233,7 +1265,7 @@ export default function CreatePostScreen() {
           <Feather name="check" size={44} color={GREEN} />
         </LinearGradient>
         <Text style={s.doneTitle}>Posted!</Text>
-        <Text style={s.doneSub}>Your content is now live on Thread.</Text>
+        <Text style={s.doneSub}>Your post has been saved and will appear on your profile.</Text>
         <TouchableOpacity
           style={s.doneBtn2}
           activeOpacity={0.85}

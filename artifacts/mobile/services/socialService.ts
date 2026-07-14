@@ -369,6 +369,75 @@ export async function getMyReposts(): Promise<RepostRecord[]> {
   return load<RepostRecord[]>(K.reposts, []);
 }
 
+// ─── Seller posts (Thread-eligible) ──────────────────────────────────────────
+
+const SELLER_POSTS_KEY = 'bt:social:seller-posts:v1';
+
+export interface SellerThreadPost {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorHandle: string;
+  authorInitials: string;
+  authorColor: string;
+  caption: string;
+  hashtags: string[];
+  productTagIds: string[];
+  contentType: string;
+  isDraft: boolean;
+  isArchived: boolean;
+  scheduledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function createSellerPost(params: {
+  contentType: string;
+  caption: string;
+  hashtags: string[];
+  productTagIds: string[];
+  isDraft?: boolean;
+  scheduledAt?: string | null;
+}): Promise<SellerThreadPost> {
+  const profile = await getMyProfile();
+  const existing = await load<SellerThreadPost[]>(SELLER_POSTS_KEY, []);
+  const post: SellerThreadPost = {
+    id: uid(),
+    authorId: MY_USER_ID,
+    authorName: profile.name,
+    authorHandle: '@' + profile.username,
+    authorInitials: profile.avatarInitials,
+    authorColor: profile.avatarColor,
+    caption: params.caption,
+    hashtags: params.hashtags,
+    productTagIds: params.productTagIds,
+    contentType: params.contentType,
+    isDraft: params.isDraft ?? false,
+    isArchived: false,
+    scheduledAt: params.scheduledAt ?? null,
+    createdAt: iso(),
+    updatedAt: iso(),
+  };
+  await save(SELLER_POSTS_KEY, [post, ...existing]);
+  notify();
+  return post;
+}
+
+export async function getSellerPosts(): Promise<SellerThreadPost[]> {
+  return load<SellerThreadPost[]>(SELLER_POSTS_KEY, []);
+}
+
+/** Returns published, non-archived seller posts that are past their schedule date. */
+export async function getThreadPosts(): Promise<SellerThreadPost[]> {
+  const posts = await getSellerPosts();
+  const now = new Date().toISOString();
+  return posts.filter(p =>
+    !p.isDraft &&
+    !p.isArchived &&
+    (!p.scheduledAt || p.scheduledAt <= now),
+  );
+}
+
 // ─── Friendships ──────────────────────────────────────────────────────────────
 
 export async function getFriendships(): Promise<Friendship[]> {

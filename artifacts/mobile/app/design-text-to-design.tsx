@@ -29,8 +29,10 @@ import {
   AIStyleKind, GarmentType, PlacementType,
 } from '@/services/designTypes';
 import {
-  generateDesignFromText, GenerateDesignResult,
+  generateDesignFromText, GenerateDesignResult, createBrandAsset,
 } from '@/services/designService';
+import { File, Paths } from 'expo-file-system';
+import * as MediaLibrary from 'expo-media-library';
 
 const { width: SW } = Dimensions.get('window');
 const COL_W = (SW - SP.lg * 2 - SP.sm) / 2;
@@ -67,6 +69,18 @@ export default function TextToDesignScreen() {
     }
   }
 
+  async function saveDataUriToDevice(dataUri: string): Promise<void> {
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission required', 'Allow photo library access to save images.');
+      return;
+    }
+    const b64 = dataUri.replace(/^data:image\/[a-z]+;base64,/, '');
+    const file = new File(Paths.cache, `design_${Date.now()}.png`);
+    file.write(b64, { encoding: 'base64' });
+    await MediaLibrary.saveToLibraryAsync(file.uri);
+  }
+
   async function handleGenerate() {
     if (!prompt.trim()) {
       Alert.alert('Describe your design', 'Please enter a prompt first.');
@@ -92,11 +106,26 @@ export default function TextToDesignScreen() {
     }
   }
 
-  function handleSaveAll() {
-    Alert.alert('Save all designs?', `This will save ${count} designs to your brand assets.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Save all', onPress: () => Alert.alert('Saved', 'All designs saved to brand assets.') },
-    ]);
+  async function handleSaveAll() {
+    if (!results) return;
+    const realUris = results.imageUris.filter(u => u.startsWith('data:'));
+    if (realUris.length === 0) {
+      Alert.alert('Nothing to save', 'Generate designs first.');
+      return;
+    }
+    try {
+      await Promise.all(realUris.map((uri, i) =>
+        createBrandAsset({
+          name: `${results.prompt.slice(0, 30)} #${i + 1}`,
+          type: 'graphic',
+          uri,
+          tags: ['ai-generated', 'text-to-design', results.style ?? ''].filter(Boolean),
+        }),
+      ));
+      Alert.alert('Saved', `${realUris.length} design${realUris.length !== 1 ? 's' : ''} saved to Brand Assets.`);
+    } catch {
+      Alert.alert('Save failed', 'Could not save designs. Please try again.');
+    }
   }
 
   // ─── Results screen ─────────────────────────────────────────────────────────
@@ -116,31 +145,50 @@ export default function TextToDesignScreen() {
           <View style={s.grid}>
             {results.imageUris.map((uri, idx) => (
               <View key={uri} style={s.resultCard}>
-                <LinearGradient
-                  colors={GRAD_PALETTES[idx % 4]}
-                  style={s.resultGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <Feather name="image" size={32} color="rgba(255,255,255,0.5)" />
-                  <Text style={s.resultLabel}>Design {idx + 1}</Text>
-                </LinearGradient>
+                {uri.startsWith('data:') ? (
+                  <Image source={{ uri }} style={s.resultGradient} resizeMode="cover" />
+                ) : (
+                  <LinearGradient
+                    colors={GRAD_PALETTES[idx % 4]}
+                    style={s.resultGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                  >
+                    <Feather name="image" size={32} color="rgba(255,255,255,0.5)" />
+                    <Text style={s.resultLabel}>Design {idx + 1}</Text>
+                  </LinearGradient>
+                )}
                 {/* Style badge */}
                 <View style={s.styleBadge}>
                   <Text style={s.styleBadgeText}>{results.style}</Text>
                 </View>
                 {/* Actions */}
                 <View style={s.resultActions}>
-                  <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Saved')}>
+                  <TouchableOpacity
+                    style={s.actionBtn}
+                    onPress={() => {
+                      if (!uri.startsWith('data:')) return;
+                      createBrandAsset({ name: results!.prompt.slice(0, 40), type: 'graphic', uri, tags: ['ai-generated'] })
+                        .then(() => Alert.alert('Saved', 'Saved to Brand Assets.'))
+                        .catch(() => Alert.alert('Error', 'Could not save.'));
+                    }}
+                  >
                     <Feather name="bookmark" size={ICON.sm} color={PURPLE} />
                   </TouchableOpacity>
-                  <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Try in garment')}>
+                  <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Coming Soon', 'Try in Garment requires a 3D renderer — available in a future update.')}>
                     <Feather name="layers" size={ICON.sm} color={CYAN} />
                   </TouchableOpacity>
-                  <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Create product')}>
+                  <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Coming Soon', 'Add to Product is available from the product detail screen.')}>
                     <Feather name="package" size={ICON.sm} color={FG} />
                   </TouchableOpacity>
-                  <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Export')}>
+                  <TouchableOpacity
+                    style={s.actionBtn}
+                    onPress={async () => {
+                      if (!uri.startsWith('data:')) { Alert.alert('Nothing to export', 'Generate first.'); return; }
+                      try { await saveDataUriToDevice(uri); Alert.alert('Saved', 'Design saved to photo library.'); }
+                      catch { Alert.alert('Export failed', 'Could not save.'); }
+                    }}
+                  >
                     <Feather name="download" size={ICON.sm} color={FG} />
                   </TouchableOpacity>
                 </View>

@@ -369,17 +369,54 @@ export async function exportProject(
   };
 }
 
-// ─── Mock AI Functions ────────────────────────────────────────────────────────
+// ─── AI API helpers ───────────────────────────────────────────────────────────
 
-function makeResult(prompt: string, style: AIStyleKind, prefix: string, count = 4): AIGenerationResult {
-  const uris = Array.from({ length: count }, (_, i) => `mock://${prefix}/${i + 1}`);
+function getApiBase(): string {
+  const base =
+    typeof process !== 'undefined'
+      ? (process.env?.EXPO_PUBLIC_API_BASE_URL ?? '')
+      : '';
+  return (base as string).replace(/\/$/, '');
+}
+
+async function callGenerateAPI(endpoint: string, body: object): Promise<string> {
+  const url = `${getApiBase()}${endpoint}`;
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) {
+    const msg = await resp.text().catch(() => String(resp.status));
+    throw new Error(`API error ${resp.status}: ${msg}`);
+  }
+  const data: { b64_json: string } = await resp.json();
+  return `data:image/png;base64,${data.b64_json}`;
+}
+
+/** Generate N images in parallel; fall through to mock URI on individual failure. */
+async function generateN(
+  endpoint: string,
+  body: object,
+  count: number,
+): Promise<string[]> {
+  const jobs = Array.from({ length: count }, (_, i) =>
+    callGenerateAPI(endpoint, body).catch(err => {
+      console.error(`[designService] image ${i + 1} failed:`, err);
+      return `mock://failed/${i + 1}`;
+    }),
+  );
+  return Promise.all(jobs);
+}
+
+function makeResult(prompt: string, style: AIStyleKind, imageUris: string[]): AIGenerationResult {
   const now = new Date().toISOString();
   return {
     id: uid('gen'),
     prompt,
     style,
-    imageUris: uris,
-    resultUri: uris[0],
+    imageUris,
+    resultUri: imageUris[0] ?? '',
     createdAt: now,
     generatedAt: now,
   };
@@ -391,8 +428,17 @@ export type { GenerateMockupResult } from './designTypes';
 export type { GeneratePhotoshootResult } from './designTypes';
 
 export async function generateDesignFromText(req: AIGenerationRequest): Promise<GenerateDesignResult> {
-  await delay(1500);
-  return makeResult(req.prompt, req.style, 'generated', req.count);
+  const count = req.count ?? 4;
+  const prompt = [
+    req.prompt,
+    req.style ? `Style: ${req.style}` : '',
+    req.garmentType ? `Garment type: ${req.garmentType}` : '',
+    req.placement ? `Placement: ${req.placement}` : '',
+    req.colorPalette ? `Color palette: ${req.colorPalette}` : '',
+    req.textContent ? `Include text: "${req.textContent}"` : '',
+  ].filter(Boolean).join('. ');
+  const imageUris = await generateN('/mockup/generate', { prompt }, count);
+  return makeResult(req.prompt, req.style, imageUris);
 }
 
 // generateSketchToDesign — accepts an object (used by design-upload-sketch.tsx)
@@ -402,8 +448,10 @@ export async function generateSketchToDesign(req: {
   colorPalette?: string;
   count?: number;
 }): Promise<GenerateDesignResult> {
-  await delay(2000);
-  return makeResult(`Sketch to design — ${req.sketchUri}`, req.style, 'sketch', req.count ?? 4);
+  const count = req.count ?? 4;
+  const prompt = `Convert this sketch to a garment design. Style: ${req.style}${req.colorPalette ? `. Colors: ${req.colorPalette}` : ''}.`;
+  const imageUris = await generateN('/mockup/generate', { prompt }, count);
+  return makeResult(prompt, req.style, imageUris);
 }
 
 // generateMockupToModel — accepts an object (used by design-mockup-to-model.tsx)
@@ -415,8 +463,10 @@ export async function generateMockupToModel(req: {
   imageRatio?: string;
   count?: number;
 }): Promise<GenerateMockupResult> {
-  await delay(2000);
-  return makeResult(`Mockup to model — ${req.mockupUri}`, 'minimal', 'mockup-model', req.count ?? 4);
+  const count = req.count ?? 4;
+  const prompt = `Fashion model wearing the uploaded garment design. Model: ${req.modelStyle ?? 'female'}. Scene: ${req.sceneStyle ?? 'studio'}. Lighting: ${req.lightingStyle ?? 'natural'}. Professional clothing photography.`;
+  const imageUris = await generateN('/photography/generate', { images: [], prompt }, count);
+  return makeResult(prompt, 'minimal' as AIStyleKind, imageUris);
 }
 
 // generatePhotoshoot — accepts an object (used by design-ai-photoshoot.tsx)
@@ -429,13 +479,10 @@ export async function generatePhotoshoot(req: {
   imageRatio?: string;
   count?: number;
 }): Promise<GeneratePhotoshootResult> {
-  await delay(2500);
-  return makeResult(
-    `Photoshoot — ${req.sceneStyle ?? 'studio'} ${req.lightingStyle ?? 'natural'}`,
-    'editorial',
-    'photoshoot',
-    req.count ?? 4,
-  );
+  const count = req.count ?? 4;
+  const prompt = `Professional product photography. Scene: ${req.sceneStyle ?? 'studio'}. Model: ${req.modelStyle ?? 'female'}. Lighting: ${req.lightingStyle ?? 'natural'}. Format: ${req.outputFormat ?? 'product_page'}. Clean, commercial fashion shoot.`;
+  const imageUris = await generateN('/photography/generate', { images: [], prompt }, count);
+  return makeResult(prompt, 'editorial' as AIStyleKind, imageUris);
 }
 
 // applyPromptEdit — accepts an object (used by design-prompt-edit.tsx)
@@ -446,8 +493,9 @@ export async function applyPromptEdit(req: {
   preserveLogo?: boolean;
   preserveGarmentColor?: boolean;
 }): Promise<AIGenerationResult> {
-  await delay(1500);
-  return makeResult(req.prompt, 'custom', 'edited');
+  const prompt = `Edit garment design: ${req.prompt}. ${req.preserveProduct ? 'Keep product shape.' : ''} ${req.preserveGarmentColor ? 'Keep original colors.' : ''}`.trim();
+  const imageUris = await generateN('/mockup/generate', { prompt }, 1);
+  return makeResult(req.prompt, 'custom' as AIStyleKind, imageUris);
 }
 
 // removeBackgroundFromImage — returns a string URI (used by design-bg-removal.tsx)
