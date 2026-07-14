@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import AIBrainFAB from '@/components/AIBrainFAB';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
   StyleSheet, Alert, Share, Modal, Pressable, Image,
@@ -586,6 +587,7 @@ export default function ProductsScreen() {
         onApply={(f) => setFilter(f)}
         onClose={() => setFilterModalVisible(false)}
       />
+      <AIBrainFAB context={{ screen: 'products' as const }} bottomOffset={72} />
     </View>
   );
 }

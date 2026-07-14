@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import AIBrainFAB from '@/components/AIBrainFAB';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Alert, Animated, Image, FlatList,
@@ -227,6 +228,7 @@ export default function ProductDetailScreen() {
           <Feather name="edit-2" size={ICON.md} color="#fff" />
         </LinearGradient>
       </TouchableOpacity>
+      <AIBrainFAB context={{ screen: 'product_detail' as const, productId: String(id ?? ''), productName: String(product.name ?? '') }} bottomOffset={0} />
     </View>
   );
 }

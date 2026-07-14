@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import AIBrainFAB from '@/components/AIBrainFAB';
 import {
   ScrollView, View, Text, TouchableOpacity, StyleSheet,
   Alert, Platform, TextInput,
@@ -212,6 +213,7 @@ export default function ContentScreen() {
           )}
         </View>
       </ScrollView>
+      <AIBrainFAB context={{ screen: 'content' as const }} bottomOffset={0} />
     </View>
   );
 }

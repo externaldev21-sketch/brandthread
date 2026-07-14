@@ -14,6 +14,7 @@ import bgRemovalRouter from "./bg-removal";
 import lifestyleRouter from "./lifestyle";
 import techpackRouter from "./techpack";
 import manufacturersRouter from "./manufacturers";
+import aiRouter from "./ai";
 
 const router = Router();
 
@@ -32,5 +33,6 @@ router.use("/bg-removal",   bgRemovalRouter);
 router.use("/lifestyle",    lifestyleRouter);
 router.use("/techpack",         techpackRouter);
 router.use("/manufacturers",    manufacturersRouter);
+router.use("/ai",               aiRouter);
 
 export default router;

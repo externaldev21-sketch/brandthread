@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import AIBrainFAB from '@/components/AIBrainFAB';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, TextInput } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -150,6 +151,7 @@ export default function CustomersScreen() {
         ))}
       </View>
     </ScrollView>
+      <AIBrainFAB context={{ screen: 'customers' as const }} bottomOffset={0} />
     </View>
   );
 }

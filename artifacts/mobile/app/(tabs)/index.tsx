@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import AIBrainFAB from '@/components/AIBrainFAB';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Animated, Modal, TextInput, FlatList, Alert, Pressable,
@@ -785,6 +786,7 @@ export default function SellerHomeScreen() {
           </ScrollView>
         </View>
       </Modal>
+      <AIBrainFAB context={{ screen: 'home' as const }} bottomOffset={72} />
     </View>
   );
 }

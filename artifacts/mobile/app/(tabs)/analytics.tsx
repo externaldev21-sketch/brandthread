@@ -3,6 +3,7 @@
  * Premium analytics hub. All data from analyticsService (stable, no random).
  */
 import React, { useState, useEffect, useCallback } from 'react';
+import AIBrainFAB from '@/components/AIBrainFAB';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   RefreshControl, Platform, useWindowDimensions, ActivityIndicator,
@@ -237,6 +238,7 @@ export default function AnalyticsScreen() {
   const chg = chartMetricChange();
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView
       style={styles.scroll}
       contentContainerStyle={[styles.content, { paddingTop: topPad + 12 }]}
@@ -436,6 +438,8 @@ export default function AnalyticsScreen() {
 
       <View style={{ height: 120 }} />
     </ScrollView>
+    <AIBrainFAB context={{ screen: 'analytics' as const }} bottomOffset={72} />
+    </View>
   );
 }
 

@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
+import AIBrainFAB from '@/components/AIBrainFAB';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Alert, RefreshControl, Modal,
@@ -739,6 +740,7 @@ export default function OrdersScreen() {
         onSelect={k => { setSort(k); setSortModalVisible(false); }}
         onClose={() => setSortModalVisible(false)}
       />
+      <AIBrainFAB context={{ screen: 'orders' as const }} bottomOffset={72} />
     </View>
   );
 }

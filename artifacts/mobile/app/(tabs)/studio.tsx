@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import AIBrainFAB from '@/components/AIBrainFAB';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   useWindowDimensions, Alert, ActivityIndicator,
@@ -405,6 +406,7 @@ export default function StudioScreen() {
         </ScrollView>
 
       </ScrollView>
+      <AIBrainFAB context={{ screen: 'design_studio' as const }} bottomOffset={72} />
     </View>
   );
 }
