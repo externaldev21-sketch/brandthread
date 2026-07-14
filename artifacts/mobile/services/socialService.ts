@@ -37,6 +37,7 @@ const K = {
   saved:         'bt:social:saved:v1',
   privacy:       'bt:social:privacy:v1',
   seeded:        'bt:social:seeded:v1',
+  friendLikes:   'bt:social:friend-likes:v1',
 } as const;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -388,6 +389,31 @@ export async function likePost(id: string): Promise<void> {
     posts[idx].likesCount += posts[idx].likedByMe ? 1 : -1;
     await save(K.posts, posts); notify();
   }
+}
+
+// ─── Friend-post engagement (likes persisted independently of K.posts) ─────────
+
+type FriendLikeState = { likedByMe: boolean; likesCount: number };
+
+export async function getFriendPostEngagements(): Promise<Record<string, FriendLikeState>> {
+  return load<Record<string, FriendLikeState>>(K.friendLikes, {});
+}
+
+export async function likeFriendPost(
+  postId: string,
+  baseLikesCount: number,
+  baseLikedByMe: boolean,
+): Promise<FriendLikeState> {
+  const all = await getFriendPostEngagements();
+  const cur = all[postId] ?? { likedByMe: baseLikedByMe, likesCount: baseLikesCount };
+  const next: FriendLikeState = {
+    likedByMe: !cur.likedByMe,
+    likesCount: cur.likedByMe ? cur.likesCount - 1 : cur.likesCount + 1,
+  };
+  all[postId] = next;
+  await save(K.friendLikes, all);
+  notify();
+  return next;
 }
 export async function repostPost(id: string): Promise<void> {
   const posts = await getMyPosts();

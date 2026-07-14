@@ -20,6 +20,7 @@ import {
   getAcceptedFriends, getFriendRequests, getStories,
   subscribeSocial, getMyPosts,
   repostPost, saveItem, createOrGetConversation,
+  likeFriendPost, getFriendPostEngagements, getComments,
 } from '@/services/socialService';
 import type { Friendship, Story, BuyerPost } from '@/services/socialTypes';
 
@@ -76,11 +77,13 @@ const DEMO_FRIEND_POSTS: BuyerPost[] = [
 
 function PostCard({
   post,
+  onLike,
   onRepost,
   onSave,
   onOpenComments,
 }: {
   post: BuyerPost;
+  onLike: (post: BuyerPost) => void;
   onRepost: (id: string) => void;
   onSave: (post: BuyerPost) => void;
   onOpenComments: (post: BuyerPost) => void;
@@ -143,13 +146,13 @@ function PostCard({
 
       {/* Actions */}
       <View style={s.actionRow}>
-        <TouchableOpacity style={s.actionItem}>
+        <TouchableOpacity style={s.actionItem} onPress={() => onLike(post)}>
           <Feather
-            name="heart"
+            name={post.likedByMe ? 'heart' : 'heart'}
             size={ICON.lg}
             color={post.likedByMe ? RED : MUTED}
           />
-          <Text style={s.actionCount}>{post.likesCount}</Text>
+          <Text style={[s.actionCount, post.likedByMe && { color: RED }]}>{post.likesCount}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={s.actionItem} onPress={() => onOpenComments(post)}>
           <Feather name="message-circle" size={ICON.lg} color={MUTED} />
@@ -210,10 +213,13 @@ export default function FriendsScreen() {
   const [feedPosts, setFeedPosts] = useState<BuyerPost[]>(DEMO_FRIEND_POSTS);
 
   async function loadData() {
-    const [fs, reqs, sts] = await Promise.all([
+    const postIds = DEMO_FRIEND_POSTS.map(p => p.id);
+    const [fs, reqs, sts, engagements, ...commentArrays] = await Promise.all([
       getAcceptedFriends(),
       getFriendRequests(),
       getStories(),
+      getFriendPostEngagements(),
+      ...postIds.map(id => getComments(id)),
     ]);
     setFriends(fs);
     const incoming = reqs.filter(
@@ -222,6 +228,18 @@ export default function FriendsScreen() {
     setPendingCount(incoming.length);
     const now = Date.now();
     setStories(sts.filter(s => s.expiresAt > now));
+
+    // Merge persisted like state and real comment counts into feed posts
+    setFeedPosts(DEMO_FRIEND_POSTS.map((post, i) => {
+      const eng = (engagements as Record<string, { likedByMe: boolean; likesCount: number }>)[post.id];
+      const commentCount = (commentArrays[i] as { length: number }).length;
+      return {
+        ...post,
+        likedByMe:    eng ? eng.likedByMe  : post.likedByMe,
+        likesCount:   eng ? eng.likesCount : post.likesCount,
+        commentsCount: commentCount,
+      };
+    }));
   }
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
@@ -230,6 +248,23 @@ export default function FriendsScreen() {
     const unsub = subscribeSocial(() => { loadData(); });
     return unsub;
   }, []);
+
+  function handleLike(post: BuyerPost) {
+    // Optimistic update
+    setFeedPosts(prev =>
+      prev.map(p =>
+        p.id === post.id
+          ? {
+              ...p,
+              likedByMe:  !p.likedByMe,
+              likesCount: p.likedByMe ? p.likesCount - 1 : p.likesCount + 1,
+            }
+          : p,
+      ),
+    );
+    // Persist asynchronously (fire and forget; errors are silent)
+    likeFriendPost(post.id, post.likesCount, post.likedByMe);
+  }
 
   function handleRepost(postId: string) {
     setFeedPosts(prev =>
@@ -448,7 +483,7 @@ export default function FriendsScreen() {
           ) : null
         }
         renderItem={({ item }) => (
-          <PostCard post={item} onRepost={handleRepost} onSave={handleSave} onOpenComments={handleOpenComments} />
+          <PostCard post={item} onLike={handleLike} onRepost={handleRepost} onSave={handleSave} onOpenComments={handleOpenComments} />
         )}
       />
     </View>
