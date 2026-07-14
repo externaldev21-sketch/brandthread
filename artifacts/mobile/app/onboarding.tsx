@@ -730,7 +730,7 @@ const ss = StyleSheet.create({
 });
 
 // ─── Auth step ────────────────────────────────────────────────────────────────
-type AuthPhase = 'form' | 'verify';
+type AuthPhase = 'form' | 'verify' | 'existing-account';
 
 interface AuthStepProps {
   flow: Flow;
@@ -817,14 +817,29 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
       }
       // ───────────────────────────────────────────────────────────────────────
 
-      if (err) { setError(mapClerkError(err)); return; }
+      if (err) {
+        const inner = (err as any)?.errors?.[0] ?? err;
+        const errCode = ((inner as any)?.code ?? '').toLowerCase();
+        if (errCode === 'form_identifier_exists') {
+          setPhase('existing-account');
+        } else {
+          setError(mapClerkError(err));
+        }
+        return;
+      }
 
       await signUp.verifications.sendEmailCode();
       setPhase('verify');
     } catch (e: any) {
       console.log('[Auth] Sign-up exception code   :', e?.code);
       console.log('[Auth] Sign-up exception message:', e?.message);
-      setError(mapClerkError(e));
+      const excInner = e?.errors?.[0] ?? e;
+      const excCode  = (excInner?.code ?? '').toLowerCase();
+      if (excCode === 'form_identifier_exists') {
+        setPhase('existing-account');
+      } else {
+        setError(mapClerkError(e));
+      }
     } finally {
       setLoading(false);
     }
@@ -909,6 +924,56 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
 
           <TouchableOpacity style={sa.continueBtn} onPress={onAuthComplete} activeOpacity={0.8}>
             <Text style={sa.continueBtnText}>Continue with current account →</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  // ── Existing account panel ──────────────────────────────────────────────────
+  if (phase === 'existing-account') {
+    return (
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={sa.scroll} keyboardShouldPersistTaps="handled">
+          <Text style={sa.headline}>Account exists.</Text>
+          <Text style={sa.sub}>An account already exists with this email.</Text>
+
+          {/* Email chip */}
+          <View style={sa.existingEmailChip}>
+            <Text style={sa.existingEmailText}>{email}</Text>
+          </View>
+
+          {/* Info card */}
+          <View style={sa.existingCard}>
+            <Text style={sa.existingCardTitle}>Sign in to continue your Brandthread journey.</Text>
+            <Text style={sa.existingCardSub}>
+              Use your existing account to complete setup. Your onboarding answers are saved.
+            </Text>
+          </View>
+
+          {/* Sign in */}
+          <TouchableOpacity
+            style={sa.existingSignInBtn}
+            onPress={() => router.push('/sign-in' as never)}
+            activeOpacity={0.88}
+          >
+            <LinearGradient
+              colors={[PURPLE, CYAN]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={sa.existingSignInGrad}
+            >
+              <Text style={sa.existingSignInText}>Sign in</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Use different email */}
+          <TouchableOpacity
+            style={sa.existingDiffBtn}
+            onPress={() => { setPhase('form'); setEmail(''); setPassword(''); setError(''); }}
+            activeOpacity={0.85}
+          >
+            <Text style={sa.existingDiffText}>Use a different email</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -1086,6 +1151,32 @@ const sa = StyleSheet.create({
   resendBtn: { paddingVertical: 12, alignItems: 'center', marginTop: 8 },
   resendText:{ fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED },
   legal:     { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED2, textAlign: 'center', lineHeight: 18, marginTop: 14 },
+  // Existing-account panel
+  existingEmailChip: {
+    alignSelf: 'flex-start', backgroundColor: 'rgba(139,92,246,0.12)',
+    borderRadius: 20, borderWidth: 1, borderColor: 'rgba(139,92,246,0.3)',
+    paddingHorizontal: 14, paddingVertical: 7, marginBottom: 20,
+  },
+  existingEmailText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: PURPLE },
+  existingCard: {
+    backgroundColor: 'rgba(139,92,246,0.06)', borderRadius: 16,
+    borderWidth: 1, borderColor: 'rgba(139,92,246,0.18)',
+    padding: 18, marginBottom: 24,
+  },
+  existingCardTitle: {
+    fontSize: 17, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 8, lineHeight: 23,
+  },
+  existingCardSub: {
+    fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 20,
+  },
+  existingSignInBtn:  { marginBottom: 10, borderRadius: 14, overflow: 'hidden' },
+  existingSignInGrad: { paddingVertical: 17, alignItems: 'center', borderRadius: 14 },
+  existingSignInText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+  existingDiffBtn: {
+    borderRadius: 14, paddingVertical: 16, alignItems: 'center',
+    borderWidth: 1, borderColor: BORDER,
+  },
+  existingDiffText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
   // Active-session warning
   sessionBtn:     { marginTop: 8, marginBottom: 12, borderRadius: 16, overflow: 'hidden' },
   sessionBtnGrad: { paddingVertical: 17, alignItems: 'center', paddingHorizontal: 20 },

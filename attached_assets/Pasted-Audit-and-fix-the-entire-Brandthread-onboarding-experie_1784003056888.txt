@@ -1,0 +1,427 @@
+Audit and fix the entire Brandthread onboarding experience directly inside my existing project.
+
+Current problem:
+
+The new onboarding design looks perfect, but at least one button during onboarding opened a screen that still looked like the old onboarding process.
+
+I do not remember exactly which button caused it. It may have been something related to:
+
+* Account already exists
+* Sign in instead
+* Existing account
+* Login
+* Email verification
+* Forgot password
+* Back button
+* Social sign-in
+* Authentication error
+* Session detected
+* Account recovery
+
+Do not ask me which button it was.
+
+Inspect every screen, button, route, modal, alert, bottom sheet and authentication state connected to onboarding on both the Buyer and Seller sides.
+
+The goal is:
+
+Every single part of onboarding must use the exact same premium Brandthread visual system.
+
+Do not leave any old onboarding screen, old color palette, old layout, old button style, old input style or old authentication page anywhere in the flow.
+
+FIRST, AUDIT ALL ONBOARDING ROUTES
+
+Find every route and screen that can be reached from onboarding, including:
+
+* Splash
+* Welcome
+* Account type selection
+* Buyer onboarding
+* Seller onboarding
+* Account creation
+* Sign in
+* Sign in instead
+* Existing-account message
+* Email verification
+* Forgot password
+* Reset password
+* Apple sign-in
+* Google sign-in
+* Authentication errors
+* Active-session warning
+* Logout
+* Clear local session
+* Reset onboarding
+* Notification permissions
+* Success screen
+* Buyer Thread redirect
+* Seller Dashboard redirect
+* Any modal or popup opened during signup
+* Any fallback authentication screen
+* Any route triggered by a back button
+* Any route triggered after restarting the app
+
+Create a temporary internal route map and identify any screen that still uses the old onboarding components or styling.
+
+Do not show me the route map. Use it to fix the project.
+
+UNIFY THE VISUAL SYSTEM
+
+Every onboarding-related screen must use the same Brandthread design system:
+
+* Deep black and charcoal background
+* Purple, blue, cyan and green gradient accents
+* Large clean headings
+* Medium-weight readable typography
+* Rounded premium cards
+* Rounded inputs
+* Soft borders
+* Subtle glow effects
+* Smooth animations
+* Consistent button height
+* Consistent spacing
+* Consistent icons
+* Consistent progress bar
+* Consistent back button
+* Consistent loading states
+* Consistent error messages
+* Consistent success states
+* Safe-area support
+* Keyboard avoidance
+* No white flashes
+* No default browser-looking or system-looking forms
+
+Do not allow any screen to fall back to the old design.
+
+CREATE OR REUSE SHARED COMPONENTS
+
+All onboarding and authentication screens must use shared components instead of separately styled pages.
+
+Use or create shared components such as:
+
+* OnboardingScreen
+* OnboardingHeader
+* OnboardingProgressBar
+* OnboardingBackButton
+* BrandthreadLogo
+* PrimaryButton
+* SecondaryButton
+* SocialAuthButton
+* FormInput
+* PasswordInput
+* SelectableCard
+* ErrorMessage
+* SuccessMessage
+* LoadingOverlay
+* AuthModal
+* ConfirmationModal
+
+Do not create a separate old-looking style for login, forgot password or existing-account screens.
+
+ACCOUNT ALREADY EXISTS FLOW
+
+If the user enters an email that already has an account, show a premium Brandthread screen or modal using the same onboarding style.
+
+Text:
+
+“An account already exists with this email.”
+
+Description:
+
+“Sign in to continue your Brandthread journey.”
+
+Buttons:
+
+* Sign in
+* Use a different email
+
+The Sign in button must open a newly styled Brandthread login screen.
+
+The Use a different email button must return to account creation while preserving all onboarding answers except the email and password.
+
+ACTIVE SESSION FLOW
+
+If another account is currently signed in, show a premium Brandthread screen or modal.
+
+Text:
+
+“You’re already signed in.”
+
+Description:
+
+“You are currently signed in as [current email].”
+
+Buttons:
+
+* Continue with this account
+* Sign out and create another account
+
+Do not use a default system alert for this.
+
+LOGIN SCREEN
+
+Make sure the login screen visually matches onboarding exactly.
+
+Include:
+
+* Brandthread logo
+* Heading:
+  “Welcome back.”
+* Description:
+  “Sign in to continue where you left off.”
+* Email input
+* Password input
+* Show or hide password
+* Forgot password
+* Sign in button
+* Create account button
+* Apple sign-in button if configured
+* Google sign-in button if configured
+* Loading state
+* Error state
+* Back button
+
+The login screen must not look like the old onboarding design.
+
+FORGOT PASSWORD SCREEN
+
+Create or restyle the forgot-password screen.
+
+Heading:
+
+“Reset your password.”
+
+Description:
+
+“Enter your email and we’ll send you a secure reset link.”
+
+Include:
+
+* Email input
+* Send reset link button
+* Back to sign in
+* Success state
+* Error state
+
+EMAIL VERIFICATION SCREEN
+
+Create or restyle the email-verification screen.
+
+Heading:
+
+“Check your email.”
+
+Description:
+
+“We sent a verification link to [email].”
+
+Include:
+
+* Open email app if supported
+* Resend email
+* Change email
+* Sign out
+* Loading state
+* Resend countdown
+
+SOCIAL SIGN-IN
+
+Make Apple and Google buttons match the new onboarding style.
+
+Do not use old buttons, unstyled buttons or default provider UI inside the Brandthread screen.
+
+Handle:
+
+* Loading
+* Cancellation
+* Provider error
+* Existing account
+* New account
+* Missing profile
+* Buyer or Seller routing
+
+ERRORS
+
+Do not use raw alerts or plain text error screens.
+
+Show errors inside styled Brandthread components.
+
+Examples:
+
+* Invalid email
+* Weak password
+* Existing account
+* Wrong password
+* Network error
+* Email not verified
+* Session expired
+* Authentication unavailable
+* Too many attempts
+
+Every error state must match the same visual design.
+
+BACK BUTTONS
+
+Test every back button.
+
+A back button must never return the user to an old route or old screen.
+
+Fix any route that points to a previous onboarding implementation.
+
+Remove obsolete onboarding routes only after confirming they are not used elsewhere.
+
+BUYER AND SELLER CONSISTENCY
+
+Audit both account types separately.
+
+Buyer onboarding and Seller onboarding may have different questions, but they must use the same:
+
+* Background
+* Typography
+* Buttons
+* Cards
+* Inputs
+* Progress bar
+* Back button
+* Animations
+* Error styles
+* Authentication screens
+* Success screens
+
+Do not let one side use the new design while the other side uses the old design.
+
+ROUTING CLEANUP
+
+Inspect all route names, redirects and navigation guards.
+
+Fix:
+
+* Old onboarding routes
+* Duplicate login routes
+* Duplicate signup routes
+* Fallback screens
+* Redirect loops
+* Routes that bypass the new design
+* Routes that load the old account screen
+* Routes that open after an authentication error
+* Routes that open after an active session is detected
+
+Make sure every onboarding-related route points to the new Brandthread components.
+
+PERSISTENCE
+
+Preserve the user’s onboarding answers when they temporarily leave onboarding to:
+
+* Sign in
+* Reset password
+* Verify email
+* Change email
+* Resolve an existing-account message
+
+Do not make the user restart onboarding unless they intentionally reset it.
+
+TEST EVERY BUTTON
+
+Test every clickable element in both flows.
+
+Buyer:
+
+* Splash continuation
+* Get started
+* Buyer selection
+* Continue
+* Back
+* Interest selections
+* Account creation
+* Sign in instead
+* Apple sign-in
+* Google sign-in
+* Forgot password
+* Resend verification
+* Change email
+* Notification toggle
+* Not now
+* Start exploring
+
+Seller:
+
+* Splash continuation
+* Get started
+* Seller selection
+* Continue
+* Back
+* Brand name
+* Brand stage
+* Product model
+* Goals
+* Build my workspace
+* Account creation
+* Sign in instead
+* Apple sign-in
+* Google sign-in
+* Forgot password
+* Resend verification
+* Change email
+* Notification toggle
+* Not now
+* Go to Dashboard
+
+Also test:
+
+* Existing-account errors
+* Active-session messages
+* Wrong-password errors
+* Network errors
+* Session restoration
+* Restarting the app
+* Logout
+* Reset onboarding
+* Clear local test session
+
+REMOVE OLD DESIGN REFERENCES
+
+Search the project for:
+
+* Old onboarding colors
+* Old onboarding component names
+* Old screen files
+* Old auth components
+* Old style objects
+* Old route paths
+* Deprecated onboarding imports
+
+Replace every active reference with the new Brandthread design system.
+
+Do not delete a file until you confirm it is no longer referenced.
+
+FINAL VERIFICATION
+
+After fixing everything:
+
+1. Run the app.
+2. Complete Buyer onboarding.
+3. Open every Buyer authentication-related screen.
+4. Confirm every screen matches the new onboarding design.
+5. Complete Seller onboarding.
+6. Open every Seller authentication-related screen.
+7. Confirm every screen matches the new onboarding design.
+8. Trigger an existing-account error.
+9. Trigger a wrong-password error.
+10. Open forgot password.
+11. Open email verification.
+12. Test Apple and Google sign-in if configured.
+13. Test every back button.
+14. Restart the app during onboarding.
+15. Confirm no old-looking screen appears.
+16. Fix every TypeScript error.
+17. Fix every route error.
+18. Fix every console error.
+19. Fix every visual inconsistency.
+20. Confirm there are no active old onboarding routes.
+
+Do not stop after restyling one screen.
+
+Audit and fix every onboarding and authentication path.
+
+When everything is complete, respond with only:
+
+“Every Brandthread onboarding and authentication screen now uses the new design.”

@@ -29,7 +29,7 @@ export const ONBOARDING_KEY = 'onboarding_complete';
 
 // ─── DEV: force restart to onboarding start ──────────────────────────────────
 // Set back to false (or remove) when done testing.
-const DEV_FORCE_ONBOARDING_START = true;
+const DEV_FORCE_ONBOARDING_START = false;
 
 // Screens that don't require authentication
 const AUTH_SCREENS = ['welcome', 'sign-in', 'forgot-password', 'splash'];

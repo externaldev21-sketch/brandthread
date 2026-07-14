@@ -1,0 +1,180 @@
+Fix only the Brandthread sign-in screen and the route connected to the first onboarding page.
+
+Current issue:
+
+On the first screen that says:
+
+“Your entire fashion world, in one place.”
+
+there are two buttons:
+
+* Get started
+* Sign in
+
+When I tap Sign in, it opens a “Welcome back” screen that still uses the old green and gray design.
+
+Replace that old sign-in screen completely.
+
+Do not change the new onboarding design. Do not redesign the Buyer or Seller onboarding flows. Only fix the sign-in screen and its connected authentication states.
+
+The Sign in button on the welcome screen must open a new premium Brandthread login screen that matches the current onboarding exactly.
+
+Use the same:
+
+* Black and charcoal background
+* Purple, blue, cyan and green gradient accents
+* Brandthread logo
+* Rounded inputs
+* Rounded buttons
+* Typography
+* Spacing
+* Back button
+* Glow effects
+* Safe-area spacing
+* Keyboard avoidance
+* Loading states
+* Error styles
+* Animations
+
+The new sign-in screen must include:
+
+Brandthread logo
+
+Heading:
+“Welcome back.”
+
+Description:
+“Sign in to continue where you left off.”
+
+Fields:
+
+* Email
+* Password
+
+Password field must include a working show and hide password button.
+
+Include:
+
+* Forgot password
+* Sign in button
+* Continue with Apple, only if Apple authentication is actually configured
+* Continue with Google, only if Google authentication is actually configured
+* Create account button
+* Back button
+
+The Create account button must return the user to the new onboarding flow.
+
+The back button must return to the new welcome screen.
+
+Do not route either button to an old screen.
+
+Fix the current welcome screen Sign in button so it points to the new login route.
+
+Find and remove every active reference to the old green and gray sign-in page.
+
+Search for:
+
+* Old login route
+* Old sign-in component
+* Old auth styles
+* Green background colors
+* Gray auth cards
+* Deprecated login imports
+* Duplicate login screens
+* Fallback authentication routes
+
+Do not delete anything until you confirm it is no longer referenced.
+
+AUTHENTICATION BEHAVIOR
+
+Keep the project’s existing authentication provider.
+
+Do not install a second authentication system.
+
+The Sign in button must:
+
+* Validate the email
+* Validate the password
+* Show loading
+* Call the real existing sign-in function
+* Show readable errors
+* Restore the user profile
+* Read Buyer or Seller account type
+* Route Buyer to Thread
+* Route Seller to Dashboard
+
+Handle these errors using the new Brandthread styling:
+
+* Incorrect email or password
+* Invalid email
+* Email not verified
+* Network error
+* Too many attempts
+* Session expired
+* Authentication unavailable
+
+Do not use a default system alert.
+
+FORGOT PASSWORD
+
+The Forgot password button must open a screen that also matches the new onboarding design.
+
+Heading:
+“Reset your password.”
+
+Description:
+“Enter your email and we’ll send you a secure reset link.”
+
+Include:
+
+* Email field
+* Send reset link button
+* Back to sign in
+* Success state
+* Error state
+
+Do not route to an old green or gray forgot-password page.
+
+ACTIVE SESSION
+
+If a user is already signed in and taps Sign in, show a premium Brandthread screen or modal.
+
+Heading:
+“You’re already signed in.”
+
+Description:
+“You are currently signed in as [email].”
+
+Buttons:
+
+* Continue with this account
+* Sign out
+
+Do not use a default alert or old layout.
+
+TEST THESE EXACT PATHS
+
+1. Open the app.
+2. Reach the first welcome screen.
+3. Tap Sign in.
+4. Confirm the new premium Brandthread login screen opens.
+5. Tap Back.
+6. Confirm it returns to the new welcome screen.
+7. Tap Create account.
+8. Confirm it returns to the new onboarding flow.
+9. Tap Forgot password.
+10. Confirm the reset-password screen matches the same design.
+11. Test the wrong password error.
+12. Test a valid sign-in.
+13. Confirm Buyer routes to Thread.
+14. Confirm Seller routes to Dashboard.
+15. Restart the app.
+16. Confirm no old green and gray login screen appears.
+17. Fix all TypeScript errors.
+18. Fix all route errors.
+19. Fix all console errors.
+20. Confirm the old login route is no longer active.
+
+When complete, respond with only:
+
+“The Brandthread sign-in screen now matches the new onboarding design.”

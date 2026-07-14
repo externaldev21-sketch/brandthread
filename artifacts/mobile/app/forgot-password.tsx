@@ -1,21 +1,40 @@
+/**
+ * Forgot / Reset password — Brandthread premium dark design
+ * Steps: email → code + new password → done
+ */
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, ActivityIndicator, useColorScheme, ScrollView,
+  KeyboardAvoidingView, Platform, ActivityIndicator,
+  ScrollView, StatusBar,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSignIn } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
 type Step = 'email' | 'code' | 'done';
+
+// ─── Design tokens (exact match to onboarding / splash / welcome) ────────────
+const BG       = '#07070F';
+const PURPLE   = '#8B5CF6';
+const CYAN     = '#22D3EE';
+const FG       = '#FFFFFF';
+const MUTED    = 'rgba(255,255,255,0.5)';
+const MUTED2   = 'rgba(255,255,255,0.28)';
+const CARD     = 'rgba(255,255,255,0.04)';
+const BORDER   = 'rgba(255,255,255,0.09)';
+const INPUT_BG = 'rgba(255,255,255,0.07)';
+const INPUT_BD = 'rgba(255,255,255,0.12)';
+const ERR      = '#F87171';
+const SUCCESS  = '#34D399';
 
 export default function ForgotPasswordScreen() {
   const { signIn, fetchStatus } = useSignIn();
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
-  const scheme  = useColorScheme();
-  const isDark  = scheme !== 'light';
 
   const [step, setStep]         = useState<Step>('email');
   const [email, setEmail]       = useState('');
@@ -25,18 +44,12 @@ export default function ForgotPasswordScreen() {
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
 
-  const bg      = isDark ? '#0E0E0E' : '#F5F5F5';
-  const card    = isDark ? '#1A1A1A' : '#FFFFFF';
-  const border  = isDark ? '#2A2A2A' : '#E0E0E0';
-  const fg      = isDark ? '#FFFFFF' : '#0A0A0A';
-  const muted   = isDark ? '#888' : '#666';
-  const primary = '#00C853';
-  const inputBg = isDark ? '#252525' : '#F0F0F0';
+  const isFetching = fetchStatus === 'fetching' || loading;
 
-  const inputStyle = [styles.input, { backgroundColor: inputBg, borderColor: border, color: fg }];
-
-  const handleSendCode = async () => {
-    if (!email.trim()) return;
+  // ─── Send reset code ─────────────────────────────────────────────────────────
+  async function handleSendCode() {
+    if (!email.trim() || isFetching) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
     setError('');
     try {
@@ -46,15 +59,16 @@ export default function ForgotPasswordScreen() {
       });
       setStep('code');
     } catch (e: any) {
-      const msg = e?.errors?.[0]?.longMessage ?? e?.message ?? 'Something went wrong.';
-      setError(msg);
+      setError(mapError(e));
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleReset = async () => {
-    if (!code || !password) return;
+  // ─── Verify code + set new password ──────────────────────────────────────────
+  async function handleReset() {
+    if (!code || !password || isFetching) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLoading(true);
     setError('');
     try {
@@ -65,164 +79,371 @@ export default function ForgotPasswordScreen() {
       });
       setStep('done');
     } catch (e: any) {
-      const msg = e?.errors?.[0]?.longMessage ?? e?.message ?? 'Invalid code or password too weak.';
-      setError(msg);
+      setError(mapError(e));
     } finally {
       setLoading(false);
     }
-  };
-
-  const isFetching = fetchStatus === 'fetching' || loading;
+  }
 
   return (
-    <KeyboardAvoidingView
-      style={[styles.root, { backgroundColor: bg }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} keyboardShouldPersistTaps="handled">
-        <View style={[styles.card, { backgroundColor: card, borderColor: border, marginTop: insets.top + 32, marginHorizontal: 20 }]}>
+    <View style={[s.root, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="light-content" />
 
+      {/* Ambient glow */}
+      <View style={s.glowTop} />
+
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 36 }]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
           {/* Back */}
           {step !== 'done' && (
-            <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-              <Feather name="arrow-left" size={20} color={muted} />
+            <TouchableOpacity
+              style={s.backBtn}
+              onPress={() => {
+                Haptics.selectionAsync();
+                step === 'code' ? setStep('email') : router.back();
+              }}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <Feather name="arrow-left" size={20} color={MUTED} />
             </TouchableOpacity>
           )}
 
+          {/* Logo */}
+          <View style={s.logoRow}>
+            <LinearGradient
+              colors={[PURPLE, CYAN]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={s.logoBox}
+            >
+              <Text style={s.logoLetter}>B</Text>
+            </LinearGradient>
+            <Text style={s.logoText}>BRANDTHREAD</Text>
+          </View>
+
+          {/* ── Step: email ────────────────────────────────────────────────────── */}
           {step === 'email' && (
             <>
-              <Text style={[styles.title, { color: fg }]}>Reset password</Text>
-              <Text style={[styles.sub, { color: muted }]}>
-                Enter your email and we'll send a reset code.
+              <Text style={s.headline}>Reset your password.</Text>
+              <Text style={s.subtitle}>
+                Enter your email and we'll send you a secure reset link.
               </Text>
 
-              <View style={styles.field}>
-                <Text style={[styles.label, { color: muted }]}>Email</Text>
+              <View style={s.fieldWrap}>
+                <Text style={s.label}>Email address</Text>
                 <TextInput
-                  style={inputStyle}
+                  style={s.input}
                   placeholder="you@yourbrand.com"
-                  placeholderTextColor={muted}
+                  placeholderTextColor={MUTED2}
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={t => { setEmail(t); setError(''); }}
                   autoCapitalize="none"
                   keyboardType="email-address"
+                  autoComplete="email"
                   autoFocus
                 />
               </View>
 
-              {error ? <Text style={styles.error}>{error}</Text> : null}
+              {error ? (
+                <View style={s.errorBox}>
+                  <Feather name="alert-circle" size={14} color={ERR} />
+                  <Text style={s.errorText}>{error}</Text>
+                </View>
+              ) : null}
 
               <TouchableOpacity
-                style={[styles.btn, { backgroundColor: primary }, (!email || isFetching) && { opacity: 0.6 }]}
+                style={[s.primaryWrap, (!email.trim() || isFetching) && { opacity: 0.5 }]}
                 onPress={handleSendCode}
-                disabled={!email || isFetching}
+                disabled={!email.trim() || isFetching}
+                activeOpacity={0.88}
+              >
+                <LinearGradient
+                  colors={[PURPLE, CYAN]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={s.primaryBtn}
+                >
+                  {isFetching
+                    ? <ActivityIndicator color={FG} size="small" />
+                    : <Text style={s.primaryBtnText}>Send reset code</Text>}
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={s.secondaryBtn}
+                onPress={() => { Haptics.selectionAsync(); router.back(); }}
                 activeOpacity={0.85}
               >
-                {isFetching
-                  ? <ActivityIndicator color="#021208" />
-                  : <Text style={styles.btnText}>Send reset code</Text>}
+                <Text style={s.secondaryBtnText}>Back to sign in</Text>
               </TouchableOpacity>
             </>
           )}
 
+          {/* ── Step: code + new password ──────────────────────────────────────── */}
           {step === 'code' && (
             <>
-              <Text style={[styles.title, { color: fg }]}>Check your inbox</Text>
-              <Text style={[styles.sub, { color: muted }]}>
-                We sent a reset code to {email}. Enter it below along with your new password.
+              <Text style={s.headline}>Check your inbox.</Text>
+              <Text style={s.subtitle}>
+                We sent a reset code to {email}.{'\n'}Enter it below with your new password.
               </Text>
 
-              <View style={styles.field}>
-                <Text style={[styles.label, { color: muted }]}>Reset code</Text>
+              <View style={s.fieldWrap}>
+                <Text style={s.label}>Reset code</Text>
                 <TextInput
-                  style={[inputStyle, { letterSpacing: 4, textAlign: 'center', fontSize: 20 }]}
+                  style={[s.input, s.codeInput]}
                   placeholder="000000"
-                  placeholderTextColor={muted}
+                  placeholderTextColor={MUTED2}
                   value={code}
-                  onChangeText={setCode}
+                  onChangeText={t => { setCode(t); setError(''); }}
                   keyboardType="number-pad"
                   maxLength={6}
                   autoFocus
                 />
               </View>
 
-              <View style={styles.field}>
-                <Text style={[styles.label, { color: muted }]}>New password</Text>
-                <View style={styles.pwWrap}>
+              <View style={s.fieldWrap}>
+                <Text style={s.label}>New password</Text>
+                <View style={s.pwRow}>
                   <TextInput
-                    style={[inputStyle, { flex: 1, borderWidth: 0, paddingRight: 44 }]}
-                    placeholder="Min. 8 characters"
-                    placeholderTextColor={muted}
+                    style={[s.input, s.pwInput]}
+                    placeholder="Minimum 8 characters"
+                    placeholderTextColor={MUTED2}
                     value={password}
-                    onChangeText={setPassword}
+                    onChangeText={t => { setPassword(t); setError(''); }}
                     secureTextEntry={!showPw}
+                    autoComplete="new-password"
                   />
-                  <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowPw(v => !v)}>
-                    <Feather name={showPw ? 'eye-off' : 'eye'} size={18} color={muted} />
+                  <TouchableOpacity style={s.eyeBtn} onPress={() => setShowPw(v => !v)}>
+                    <Feather name={showPw ? 'eye-off' : 'eye'} size={18} color={MUTED} />
                   </TouchableOpacity>
                 </View>
+                {password.length > 0 && password.length < 8 && (
+                  <Text style={s.hint}>Use at least 8 characters</Text>
+                )}
               </View>
 
-              {error ? <Text style={styles.error}>{error}</Text> : null}
+              {error ? (
+                <View style={s.errorBox}>
+                  <Feather name="alert-circle" size={14} color={ERR} />
+                  <Text style={s.errorText}>{error}</Text>
+                </View>
+              ) : null}
 
               <TouchableOpacity
-                style={[styles.btn, { backgroundColor: primary }, (!code || !password || isFetching) && { opacity: 0.6 }]}
+                style={[s.primaryWrap, (!code || !password || isFetching) && { opacity: 0.5 }]}
                 onPress={handleReset}
                 disabled={!code || !password || isFetching}
-                activeOpacity={0.85}
+                activeOpacity={0.88}
               >
-                {isFetching
-                  ? <ActivityIndicator color="#021208" />
-                  : <Text style={styles.btnText}>Reset password</Text>}
+                <LinearGradient
+                  colors={[PURPLE, CYAN]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={s.primaryBtn}
+                >
+                  {isFetching
+                    ? <ActivityIndicator color={FG} size="small" />
+                    : <Text style={s.primaryBtnText}>Reset password</Text>}
+                </LinearGradient>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.resendRow} onPress={handleSendCode}>
-                <Text style={[styles.resendText, { color: muted }]}>
-                  {"Didn't get it? "}<Text style={{ color: primary }}>Resend code</Text>
+              <TouchableOpacity
+                style={s.resendBtn}
+                onPress={handleSendCode}
+                disabled={isFetching}
+                activeOpacity={0.8}
+              >
+                <Text style={s.resendText}>
+                  {"Didn't get it? "}
+                  <Text style={{ color: PURPLE, fontFamily: 'Inter_600SemiBold' }}>Resend code</Text>
                 </Text>
               </TouchableOpacity>
             </>
           )}
 
+          {/* ── Step: done ─────────────────────────────────────────────────────── */}
           {step === 'done' && (
             <>
-              <View style={styles.doneIcon}>
-                <Feather name="check-circle" size={48} color={primary} />
+              {/* Success card */}
+              <View style={s.successCard}>
+                <LinearGradient
+                  colors={['rgba(52,211,153,0.12)', 'rgba(52,211,153,0.04)']}
+                  style={s.successGrad}
+                >
+                  <View style={s.successIconWrap}>
+                    <LinearGradient
+                      colors={[SUCCESS, '#059669']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={s.successIconGrad}
+                    >
+                      <Feather name="check" size={28} color={FG} />
+                    </LinearGradient>
+                  </View>
+                  <Text style={s.successTitle}>Password updated.</Text>
+                  <Text style={s.successSub}>
+                    Your password has been reset successfully.{'\n'}Sign in with your new password.
+                  </Text>
+                </LinearGradient>
               </View>
-              <Text style={[styles.title, { color: fg, textAlign: 'center' }]}>Password updated</Text>
-              <Text style={[styles.sub, { color: muted, textAlign: 'center' }]}>
-                Your password has been reset. Sign in with your new password.
-              </Text>
+
               <TouchableOpacity
-                style={[styles.btn, { backgroundColor: primary }]}
-                onPress={() => router.replace('/sign-in' as never)}
-                activeOpacity={0.85}
+                style={s.primaryWrap}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.replace('/sign-in' as never); }}
+                activeOpacity={0.88}
               >
-                <Text style={styles.btnText}>Back to sign in</Text>
+                <LinearGradient
+                  colors={[PURPLE, CYAN]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={s.primaryBtn}
+                >
+                  <Text style={s.primaryBtnText}>Sign in</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </>
           )}
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  root:     { flex: 1 },
-  card:     { borderRadius: 24, padding: 28, borderWidth: 1, marginBottom: 24 },
-  backBtn:  { marginBottom: 20 },
-  title:    { fontSize: 24, fontFamily: 'Inter_700Bold', letterSpacing: -0.5, marginBottom: 8 },
-  sub:      { fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 21, marginBottom: 24, color: '#666' },
-  field:    { marginBottom: 16 },
-  label:    { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginBottom: 6 },
-  input:    { borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: 'Inter_400Regular' },
-  pwWrap:   { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, overflow: 'hidden' },
-  eyeBtn:   { position: 'absolute', right: 14 },
-  error:    { color: '#EF4444', fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 12 },
-  btn:      { borderRadius: 14, paddingVertical: 15, alignItems: 'center', marginTop: 4 },
-  btnText:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#021208' },
-  resendRow: { marginTop: 16, alignItems: 'center' },
-  resendText: { fontSize: 14, fontFamily: 'Inter_400Regular' },
-  doneIcon:  { alignItems: 'center', marginBottom: 20 },
+// ─── Error mapper ─────────────────────────────────────────────────────────────
+function mapError(err: any): string {
+  if (!err) return '';
+  const inner = err?.errors?.[0] ?? err;
+  const code  = (inner?.code ?? '').toLowerCase();
+  const msg   = (inner?.message ?? inner?.longMessage ?? err?.message ?? '').toLowerCase();
+
+  if (code === 'form_identifier_not_found')
+    return 'No account found with that email address.';
+  if (code === 'form_code_incorrect')
+    return 'Invalid code. Please check and try again.';
+  if (code === 'verification_expired')
+    return 'Code expired. Request a new one.';
+  if (code === 'form_password_pwned' || code === 'form_password_strength_insufficient')
+    return 'This password is too common. Choose a stronger one.';
+  if (code === 'form_password_length_too_short')
+    return 'Use at least 8 characters.';
+  if (code === 'request_rate_limited')
+    return 'Too many attempts. Please wait a moment.';
+  if (code === 'network_failure' || code === 'request_timeout')
+    return "Couldn't connect. Check your internet and try again.";
+
+  if (msg.includes('no user') || msg.includes('not found'))
+    return 'No account found with that email address.';
+  if (msg.includes('incorrect') || (msg.includes('code') && msg.includes('invalid')))
+    return 'Invalid code. Please check and try again.';
+  if (msg.includes('expired'))
+    return 'Code expired. Request a new one.';
+  if (msg.includes('weak') || msg.includes('pwned'))
+    return 'Choose a stronger password.';
+
+  return inner?.message || err?.message || 'Something went wrong. Please try again.';
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const s = StyleSheet.create({
+  root:    { flex: 1, backgroundColor: BG },
+
+  glowTop: {
+    position: 'absolute', top: -80, left: '10%',
+    width: '80%', height: 220, borderRadius: 150,
+    backgroundColor: '#8B5CF612',
+  },
+
+  scroll: { paddingHorizontal: 24, paddingTop: 16 },
+
+  backBtn: { width: 40, height: 40, justifyContent: 'center', marginBottom: 20 },
+
+  logoRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 36 },
+  logoBox: {
+    width: 36, height: 36, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  logoLetter: { fontSize: 20, fontFamily: 'Inter_700Bold', color: FG },
+  logoText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: 2.5 },
+
+  headline: {
+    fontSize: 32, fontFamily: 'Inter_700Bold',
+    color: FG, letterSpacing: -0.8, marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 15, fontFamily: 'Inter_400Regular',
+    color: MUTED, lineHeight: 22, marginBottom: 32,
+  },
+
+  fieldWrap: { marginBottom: 16 },
+  label:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, marginBottom: 6 },
+  input: {
+    backgroundColor: INPUT_BG, borderWidth: 1, borderColor: INPUT_BD,
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13,
+    fontSize: 15, fontFamily: 'Inter_400Regular', color: FG,
+  },
+  codeInput: {
+    letterSpacing: 8, fontSize: 22, textAlign: 'center',
+    fontFamily: 'Inter_700Bold',
+  },
+  pwRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: INPUT_BG, borderWidth: 1, borderColor: INPUT_BD, borderRadius: 12,
+  },
+  pwInput: { flex: 1, borderWidth: 0, backgroundColor: 'transparent' },
+  eyeBtn:  { paddingHorizontal: 14 },
+  hint:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 4 },
+
+  errorBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(248,113,113,0.08)', borderRadius: 10,
+    borderWidth: 1, borderColor: 'rgba(248,113,113,0.25)',
+    paddingHorizontal: 12, paddingVertical: 10, marginBottom: 16,
+  },
+  errorText: { fontSize: 13, fontFamily: 'Inter_400Regular', color: ERR, flex: 1 },
+
+  primaryWrap: { marginBottom: 10 },
+  primaryBtn:  { borderRadius: 14, paddingVertical: 17, alignItems: 'center' },
+  primaryBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+
+  secondaryBtn: {
+    borderRadius: 14, paddingVertical: 16, alignItems: 'center',
+    borderWidth: 1, borderColor: BORDER,
+  },
+  secondaryBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+
+  resendBtn:  { paddingVertical: 14, alignItems: 'center' },
+  resendText: { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED },
+
+  // Success card
+  successCard: {
+    borderRadius: 20, borderWidth: 1,
+    borderColor: 'rgba(52,211,153,0.25)', overflow: 'hidden', marginBottom: 28,
+  },
+  successGrad: { padding: 28, alignItems: 'center' },
+  successIconWrap: { marginBottom: 20 },
+  successIconGrad: {
+    width: 64, height: 64, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: SUCCESS, shadowOpacity: 0.5,
+    shadowRadius: 16, shadowOffset: { width: 0, height: 0 },
+    elevation: 12,
+  },
+  successTitle: {
+    fontSize: 26, fontFamily: 'Inter_700Bold', color: FG,
+    letterSpacing: -0.5, marginBottom: 8, textAlign: 'center',
+  },
+  successSub: {
+    fontSize: 14, fontFamily: 'Inter_400Regular',
+    color: MUTED, lineHeight: 21, textAlign: 'center',
+  },
+
+  // Generic card (CARD token)
+  _card: { backgroundColor: CARD },
 });

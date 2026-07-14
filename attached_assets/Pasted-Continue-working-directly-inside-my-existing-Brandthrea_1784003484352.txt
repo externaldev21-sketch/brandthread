@@ -1,0 +1,780 @@
+Continue working directly inside my existing Brandthread Expo React Native project.
+
+Do not give me instructions or sample code. Inspect the current project, edit it directly, run it, and fix all errors.
+
+Build the complete Seller Profile and Seller Content Creation system.
+
+Do not redesign onboarding.
+
+Do not break Buyer accounts, authentication, Seller Dashboard, Products, Orders, or existing navigation.
+
+CORE BRANDTHREAD RULE
+
+Only content posted by Seller accounts may appear in the Buyer home feed called “Thread.”
+
+Buyer-created posts must never appear in Thread.
+
+Buyer posts may appear only on the buyer’s own profile, based on their public or private profile settings and friendship permissions.
+
+SELLER PROFILE PAGE
+
+Create a premium Seller Profile page that acts as the public brand profile buyers see.
+
+The Seller Profile must include:
+
+* Brand profile image
+* Brand cover image or visual header
+* Brand name
+* Verified badge support
+* Username
+* Brand description
+* Website link
+* Location
+* Followers count
+* Following count
+* Total likes
+* Products count
+* Message button
+* Follow button for buyers
+* Share profile button
+* Shopping bag or Shop button
+* Edit profile button for the profile owner
+
+SELLER PROFILE TABS
+
+Create these profile tabs:
+
+1. Posts
+2. Products
+3. Tagged
+4. Reposts
+5. Saved, visible only to the profile owner
+
+POSTS TAB
+
+Show the seller’s published content in a clean grid.
+
+Content may include:
+
+* Videos
+* Photo slideshows
+* Product announcements
+* Drop countdowns
+* Behind-the-scenes content
+* Campaign content
+
+Each thumbnail must show:
+
+* Video or slideshow indicator
+* View count
+* Product tag indicator
+* Draft or scheduled status when viewed by the seller
+* Post aspect ratio preview
+* Pinned-post indicator
+
+Allow the seller to:
+
+* Open a post
+* Edit a post
+* Delete a post
+* Archive a post
+* Pin or unpin a post
+* Repost content
+* View analytics
+* Copy post link
+* Save a post
+
+PRODUCTS TAB
+
+Show the seller’s active products.
+
+Each product card must include:
+
+* Product image
+* Product name
+* Price
+* Sale price when applicable
+* Pre-order or pre-made badge
+* Stock status
+* Tap to open product details
+
+Buyers must be able to shop directly from the Seller Profile.
+
+EDIT SELLER PROFILE
+
+Create a working Edit Profile screen with:
+
+* Brand profile image
+* Cover image
+* Brand name
+* Username
+* Bio
+* Website
+* Location
+* Category
+* Contact email
+* Public or private visibility settings where appropriate
+* Message permissions
+* Save changes button
+
+CONTENT CREATION ENTRY POINTS
+
+Add a Create Content button in:
+
+* Seller Profile
+* Seller Dashboard quick actions
+* Seller navigation
+* Product detail pages
+* Content hub
+
+Create a reusable Seller Content Creator.
+
+CONTENT TYPES
+
+Allow the Seller to choose:
+
+* Video
+* Photo slideshow
+* Product announcement
+* Drop announcement
+* Behind the scenes
+* Story
+
+VIDEO POST RULES
+
+All Seller video posts must publish in 9:16 vertical format.
+
+Do not ask the Seller to choose a video aspect ratio.
+
+The video editor must always use a 9:16 preview canvas.
+
+Allow these video duration choices:
+
+* 10 seconds
+* 15 seconds
+* 30 seconds
+* 60 seconds
+
+The Seller must choose a maximum duration before or during editing.
+
+If the uploaded video is longer than the selected duration, require trimming before publishing.
+
+If the uploaded video is shorter, allow it to publish at its original length.
+
+VIDEO CREATION FLOW
+
+Step 1:
+Choose or record video
+
+Include:
+
+* Record with camera
+* Upload from device
+* Select multiple clips
+* Camera permission handling
+* Media-library permission handling
+
+Step 2:
+Choose maximum duration
+
+Options:
+
+* 10 seconds
+* 15 seconds
+* 30 seconds
+* 60 seconds
+
+Step 3:
+Edit video
+
+Create a mobile video-editing workspace with:
+
+* 9:16 preview
+* Timeline
+* Play and pause
+* Scrubbing
+* Trim clip start
+* Trim clip end
+* Split clip
+* Delete clip
+* Reorder clips
+* Duplicate clip
+* Adjust clip volume
+* Mute original audio
+* Playback speed
+* Crop to 9:16
+* Reposition crop
+* Zoom crop
+* Rotate
+* Undo
+* Redo
+
+Allow multiple video clips to be combined into one post.
+
+SOUND SYSTEM
+
+Allow Sellers to add a sound to videos and slideshows.
+
+Create a Sound Library screen with:
+
+* Search sounds
+* Trending sounds
+* Saved sounds
+* Recently used sounds
+* Original sounds
+* Sound categories
+* Sound preview
+* Sound duration
+* Use sound button
+
+Allow the Seller to:
+
+* Select a sound
+* Choose the sound start point
+* Trim the sound
+* Change music volume
+* Change original-video volume
+* Mute original sound
+* Replace sound
+* Remove sound
+
+Store sound attribution with the post.
+
+Do not claim to provide copyrighted commercial music unless a properly licensed sound provider is connected.
+
+Use clearly labeled demo or royalty-free sounds when no licensed music provider exists.
+
+BEAT SYNC
+
+Add a Beat Sync tool.
+
+The tool should analyze or simulate beat markers on the selected sound timeline.
+
+Allow the Seller to:
+
+* View beat markers
+* Snap clip cuts to beats
+* Automatically align selected clips with detected beats
+* Preview the beat-synced edit
+* Manually adjust cuts
+* Turn Beat Sync on or off
+
+If no audio-analysis backend exists, create a separated mock beat-analysis service for development.
+
+Keep the interface ready for a real provider later.
+
+VIDEO TEXT AND OVERLAYS
+
+Allow Sellers to add:
+
+* Text
+* Multiple text layers
+* Font choices
+* Font size
+* Text color
+* Background color
+* Text alignment
+* Text timing
+* Stickers
+* Product stickers
+* Price stickers
+* Drop-date stickers
+* Countdown stickers
+* Brand logo
+* Image overlay
+
+Each overlay must be movable, resizable, rotatable, duplicatable, and removable.
+
+PHOTO SLIDESHOW RULES
+
+Only photo slideshows should ask the Seller to choose an aspect ratio.
+
+Allow these slideshow aspect ratios:
+
+* 9:16
+* 3:4
+* 1:1 square
+
+Set 9:16 as the default and recommended option.
+
+Show a clear visual preview of how each format will appear in Thread.
+
+Allow the Seller to change the slideshow ratio before publishing.
+
+PHOTO SLIDESHOW CREATION FLOW
+
+Allow:
+
+* Upload multiple photos
+* Reorder photos
+* Remove photos
+* Duplicate photos
+* Crop each photo
+* Reposition each photo
+* Choose transition style
+* Choose transition speed
+* Set slide duration
+* Add sound
+* Add text
+* Add stickers
+* Add product tags
+* Preview full slideshow
+
+Allow slideshow transitions such as:
+
+* Cut
+* Fade
+* Slide
+* Zoom
+* Flash
+* Blur
+
+POST DETAILS SCREEN
+
+After editing the content, show a post-details screen.
+
+Include:
+
+* Post preview
+* Description or caption
+* Hashtags
+* Tag products
+* Add location
+* Add collaborators
+* Allow comments toggle
+* Allow reposts toggle
+* Show like count toggle
+* Schedule post
+* Save draft
+* Publish now
+
+DESCRIPTION
+
+Allow a full post description.
+
+Include:
+
+* Character counter
+* Line breaks
+* Mention support
+* Hashtag support
+* Product name suggestions
+* Brand username suggestions
+
+HASHTAGS
+
+Allow Sellers to:
+
+* Type hashtags
+* View suggested hashtags
+* View recently used hashtags
+* View trending hashtags
+* Remove hashtags
+* Save hashtag groups
+
+Do not automatically spam posts with hashtags.
+
+PRODUCT TAGGING
+
+This is required.
+
+Allow the Seller to tag one or more products from their Brandthread product catalog.
+
+The Product Tagging screen must include:
+
+* Product search
+* Product image
+* Product name
+* Price
+* Variant selection
+* Product status
+* Pre-order or pre-made status
+* Add product tag
+* Remove product tag
+
+For video posts:
+
+* Allow product tags to be attached to the entire video
+* Optionally allow a tag to appear at a selected timestamp
+* Allow placement of a product sticker on the video
+
+For slideshows:
+
+* Allow different products to be tagged on different slides
+* Allow multiple products per slideshow
+* Allow tapping a tagged product to open its product page
+
+In Thread, product-tagged posts must include a clear shopping action such as:
+
+* Shop
+* View product
+* Product card
+* Shopping bag button
+
+Do not allow archived, deleted, or unavailable products to be newly tagged.
+
+POST PREVIEW
+
+Before publishing, show a realistic Thread preview.
+
+The Seller must see exactly how the post will appear to Buyers.
+
+For videos, preview in 9:16.
+
+For slideshows, preview in the selected:
+
+* 9:16
+* 3:4
+* 1:1
+
+Include:
+
+* Brand name
+* Brand profile image
+* Follow button
+* Caption
+* Hashtags
+* Sound name
+* Like
+* Comment
+* Repost
+* Save
+* Share
+* Shopping bag
+* Tagged product card
+
+PUBLISHING
+
+Create working publishing states:
+
+* Draft
+* Processing
+* Scheduled
+* Published
+* Failed
+* Archived
+
+When publishing:
+
+* Upload media
+* Generate thumbnail
+* Save caption
+* Save hashtags
+* Save sound information
+* Save tagged products
+* Save aspect ratio
+* Save video duration
+* Save visibility settings
+* Save scheduling information
+* Save Seller account ID
+* Mark the post as Seller content
+* Make it eligible for Thread
+
+Only successfully published Seller content may enter Thread.
+
+THREAD FEED RULES
+
+Update the Buyer Thread data model and feed rules.
+
+Thread may contain only:
+
+* Published Seller videos
+* Published Seller slideshows
+* Published Seller product posts
+* Published Seller brand content
+* Seller reposts when allowed
+
+Thread must never contain:
+
+* Buyer profile posts
+* Buyer private content
+* Buyer friend-only content
+* Seller drafts
+* Seller scheduled posts before publication
+* Archived posts
+* Failed uploads
+* Deleted posts
+
+MAIN THREAD FORMAT
+
+The primary Thread format is 9:16 vertical video.
+
+Videos must display in a full-height immersive feed.
+
+Slideshows may display using:
+
+* 9:16
+* 3:4
+* 1:1
+
+The feed must respect the slideshow format selected by the Seller while maintaining a clean surrounding layout.
+
+VIDEO LENGTH DISPLAY
+
+Store and display the actual published duration.
+
+Support maximum choices of:
+
+* 10 seconds
+* 15 seconds
+* 30 seconds
+* 60 seconds
+
+Do not force a shorter clip to be padded unnecessarily.
+
+CONTENT ANALYTICS
+
+Add analytics for every Seller post.
+
+Show:
+
+* Views
+* Unique viewers
+* Likes
+* Comments
+* Reposts
+* Saves
+* Shares
+* Profile visits
+* Product clicks
+* Add-to-cart actions
+* Purchases attributed to the post
+* Revenue attributed to the post
+* Average watch time
+* Completion rate
+* Audience retention
+* Slideshow swipe-through rate
+
+Allow the Seller to open Post Analytics from their profile or Content hub.
+
+CONTENT MANAGEMENT HUB
+
+Create Seller content sections:
+
+* Drafts
+* Scheduled
+* Published
+* Archived
+* Failed
+* Best performing
+
+Allow filtering by:
+
+* Video
+* Slideshow
+* Product post
+* Story
+* Date
+* Product
+* Performance
+
+STORIES
+
+Seller Stories may include:
+
+* Video
+* Photo
+* Product tag
+* Sound
+* Text
+* Link
+* Poll
+
+Stories expire after 24 hours.
+
+Only Seller Stories should appear in the public Buyer story row.
+
+Buyer Stories must remain limited by buyer-profile visibility and friendships and must not be promoted into the Seller Thread feed.
+
+UPLOAD AND PROCESSING
+
+Use the project’s existing backend and storage provider.
+
+Do not install a second backend.
+
+Create or update strongly typed services for:
+
+* Media upload
+* Video metadata
+* Video processing
+* Thumbnail generation
+* Post creation
+* Post editing
+* Post deletion
+* Post scheduling
+* Sound data
+* Product tags
+* Hashtags
+* Feed eligibility
+* Analytics
+
+If real video rendering or processing is not yet available:
+
+* Build the full working UI
+* Use local preview editing
+* Save edit instructions as structured data
+* Create a separate mock processing service
+* Do not pretend the final processed video was created by a real backend
+
+DATA MODELS
+
+Create typed models for:
+
+SellerProfile
+
+SellerPost
+
+PostMedia
+
+VideoClip
+
+VideoEdit
+
+SlideshowEdit
+
+Sound
+
+SoundSelection
+
+BeatMarker
+
+PostOverlay
+
+PostHashtag
+
+PostProductTag
+
+PostAnalytics
+
+PostSchedule
+
+PostVisibility
+
+Store fields such as:
+
+* Seller ID
+* Brand ID
+* Post type
+* Media URLs
+* Thumbnail URL
+* Aspect ratio
+* Video duration
+* Maximum selected duration
+* Caption
+* Hashtags
+* Sound ID
+* Sound start time
+* Original audio volume
+* Sound volume
+* Beat-sync state
+* Tagged products
+* Product-tag timestamps
+* Product-tag slide index
+* Visibility
+* Status
+* Created time
+* Scheduled time
+* Published time
+
+NAVIGATION
+
+The Seller Profile must be reachable from:
+
+* Seller Dashboard avatar
+* More menu
+* Seller navigation
+* Content hub
+
+The Create Post flow must be reachable from:
+
+* Seller Profile
+* Seller Dashboard
+* Studio
+* Product details
+* Content hub
+
+The Buyer must be able to open the Seller Profile by tapping the Seller’s name or profile image on any Thread post.
+
+PERMISSIONS
+
+Handle:
+
+* Camera
+* Microphone
+* Photo library
+* Notifications
+
+Show premium Brandthread permission screens instead of unstyled system explanations.
+
+ACCESSIBILITY AND MOBILE QUALITY
+
+Ensure:
+
+* Safe-area support
+* Keyboard avoidance
+* Smooth scrolling
+* No text overflow
+* Minimum touch targets
+* Screen-reader labels
+* Loading states
+* Upload progress
+* Processing states
+* Failure retry states
+* Offline handling
+* Draft recovery
+* No white flashes
+* No broken back gestures
+
+TESTING
+
+Test these exact paths:
+
+1. Open Seller Profile.
+2. Edit the Seller Profile.
+3. Create a 10-second video post.
+4. Create a 15-second video post.
+5. Create a 30-second video post.
+6. Create a 60-second video post.
+7. Upload multiple video clips.
+8. Trim and split clips.
+9. Add a sound.
+10. Adjust sound start point.
+11. Adjust original-audio volume.
+12. Use Beat Sync.
+13. Add text.
+14. Tag a product.
+15. Add hashtags and a description.
+16. Preview the post in 9:16.
+17. Save as draft.
+18. Publish the post.
+19. Confirm it appears on the Seller Profile.
+20. Confirm it appears in Buyer Thread.
+21. Create a photo slideshow.
+22. Test 9:16 slideshow.
+23. Test 3:4 slideshow.
+24. Test square slideshow.
+25. Tag different products on different slides.
+26. Publish the slideshow.
+27. Confirm the selected slideshow ratio appears correctly in Thread.
+28. Confirm Buyer posts never appear in Thread.
+29. Open a tagged product from a Thread post.
+30. Open Seller Profile from a Thread post.
+31. Open post analytics.
+32. Delete a post.
+33. Archive a post.
+34. Schedule a post.
+35. Confirm scheduled content does not appear early.
+36. Restart the app during an unfinished edit.
+37. Confirm the draft can be recovered.
+38. Fix all TypeScript errors.
+39. Fix all route errors.
+40. Fix all runtime errors.
+41. Fix all console errors caused by this system.
+
+Do not stop after creating static screens.
+
+Build the routes, UI, state, typed models, demo services where necessary, navigation, publishing states, Seller Profile, and Thread eligibility rules.
+
+When complete, respond with only:
+
+“The Brandthread Seller Profile and content creation system are installed and working.”
