@@ -1,227 +1,423 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * Manufacturer Messages Screen
+ * Params: conversationId (string)
+ */
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, Platform,
+  View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet,
+  KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
+import {
+  getConversations, sendMessage, markConversationRead,
+} from '@/services/manufacturerService';
+import { ManufacturerConversation, ManufacturerMessage } from '@/services/manufacturerTypes';
+import { BrandthreadHeader, GuidedTip, StatusBadge } from '@/components/BrandthreadUI';
+import {
+  BG, CARD, CARD_ELEVATED, BORDER, BORDER_FOCUS,
+  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
+  CYAN, CYAN_DIM, ORANGE, ORANGE_DIM,
+  FONT, FS, SP, RADIUS, ICON,
+} from '@/lib/theme';
 
-// ─── Tokens ───────────────────────────────────────────────────────────────────
-const BG     = '#0A0B0A';
-const CARD   = '#131713';
-const BORDER = '#1E221E';
-const FG     = '#EAF2ED';
-const MUTED  = '#5C6B5E';
-const GREEN  = '#39FF88';
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-// ─── Mock manufacturer conversations ─────────────────────────────────────────
-const CONVOS = [
-  {
-    id: 'manufacturer-ace',
-    name: 'Ace Apparel Co.',
-    location: 'Pakistan',
-    initials: 'ACE',
-    gradient: ['#1A2C1A', '#0F1F0F'] as [string, string],
-    online: true,
-    lastMsg: 'We have received your tech pack. Sample will be ready in 5 days.',
-    time: '2m ago',
-    unread: 2,
-    tag: 'Sampling',
-    tagColor: '#F97316',
-  },
-  {
-    id: 'manufacturer-m2',
-    name: 'Stitch Labs',
-    location: 'Portugal',
-    initials: 'SL',
-    gradient: ['#1A1F2C', '#0F1520'] as [string, string],
-    online: true,
-    lastMsg: 'Can you confirm the pantone colors for the spring collection?',
-    time: '1h ago',
-    unread: 0,
-    tag: 'In Production',
-    tagColor: GREEN,
-  },
-  {
-    id: 'manufacturer-m3',
-    name: 'Elite Garments',
-    location: 'Turkey',
-    initials: 'EG',
-    gradient: ['#2C1A1A', '#200F0F'] as [string, string],
-    online: true,
-    lastMsg: 'Production update: 60% completed. On track for delivery.',
-    time: '3h ago',
-    unread: 0,
-    tag: 'In Production',
-    tagColor: GREEN,
-  },
-  {
-    id: 'manufacturer-m4',
-    name: 'Apex Garment Co.',
-    location: 'Guangzhou, CN',
-    initials: 'AG',
-    gradient: ['#1E2A1E', '#121A12'] as [string, string],
-    online: false,
-    lastMsg: 'Please send the revised tech pack when ready.',
-    time: 'Yesterday',
-    unread: 0,
-    tag: 'Pending',
-    tagColor: '#FBBF24',
-  },
-  {
-    id: 'manufacturer-m5',
-    name: 'Milano Couture',
-    location: 'Milan, IT',
-    initials: 'MC',
-    gradient: ['#2A1A2C', '#1A0F20'] as [string, string],
-    online: false,
-    lastMsg: 'We can accommodate your MOQ of 150 units. Quote attached.',
-    time: '2 days ago',
-    unread: 0,
-    tag: 'Quote',
-    tagColor: '#0EA5E9',
-  },
-];
+type AttachType = null | 'quote' | 'sample' | 'production';
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
-export default function ManufacturerMessagesScreen() {
-  const insets = useSafeAreaInsets();
-  const router = useRouter();
-  const topPad = Platform.OS === 'web' ? 20 : insets.top;
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-  function openChat(id: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push(`/chat/${id}` as never);
+function fmtTime(iso: string) {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function attachIcon(type: ManufacturerMessage['attachmentType']): string {
+  switch (type) {
+    case 'quote': return '📋';
+    case 'sample': return '🧵';
+    case 'production': return '🏭';
+    case 'product': return '📦';
+    default: return '📎';
+  }
+}
+
+// ─── Message Bubble ───────────────────────────────────────────────────────────
+
+function MessageBubble({ msg }: { msg: ManufacturerMessage }) {
+  const isSeller = msg.senderType === 'seller';
+  const isSystem = msg.senderType === 'system';
+  const isInternal = msg.isInternalNote;
+
+  if (isSystem) {
+    return (
+      <View style={bubS.systemWrap}>
+        <Text style={bubS.systemText}>{msg.text}</Text>
+        <Text style={bubS.timestamp}>{fmtTime(msg.createdAt)}</Text>
+      </View>
+    );
   }
 
-  const totalUnread = CONVOS.reduce((n, c) => n + c.unread, 0);
+  const bubbleStyle = isInternal
+    ? bubS.internalBubble
+    : isSeller
+    ? bubS.sellerBubble
+    : bubS.mfgBubble;
 
   return (
-    <View style={[s.root, { paddingTop: topPad }]}>
-
-      {/* ── Nav ── */}
-      <View style={s.nav}>
-        <TouchableOpacity style={s.navIcon} onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Feather name="arrow-left" size={20} color={FG} />
-        </TouchableOpacity>
-        <View style={{ alignItems: 'center', gap: 2 }}>
-          <Text style={s.navTitle}>Manufacturer Messages</Text>
-          {totalUnread > 0 && (
-            <Text style={s.navSub}>{totalUnread} unread</Text>
-          )}
+    <View style={[bubS.row, isSeller ? bubS.rowRight : bubS.rowLeft]}>
+      <View style={{ maxWidth: '78%' }}>
+        {isInternal && (
+          <Text style={bubS.internalLabel}>🔒 Internal note</Text>
+        )}
+        <View style={[bubS.bubble, bubbleStyle]}>
+          <Text style={[bubS.msgText, isSeller && { color: '#fff' }]}>{msg.text}</Text>
         </View>
-        <TouchableOpacity
-          style={s.navIcon}
-          onPress={() => router.push('/manufacturer-onboard' as never)}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <Feather name="user-plus" size={19} color={FG} />
-        </TouchableOpacity>
+        {msg.attachmentType && (
+          <View style={bubS.attachCard}>
+            <Text style={bubS.attachIcon}>{attachIcon(msg.attachmentType)}</Text>
+            <View>
+              <Text style={bubS.attachLabel}>{msg.attachmentLabel ?? msg.attachmentType}</Text>
+              <Text style={bubS.attachSub}>{msg.attachmentType}</Text>
+            </View>
+          </View>
+        )}
+        <Text style={[bubS.timestamp, isSeller ? { textAlign: 'right' } : {}]}>
+          {fmtTime(msg.createdAt)}
+        </Text>
       </View>
-
-      {/* ── List ── */}
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingBottom: 40 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {CONVOS.map((c, i) => (
-          <TouchableOpacity
-            key={c.id}
-            style={[s.row, i > 0 && { borderTopWidth: 1, borderTopColor: BORDER }]}
-            onPress={() => openChat(c.id)}
-            activeOpacity={0.8}
-          >
-            {/* Avatar */}
-            <View style={s.avatarWrap}>
-              <LinearGradient colors={c.gradient} style={s.avatar}>
-                <Text style={s.initials}>{c.initials}</Text>
-              </LinearGradient>
-              {c.online && <View style={s.onlineDot} />}
-            </View>
-
-            {/* Content */}
-            <View style={{ flex: 1, gap: 4 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                <Text style={[s.name, c.unread > 0 && { color: FG }]}>{c.name}</Text>
-                <View style={[s.tagPill, { backgroundColor: c.tagColor + '22', borderColor: c.tagColor + '44' }]}>
-                  <Text style={[s.tagText, { color: c.tagColor }]}>{c.tag}</Text>
-                </View>
-              </View>
-              <Text style={s.location}>{c.location}</Text>
-              <Text
-                style={[s.preview, c.unread > 0 && s.previewBold]}
-                numberOfLines={2}
-              >
-                {c.lastMsg}
-              </Text>
-            </View>
-
-            {/* Right side */}
-            <View style={{ alignItems: 'flex-end', gap: 6, marginTop: 2 }}>
-              <Text style={s.time}>{c.time}</Text>
-              {c.unread > 0 ? (
-                <View style={s.badge}>
-                  <Text style={s.badgeText}>{c.unread}</Text>
-                </View>
-              ) : (
-                <Feather name="chevron-right" size={14} color={MUTED} />
-              )}
-            </View>
-          </TouchableOpacity>
-        ))}
-
-        {/* ── Add manufacturer CTA ── */}
-        <TouchableOpacity
-          style={s.addCta}
-          onPress={() => router.push('/manufacturer-onboard' as never)}
-          activeOpacity={0.85}
-        >
-          <View style={s.addCtaIcon}>
-            <Feather name="user-plus" size={18} color={GREEN} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.addCtaTitle}>Add a Manufacturer</Text>
-            <Text style={s.addCtaSub}>Send an invite link to start a conversation</Text>
-          </View>
-          <Feather name="chevron-right" size={16} color={MUTED} />
-        </TouchableOpacity>
-      </ScrollView>
     </View>
   );
 }
 
+const bubS = StyleSheet.create({
+  row: { marginVertical: 3, paddingHorizontal: SP.md },
+  rowRight: { flexDirection: 'row', justifyContent: 'flex-end' },
+  rowLeft:  { flexDirection: 'row', justifyContent: 'flex-start' },
+  bubble: {
+    borderRadius: RADIUS.lg,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+    maxWidth: '100%',
+  },
+  sellerBubble: {
+    backgroundColor: PURPLE,
+    borderBottomRightRadius: 4,
+  },
+  mfgBubble: {
+    backgroundColor: CARD_ELEVATED,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderBottomLeftRadius: 4,
+  },
+  internalBubble: {
+    backgroundColor: ORANGE_DIM,
+    borderWidth: 1,
+    borderColor: ORANGE + '50',
+    borderBottomRightRadius: 4,
+  },
+  msgText: {
+    fontSize: FS.base,
+    fontFamily: FONT.regular,
+    color: FG,
+    lineHeight: 20,
+  },
+  systemWrap: {
+    alignItems: 'center',
+    marginVertical: SP.sm,
+    paddingHorizontal: SP.lg,
+  },
+  systemText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: SUBTLE,
+    fontStyle: 'italic',
+    textAlign: 'center',
+  },
+  internalLabel: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: ORANGE,
+    marginBottom: 3,
+    textAlign: 'right',
+  },
+  timestamp: {
+    fontSize: 10,
+    fontFamily: FONT.regular,
+    color: SUBTLE,
+    marginTop: 3,
+  },
+  attachCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    backgroundColor: CARD,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: SP.sm,
+    marginTop: 4,
+  },
+  attachIcon: { fontSize: 20 },
+  attachLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
+  attachSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+});
+
+// ─── Attachment Chip ──────────────────────────────────────────────────────────
+
+function AttachChip({ type, onRemove }: { type: AttachType; onRemove: () => void }) {
+  if (!type) return null;
+  const labels: Record<string, string> = { quote: 'Quote', sample: 'Sample', production: 'Production' };
+  return (
+    <View style={chipS.root}>
+      <Text style={chipS.text}>{attachIcon(type as any)} {labels[type]}</Text>
+      <TouchableOpacity onPress={onRemove} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+        <Feather name="x" size={12} color={MUTED} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const chipS = StyleSheet.create({
+  root: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.pill,
+    borderWidth: 1, borderColor: BORDER,
+    paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start',
+  },
+  text: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
+});
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+
+export default function ManufacturerMessagesScreen() {
+  const { conversationId } = useLocalSearchParams<{ conversationId: string }>();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+
+  const [conversation, setConversation] = useState<ManufacturerConversation | null>(null);
+  const [messages, setMessages] = useState<ManufacturerMessage[]>([]);
+  const [inputText, setInputText] = useState('');
+  const [sending, setSending] = useState(false);
+  const [attachType, setAttachType] = useState<AttachType>(null);
+  const [tipDismissed, setTipDismissed] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const inputRef = useRef<TextInput>(null);
+
+  const load = useCallback(async () => {
+    if (!conversationId) return;
+    const convs = await getConversations();
+    const conv = convs.find(c => c.id === conversationId);
+    if (conv) {
+      setConversation(conv);
+      setMessages([...conv.messages].reverse());
+      await markConversationRead(conversationId);
+    }
+    setLoading(false);
+  }, [conversationId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function handleSend() {
+    const text = inputText.trim();
+    if (!text || !conversationId) return;
+    setSending(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    try {
+      const msg = await sendMessage(conversationId, {
+        text,
+        attachmentType: attachType ?? undefined,
+        attachmentLabel: attachType ? attachType.charAt(0).toUpperCase() + attachType.slice(1) : undefined,
+        isInternalNote: false,
+      });
+      setMessages(prev => [msg, ...prev]);
+      setInputText('');
+      setAttachType(null);
+    } catch (e) {
+      Alert.alert('Error', 'Could not send message.');
+    }
+    setSending(false);
+  }
+
+  async function handleSendInternal() {
+    const text = inputText.trim();
+    if (!text || !conversationId) return;
+    setSending(true);
+    try {
+      const msg = await sendMessage(conversationId, {
+        text,
+        isInternalNote: true,
+      });
+      setMessages(prev => [msg, ...prev]);
+      setInputText('');
+      setAttachType(null);
+    } catch {}
+    setSending(false);
+  }
+
+  function handleAttachPress() {
+    Alert.alert('Attach', 'Choose attachment type', [
+      { text: 'Attach Quote', onPress: () => setAttachType('quote') },
+      { text: 'Attach Sample', onPress: () => setAttachType('sample') },
+      { text: 'Attach Production', onPress: () => setAttachType('production') },
+      { text: 'Internal Note', onPress: () => {
+        Alert.alert('Internal Note', 'Type your note and it will be marked as internal.', [
+          { text: 'OK', onPress: () => inputRef.current?.focus() },
+        ]);
+      }},
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={PURPLE} />
+      </View>
+    );
+  }
+
+  if (!conversation) {
+    return (
+      <View style={{ flex: 1, backgroundColor: BG, paddingTop: insets.top }}>
+        <BrandthreadHeader title="Messages" onBack={() => router.back()} />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: MUTED, fontFamily: FONT.regular }}>Conversation not found.</Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: BG }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={0}
+    >
+      {/* Header */}
+      <View style={{ paddingTop: insets.top, backgroundColor: BG, borderBottomWidth: 1, borderBottomColor: BORDER }}>
+        <BrandthreadHeader
+          title={conversation.manufacturerName}
+          subtitle={conversation.contextLabel ?? undefined}
+          onBack={() => router.back()}
+          rightElement={
+            conversation.contextLabel ? (
+              <StatusBadge label={conversation.contextLabel} variant="purple" small />
+            ) : undefined
+          }
+        />
+      </View>
+
+      {/* Demo tip */}
+      {!tipDismissed && (
+        <GuidedTip
+          id="msg-demo"
+          text="Messages are stored locally. Real-time sync available with backend."
+          dismissedIds={[]}
+          onDismiss={() => setTipDismissed(true)}
+          style={{ marginTop: SP.sm }}
+        />
+      )}
+
+      {/* Messages */}
+      <FlatList
+        data={messages}
+        keyExtractor={m => m.id}
+        inverted
+        renderItem={({ item }) => <MessageBubble msg={item} />}
+        contentContainerStyle={{ paddingVertical: SP.md }}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={{ alignItems: 'center', marginTop: 40 }}>
+            <Text style={{ color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.sm }}>
+              No messages yet. Say hello!
+            </Text>
+          </View>
+        }
+      />
+
+      {/* Input Bar */}
+      <View style={[s.inputArea, { paddingBottom: Math.max(insets.bottom, SP.md) }]}>
+        {attachType && (
+          <View style={{ paddingHorizontal: SP.md, paddingBottom: SP.sm }}>
+            <AttachChip type={attachType} onRemove={() => setAttachType(null)} />
+          </View>
+        )}
+        <View style={s.inputRow}>
+          <TouchableOpacity onPress={handleAttachPress} style={s.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={{ fontSize: 20 }}>📎</Text>
+          </TouchableOpacity>
+          <TextInput
+            ref={inputRef}
+            style={s.textInput}
+            value={inputText}
+            onChangeText={setInputText}
+            placeholder="Message…"
+            placeholderTextColor={SUBTLE}
+            multiline
+            returnKeyType="default"
+          />
+          <TouchableOpacity
+            onPress={handleSend}
+            style={[s.sendBtn, (!inputText.trim() || sending) && { opacity: 0.4 }]}
+            disabled={!inputText.trim() || sending}
+          >
+            {sending
+              ? <ActivityIndicator size="small" color="#fff" />
+              : <Feather name="send" size={ICON.sm} color="#fff" />
+            }
+          </TouchableOpacity>
+        </View>
+      </View>
+    </KeyboardAvoidingView>
+  );
+}
+
 // ─── Styles ───────────────────────────────────────────────────────────────────
+
+
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
-
-  nav:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: BORDER },
-  navIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  navTitle:{ fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
-  navSub:  { fontSize: 10, fontFamily: 'Inter_500Medium', color: GREEN },
-
-  row:       { flexDirection: 'row', alignItems: 'flex-start', gap: 13, paddingHorizontal: 16, paddingVertical: 16 },
-  avatarWrap:{ position: 'relative' },
-  avatar:    { width: 48, height: 48, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
-  initials:  { fontSize: 13, fontFamily: 'Inter_700Bold', color: GREEN },
-  onlineDot: { position: 'absolute', bottom: 1, right: 1, width: 10, height: 10, borderRadius: 5, backgroundColor: GREEN, borderWidth: 2, borderColor: BG },
-
-  name:        { fontSize: 14, fontFamily: 'Inter_700Bold', color: FG },
-  location:    { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
-  tagPill:     { borderRadius: 6, borderWidth: 1, paddingHorizontal: 6, paddingVertical: 2 },
-  tagText:     { fontSize: 9, fontFamily: 'Inter_600SemiBold' },
-  preview:     { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 17 },
-  previewBold: { fontFamily: 'Inter_600SemiBold', color: FG + 'CC' },
-
-  time:      { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
-  badge:     { width: 20, height: 20, borderRadius: 10, backgroundColor: GREEN, alignItems: 'center', justifyContent: 'center' },
-  badgeText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: '#000' },
-
-  addCta:      { flexDirection: 'row', alignItems: 'center', gap: 14, marginHorizontal: 14, marginTop: 10, backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, padding: 16 },
-  addCtaIcon:  { width: 40, height: 40, borderRadius: 10, backgroundColor: '#0C2418', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: GREEN + '40' },
-  addCtaTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', color: FG },
-  addCtaSub:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 2 },
+  inputArea: {
+    backgroundColor: CARD,
+    borderTopWidth: 1,
+    borderTopColor: BORDER,
+    paddingTop: SP.sm,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: SP.sm,
+    paddingHorizontal: SP.md,
+  },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textInput: {
+    flex: 1,
+    minHeight: 40,
+    maxHeight: 120,
+    backgroundColor: CARD_ELEVATED,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+    fontSize: FS.base,
+    fontFamily: FONT.regular,
+    color: FG,
+  },
+  sendBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: PURPLE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

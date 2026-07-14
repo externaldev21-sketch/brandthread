@@ -1,0 +1,1239 @@
+Continue working directly inside my existing Brandthread Expo React Native project.
+
+Do not explain the code to me.
+
+Do not give me an outline.
+
+Do not give me sample code.
+
+Inspect the current project, edit the files directly, run the app, test the feature, and fix all errors.
+
+Build the complete Brandthread AI Store Builder and Theme System.
+
+Do not redesign onboarding.
+
+Do not break Seller Dashboard, Products, Manufacturer Hub, Orders, Inventory, Seller Profile, Content Creator, Buyer Thread, authentication, or navigation.
+
+CORE GOAL
+
+A Seller must be able to create a professional clothing-brand website from their phone without knowing how to code.
+
+The Store Builder should be AI-first.
+
+The primary experience should not begin with hundreds of templates.
+
+The primary experience should ask the Seller about their brand and automatically generate a complete storefront.
+
+Sellers must also be able to select a professionally designed theme and customize it manually.
+
+STORE BUILDER ENTRY SCREEN
+
+Create a premium Store Builder home screen matching the Brandthread onboarding design system.
+
+Heading:
+
+“Build your brand’s home.”
+
+Description:
+
+“Create a complete storefront with Brandthread AI or start with a professionally designed theme.”
+
+Show these primary options:
+
+1. Build with AI
+2. Choose a theme
+3. Generate from logo
+4. Generate from mood board
+5. Generate from social profile
+6. Continue editing current store
+
+Include:
+
+* Current store status
+* Draft or Published badge
+* Last edited time
+* Mobile preview thumbnail
+* Preview store
+* Edit store
+* Publish
+* Store settings
+
+Do not claim social-profile importing works unless the project has a valid API or the user uploads content manually.
+
+When no external API exists, create a safe mock import flow and clearly separate it from real services.
+
+AI STORE GENERATOR
+
+Create a multi-step AI Store Generator.
+
+Show:
+
+* Current step
+* Total steps
+* Progress bar
+* Back
+* Continue
+* Save and exit
+* Resume later
+
+Preserve all answers.
+
+STEP 1 — BRAND STYLE
+
+Heading:
+
+“What kind of brand are you building?”
+
+Options:
+
+* Luxury
+* Streetwear
+* Minimal
+* Vintage
+* Y2K
+* Techwear
+* Outdoor
+* Sportswear
+* High fashion
+* Basics
+* Contemporary
+* Custom
+
+Allow one primary style and up to two secondary styles.
+
+STEP 2 — BRAND MOOD
+
+Heading:
+
+“What should customers feel?”
+
+Options:
+
+* Premium
+* Clean
+* Bold
+* Futuristic
+* Cozy
+* Dark
+* Colorful
+* Editorial
+* Exclusive
+* Playful
+* Raw
+* Artistic
+
+Allow multiple selections.
+
+STEP 3 — BRAND COLORS
+
+Allow the Seller to:
+
+* Select primary color
+* Select secondary color
+* Select accent color
+* Enter hex values
+* Choose from preset palettes
+* Generate a color palette
+* Generate colors from logo
+* Generate colors from mood board
+* Preview colors live
+
+Add accessibility checks for:
+
+* Text contrast
+* Button contrast
+* Background contrast
+
+Warn the Seller when a color combination is difficult to read.
+
+STEP 4 — TYPOGRAPHY
+
+Heading:
+
+“What matches your brand?”
+
+Typography styles:
+
+* Modern
+* Luxury
+* Minimal
+* Bold
+* Editorial
+* Technical
+* Classic
+* Experimental
+
+Show real preview cards using sample storefront text.
+
+Allow:
+
+* Heading font
+* Body font
+* Button font
+* Font weight
+* Letter spacing
+* Text case
+
+Use fonts that are legally safe and compatible with Expo and the storefront renderer.
+
+STEP 5 — HOMEPAGE PRIORITY
+
+Heading:
+
+“What should customers see first?”
+
+Options:
+
+* Hero video
+* Hero slideshow
+* Single hero image
+* Featured collection
+* Product grid
+* Brand story
+* New collection
+* Drop countdown
+* Best sellers
+* Lookbook
+
+Allow the Seller to choose one main priority and additional homepage sections.
+
+STEP 6 — BRAND STORY
+
+Heading:
+
+“What makes your brand different?”
+
+Include a large text input.
+
+Allow:
+
+* Write manually
+* Generate with AI
+* Improve writing
+* Shorten
+* Make more premium
+* Make more bold
+* Make more emotional
+
+Do not overwrite the Seller’s text without confirmation.
+
+STEP 7 — TARGET CUSTOMER
+
+Allow selections:
+
+* Men
+* Women
+* Unisex
+* Kids
+* Luxury shoppers
+* Streetwear buyers
+* Athletes
+* Creatives
+* Fashion enthusiasts
+* Everyday basics customers
+* Custom audience
+
+Allow age range and optional customer description.
+
+STEP 8 — STORE CONTENT
+
+Ask the Seller what content they already have:
+
+* Logo
+* Product photos
+* Product videos
+* Campaign images
+* Brand story
+* Customer reviews
+* Social posts
+* Lookbook
+* None yet
+
+Allow upload where appropriate.
+
+STEP 9 — STORE FEATURES
+
+Allow the Seller to select:
+
+* Product reviews
+* Size guide
+* Wishlist
+* Drop countdown
+* Email signup
+* SMS signup
+* Social feed
+* Seller posts
+* Product recommendations
+* Recently viewed
+* Quick add
+* Sticky add to cart
+* Pre-order display
+* Low-stock notice
+* Announcement bar
+* FAQ
+* Contact form
+
+STEP 10 — REVIEW
+
+Show all selections.
+
+Include:
+
+* Brand style
+* Mood
+* Colors
+* Typography
+* Homepage priority
+* Target customer
+* Selected features
+* Uploaded assets
+
+Buttons:
+
+* Edit answers
+* Generate my store
+
+AI GENERATION SCREEN
+
+Create a premium animated generation screen.
+
+Show these steps:
+
+* Reading your brand identity
+* Building homepage
+* Designing navigation
+* Creating collections
+* Styling product pages
+* Optimizing mobile
+* Adding conversion tools
+* Connecting Seller content
+* Finalizing your storefront
+
+Each step should animate and show a completed state.
+
+Do not use a plain loading spinner.
+
+If no AI backend exists, create a separated mock generation service that builds a valid storefront configuration from the Seller’s answers.
+
+Do not place fake generation logic directly in the UI component.
+
+GENERATED STORE RESULT
+
+After generation, open a live storefront preview.
+
+Show:
+
+* Homepage
+* Product pages
+* Collections
+* Navigation
+* Footer
+* Announcement bar
+* Brand story
+* Seller content section
+* Mobile menu
+* Cart preview
+
+Buttons:
+
+* Edit store
+* Regenerate
+* Save draft
+* Publish
+
+LIVE MOBILE PREVIEW
+
+This is required.
+
+Create a live phone-shaped storefront preview inside the Store Builder.
+
+The Seller must always be able to see what Buyers will see.
+
+Allow:
+
+* Scroll inside the phone preview
+* Tap sections inside the preview
+* Select the tapped section for editing
+* Switch between homepage, product page, collection page, and menu
+* Preview dark and light modes when supported
+* Preview different mobile device widths
+* Open full-screen preview
+
+The preview must update immediately when the Seller changes:
+
+* Colors
+* Fonts
+* Images
+* Text
+* Layout
+* Section order
+* Buttons
+* Products
+* Collections
+
+Do not make the Seller search through menus to find a section.
+
+Tapping a section in the preview should open that section’s settings.
+
+THEME LIBRARY
+
+Create a curated Theme Library.
+
+Do not create hundreds of themes.
+
+Create a polished set of approximately 15–20 configurable themes.
+
+Theme categories:
+
+* Streetwear
+* Luxury
+* Minimal
+* Editorial
+* Modern
+* Experimental
+
+Include themes such as:
+
+* Street
+* Noir
+* Canvas
+* Muse
+* Tokyo
+* Gallery
+* Motion
+* Archive
+* Vertex
+* Luxe
+* Mono
+* District
+* Pulse
+* Studio
+* Horizon
+* Atelier
+* Concrete
+* Prestige
+
+Each theme card must show:
+
+* Theme name
+* Category
+* Preview image
+* Light, Dark, or Auto support
+* Best use case
+* Preview button
+* Use theme button
+
+Do not copy real commercial themes.
+
+Create original Brandthread theme configurations.
+
+THEME PREVIEW
+
+Allow the Seller to preview a theme using their actual:
+
+* Brand name
+* Logo
+* Products
+* Collections
+* Colors
+* Seller posts
+
+Include:
+
+* Use this theme
+* Customize first
+* Return to themes
+
+Changing themes must not delete:
+
+* Products
+* Collections
+* Pages
+* Navigation
+* Policies
+* Store data
+
+Warn the Seller if a theme does not support a specific section.
+
+THEME CUSTOMIZATION
+
+Allow manual customization of:
+
+BRANDING
+
+* Logo
+* Favicon
+* Primary color
+* Secondary color
+* Accent color
+* Background color
+* Text color
+* Heading font
+* Body font
+* Button style
+* Corner radius
+* Icon style
+* Animation level
+
+HEADER
+
+* Logo position
+* Menu style
+* Search
+* Cart
+* Account
+* Sticky header
+* Transparent header
+* Announcement bar
+
+HOMEPAGE
+
+* Add section
+* Edit section
+* Reorder section
+* Duplicate section
+* Hide section
+* Delete section
+
+PRODUCT PAGE
+
+* Media layout
+* Image size
+* Product information position
+* Variant selector style
+* Size guide
+* Reviews
+* Sticky add to cart
+* Related products
+* Seller Profile link
+* Seller content featuring product
+
+COLLECTION PAGE
+
+* Grid columns
+* Product-card style
+* Filters
+* Sorting
+* Quick add
+* Pagination or infinite scroll
+
+FOOTER
+
+* Menus
+* Newsletter
+* Social links
+* Policies
+* Contact information
+* Payment icons
+* Copyright text
+
+HOMEPAGE SECTIONS
+
+Support:
+
+* Hero image
+* Hero video
+* Hero slideshow
+* Featured collection
+* Product grid
+* Featured product
+* Image with text
+* Video with text
+* Brand story
+* Lookbook
+* Customer reviews
+* Seller posts
+* Drop countdown
+* Announcement
+* Newsletter
+* FAQ
+* Social feed
+* Logo list
+* Before and after
+* Text banner
+* Spacer
+* Custom content block
+
+SECTION SETTINGS
+
+Each section should support appropriate settings such as:
+
+* Heading
+* Description
+* Image
+* Video
+* Button label
+* Button destination
+* Text alignment
+* Content position
+* Background color
+* Text color
+* Spacing
+* Full width
+* Section height
+* Overlay strength
+* Mobile layout
+* Visibility
+* Schedule
+
+HERO VIDEO
+
+Allow the Seller to:
+
+* Select a Seller video
+* Upload a store video
+* Mute or unmute
+* Autoplay
+* Loop
+* Choose poster image
+* Add heading
+* Add description
+* Add button
+* Set overlay
+* Choose mobile crop
+
+Use performance-safe video behavior.
+
+HERO SLIDESHOW
+
+Allow:
+
+* Multiple slides
+* Images or videos
+* Reorder
+* Slide duration
+* Transition
+* Heading
+* Description
+* Button
+* Mobile crop
+
+PRODUCT CONNECTION
+
+Store Builder must use products from the Brandthread Products system.
+
+Allow:
+
+* Featured products
+* Featured collections
+* Best sellers
+* New arrivals
+* Pre-orders
+* Low-stock products
+* Related products
+* Recommended products
+
+Do not duplicate product records inside the Store Builder.
+
+COLLECTIONS
+
+Create a complete Collections system.
+
+Allow:
+
+* Manual collection
+* Automated collection
+* Collection name
+* Description
+* Cover image
+* Product selection
+* Product order
+* SEO title
+* SEO description
+* URL handle
+* Visibility
+* Scheduled publication
+
+Automated collection conditions may include:
+
+* Product tag
+* Category
+* Price
+* Inventory
+* Product type
+* Pre-order status
+* Vendor
+* New products
+
+NAVIGATION
+
+Create menu management.
+
+Support:
+
+* Main menu
+* Mobile menu
+* Footer menu
+
+Allow:
+
+* Add menu item
+* Reorder
+* Nest items
+* Link to product
+* Link to collection
+* Link to page
+* Link to Seller Profile
+* Link to external URL
+* Hide item
+* Delete item
+
+PAGES
+
+Create page management for:
+
+* About
+* Contact
+* FAQ
+* Size guide
+* Shipping policy
+* Return policy
+* Privacy policy
+* Terms
+* Custom page
+
+Allow:
+
+* Create
+* Edit
+* Duplicate
+* Draft
+* Publish
+* Schedule
+* Hide
+* Delete
+
+POLICIES
+
+Create guided policy setup.
+
+Include:
+
+* Shipping policy
+* Return policy
+* Refund policy
+* Privacy policy
+* Terms of service
+* Pre-order policy
+
+Allow AI-assisted drafting, but clearly require Seller review before publishing.
+
+Do not claim generated policies are legal advice.
+
+ANNOUNCEMENT BAR
+
+Allow:
+
+* Text
+* Link
+* Background color
+* Text color
+* Countdown
+* Dismissible toggle
+* Sticky toggle
+* Start date
+* End date
+* Audience rules
+
+DROP COUNTDOWN
+
+Allow:
+
+* Drop date
+* End date
+* Countdown style
+* Product or collection link
+* Background media
+* Button
+* Expired state
+
+SELLER CONTENT INTEGRATION
+
+Allow Seller posts to appear on the storefront.
+
+Sections:
+
+* Latest posts
+* Shop the Thread
+* Featured video
+* Lookbook
+* Tagged products
+
+Only published Seller posts may appear.
+
+Buyer posts must never appear in the public storefront content sections.
+
+STORE PREVIEW MODES
+
+Allow preview of:
+
+* Homepage
+* Product page
+* Collection page
+* Search
+* Menu
+* Cart
+* Empty cart
+* Checkout entry
+* Seller Profile
+
+Allow preview states:
+
+* New visitor
+* Returning visitor
+* Product in stock
+* Product low stock
+* Product out of stock
+* Pre-order product
+
+AI IMPROVE STORE
+
+Create a floating AI button:
+
+“Improve Store”
+
+When tapped, analyze or simulate analysis of the current store.
+
+Suggestion categories:
+
+* Layout
+* Branding
+* Conversion
+* Mobile usability
+* Product presentation
+* Copywriting
+* Navigation
+* Accessibility
+* Performance
+
+Example suggestions:
+
+* Make the hero button more visible
+* Move best sellers higher
+* Improve text contrast
+* Add a size guide
+* Add a pre-order explanation
+* Feature a strong Seller video
+* Simplify navigation
+* Shorten homepage copy
+
+Each suggestion must include:
+
+* Problem
+* Recommendation
+* Preview change
+* Apply
+* Dismiss
+
+Do not automatically change the store without Seller approval.
+
+Track dismissed suggestions so they do not repeat constantly.
+
+GENERATE FROM LOGO
+
+Create a flow where the Seller uploads a logo.
+
+Analyze or simulate:
+
+* Dominant colors
+* Accent colors
+* Logo style
+* Brand mood
+* Suggested typography
+* Suggested themes
+
+Generate a storefront configuration.
+
+Do not claim advanced image analysis unless a real provider is connected.
+
+GENERATE FROM MOOD BOARD
+
+Allow the Seller to upload multiple images.
+
+Generate or simulate:
+
+* Color palette
+* Typography direction
+* Layout style
+* Image treatment
+* Suggested theme
+* Suggested homepage sections
+
+GENERATE FROM SOCIAL PROFILE
+
+Create a flow that allows:
+
+* Enter social-profile URL
+* Upload screenshots
+* Upload exported content
+* Select existing Seller posts
+
+When a real social API is unavailable, use uploaded screenshots and Seller posts.
+
+Do not scrape restricted platforms or claim direct access without authorization.
+
+STORE SETTINGS
+
+Create settings for:
+
+* Store name
+* Store URL
+* Domain
+* Contact email
+* Customer support email
+* Currency
+* Language
+* Time zone
+* Measurement units
+* Store status
+* Password protection
+* Checkout settings
+* Customer accounts
+* Order notifications
+* Analytics settings
+
+DOMAIN SETTINGS
+
+Create UI for:
+
+* Brandthread subdomain
+* Custom domain
+* Connect domain
+* Verification status
+* SSL status
+* Primary domain
+* Redirect domain
+
+Do not claim a custom domain is connected unless DNS verification succeeds.
+
+If no domain backend exists, create a clear development demo flow.
+
+SEO
+
+Create global SEO settings:
+
+* Homepage title
+* Homepage description
+* Social image
+* Sitemap status
+* Search visibility
+* Product SEO defaults
+* Collection SEO defaults
+
+STORE STATUS
+
+Support:
+
+* Not started
+* Draft
+* Ready to publish
+* Published
+* Password protected
+* Maintenance
+* Unpublished
+
+PUBLISH FLOW
+
+Before publishing, run validation.
+
+Check:
+
+* Store name
+* Logo
+* Homepage
+* At least one active product
+* Navigation
+* Contact information
+* Shipping policy
+* Return policy
+* Payment setup
+* Domain or Brandthread subdomain
+* Mobile usability
+* Broken links
+
+Show:
+
+* Errors
+* Warnings
+* Recommendations
+
+Do not block publishing for optional recommendations.
+
+Require confirmation before publishing.
+
+Show publishing progress.
+
+Avoid duplicate publish requests.
+
+VERSION HISTORY
+
+Create store version history.
+
+Save versions when:
+
+* Theme changes
+* Major section changes
+* Store publishes
+* AI changes are applied
+
+Allow:
+
+* View version
+* Preview version
+* Restore version
+
+Warn before restoring.
+
+AUTOSAVE
+
+Autosave Store Builder changes.
+
+Show:
+
+* Saving
+* Saved
+* Save failed
+* Retry
+
+Preserve drafts after closing or restarting the app.
+
+UNDO AND REDO
+
+Support undo and redo for:
+
+* Section order
+* Text edits
+* Color changes
+* Theme settings
+* Section deletion
+* Added sections
+
+DATA MODELS
+
+Create or update typed models for:
+
+* Storefront
+* StoreTheme
+* StoreThemeCategory
+* StoreThemeSettings
+* StoreBranding
+* StoreTypography
+* StoreColorPalette
+* StorePage
+* StoreSection
+* StoreSectionType
+* StoreSectionSettings
+* StoreCollection
+* StoreMenu
+* StoreMenuItem
+* StorePolicy
+* StoreDomain
+* StoreSEO
+* StorePublishStatus
+* StoreVersion
+* StoreAISuggestion
+* StoreGenerationAnswers
+* StoreGenerationResult
+* StorePreviewState
+
+SERVICES
+
+Use the existing backend.
+
+Do not install a second backend.
+
+Create or update strongly typed services for:
+
+* Get storefront
+* Create storefront
+* Update storefront
+* Autosave storefront
+* Generate store configuration
+* Generate from logo
+* Generate from mood board
+* Generate from uploaded social content
+* Load themes
+* Apply theme
+* Update theme settings
+* Create section
+* Update section
+* Reorder section
+* Delete section
+* Create collection
+* Update collection
+* Create page
+* Update page
+* Create menu
+* Update menu
+* Validate store
+* Publish store
+* Unpublish store
+* Create version
+* Restore version
+* Generate AI suggestions
+* Apply AI suggestion
+* Dismiss AI suggestion
+
+Keep mock services separate from UI components.
+
+Do not place AI generation logic directly inside screen components.
+
+DESIGN CONSISTENCY
+
+Every Store Builder screen must match the Brandthread onboarding and Seller design system.
+
+Use:
+
+* Deep black and charcoal backgrounds
+* Purple and blue primary accents
+* Controlled cyan and green accents
+* Rounded cards
+* Rounded buttons
+* Premium typography
+* Consistent spacing
+* Subtle borders
+* Smooth transitions
+* Styled loading states
+* Styled empty states
+* Styled error states
+* No old green and gray layouts
+* No white flashes
+
+EMPTY STATES
+
+Store Builder:
+
+“Build your brand’s online home.”
+
+Themes:
+
+“Choose a starting point for your storefront.”
+
+Pages:
+
+“Create pages that explain your brand and policies.”
+
+Collections:
+
+“Group products into collections Buyers can shop.”
+
+Versions:
+
+“Published and saved versions will appear here.”
+
+Each empty state must include a useful action.
+
+NAVIGATION
+
+Store Builder must be reachable from:
+
+* More
+* Seller Home
+* Setup checklist
+* Global search
+* Go To menu
+* Products
+* Seller Profile
+
+The public Buyer storefront must be reachable from:
+
+* Seller Profile Shop button
+* Product page Seller link
+* Thread post Shop action
+* Search results
+* Shared store link
+
+TESTING
+
+Test these exact paths:
+
+1. Open Store Builder.
+2. Start AI Store Generator.
+3. Select brand style.
+4. Select mood.
+5. Choose colors.
+6. Generate color palette.
+7. Choose typography.
+8. Choose homepage priority.
+9. Enter brand story.
+10. Choose target customer.
+11. Upload logo.
+12. Upload mood board.
+13. Select store features.
+14. Generate storefront.
+15. Confirm generated preview opens.
+16. Open Theme Library.
+17. Preview multiple themes.
+18. Apply a theme.
+19. Confirm products and content remain.
+20. Customize colors.
+21. Customize typography.
+22. Edit header.
+23. Edit footer.
+24. Add hero image.
+25. Add hero video.
+26. Add slideshow.
+27. Add product grid.
+28. Add collection.
+29. Add Seller content section.
+30. Reorder sections.
+31. Hide a section.
+32. Duplicate a section.
+33. Delete a section.
+34. Undo deletion.
+35. Redo deletion.
+36. Create a collection.
+37. Create an automated collection.
+38. Create a page.
+39. Create policies.
+40. Create navigation.
+41. Test nested menu items.
+42. Edit announcement bar.
+43. Create drop countdown.
+44. Use live mobile preview.
+45. Tap a preview section to edit it.
+46. Preview product page.
+47. Preview collection page.
+48. Preview mobile menu.
+49. Preview cart.
+50. Open Improve Store.
+51. Preview AI suggestion.
+52. Apply suggestion.
+53. Dismiss suggestion.
+54. Generate from logo.
+55. Generate from mood board.
+56. Test social-content upload flow.
+57. Configure store settings.
+58. Configure Brandthread subdomain.
+59. Test domain demo or real verification.
+60. Configure SEO.
+61. Save draft.
+62. Close app.
+63. Reopen app.
+64. Confirm draft persists.
+65. Validate store.
+66. Fix validation errors.
+67. Publish store.
+68. Confirm public Buyer storefront opens.
+69. Confirm products display correctly.
+70. Confirm inventory states display correctly.
+71. Confirm pre-order states display correctly.
+72. Confirm Seller posts display correctly.
+73. Confirm Buyer posts never display.
+74. Create a new store version.
+75. Restore a previous version.
+76. Test unpublish.
+77. Fix all TypeScript errors.
+78. Fix all routing errors.
+79. Fix all runtime errors.
+80. Fix all console errors caused by this system.
+81. Confirm onboarding remains unchanged.
+82. Confirm Buyer and Seller accounts still work.
+
+Do not stop after creating static theme screens.
+
+Build the complete AI Store Generator, curated Theme Library, live mobile preview, section editor, product and content connections, AI improvement suggestions, publishing flow, version history, typed models, services, and full testing.
+
+When complete, respond with only:
+
+“The Brandthread AI Store Builder is installed and working.”

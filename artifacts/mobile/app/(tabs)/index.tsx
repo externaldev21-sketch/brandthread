@@ -15,6 +15,7 @@ import {
   markFeatureOpened, type SetupState,
 } from '@/lib/setupStore';
 import { DEMO_ORDERS, DEMO_PRODUCTS } from '@/services/data';
+import { getHubStats } from '@/services/manufacturerService';
 import {
   BrandthreadScreen, BrandthreadCard, GradientCard,
   PrimaryButton, SecondaryButton, IconButton, SearchBar,
@@ -86,7 +87,7 @@ const COMMAND_ITEMS = [
   { label: 'Create design',     icon: 'pen-tool'     as const, route: '/(tabs)/studio'   },
   { label: 'Create post',       icon: 'video'        as const, route: '/create-post'     },
   { label: 'View orders',       icon: 'shopping-bag' as const, route: '/(tabs)/orders'   },
-  { label: 'Manufacturer Hub',  icon: 'tool'         as const, route: '/(tabs)/more'     },
+  { label: 'Manufacturer Hub',  icon: 'package'      as const, route: '/manufacturer-hub' },
   { label: 'Inventory',         icon: 'layers'       as const, route: '/(tabs)/more'     },
   { label: 'Store Builder',     icon: 'layout'       as const, route: '/(tabs)/more'     },
   { label: 'Analytics',         icon: 'bar-chart-2'  as const, route: '/(tabs)/analytics'},
@@ -116,6 +117,12 @@ export default function SellerHomeScreen() {
   const [searchModal, setSearchModal] = useState(false);
   const [commandModal, setCommandModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [hubStats, setHubStats] = useState<{
+    activeQuotes: number;
+    samplesNeedingReview: number;
+    activeProduction: number;
+    unreadMessages: number;
+  } | null>(null);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
 
@@ -138,6 +145,13 @@ export default function SellerHomeScreen() {
     }, 0);
     // Show skeleton for at least 500ms
     const minLoad = setTimeout(() => {}, 500);
+    // Load hub stats
+    getHubStats().then(stats => setHubStats({
+      activeQuotes: stats.activeQuotes,
+      samplesNeedingReview: stats.samplesNeedingReview,
+      activeProduction: stats.activeProduction,
+      unreadMessages: stats.unreadMessages,
+    })).catch(() => {});
     return () => { clearTimeout(timer); clearTimeout(minLoad); };
   }, []);
 
@@ -436,7 +450,7 @@ export default function SellerHomeScreen() {
               accent={ORANGE}
               description="New message"
               badge
-              onPress={() => Alert.alert('Manufacturer', 'Quote review coming soon.')}
+              onPress={() => nav('/manufacturer-hub')}
             />
             <NavigationCard
               label="Upload product images"
@@ -447,6 +461,44 @@ export default function SellerHomeScreen() {
             />
           </View>
         </View>
+
+        {/* ── Manufacturer Hub Stats ────────────────────────────────────── */}
+        {hubStats && (hubStats.samplesNeedingReview > 0 || hubStats.activeProduction > 0 || hubStats.unreadMessages > 0) && (
+          <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
+            <SectionHeader title="Manufacturer Hub" style={{ paddingHorizontal: 0, marginBottom: SP.sm }} action={{ label: 'Open hub', onPress: () => nav('/manufacturer-hub') }} />
+            <View style={{ gap: 8 }}>
+              {hubStats.samplesNeedingReview > 0 && (
+                <NavigationCard
+                  label={`${hubStats.samplesNeedingReview} sample${hubStats.samplesNeedingReview > 1 ? 's' : ''} need review`}
+                  icon="package"
+                  accent={ORANGE}
+                  description="Tap to review"
+                  badge
+                  onPress={() => nav('/manufacturer-hub')}
+                />
+              )}
+              {hubStats.activeProduction > 0 && (
+                <NavigationCard
+                  label={`${hubStats.activeProduction} active production order${hubStats.activeProduction > 1 ? 's' : ''}`}
+                  icon="layers"
+                  accent={PURPLE}
+                  description="Track progress"
+                  onPress={() => nav('/manufacturer-hub')}
+                />
+              )}
+              {hubStats.unreadMessages > 0 && (
+                <NavigationCard
+                  label={`${hubStats.unreadMessages} new manufacturer message${hubStats.unreadMessages > 1 ? 's' : ''}`}
+                  icon="message-circle"
+                  accent={CYAN}
+                  description="Tap to reply"
+                  badge
+                  onPress={() => nav('/manufacturer-hub')}
+                />
+              )}
+            </View>
+          </View>
+        )}
 
         {/* ── Recent Activity ───────────────────────────────────────────── */}
         <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>

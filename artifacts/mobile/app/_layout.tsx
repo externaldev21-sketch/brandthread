@@ -187,6 +187,16 @@ function RootLayoutNav() {
         <Stack.Screen name="help"             options={{ headerShown: false }} />
         <Stack.Screen name="bg-removal"       options={{ headerShown: false }} />
         <Stack.Screen name="tech-pack-generator" options={{ headerShown: false }} />
+        {/* Manufacturer Hub screens */}
+        <Stack.Screen name="manufacturer-hub"      options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="manufacturer-profile"  options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="quote-request"         options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="quote-detail"          options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="quote-compare"         options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="sample-detail"         options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="production-detail"     options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="manufacturer-messages" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="invite-manufacturer"   options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
       </Stack>
     </AuthGate>
   );
