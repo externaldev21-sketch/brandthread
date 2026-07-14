@@ -14,6 +14,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { dismissTip, markFeatureOpened, getSetupState } from '@/lib/setupStore';
+import { getProjects } from '@/services/designService';
+import { DesignProject, PROJECT_TYPE_LABELS, PROJECT_STATUS_LABELS } from '@/services/designTypes';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -45,9 +47,9 @@ interface HeroTool {
 const HERO_TOOLS: HeroTool[] = [
   { title: 'Design Studio',       icon: 'edit-3',   accent: PURPLE,  desc: 'Create product artwork',          badge: true, route: '/design' },
   { title: 'Create Content',      icon: 'video',    accent: CYAN,    desc: 'Film and edit Seller posts',      badge: true, route: '/create-post' },
-  { title: 'AI Photoshoot',       icon: 'camera',   accent: BLUE,    desc: 'Generate product photos' },
-  { title: 'Mockup to Model',     icon: 'user',     accent: ORANGE,  desc: 'Wear your design on a model' },
-  { title: 'Remove Background',   icon: 'scissors', accent: SUCCESS, desc: 'Clean image backgrounds' },
+  { title: 'AI Photoshoot',       icon: 'camera',   accent: BLUE,    desc: 'Generate product photos',         route: '/design-ai-photoshoot' },
+  { title: 'Mockup to Model',     icon: 'user',     accent: ORANGE,  desc: 'Wear your design on a model',    route: '/design-mockup-to-model' },
+  { title: 'Remove Background',   icon: 'scissors', accent: SUCCESS, desc: 'Clean image backgrounds',        route: '/design-bg-removal' },
   { title: 'Brand Kit',           icon: 'layers',   accent: GOLD,    desc: 'Logos, colors and fonts',                  route: '/brand' },
 ];
 
@@ -79,6 +81,15 @@ export default function StudioScreen() {
   const [activeFilter, setActiveFilter] = useState('All');
   const [dismissedTips, setDismissedTips] = useState<string[]>([]);
   const [openedFeatures, setOpenedFeatures] = useState<string[]>([]);
+  const [projects, setProjects] = useState<DesignProject[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(true);
+
+  // Load design projects
+  useEffect(() => {
+    getProjects()
+      .then(p => { setProjects(p.filter(x => x.status !== 'archived' as never)); setLoadingProjects(false); })
+      .catch(() => setLoadingProjects(false));
+  }, []);
 
   // Load dismissed tips + opened features from setupStore / AsyncStorage
   useEffect(() => {
@@ -238,7 +249,56 @@ export default function StudioScreen() {
           </BrandthreadCard>
         ))}
 
-        {/* ── 5. TEMPLATES ── */}
+        {/* ── 5. RECENT DESIGNS (real projects) ── */}
+        <SectionHeader
+          title="Recent designs"
+          action={{ label: 'View all', onPress: () => router.push('/design' as never) }}
+          style={styles.sectionHeader}
+        />
+        {loadingProjects ? (
+          <View style={styles.designSkeletonRow}>
+            <View style={styles.designSkeleton} />
+            <View style={styles.designSkeleton} />
+          </View>
+        ) : projects.length === 0 ? (
+          <View style={{ paddingHorizontal: SP.md }}>
+            <Text style={styles.designEmptyText}>No projects yet. Tap Design Studio to start.</Text>
+          </View>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.designRow}
+          >
+            {projects.slice(0, 4).map(proj => {
+              const statusVariant: 'purple' | 'info' | 'warning' | 'neutral' | 'success' =
+                proj.status === 'saved'              ? 'success' :
+                proj.status === 'exported'           ? 'info'    :
+                proj.status === 'sent_product'       ? 'purple'  :
+                proj.status === 'sent_manufacturer'  ? 'warning' : 'neutral';
+              return (
+                <TouchableOpacity
+                  key={proj.id}
+                  onPress={() => router.push(`/design-canvas?id=${proj.id}` as never)}
+                  activeOpacity={0.8}
+                >
+                  <BrandthreadCard style={styles.designCard}>
+                    <LinearGradient
+                      colors={['#8B5CF6', '#22D3EE']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.designThumb}
+                    />
+                    <Text style={styles.designName} numberOfLines={2}>{proj.name}</Text>
+                    <StatusBadge label={PROJECT_STATUS_LABELS[proj.status]} variant={statusVariant} small />
+                  </BrandthreadCard>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
+
+        {/* ── 6. TEMPLATES ── */}
         <SectionHeader
           title="Templates"
           action={{ label: 'Browse all', onPress: () => Alert.alert('Templates', 'Full template library coming soon.') }}
@@ -436,6 +496,48 @@ const styles = StyleSheet.create({
     fontSize: FS.xs,
     fontFamily: FONT.medium,
     color: SUBTLE,
+  },
+
+  // Recent designs (real projects)
+  designSkeletonRow: {
+    flexDirection: 'row',
+    gap: SP.sm,
+    paddingHorizontal: SP.md,
+  },
+  designSkeleton: {
+    width: 80,
+    height: 100,
+    borderRadius: RADIUS.md,
+    backgroundColor: CARD,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  designEmptyText: {
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    color: MUTED,
+  },
+  designRow: {
+    flexDirection: 'row',
+    gap: SP.sm,
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.sm,
+  },
+  designCard: {
+    width: 80,
+    gap: 6,
+    padding: SP.sm,
+  },
+  designThumb: {
+    width: '100%',
+    height: 60,
+    borderRadius: RADIUS.sm,
+  },
+  designName: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: FG,
+    lineHeight: 14,
   },
 
   // Templates

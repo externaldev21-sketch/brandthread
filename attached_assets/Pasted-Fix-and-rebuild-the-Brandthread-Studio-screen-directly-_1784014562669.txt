@@ -1,0 +1,147 @@
+Fix and rebuild the Brandthread Studio screen directly inside my existing Expo React Native project.
+
+Do not explain anything to me.
+Do not give me sample code.
+Do not ask me to manually edit files.
+Inspect the current Studio implementation, edit the project directly, run it, and fix every issue.
+
+I uploaded a reference image showing exactly how the Studio screen should look.
+
+CURRENT PROBLEM
+
+The current Studio screen is broken on mobile:
+
+- Cards are extremely narrow.
+- Words wrap one letter or one syllable per line.
+- Card descriptions are unreadable.
+- Card widths are inconsistent.
+- Large empty spaces appear between cards.
+- Content does not fit naturally across the screen.
+- Some badges are clipped.
+- The page feels unfinished.
+- It does not match the premium Brandthread onboarding design.
+- It appears that the grid is using incorrect fixed widths, incorrect flex values, or incorrect percentage calculations.
+
+Do not solve this by shrinking the font.
+
+Rebuild the responsive layout correctly.
+
+REFERENCE DESIGN
+
+The new Studio screen must closely follow the uploaded reference image.
+
+It should include:
+
+- Dark black premium background
+- Large gradient “Studio” heading
+- Subtitle: “Your creative workspace”
+- My Projects button in the upper-right area
+- Premium information banner
+- “Start creating” heading
+- Properly sized creation cards
+- Three columns on wider supported phones when space allows
+- Two columns on standard and narrow phones
+- One column only on extremely narrow accessibility layouts
+- Recent Projects section below the tools
+- Existing five-tab Seller bottom navigation
+
+The screen must still support everything we previously discussed.
+
+DO NOT REMOVE FEATURES
+
+Keep all current Studio tools and functionality:
+
+- Design Studio
+- Create Content
+- AI Photoshoot
+- Mockup to Model
+- Remove Background
+- Background Replace
+- AI Design
+- Brand Assets
+- Campaign Generator
+- Text to Design
+- Upload Sketch
+- Prompt Editing
+- Product Mockups
+- Recent Projects
+- Templates
+- Saved Assets
+- Product integration
+- Manufacturer integration
+- Store Builder integration
+- Content Creator integration
+
+If some tools are currently located deeper inside Studio, keep those routes working.
+
+PRIMARY STUDIO TOOLS
+
+The main “Start creating” grid should display these nine cards in this order:
+
+1. Design Studio
+   Description:
+   “Create product artwork, graphics and custom designs.”
+
+2. Create Content
+   Description:
+   “Film and edit Seller posts and videos.”
+
+3. AI Photoshoot
+   Description:
+   “Generate product photos with AI.”
+
+4. Mockup to Model
+   Description:
+   “Wear your design on a model.”
+
+5. Remove Background
+   Description:
+   “Remove backgrounds instantly.”
+
+6. Background Replace
+   Description:
+   “Change or generate new backgrounds.”
+
+7. AI Design
+   Description:
+   “Describe your idea and create unique designs.”
+
+8. Brand Assets
+   Description:
+   “Access logos, colors, fonts and saved assets.”
+
+9. Campaign Generator
+   Description:
+   “Generate marketing content and campaigns.”
+
+Every card must open its existing correct route.
+
+Do not create duplicate routes.
+
+RESPONSIVE GRID REQUIREMENTS
+
+Use the real available screen width.
+
+Calculate card width based on:
+
+- Window width
+- Horizontal page padding
+- Column gap
+- Number of columns
+
+Do not use incorrect fixed percentages such as 30%, 40%, 45%, or 48% when those values conflict with gaps and padding.
+
+Do not combine fixed widths with flex values in a way that compresses cards.
+
+Recommended logic:
+
+- Under approximately 390 logical pixels: 2 columns
+- Standard mobile widths: 2 columns
+- Wider mobile widths where the minimum card width remains readable: 3 columns
+- Large accessibility text or extremely narrow usable width: 1 column
+
+Each card must maintain a sensible minimum width.
+
+No card may become narrow enough to break normal words across multiple lines.
+
+Use `useWindowDimensions()` so

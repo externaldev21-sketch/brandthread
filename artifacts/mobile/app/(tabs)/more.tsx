@@ -60,6 +60,14 @@ const STORE: NavItem[] = [
   { icon: 'globe',  label: 'Domains',       desc: 'Custom domain settings',    accent: BLUE,   route: '/store-domain' },
 ];
 
+const CREATIVE: NavItem[] = [
+  { icon: 'edit-3',      label: 'Design Studio',       desc: 'Create designs and mockups',    accent: PURPLE, route: '/design' },
+  { icon: 'camera',      label: 'AI Photoshoot',       desc: 'Generate product photos',       accent: BLUE,   route: '/design-ai-photoshoot' },
+  { icon: 'scissors',    label: 'Background Removal',  desc: 'Clean image backgrounds',       accent: CYAN,   route: '/design-bg-removal' },
+  { icon: 'trending-up', label: 'Campaign Generator',  desc: 'Create campaign assets',        accent: ORANGE, route: '/design-campaign' },
+  { icon: 'layers',      label: 'Brand Assets',        desc: 'Logos, colors and graphics',    accent: GOLD,   route: '/design-brand-assets' },
+];
+
 const ACCOUNT: NavItem[] = [
   { icon: 'star',         label: 'Subscription',   desc: 'Manage your Brandthread plan',    accent: GOLD,   badge: true },
   { icon: 'link',         label: 'Integrations',   desc: 'Connect third-party services',    accent: PURPLE },
@@ -197,6 +205,7 @@ export default function MoreScreen() {
         {/* 3. SECTIONS */}
         {renderSection('OPERATIONS', OPERATIONS)}
         {renderSection('GROWTH', GROWTH)}
+        {renderSection('CREATIVE', CREATIVE)}
         {renderSection('STORE', STORE)}
         {renderSection('ACCOUNT', ACCOUNT)}
 

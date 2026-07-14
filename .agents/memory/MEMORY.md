@@ -9,3 +9,4 @@
 - [Orders System Architecture](orders-system-architecture.md) — orderTypes.ts + orderService.ts; 7 new screens; routes in _layout.tsx; AsyncStorage v1 keys; demo data seeds 6 orders.
 - [Inventory System Architecture](inventory-system-architecture.md) — inventoryTypes.ts + inventoryService.ts; 7 screens (hub + 6 detail); AsyncStorage inv:*:v1 keys; demo seeds 6 items + 2 locations.
 - [Store Builder Architecture](store-builder-architecture.md) — storeTypes.ts + storeService.ts; 20 screens; bt:store:v1 key; no dynamic imports in service; StoreValidationResult from storeService not storeTypes.
+- [Design Studio Architecture](design-studio-architecture.md) — designTypes.ts + designService.ts; 17 screens; bt:design:*:v1 keys; mock AI in service; textColor/fillColor field names; no local color names.
