@@ -180,6 +180,11 @@ export default function BuyerConversationScreen() {
   const isDisabled = conv?.isFriendshipActive === false;
   const canSend = text.trim().length > 0 && !isDisabled && !isSending;
 
+  // Show "View store" button for any seller conversation (resolved or pre-created)
+  const convType = conv?.type ?? params.type ?? '';
+  const isSellerConv = convType === 'buyer_to_seller' || convType === 'buyer_to_seller_product';
+  const sellerUserId = participant?.userId ?? params.participantId ?? '';
+
   // ── Send message ────────────────────────────────────────────────────────────
 
   async function handleSend() {
@@ -349,9 +354,24 @@ export default function BuyerConversationScreen() {
             },
           ]}
         >
-          {/* Attachment */}
+          {/* Attachment — tappable for product/order types */}
           {msg.attachment && (
-            <View style={s.attachCard}>
+            <TouchableOpacity
+              style={s.attachCard}
+              activeOpacity={msg.attachment.type === 'product' || msg.attachment.type === 'order' ? 0.7 : 1}
+              onPress={() => {
+                if (msg.attachment?.type === 'product') {
+                  const productId = msg.attachment.meta?.productId;
+                  if (productId) {
+                    router.push(('/buyer-product-detail?productId=' + productId) as never);
+                  } else if (participant) {
+                    router.push(('/seller-profile?id=' + participant.userId) as never);
+                  }
+                } else if (msg.attachment?.type === 'order') {
+                  router.push('/(buyer)/orders' as never);
+                }
+              }}
+            >
               <Feather
                 name={attachmentIcon(msg.attachment.type)}
                 size={ICON.sm}
@@ -365,7 +385,10 @@ export default function BuyerConversationScreen() {
                   <Text style={s.attachSubtitle} numberOfLines={1}>{msg.attachment.subtitle}</Text>
                 ) : null}
               </View>
-            </View>
+              {(msg.attachment.type === 'product' || msg.attachment.type === 'order') && (
+                <Feather name="chevron-right" size={ICON.xs} color={MUTED} />
+              )}
+            </TouchableOpacity>
           )}
 
           {/* Text */}
@@ -452,6 +475,17 @@ export default function BuyerConversationScreen() {
           ) : null}
         </View>
 
+        {/* View Store — only for seller conversations */}
+        {isSellerConv && sellerUserId && (
+          <TouchableOpacity
+            style={s.headerShop}
+            onPress={() => router.push(('/seller-profile?id=' + sellerUserId) as never)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Feather name="shopping-bag" size={ICON.lg} color={PURPLE} />
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
           style={s.headerMore}
           onPress={openOptions}
@@ -480,6 +514,30 @@ export default function BuyerConversationScreen() {
               <Text style={s.orderStatusText}>{conv.contextOrderStatus}</Text>
             </View>
           ) : null}
+        </TouchableOpacity>
+      )}
+
+      {/* Product context card — shown for seller product conversations */}
+      {conv?.type === 'buyer_to_seller_product' && conv.contextProductName && (
+        <TouchableOpacity
+          style={s.orderCard}
+          onPress={() => {
+            if (participant) {
+              router.push(('/seller-profile?id=' + participant.userId) as never);
+            }
+          }}
+          activeOpacity={0.8}
+        >
+          <Feather name="shopping-bag" size={ICON.md} color={PURPLE} />
+          <View style={{ flex: 1, marginLeft: SP.sm }}>
+            <Text style={s.orderCardNumber} numberOfLines={1}>{conv.contextProductName}</Text>
+            {conv.contextSellerName ? (
+              <Text style={s.orderCardProduct} numberOfLines={1}>{conv.contextSellerName}</Text>
+            ) : null}
+          </View>
+          <View style={s.orderStatusBadge}>
+            <Text style={s.orderStatusText}>View store</Text>
+          </View>
         </TouchableOpacity>
       )}
 
@@ -624,8 +682,11 @@ const s = StyleSheet.create({
     color: MUTED,
     marginTop: 1,
   },
-  headerMore: {
+  headerShop: {
     marginLeft: SP.sm,
+  },
+  headerMore: {
+    marginLeft: SP.xs,
   },
 
   // Order context card
