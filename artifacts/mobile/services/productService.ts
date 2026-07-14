@@ -424,6 +424,19 @@ export async function deleteDraft(id: string): Promise<void> {
   try { await AsyncStorage.removeItem(DRAFT_PREFIX + id); } catch { /* non-fatal */ }
 }
 
+export async function listDrafts(): Promise<ProductDraft[]> {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const draftKeys = keys.filter(k => k.startsWith(DRAFT_PREFIX));
+    if (draftKeys.length === 0) return [];
+    const pairs = await AsyncStorage.multiGet(draftKeys);
+    return pairs
+      .map(([, v]) => (v ? (JSON.parse(v) as ProductDraft) : null))
+      .filter((d): d is ProductDraft => d !== null)
+      .sort((a, b) => b.lastSavedAt.localeCompare(a.lastSavedAt));
+  } catch { return []; }
+}
+
 // ─── Taggable products (for content system) ───────────────────────────────────
 
 export async function getTaggableProducts(forDraftContent = false): Promise<Product[]> {

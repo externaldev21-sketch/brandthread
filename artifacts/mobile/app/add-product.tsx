@@ -29,13 +29,14 @@ import {
 } from '@/components/BrandthreadUI';
 
 import {
-  createProduct, saveDraft, loadDraft, getCollections, DEMO_FULL_PRODUCTS,
+  createProduct, updateProduct, getProduct, saveDraft, loadDraft, deleteDraft,
+  getCollections, DEMO_FULL_PRODUCTS,
 } from '@/services/productService';
 
 import {
   Product, ProductDraft, ProductCategory, PRODUCT_CATEGORIES,
   SIZE_PRESETS, COLOR_PRESETS, SalesModel, OptionType,
-  ProductOption, OptionValue, ProductVariant, ProductMedia,
+  ProductOption, OptionValue, ProductVariant, ProductMedia, ProductCollection,
 } from '@/services/productTypes';
 
 import {
@@ -147,41 +148,119 @@ export default function AddProductScreen() {
   const [dismissedTips, setDismissedTips] = useState<string[]>([]);
   // Fix #2: loading state to prevent double-publish
   const [publishing, setPublishing] = useState(false);
+  // Edit-mode state
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editProductId, setEditProductId] = useState<string | null>(null);
+  // Collections for Step 1 picker
+  const [collections, setCollections] = useState<ProductCollection[]>([]);
 
   const draftId = useRef('draft_' + uid());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fix #1: Draft loading on mount
+  // ── Restore helper (shared by draft-load and product-load) ──
+  function restoreFormState(source: Partial<Product>) {
+    if (source.pricing) {
+      setPriceStr(source.pricing.price?.toString() ?? '');
+      setCompareAtStr(source.pricing.compareAtPrice?.toString() ?? '');
+      setCostStr(source.pricing.cost?.toString() ?? '');
+      setShippingStr(source.pricing.estimatedShippingCost?.toString() ?? '');
+      setFeesStr(source.pricing.estimatedFees?.toString() ?? '');
+    }
+    if (source.tags) setTagsInput(source.tags.join(', '));
+    if (source.storeSettings?.featuredOnHomepage) setFeaturedHome(source.storeSettings.featuredOnHomepage);
+    if (source.inventory) {
+      setTrackInventory(source.inventory.trackQuantity ?? true);
+      setAllowOversell(source.inventory.allowOverselling ?? false);
+      setStockStr(source.inventory.totalStock?.toString() ?? '');
+      setLowStockStr(source.inventory.lowStockThreshold?.toString() ?? '5');
+    }
+    if (source.options?.length) {
+      setLocalOptions(source.options.map(o => ({
+        id: o.id,
+        type: o.type,
+        name: o.name,
+        values: o.values.map(v => ({ id: v.id, value: v.value, colorHex: v.colorHex })),
+        customInput: '',
+      })));
+    }
+    if (source.variants?.length) {
+      setLocalVariants(source.variants.map(v => ({
+        id: v.id,
+        title: v.title,
+        optionValues: v.optionValues,
+        sku: v.sku ?? '',
+        price: v.price?.toString() ?? '',
+        qty: v.inventoryQuantity.toString(),
+      })));
+      const qtys: Record<string, string> = {};
+      source.variants.forEach(v => { qtys[v.id] = v.inventoryQuantity.toString(); });
+      setVariantQtys(qtys);
+    }
+    if (source.manufacturing) {
+      if (source.manufacturing.manufacturerName) {
+        setMfgMode('existing');
+        setMfgName(source.manufacturing.manufacturerName);
+      }
+      setTargetCost(source.manufacturing.targetCostPerUnit?.toString() ?? '');
+      setReqQty(source.manufacturing.requiredQuantity?.toString() ?? '');
+      setProdDeadline(source.manufacturing.productionDeadline ?? '');
+    }
+  }
+
+  // Fix #1: Draft loading on mount — handles both draft resume and existing-product edit
   useEffect(() => {
     const editId = params.editId as string | undefined;
-    if (editId) {
-      loadDraft(editId).then(draft => {
-        if (!draft) return;
+    if (!editId) return;
+
+    async function loadForEdit() {
+      // Try draft storage first (in-progress creation)
+      const draft = await loadDraft(editId!);
+      if (draft) {
         setDraftData(draft as Partial<Product>);
         setStep(draft.currentStep ?? 1);
-        // restore pricing strings from draft
-        if (draft.pricing) {
-          setPriceStr(draft.pricing.price?.toString() ?? '');
-          setCompareAtStr(draft.pricing.compareAtPrice?.toString() ?? '');
-          setCostStr(draft.pricing.cost?.toString() ?? '');
-          setShippingStr(draft.pricing.estimatedShippingCost?.toString() ?? '');
-          setFeesStr(draft.pricing.estimatedFees?.toString() ?? '');
-        }
-        // restore tags
-        if (draft.tags) setTagsInput(draft.tags.join(', '));
-        // restore options/variants — store them as localOptions/localVariants
-        // For simplicity, just restore draftData; user will re-generate combos
-        draftId.current = editId;
-      });
+        restoreFormState(draft);
+        draftId.current = editId!;
+        return;
+      }
+      // No draft found — load existing published/draft product (edit mode)
+      const product = await getProduct(editId!);
+      if (product) {
+        setIsEditMode(true);
+        setEditProductId(editId!);
+        setDraftData(product as Partial<Product>);
+        restoreFormState(product);
+        draftId.current = 'edit_' + editId!;
+      }
     }
+    loadForEdit();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Load collections for Step 1 picker ──
+  useEffect(() => {
+    getCollections().then(cols => setCollections(cols)).catch(() => {});
   }, []);
 
-  // ── Auto-save draft ──
+  // ── Auto-save draft (includes options & variants so they survive app restart) ──
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
+      const productOptions: ProductOption[] = localOptions.map((o, i) => ({
+        id: o.id, type: o.type, name: o.name, values: o.values, sortOrder: i,
+      }));
+      const productVariants: ProductVariant[] = localVariants.map(v => ({
+        id: v.id, productId: '',
+        title: v.title, optionValues: v.optionValues,
+        sku: v.sku, price: parseFloat(v.price) || undefined,
+        inventoryQuantity: parseInt(variantQtys[v.id] ?? v.qty) || 0,
+        reservedQuantity: 0, incomingQuantity: 0,
+        status: 'active' as const,
+        requiresShipping: true, taxable: true,
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      }));
       const draft: ProductDraft = {
         ...draftData,
+        options: productOptions,
+        variants: productVariants,
         id: draftId.current,
         isDraft: true,
         currentStep: step,
@@ -190,25 +269,44 @@ export default function AddProductScreen() {
       saveDraft(draft);
     }, 2000);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [draftData, step]);
+  }, [draftData, step, localOptions, localVariants, variantQtys]);
 
   // ── Helpers ──
   function patchDraft(patch: Partial<Product>) {
     setDraftData(prev => ({ ...prev, ...patch }));
   }
 
+  // Build a draft snapshot that captures options & variants (not just draftData)
+  function buildDraftSnapshot(): ProductDraft {
+    const productOptions: ProductOption[] = localOptions.map((o, i) => ({
+      id: o.id, type: o.type, name: o.name, values: o.values, sortOrder: i,
+    }));
+    const productVariants: ProductVariant[] = localVariants.map(v => ({
+      id: v.id, productId: '',
+      title: v.title, optionValues: v.optionValues,
+      sku: v.sku, price: parseFloat(v.price) || undefined,
+      inventoryQuantity: parseInt(variantQtys[v.id] ?? v.qty) || 0,
+      reservedQuantity: 0, incomingQuantity: 0,
+      status: 'active' as const,
+      requiresShipping: true, taxable: true,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    }));
+    return {
+      ...draftData,
+      options: productOptions,
+      variants: productVariants,
+      id: draftId.current,
+      isDraft: true,
+      currentStep: step,
+      lastSavedAt: new Date().toISOString(),
+    };
+  }
+
   function handleExit() {
     Alert.alert('Exit product creation?', 'Your progress will be saved as a draft.', [
       {
         text: 'Save draft', onPress: () => {
-          const draft: ProductDraft = {
-            ...draftData,
-            id: draftId.current,
-            isDraft: true,
-            currentStep: step,
-            lastSavedAt: new Date().toISOString(),
-          };
-          saveDraft(draft);
+          saveDraft(buildDraftSnapshot());
           router.back();
         },
       },
@@ -219,27 +317,13 @@ export default function AddProductScreen() {
 
   // Fix #9: Split into two save-draft functions
   function handleSaveDraftAndExit() {
-    const draft: ProductDraft = {
-      ...draftData,
-      id: draftId.current,
-      isDraft: true,
-      currentStep: step,
-      lastSavedAt: new Date().toISOString(),
-    };
-    saveDraft(draft);
+    saveDraft(buildDraftSnapshot());
     Alert.alert('Draft saved', 'You can continue editing later.');
     router.back();
   }
 
   function handleSaveDraftInPlace() {
-    const draft: ProductDraft = {
-      ...draftData,
-      id: draftId.current,
-      isDraft: true,
-      currentStep: step,
-      lastSavedAt: new Date().toISOString(),
-    };
-    saveDraft(draft);
+    saveDraft(buildDraftSnapshot());
     Alert.alert('Draft saved', 'Your progress has been saved.');
   }
 
@@ -386,42 +470,56 @@ export default function AddProductScreen() {
     // Fix #3: total stock from variant quantities
     const totalStock = productVariants.reduce((sum, v) => sum + v.inventoryQuantity, 0);
 
-    try {
-      const newProduct = await createProduct({
-        ...draftData,
-        pricing,
-        options: productOptions,
-        variants: productVariants,
+    const productPayload: Partial<Product> = {
+      ...draftData,
+      pricing,
+      options: productOptions,
+      variants: productVariants,
+      status: 'active',
+      inventory: {
+        ...(draftData.inventory ?? { productId: '', trackQuantity: true, allowOverselling: false, policy: 'deny', lowStockThreshold: 5, reservedStock: 0, incomingStock: 0, locationStock: [], variantStock: [] }),
+        productId: isEditMode && editProductId ? editProductId : '',
+        totalStock,
+        availableStock: totalStock,
+        trackQuantity: trackInventory,
+        allowOverselling: allowOversell,
+        policy: allowOversell ? 'continue' : 'deny',
+        lowStockThreshold: parseInt(lowStockStr) || 5,
+      },
+      storeSettings: {
+        ...(draftData.storeSettings ?? { collectionIds: [], featuredOnHomepage: false, relatedProductIds: [], seo: { searchVisible: true } }),
         status: 'active',
-        inventory: {
-          ...(draftData.inventory ?? { productId: '', trackQuantity: true, allowOverselling: false, policy: 'deny', lowStockThreshold: 5, reservedStock: 0, incomingStock: 0, locationStock: [], variantStock: [] }),
-          productId: '',
-          totalStock,
-          availableStock: totalStock,
-          trackQuantity: trackInventory,
-          allowOverselling: allowOversell,
-          policy: allowOversell ? 'continue' : 'deny',
-          lowStockThreshold: parseInt(lowStockStr) || 5,
-        },
-        storeSettings: {
-          ...(draftData.storeSettings ?? { collectionIds: [], featuredOnHomepage: false, relatedProductIds: [], seo: { searchVisible: true } }),
-          status: 'active',
-          featuredOnHomepage: featuredHome,
-        },
-        manufacturing: {
-          stage: mfgMode === 'quote' ? 'quote_requested' : 'none',
-          manufacturerName: mfgName || undefined,
-          targetCostPerUnit: parseFloat(targetCost) || undefined,
-          requiredQuantity: parseInt(reqQty) || undefined,
-          productionDeadline: prodDeadline || undefined,
-        },
-      });
-      // Fix #2: success alert with view/done options
+        featuredOnHomepage: featuredHome,
+      },
+      manufacturing: {
+        stage: mfgMode === 'quote' ? 'quote_requested' : 'none',
+        manufacturerName: mfgName || undefined,
+        targetCostPerUnit: parseFloat(targetCost) || undefined,
+        requiredQuantity: parseInt(reqQty) || undefined,
+        productionDeadline: prodDeadline || undefined,
+      },
+    };
+
+    try {
       const name = draftData.name ?? 'Product';
-      Alert.alert('Product published!', name + ' is now live.', [
-        { text: 'View product', onPress: () => router.replace('/product-detail?id=' + newProduct.id as never) },
-        { text: 'Done', onPress: () => router.back() },
-      ]);
+      if (isEditMode && editProductId) {
+        // ── Update existing product ──
+        await updateProduct(editProductId, productPayload);
+        await deleteDraft(draftId.current);
+        Alert.alert('Product updated!', name + ' has been updated.', [
+          { text: 'View product', onPress: () => router.replace('/product-detail?id=' + editProductId as never) },
+          { text: 'Done', onPress: () => router.back() },
+        ]);
+      } else {
+        // ── Create new product ──
+        const newProduct = await createProduct(productPayload);
+        await deleteDraft(draftId.current);
+        // Fix #2: success alert with view/done options
+        Alert.alert('Product published!', name + ' is now live.', [
+          { text: 'View product', onPress: () => router.replace('/product-detail?id=' + newProduct.id as never) },
+          { text: 'Done', onPress: () => router.back() },
+        ]);
+      }
     } catch {
       Alert.alert('Error', 'Could not publish. Please try again.');
     } finally {
@@ -479,6 +577,30 @@ export default function AddProductScreen() {
           }}
           placeholder="streetwear, hoodie, oversized"
         />
+        {collections.length > 0 && (
+          <>
+            <SectionHeader title="Collection" style={s.sectionHdr} />
+            <View style={s.chipGrid}>
+              {collections.map(col => {
+                const collIds = draftData.storeSettings?.collectionIds ?? [];
+                const active = collIds.includes(col.id);
+                return (
+                  <FilterChip
+                    key={col.id}
+                    label={col.name}
+                    active={active}
+                    onPress={() => {
+                      const updated = active
+                        ? collIds.filter(id => id !== col.id)
+                        : [...collIds, col.id];
+                      patchDraft({ storeSettings: { ...(draftData.storeSettings ?? { status: 'draft', featuredOnHomepage: false, relatedProductIds: [], seo: { searchVisible: true } }), collectionIds: updated } });
+                    }}
+                  />
+                );
+              })}
+            </View>
+          </>
+        )}
       </View>
     );
   }

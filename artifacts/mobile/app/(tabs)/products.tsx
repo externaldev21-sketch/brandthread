@@ -29,9 +29,9 @@ import {
 } from '@/components/BrandthreadUI';
 import {
   getProducts, getProductStats, archiveProduct, unarchiveProduct,
-  deleteProduct, duplicateProduct, DEMO_FULL_PRODUCTS,
+  deleteProduct, duplicateProduct, listDrafts, DEMO_FULL_PRODUCTS,
 } from '@/services/productService';
-import { Product, ProductFilter, ProductCategory } from '@/services/productTypes';
+import { Product, ProductDraft, ProductFilter, ProductCategory } from '@/services/productTypes';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -99,7 +99,7 @@ function ProductCard({ product, onEdit, onDuplicate, onMore }: ProductCardProps)
       <View style={s.cardRow}>
         {/* Thumbnail */}
         <View style={s.thumbWrap}>
-          {coverUri && coverUri.startsWith('http') ? (
+          {coverUri ? (
             <Image source={{ uri: coverUri }} style={s.thumb} resizeMode="cover" />
           ) : (
             <LinearGradient colors={gradColors} style={s.thumb} />
@@ -359,6 +359,7 @@ export default function ProductsScreen() {
   const router = useRouter();
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [inProgressDrafts, setInProgressDrafts] = useState<ProductDraft[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
   const [filter, setFilter] = useState<ProductFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -402,7 +403,10 @@ export default function ProductsScreen() {
   }, [loadProducts]);
 
   // Reload when the tab comes back into focus (e.g. after creating a product)
-  useFocusEffect(useCallback(() => { loadProducts(); }, [loadProducts]));
+  useFocusEffect(useCallback(() => {
+    loadProducts();
+    listDrafts().then(setInProgressDrafts).catch(() => {});
+  }, [loadProducts]));
 
   function refresh() {
     loadProducts();
@@ -466,6 +470,42 @@ export default function ProductsScreen() {
 
   const ListHeader = useMemo(() => (
     <>
+      {/* In-progress creation drafts */}
+      {inProgressDrafts.length > 0 && (
+        <>
+          <SectionHeader title={`In Progress (${inProgressDrafts.length})`} style={{ marginBottom: SP.sm }} />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: SP.sm, paddingBottom: SP.sm }}
+            style={{ marginBottom: SP.md }}
+          >
+            {inProgressDrafts.map(draft => (
+              <TouchableOpacity
+                key={draft.id}
+                style={s.draftCard}
+                onPress={() => router.push(('/add-product?editId=' + draft.id) as never)}
+                activeOpacity={0.75}
+              >
+                <View style={s.draftCardTop}>
+                  <Feather name="edit-3" size={14} color={ORANGE} />
+                  <Text style={s.draftStep}>Step {draft.currentStep ?? 1}/10</Text>
+                </View>
+                <Text style={s.draftName} numberOfLines={1}>
+                  {draft.name || 'Untitled product'}
+                </Text>
+                <Text style={s.draftTime} numberOfLines={1}>
+                  Saved {draft.lastSavedAt ? new Date(draft.lastSavedAt).toLocaleDateString() : '—'}
+                </Text>
+                <View style={s.draftResume}>
+                  <Text style={s.draftResumeLabel}>Resume →</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </>
+      )}
+
       {/* Summary stats */}
       <ScrollView
         horizontal
@@ -514,7 +554,7 @@ export default function ProductsScreen() {
         style={{ marginBottom: SP.sm }}
       />
     </>
-  ), [stats, filter, dismissedTips]);
+  ), [stats, filter, dismissedTips, inProgressDrafts, router]);
 
   const ListEmpty = useMemo(() => (
     <EmptyState
@@ -625,6 +665,43 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.sm,
+  },
+  draftCard: {
+    width: 160,
+    backgroundColor: CARD,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: ORANGE + '55',
+    padding: SP.sm,
+    gap: 4,
+  },
+  draftCardTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  draftStep: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: ORANGE,
+  },
+  draftName: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    color: FG,
+  },
+  draftTime: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: MUTED,
+  },
+  draftResume: {
+    marginTop: 4,
+  },
+  draftResumeLabel: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: PURPLE_LIGHT,
   },
   statsRow: {
     paddingHorizontal: SP.md,
