@@ -1,384 +1,1266 @@
-import React, { useState } from 'react';
+/**
+ * Order Detail — full rewrite
+ * Tabs: overview | customer | payment | fulfillment | timeline | returns | disputes | notes
+ */
+
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  ScrollView, View, Text, TouchableOpacity, StyleSheet,
-  Alert, Platform,
+  View, Text, ScrollView, TouchableOpacity, TextInput,
+  StyleSheet, Alert, ActivityIndicator, Modal,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { DEMO_ORDERS } from '@/services/data';
-import type { Order, OrderStatus } from '@/services/types';
+import {
+  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
+  FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN, SUCCESS, SUCCESS_DIM,
+  BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
+  GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
+} from '@/lib/theme';
+import {
+  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
+  IconButton, StatusBadge, SectionHeader, EmptyState,
+} from '@/components/BrandthreadUI';
+import {
+  getOrder, markProcessing, markReadyToShip, markShipped,
+  markDelivered, addOrderNote, cancelOrder, updateReturnStatus,
+  addTracking,
+} from '@/services/orderService';
+import {
+  Order, PAYOUT_MILESTONES, CANCELLATION_REASONS,
+  CancellationReason, ReturnStatus, RETURN_REASONS,
+} from '@/services/orderTypes';
 
-// ─── Theme ────────────────────────────────────────────────────────────────────
-const BG     = '#0A0B0A';
-const CARD   = '#111311';
-const BORDER = '#1E221E';
-const FG     = '#EAF2ED';
-const MUTED  = '#5A6B5C';
-const GREEN  = '#39FF88';
-const BLUE   = '#3B82F6';
-const PURPLE = '#8B5CF6';
-const CYAN   = '#06B6D4';
-const ORANGE = '#F97316';
-const RED    = '#EF4444';
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-function statusColor(s: OrderStatus): string {
-  const map: Record<OrderStatus, string> = {
-    new: BLUE, processing: PURPLE, ready_to_ship: CYAN, shipped: GREEN,
-    delivered: GREEN, refunded: ORANGE, disputed: RED, cancelled: MUTED,
-  };
-  return map[s] ?? MUTED;
+type Tab = 'overview' | 'customer' | 'payment' | 'fulfillment' | 'timeline' | 'returns' | 'disputes' | 'notes';
+
+const TABS: { key: Tab; label: string }[] = [
+  { key: 'overview',    label: 'Overview' },
+  { key: 'customer',    label: 'Customer' },
+  { key: 'payment',     label: 'Payment' },
+  { key: 'fulfillment', label: 'Fulfillment' },
+  { key: 'timeline',    label: 'Timeline' },
+  { key: 'returns',     label: 'Returns' },
+  { key: 'disputes',    label: 'Disputes' },
+  { key: 'notes',       label: 'Notes' },
+];
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function fmt(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+function fmtShort(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+function fmtTime(iso: string) {
+  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+function usd(n: number) {
+  return `$${n.toFixed(2)}`;
 }
 
-function statusLabel(s: OrderStatus): string {
-  const map: Record<OrderStatus, string> = {
-    new: 'New', processing: 'Processing', ready_to_ship: 'Ready to Ship',
-    shipped: 'Shipped', delivered: 'Delivered', refunded: 'Refunded',
-    disputed: 'Disputed', cancelled: 'Cancelled',
-  };
-  return map[s] ?? s;
+function orderStatusVariant(status: string): 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple' {
+  switch (status) {
+    case 'new': return 'info';
+    case 'processing': return 'warning';
+    case 'ready_to_ship': return 'purple';
+    case 'shipped': return 'info';
+    case 'delivered': return 'success';
+    case 'cancelled': return 'neutral';
+    case 'refunded': return 'neutral';
+    case 'disputed': return 'error';
+    default: return 'neutral';
+  }
 }
+
+function paymentVariant(status: string): 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple' {
+  switch (status) {
+    case 'paid': return 'success';
+    case 'pending': case 'authorized': return 'warning';
+    case 'refunded': case 'partially_refunded': return 'info';
+    case 'failed': case 'voided': return 'error';
+    default: return 'neutral';
+  }
+}
+
+function timelineColor(type: string): string {
+  switch (type) {
+    case 'order_created': return CYAN;
+    case 'payment_confirmed': return SUCCESS;
+    case 'shipped': case 'label_purchased': case 'tracking_added': return BLUE;
+    case 'delivered': return SUCCESS;
+    case 'return_requested': case 'refund_issued': return ORANGE;
+    case 'dispute_opened': case 'cancelled': return RED;
+    case 'risk_review': return RED;
+    case 'note_added': return PURPLE;
+    default: return MUTED;
+  }
+}
+
+function returnReasonLabel(key: string): string {
+  return RETURN_REASONS.find(r => r.key === key)?.label ?? key;
+}
+
+// ─── InfoRow ─────────────────────────────────────────────────────────────────
+
+function InfoRow({ label, value, valueColor, bold }: { label: string; value: string; valueColor?: string; bold?: boolean }) {
+  return (
+    <View style={s.infoRow}>
+      <Text style={s.infoLabel}>{label}</Text>
+      <Text style={[s.infoValue, bold && s.infoValueBold, valueColor ? { color: valueColor } : {}]}>{value}</Text>
+    </View>
+  );
+}
+
+// ─── AddressCard ─────────────────────────────────────────────────────────────
+
+function AddressCard({ title, addr }: { title: string; addr: { name: string; line1: string; line2?: string; city: string; state: string; zip: string; country: string } }) {
+  return (
+    <BrandthreadCard style={s.addressCard}>
+      <Text style={s.addressTitle}>{title}</Text>
+      <Text style={s.addressText}>{addr.name}</Text>
+      <Text style={s.addressText}>{addr.line1}{addr.line2 ? `, ${addr.line2}` : ''}</Text>
+      <Text style={s.addressText}>{addr.city}, {addr.state} {addr.zip}</Text>
+      <Text style={s.addressText}>{addr.country}</Text>
+    </BrandthreadCard>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function OrderDetailScreen() {
-  const insets = useSafeAreaInsets();
+  const { id, tab } = useLocalSearchParams<{ id: string; tab?: string }>();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const insets = useSafeAreaInsets();
 
-  const order = DEMO_ORDERS.find(o => o.id === id) ?? DEMO_ORDERS[0];
-  const [showShipping, setShowShipping] = useState(false);
+  const [order, setOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<Tab>((tab as Tab) || 'overview');
 
-  function back() { router.back(); }
-  function go(route: string) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(route as never); }
+  // Cancel modal
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState<CancellationReason | null>(null);
+  const [cancelNote, setCancelNote] = useState('');
+  const [cancelling, setCancelling] = useState(false);
 
-  function handleAction(label: string) {
+  // Note form
+  const [noteText, setNoteText] = useState('');
+  const [noteType, setNoteType] = useState<'internal' | 'customer' | 'manufacturer'>('internal');
+  const [addingNote, setAddingNote] = useState(false);
+
+  // Tracking form per group
+  const [trackingForms, setTrackingForms] = useState<Record<string, { carrier: string; tracking: string; visible: boolean }>>({});
+
+  // Tracking events modal
+  const [trackingModalShipmentId, setTrackingModalShipmentId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    const o = await getOrder(id);
+    setOrder(o ?? null);
+    setLoading(false);
+  }, [id]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // ── Actions ──────────────────────────────────────────────────────────────
+
+  async function handleMarkProcessing() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    if (label === 'Buy Shipping Label') {
-      setShowShipping(true);
-    } else {
-      Alert.alert(label, `Action: ${label} for order ${order.orderNumber}`, [{ text: 'OK' }]);
+    await markProcessing(id);
+    load();
+  }
+
+  async function handleMarkReadyToShip() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await markReadyToShip(id);
+    load();
+  }
+
+  async function handleMarkShipped() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await markShipped(id);
+    load();
+  }
+
+  async function handleMarkDelivered() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await markDelivered(id);
+    load();
+  }
+
+  async function handleCancelOrder() {
+    if (!cancelReason) {
+      Alert.alert('Select a reason', 'Please choose a cancellation reason.');
+      return;
+    }
+    setCancelling(true);
+    await cancelOrder(id, cancelReason, cancelNote || undefined);
+    setCancelling(false);
+    setShowCancelModal(false);
+    load();
+  }
+
+  async function handleAddNote() {
+    if (!noteText.trim()) return;
+    setAddingNote(true);
+    await addOrderNote(id, noteText.trim(), noteType);
+    setNoteText('');
+    setAddingNote(false);
+    load();
+  }
+
+  async function handleAddTracking(groupId: string) {
+    const form = trackingForms[groupId];
+    if (!form?.carrier.trim() || !form?.tracking.trim()) {
+      Alert.alert('Missing info', 'Please enter carrier and tracking number.');
+      return;
+    }
+    await addTracking(id, form.carrier.trim(), form.tracking.trim());
+    setTrackingForms(prev => ({ ...prev, [groupId]: { ...prev[groupId], visible: false } }));
+    load();
+  }
+
+  async function handlePinNote(noteId: string, current: boolean) {
+    if (!order) return;
+    // Toggle pin locally (service doesn't expose togglePin, update in-memory and reload)
+    const note = order.notes.find(n => n.id === noteId);
+    if (note) { note.isPinned = !current; }
+    setOrder({ ...order, notes: [...order.notes] });
+  }
+
+  async function handleReturnAction(returnId: string, status: ReturnStatus, deniedReason?: string) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await updateReturnStatus(id, returnId, status, deniedReason);
+    load();
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <View style={s.centered}>
+        <ActivityIndicator color={PURPLE} size="large" />
+      </View>
+    );
+  }
+
+  if (!order) {
+    return (
+      <View style={[s.root, { paddingTop: insets.top }]}>
+        <EmptyState
+          icon="alert-circle"
+          title="Order not found"
+          description="This order may have been deleted or the ID is invalid."
+          action={{ label: 'Go Back', onPress: () => router.back(), icon: 'arrow-left' }}
+        />
+      </View>
+    );
+  }
+
+  const trackingModal = order.shipments.find(sh => sh.id === trackingModalShipmentId);
+
+  return (
+    <View style={[s.root, { paddingTop: insets.top }]}>
+      {/* Header */}
+      <View style={s.header}>
+        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
+          <Feather name="arrow-left" size={ICON.md} color={FG} />
+        </TouchableOpacity>
+        <View style={s.headerMid}>
+          <Text style={s.headerTitle}>{order.orderNumber}</Text>
+          <Text style={s.headerSub}>{order.customer.name}</Text>
+        </View>
+        <IconButton name="refresh-cw" onPress={load} color={MUTED} />
+      </View>
+
+      {/* Tab bar */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={s.tabBar}
+        contentContainerStyle={s.tabBarContent}
+      >
+        {TABS.map(t => (
+          <TouchableOpacity
+            key={t.key}
+            onPress={() => { Haptics.selectionAsync(); setActiveTab(t.key); }}
+            style={[s.tabItem, activeTab === t.key && s.tabItemActive]}
+          >
+            <Text style={[s.tabLabel, activeTab === t.key && s.tabLabelActive]}>{t.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* Content */}
+      <ScrollView
+        style={s.content}
+        contentContainerStyle={{ paddingBottom: insets.bottom + SP.xxl }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {activeTab === 'overview'    && <OverviewTab order={order} onMarkProcessing={handleMarkProcessing} onMarkReadyToShip={handleMarkReadyToShip} onMarkShipped={handleMarkShipped} onMarkDelivered={handleMarkDelivered} onCancelPress={() => setShowCancelModal(true)} router={router} reload={load} />}
+        {activeTab === 'customer'    && <CustomerTab order={order} />}
+        {activeTab === 'payment'     && <PaymentTab order={order} />}
+        {activeTab === 'fulfillment' && <FulfillmentTab order={order} trackingForms={trackingForms} setTrackingForms={setTrackingForms} onAddTracking={handleAddTracking} onMarkShipped={handleMarkShipped} onShowTracking={(sid) => setTrackingModalShipmentId(sid)} router={router} />}
+        {activeTab === 'timeline'    && <TimelineTab order={order} noteText={noteText} setNoteText={setNoteText} onAddNote={handleAddNote} addingNote={addingNote} />}
+        {activeTab === 'returns'     && <ReturnsTab order={order} onAction={handleReturnAction} router={router} />}
+        {activeTab === 'disputes'    && <DisputesTab order={order} router={router} />}
+        {activeTab === 'notes'       && <NotesTab order={order} noteText={noteText} setNoteText={setNoteText} noteType={noteType} setNoteType={setNoteType} onAddNote={handleAddNote} addingNote={addingNote} onPinNote={handlePinNote} />}
+      </ScrollView>
+
+      {/* Cancel Modal */}
+      <Modal visible={showCancelModal} transparent animationType="fade" onRequestClose={() => setShowCancelModal(false)}>
+        <View style={s.modalOverlay}>
+          <View style={s.modalCard}>
+            <Text style={s.modalTitle}>Cancel Order</Text>
+            <Text style={s.modalSubtitle}>Select a reason</Text>
+            <View style={s.chipRow}>
+              {CANCELLATION_REASONS.map(r => (
+                <TouchableOpacity
+                  key={r.key}
+                  onPress={() => setCancelReason(r.key)}
+                  style={[s.chip, cancelReason === r.key && s.chipActive]}
+                >
+                  <Text style={[s.chipText, cancelReason === r.key && s.chipTextActive]}>{r.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TextInput
+              style={s.cancelNoteInput}
+              value={cancelNote}
+              onChangeText={setCancelNote}
+              placeholder="Additional notes (optional)"
+              placeholderTextColor={SUBTLE}
+              multiline
+            />
+            {/* Warning */}
+            <BrandthreadCard style={s.warningCard}>
+              <View style={s.warningRow}>
+                <Feather name="alert-triangle" size={ICON.sm} color={RED} />
+                <Text style={s.warningText}>
+                  This will refund {usd(order.payment.amountPaid - order.payment.amountRefunded)} to customer. This cannot be undone.
+                </Text>
+              </View>
+            </BrandthreadCard>
+            <View style={s.modalActions}>
+              <SecondaryButton label="Go Back" onPress={() => setShowCancelModal(false)} style={{ flex: 1 }} />
+              <PrimaryButton
+                label="Confirm Cancel"
+                onPress={handleCancelOrder}
+                loading={cancelling}
+                colors={[RED, '#C0392B']}
+                style={{ flex: 1 }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Tracking Events Modal */}
+      <Modal visible={!!trackingModalShipmentId} transparent animationType="slide" onRequestClose={() => setTrackingModalShipmentId(null)}>
+        <View style={s.modalOverlay}>
+          <View style={s.modalCard}>
+            <Text style={s.modalTitle}>Tracking Events</Text>
+            {trackingModal && (
+              <>
+                <Text style={s.modalSubtitle}>{trackingModal.carrier} · {trackingModal.trackingNumber}</Text>
+                {trackingModal.trackingEvents.map(ev => (
+                  <View key={ev.id} style={s.trackingEventRow}>
+                    <View style={[s.trackingDot, { backgroundColor: timelineColor(ev.status) }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.trackingEvDesc}>{ev.description}</Text>
+                      {ev.location && <Text style={s.trackingEvLoc}>{ev.location}</Text>}
+                      <Text style={s.trackingEvTime}>{fmtTime(ev.timestamp)}</Text>
+                    </View>
+                  </View>
+                ))}
+              </>
+            )}
+            <SecondaryButton label="Close" onPress={() => setTrackingModalShipmentId(null)} style={{ marginTop: SP.md }} />
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// TAB: OVERVIEW
+// ═══════════════════════════════════════════════════════
+
+function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped, onMarkDelivered, onCancelPress, router, reload }: {
+  order: Order;
+  onMarkProcessing: () => void;
+  onMarkReadyToShip: () => void;
+  onMarkShipped: () => void;
+  onMarkDelivered: () => void;
+  onCancelPress: () => void;
+  router: ReturnType<typeof useRouter>;
+  reload: () => void;
+}) {
+  const [addingTracking, setAddingTracking] = useState(false);
+  const [trackingCarrier, setTrackingCarrier] = useState('');
+  const [trackingNum, setTrackingNum] = useState('');
+
+  async function handleAddTrackingAndShip() {
+    if (!trackingCarrier.trim() || !trackingNum.trim()) {
+      Alert.alert('Missing info', 'Enter carrier and tracking number.');
+      return;
+    }
+    await addTracking(order.id, trackingCarrier.trim(), trackingNum.trim());
+    reload();
+    setAddingTracking(false);
+  }
+
+  return (
+    <View style={s.tabContent}>
+      {/* Hero card */}
+      <GradientCard glow style={s.heroCard}>
+        <View style={s.heroRow}>
+          <Text style={s.heroOrderNum}>{order.orderNumber}</Text>
+          <View style={s.badgeRow}>
+            <StatusBadge label={order.status.replace(/_/g, ' ').toUpperCase()} variant={orderStatusVariant(order.status)} />
+            <StatusBadge label={order.paymentStatus.replace(/_/g, ' ').toUpperCase()} variant={paymentVariant(order.paymentStatus)} />
+          </View>
+        </View>
+        <Text style={s.heroDate}>{fmt(order.createdAt)}</Text>
+        <View style={s.heroMeta}>
+          <Text style={s.heroMetaText}>Source: {order.source}</Text>
+          <Text style={s.heroMetaText}>·</Text>
+          <Text style={s.heroMetaText}>{order.salesChannel}</Text>
+          <Text style={s.heroMetaText}>·</Text>
+          <Text style={s.heroMetaText}>{order.currency}</Text>
+        </View>
+        {order.riskLevel !== 'low' && (
+          <View style={s.riskBadge}>
+            <Feather name="alert-triangle" size={ICON.xs} color={FG} />
+            <Text style={s.riskBadgeText}>⚠ High Risk</Text>
+          </View>
+        )}
+        {order.isPreOrder && (
+          <View style={s.preOrderBadge}>
+            <Text style={s.preOrderBadgeText}>PRE-ORDER</Text>
+          </View>
+        )}
+      </GradientCard>
+
+      {/* Action Buttons */}
+      <View style={s.actionSection}>
+        <SectionHeader title="Actions" />
+        {order.status === 'new' && (
+          <View style={s.actionRow}>
+            <PrimaryButton label="Mark Processing" onPress={onMarkProcessing} icon="play" style={{ flex: 1 }} />
+            <SecondaryButton label="Cancel Order" onPress={onCancelPress} icon="x" style={{ flex: 1 }} accent={RED} />
+          </View>
+        )}
+        {order.status === 'processing' && (
+          <View style={s.actionRow}>
+            <PrimaryButton label="Mark Ready to Ship" onPress={onMarkReadyToShip} icon="package" style={{ flex: 1 }} />
+            <SecondaryButton label="Buy Shipping Label" onPress={() => router.push(`/shipping-label?orderId=${order.id}`)} icon="tag" style={{ flex: 1 }} />
+          </View>
+        )}
+        {order.status === 'ready_to_ship' && (
+          <View style={s.actionCol}>
+            <View style={s.actionRow}>
+              <PrimaryButton label="Buy Label" onPress={() => router.push(`/shipping-label?orderId=${order.id}`)} icon="tag" style={{ flex: 1 }} />
+              <SecondaryButton label="Add Tracking" onPress={() => setAddingTracking(!addingTracking)} icon="map-pin" style={{ flex: 1 }} />
+            </View>
+            {addingTracking && (
+              <BrandthreadCard style={s.inlineForm}>
+                <TextInput style={s.inlineInput} value={trackingCarrier} onChangeText={setTrackingCarrier} placeholder="Carrier (USPS, UPS...)" placeholderTextColor={SUBTLE} />
+                <TextInput style={s.inlineInput} value={trackingNum} onChangeText={setTrackingNum} placeholder="Tracking number" placeholderTextColor={SUBTLE} />
+                <PrimaryButton label="Save & Mark Shipped" onPress={handleAddTrackingAndShip} small />
+              </BrandthreadCard>
+            )}
+            <SecondaryButton label="Mark Shipped" onPress={onMarkShipped} icon="send" />
+          </View>
+        )}
+        {order.status === 'shipped' && (
+          <View style={s.actionRow}>
+            <PrimaryButton label="Mark Delivered" onPress={onMarkDelivered} icon="check-circle" style={{ flex: 1 }} />
+            {order.shipments[0]?.trackingNumber && (
+              <SecondaryButton label="View Tracking" onPress={() => Alert.alert('Tracking', order.shipments[0].trackingNumber ?? '')} icon="map-pin" style={{ flex: 1 }} />
+            )}
+          </View>
+        )}
+        {order.status === 'delivered' && (
+          <BrandthreadCard style={s.deliveredCard}>
+            <Feather name="check-circle" size={ICON.md} color={SUCCESS} />
+            <Text style={s.deliveredText}>Order delivered · Read-only</Text>
+          </BrandthreadCard>
+        )}
+        {(order.status === 'new' || order.status === 'processing' || order.status === 'ready_to_ship') && order.status !== 'new' && (
+          <SecondaryButton label="Cancel Order" onPress={onCancelPress} icon="x" accent={RED} />
+        )}
+      </View>
+
+      {/* Risk Flags */}
+      {order.riskFlags.length > 0 && (
+        <View style={s.section}>
+          <SectionHeader title="Risk Flags" />
+          {order.riskFlags.map(f => (
+            <View key={f.id} style={s.riskRow}>
+              <Feather name="alert-circle" size={ICON.sm} color={f.severity === 'high' ? RED : ORANGE} />
+              <Text style={s.riskRowText}>{f.label}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+
+      {/* Pre-order info */}
+      {order.isPreOrder && order.preOrder && (
+        <View style={s.section}>
+          <SectionHeader title="Pre-Order Details" />
+          <BrandthreadCard>
+            <InfoRow label="Manufacturer" value={order.preOrder.manufacturerName ?? 'TBD'} />
+            <InfoRow label="Production Status" value={order.preOrder.productionStatus.replace(/_/g, ' ')} />
+            {order.preOrder.estimatedShipDate && (
+              <InfoRow label="Est. Ship Date" value={fmtShort(order.preOrder.estimatedShipDate)} />
+            )}
+            <InfoRow label="Units Ordered" value={String(order.preOrder.unitsOrdered)} />
+          </BrandthreadCard>
+        </View>
+      )}
+
+      {/* Line items summary */}
+      <View style={s.section}>
+        <SectionHeader title="Items" />
+        {order.lineItems.map(li => (
+          <BrandthreadCard key={li.id} style={s.lineItemCard}>
+            <View style={s.lineItemRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.lineItemName}>{li.productName}</Text>
+                <Text style={s.lineItemVariant}>{li.variant}</Text>
+                {li.sku && <Text style={s.lineItemSku}>SKU: {li.sku}</Text>}
+              </View>
+              <View style={s.lineItemRight}>
+                <Text style={s.lineItemQty}>×{li.quantity}</Text>
+                <Text style={s.lineItemTotal}>{usd(li.total)}</Text>
+              </View>
+            </View>
+          </BrandthreadCard>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// TAB: CUSTOMER
+// ═══════════════════════════════════════════════════════
+
+function CustomerTab({ order }: { order: Order }) {
+  const c = order.customer;
+  return (
+    <View style={s.tabContent}>
+      <BrandthreadCard elevated style={s.customerHero}>
+        <View style={s.avatarCircle}>
+          <Text style={s.avatarInitials}>{c.initials}</Text>
+        </View>
+        <Text style={s.customerName}>{c.name}</Text>
+        <Text style={s.customerEmail}>{c.email}</Text>
+        {c.phone && <Text style={s.customerPhone}>{c.phone}</Text>}
+      </BrandthreadCard>
+
+      <BrandthreadCard style={s.customerStatsCard}>
+        <InfoRow label="Total Orders" value={String(c.totalOrders)} />
+        <InfoRow label="Lifetime Value" value={usd(c.lifetimeValue)} bold />
+      </BrandthreadCard>
+
+      {c.tags.length > 0 && (
+        <View style={s.section}>
+          <SectionHeader title="Customer Tags" />
+          <View style={s.chipRow}>
+            {c.tags.map(t => (
+              <View key={t} style={s.chip}><Text style={s.chipText}>{t}</Text></View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      <View style={s.section}>
+        <AddressCard title="Shipping Address" addr={c.shippingAddress} />
+      </View>
+      <View style={s.section}>
+        <AddressCard title="Billing Address" addr={c.billingAddress} />
+      </View>
+
+      <View style={[s.actionRow, { marginHorizontal: SP.md }]}>
+        <SecondaryButton label="Message Customer" onPress={() => Alert.alert('Message', 'Messaging coming soon.')} icon="message-circle" style={{ flex: 1 }} />
+        <SecondaryButton label="View Profile" onPress={() => Alert.alert('Profile', 'Customer profile coming soon.')} icon="user" style={{ flex: 1 }} />
+      </View>
+    </View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// TAB: PAYMENT
+// ═══════════════════════════════════════════════════════
+
+function PaymentTab({ order }: { order: Order }) {
+  const p = order.payment;
+  return (
+    <View style={s.tabContent}>
+      <SectionHeader title="Payment Breakdown" />
+      <BrandthreadCard>
+        <InfoRow label="Subtotal" value={usd(p.subtotal)} />
+        {p.discountTotal > 0 && <InfoRow label="Discounts" value={`-${usd(p.discountTotal)}`} valueColor={SUCCESS} />}
+        <InfoRow label="Shipping" value={usd(p.shippingTotal)} />
+        <InfoRow label="Tax" value={usd(p.taxTotal)} />
+        <View style={s.divider} />
+        <InfoRow label="Total" value={usd(p.total)} bold />
+        <InfoRow label="Amount Paid" value={usd(p.amountPaid)} valueColor={SUCCESS} />
+        {p.amountRefunded > 0 && <InfoRow label="Amount Refunded" value={`-${usd(p.amountRefunded)}`} valueColor={RED} />}
+        <InfoRow label="Amount Held" value={usd(p.amountHeld)} valueColor={ORANGE} />
+      </BrandthreadCard>
+
+      {order.heldFunds && (
+        <View style={s.section}>
+          <SectionHeader title="Held Funds" />
+          <GradientCard style={{ borderColor: ORANGE + '55' }}>
+            <View style={s.heldFundsNotice}>
+              <Feather name="lock" size={ICON.sm} color={ORANGE} />
+              <Text style={s.heldFundsNoticeText}>
+                Funds are held based on fulfillment milestones. This is not legally guaranteed escrow.
+              </Text>
+            </View>
+            <View style={s.heldFundsGrid}>
+              <View style={s.heldFundStat}>
+                <Text style={s.heldFundLabel}>Currently Held</Text>
+                <Text style={[s.heldFundValue, { color: ORANGE }]}>{usd(order.heldFunds.currentlyHeld)}</Text>
+              </View>
+              <View style={s.heldFundStat}>
+                <Text style={s.heldFundLabel}>Seller Pending</Text>
+                <Text style={[s.heldFundValue, { color: SUCCESS }]}>{usd(order.heldFunds.sellerPending)}</Text>
+              </View>
+              <View style={s.heldFundStat}>
+                <Text style={s.heldFundLabel}>Platform Fee</Text>
+                <Text style={s.heldFundValue}>{usd(order.heldFunds.platformFee)}</Text>
+              </View>
+            </View>
+            <Text style={s.milestoneTitle}>Payout Milestones</Text>
+            {order.heldFunds.milestones.map(m => (
+              <View key={m.key} style={s.milestoneRow}>
+                <Feather name={m.completedAt ? 'check-circle' : 'circle'} size={ICON.sm} color={m.completedAt ? SUCCESS : SUBTLE} />
+                <Text style={[s.milestoneLabel, m.completedAt && { color: FG }]}>{m.label}</Text>
+                {m.completedAt && <Text style={s.milestoneDate}>{fmtShort(m.completedAt)}</Text>}
+              </View>
+            ))}
+            {order.heldFunds.expectedReleaseDate && (
+              <Text style={s.expectedRelease}>Expected release: {fmt(order.heldFunds.expectedReleaseDate)}</Text>
+            )}
+          </GradientCard>
+        </View>
+      )}
+
+      {order.refunds.length > 0 && (
+        <View style={s.section}>
+          <SectionHeader title="Refunds" />
+          {order.refunds.map(r => (
+            <BrandthreadCard key={r.id} style={s.refundCard}>
+              <View style={s.refundHeader}>
+                <StatusBadge label={r.status.toUpperCase()} variant={r.status === 'completed' ? 'success' : r.status === 'failed' ? 'error' : 'warning'} />
+                <StatusBadge label={r.type.replace(/_/g, ' ')} variant="neutral" />
+                <Text style={s.refundAmount}>{usd(r.totalAmount)}</Text>
+              </View>
+              <Text style={s.refundDate}>{fmt(r.createdAt)}</Text>
+              {r.isDemo && <Text style={s.demoTag}>Demo refund</Text>}
+            </BrandthreadCard>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// TAB: FULFILLMENT
+// ═══════════════════════════════════════════════════════
+
+function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking, onMarkShipped, onShowTracking, router }: {
+  order: Order;
+  trackingForms: Record<string, { carrier: string; tracking: string; visible: boolean }>;
+  setTrackingForms: React.Dispatch<React.SetStateAction<Record<string, { carrier: string; tracking: string; visible: boolean }>>>;
+  onAddTracking: (groupId: string) => void;
+  onMarkShipped: () => void;
+  onShowTracking: (shipmentId: string) => void;
+  router: ReturnType<typeof useRouter>;
+}) {
+  const { fulfillment, shipments } = order;
+
+  function getForm(groupId: string) {
+    return trackingForms[groupId] ?? { carrier: '', tracking: '', visible: false };
+  }
+  function updateForm(groupId: string, key: 'carrier' | 'tracking', val: string) {
+    setTrackingForms(prev => ({ ...prev, [groupId]: { ...getForm(groupId), [key]: val } }));
+  }
+  function toggleForm(groupId: string) {
+    setTrackingForms(prev => ({ ...prev, [groupId]: { ...getForm(groupId), visible: !getForm(groupId).visible } }));
+  }
+
+  return (
+    <View style={s.tabContent}>
+      {fulfillment.groups.map((group, idx) => {
+        const groupItems = order.lineItems.filter(li => group.lineItemIds.includes(li.id));
+        const form = getForm(group.id);
+        const groupShipments = shipments.filter(sh => sh.fulfillmentGroupId === group.id);
+        const isManufacturer = group.type === 'manufacturer';
+
+        return (
+          <View key={group.id} style={s.section}>
+            <View style={s.groupHeader}>
+              <Text style={s.groupTitle}>Group {idx + 1} — {isManufacturer ? 'Manufacturer Fulfilled' : 'Seller Fulfilled'}</Text>
+              <StatusBadge label={group.status.replace(/_/g, ' ').toUpperCase()} variant={group.status === 'fulfilled' ? 'success' : 'warning'} />
+            </View>
+
+            {/* Line items */}
+            {groupItems.map(li => (
+              <BrandthreadCard key={li.id} style={s.lineItemCard}>
+                <Text style={s.lineItemName}>{li.productName}</Text>
+                <Text style={s.lineItemVariant}>{li.variant} · ×{li.quantity}</Text>
+              </BrandthreadCard>
+            ))}
+
+            {isManufacturer ? (
+              <BrandthreadCard style={s.manufacturerCard}>
+                <Text style={s.manufacturerName}>{group.manufacturerName ?? 'Manufacturer'}</Text>
+                <Text style={s.manufacturerStatus}>Status: {group.status.replace(/_/g, ' ')}</Text>
+                <Text style={s.manufacturerNotice}>Fulfillment request sent to manufacturer (demo)</Text>
+                <SecondaryButton label="Add Tracking from Manufacturer" onPress={() => toggleForm(group.id)} icon="map-pin" small style={{ marginTop: SP.sm }} />
+              </BrandthreadCard>
+            ) : (
+              <BrandthreadCard style={s.sellerFulfillCard}>
+                {/* Checklist */}
+                <View style={s.checklistRow}>
+                  <View style={[s.checkItem, fulfillment.isPicked && s.checkItemDone]}>
+                    <Feather name={fulfillment.isPicked ? 'check-square' : 'square'} size={ICON.sm} color={fulfillment.isPicked ? SUCCESS : MUTED} />
+                    <Text style={s.checkLabel}>Picked</Text>
+                  </View>
+                  <View style={[s.checkItem, fulfillment.isPacked && s.checkItemDone]}>
+                    <Feather name={fulfillment.isPacked ? 'check-square' : 'square'} size={ICON.sm} color={fulfillment.isPacked ? SUCCESS : MUTED} />
+                    <Text style={s.checkLabel}>Packed</Text>
+                  </View>
+                </View>
+
+                {fulfillment.fromAddress && (
+                  <View style={s.fromAddrRow}>
+                    <Feather name="map-pin" size={ICON.xs} color={MUTED} />
+                    <Text style={s.fromAddrText}>From: {fulfillment.fromAddress.city}, {fulfillment.fromAddress.state}</Text>
+                  </View>
+                )}
+
+                <View style={s.actionRow}>
+                  <SecondaryButton label="Buy Label" onPress={() => router.push(`/shipping-label?orderId=${order.id}&groupId=${group.id}`)} icon="tag" small style={{ flex: 1 }} />
+                  <SecondaryButton label="Add Tracking" onPress={() => toggleForm(group.id)} icon="map-pin" small style={{ flex: 1 }} />
+                </View>
+              </BrandthreadCard>
+            )}
+
+            {/* Inline tracking form */}
+            {form.visible && (
+              <BrandthreadCard style={s.inlineForm}>
+                <Text style={s.inlineFormTitle}>Add Tracking</Text>
+                <TextInput style={s.inlineInput} value={form.carrier} onChangeText={v => updateForm(group.id, 'carrier', v)} placeholder="Carrier (USPS, UPS, FedEx...)" placeholderTextColor={SUBTLE} />
+                <TextInput style={s.inlineInput} value={form.tracking} onChangeText={v => updateForm(group.id, 'tracking', v)} placeholder="Tracking number" placeholderTextColor={SUBTLE} />
+                <View style={s.actionRow}>
+                  <SecondaryButton label="Cancel" onPress={() => toggleForm(group.id)} small style={{ flex: 1 }} />
+                  <PrimaryButton label="Save" onPress={() => onAddTracking(group.id)} small style={{ flex: 1 }} />
+                </View>
+                {form.tracking.trim().length > 0 && (
+                  <SecondaryButton label="Mark Shipped" onPress={onMarkShipped} icon="send" small style={{ marginTop: SP.sm }} />
+                )}
+              </BrandthreadCard>
+            )}
+
+            {/* Shipments */}
+            {groupShipments.length > 0 && (
+              <View style={{ marginTop: SP.sm }}>
+                <Text style={s.shipmentsTitle}>Shipments</Text>
+                {groupShipments.map(sh => (
+                  <BrandthreadCard key={sh.id} style={s.shipmentCard}>
+                    <View style={s.shipmentHeader}>
+                      <Text style={s.shipmentCarrier}>{sh.carrier}</Text>
+                      {sh.trackingStatus && <StatusBadge label={sh.trackingStatus.replace(/_/g, ' ')} variant={sh.trackingStatus === 'delivered' ? 'success' : 'info'} />}
+                    </View>
+                    {sh.trackingNumber && <Text style={s.trackingNum}>{sh.trackingNumber}</Text>}
+                    {sh.trackingEvents.length > 0 && (
+                      <Text style={s.latestEvent}>{sh.trackingEvents[sh.trackingEvents.length - 1].description}</Text>
+                    )}
+                    <TouchableOpacity onPress={() => onShowTracking(sh.id)} style={s.viewTrackingBtn}>
+                      <Feather name="map-pin" size={ICON.xs} color={CYAN} />
+                      <Text style={s.viewTrackingText}>View tracking</Text>
+                    </TouchableOpacity>
+                  </BrandthreadCard>
+                ))}
+              </View>
+            )}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// TAB: TIMELINE
+// ═══════════════════════════════════════════════════════
+
+function TimelineTab({ order, noteText, setNoteText, onAddNote, addingNote }: {
+  order: Order;
+  noteText: string;
+  setNoteText: (v: string) => void;
+  onAddNote: () => void;
+  addingNote: boolean;
+}) {
+  const events = [...order.timeline].reverse();
+  return (
+    <View style={s.tabContent}>
+      <SectionHeader title="Timeline" />
+      {events.map(ev => (
+        <View key={ev.id} style={s.timelineRow}>
+          <View style={[s.timelineDot, { backgroundColor: timelineColor(ev.type) }]} />
+          <View style={s.timelineBody}>
+            <Text style={s.timelineMessage}>{ev.message}</Text>
+            <View style={s.timelineMeta}>
+              <Text style={s.timelineTime}>{fmtTime(ev.createdAt)}</Text>
+              {ev.isCustomerVisible && (
+                <View style={s.timelineTag}>
+                  <Feather name="eye" size={10} color={CYAN} />
+                  <Text style={[s.timelineTagText, { color: CYAN }]}>Customer</Text>
+                </View>
+              )}
+              {ev.isSellerNote && (
+                <View style={s.timelineTag}>
+                  <Feather name="lock" size={10} color={ORANGE} />
+                  <Text style={[s.timelineTagText, { color: ORANGE }]}>Internal</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      ))}
+
+      <View style={s.divider} />
+      <SectionHeader title="Add Internal Note" />
+      <View style={s.noteFormCard}>
+        <TextInput
+          style={s.noteInput}
+          value={noteText}
+          onChangeText={setNoteText}
+          placeholder="Write an internal note..."
+          placeholderTextColor={SUBTLE}
+          multiline
+        />
+        <PrimaryButton label="Add Note" onPress={onAddNote} loading={addingNote} icon="plus" small />
+      </View>
+    </View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// TAB: RETURNS
+// ═══════════════════════════════════════════════════════
+
+function ReturnsTab({ order, onAction, router }: {
+  order: Order;
+  onAction: (returnId: string, status: ReturnStatus, reason?: string) => void;
+  router: ReturnType<typeof useRouter>;
+}) {
+  if (order.returns.length === 0) {
+    return (
+      <View style={s.tabContent}>
+        <EmptyState icon="package" title="No Return Requests" description="No return requests have been submitted for this order." />
+      </View>
+    );
+  }
+
+  return (
+    <View style={s.tabContent}>
+      {order.returns.map(ret => (
+        <BrandthreadCard key={ret.id} style={s.returnCard}>
+          <View style={s.returnHeader}>
+            <StatusBadge label={ret.status.replace(/_/g, ' ').toUpperCase()} variant={ret.status === 'refunded' ? 'success' : ret.status === 'denied' ? 'error' : 'warning'} />
+            <Text style={s.returnResolution}>{ret.requestedResolution.replace(/_/g, ' ')}</Text>
+          </View>
+          <Text style={s.returnCustomer}>{ret.customerName}</Text>
+          <Text style={s.returnExplanation}>{ret.customerExplanation}</Text>
+
+          {/* Items */}
+          {ret.items.map(item => (
+            <View key={item.lineItemId} style={s.returnItemRow}>
+              <Feather name="package" size={ICON.xs} color={MUTED} />
+              <Text style={s.returnItemText}>{item.productName} · {item.variant} · ×{item.quantity}</Text>
+              <Text style={s.returnItemReason}>{returnReasonLabel(item.reason)}</Text>
+            </View>
+          ))}
+
+          {/* Actions */}
+          <View style={s.returnActions}>
+            {ret.status === 'requested' && (
+              <>
+                <SecondaryButton label="Approve" onPress={() => onAction(ret.id, 'approved')} icon="check" small accent={SUCCESS} style={{ flex: 1 }} />
+                <SecondaryButton label="Deny" onPress={() => Alert.prompt('Deny Reason', 'Reason for denial:', (text) => { if (text) onAction(ret.id, 'denied', text); })} icon="x" small accent={RED} style={{ flex: 1 }} />
+              </>
+            )}
+            {(ret.status === 'approved') && (
+              <SecondaryButton label="Issue Label" onPress={() => Alert.alert('Label', 'Return label issuance available in production build.')} icon="tag" small style={{ flex: 1 }} />
+            )}
+            {(ret.status === 'label_issued' || ret.status === 'in_transit') && (
+              <SecondaryButton label="Mark Received" onPress={() => onAction(ret.id, 'received')} icon="inbox" small style={{ flex: 1 }} />
+            )}
+            {ret.status === 'received' && (
+              <SecondaryButton label="Mark Inspected" onPress={() => onAction(ret.id, 'inspected')} icon="search" small style={{ flex: 1 }} />
+            )}
+            {(ret.status === 'inspected' || ret.status === 'refund_pending') && (
+              <PrimaryButton label="Issue Refund" onPress={() => router.push(`/refund-detail?orderId=${order.id}&returnId=${ret.id}`)} icon="credit-card" small style={{ flex: 1 }} />
+            )}
+          </View>
+        </BrandthreadCard>
+      ))}
+    </View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// TAB: DISPUTES
+// ═══════════════════════════════════════════════════════
+
+function DisputesTab({ order, router }: { order: Order; router: ReturnType<typeof useRouter> }) {
+  if (order.disputes.length === 0) {
+    return (
+      <View style={s.tabContent}>
+        <EmptyState icon="shield" title="No Disputes" description="No disputes have been opened for this order." />
+      </View>
+    );
+  }
+
+  return (
+    <View style={s.tabContent}>
+      {order.disputes.map(d => {
+        const daysUntilDeadline = d.evidenceDeadline
+          ? Math.ceil((new Date(d.evidenceDeadline).getTime() - Date.now()) / 86400000)
+          : null;
+        const deadlineUrgent = daysUntilDeadline !== null && daysUntilDeadline <= 5;
+
+        return (
+          <GradientCard key={d.id} colors={['rgba(248,113,113,0.12)', 'rgba(248,113,113,0.04)']} style={s.disputeCard} glow>
+            <View style={s.disputeHeader}>
+              <StatusBadge label={d.status.replace(/_/g, ' ').toUpperCase()} variant={d.status === 'won' ? 'success' : d.status === 'lost' ? 'error' : 'warning'} />
+              <Text style={s.disputeType}>{d.type.replace(/_/g, ' ')}</Text>
+              <Text style={s.disputeAmount}>{usd(d.amount)}</Text>
+            </View>
+
+            <Text style={s.disputeClaim}>{d.customerClaim}</Text>
+
+            {d.evidenceDeadline && (
+              <View style={s.disputeDeadlineRow}>
+                <Feather name="clock" size={ICON.xs} color={deadlineUrgent ? ORANGE : MUTED} />
+                <Text style={[s.disputeDeadline, deadlineUrgent && { color: ORANGE }]}>
+                  Evidence due {fmt(d.evidenceDeadline)}{deadlineUrgent ? ` (${daysUntilDeadline}d)` : ''}
+                </Text>
+              </View>
+            )}
+
+            <Text style={s.disputeEvCount}>Evidence: {d.evidence.length} item{d.evidence.length !== 1 ? 's' : ''}</Text>
+
+            <View style={s.disputeActions}>
+              <SecondaryButton label="Add Evidence" onPress={() => router.push(`/dispute-detail?orderId=${order.id}&disputeId=${d.id}`)} icon="plus" small style={{ flex: 1 }} />
+              <SecondaryButton label="Accept Dispute" onPress={() => Alert.alert('Accept Dispute', 'Are you sure? This will refund the customer.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Accept', style: 'destructive', onPress: () => Alert.alert('Accepted', 'Dispute accepted (demo).') }])} icon="check" small accent={RED} style={{ flex: 1 }} />
+            </View>
+            {d.status === 'evidence_needed' && (
+              <PrimaryButton label="Submit Evidence" onPress={() => router.push(`/dispute-detail?orderId=${order.id}&disputeId=${d.id}`)} icon="upload" small style={{ marginTop: SP.sm }} />
+            )}
+          </GradientCard>
+        );
+      })}
+    </View>
+  );
+}
+
+// ═══════════════════════════════════════════════════════
+// TAB: NOTES
+// ═══════════════════════════════════════════════════════
+
+function NotesTab({ order, noteText, setNoteText, noteType, setNoteType, onAddNote, addingNote, onPinNote }: {
+  order: Order;
+  noteText: string;
+  setNoteText: (v: string) => void;
+  noteType: 'internal' | 'customer' | 'manufacturer';
+  setNoteType: (t: 'internal' | 'customer' | 'manufacturer') => void;
+  onAddNote: () => void;
+  addingNote: boolean;
+  onPinNote: (noteId: string, current: boolean) => void;
+}) {
+  const sorted = [...order.notes].sort((a, b) => {
+    if (a.isPinned && !b.isPinned) return -1;
+    if (!a.isPinned && b.isPinned) return 1;
+    return b.createdAt.localeCompare(a.createdAt);
+  });
+
+  function noteTypeColor(t: string) {
+    switch (t) {
+      case 'internal': return PURPLE;
+      case 'customer': return CYAN;
+      case 'manufacturer': return ORANGE;
+      default: return MUTED;
+    }
+  }
+  function noteTypeVariant(t: string): 'purple' | 'info' | 'warning' {
+    switch (t) {
+      case 'internal': return 'purple';
+      case 'customer': return 'info';
+      case 'manufacturer': return 'warning';
+      default: return 'purple';
     }
   }
 
-  const topPad = Platform.OS === 'web' ? 20 : insets.top;
-
   return (
-    <View style={[s.root, { paddingTop: topPad }]}>
-      {/* Back bar */}
-      <View style={s.backBar}>
-        <TouchableOpacity style={s.backBtn} onPress={back} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Feather name="arrow-left" size={20} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.backTitle}>{order.orderNumber}</Text>
-        <TouchableOpacity style={s.moreBtn}>
-          <Feather name="more-horizontal" size={20} color={FG} />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 140 }}>
-        {/* Status header */}
-        <View style={s.statusHeader}>
-          <View style={[s.statusBadge, { backgroundColor: statusColor(order.status) + '22', borderColor: statusColor(order.status) + '44' }]}>
-            <View style={[s.statusDot, { backgroundColor: statusColor(order.status) }]} />
-            <Text style={[s.statusText, { color: statusColor(order.status) }]}>{statusLabel(order.status)}</Text>
-          </View>
-          <Text style={s.orderDate}>{order.date}</Text>
-        </View>
-
-        {/* Customer info */}
-        <View style={[s.card, s.section]}>
-          <Text style={s.cardTitle}>Customer</Text>
-          <View style={s.customerRow}>
-            <View style={s.initials}>
-              <Text style={s.initialsText}>{order.customer.initials}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.customerName}>{order.customer.name}</Text>
-              <Text style={s.customerEmail}>{order.customer.email}</Text>
-              <Text style={s.customerOrders}>{order.customer.totalOrders} lifetime orders</Text>
-            </View>
-            <TouchableOpacity style={s.contactBtn} onPress={() => {}}>
-              <Feather name="message-circle" size={16} color={GREEN} />
+    <View style={s.tabContent}>
+      {sorted.length === 0 && (
+        <Text style={s.emptyNotes}>No notes yet. Add one below.</Text>
+      )}
+      {sorted.map(note => (
+        <BrandthreadCard key={note.id} style={s.noteCard}>
+          <View style={s.noteHeader}>
+            <StatusBadge label={note.type.toUpperCase()} variant={noteTypeVariant(note.type)} />
+            {note.isPinned && <Feather name="bookmark" size={ICON.xs} color={GOLD} />}
+            <TouchableOpacity onPress={() => onPinNote(note.id, note.isPinned)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }} style={{ marginLeft: 'auto' }}>
+              <Text style={[s.pinToggle, { color: note.isPinned ? ORANGE : MUTED }]}>{note.isPinned ? 'Unpin' : 'Pin'}</Text>
             </TouchableOpacity>
           </View>
-        </View>
-
-        {/* Items */}
-        <View style={[s.card, s.section]}>
-          <Text style={s.cardTitle}>Items</Text>
-          {order.items.map((item, i) => (
-            <View key={i} style={[s.itemRow, i > 0 && s.borderTop]}>
-              <View style={s.itemThumb}>
-                <Feather name="tag" size={16} color={MUTED} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.itemName}>{item.productName}</Text>
-                <Text style={s.itemVariant}>{item.variant}</Text>
-              </View>
-              <View style={{ alignItems: 'flex-end', gap: 2 }}>
-                <Text style={s.itemTotal}>${item.total.toFixed(2)}</Text>
-                <Text style={s.itemQty}>×{item.quantity}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        {/* Price breakdown */}
-        <View style={[s.card, s.section]}>
-          <Text style={s.cardTitle}>Payment</Text>
-          {[
-            { label: 'Subtotal',  value: `$${order.subtotal.toFixed(2)}` },
-            { label: 'Discount',  value: order.discount > 0 ? `-$${order.discount.toFixed(2)}` : '—', color: GREEN },
-            { label: 'Shipping',  value: order.shipping > 0 ? `$${order.shipping.toFixed(2)}` : 'Free' },
-            { label: 'Tax',       value: `$${order.tax.toFixed(2)}` },
-          ].map(row => (
-            <View key={row.label} style={s.priceRow}>
-              <Text style={s.priceLabel}>{row.label}</Text>
-              <Text style={[s.priceValue, row.color ? { color: row.color } : {}]}>{row.value}</Text>
-            </View>
-          ))}
-          <View style={[s.priceRow, s.totalRow]}>
-            <Text style={s.totalLabel}>Total</Text>
-            <Text style={s.totalValue}>${order.total.toFixed(2)}</Text>
-          </View>
-          <View style={[s.payBadge, { backgroundColor: GREEN + '18', borderColor: GREEN + '33' }]}>
-            <Feather name="check-circle" size={13} color={GREEN} />
-            <Text style={[s.payBadgeText, { color: GREEN }]}>Paid</Text>
-          </View>
-        </View>
-
-        {/* Shipping address */}
-        <View style={[s.card, s.section]}>
-          <Text style={s.cardTitle}>Shipping address</Text>
-          <Text style={s.addrLine}>{order.shippingAddress.name}</Text>
-          <Text style={s.addrLine}>{order.shippingAddress.line1}</Text>
-          <Text style={s.addrLine}>{order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zip}</Text>
-          <Text style={s.addrLine}>{order.shippingAddress.country}</Text>
-          {order.trackingNumber && (
-            <View style={s.trackingRow}>
-              <Feather name="truck" size={13} color={CYAN} />
-              <Text style={s.trackingText}>{order.carrier}: {order.trackingNumber}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Held funds display */}
-        {order.paymentStatus === 'paid' && order.status !== 'delivered' && (
-          <View style={[s.card, s.section]}>
-            <Text style={s.cardTitle}>Funds breakdown</Text>
-            <Text style={s.fundsNote}>Funds are released upon shipment and delivery confirmation.</Text>
-            {[
-              { label: 'Customer paid',        value: `$${order.total.toFixed(2)}`,     color: FG    },
-              { label: 'Shipping allocation',   value: `-$${order.shipping.toFixed(2)}`, color: MUTED },
-              { label: 'Platform fee (5%)',     value: `-$${(order.total * 0.05).toFixed(2)}`, color: MUTED },
-              { label: 'Your net',              value: `$${(order.total - order.shipping - order.total * 0.05).toFixed(2)}`, color: GREEN },
-            ].map(row => (
-              <View key={row.label} style={s.fundsRow}>
-                <Text style={s.fundsLabel}>{row.label}</Text>
-                <Text style={[s.fundsValue, { color: row.color }]}>{row.value}</Text>
-              </View>
-            ))}
-            <View style={s.holdBadge}>
-              <Feather name="clock" size={12} color={ORANGE} />
-              <Text style={s.holdText}>Held until delivery confirmed</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Timeline */}
-        <View style={[s.card, s.section]}>
-          <Text style={s.cardTitle}>Timeline</Text>
-          {order.timeline.map((ev, i) => (
-            <View key={i} style={[s.timelineRow, i > 0 && s.borderTop]}>
-              <View style={[s.tlDot, { backgroundColor: ev.type === 'success' ? GREEN : ev.type === 'warning' ? ORANGE : MUTED }]} />
-              <View style={{ flex: 1 }}>
-                <Text style={s.tlEvent}>{ev.event}</Text>
-                <Text style={s.tlDate}>{ev.date}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        {/* Actions */}
-        <View style={s.section}>
-          <Text style={s.cardTitle}>Actions</Text>
-          <View style={s.actionsGrid}>
-            {[
-              { label: 'Mark Processing',     icon: 'refresh-cw'      as const, color: PURPLE },
-              { label: 'Mark Ready to Ship',  icon: 'package'         as const, color: CYAN   },
-              { label: 'Buy Shipping Label',  icon: 'truck'           as const, color: GREEN  },
-              { label: 'Add Tracking',        icon: 'map-pin'         as const, color: BLUE   },
-              { label: 'Mark Shipped',        icon: 'send'            as const, color: GREEN  },
-              { label: 'Contact Customer',    icon: 'message-circle'  as const, color: MUTED  },
-              { label: 'Cancel Order',        icon: 'x-circle'        as const, color: RED    },
-              { label: 'Issue Refund',        icon: 'rotate-ccw'      as const, color: ORANGE },
-            ].map(action => (
-              <TouchableOpacity
-                key={action.label}
-                style={s.actionCard}
-                onPress={() => handleAction(action.label)}
-                activeOpacity={0.8}
-              >
-                <View style={[s.actionIcon, { backgroundColor: action.color + '20' }]}>
-                  <Feather name={action.icon} size={16} color={action.color} />
-                </View>
-                <Text style={s.actionLabel}>{action.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Shipping label modal */}
-        {showShipping && (
-          <ShippingLabelPanel order={order} onClose={() => setShowShipping(false)} />
-        )}
-      </ScrollView>
-    </View>
-  );
-}
-
-// ─── Shipping label inline panel ──────────────────────────────────────────────
-function ShippingLabelPanel({ order, onClose }: { order: Order; onClose: () => void }) {
-  const [selected, setSelected] = useState<number | null>(null);
-
-  const carriers = [
-    { name: 'UPS Ground',      price: '$8.49',  days: '3-5 business days', color: '#F97316' },
-    { name: 'USPS Priority',   price: '$10.20', days: '1-3 business days', color: BLUE      },
-    { name: 'FedEx 2-Day',     price: '$18.95', days: '2 business days',   color: '#7C3AED' },
-    { name: 'DHL Express',     price: '$24.50', days: '1-2 business days', color: '#FBBF24' },
-  ];
-
-  return (
-    <View style={[sl.wrap, { marginHorizontal: 16, marginBottom: 16 }]}>
-      <View style={sl.head}>
-        <Text style={sl.title}>Buy Shipping Label</Text>
-        <TouchableOpacity onPress={onClose}><Feather name="x" size={18} color={MUTED} /></TouchableOpacity>
-      </View>
-      <View style={sl.infoRow}>
-        <Text style={sl.infoLabel}>Ship to</Text>
-        <Text style={sl.infoValue}>{order.shippingAddress.city}, {order.shippingAddress.state}</Text>
-      </View>
-      <View style={sl.infoRow}>
-        <Text style={sl.infoLabel}>Weight</Text>
-        <Text style={sl.infoValue}>0.8 kg (estimated)</Text>
-      </View>
-      <Text style={sl.subTitle}>Select carrier</Text>
-      {carriers.map((c, i) => (
-        <TouchableOpacity
-          key={c.name}
-          style={[sl.carrierRow, selected === i && sl.carrierSelected, { borderColor: selected === i ? c.color + '66' : BORDER }]}
-          onPress={() => setSelected(i)}
-          activeOpacity={0.8}
-        >
-          <View style={[sl.carrierDot, { backgroundColor: c.color }]} />
-          <View style={{ flex: 1 }}>
-            <Text style={sl.carrierName}>{c.name}</Text>
-            <Text style={sl.carrierDays}>{c.days}</Text>
-          </View>
-          <Text style={sl.carrierPrice}>{c.price}</Text>
-          {selected === i && <Feather name="check-circle" size={16} color={GREEN} />}
-        </TouchableOpacity>
+          <Text style={s.noteContent}>{note.content}</Text>
+          <Text style={s.noteMeta}>{note.authorName} · {fmtTime(note.createdAt)}</Text>
+        </BrandthreadCard>
       ))}
-      <TouchableOpacity
-        style={[sl.buyBtn, selected === null && sl.buyBtnDisabled]}
-        disabled={selected === null}
-        onPress={() => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          Alert.alert('Label Purchased', `Shipping label from ${carriers[selected!].name} has been created.`, [{ text: 'OK', onPress: onClose }]);
-        }}
-        activeOpacity={0.85}
-      >
-        <LinearGradient colors={[GREEN, '#00C853']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sl.buyGrad}>
-          <Feather name="truck" size={15} color="#0A0B0A" />
-          <Text style={sl.buyText}>Buy Label {selected !== null ? carriers[selected].price : ''}</Text>
-        </LinearGradient>
-      </TouchableOpacity>
+
+      <View style={s.divider} />
+      <SectionHeader title="Add Note" />
+
+      {/* Type selector */}
+      <View style={s.noteTypeRow}>
+        {(['internal', 'customer', 'manufacturer'] as const).map(t => (
+          <TouchableOpacity
+            key={t}
+            onPress={() => setNoteType(t)}
+            style={[s.noteTypeChip, noteType === t && { borderColor: noteTypeColor(t), backgroundColor: noteTypeColor(t) + '22' }]}
+          >
+            <Text style={[s.noteTypeText, noteType === t && { color: noteTypeColor(t) }]}>{t}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      <View style={s.noteFormCard}>
+        <TextInput
+          style={s.noteInput}
+          value={noteText}
+          onChangeText={setNoteText}
+          placeholder="Write a note..."
+          placeholderTextColor={SUBTLE}
+          multiline
+        />
+        <PrimaryButton label="Add Note" onPress={onAddNote} loading={addingNote} icon="plus" small />
+      </View>
     </View>
   );
 }
 
-const sl = StyleSheet.create({
-  wrap:   { backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: BORDER, overflow: 'hidden', marginTop: 16 },
-  head:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: BORDER },
-  title:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
-  infoRow:{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 6 },
-  infoLabel:{ fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
-  infoValue:{ fontSize: 12, fontFamily: 'Inter_600SemiBold', color: FG },
-  subTitle:{ fontSize: 13, fontFamily: 'Inter_600SemiBold', color: MUTED, paddingHorizontal: 16, marginTop: 8, marginBottom: 4 },
-  carrierRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, marginHorizontal: 12, marginBottom: 8, borderRadius: 12 },
-  carrierSelected: { backgroundColor: GREEN + '08' },
-  carrierDot:    { width: 8, height: 8, borderRadius: 4 },
-  carrierName:   { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
-  carrierDays:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 1 },
-  carrierPrice:  { fontSize: 13, fontFamily: 'Inter_700Bold', color: FG, marginRight: 4 },
-  buyBtn:        { margin: 16, borderRadius: 14, overflow: 'hidden' },
-  buyBtnDisabled:{ opacity: 0.4 },
-  buyGrad:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15 },
-  buyText:       { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#0A0B0A' },
-});
+// ═══════════════════════════════════════════════════════
+// STYLES
+// ═══════════════════════════════════════════════════════
 
-// ─── Main styles ──────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  root:    { flex: 1, backgroundColor: BG },
-  backBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
-  backBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  backTitle: { flex: 1, fontSize: 17, fontFamily: 'Inter_700Bold', color: FG },
-  moreBtn:   { width: 36, height: 36, borderRadius: 10, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  root:             { flex: 1, backgroundColor: BG },
+  centered:         { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
 
-  statusHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 16 },
-  statusBadge:  { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1 },
-  statusDot:    { width: 6, height: 6, borderRadius: 3 },
-  statusText:   { fontSize: 12, fontFamily: 'Inter_700Bold' },
-  orderDate:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
+  // Header
+  header:           { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, gap: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
+  backBtn:          { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  headerMid:        { flex: 1 },
+  headerTitle:      { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
+  headerSub:        { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
 
-  section:  { marginHorizontal: 16, marginBottom: 12 },
-  card:     { backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: BORDER, padding: 16, gap: 10 },
-  cardTitle:{ fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, letterSpacing: 0.4, textTransform: 'uppercase', marginBottom: 4 },
-  borderTop:{ borderTopWidth: 1, borderTopColor: BORDER, paddingTop: 12, marginTop: 4 },
+  // Tab bar
+  tabBar:           { borderBottomWidth: 1, borderBottomColor: BORDER, maxHeight: 44, backgroundColor: SURFACE },
+  tabBarContent:    { paddingHorizontal: SP.md, gap: SP.xs },
+  tabItem:          { paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabItemActive:    { borderBottomColor: PURPLE },
+  tabLabel:         { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
+  tabLabelActive:   { color: FG, fontFamily: FONT.semibold },
 
-  customerRow:    { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  initials:       { width: 44, height: 44, borderRadius: 22, backgroundColor: PURPLE + '30', alignItems: 'center', justifyContent: 'center' },
-  initialsText:   { fontSize: 16, fontFamily: 'Inter_700Bold', color: PURPLE },
-  customerName:   { fontSize: 14, fontFamily: 'Inter_700Bold', color: FG },
-  customerEmail:  { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 1 },
-  customerOrders: { fontSize: 10, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 1 },
-  contactBtn:     { width: 36, height: 36, borderRadius: 10, backgroundColor: GREEN + '15', alignItems: 'center', justifyContent: 'center' },
+  // Content
+  content:          { flex: 1 },
+  tabContent:       { padding: SP.md, gap: SP.md },
+  section:          { gap: SP.sm },
 
-  itemRow:    { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  itemThumb:  { width: 44, height: 44, borderRadius: 10, backgroundColor: '#1A1E1A', alignItems: 'center', justifyContent: 'center' },
-  itemName:   { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
-  itemVariant:{ fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 2 },
-  itemTotal:  { fontSize: 13, fontFamily: 'Inter_700Bold', color: FG },
-  itemQty:    { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
+  // Hero / Overview
+  heroCard:         { marginBottom: SP.sm },
+  heroRow:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  heroOrderNum:     { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
+  badgeRow:         { flexDirection: 'row', gap: SP.sm, flexWrap: 'wrap' },
+  heroDate:         { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: SP.xs },
+  heroMeta:         { flexDirection: 'row', gap: SP.xs, marginTop: SP.xs, flexWrap: 'wrap' },
+  heroMetaText:     { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  riskBadge:        { flexDirection: 'row', gap: SP.xs, alignItems: 'center', backgroundColor: RED_DIM, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: SP.xs, marginTop: SP.sm, alignSelf: 'flex-start' },
+  riskBadgeText:    { fontSize: FS.xs, fontFamily: FONT.bold, color: RED },
+  preOrderBadge:    { backgroundColor: PURPLE_DIM, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: SP.xs, marginTop: SP.xs, alignSelf: 'flex-start' },
+  preOrderBadgeText:{ fontSize: FS.xs, fontFamily: FONT.bold, color: PURPLE },
 
-  priceRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 },
-  priceLabel: { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED },
-  priceValue: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
-  totalRow:   { borderTopWidth: 1, borderTopColor: BORDER, paddingTop: 12, marginTop: 4 },
-  totalLabel: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
-  totalValue: { fontSize: 17, fontFamily: 'Inter_700Bold', color: FG },
-  payBadge:   { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, alignSelf: 'flex-start' },
-  payBadgeText:{ fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  // Actions
+  actionSection:    { gap: SP.sm },
+  actionRow:        { flexDirection: 'row', gap: SP.sm },
+  actionCol:        { gap: SP.sm },
+  deliveredCard:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
+  deliveredText:    { fontSize: FS.sm, fontFamily: FONT.medium, color: SUCCESS },
 
-  addrLine:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: FG, lineHeight: 20 },
-  trackingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, backgroundColor: CYAN + '15', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  trackingText:{ fontSize: 12, fontFamily: 'Inter_500Medium', color: CYAN, flex: 1 },
+  // Risk
+  riskRow:          { flexDirection: 'row', gap: SP.sm, alignItems: 'center', paddingVertical: SP.xs },
+  riskRowText:      { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, flex: 1 },
 
-  fundsNote:  { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 4, lineHeight: 17 },
-  fundsRow:   { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
-  fundsLabel: { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED },
-  fundsValue: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  holdBadge:  { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, backgroundColor: ORANGE + '15', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  holdText:   { fontSize: 11, fontFamily: 'Inter_500Medium', color: ORANGE },
+  // InfoRow
+  infoRow:          { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: SP.xs },
+  infoLabel:        { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  infoValue:        { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
+  infoValueBold:    { fontFamily: FONT.bold, fontSize: FS.base },
 
-  timelineRow:{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 8 },
-  tlDot:      { width: 8, height: 8, borderRadius: 4, marginTop: 4 },
-  tlEvent:    { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
-  tlDate:     { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 1 },
+  // Line items
+  lineItemCard:     { marginBottom: SP.xs },
+  lineItemRow:      { flexDirection: 'row', alignItems: 'center' },
+  lineItemName:     { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
+  lineItemVariant:  { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  lineItemSku:      { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
+  lineItemRight:    { alignItems: 'flex-end' },
+  lineItemQty:      { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  lineItemTotal:    { fontSize: FS.sm, fontFamily: FONT.bold, color: FG },
 
-  actionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  actionCard:  { width: '22.5%', backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, alignItems: 'center', paddingVertical: 14, gap: 7 },
-  actionIcon:  { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  actionLabel: { fontSize: 10, fontFamily: 'Inter_500Medium', color: MUTED, textAlign: 'center' },
+  // Customer
+  customerHero:     { alignItems: 'center', gap: SP.sm },
+  avatarCircle:     { width: 64, height: 64, borderRadius: 32, backgroundColor: PURPLE_DIM, borderWidth: 2, borderColor: BORDER_ACTIVE, alignItems: 'center', justifyContent: 'center' },
+  avatarInitials:   { fontSize: FS.xl, fontFamily: FONT.bold, color: PURPLE },
+  customerName:     { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
+  customerEmail:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  customerPhone:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  customerStatsCard:{ gap: SP.xs },
+  addressCard:      { gap: SP.xs, marginBottom: SP.sm },
+  addressTitle:     { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, marginBottom: SP.xs },
+  addressText:      { fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
+
+  // Chips
+  chipRow:          { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
+  chip:             { paddingHorizontal: SP.md, paddingVertical: SP.xs, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+  chipActive:       { borderColor: PURPLE, backgroundColor: PURPLE_DIM },
+  chipText:         { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
+  chipTextActive:   { color: FG },
+
+  // Payment
+  divider:          { height: 1, backgroundColor: BORDER, marginVertical: SP.sm },
+  heldFundsNotice:  { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', marginBottom: SP.md },
+  heldFundsNoticeText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
+  heldFundsGrid:    { flexDirection: 'row', gap: SP.md, marginBottom: SP.md },
+  heldFundStat:     { flex: 1, alignItems: 'center' },
+  heldFundLabel:    { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  heldFundValue:    { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
+  milestoneTitle:   { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, marginBottom: SP.sm },
+  milestoneRow:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs },
+  milestoneLabel:   { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  milestoneDate:    { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
+  expectedRelease:  { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: SP.sm },
+  refundCard:       { gap: SP.xs, marginBottom: SP.xs },
+  refundHeader:     { flexDirection: 'row', gap: SP.sm, alignItems: 'center', flexWrap: 'wrap' },
+  refundAmount:     { fontSize: FS.base, fontFamily: FONT.bold, color: FG, marginLeft: 'auto' },
+  refundDate:       { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  demoTag:          { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
+
+  // Fulfillment
+  groupHeader:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },
+  groupTitle:       { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
+  manufacturerCard: { gap: SP.sm },
+  manufacturerName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
+  manufacturerStatus:{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  manufacturerNotice:{ fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
+  sellerFulfillCard:{ gap: SP.sm },
+  checklistRow:     { flexDirection: 'row', gap: SP.md },
+  checkItem:        { flexDirection: 'row', gap: SP.xs, alignItems: 'center' },
+  checkItemDone:    {},
+  checkLabel:       { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
+  fromAddrRow:      { flexDirection: 'row', gap: SP.xs, alignItems: 'center' },
+  fromAddrText:     { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  inlineForm:       { gap: SP.sm, borderColor: BORDER_ACTIVE },
+  inlineFormTitle:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
+  inlineInput:      { backgroundColor: SURFACE, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, fontSize: FS.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  shipmentsTitle:   { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, marginBottom: SP.xs },
+  shipmentCard:     { gap: SP.xs, marginBottom: SP.xs },
+  shipmentHeader:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  shipmentCarrier:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
+  trackingNum:      { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  latestEvent:      { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  viewTrackingBtn:  { flexDirection: 'row', gap: SP.xs, alignItems: 'center', marginTop: SP.xs },
+  viewTrackingText: { fontSize: FS.xs, fontFamily: FONT.medium, color: CYAN },
+
+  // Timeline
+  timelineRow:      { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
+  timelineDot:      { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
+  timelineBody:     { flex: 1 },
+  timelineMessage:  { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
+  timelineMeta:     { flexDirection: 'row', gap: SP.sm, alignItems: 'center', marginTop: 2 },
+  timelineTime:     { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
+  timelineTag:      { flexDirection: 'row', gap: 3, alignItems: 'center' },
+  timelineTagText:  { fontSize: 10, fontFamily: FONT.medium },
+
+  // Notes
+  noteFormCard:     { gap: SP.sm, backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: SP.md },
+  noteInput:        { color: FG, fontFamily: FONT.regular, fontSize: FS.sm, minHeight: 80, textAlignVertical: 'top' },
+  emptyNotes:       { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', paddingVertical: SP.lg },
+  noteCard:         { gap: SP.sm, marginBottom: SP.xs },
+  noteHeader:       { flexDirection: 'row', gap: SP.sm, alignItems: 'center' },
+  noteContent:      { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
+  noteMeta:         { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
+  pinToggle:        { fontSize: FS.xs, fontFamily: FONT.medium },
+  noteTypeRow:      { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
+  noteTypeChip:     { paddingHorizontal: SP.md, paddingVertical: SP.xs, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
+  noteTypeText:     { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, textTransform: 'capitalize' },
+
+  // Returns
+  returnCard:       { gap: SP.sm, marginBottom: SP.sm },
+  returnHeader:     { flexDirection: 'row', gap: SP.sm, alignItems: 'center', flexWrap: 'wrap' },
+  returnResolution: { fontSize: FS.xs, fontFamily: FONT.medium, color: CYAN, textTransform: 'capitalize' },
+  returnCustomer:   { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
+  returnExplanation:{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 20 },
+  returnItemRow:    { flexDirection: 'row', gap: SP.xs, alignItems: 'center', paddingVertical: 2 },
+  returnItemText:   { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, flex: 1 },
+  returnItemReason: { fontSize: FS.xs, fontFamily: FONT.regular, color: ORANGE },
+  returnActions:    { flexDirection: 'row', gap: SP.sm, flexWrap: 'wrap', marginTop: SP.xs },
+
+  // Disputes
+  disputeCard:      { gap: SP.sm, marginBottom: SP.sm },
+  disputeHeader:    { flexDirection: 'row', gap: SP.sm, alignItems: 'center', flexWrap: 'wrap' },
+  disputeType:      { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, textTransform: 'capitalize' },
+  disputeAmount:    { fontSize: FS.base, fontFamily: FONT.bold, color: RED, marginLeft: 'auto' },
+  disputeClaim:     { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
+  disputeDeadlineRow:{ flexDirection: 'row', gap: SP.xs, alignItems: 'center' },
+  disputeDeadline:  { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
+  disputeEvCount:   { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
+  disputeActions:   { flexDirection: 'row', gap: SP.sm },
+
+  // Modal
+  modalOverlay:     { flex: 1, backgroundColor: 'rgba(0,0,0,0.72)', justifyContent: 'flex-end' },
+  modalCard:        { backgroundColor: CARD_ELEVATED, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, borderWidth: 1, borderColor: BORDER, padding: SP.lg, gap: SP.md, maxHeight: '90%' },
+  modalTitle:       { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
+  modalSubtitle:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  modalActions:     { flexDirection: 'row', gap: SP.sm },
+  cancelNoteInput:  { backgroundColor: SURFACE, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, fontSize: FS.sm, padding: SP.md, minHeight: 80, textAlignVertical: 'top' },
+  warningCard:      { borderColor: RED + '44' },
+  warningRow:       { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start' },
+  warningText:      { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: RED, lineHeight: 20 },
+
+  // Tracking modal
+  trackingEventRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },
+  trackingDot:      { width: 10, height: 10, borderRadius: 5, marginTop: 4 },
+  trackingEvDesc:   { fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
+  trackingEvLoc:    { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  trackingEvTime:   { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
 });

@@ -197,6 +197,11 @@ function RootLayoutNav() {
         <Stack.Screen name="production-detail"     options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="manufacturer-messages" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="invite-manufacturer"   options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
+        <Stack.Screen name="shipping-label"      options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="return-detail"       options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="refund-detail"       options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="dispute-detail"      options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-order-detail"  options={{ headerShown: false, animation: 'slide_from_right' }} />
       </Stack>
     </AuthGate>
   );

@@ -1,359 +1,761 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useState, useCallback, useMemo } from 'react';
+import {
+  View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
+  StyleSheet, Alert, RefreshControl, Modal,
+} from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import {
-  BG, SURFACE, CARD, BORDER, BORDER_ACTIVE,
+  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
+  CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
   ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_PRIMARY, GRAD_CARD_GLOW,
-  FONT, FS, SP, RADIUS, COMP, ICON,
+  GRAD_PRIMARY, GRAD_CARD_GLOW, GRAD_DARK_FADE,
+  FONT, FS, SP, RADIUS, COMP, ICON, ANIM,
 } from '@/lib/theme';
 import {
-  BrandthreadScreen, BrandthreadCard, GradientCard,
-  PrimaryButton, SecondaryButton, IconButton,
-  SearchBar, FilterChip, StatusBadge,
-  EmptyState, SectionHeader, StatCard, GuidedTip,
+  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
+  IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState,
+  StatCard, SearchBar,
 } from '@/components/BrandthreadUI';
-import { DEMO_ORDERS } from '@/services/data';
-import type { Order } from '@/services/types';
+import {
+  getOrders, searchOrders, filterOrders, sortOrders, markProcessing,
+  markReadyToShip, getOrderStats,
+} from '@/services/orderService';
+import { Order, OrderFilterKey, OrderSortKey } from '@/services/orderTypes';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type FilterLabel = 'All' | 'New' | 'Processing' | 'Ready' | 'Shipped' | 'Returns' | 'Disputes';
-
-const FILTERS: FilterLabel[] = ['All', 'New', 'Processing', 'Ready', 'Shipped', 'Returns', 'Disputes'];
+interface OrderStats {
+  newOrders: number;
+  toProcess: number;
+  readyToShip: number;
+  returnRequests: number;
+  disputes: number;
+  total: number;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function statusVariant(status: string): 'info' | 'purple' | 'warning' | 'success' | 'neutral' | 'error' {
+function fmtDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function fmtMoney(n: number): string {
+  return '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
+function getPaymentColor(status: string): string {
   switch (status) {
-    case 'new':              return 'info';
-    case 'processing':       return 'purple';
-    case 'ready_to_ship':    return 'warning';
-    case 'shipped':          return 'success';
-    case 'returned':         return 'neutral';
-    case 'refund_requested': return 'warning';
-    case 'disputed':         return 'error';
-    default:                 return 'neutral';
+    case 'paid': return SUCCESS;
+    case 'pending': case 'authorized': return ORANGE;
+    case 'refunded': case 'partially_refunded': return CYAN;
+    case 'failed': case 'voided': return RED;
+    default: return MUTED;
   }
 }
 
-function statusDisplayLabel(status: string): string {
+function getFulfillmentColor(status: string): string {
   switch (status) {
-    case 'new':              return 'New';
-    case 'processing':       return 'Processing';
-    case 'ready_to_ship':    return 'Ready to ship';
-    case 'shipped':          return 'Shipped';
-    case 'returned':         return 'Returned';
-    case 'refund_requested': return 'Refund';
-    case 'disputed':         return 'Disputed';
-    // Map data.ts statuses to display labels
-    case 'delivered':        return 'Shipped';
-    case 'refunded':         return 'Returned';
-    case 'cancelled':        return 'Returned';
-    default:                 return status;
+    case 'unfulfilled': return ORANGE;
+    case 'partially_fulfilled': return CYAN;
+    case 'fulfilled': return SUCCESS;
+    case 'manufacturer_pending': return BLUE;
+    default: return MUTED;
   }
 }
 
-function normaliseStatus(status: string): string {
-  // Map actual data statuses to our filter buckets
-  if (status === 'delivered') return 'shipped';
-  if (status === 'refunded')  return 'returned';
-  if (status === 'cancelled') return 'returned';
-  return status;
-}
-
-function filterMatches(order: Order, filter: FilterLabel): boolean {
-  const s = normaliseStatus(order.status);
-  switch (filter) {
-    case 'All':        return true;
-    case 'New':        return s === 'new';
-    case 'Processing': return s === 'processing';
-    case 'Ready':      return s === 'ready_to_ship';
-    case 'Shipped':    return s === 'shipped';
-    case 'Returns':    return s === 'returned' || s === 'refund_requested';
-    case 'Disputes':   return s === 'disputed';
+function getPaymentLabel(status: string): string {
+  switch (status) {
+    case 'paid': return 'Paid';
+    case 'pending': return 'Pending';
+    case 'authorized': return 'Authorized';
+    case 'refunded': return 'Refunded';
+    case 'partially_refunded': return 'Part. Refunded';
+    case 'failed': return 'Failed';
+    case 'voided': return 'Voided';
+    default: return status;
   }
 }
 
-function totalRevenue(orders: Order[]): string {
-  const total = orders.reduce((sum, o) => sum + o.total, 0);
-  return '$' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function getFulfillmentLabel(status: string): string {
+  switch (status) {
+    case 'unfulfilled': return 'Unfulfilled';
+    case 'partially_fulfilled': return 'Partial';
+    case 'fulfilled': return 'Fulfilled';
+    case 'manufacturer_pending': return 'Mfg Pending';
+    case 'returned': return 'Returned';
+    case 'cancelled': return 'Cancelled';
+    default: return status;
+  }
 }
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
-
-export default function OrdersScreen() {
-  const insets = useSafeAreaInsets();
-
-  const [search, setSearch]   = useState('');
-  const [filter, setFilter]   = useState<FilterLabel>('All');
-
-  // ─── Stats ─────────────────────────────────────────────────────────────────
-
-  const newCount        = DEMO_ORDERS.filter(o => normaliseStatus(o.status) === 'new').length;
-  const processingCount = DEMO_ORDERS.filter(o => normaliseStatus(o.status) === 'processing').length;
-  const readyCount      = DEMO_ORDERS.filter(o => normaliseStatus(o.status) === 'ready_to_ship').length;
-  const shippedCount    = DEMO_ORDERS.filter(o => normaliseStatus(o.status) === 'shipped').length;
-  const returnsCount    = DEMO_ORDERS.filter(o =>
-    normaliseStatus(o.status) === 'returned' || normaliseStatus(o.status) === 'refund_requested'
-  ).length;
-
-  // ─── Filtered orders ───────────────────────────────────────────────────────
-
-  const filteredOrders = useMemo(() => {
-    let list = DEMO_ORDERS.filter(o => filterMatches(o, filter));
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(o =>
-        o.orderNumber.toLowerCase().includes(q) ||
-        o.customer.name.toLowerCase().includes(q) ||
-        o.items.some(i => i.productName.toLowerCase().includes(q))
-      );
-    }
-    return list;
-  }, [search, filter]);
-
-  return (
-    <BrandthreadScreen noSafeTop>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={s.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* ── Header ────────────────────────────────────────────────────── */}
-        <View style={[s.header, { paddingTop: insets.top + 8 }]}>
-          <Text style={s.headerTitle}>Orders</Text>
-        </View>
-
-        {/* ── Summary Stats ─────────────────────────────────────────────── */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={s.statsScroll}
-          contentContainerStyle={s.statsContent}
-        >
-          <StatCard
-            label="New"
-            value={String(newCount)}
-            icon="inbox"
-            accent={BLUE}
-            style={s.statCard}
-          />
-          <StatCard
-            label="Processing"
-            value={String(processingCount)}
-            icon="refresh-cw"
-            accent={PURPLE}
-            style={s.statCard}
-          />
-          <StatCard
-            label="Ready"
-            value={String(readyCount)}
-            icon="package"
-            accent={ORANGE}
-            style={s.statCard}
-          />
-          <StatCard
-            label="Shipped"
-            value={String(shippedCount)}
-            icon="truck"
-            accent={SUCCESS}
-            style={s.statCard}
-          />
-          <StatCard
-            label="Returns"
-            value={String(returnsCount)}
-            icon="rotate-ccw"
-            accent={RED}
-            style={s.statCard}
-          />
-          <StatCard
-            label="Revenue"
-            value={totalRevenue(DEMO_ORDERS)}
-            icon="dollar-sign"
-            accent={GOLD}
-            style={s.statCard}
-          />
-        </ScrollView>
-
-        {/* ── Search + Filters ──────────────────────────────────────────── */}
-        <View style={s.searchWrap}>
-          <SearchBar
-            value={search}
-            onChange={setSearch}
-            placeholder="Search orders…"
-          />
-        </View>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={s.filtersScroll}
-          contentContainerStyle={s.filtersContent}
-        >
-          {FILTERS.map(f => (
-            <FilterChip
-              key={f}
-              label={f}
-              active={filter === f}
-              onPress={() => setFilter(f)}
-            />
-          ))}
-        </ScrollView>
-
-        {/* ── Orders List ───────────────────────────────────────────────── */}
-        <View style={s.listWrap}>
-          {filteredOrders.length === 0 ? (
-            <EmptyState
-              icon="shopping-bag"
-              title="No orders yet"
-              description="Orders from buyers appear here once your store is live."
-              style={s.emptyState}
-            />
-          ) : (
-            filteredOrders.map(order => (
-              <OrderCard key={order.id} order={order} />
-            ))
-          )}
-        </View>
-      </ScrollView>
-    </BrandthreadScreen>
-  );
+function computeStats(orders: Order[]): OrderStats {
+  return {
+    newOrders: orders.filter(o => o.status === 'new').length,
+    toProcess: orders.filter(o => o.status === 'processing').length,
+    readyToShip: orders.filter(o => o.status === 'ready_to_ship').length,
+    returnRequests: orders.filter(o => o.returns.length > 0).length,
+    disputes: orders.filter(o => o.disputes.length > 0).length,
+    total: orders.length,
+  };
 }
+
+// ─── Filter Config ────────────────────────────────────────────────────────────
+
+const FILTERS: { key: OrderFilterKey; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'new', label: 'New' },
+  { key: 'unfulfilled', label: 'Unfulfilled' },
+  { key: 'processing', label: 'Processing' },
+  { key: 'ready_to_ship', label: 'Ready' },
+  { key: 'shipped', label: 'Shipped' },
+  { key: 'delivered', label: 'Delivered' },
+  { key: 'cancelled', label: 'Cancelled' },
+  { key: 'returned', label: 'Returns' },
+  { key: 'pre_order', label: 'Pre-order' },
+  { key: 'manufacturer_fulfilled', label: 'Mfg Fulfilled' },
+  { key: 'high_risk', label: 'High Risk' },
+  { key: 'disputed', label: 'Disputed' },
+];
+
+const SORTS: { key: OrderSortKey; label: string }[] = [
+  { key: 'newest', label: 'Newest first' },
+  { key: 'oldest', label: 'Oldest first' },
+  { key: 'highest_value', label: 'Highest value' },
+  { key: 'lowest_value', label: 'Lowest value' },
+  { key: 'customer_name', label: 'Customer name' },
+  { key: 'fulfillment_status', label: 'Fulfillment status' },
+  { key: 'payment_status', label: 'Payment status' },
+];
 
 // ─── Order Card ───────────────────────────────────────────────────────────────
 
-function OrderCard({ order }: { order: Order }) {
-  const itemCount  = order.items.reduce((s, i) => s + i.quantity, 0);
-  const firstItem  = order.items[0];
-  const extraCount = order.items.length - 1;
-  const normStatus = normaliseStatus(order.status);
+interface OrderCardProps {
+  order: Order;
+  selected: boolean;
+  selectionMode: boolean;
+  onPress: () => void;
+  onLongPress: () => void;
+  onMarkProcessing: () => void;
+  onMarkReady: () => void;
+  onShip: () => void;
+}
 
-  function handlePress() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert('Order ' + order.orderNumber);
-  }
+function OrderCard({
+  order, selected, selectionMode, onPress, onLongPress,
+  onMarkProcessing, onMarkReady, onShip,
+}: OrderCardProps) {
+  const isHighRisk = order.riskLevel === 'high';
+  const hasReturn = order.returns.length > 0;
+  const hasDispute = order.disputes.length > 0;
 
-  function handleAccept() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert('Accept', 'Order ' + order.orderNumber + ' accepted.');
-  }
+  const firstItem = order.lineItems[0];
+  const moreCount = order.lineItems.length - 1;
+  const itemSummary = firstItem
+    ? moreCount > 0
+      ? `${firstItem.productName} + ${moreCount} more`
+      : firstItem.productName
+    : 'No items';
 
-  function handleMarkReady() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert('Mark Ready', 'Order ' + order.orderNumber + ' marked ready.');
-  }
-
-  function handleShip() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert('Ship', 'Order ' + order.orderNumber + ' marked as shipped.');
-  }
-
-  function handleReview() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert('Review', 'Opening dispute review for ' + order.orderNumber);
-  }
-
-  const actionButton = (() => {
-    switch (normStatus) {
-      case 'new':
-        return (
-          <PrimaryButton
-            small
-            label="Accept"
-            onPress={handleAccept}
-            colors={['#3B82F6', '#22D3EE']}
-            style={s.actionBtn}
-          />
-        );
-      case 'processing':
-        return (
-          <SecondaryButton
-            small
-            label="Mark ready"
-            onPress={handleMarkReady}
-            accent={ORANGE}
-            style={s.actionBtn}
-          />
-        );
-      case 'ready_to_ship':
-        return (
-          <PrimaryButton
-            small
-            label="Ship"
-            onPress={handleShip}
-            colors={['#10B981', '#34D399']}
-            style={s.actionBtn}
-          />
-        );
-      case 'disputed':
-        return (
-          <PrimaryButton
-            small
-            label="Review"
-            onPress={handleReview}
-            colors={['#F87171', '#F97316']}
-            style={s.actionBtn}
-          />
-        );
-      default:
-        return null;
-    }
-  })();
+  const payColor = getPaymentColor(order.paymentStatus);
+  const fulColor = getFulfillmentColor(order.fulfillmentStatus);
 
   return (
-    <BrandthreadCard
-      style={s.orderCard}
-      onPress={handlePress}
+    <TouchableOpacity
+      activeOpacity={0.82}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      style={[s.card, selected && s.cardSelected, isHighRisk && s.cardRisk]}
     >
-      {/* Top row: order number + badge + date */}
-      <View style={s.orderTop}>
-        <Text style={s.orderNum}>{order.orderNumber}</Text>
-        <StatusBadge
-          label={statusDisplayLabel(order.status)}
-          variant={statusVariant(normStatus)}
-          small
-        />
-        <Text style={s.orderDate}>2 days ago</Text>
-      </View>
+      {/* Selection indicator */}
+      {selectionMode && (
+        <View style={[s.selBox, selected && s.selBoxActive]}>
+          {selected && <Feather name="check" size={10} color={FG} />}
+        </View>
+      )}
 
-      {/* Customer name */}
-      <Text style={s.customerName}>{order.customer.name}</Text>
-
-      {/* Items summary */}
-      <Text style={s.itemsSummary} numberOfLines={1}>
-        {firstItem.productName}
-        {extraCount > 0 ? ` and ${extraCount} more` : ''}
-      </Text>
-
-      {/* Bottom row: item count + total + action */}
-      <View style={s.orderBottom}>
-        <Text style={s.itemCount}>{itemCount} {itemCount === 1 ? 'item' : 'items'}</Text>
-        <View style={s.bottomRight}>
-          <Text style={s.orderTotal}>${order.total.toFixed(2)}</Text>
-          {actionButton}
+      {/* Row 1: Order number + badges */}
+      <View style={s.cardRow}>
+        <View style={s.cardRowLeft}>
+          <Text style={s.orderNum}>{order.orderNumber}</Text>
+          {order.status === 'new' && (
+            <View style={s.newBadge}>
+              <Text style={s.newBadgeText}>NEW</Text>
+            </View>
+          )}
+          {order.hasUnreadMessage && <View style={s.unreadDot} />}
+        </View>
+        <View style={s.cardRowRight}>
+          {isHighRisk && (
+            <View style={s.riskBadge}>
+              <Feather name="alert-triangle" size={9} color={RED} />
+              <Text style={s.riskText}>HIGH RISK</Text>
+            </View>
+          )}
+          {hasReturn && (
+            <View style={s.returnBadge}>
+              <Text style={s.returnBadgeText}>RETURN</Text>
+            </View>
+          )}
+          {hasDispute && (
+            <View style={s.disputeBadge}>
+              <Text style={s.disputeBadgeText}>DISPUTE</Text>
+            </View>
+          )}
         </View>
       </View>
-    </BrandthreadCard>
+
+      {/* Row 2: Customer + date */}
+      <View style={s.cardRow}>
+        <Text style={s.customerName}>{order.customer.name}</Text>
+        <Text style={s.orderDate}>{fmtDate(order.createdAt)}</Text>
+      </View>
+
+      {/* Row 3: Items summary */}
+      <Text style={s.itemSummary} numberOfLines={1}>
+        {itemSummary}  ·  {order.lineItems.length} {order.lineItems.length === 1 ? 'item' : 'items'}
+      </Text>
+
+      {/* Divider */}
+      <View style={s.divider} />
+
+      {/* Row 4: Payment + fulfillment + total */}
+      <View style={s.cardRow}>
+        <View style={s.statusRow}>
+          <View style={s.statusPill}>
+            <View style={[s.statusDot, { backgroundColor: payColor }]} />
+            <Text style={[s.statusLabel, { color: payColor }]}>
+              {getPaymentLabel(order.paymentStatus)}
+            </Text>
+          </View>
+          <View style={s.statusPill}>
+            <View style={[s.statusDot, { backgroundColor: fulColor }]} />
+            <Text style={[s.statusLabel, { color: fulColor }]}>
+              {getFulfillmentLabel(order.fulfillmentStatus)}
+            </Text>
+          </View>
+        </View>
+        <Text style={s.totalAmount}>{fmtMoney(order.payment.total)}</Text>
+      </View>
+
+      {/* Row 5: Tags */}
+      {(order.isPreOrder || order.isManufacturerFulfilled) && (
+        <View style={s.tagRow}>
+          {order.isPreOrder && (
+            <View style={s.tagPreOrder}>
+              <Text style={s.tagPreOrderText}>PRE-ORDER</Text>
+            </View>
+          )}
+          {order.isManufacturerFulfilled && (
+            <View style={s.tagMfg}>
+              <Text style={s.tagMfgText}>MFG</Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Divider */}
+      <View style={s.divider} />
+
+      {/* Row 6: Context actions */}
+      <View style={s.actionRow}>
+        {order.status === 'new' && (
+          <TouchableOpacity
+            style={s.actionBtn}
+            onPress={e => { e.stopPropagation(); onMarkProcessing(); }}
+            activeOpacity={0.8}
+          >
+            <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.actionBtnGrad}>
+              <Feather name="check-circle" size={12} color="#fff" />
+              <Text style={s.actionBtnText}>Accept</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+        {order.status === 'processing' && (
+          <TouchableOpacity
+            style={s.actionBtn}
+            onPress={e => { e.stopPropagation(); onMarkReady(); }}
+            activeOpacity={0.8}
+          >
+            <LinearGradient colors={[BLUE, CYAN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.actionBtnGrad}>
+              <Feather name="package" size={12} color="#fff" />
+              <Text style={s.actionBtnText}>Mark Ready</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+        {order.status === 'ready_to_ship' && (
+          <TouchableOpacity
+            style={s.actionBtn}
+            onPress={e => { e.stopPropagation(); onShip(); }}
+            activeOpacity={0.8}
+          >
+            <LinearGradient colors={[SUCCESS, CYAN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.actionBtnGrad}>
+              <Feather name="send" size={12} color="#fff" />
+              <Text style={s.actionBtnText}>Ship</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+        {order.status === 'shipped' && order.shipments[0] && (
+          <View style={s.trackingPill}>
+            <Feather name="truck" size={11} color={SUCCESS} />
+            <Text style={s.trackingText}>
+              {order.shipments[0].carrier} · {order.shipments[0].trackingNumber?.slice(-6)}
+            </Text>
+          </View>
+        )}
+        {order.status === 'disputed' && (
+          <View style={s.disputePill}>
+            <Feather name="alert-circle" size={11} color={RED} />
+            <Text style={s.disputePillText}>Dispute open</Text>
+          </View>
+        )}
+        <TouchableOpacity
+          style={s.viewBtn}
+          onPress={e => { e.stopPropagation(); onPress(); }}
+          activeOpacity={0.8}
+        >
+          <Text style={s.viewBtnText}>
+            {order.status === 'disputed' ? 'View Dispute' : 'View Details'}
+          </Text>
+          <Feather name="arrow-right" size={12} color={PURPLE_LIGHT} />
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Sort Modal ───────────────────────────────────────────────────────────────
+
+function SortModal({
+  visible, current, onSelect, onClose,
+}: {
+  visible: boolean;
+  current: OrderSortKey;
+  onSelect: (k: OrderSortKey) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={onClose} />
+      <View style={s.modalSheet}>
+        <View style={s.modalHandle} />
+        <Text style={s.modalTitle}>Sort Orders</Text>
+        {SORTS.map(({ key, label }) => (
+          <TouchableOpacity
+            key={key}
+            style={[s.sortOption, current === key && s.sortOptionActive]}
+            onPress={() => { Haptics.selectionAsync(); onSelect(key); }}
+            activeOpacity={0.8}
+          >
+            <Text style={[s.sortOptionText, current === key && s.sortOptionTextActive]}>
+              {label}
+            </Text>
+            {current === key && <Feather name="check" size={ICON.sm} color={PURPLE_LIGHT} />}
+          </TouchableOpacity>
+        ))}
+        <TouchableOpacity style={s.modalCloseBtn} onPress={onClose}>
+          <Text style={s.modalCloseBtnText}>Cancel</Text>
+        </TouchableOpacity>
+      </View>
+    </Modal>
+  );
+}
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+
+export default function OrdersScreen() {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchActive, setSearchActive] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<OrderFilterKey>('all');
+  const [sort, setSort] = useState<OrderSortKey>('newest');
+  const [sortModalVisible, setSortModalVisible] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [stats, setStats] = useState<OrderStats | null>(null);
+
+  const loadData = useCallback(async () => {
+    try {
+      const all = await getOrders();
+      setOrders(all);
+      setStats(computeStats(all));
+    } catch (e) {
+      console.error('Failed to load orders', e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      setLoading(true);
+      loadData();
+    }, [loadData])
+  );
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadData();
+  }, [loadData]);
+
+  // Filtered + sorted list
+  const filtered = useMemo(() => {
+    let base = orders;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      base = orders.filter(o =>
+        o.orderNumber.toLowerCase().includes(q) ||
+        o.customer.name.toLowerCase().includes(q) ||
+        o.customer.email.toLowerCase().includes(q) ||
+        o.lineItems.some(li => li.productName.toLowerCase().includes(q))
+      );
+    }
+    base = filterOrders(base, activeFilter);
+    base = sortOrders(base, sort);
+    return base;
+  }, [orders, searchQuery, activeFilter, sort]);
+
+  // Filter counts
+  const filterCounts = useMemo(() => {
+    const map: Partial<Record<OrderFilterKey, number>> = {};
+    FILTERS.forEach(({ key }) => {
+      const count = filterOrders(orders, key).length;
+      if (key !== 'all') map[key] = count;
+    });
+    return map;
+  }, [orders]);
+
+  // ─── Actions ───────────────────────────────────────────────────────────────
+
+  const handleMarkProcessing = useCallback(async (orderId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await markProcessing(orderId);
+      await loadData();
+    } catch {
+      Alert.alert('Error', 'Could not update order.');
+    }
+  }, [loadData]);
+
+  const handleMarkReady = useCallback(async (orderId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await markReadyToShip(orderId);
+      await loadData();
+    } catch {
+      Alert.alert('Error', 'Could not update order.');
+    }
+  }, [loadData]);
+
+  const handleShip = useCallback((orderId: string) => {
+    router.push(('/order-detail?id=' + orderId + '&tab=shipping') as never);
+  }, [router]);
+
+  const handleCardPress = useCallback((order: Order) => {
+    if (selectedIds.length > 0) {
+      // Toggle selection
+      setSelectedIds(prev =>
+        prev.includes(order.id) ? prev.filter(id => id !== order.id) : [...prev, order.id]
+      );
+    } else {
+      router.push(('/order-detail?id=' + order.id) as never);
+    }
+  }, [selectedIds, router]);
+
+  const handleLongPress = useCallback((orderId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    setSelectedIds(prev =>
+      prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]
+    );
+  }, []);
+
+  const handleBulkMarkProcessing = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await Promise.all(selectedIds.map(id => markProcessing(id)));
+      setSelectedIds([]);
+      await loadData();
+    } catch {
+      Alert.alert('Error', 'Could not bulk update orders.');
+    }
+  }, [selectedIds, loadData]);
+
+  const handleBulkMarkReady = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await Promise.all(selectedIds.map(id => markReadyToShip(id)));
+      setSelectedIds([]);
+      await loadData();
+    } catch {
+      Alert.alert('Error', 'Could not bulk update orders.');
+    }
+  }, [selectedIds, loadData]);
+
+  const handleMoreMenu = useCallback(() => {
+    Alert.alert('Orders', 'Choose an action', [
+      { text: 'Export CSV', onPress: () => Alert.alert('Export', 'CSV export coming soon.') },
+      { text: 'Bulk Actions', onPress: () => Alert.alert('Bulk', 'Long-press orders to select.') },
+      { text: 'Refresh', onPress: onRefresh },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [onRefresh]);
+
+  // ─── Render item ───────────────────────────────────────────────────────────
+
+  const renderItem = useCallback(({ item }: { item: Order }) => (
+    <OrderCard
+      order={item}
+      selected={selectedIds.includes(item.id)}
+      selectionMode={selectedIds.length > 0}
+      onPress={() => handleCardPress(item)}
+      onLongPress={() => handleLongPress(item.id)}
+      onMarkProcessing={() => handleMarkProcessing(item.id)}
+      onMarkReady={() => handleMarkReady(item.id)}
+      onShip={() => handleShip(item.id)}
+    />
+  ), [selectedIds, handleCardPress, handleLongPress, handleMarkProcessing, handleMarkReady, handleShip]);
+
+  const keyExtractor = useCallback((o: Order) => o.id, []);
+
+  // ─── Header right ──────────────────────────────────────────────────────────
+
+  const headerRight = (
+    <View style={s.headerRight}>
+      <IconButton
+        name="search"
+        onPress={() => {
+          setSearchActive(v => !v);
+          if (searchActive) setSearchQuery('');
+        }}
+        color={searchActive ? PURPLE_LIGHT : FG}
+      />
+      <IconButton
+        name="sliders"
+        onPress={() => {
+          Haptics.selectionAsync();
+          // cycle filter via modal — use sort modal for now as filter bar is visible
+        }}
+        color={activeFilter !== 'all' ? PURPLE_LIGHT : FG}
+      />
+      <IconButton
+        name="sliders"
+        onPress={() => setSortModalVisible(true)}
+        color={FG}
+      />
+      <IconButton name="more-horizontal" onPress={handleMoreMenu} color={FG} />
+    </View>
+  );
+
+  // ─── Empty + Loading ───────────────────────────────────────────────────────
+
+  const ListEmpty = useCallback(() => {
+    if (loading) return null;
+    return (
+      <EmptyState
+        icon="shopping-bag"
+        title="No orders yet"
+        description="Your first orders will appear here. Share your store link to start selling."
+        style={{ marginTop: SP.xl }}
+      />
+    );
+  }, [loading]);
+
+  const ListHeader = useCallback(() => (
+    <View>
+      {/* Summary Strip */}
+      {stats && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.statStrip}
+        >
+          <TouchableOpacity style={[s.statChip, { borderColor: PURPLE + '55' }]} onPress={() => setActiveFilter('all')}>
+            <Text style={[s.statChipVal, { color: PURPLE_LIGHT }]}>{stats.total}</Text>
+            <Text style={s.statChipLabel}>Total</Text>
+          </TouchableOpacity>
+          {stats.newOrders > 0 && (
+            <TouchableOpacity style={[s.statChip, { borderColor: ORANGE + '55' }]} onPress={() => setActiveFilter('new')}>
+              <Text style={[s.statChipVal, { color: ORANGE }]}>{stats.newOrders}</Text>
+              <Text style={s.statChipLabel}>New</Text>
+            </TouchableOpacity>
+          )}
+          {stats.toProcess > 0 && (
+            <TouchableOpacity style={[s.statChip, { borderColor: BLUE + '55' }]} onPress={() => setActiveFilter('processing')}>
+              <Text style={[s.statChipVal, { color: BLUE }]}>{stats.toProcess}</Text>
+              <Text style={s.statChipLabel}>Processing</Text>
+            </TouchableOpacity>
+          )}
+          {stats.readyToShip > 0 && (
+            <TouchableOpacity style={[s.statChip, { borderColor: SUCCESS + '55' }]} onPress={() => setActiveFilter('ready_to_ship')}>
+              <Text style={[s.statChipVal, { color: SUCCESS }]}>{stats.readyToShip}</Text>
+              <Text style={s.statChipLabel}>Ready</Text>
+            </TouchableOpacity>
+          )}
+          {stats.returnRequests > 0 && (
+            <TouchableOpacity style={[s.statChip, { borderColor: CYAN + '55' }]} onPress={() => setActiveFilter('returned')}>
+              <Text style={[s.statChipVal, { color: CYAN }]}>{stats.returnRequests}</Text>
+              <Text style={s.statChipLabel}>Returns</Text>
+            </TouchableOpacity>
+          )}
+          {stats.disputes > 0 && (
+            <TouchableOpacity style={[s.statChip, { borderColor: RED + '55' }]} onPress={() => setActiveFilter('disputed')}>
+              <Text style={[s.statChipVal, { color: RED }]}>{stats.disputes}</Text>
+              <Text style={s.statChipLabel}>Disputes</Text>
+            </TouchableOpacity>
+          )}
+        </ScrollView>
+      )}
+
+      {/* Filter bar */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={s.filterBar}
+      >
+        {FILTERS.map(({ key, label }) => (
+          <FilterChip
+            key={key}
+            label={label}
+            active={activeFilter === key}
+            onPress={() => setActiveFilter(key)}
+            count={key !== 'all' && filterCounts[key] != null ? filterCounts[key] : undefined}
+          />
+        ))}
+      </ScrollView>
+
+      {/* Results count */}
+      <View style={s.resultsRow}>
+        <Text style={s.resultsText}>
+          {filtered.length} {filtered.length === 1 ? 'order' : 'orders'}
+          {activeFilter !== 'all' ? ` · ${FILTERS.find(f => f.key === activeFilter)?.label}` : ''}
+        </Text>
+        {sort !== 'newest' && (
+          <TouchableOpacity onPress={() => setSortModalVisible(true)}>
+            <Text style={s.sortLabel}>
+              {SORTS.find(s => s.key === sort)?.label} ↕
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  ), [stats, activeFilter, filterCounts, filtered.length, sort]);
+
+  // ─── Render ────────────────────────────────────────────────────────────────
+
+  return (
+    <View style={[s.root, { paddingTop: insets.top }]}>
+      {/* Header */}
+      <View style={s.header}>
+        <Text style={s.headerTitle}>Orders</Text>
+        {headerRight}
+      </View>
+
+      {/* Search bar */}
+      {searchActive && (
+        <View style={s.searchWrap}>
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search orders, customers, SKUs…"
+            style={{ flex: 1 }}
+          />
+          <TouchableOpacity
+            onPress={() => { setSearchActive(false); setSearchQuery(''); }}
+            style={s.searchClose}
+          >
+            <Feather name="x" size={ICON.sm} color={MUTED} />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Main list */}
+      <FlatList
+        data={filtered}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        ListHeaderComponent={ListHeader}
+        ListEmptyComponent={ListEmpty}
+        contentContainerStyle={[
+          s.listContent,
+          { paddingBottom: insets.bottom + COMP.tabBarH + (selectedIds.length > 0 ? 80 : SP.md) },
+        ]}
+        scrollEventThrottle={16}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={PURPLE}
+            colors={[PURPLE]}
+          />
+        }
+      />
+
+      {/* Bulk action bar */}
+      {selectedIds.length > 0 && (
+        <View style={[s.bulkBar, { paddingBottom: insets.bottom + SP.sm }]}>
+          <LinearGradient colors={['#12121F', '#07070F']} style={s.bulkBarInner}>
+            <Text style={s.bulkCount}>{selectedIds.length} selected</Text>
+            <View style={s.bulkActions}>
+              <TouchableOpacity style={s.bulkBtn} onPress={handleBulkMarkProcessing}>
+                <Feather name="play" size={ICON.xs} color={BLUE} />
+                <Text style={[s.bulkBtnText, { color: BLUE }]}>Processing</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.bulkBtn} onPress={handleBulkMarkReady}>
+                <Feather name="package" size={ICON.xs} color={SUCCESS} />
+                <Text style={[s.bulkBtnText, { color: SUCCESS }]}>Ready</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.bulkBtn} onPress={() => Alert.alert('Export', 'Export coming soon.')}>
+                <Feather name="download" size={ICON.xs} color={MUTED} />
+                <Text style={[s.bulkBtnText, { color: MUTED }]}>Export</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.bulkBtn} onPress={() => setSelectedIds([])}>
+                <Feather name="x" size={ICON.xs} color={RED} />
+                <Text style={[s.bulkBtnText, { color: RED }]}>Clear</Text>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
+        </View>
+      )}
+
+      {/* Sort Modal */}
+      <SortModal
+        visible={sortModalVisible}
+        current={sort}
+        onSelect={k => { setSort(k); setSortModalVisible(false); }}
+        onClose={() => setSortModalVisible(false)}
+      />
+    </View>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  scrollContent: {
-    paddingBottom: COMP.tabBarH + SP.xl,
+  root: {
+    flex: 1,
+    backgroundColor: BG,
   },
 
   // Header
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: SP.md,
-    paddingBottom: SP.sm,
+    paddingVertical: SP.sm,
+    minHeight: COMP.headerH,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
   },
   headerTitle: {
     fontSize: FS.xl,
@@ -361,102 +763,471 @@ const s = StyleSheet.create({
     color: FG,
     letterSpacing: -0.3,
   },
-
-  // Stats
-  statsScroll: {
-    flexGrow: 0,
-    marginTop: SP.sm,
-  },
-  statsContent: {
-    paddingHorizontal: SP.md,
-    gap: SP.sm,
-    paddingBottom: SP.xs,
-  },
-  statCard: {
-    minWidth: 100,
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
   },
 
   // Search
   searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
     paddingHorizontal: SP.md,
-    marginTop: SP.md,
-    marginBottom: SP.sm,
+    paddingVertical: SP.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+  },
+  searchClose: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.sm,
+    backgroundColor: CARD,
+    borderWidth: 1,
+    borderColor: BORDER,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
-  // Filters
-  filtersScroll: {
-    flexGrow: 0,
-    marginBottom: SP.sm,
-  },
-  filtersContent: {
+  // Stat strip
+  statStrip: {
     paddingHorizontal: SP.md,
+    paddingTop: SP.md,
+    paddingBottom: SP.sm,
     gap: SP.sm,
+  },
+  statChip: {
+    alignItems: 'center',
+    backgroundColor: CARD,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+    minWidth: 72,
+    gap: 2,
+  },
+  statChipVal: {
+    fontSize: FS.xl,
+    fontFamily: FONT.bold,
+    letterSpacing: -0.5,
+  },
+  statChipLabel: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: MUTED,
+  },
+
+  // Filter bar
+  filterBar: {
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+    gap: SP.sm,
+  },
+
+  // Results row
+  resultsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.sm,
+  },
+  resultsText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: SUBTLE,
+  },
+  sortLabel: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: PURPLE_LIGHT,
   },
 
   // List
-  listWrap: {
+  listContent: {
     paddingHorizontal: SP.md,
-    paddingTop: SP.sm,
-    gap: 0,
-  },
-  emptyState: {
-    marginTop: SP.xl,
+    gap: SP.sm,
   },
 
   // Order card
-  orderCard: {
-    marginBottom: 10,
-    gap: SP.xs,
+  card: {
+    backgroundColor: CARD,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: SP.md,
+    gap: SP.sm,
+    marginBottom: SP.sm,
   },
-  orderTop: {
+  cardSelected: {
+    borderColor: BORDER_ACTIVE,
+    backgroundColor: CARD_ELEVATED,
+  },
+  cardRisk: {
+    borderColor: RED + '44',
+  },
+
+  // Selection
+  selBox: {
+    position: 'absolute',
+    top: SP.md,
+    right: SP.md,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    backgroundColor: CARD,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+  },
+  selBoxActive: {
+    backgroundColor: PURPLE,
+    borderColor: PURPLE,
+  },
+
+  // Card rows
+  cardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  cardRowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.sm,
-  },
-  orderNum: {
-    fontSize: FS.sm,
-    fontFamily: FONT.bold,
-    color: PURPLE_LIGHT,
     flex: 1,
   },
-  orderDate: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: SUBTLE,
-    marginLeft: 'auto',
+  cardRowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
+  },
+
+  orderNum: {
+    fontSize: FS.base,
+    fontFamily: FONT.bold,
+    color: FG,
+    letterSpacing: -0.2,
+  },
+  newBadge: {
+    backgroundColor: ORANGE_DIM,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.sm,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: ORANGE + '44',
+  },
+  newBadgeText: {
+    fontSize: 9,
+    fontFamily: FONT.bold,
+    color: ORANGE,
+    letterSpacing: 0.5,
+  },
+  unreadDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: PURPLE,
+  },
+  riskBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: RED_DIM,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.sm,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: RED + '44',
+  },
+  riskText: {
+    fontSize: 9,
+    fontFamily: FONT.bold,
+    color: RED,
+    letterSpacing: 0.4,
+  },
+  returnBadge: {
+    backgroundColor: CYAN_DIM,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.sm,
+    paddingVertical: 2,
+  },
+  returnBadgeText: {
+    fontSize: 9,
+    fontFamily: FONT.bold,
+    color: CYAN,
+    letterSpacing: 0.3,
+  },
+  disputeBadge: {
+    backgroundColor: RED_DIM,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.sm,
+    paddingVertical: 2,
+  },
+  disputeBadgeText: {
+    fontSize: 9,
+    fontFamily: FONT.bold,
+    color: RED,
+    letterSpacing: 0.3,
   },
   customerName: {
     fontSize: FS.base,
-    fontFamily: FONT.medium,
+    fontFamily: FONT.semibold,
     color: FG,
   },
-  itemsSummary: {
+  orderDate: {
     fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: SUBTLE,
+  },
+  itemSummary: {
+    fontSize: FS.sm,
     fontFamily: FONT.regular,
     color: MUTED,
   },
-  orderBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: SP.xs,
+  divider: {
+    height: 1,
+    backgroundColor: BORDER,
+    marginVertical: 2,
   },
-  itemCount: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: SUBTLE,
-    flex: 1,
-  },
-  bottomRight: {
+
+  // Status pills
+  statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.sm,
+    flex: 1,
   },
-  orderTotal: {
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusLabel: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+  },
+  totalAmount: {
     fontSize: FS.base,
     fontFamily: FONT.bold,
     color: FG,
+    letterSpacing: -0.2,
+  },
+
+  // Tags
+  tagRow: {
+    flexDirection: 'row',
+    gap: SP.xs,
+    marginTop: -SP.xs,
+  },
+  tagPreOrder: {
+    backgroundColor: PURPLE_DIM,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.sm,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: BORDER_ACTIVE,
+  },
+  tagPreOrderText: {
+    fontSize: 9,
+    fontFamily: FONT.bold,
+    color: PURPLE_LIGHT,
+    letterSpacing: 0.4,
+  },
+  tagMfg: {
+    backgroundColor: BLUE_DIM,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.sm,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: BLUE + '44',
+  },
+  tagMfgText: {
+    fontSize: 9,
+    fontFamily: FONT.bold,
+    color: BLUE,
+    letterSpacing: 0.4,
+  },
+
+  // Action row
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    flexWrap: 'wrap',
   },
   actionBtn: {
-    minWidth: 80,
+    borderRadius: RADIUS.sm,
+    overflow: 'hidden',
+  },
+  actionBtnGrad: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+  },
+  actionBtnText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.bold,
+    color: '#fff',
+  },
+  viewBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: 'auto',
+    paddingHorizontal: SP.sm,
+    paddingVertical: SP.xs,
+  },
+  viewBtnText: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    color: PURPLE_LIGHT,
+  },
+  trackingPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: SUCCESS_DIM,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.sm,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: SUCCESS + '44',
+  },
+  trackingText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: SUCCESS,
+  },
+  disputePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: RED_DIM,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.sm,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: RED + '44',
+  },
+  disputePillText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: RED,
+  },
+
+  // Bulk bar
+  bulkBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  bulkBarInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SP.md,
+    paddingTop: SP.md,
+    borderTopWidth: 1,
+    borderTopColor: BORDER_ACTIVE,
+  },
+  bulkCount: {
+    fontSize: FS.sm,
+    fontFamily: FONT.bold,
+    color: FG,
+  },
+  bulkActions: {
+    flexDirection: 'row',
+    gap: SP.sm,
+  },
+  bulkBtn: {
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: SP.sm,
+    paddingVertical: SP.xs,
+    backgroundColor: CARD,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  bulkBtnText: {
+    fontSize: 10,
+    fontFamily: FONT.semibold,
+  },
+
+  // Sort modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.72)',
+  },
+  modalSheet: {
+    backgroundColor: SURFACE,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    borderTopWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.xxl,
+    paddingTop: SP.md,
+    gap: SP.xs,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: BORDER,
+    borderRadius: RADIUS.pill,
+    alignSelf: 'center',
+    marginBottom: SP.sm,
+  },
+  modalTitle: {
+    fontSize: FS.md,
+    fontFamily: FONT.bold,
+    color: FG,
+    paddingBottom: SP.sm,
+  },
+  sortOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: SP.md,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+  },
+  sortOptionActive: {
+    // subtle purple tint handled by text color
+  },
+  sortOptionText: {
+    fontSize: FS.base,
+    fontFamily: FONT.medium,
+    color: MUTED,
+  },
+  sortOptionTextActive: {
+    color: PURPLE_LIGHT,
+    fontFamily: FONT.semibold,
+  },
+  modalCloseBtn: {
+    marginTop: SP.md,
+    alignItems: 'center',
+    paddingVertical: SP.md,
+    backgroundColor: CARD,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  modalCloseBtnText: {
+    fontSize: FS.base,
+    fontFamily: FONT.semibold,
+    color: MUTED,
   },
 });

@@ -16,6 +16,7 @@ import {
 } from '@/lib/setupStore';
 import { DEMO_ORDERS, DEMO_PRODUCTS } from '@/services/data';
 import { getHubStats } from '@/services/manufacturerService';
+import { getOrderStats } from '@/services/orderService';
 import {
   BrandthreadScreen, BrandthreadCard, GradientCard,
   PrimaryButton, SecondaryButton, IconButton, SearchBar,
@@ -123,6 +124,13 @@ export default function SellerHomeScreen() {
     activeProduction: number;
     unreadMessages: number;
   } | null>(null);
+  const [orderStats, setOrderStats] = useState<{
+    newOrders: number;
+    toProcess: number;
+    readyToShip: number;
+    returnRequests: number;
+    disputes: number;
+  } | null>(null);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
 
@@ -151,6 +159,14 @@ export default function SellerHomeScreen() {
       samplesNeedingReview: stats.samplesNeedingReview,
       activeProduction: stats.activeProduction,
       unreadMessages: stats.unreadMessages,
+    })).catch(() => {});
+    // Load order stats
+    getOrderStats().then(s => setOrderStats({
+      newOrders: s.newOrders,
+      toProcess: s.toProcess,
+      readyToShip: s.readyToShip,
+      returnRequests: s.returnRequests,
+      disputes: s.disputes,
     })).catch(() => {});
     return () => { clearTimeout(timer); clearTimeout(minLoad); };
   }, []);
@@ -461,6 +477,55 @@ export default function SellerHomeScreen() {
             />
           </View>
         </View>
+
+        {/* ── Order Stats ───────────────────────────────────────────────── */}
+        {orderStats && (orderStats.newOrders > 0 || orderStats.readyToShip > 0 || orderStats.returnRequests > 0 || orderStats.disputes > 0) && (
+          <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
+            <SectionHeader title="Orders" style={{ paddingHorizontal: 0, marginBottom: SP.sm }} action={{ label: 'View all', onPress: () => nav('/(tabs)/orders') }} />
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              {(orderStats.newOrders > 0) && (
+                <QuickActionCard
+                  label={`${orderStats.newOrders} New order${orderStats.newOrders > 1 ? 's' : ''}`}
+                  icon="shopping-bag"
+                  accent={BLUE}
+                  badge
+                  onPress={() => nav('/(tabs)/orders')}
+                  style={{ width: '48.5%' }}
+                />
+              )}
+              {(orderStats.readyToShip > 0) && (
+                <QuickActionCard
+                  label={`${orderStats.readyToShip} Ready to ship`}
+                  icon="truck"
+                  accent={SUCCESS}
+                  badge
+                  onPress={() => nav('/(tabs)/orders')}
+                  style={{ width: '48.5%' }}
+                />
+              )}
+              {(orderStats.returnRequests > 0) && (
+                <QuickActionCard
+                  label={`${orderStats.returnRequests} Return${orderStats.returnRequests > 1 ? 's' : ''}`}
+                  icon="refresh-ccw"
+                  accent={ORANGE}
+                  badge
+                  onPress={() => nav('/(tabs)/orders')}
+                  style={{ width: '48.5%' }}
+                />
+              )}
+              {(orderStats.disputes > 0) && (
+                <QuickActionCard
+                  label={`${orderStats.disputes} Dispute${orderStats.disputes > 1 ? 's' : ''}`}
+                  icon="alert-circle"
+                  accent={RED}
+                  badge
+                  onPress={() => nav('/(tabs)/orders')}
+                  style={{ width: '48.5%' }}
+                />
+              )}
+            </View>
+          </View>
+        )}
 
         {/* ── Manufacturer Hub Stats ────────────────────────────────────── */}
         {hubStats && (hubStats.samplesNeedingReview > 0 || hubStats.activeProduction > 0 || hubStats.unreadMessages > 0) && (

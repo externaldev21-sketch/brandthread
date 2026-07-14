@@ -1,0 +1,1148 @@
+Continue working directly inside my existing Brandthread Expo React Native project.
+
+Do not explain the code to me.
+
+Do not give me an outline.
+
+Do not give me sample code.
+
+Inspect the current project, edit the files directly, run the app, test the feature, and fix all errors.
+
+Build the complete Brandthread Design Studio.
+
+Do not redesign onboarding.
+
+Do not break the Seller Dashboard, Products, Manufacturer Hub, Orders, Inventory, Store Builder, Seller Profile, Content Creator, Buyer Thread, authentication, or navigation.
+
+CORE GOAL
+
+A Seller must be able to create clothing designs, mockups, campaign images, product visuals, and reusable design projects directly inside Brandthread.
+
+The Design Studio should feel like a premium mobile creative workspace.
+
+It should be powerful, but not confusing.
+
+Do not try to build every advanced Procreate feature at once.
+
+Build a stable working design editor first, then add the AI tools around it.
+
+DESIGN STUDIO NAVIGATION
+
+Create a premium Design Studio home screen matching the Brandthread onboarding and Seller design system.
+
+The Studio tab must include:
+
+* Start blank canvas
+* Create garment design
+* Upload sketch
+* Upload mockup
+* Text to design
+* Mockup to model
+* AI photoshoot
+* Edit with prompt
+* Remove background
+* Background replacement
+* Campaign generator
+* Recent projects
+* Templates
+* Saved assets
+
+The Design Studio must be reachable from:
+
+* Seller bottom navigation
+* Seller Home quick actions
+* Product details
+* Content Creator
+* Manufacturer Hub
+* Global search
+* Go To menu
+
+STUDIO HOME
+
+Heading:
+
+“Create without limits.”
+
+Description:
+
+“Turn an idea into a design, mockup, product visual, or campaign from your phone.”
+
+Show a clear primary button:
+
+“Create new project”
+
+Show creation cards for:
+
+* Blank canvas
+* Garment design
+* AI design
+* Product mockup
+* Fashion photoshoot
+* Social campaign
+* Background removal
+
+RECENT PROJECTS
+
+Show project cards with:
+
+* Thumbnail
+* Project name
+* Project type
+* Last edited
+* Status
+* Linked product
+* Linked manufacturer
+* More menu
+
+Project statuses:
+
+* Draft
+* Saved
+* Exported
+* Sent to product
+* Sent to manufacturer
+* Archived
+
+Project actions:
+
+* Open
+* Rename
+* Duplicate
+* Archive
+* Delete
+* Export
+* Create product
+* Send to manufacturer
+* Create Seller post
+
+PROJECT FILTERS
+
+Include:
+
+* All
+* Designs
+* Mockups
+* Photoshoots
+* Campaigns
+* Drafts
+* Archived
+
+TEMPLATE LIBRARY
+
+Create templates for:
+
+* T-shirt
+* Hoodie
+* Sweatshirt
+* Sweatpants
+* Shorts
+* Jacket
+* Denim
+* Hat
+* Bag
+* Packaging
+* Product card
+* Social post
+* Story
+* Campaign banner
+
+Each garment template should support:
+
+* Front
+* Back
+* Side when available
+* Detail view
+* Blank garment color
+* Garment measurements
+* Print-safe area
+* Embroidery-safe area
+
+CREATE PROJECT FLOW
+
+Create a project setup flow.
+
+Step 1:
+Choose project type
+
+Options:
+
+* Garment design
+* Free canvas
+* Product mockup
+* Campaign image
+* Social content
+* Packaging
+
+Step 2:
+Choose template or canvas
+
+Step 3:
+Choose dimensions
+
+Include:
+
+* Custom size
+* Square
+* Portrait
+* Landscape
+* Story 9:16
+* Post 4:5
+* Product image
+* Print dimensions
+
+Step 4:
+Choose background
+
+Options:
+
+* Transparent
+* White
+* Black
+* Custom color
+* Uploaded image
+
+Step 5:
+Name project
+
+Step 6:
+Create project
+
+BASIC DESIGN EDITOR
+
+Create a working mobile design editor.
+
+The editor must include:
+
+* Canvas
+* Garment preview
+* Front and back views
+* Zoom
+* Pan
+* Fit to screen
+* Full-screen mode
+* Grid
+* Snap guides
+* Safe area guides
+* Print area guides
+* Undo
+* Redo
+* Save
+* Autosave
+* Export
+* Preview
+* Project settings
+
+BOTTOM TOOLBAR
+
+Create a simple mobile toolbar with:
+
+* Select
+* Add
+* Text
+* Image
+* Draw
+* Layers
+* Color
+* Effects
+* Preview
+
+Do not overcrowd the screen.
+
+Use bottom sheets for tool settings.
+
+SELECT TOOL
+
+Allow the Seller to:
+
+* Select object
+* Move
+* Resize
+* Rotate
+* Flip horizontal
+* Flip vertical
+* Duplicate
+* Lock
+* Hide
+* Delete
+* Align
+* Center
+* Bring forward
+* Send backward
+
+Add visible selection handles.
+
+Use gestures that work reliably on mobile.
+
+ADD TOOL
+
+Allow adding:
+
+* Text
+* Image
+* Shape
+* Logo
+* Sticker
+* Product badge
+* Price label
+* QR code placeholder
+* Brand asset
+
+TEXT TOOL
+
+Allow:
+
+* Add text
+* Edit text
+* Font selection
+* Font size
+* Font weight
+* Letter spacing
+* Line spacing
+* Alignment
+* Curve text
+* Text color
+* Gradient text
+* Outline
+* Shadow
+* Background
+* Opacity
+* Rotation
+
+Use legally safe fonts compatible with Expo and storefront export.
+
+IMAGE TOOL
+
+Allow:
+
+* Upload image
+* Select from brand assets
+* Crop
+* Resize
+* Rotate
+* Flip
+* Opacity
+* Remove background
+* Replace background
+* Blend mode
+* Mask
+* Erase
+* Duplicate
+* Delete
+
+DRAW TOOL
+
+Create a stable basic drawing system.
+
+Include:
+
+* Pencil
+* Marker
+* Pen
+* Airbrush
+* Eraser
+* Brush size
+* Opacity
+* Color
+* Undo
+* Redo
+
+Do not attempt hundreds of advanced brushes yet.
+
+The drawing system must work smoothly before advanced brushes are added.
+
+SHAPES
+
+Allow:
+
+* Rectangle
+* Circle
+* Triangle
+* Line
+* Star
+* Custom simple shape
+
+Each shape should support:
+
+* Fill
+* Border
+* Border width
+* Opacity
+* Rotation
+* Resize
+
+LAYERS
+
+Create a working layers panel.
+
+Each layer must show:
+
+* Thumbnail
+* Name
+* Type
+* Visibility
+* Lock state
+
+Allow:
+
+* Reorder
+* Rename
+* Hide
+* Show
+* Lock
+* Unlock
+* Duplicate
+* Delete
+* Group
+* Ungroup
+* Merge where supported
+
+Do not lose layer order after saving and reopening.
+
+COLOR SYSTEM
+
+Allow:
+
+* Color picker
+* Hex input
+* Recent colors
+* Brand colors
+* Saved palettes
+* Eyedropper if supported
+* Gradients
+* Opacity
+
+Allow Sellers to save a color palette to Brand Assets.
+
+EFFECTS
+
+Add stable basic effects:
+
+* Shadow
+* Blur
+* Glow
+* Outline
+* Grayscale
+* Contrast
+* Brightness
+* Saturation
+* Tint
+* Opacity
+
+Do not add effects that cannot be previewed reliably.
+
+GARMENT DESIGN MODE
+
+Create a garment-specific design mode.
+
+Allow:
+
+* Select garment type
+* Select garment color
+* Switch front and back
+* View print-safe area
+* Add chest print
+* Add back print
+* Add sleeve print
+* Add label placement
+* Add embroidery placement
+* Preview design on garment
+
+Store placement information.
+
+Garment placement types:
+
+* Center chest
+* Left chest
+* Full front
+* Full back
+* Upper back
+* Sleeve
+* Pocket
+* Neck label
+* Hem label
+* Custom
+
+MOCKUP PREVIEW
+
+Create a realistic mockup preview screen.
+
+Allow:
+
+* Front
+* Back
+* Detail
+* Flat lay
+* Model preview when available
+* Background color
+* Background image
+* Shadow style
+* Export preview
+
+If realistic garment rendering is not available, use a separated mock rendering service and valid preview placeholders.
+
+Do not claim an AI-rendered mockup was created if no real model is connected.
+
+BRAND ASSETS
+
+Create a Brand Assets library.
+
+Allow saving:
+
+* Logos
+* Icons
+* Fonts
+* Colors
+* Patterns
+* Graphics
+* Photos
+* Mockups
+* Packaging assets
+* Reusable text styles
+
+Allow:
+
+* Upload
+* Rename
+* Organize
+* Tag
+* Delete
+* Add to project
+
+TEXT TO DESIGN
+
+Create an AI design form.
+
+Include:
+
+* Prompt
+* Garment type
+* Design placement
+* Style
+* Color palette
+* Text content
+* Reference image
+* Number of results
+* Generate button
+
+Style options:
+
+* Streetwear
+* Luxury
+* Minimal
+* Vintage
+* Y2K
+* Techwear
+* Hand-drawn
+* Gothic
+* Athletic
+* Editorial
+* Custom
+
+Result screen must include:
+
+* Generated design preview
+* Try again
+* Edit prompt
+* Save to project
+* Add to garment
+* Create product
+* Export
+
+If no AI image API exists, create a separated mock generation service.
+
+Do not place fake AI logic directly inside the screen.
+
+UPLOAD SKETCH
+
+Create a sketch-to-design flow.
+
+Allow:
+
+* Upload sketch
+* Crop
+* Clean background
+* Increase contrast
+* Vectorize placeholder
+* Choose style
+* Choose color palette
+* Generate cleaned design
+* Save to project
+
+MOCKUP TO MODEL
+
+Create a working setup flow.
+
+Allow:
+
+* Upload garment mockup
+* Select model style
+* Select gender presentation
+* Select pose
+* Select background
+* Select lighting
+* Select image ratio
+* Generate
+
+Image ratios:
+
+* 9:16
+* 4:5
+* 1:1
+* 3:4
+
+Result actions:
+
+* Save
+* Retry
+* Edit prompt
+* Add to product media
+* Create Seller post
+* Add to storefront
+* Create campaign
+
+Do not claim the result is photorealistic unless a real provider is connected.
+
+AI PHOTOSHOOT
+
+Create an AI Photoshoot flow.
+
+Step 1:
+Choose product
+
+Step 2:
+Choose model direction
+
+Options:
+
+* Male model
+* Female model
+* Androgynous model
+* No visible face
+* Flat lay
+* Mannequin
+* Product-only
+
+Step 3:
+Choose scene
+
+Options:
+
+* Studio
+* Street
+* Luxury interior
+* Outdoor
+* Industrial
+* Minimal
+* Runway
+* Night
+* Custom
+
+Step 4:
+Choose lighting
+
+Options:
+
+* Natural
+* Softbox
+* Dramatic
+* Flash
+* Golden hour
+* Neon
+* Black-and-white
+
+Step 5:
+Choose output
+
+Options:
+
+* Product page
+* Campaign
+* Story
+* Thread post
+* Lookbook
+* Ad creative
+
+Step 6:
+Generate
+
+Allow generating multiple images.
+
+Result actions:
+
+* Save all
+* Save selected
+* Retry
+* Edit prompt
+* Add to Product
+* Add to Seller post
+* Add to Store Builder
+* Create campaign
+
+PROMPT EDITING
+
+Create an Edit with Prompt tool.
+
+Allow:
+
+* Upload or choose image
+* Enter edit instruction
+* Select area when supported
+* Preserve product toggle
+* Preserve logo toggle
+* Preserve garment color toggle
+* Generate edit
+* Compare before and after
+* Save result
+
+Example prompts:
+
+* Make the background black
+* Change hoodie color to gray
+* Add dramatic lighting
+* Remove wrinkles
+* Make image look like a campaign photo
+* Put the model in a studio
+
+BACKGROUND REMOVAL
+
+Create:
+
+* Upload image
+* Remove background
+* Preview checkerboard
+* Refine edges
+* Restore area
+* Erase area
+* Add new background
+* Export transparent PNG
+* Save to Brand Assets
+
+BACKGROUND REPLACEMENT
+
+Allow:
+
+* Solid color
+* Gradient
+* Uploaded image
+* AI-generated background
+* Studio
+* Street
+* Luxury
+* Outdoor
+* Custom prompt
+
+CAMPAIGN GENERATOR
+
+Create a Campaign Generator.
+
+Inputs:
+
+* Select product
+* Select campaign style
+* Select colors
+* Add headline
+* Add call to action
+* Select formats
+* Select number of outputs
+
+Formats:
+
+* Thread post
+* Story
+* Store hero
+* Product banner
+* Email banner
+* Ad creative
+* Square post
+* Portrait post
+
+Result actions:
+
+* Save campaign
+* Edit individual asset
+* Send to Content Creator
+* Add to Store Builder
+* Export
+
+BASIC VIDEO AND MOTION SUPPORT
+
+Do not build the full video editor again.
+
+Reuse the Seller Content Creator for video editing.
+
+Design Studio should allow:
+
+* Create static graphic
+* Animate simple text
+* Animate image entry
+* Create short motion poster
+* Send project to Content Creator
+
+Project export to Content Creator must preserve:
+
+* Canvas size
+* Layers where possible
+* Text
+* Images
+* Brand assets
+* Product links
+
+PRODUCT INTEGRATION
+
+From Design Studio, allow:
+
+* Create new Product
+* Add design to existing Product
+* Add mockup to Product media
+* Add photoshoot result to Product media
+* Add packaging design
+* Link project to Product
+
+From Product Details, allow:
+
+* Open linked design
+* Create new design
+* Open mockup
+* Create photoshoot
+* View design history
+
+MANUFACTURER INTEGRATION
+
+Allow:
+
+* Send design file
+* Send mockup
+* Send print placement
+* Send dimensions
+* Send color references
+* Send tech-pack assets
+* Attach project to quote request
+* Attach project to production
+
+Do not claim a manufacturer received files unless the real messaging or file service confirms it.
+
+CONTENT CREATOR INTEGRATION
+
+Allow:
+
+* Send design to Seller post
+* Send campaign image
+* Send photoshoot result
+* Send motion graphic
+* Tag linked product automatically
+* Open Content Creator with assets preloaded
+
+STORE BUILDER INTEGRATION
+
+Allow:
+
+* Add campaign to hero
+* Add lookbook image
+* Add product banner
+* Add brand graphic
+* Add logo
+* Add background
+* Add social asset
+
+EXPORT
+
+Support export formats where compatible:
+
+* PNG
+* JPG
+* Transparent PNG
+* PDF
+* SVG placeholder when vector export is not available
+* Project file
+* Mockup image
+
+Allow export sizes:
+
+* Original
+* Web
+* Product page
+* Story
+* Thread post
+* Print
+
+Do not claim SVG export works unless the editor truly stores vector shapes.
+
+PROJECT SAVING
+
+Support:
+
+* Autosave
+* Manual save
+* Save copy
+* Duplicate
+* Version history
+* Restore version
+* Draft recovery
+
+Show:
+
+* Saving
+* Saved
+* Save failed
+* Retry
+
+Preserve projects after restarting the app.
+
+UNDO AND REDO
+
+Support undo and redo for:
+
+* Move
+* Resize
+* Rotate
+* Add object
+* Delete object
+* Layer reorder
+* Text changes
+* Color changes
+* Effects
+* Drawing strokes
+
+Do not allow undo history to corrupt the project.
+
+VERSION HISTORY
+
+Create project version history.
+
+Save versions when:
+
+* Manual save
+* Export
+* Send to Product
+* Send to Manufacturer
+* Major AI result applied
+
+Allow:
+
+* Preview version
+* Restore version
+* Duplicate version
+
+PERFORMANCE
+
+Optimize the editor for mobile.
+
+Use:
+
+* Memoized canvas elements
+* Efficient gesture handling
+* Safe image resizing
+* Thumbnail caching
+* Lazy loading
+* Progressive image preview
+* Controlled autosave
+
+Avoid:
+
+* Re-rendering every layer on every gesture
+* Loading full-resolution assets unnecessarily
+* Blocking the UI during exports
+* Memory-heavy operations without limits
+
+Show a warning when a project is too large for the device.
+
+PERMISSIONS
+
+Handle:
+
+* Photo library
+* Camera
+* Microphone only where needed
+* File access
+
+Use premium Brandthread permission screens.
+
+Do not show raw permission failures.
+
+DATA MODELS
+
+Create or update typed models for:
+
+* DesignProject
+* DesignProjectType
+* DesignCanvas
+* DesignLayer
+* DesignLayerType
+* DesignTextLayer
+* DesignImageLayer
+* DesignShapeLayer
+* DesignDrawingLayer
+* DesignEffect
+* DesignTransform
+* DesignAsset
+* BrandAsset
+* GarmentTemplate
+* GarmentPlacement
+* DesignExport
+* DesignVersion
+* AIGenerationRequest
+* AIGenerationResult
+* AIPhotoshootRequest
+* CampaignProject
+* CampaignAsset
+
+SERVICES
+
+Use the existing backend and storage provider.
+
+Do not install a second backend.
+
+Create or update strongly typed services for:
+
+* Create project
+* Load project
+* Update project
+* Autosave project
+* Duplicate project
+* Archive project
+* Delete project
+* Upload design asset
+* Create brand asset
+* Export design
+* Create version
+* Restore version
+* Generate text-to-design result
+* Generate sketch-to-design result
+* Generate mockup-to-model result
+* Generate photoshoot result
+* Apply prompt edit
+* Remove background
+* Replace background
+* Generate campaign
+* Link project to product
+* Send project to manufacturer
+* Send project to content creator
+* Send asset to Store Builder
+
+Keep mock AI services separate from UI components.
+
+Do not place demo generation logic directly inside screens.
+
+DESIGN CONSISTENCY
+
+Every Design Studio screen must match onboarding and the current Seller design system.
+
+Use:
+
+* Deep black and charcoal backgrounds
+* Purple and blue primary accents
+* Controlled cyan and green accents
+* Rounded cards
+* Rounded tool panels
+* Premium typography
+* Consistent spacing
+* Subtle borders
+* Smooth transitions
+* Styled loading states
+* Styled empty states
+* Styled error states
+* No old green and gray layouts
+* No white flashes
+
+EMPTY STATES
+
+Recent Projects:
+
+“Your creative projects will appear here.”
+
+Brand Assets:
+
+“Save logos, colors, graphics, and reusable assets.”
+
+Templates:
+
+“Choose a starting point for your next design.”
+
+AI Results:
+
+“Your generated designs will appear here.”
+
+Each empty state must include a useful action.
+
+TESTING
+
+Test these exact paths:
+
+1. Open Design Studio.
+2. Create a blank project.
+3. Create a garment project.
+4. Choose a T-shirt.
+5. Switch front and back.
+6. Change garment color.
+7. Add text.
+8. Edit font.
+9. Change text color.
+10. Move text.
+11. Resize text.
+12. Rotate text.
+13. Duplicate text.
+14. Delete text.
+15. Upload image.
+16. Crop image.
+17. Resize image.
+18. Rotate image.
+19. Remove background.
+20. Replace background.
+21. Add shape.
+22. Change shape color.
+23. Use drawing tool.
+24. Erase drawing.
+25. Reorder layers.
+26. Hide layer.
+27. Lock layer.
+28. Group layers.
+29. Undo.
+30. Redo.
+31. Save project.
+32. Close app.
+33. Reopen project.
+34. Confirm layers persist.
+35. Confirm transforms persist.
+36. Export PNG.
+37. Export transparent PNG.
+38. Preview garment mockup.
+39. Save mockup.
+40. Create text-to-design request.
+41. Generate or simulate results.
+42. Save result to project.
+43. Upload sketch.
+44. Create cleaned design.
+45. Run mockup-to-model flow.
+46. Run AI photoshoot flow.
+47. Run prompt edit.
+48. Compare before and after.
+49. Run campaign generator.
+50. Send campaign asset to Content Creator.
+51. Add design to Product.
+52. Add photoshoot image to Product media.
+53. Send project to Manufacturer Hub.
+54. Add asset to Store Builder.
+55. Create version.
+56. Restore version.
+57. Duplicate project.
+58. Archive project.
+59. Recover draft after app restart.
+60. Test large image handling.
+61. Test failed upload.
+62. Test failed export.
+63. Test save retry.
+64. Fix all TypeScript errors.
+65. Fix all routing errors.
+66. Fix all runtime errors.
+67. Fix all console errors caused by this system.
+68. Confirm onboarding remains unchanged.
+69. Confirm Buyer and Seller accounts still work.
+70. Confirm Products, Manufacturer Hub, Content Creator, and Store Builder integrations still work.
+
+Do not stop after creating static Studio screens.
+
+Build the working editor, gesture tools, layers, garment design mode, mockups, Brand Assets, AI tool flows, Product integration, Manufacturer integration, Content Creator integration, Store Builder integration, project persistence, exports, and full testing.
+
+When complete, respond with only:
+
+“The Brandthread Design Studio is installed and working.”
