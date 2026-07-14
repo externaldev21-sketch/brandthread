@@ -195,6 +195,26 @@ export default function ProductStoreScreen() {
     }
   }, [product, selectedVariant, router]);
 
+  const handleMessageSeller = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push((
+      '/buyer-conversation?participantId=u_vault' +
+      '&participantName=Vault%20Studio' +
+      '&participantHandle=%40vaultstudio' +
+      '&participantInitials=VS' +
+      '&participantColor=%2339FF88' +
+      '&participantAccountType=seller' +
+      '&type=buyer_to_seller_product' +
+      (product ? '&contextProductName=' + encodeURIComponent(product.name) + '&contextSellerName=Vault%20Studio' : '')
+    ) as never);
+  }, [router, product]);
+
+  const handleReportSeller = useCallback(() => {
+    router.push(
+      '/buyer-report?targetType=seller&targetId=u_vault&targetLabel=Vault%20Studio' as never
+    );
+  }, [router]);
+
   const handleBuyNow = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     if (product) {
@@ -309,6 +329,24 @@ export default function ProductStoreScreen() {
             small
             style={s.followBtn}
           />
+          <TouchableOpacity style={s.msgIconBtn} onPress={handleMessageSeller} activeOpacity={0.75}>
+            <Feather name="mail" size={ICON.sm} color={PURPLE_LIGHT} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={s.msgIconBtn}
+            onPress={() => Alert.alert(
+              'Vault Studio',
+              '',
+              [
+                { text: 'Message seller', onPress: handleMessageSeller },
+                { text: 'Report seller', style: 'destructive', onPress: handleReportSeller },
+                { text: 'Cancel', style: 'cancel' },
+              ]
+            )}
+            activeOpacity={0.75}
+          >
+            <Feather name="more-horizontal" size={ICON.sm} color={MUTED} />
+          </TouchableOpacity>
         </View>
 
         {/* 4. Product info */}
@@ -934,6 +972,13 @@ const s = StyleSheet.create({
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
     color: MUTED,
+  },
+
+  // Message icon button
+  msgIconBtn: {
+    width: 34, height: 34, borderRadius: RADIUS.sm,
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    alignItems: 'center', justifyContent: 'center',
   },
 
   // Seller profile link

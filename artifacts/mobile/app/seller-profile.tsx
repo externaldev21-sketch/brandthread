@@ -276,6 +276,37 @@ export default function SellerProfileScreen() {
     Share.share({ message: 'Check out @' + profile.username + ' on Brandthread' });
   }, [profile.username]);
 
+  const handleMessageSeller = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push((
+      '/buyer-conversation?participantId=u_vault' +
+      '&participantName=' + encodeURIComponent(profile.brandName) +
+      '&participantHandle=%40' + encodeURIComponent(profile.username) +
+      '&participantInitials=' + encodeURIComponent(profile.initials) +
+      '&participantColor=' + encodeURIComponent(profile.avatarColor) +
+      '&participantAccountType=seller&type=buyer_to_seller'
+    ) as never);
+  }, [router, profile]);
+
+  const handleMoreOptions = useCallback(() => {
+    Alert.alert(
+      profile.brandName,
+      'What would you like to do?',
+      [
+        { text: 'Share profile', onPress: handleShare },
+        {
+          text: 'Report seller',
+          style: 'destructive',
+          onPress: () => router.push((
+            '/buyer-report?targetType=seller&targetId=u_vault&targetLabel=' +
+            encodeURIComponent(profile.brandName)
+          ) as never),
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  }, [profile, handleShare, router]);
+
   const handlePostPress = useCallback((post: SellerPost) => {
     setSelectedPost(post);
     setShowActionSheet(true);
@@ -376,12 +407,12 @@ export default function SellerProfileScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.iconOutlineBtn}
-                    onPress={() => router.push('/chat/seller-1' as never)}
+                    onPress={handleMessageSeller}
                   >
                     <Feather name="mail" size={16} color={FG} />
                   </TouchableOpacity>
-                  <TouchableOpacity style={styles.iconOutlineBtn} onPress={handleShare}>
-                    <Feather name="share-2" size={16} color={FG} />
+                  <TouchableOpacity style={styles.iconOutlineBtn} onPress={handleMoreOptions}>
+                    <Feather name="more-horizontal" size={16} color={FG} />
                   </TouchableOpacity>
                 </>
               )}

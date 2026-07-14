@@ -161,7 +161,37 @@ export default function BuyerOrderDetailScreen() {
   }
 
   function handleContactSeller() {
-    Alert.alert('Contact Seller', 'Messaging the seller for this order — coming soon.');
+    if (!order) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const sellerId = 'u_' + order.sellerName.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    const initials = order.sellerName
+      .split(/\s+/)
+      .map(w => w[0] ?? '')
+      .slice(0, 2)
+      .join('')
+      .toUpperCase();
+    router.push((
+      '/buyer-conversation?participantId=' + encodeURIComponent(sellerId) +
+      '&participantName=' + encodeURIComponent(order.sellerName) +
+      '&participantHandle=%40' + encodeURIComponent(order.sellerName.toLowerCase().replace(/\s+/g, '')) +
+      '&participantInitials=' + encodeURIComponent(initials) +
+      '&participantColor=' + encodeURIComponent(PURPLE) +
+      '&participantAccountType=seller' +
+      '&type=buyer_to_seller_order' +
+      '&contextOrderId=' + encodeURIComponent(order.id) +
+      '&contextOrderNumber=' + encodeURIComponent(order.orderNumber) +
+      '&contextOrderStatus=' + encodeURIComponent(order.status) +
+      '&contextSellerName=' + encodeURIComponent(order.sellerName)
+    ) as never);
+  }
+
+  function handleReportSeller() {
+    if (!order) return;
+    router.push((
+      '/buyer-report?targetType=seller&targetId=' +
+      encodeURIComponent('u_' + order.sellerName.toLowerCase().replace(/[^a-z0-9]+/g, '_')) +
+      '&targetLabel=' + encodeURIComponent(order.sellerName)
+    ) as never);
   }
 
   function handleRequestReturn() {
@@ -408,6 +438,12 @@ export default function BuyerOrderDetailScreen() {
             label="Report a Problem"
             icon="alert-circle"
             onPress={handleReportProblem}
+            accent={RED}
+          />
+          <SecondaryButton
+            label="Report Seller"
+            icon="flag"
+            onPress={handleReportSeller}
             accent={RED}
           />
           {order.status === 'delivered' && (
