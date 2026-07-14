@@ -180,7 +180,7 @@ function HeroCard({ isDark }: { isDark: boolean }) {
           <TouchableOpacity
             style={[s.heroShopBtn, { backgroundColor: HERO_DROP.brandColor }]}
             activeOpacity={0.85}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/checkout' as never); }}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/buyer-product-detail?productId=prod_canvas_cargo&productName=Canvas+Cargo+Jacket' as never); }}
           >
             <Feather name="shopping-bag" size={15} color="#FFF" />
             <Text style={s.heroShopText}>Shop Drop — {HERO_DROP.price}</Text>
@@ -212,7 +212,7 @@ function ForYouCard({ item, isDark }: { item: ForYouItem; isDark: boolean }) {
     <TouchableOpacity
       style={[fy.card, { backgroundColor: card, borderColor: border }]}
       activeOpacity={0.85}
-      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/checkout' as never); }}
+      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push(('/buyer-product-detail?productId=prod_essential_tee&productName=' + encodeURIComponent(item.name)) as never); }}
     >
       <View style={[fy.visual, { backgroundColor: item.color }]}>
         <View style={fy.visualIcon}>
@@ -279,7 +279,7 @@ function DroppingRow({ item, isDark }: { item: typeof DROPPING_SOON[0]; isDark: 
     <TouchableOpacity
       style={[dr.row, { backgroundColor: card, borderColor: border }]}
       activeOpacity={0.8}
-      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/checkout' as never); }}
+      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(('/buyer-product-detail?productId=prod_ripstop_cargo&productName=' + encodeURIComponent(item.name)) as never); }}
     >
       <View style={[dr.avatar, { backgroundColor: item.color }]}>
         <Text style={dr.initials}>{item.initials}</Text>
@@ -329,7 +329,7 @@ function TrendingRow({ item, isDark }: { item: typeof TRENDING[0]; isDark: boole
     <TouchableOpacity
       style={[tr.row, { backgroundColor: card, borderColor: border }]}
       activeOpacity={0.8}
-      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/checkout' as never); }}
+      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(('/buyer-product-detail?productId=prod_canvas_cargo&productName=' + encodeURIComponent(item.name)) as never); }}
     >
       <Text style={[tr.rank, { color: primary }]}>#{item.rank}</Text>
       <View style={[tr.avatar, { backgroundColor: item.color }]}>

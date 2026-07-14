@@ -190,13 +190,17 @@ export default function ProductStoreScreen() {
 
   const handleAddToCart = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert('Added to cart!', 'This is a buyer-side preview.');
-  }, []);
+    if (product) {
+      router.push(('/buyer-product-detail?productId=' + product.id + (selectedVariant ? '&variantId=' + selectedVariant.id : '')) as never);
+    }
+  }, [product, selectedVariant, router]);
 
   const handleBuyNow = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert('Buy Now', 'This is a buyer-side preview.');
-  }, []);
+    if (product) {
+      router.push(('/buyer-product-detail?productId=' + product.id + (selectedVariant ? '&variantId=' + selectedVariant.id : '') + '&buyNow=1') as never);
+    }
+  }, [product, selectedVariant, router]);
 
   // ── Loading state ──────────────────────────────────────────────────────────
 

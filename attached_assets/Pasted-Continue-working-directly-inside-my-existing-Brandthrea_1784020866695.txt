@@ -1,0 +1,826 @@
+Continue working directly inside my existing Brandthread Expo React Native project.
+
+Do not explain the code to me.
+Do not give me an outline.
+Do not give me sample code.
+Do not ask me to manually edit files.
+
+Inspect the current project, edit it directly, run the app, test the complete system, and fix all errors.
+
+Build the complete Brandthread Buyer Profiles, Friendships, Messaging, Stories, Privacy, and Notifications system.
+
+Do not redesign onboarding.
+
+Do not break:
+
+- Authentication
+- Buyer Thread
+- Buyer commerce
+- Seller Dashboard
+- Seller Profile
+- Seller content creation
+- Products
+- Orders
+- Inventory
+- Manufacturer Hub
+- Store Builder
+- Design Studio
+- Customers
+- Marketing
+- Analytics
+- Existing navigation
+- Official Brandthread logo integration
+
+CORE BRANDTHREAD SOCIAL RULES
+
+Only Seller posts may appear in the public Buyer home feed called Thread.
+
+Buyer posts must never appear in Thread.
+
+Buyer posts may appear only on the Buyer’s own profile.
+
+Buyer profile-post visibility must follow the Buyer’s public or private profile settings.
+
+Stories expire after 24 hours.
+
+Buyer messaging is limited to accepted friends.
+
+Buyers may message Sellers through Seller Profile, product, storefront, or order context.
+
+BUYER PROFILE
+
+Create a premium Buyer Profile matching the Brandthread design system.
+
+Include:
+
+- Profile photo
+- Display name
+- Username
+- Bio
+- Location when shared
+- Website when shared
+- Public or private badge
+- Friends count
+- Posts count
+- Saved collections count visible only to owner
+- Edit profile button for owner
+- Add friend button for other Buyers
+- Message button only when friendship allows it
+- Share profile
+- More menu
+- Block
+- Report
+
+BUYER PROFILE TABS
+
+Create:
+
+1. Posts
+2. Tagged
+3. Reposts
+4. Saved, owner only
+
+BUYER POSTS RULE
+
+Buyer posts may include:
+
+- Image
+- Slideshow
+- Short video
+- Caption
+- Hashtags
+- Friends-only or public visibility
+
+Buyer posts must never be eligible for Thread.
+
+Store an explicit field such as:
+
+- authorAccountType
+- feedEligibility
+- profileVisibility
+
+Do not infer feed eligibility from screen location.
+
+BUYER POST CREATION
+
+Allow Buyers to create profile posts.
+
+Support:
+
+- Photo
+- Slideshow
+- Short video
+- Caption
+- Hashtags
+- Visibility
+- Save draft
+- Publish
+- Delete
+- Archive
+
+Do not allow Buyer product-selling posts to enter Thread.
+
+Do not allow Buyer accounts to tag their own products unless future marketplace rules support it.
+
+BUYER PROFILE VISIBILITY
+
+Support:
+
+- Public
+- Private
+
+Public profile:
+
+- Anyone may view approved public profile content
+- Friend requests remain required for messaging
+
+Private profile:
+
+- Only accepted friends may view posts
+- Non-friends see limited profile information
+- Friend request action remains visible
+
+Allow Buyers to approve or decline friend requests.
+
+FRIEND REQUESTS
+
+Create Friend Requests screens:
+
+- Incoming
+- Sent
+- Accepted
+- Suggested
+
+Actions:
+
+- Send request
+- Accept
+- Decline
+- Cancel request
+- Remove friend
+- Block
+- Report
+
+Prevent:
+
+- Duplicate requests
+- Requests to self
+- Requests to blocked users
+- Messaging before acceptance
+- Repeated request spam
+
+FRIENDS LIST
+
+Show:
+
+- Profile photo
+- Name
+- Username
+- Online or recent status only if privacy allows
+- Message
+- Remove friend
+- Open profile
+
+FRIEND SUGGESTIONS
+
+Suggestions may use:
+
+- Mutual friends
+- Shared interests
+- Shared brand follows
+- Contact discovery only with permission
+
+Do not upload contacts without explicit permission.
+
+MESSAGING
+
+Create a premium Messaging hub.
+
+Main sections:
+
+- Friends
+- Sellers
+- Orders
+- Requests
+- Archived
+
+CONVERSATION TYPES
+
+Support:
+
+- Buyer-to-Buyer friend conversation
+- Buyer-to-Seller general conversation
+- Buyer-to-Seller product conversation
+- Buyer-to-Seller order conversation
+- Seller-to-Manufacturer conversation using existing Manufacturer Hub
+
+Do not combine unrelated order conversations incorrectly.
+
+BUYER-TO-BUYER MESSAGING RULE
+
+Buyer-to-Buyer messaging is allowed only when both users are accepted friends.
+
+If friendship is removed:
+
+- Preserve conversation history
+- Disable new messages unless friendship is restored
+- Allow block and report
+
+MESSAGE THREAD
+
+Allow:
+
+- Text
+- Image
+- Video
+- Voice note if supported
+- Product attachment
+- Seller post attachment
+- Order attachment
+- Profile attachment
+- Link preview where safe
+- Reply to message
+- Reaction
+- Copy
+- Delete for self
+- Report
+
+Do not claim end-to-end encryption unless it is truly implemented.
+
+MESSAGE STATES
+
+Support:
+
+- Sending
+- Sent
+- Delivered when provider confirms
+- Read when allowed
+- Failed
+- Retry
+
+Do not display delivered or read states without backend confirmation.
+
+ORDER MESSAGING
+
+Order conversations must include:
+
+- Order number
+- Seller
+- Product summary
+- Current order status
+- Open Order Details
+- Report issue
+- Request return
+- Attach evidence
+
+Keep order context attached to the thread.
+
+SELLER MESSAGING
+
+Buyers may message Sellers from:
+
+- Seller Profile
+- Product page
+- Storefront
+- Thread post
+- Order Details
+
+Allow Sellers to configure:
+
+- Allow all Buyer messages
+- Allow customer-only messages
+- Allow product questions
+- Auto-reply
+- Business hours
+
+MESSAGE REQUESTS
+
+When a Buyer messages a Seller without an existing relationship:
+
+- Place it in Seller message requests when appropriate
+- Allow Seller to accept, decline, block, or report
+
+Buyer-to-Buyer requests do not bypass friendship rules.
+
+STORIES
+
+Create Stories for Buyers and Sellers.
+
+Stories expire after 24 hours.
+
+SELLER STORIES
+
+Seller Stories may appear in the public Buyer story row.
+
+Seller Stories may include:
+
+- Video
+- Photo
+- Product tag
+- Sound
+- Text
+- Link
+- Poll
+
+BUYER STORIES
+
+Buyer Stories follow profile visibility:
+
+- Public Buyer story visible according to public profile settings
+- Private Buyer story visible only to accepted friends
+
+Buyer Stories must not be promoted into Seller Thread content.
+
+STORY CREATION
+
+Allow:
+
+- Photo
+- Video
+- Text
+- Drawing
+- Sticker
+- Poll
+- Link where allowed
+- Product tag for Sellers only
+- Sound where supported
+- Close friends for Buyers if implemented
+
+STORY VIEWER
+
+Include:
+
+- Progress segments
+- Tap forward
+- Tap back
+- Hold to pause
+- Swipe down to close
+- Reply
+- React
+- Report
+- Mute account
+- Open product tag for Seller Stories
+- Open profile
+
+STORY PRIVACY
+
+Allow Buyers to:
+
+- Hide story from selected users
+- Share to friends
+- Share to close friends
+- Disable replies
+- View story viewers
+
+Do not expose viewers after the allowed retention period unless intended.
+
+NOTIFICATIONS
+
+Create a complete Notifications hub.
+
+Categories:
+
+- Social
+- Orders
+- Messages
+- Seller updates
+- Products
+- Marketing
+- System
+
+SOCIAL NOTIFICATIONS
+
+Include:
+
+- Friend request
+- Friend request accepted
+- Post like
+- Post comment
+- Repost
+- Mention
+- Story reaction
+- Story reply
+- New follower for Seller accounts
+
+ORDER NOTIFICATIONS
+
+Include:
+
+- Order confirmed
+- Processing
+- Production update
+- Shipped
+- Delivered
+- Delay
+- Return update
+- Refund update
+- Dispute update
+
+PRODUCT NOTIFICATIONS
+
+Include:
+
+- Product restocked
+- Drop live
+- Pre-order closing
+- Price drop
+- Saved product update
+
+MESSAGE NOTIFICATIONS
+
+Include:
+
+- New friend message
+- New Seller reply
+- New order message
+- Message request
+
+NOTIFICATION ACTIONS
+
+Allow:
+
+- Open relevant screen
+- Mark read
+- Mark unread
+- Delete
+- Mute category
+- Clear all read
+
+NOTIFICATION SETTINGS
+
+Create settings for:
+
+- Push
+- Email
+- SMS
+- In-app
+
+Allow category controls for:
+
+- Friend requests
+- Messages
+- Order updates
+- Seller posts
+- Product drops
+- Marketing
+- Story activity
+
+Respect marketing consent separately from transactional notifications.
+
+BLOCKING
+
+Create a complete block system.
+
+When blocked:
+
+- Profile access is restricted
+- Friend requests are cancelled
+- Friendship is removed
+- Buyer-to-Buyer messaging is disabled
+- Content visibility is restricted
+- Story visibility is restricted
+- Notifications between users stop where appropriate
+
+Do not block Buyer access to legitimate order records or required Seller communication automatically.
+
+REPORTING
+
+Allow reporting:
+
+- Profile
+- Post
+- Story
+- Message
+- Seller
+- Product
+
+Report reasons:
+
+- Spam
+- Harassment
+- Hate or abuse
+- Scam
+- Impersonation
+- Inappropriate content
+- Intellectual property
+- Dangerous product
+- Other
+
+Allow:
+
+- Description
+- Evidence
+- Block after report
+- Submit
+
+Do not fabricate moderation outcomes.
+
+PRIVACY SETTINGS
+
+Create Buyer privacy settings:
+
+- Public or private profile
+- Who can send friend requests
+- Who can see posts
+- Who can see friends list
+- Who can reply to stories
+- Who can mention
+- Activity status
+- Read receipts
+- Search visibility
+- Contact discovery
+- Blocked accounts
+- Muted accounts
+
+SELLER PRIVACY AND MESSAGE SETTINGS
+
+Create Seller controls for:
+
+- Message permissions
+- Comment permissions
+- Story replies
+- Reposts
+- Mentions
+- Blocked accounts
+- Muted accounts
+
+SAVED CONTENT
+
+Allow Buyers to save:
+
+- Seller posts
+- Products
+- Collections
+- Stores
+
+Create private Saved sections:
+
+- Posts
+- Products
+- Collections
+- Stores
+
+Saved content must be visible only to the owner.
+
+REPOSTS
+
+Buyer reposts may appear on the Buyer’s profile only.
+
+Seller reposts may be eligible for Thread only when:
+
+- Original content is Seller content
+- Reposts are allowed
+- Content remains published
+- Feed eligibility remains valid
+
+SEARCH INTEGRATION
+
+Allow search for:
+
+- Buyer profiles
+- Seller profiles
+- Brands
+- Products
+- Posts
+- Stores
+
+Respect privacy and blocking.
+
+NAVIGATION
+
+Buyer navigation should make these areas easy to reach:
+
+- Thread
+- Search
+- Create
+- Messages
+- Profile
+
+Do not overcrowd the tab bar.
+
+Use clear secondary routes for:
+
+- Notifications
+- Friends
+- Saved
+- Orders
+- Settings
+
+SELLER NAVIGATION
+
+Preserve the Seller five-tab navigation.
+
+Seller messages and notifications should be reachable from:
+
+- Home header
+- More
+- Seller Profile
+- Orders
+- Products
+
+DATA MODELS
+
+Create or update typed models for:
+
+- BuyerProfile
+- BuyerPost
+- BuyerPostVisibility
+- Friendship
+- FriendRequest
+- FriendSuggestion
+- Conversation
+- ConversationType
+- ConversationParticipant
+- Message
+- MessageAttachment
+- MessageStatus
+- MessageReaction
+- MessageRequest
+- Story
+- StoryMedia
+- StoryViewer
+- StoryPrivacy
+- Notification
+- NotificationCategory
+- NotificationPreference
+- BlockRecord
+- MuteRecord
+- Report
+- SavedItem
+- RepostRecord
+- PrivacySettings
+
+SERVICES
+
+Use the existing backend.
+
+Do not install a second backend.
+
+Create or update strongly typed services for:
+
+- Get Buyer profile
+- Update Buyer profile
+- Create Buyer post
+- Update Buyer post
+- Delete Buyer post
+- Create friend request
+- Accept friend request
+- Decline friend request
+- Cancel friend request
+- Remove friend
+- Get friend suggestions
+- Get conversations
+- Create conversation
+- Send message
+- Retry message
+- Add reaction
+- Create story
+- Get stories
+- Track story view
+- Create notification
+- Mark notification read
+- Update notification preferences
+- Block user
+- Unblock user
+- Mute user
+- Report content
+- Save item
+- Remove saved item
+- Repost content
+- Search profiles
+
+Keep mock services separated from UI components.
+
+Do not place fake real-time behavior directly inside screens.
+
+REAL-TIME BEHAVIOR
+
+Use the existing backend’s real-time features if available.
+
+Otherwise use stable polling or refresh.
+
+Do not claim real-time delivery if it is not configured.
+
+DESIGN CONSISTENCY
+
+Every screen must match the Brandthread onboarding and app design system.
+
+Use:
+
+- Deep black and charcoal backgrounds
+- Purple and blue primary accents
+- Controlled green for success
+- Controlled red or orange for warnings
+- Rounded cards
+- Rounded inputs
+- Premium typography
+- Smooth transitions
+- Styled loading states
+- Styled empty states
+- Styled error states
+- Official Brandthread logo for system branding
+- Seller-owned logos for Seller profiles
+- No old green and gray layouts
+- No white flashes
+
+EMPTY STATES
+
+Friends:
+“Friends you connect with will appear here.”
+
+Messages:
+“Your conversations will appear here.”
+
+Requests:
+“Message and friend requests will appear here.”
+
+Stories:
+“Stories from people and brands you follow will appear here.”
+
+Notifications:
+“You’re all caught up.”
+
+Saved:
+“Posts and products you save will appear here.”
+
+Each empty state must include a useful action.
+
+TESTING
+
+Test these exact paths:
+
+1. Open Buyer Profile.
+2. Edit Buyer Profile.
+3. Set profile public.
+4. Set profile private.
+5. Create Buyer photo post.
+6. Create Buyer slideshow.
+7. Create Buyer video post.
+8. Confirm Buyer post stays off Thread.
+9. Send friend request.
+10. Accept friend request.
+11. Decline friend request.
+12. Cancel sent request.
+13. Remove friend.
+14. Attempt message before friendship.
+15. Confirm messaging is blocked.
+16. Accept friendship.
+17. Send text message.
+18. Send image.
+19. Attach Seller post.
+20. Attach product.
+21. Test failed message retry.
+22. Remove friendship.
+23. Confirm new messages are disabled.
+24. Message Seller from Seller Profile.
+25. Message Seller from Product.
+26. Message Seller from Order.
+27. Create Buyer Story.
+28. Create Seller Story.
+29. Confirm Seller Story appears publicly.
+30. Confirm private Buyer Story is friends-only.
+31. Test story reply.
+32. Test story reaction.
+33. Test story expiration.
+34. Open Notifications.
+35. Trigger friend request notification.
+36. Trigger message notification.
+37. Trigger order notification.
+38. Mark notification read.
+39. Mark notification unread.
+40. Mute category.
+41. Save Seller post.
+42. Save product.
+43. Open Saved.
+44. Repost Seller content.
+45. Confirm Buyer repost stays on Buyer Profile.
+46. Block Buyer.
+47. Confirm friendship and messaging restrictions.
+48. Unblock Buyer.
+49. Report profile.
+50. Report post.
+51. Report message.
+52. Test search with private profiles.
+53. Confirm blocked users are hidden.
+54. Restart app.
+55. Confirm friendships persist.
+56. Confirm messages persist.
+57. Confirm privacy settings persist.
+58. Confirm notification settings persist.
+59. Confirm saved items persist.
+60. Fix all TypeScript errors.
+61. Fix all routing errors.
+62. Fix all runtime errors.
+63. Fix all console errors caused by this system.
+64. Confirm onboarding remains unchanged.
+65. Confirm Buyer commerce still works.
+66. Confirm Seller tools still work.
+67. Confirm official Brandthread logo still works.
+
+Do not stop after creating static profile or message screens.
+
+Build the complete working Buyer social system, friendship rules, messaging, stories, privacy, notifications, blocking, reporting, saving, reposting, typed models, services, routing, persistence, and full testing.
+
+When complete, respond with only:
+
+“The Brandthread Buyer social and messaging system is installed and working.”

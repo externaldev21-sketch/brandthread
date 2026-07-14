@@ -9,6 +9,7 @@ import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
 import { getBuyerOrder } from '@/services/orderService';
 import { BuyerOrderView, OrderStatus, TrackingStatus } from '@/services/orderTypes';
+import { getAllDemoProducts } from '@/services/cartService';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, BORDER_FOCUS,
   FG, MUTED, SUBTLE, ON_DARK,
@@ -175,6 +176,31 @@ export default function BuyerOrderDetailScreen() {
   function handleReportProblem() {
     if (!order) return;
     router.push(('/buyer-problem-report?orderId=' + order.id) as never);
+  }
+
+  async function handleBuyAgain() {
+    if (!order) return;
+    const firstItem = order.lineItems[0];
+    if (!firstItem) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Look up demo catalog by product name to find the productId
+    const allProducts = getAllDemoProducts();
+    const match = allProducts.find(p =>
+      p.name.toLowerCase() === firstItem.productName.toLowerCase()
+    );
+    if (match) {
+      router.push(('/buyer-product-detail?productId=' + match.id + '&productName=' + encodeURIComponent(match.name)) as never);
+    } else {
+      // Product not in demo catalog — navigate to discover
+      Alert.alert(
+        'Buy Again',
+        `${firstItem.productName} — tap Discover to find similar items.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Discover', onPress: () => router.push('/(buyer)/discover' as never) },
+        ]
+      );
+    }
   }
 
   if (loading) {
@@ -384,6 +410,13 @@ export default function BuyerOrderDetailScreen() {
             onPress={handleReportProblem}
             accent={RED}
           />
+          {order.status === 'delivered' && (
+            <SecondaryButton
+              label="Buy Again"
+              icon="repeat"
+              onPress={handleBuyAgain}
+            />
+          )}
         </View>
 
         {/* ── Disclaimer ───────────────────────────────────────────────────── */}

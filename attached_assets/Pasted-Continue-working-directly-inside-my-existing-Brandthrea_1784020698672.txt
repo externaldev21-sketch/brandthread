@@ -1,0 +1,1087 @@
+Continue working directly inside my existing Brandthread Expo React Native project.
+
+Do not explain the code to me.
+Do not give me an outline.
+Do not give me sample code.
+Do not ask me to manually edit files.
+
+Inspect the current project, edit it directly, run the app, test the full flow, and fix all errors.
+
+Build the complete Brandthread Buyer Cart, Checkout, Payments, and Order Tracking system.
+
+Do not redesign onboarding.
+
+Do not break:
+
+- Authentication
+- Buyer Thread
+- Buyer Profile
+- Seller Dashboard
+- Seller Profile
+- Products
+- Inventory
+- Orders
+- Manufacturer Hub
+- Store Builder
+- Design Studio
+- Customers
+- Marketing
+- Analytics
+- Existing navigation
+- Official Brandthread logo integration
+
+CORE GOAL
+
+A Buyer must be able to discover a product, select a valid variant, add it to cart, check out securely, receive order confirmation, track the order, contact the Seller, request a return, and request a refund when eligible.
+
+The system must support:
+
+- Pre-made products
+- Pre-order products
+- Multiple products
+- Multiple Sellers
+- Product tags from Thread posts
+- Storefront products
+- Seller Profile products
+- Inventory checks
+- Discounts
+- Shipping
+- Taxes
+- Payment processing
+- Held-funds status messaging
+- Order tracking
+- Returns
+- Refund requests
+- Disputes
+
+Use the existing payment, backend, inventory, Orders, Products, and authentication systems.
+
+Do not install a second backend.
+
+Do not install a second payment provider.
+
+CART ENTRY POINTS
+
+Allow Buyers to add products to cart from:
+
+- Thread post product tags
+- Seller Profile
+- Seller storefront
+- Product details
+- Search results
+- Collections
+- Related products
+- Saved products
+- Buy Again
+
+PRODUCT SELECTION
+
+Before adding to cart, require valid selections for:
+
+- Size
+- Color
+- Material
+- Style
+- Other required variant options
+
+Show:
+
+- Selected variant image
+- Price
+- Compare-at price
+- Stock status
+- Pre-order status
+- Estimated ship date
+- Quantity selector
+
+Do not allow unavailable combinations.
+
+When a variant is unavailable:
+
+- Disable it
+- Explain why
+- Suggest another option when available
+
+ADD TO CART
+
+The Add to Cart button must:
+
+- Validate the selected variant
+- Validate inventory
+- Validate product status
+- Validate Seller status
+- Prevent duplicate accidental submissions
+- Show loading
+- Add item once
+- Show success feedback
+- Open cart or allow continued shopping
+
+Support quantity limits.
+
+Respect:
+
+- Available inventory
+- Overselling settings
+- Pre-order limits
+- Maximum order quantity
+- Customer purchase limits
+
+BUY NOW
+
+Create a working Buy Now action.
+
+Buy Now should:
+
+- Validate variant
+- Validate inventory
+- Create a temporary checkout
+- Route directly to checkout
+- Not delete the Buyer’s existing cart
+- Preserve existing cart items separately
+
+CART SCREEN
+
+Create a premium Buyer Cart matching the Brandthread design system.
+
+Show:
+
+- Seller groups
+- Product image
+- Product name
+- Variant
+- Quantity
+- Unit price
+- Compare-at price
+- Discount
+- Pre-order badge
+- Estimated ship date
+- Stock warning
+- Remove
+- Save for later
+- Edit variant
+
+CART SUMMARY
+
+Show:
+
+- Subtotal
+- Discounts
+- Estimated shipping
+- Estimated taxes
+- Estimated total
+
+Clearly label estimates before shipping and taxes are finalized.
+
+MULTI-SELLER CART
+
+Support products from multiple Sellers.
+
+Group cart items by Seller.
+
+Each Seller group must show:
+
+- Seller name
+- Seller profile image
+- Store link
+- Fulfillment estimate
+- Shipping estimate
+- Item subtotal
+
+The system may create separate Seller orders after checkout while presenting one clean Buyer checkout.
+
+Do not mix Seller fulfillment data incorrectly.
+
+CART PERSISTENCE
+
+Persist the cart across:
+
+- App restart
+- Sign-in
+- Sign-out where safe
+- Session refresh
+- Navigation
+- Temporary network loss
+
+When a logged-out user signs in, safely merge guest and account carts.
+
+Do not duplicate items during merge.
+
+SAVE FOR LATER
+
+Allow Buyers to:
+
+- Move item to Saved
+- Move Saved item back to cart
+- Remove Saved item
+- Open product
+- See unavailable status
+
+Do not reserve inventory for Saved items.
+
+CART VALIDATION
+
+Before checkout, validate:
+
+- Product still active
+- Variant still exists
+- Price has not changed
+- Inventory is available
+- Pre-order is still open
+- Seller can accept orders
+- Shipping destination is supported
+- Discount is valid
+
+If something changed, show a clear review screen before continuing.
+
+CHECKOUT FLOW
+
+Create a mobile multi-step checkout.
+
+Steps:
+
+1. Contact
+2. Shipping address
+3. Delivery
+4. Discounts
+5. Payment
+6. Review
+7. Confirmation
+
+Show:
+
+- Current step
+- Progress
+- Back
+- Continue
+- Saved progress
+- Loading
+- Error states
+
+Preserve entered information.
+
+CONTACT STEP
+
+Collect:
+
+- Email
+- Phone when required
+- Marketing consent separately
+- Order update preference
+
+Do not automatically opt Buyers into marketing.
+
+SHIPPING ADDRESS
+
+Collect:
+
+- First name
+- Last name
+- Address line 1
+- Address line 2
+- City
+- State or region
+- Postal code
+- Country
+- Phone
+
+Support:
+
+- Saved addresses
+- Add new address
+- Edit address
+- Delete address
+- Set default address
+
+Validate address fields.
+
+Use address validation only if a real provider exists.
+
+Do not claim an address was verified if it was not.
+
+DELIVERY METHODS
+
+Show available shipping methods per Seller or fulfillment group.
+
+Each method must show:
+
+- Carrier or delivery type
+- Service name
+- Price
+- Estimated delivery
+- Tracking availability
+- Recommended badge when appropriate
+
+Support:
+
+- Standard
+- Expedited
+- Express
+- Local pickup if Seller enables it
+- Manufacturer shipping
+- Pre-order estimated shipping
+
+Use real shipping rates when a provider exists.
+
+Otherwise use a separated demo rate service.
+
+Do not claim a demo rate is final.
+
+PRE-ORDER CHECKOUT
+
+For pre-order items, clearly show:
+
+- Pre-order status
+- Closing date
+- Estimated production date
+- Estimated ship date
+- Delay possibility
+- Cancellation policy
+- Refund policy
+- Product-specific disclaimer
+
+Require acknowledgment before placing the order.
+
+Do not present pre-order inventory as ready to ship.
+
+MIXED CART
+
+If the cart includes both ready-to-ship and pre-order items:
+
+- Clearly separate timelines
+- Explain that items may ship separately
+- Show separate delivery estimates
+- Show separate fulfillment groups
+
+DISCOUNTS
+
+Allow:
+
+- Discount code
+- Automatic discount
+- Product discount
+- Collection discount
+- Free shipping
+- Referral reward
+- Influencer code
+- Customer-specific discount
+- Store credit where supported
+
+Show:
+
+- Applied code
+- Discount amount
+- Eligibility
+- Remove code
+- Error reason
+
+Prevent:
+
+- Duplicate codes
+- Invalid stacking
+- Expired discounts
+- Ineligible products
+- Unauthorized customer discounts
+- Negative totals
+
+TAXES
+
+Use the existing tax provider or backend if configured.
+
+Show:
+
+- Estimated tax
+- Final tax
+- Tax jurisdiction where appropriate
+
+Do not claim tax accuracy without a configured tax service.
+
+If no tax service exists, use clearly labeled estimated demo tax logic separated from UI components.
+
+PAYMENT METHODS
+
+Use the existing configured payment provider.
+
+Support where available:
+
+- Card
+- Apple Pay
+- Google Pay
+- Saved payment method
+- Store credit
+- Gift balance if supported later
+
+Do not install a second payment provider.
+
+Do not collect raw card details outside a secure payment-provider component.
+
+PAYMENT SCREEN
+
+Show:
+
+- Payment methods
+- Billing address
+- Save payment method toggle
+- Payment summary
+- Security messaging
+- Processing state
+- Failure state
+- Retry
+
+APPLE PAY AND GOOGLE PAY
+
+Show these options only when:
+
+- Provider supports them
+- Device supports them
+- Configuration is complete
+
+Do not show fake working payment buttons.
+
+PAYMENT SECURITY
+
+Never log:
+
+- Full card number
+- Security code
+- Payment token
+- Sensitive address data unnecessarily
+
+Use secure provider tokens.
+
+Do not save raw payment data in AsyncStorage.
+
+ORDER REVIEW
+
+Before placing the order, show:
+
+- Contact
+- Shipping address
+- Delivery methods
+- Products
+- Variants
+- Quantities
+- Sellers
+- Pre-order details
+- Discounts
+- Taxes
+- Shipping
+- Total
+- Payment method
+- Policies
+- Acknowledgments
+
+Allow editing each section.
+
+PLACE ORDER
+
+The Place Order button must:
+
+- Revalidate cart
+- Revalidate inventory
+- Revalidate prices
+- Revalidate discounts
+- Revalidate shipping
+- Confirm payment
+- Prevent duplicate taps
+- Show processing
+- Create Seller orders
+- Create line items
+- Reserve or reduce inventory according to policy
+- Create payment record
+- Create held-funds record when supported
+- Clear purchased cart items only after success
+- Route to confirmation
+
+Use idempotency protection if the payment provider supports it.
+
+Do not create duplicate orders after retry or app refresh.
+
+PAYMENT FAILURE
+
+Handle:
+
+- Card declined
+- Insufficient funds
+- Authentication required
+- Network timeout
+- Provider unavailable
+- Payment cancelled
+- Payment session expired
+- Inventory changed during payment
+- Price changed during payment
+
+Do not clear the cart after a failed payment.
+
+ORDER CONFIRMATION
+
+Create a premium confirmation screen.
+
+Show:
+
+- Success state
+- Order number
+- Seller names
+- Product summary
+- Total
+- Payment status
+- Shipping address
+- Delivery estimate
+- Pre-order estimate
+- Track order
+- Continue shopping
+- Contact Seller
+
+If multiple Seller orders were created, show the grouped orders clearly.
+
+HELD-FUNDS BUYER MESSAGING
+
+For supported orders, explain:
+
+“Your payment is protected while the order moves through fulfillment.”
+
+Show Buyer-friendly milestones such as:
+
+- Payment confirmed
+- Seller processing
+- Production in progress
+- Shipped
+- Delivered
+- Completed
+
+Do not show internal Seller allocations.
+
+Do not call the system escrow unless the legal and payment structure truly supports escrow.
+
+BUYER ORDERS
+
+Create a Buyer Orders hub.
+
+Filters:
+
+- All
+- Processing
+- Pre-order
+- Shipped
+- Delivered
+- Cancelled
+- Returns
+- Refunds
+- Issues
+
+Each order card must show:
+
+- Order number
+- Seller
+- Product image
+- Product count
+- Total
+- Order date
+- Status
+- Tracking status
+- Pre-order badge
+- Estimated delivery
+
+ORDER DETAILS
+
+Show:
+
+- Order number
+- Seller
+- Products
+- Variants
+- Quantities
+- Prices
+- Discounts
+- Shipping
+- Tax
+- Total
+- Payment status
+- Fulfillment status
+- Shipping address
+- Tracking
+- Timeline
+- Pre-order details
+- Contact Seller
+- Request return
+- Request refund
+- Report problem
+- Buy again
+
+TRACKING
+
+Show:
+
+- Carrier
+- Tracking number
+- Current status
+- Estimated delivery
+- Latest update
+- Tracking timeline
+
+Statuses:
+
+- Order confirmed
+- Processing
+- Production
+- Label created
+- Shipped
+- In transit
+- Out for delivery
+- Delivered
+- Exception
+- Returned
+
+PRE-ORDER TRACKING
+
+Show:
+
+- Pre-order opened
+- Order placed
+- Pre-order closed
+- Production started
+- Production update
+- Quality check
+- Ready to ship
+- Shipped
+- Delivered
+
+Allow Seller updates to appear in the Buyer timeline.
+
+BUYER COMMUNICATION
+
+Allow Buyers to:
+
+- Contact Seller
+- Ask about order
+- Ask about product
+- Report shipping issue
+- Report missing item
+- Report damaged item
+
+Keep order context attached to the conversation.
+
+RETURNS
+
+Allow Buyer return requests when eligible.
+
+Show:
+
+- Eligible products
+- Eligible quantity
+- Return deadline
+- Return policy
+- Refund estimate
+- Return shipping responsibility
+
+Return reasons:
+
+- Wrong size
+- Wrong item
+- Damaged
+- Defective
+- Not as described
+- Changed mind
+- Late delivery
+- Missing item
+- Other
+
+Allow:
+
+- Reason
+- Description
+- Photos
+- Videos
+- Preferred resolution
+- Submit request
+
+Preferred resolutions:
+
+- Refund
+- Exchange
+- Store credit
+- Replacement
+
+REFUND REQUESTS
+
+Allow a Buyer to request a refund when eligible.
+
+Show:
+
+- Order
+- Products
+- Maximum possible refund
+- Refund policy
+- Reason
+- Evidence
+- Submit
+
+Do not claim a refund is approved until the Seller or payment provider confirms it.
+
+PROBLEM REPORTS
+
+Create issue types:
+
+- Order not received
+- Tracking issue
+- Wrong product
+- Damaged product
+- Missing item
+- Seller not responding
+- Unauthorized payment
+- Other
+
+Allow:
+
+- Description
+- Photos
+- Videos
+- Contact Seller first
+- Escalate to support when appropriate
+
+DISPUTES
+
+Connect Buyer problem reports to the existing dispute system.
+
+Do not fabricate outcomes.
+
+Show:
+
+- Open
+- Evidence requested
+- Under review
+- Resolved
+- Closed
+
+BUY AGAIN
+
+Allow Buyers to reorder previous products.
+
+Before adding:
+
+- Validate product active
+- Validate variant
+- Validate inventory
+- Show price changes
+- Show pre-order changes
+
+Do not silently add an unavailable old variant.
+
+CANCELLATION
+
+Allow Buyer cancellation only according to order state and Seller policy.
+
+Show:
+
+- Cancellation eligibility
+- Expected refund
+- Inventory impact
+- Pre-order policy
+- Confirmation
+
+Do not show cancellation when shipment has already passed the allowed stage.
+
+NOTIFICATIONS
+
+Create Buyer notifications for:
+
+- Order confirmed
+- Payment issue
+- Seller processing
+- Pre-order update
+- Production started
+- Delay
+- Shipped
+- Out for delivery
+- Delivered
+- Return update
+- Refund update
+- Seller message
+- Dispute update
+
+Do not claim a push notification was delivered unless the notification provider confirms it.
+
+SELLER INTEGRATION
+
+Every successful Buyer order must appear in:
+
+- Seller Orders
+- Seller Dashboard
+- Seller notifications
+- Product analytics
+- Inventory
+- Customer profile
+- Marketing attribution
+- Payout records
+- Held-funds records
+- Manufacturer fulfillment when applicable
+
+PRODUCT INTEGRATION
+
+Update:
+
+- Inventory
+- Units sold
+- Revenue
+- Variant availability
+- Product analytics
+- Content attribution
+- Storefront availability
+
+THREAD ATTRIBUTION
+
+When checkout begins from a Seller post product tag:
+
+- Preserve source post
+- Preserve source product tag
+- Track product click
+- Track add to cart
+- Track checkout
+- Track purchase
+- Attribute revenue correctly
+
+Do not double-count attribution.
+
+STORE ATTRIBUTION
+
+Track:
+
+- Store page
+- Collection
+- Homepage section
+- Search
+- Related products
+
+MARKETING ATTRIBUTION
+
+Track:
+
+- Campaign
+- Discount
+- Influencer
+- Referral
+- Abandoned checkout recovery
+
+Use the existing attribution rules.
+
+INVENTORY INTEGRATION
+
+At the correct order milestone:
+
+- Reserve stock
+- Reduce availability
+- Release reservation after cancellation or failure
+- Reduce on hand according to fulfillment policy
+- Handle partial fulfillment
+- Handle returned inventory
+- Keep pre-order commitments separate
+
+Do not oversell unless the Seller enabled it.
+
+DATA MODELS
+
+Create or update typed models for:
+
+- Cart
+- CartItem
+- SavedCartItem
+- CartSellerGroup
+- CheckoutSession
+- CheckoutContact
+- CheckoutAddress
+- CheckoutDeliveryGroup
+- CheckoutShippingMethod
+- CheckoutDiscount
+- CheckoutTax
+- CheckoutPaymentMethod
+- CheckoutReview
+- PaymentAttempt
+- BuyerOrder
+- BuyerOrderGroup
+- BuyerOrderLineItem
+- BuyerOrderTimeline
+- BuyerTracking
+- BuyerReturnRequest
+- BuyerRefundRequest
+- BuyerProblemReport
+- BuyerDisputeView
+- CheckoutAttribution
+- CheckoutAcknowledgment
+
+SERVICES
+
+Use the existing backend and payment provider.
+
+Do not install a second backend.
+Do not install a second payment provider.
+
+Create or update strongly typed services for:
+
+- Get cart
+- Add item
+- Update item
+- Remove item
+- Save for later
+- Merge guest cart
+- Validate cart
+- Create checkout session
+- Save checkout progress
+- Get shipping rates
+- Apply discount
+- Calculate taxes
+- Create payment intent
+- Confirm payment
+- Create orders
+- Reserve inventory
+- Release inventory
+- Create held-funds record
+- Get Buyer orders
+- Get order tracking
+- Create return request
+- Create refund request
+- Create problem report
+- Cancel eligible order
+- Buy again
+- Track checkout attribution
+
+Keep mock services separated from UI components.
+
+Do not put fake payment success directly inside screen code.
+
+DESIGN CONSISTENCY
+
+Every Buyer commerce screen must match onboarding and the Brandthread design system.
+
+Use:
+
+- Deep black and charcoal backgrounds
+- Purple and blue primary accents
+- Controlled green for success
+- Controlled red or orange for errors
+- Rounded cards
+- Rounded inputs
+- Premium typography
+- Clear hierarchy
+- Smooth transitions
+- Styled loading states
+- Styled empty states
+- Styled error states
+- Official Brandthread logo only for system branding
+- Seller-owned branding where appropriate
+- No old green and gray layouts
+- No white flashes
+
+MOBILE QUALITY
+
+Ensure:
+
+- Safe-area support
+- Keyboard avoidance
+- Address-form scrolling
+- No clipped totals
+- No horizontal overflow
+- Large touch targets
+- Accessible labels
+- Screen-reader support
+- Loading feedback
+- Offline recovery
+- Draft checkout recovery
+- No duplicate order creation
+- No dead buttons
+
+EMPTY STATES
+
+Cart:
+“Your cart is ready for something great.”
+
+Saved:
+“Products you save for later will appear here.”
+
+Orders:
+“Your orders will appear here after checkout.”
+
+Returns:
+“Return requests will appear here.”
+
+Refunds:
+“Refund updates will appear here.”
+
+Each empty state must include a useful action.
+
+TESTING
+
+Test these exact paths:
+
+1. Open a product from Thread.
+2. Select a valid variant.
+3. Add to cart.
+4. Add a second product.
+5. Add a product from another Seller.
+6. Open cart.
+7. Change quantity.
+8. Edit variant.
+9. Remove item.
+10. Save item for later.
+11. Move Saved item back.
+12. Restart app.
+13. Confirm cart persists.
+14. Test guest-to-account cart merge.
+15. Start checkout.
+16. Enter contact details.
+17. Add shipping address.
+18. Select shipping method.
+19. Apply valid discount.
+20. Apply invalid discount.
+21. Test estimated tax.
+22. Select payment method.
+23. Test Apple Pay when configured.
+24. Test Google Pay when configured.
+25. Test card payment.
+26. Trigger payment failure.
+27. Retry payment.
+28. Prevent duplicate Place Order taps.
+29. Complete ready-to-ship order.
+30. Complete pre-order checkout.
+31. Complete mixed ready-stock and pre-order checkout.
+32. Complete multi-Seller checkout.
+33. Confirm order confirmation.
+34. Open Buyer Orders.
+35. Open Order Details.
+36. Test tracking.
+37. Test pre-order tracking.
+38. Contact Seller.
+39. Request return.
+40. Upload return evidence.
+41. Request refund.
+42. Report a problem.
+43. Test dispute view.
+44. Test cancellation eligibility.
+45. Test Buy Again.
+46. Test out-of-stock prevention.
+47. Test price-change review.
+48. Test inventory-change review.
+49. Test expired pre-order prevention.
+50. Test unsupported shipping destination.
+51. Confirm Seller receives order.
+52. Confirm inventory updates.
+53. Confirm analytics update.
+54. Confirm customer profile updates.
+55. Confirm payout record updates.
+56. Confirm held-funds record updates.
+57. Confirm attribution updates.
+58. Close and reopen during checkout.
+59. Confirm checkout progress recovery.
+60. Fix all TypeScript errors.
+61. Fix all routing errors.
+62. Fix all runtime errors.
+63. Fix all console errors caused by this system.
+64. Confirm onboarding remains unchanged.
+65. Confirm Buyer and Seller accounts still work.
+66. Confirm official Brandthread logo still works.
+
+Do not stop after creating static cart or checkout screens.
+
+Build the complete working Buyer cart, checkout, secure payment integration, order creation, tracking, returns, refund requests, disputes, persistence, inventory connection, Seller integration, attribution, typed models, services, and full testing.
+
+When complete, respond with only:
+
+“The Brandthread Buyer commerce system is installed and working.”

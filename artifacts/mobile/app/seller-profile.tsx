@@ -478,7 +478,7 @@ export default function SellerProfileScreen() {
               end={{ x: 1, y: 0 }}
               style={styles.shopBtnGradient}
             >
-              <TouchableOpacity style={styles.shopBtnInner} activeOpacity={0.85}>
+              <TouchableOpacity style={styles.shopBtnInner} activeOpacity={0.85} onPress={() => setActiveTab(1)}>
                 <Feather name="shopping-bag" size={18} color={BG} />
                 <Text style={styles.shopBtnText}>Shop</Text>
               </TouchableOpacity>
@@ -539,7 +539,7 @@ export default function SellerProfileScreen() {
                     key={product.id}
                     product={product as Product}
                     index={i}
-                    onPress={(id) => router.push((isOwner ? '/product-detail?id=' : '/product-store?id=') + id as never)}
+                    onPress={(id) => router.push((isOwner ? '/product-detail?id=' : '/buyer-product-detail?productId=') + id as never)}
                   />
                 ))
               )}
