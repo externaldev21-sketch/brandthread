@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -27,20 +27,42 @@ const proxyUrl = process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;
 
 export const ONBOARDING_KEY = 'onboarding_complete';
 
+// ─── DEV: force restart to onboarding start ──────────────────────────────────
+// Set back to false (or remove) when done testing.
+const DEV_FORCE_ONBOARDING_START = true;
+
 // Screens that don't require authentication
 const AUTH_SCREENS = ['welcome', 'sign-in', 'forgot-password', 'splash'];
 
 // ─── Auth gate ────────────────────────────────────────────────────────────────
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isSignedIn, isLoaded, signOut } = useAuth();
   const router   = useRouter();
   const segments = useSegments();
+  const devForcedRef = useRef(false);
   const topSegment = segments[0];
 
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [onboardingDone, setOnboardingDone]       = useState(false);
   const [storedRole, setStoredRole]               = useState<string | null>(null);
   const [splashSeen, setSplashSeen]               = useState<boolean | null>(null);
+
+  // DEV: wipe all session/onboarding state and go to splash on hot-reload
+  useEffect(() => {
+    if (!DEV_FORCE_ONBOARDING_START) return;
+    if (devForcedRef.current) return;
+    devForcedRef.current = true;
+    (async () => {
+      try { if (isSignedIn) await signOut(); } catch {}
+      await AsyncStorage.multiRemove([
+        'onboarding_complete', 'user_role', 'splash_seen',
+        'onboarding_draft', 'onboarding_first_name',
+        'onboarding_brand_name', 'onboarding_style_interests',
+      ]);
+      router.replace('/splash');
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoaded]);
 
   // Read splash_seen once on mount
   useEffect(() => {
