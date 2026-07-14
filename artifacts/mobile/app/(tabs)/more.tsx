@@ -54,10 +54,10 @@ const GROWTH: NavItem[] = [
 ];
 
 const STORE: NavItem[] = [
-  { icon: 'layout', label: 'Store Builder', desc: 'Customize your storefront', accent: PURPLE },
-  { icon: 'grid',   label: 'Collections',   desc: 'Group products',            accent: CYAN },
+  { icon: 'layout', label: 'Store Builder', desc: 'Customize your storefront', accent: PURPLE, route: '/store-builder' },
+  { icon: 'grid',   label: 'Collections',   desc: 'Group products',            accent: CYAN,   route: '/store-collections' },
   { icon: 'tag',    label: 'Discounts',     desc: 'Coupon codes and offers',   accent: GOLD },
-  { icon: 'globe',  label: 'Domains',       desc: 'Custom domain settings',    accent: BLUE },
+  { icon: 'globe',  label: 'Domains',       desc: 'Custom domain settings',    accent: BLUE,   route: '/store-domain' },
 ];
 
 const ACCOUNT: NavItem[] = [

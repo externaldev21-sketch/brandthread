@@ -208,6 +208,25 @@ function RootLayoutNav() {
         <Stack.Screen name="inventory-incoming" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="inventory-count"    options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="inventory-location" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="store-generate"       options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="store-generating"     options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
+        <Stack.Screen name="store-theme-picker"   options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="store-preview"        options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="store-editor"         options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="store-sections"       options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="store-collections"    options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="store-pages"          options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="store-nav"            options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="store-settings"       options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="store-policies"       options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="store-seo"            options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="store-domain"         options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="store-publish"        options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
+        <Stack.Screen name="store-versions"       options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="store-from-logo"      options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="store-from-moodboard" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="store-from-social"    options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="store-ai-improve"     options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
       </Stack>
     </AuthGate>
   );

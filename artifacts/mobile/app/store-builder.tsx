@@ -1,323 +1,500 @@
-import React, { useState } from 'react';
-import {
-  ScrollView, View, Text, TouchableOpacity, StyleSheet,
-  Alert, Platform,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useState, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
+  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
+  CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
+  ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
+  GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
+  IconButton, FilterChip, StatusBadge, SectionHeader,
+  EmptyState, StatCard } from '@/components/BrandthreadUI';
+import { getStorefront, saveDraft, generateAISuggestions } from '@/services/storeService';
+import { Storefront, StorePublishStatus } from '@/services/storeTypes';
 
-const BG     = '#0A0B0A';
-const CARD   = '#111311';
-const BORDER = '#1E221E';
-const FG     = '#EAF2ED';
-const MUTED  = '#5A6B5C';
-const GREEN  = '#39FF88';
-const BLUE   = '#3B82F6';
-const PURPLE = '#8B5CF6';
-const CYAN   = '#06B6D4';
-const ORANGE = '#F97316';
+function getStatusVariant(status: StorePublishStatus): 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple' {
+  switch (status) {
+    case 'published': return 'success';
+    case 'draft': return 'info';
+    case 'ready': return 'purple';
+    case 'password_protected': return 'warning';
+    case 'maintenance': return 'warning';
+    case 'unpublished': return 'error';
+    default: return 'neutral';
+  }
+}
 
-const SECTIONS_DATA = [
-  { id: 's1', type: 'Hero',               icon: 'monitor'   as const, visible: true,  color: PURPLE },
-  { id: 's2', type: 'Featured Collection',icon: 'grid'      as const, visible: true,  color: BLUE   },
-  { id: 's3', type: 'Product Grid',       icon: 'box'       as const, visible: true,  color: GREEN  },
-  { id: 's4', type: 'Brand Story',        icon: 'type'      as const, visible: false, color: CYAN   },
-  { id: 's5', type: 'Video',              icon: 'video'     as const, visible: false, color: ORANGE },
-  { id: 's6', type: 'Reviews',            icon: 'star'      as const, visible: true,  color: '#FBBF24' },
-  { id: 's7', type: 'Newsletter',         icon: 'mail'      as const, visible: false, color: MUTED  },
-];
+function getStatusLabel(status: StorePublishStatus): string {
+  switch (status) {
+    case 'published': return 'Published';
+    case 'draft': return 'Draft';
+    case 'ready': return 'Ready';
+    case 'password_protected': return 'Password Protected';
+    case 'maintenance': return 'Maintenance';
+    case 'unpublished': return 'Unpublished';
+    case 'not_started': return 'Not Started';
+  }
+}
 
-const NAV_SECTIONS = [
-  { label: 'Store Overview', icon: 'home'       as const, desc: 'Performance and live status.' },
-  { label: 'Theme',          icon: 'sliders'    as const, desc: 'Colors, fonts and brand identity.' },
-  { label: 'Pages',          icon: 'file-text'  as const, desc: 'Manage store pages.' },
-  { label: 'Navigation',     icon: 'menu'       as const, desc: 'Header and footer menus.' },
-  { label: 'Collections',    icon: 'layers'     as const, desc: 'Group products into collections.' },
-  { label: 'Domains',        icon: 'link'       as const, desc: 'Connect a custom domain.' },
-  { label: 'Payments',       icon: 'credit-card'as const, desc: 'Accept payments from customers.' },
-  { label: 'Shipping',       icon: 'truck'      as const, desc: 'Set rates and delivery zones.' },
-  { label: 'Taxes',          icon: 'percent'    as const, desc: 'Tax rates and compliance.' },
-  { label: 'Policies',       icon: 'shield'     as const, desc: 'Refund, privacy and terms.' },
-  { label: 'SEO',            icon: 'search'     as const, desc: 'Search engine optimisation.' },
-];
-
-const THEME_COLORS = ['#39FF88', '#8B5CF6', '#3B82F6', '#EC4899', '#F97316', '#EF4444', '#FBBF24', '#06B6D4'];
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
 
 export default function StoreBuilderScreen() {
-  const insets  = useSafeAreaInsets();
-  const router  = useRouter();
-  const topPad  = Platform.OS === 'web' ? 20 : insets.top;
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const [store, setStore] = useState<Storefront | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const [activeTab, setActiveTab]     = useState<'overview' | 'theme' | 'sections'>('overview');
-  const [sections,  setSections]      = useState(SECTIONS_DATA);
-  const [accentColor, setAccentColor] = useState(THEME_COLORS[0]);
+  const loadData = useCallback(async () => {
+    try {
+      const s = await getStorefront();
+      const updated = await generateAISuggestions();
+      setStore(updated);
+    } catch {
+      setStore(null);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
-  function back() { router.back(); }
+  useFocusEffect(useCallback(() => {
+    setLoading(true);
+    loadData();
+  }, [loadData]));
 
-  function toggleSection(id: string) {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSections(prev => prev.map(s => s.id === id ? { ...s, visible: !s.visible } : s));
-  }
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadData();
+  };
 
-  function publishStore() {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert('Store Published', 'Your store is now live. Changes may take a moment to appear.', [{ text: 'OK' }]);
+  const hasStore = store !== null && store.publishStatus !== 'not_started';
+  const suggestionCount = store
+    ? store.aiSuggestions.filter(s => !s.dismissed && !s.applied).length
+    : 0;
+
+  const managementRows = [
+    [
+      { label: 'Sections', icon: 'layout' as const, route: '/store-sections' },
+      { label: 'Collections', icon: 'grid' as const, route: '/store-collections' },
+      { label: 'Pages', icon: 'file-text' as const, route: '/store-pages' },
+      { label: 'Navigation', icon: 'menu' as const, route: '/store-nav' },
+    ],
+    [
+      { label: 'Policies', icon: 'shield' as const, route: '/store-policies' },
+      { label: 'SEO', icon: 'search' as const, route: '/store-seo' },
+      { label: 'Domains', icon: 'globe' as const, route: '/store-domain' },
+      { label: 'Versions', icon: 'clock' as const, route: '/store-versions' },
+    ],
+  ];
+
+  if (loading) {
+    return (
+      <View style={[s.loadingContainer, { paddingTop: insets.top }]}>
+        <ActivityIndicator color={PURPLE} size="large" />
+      </View>
+    );
   }
 
   return (
-    <View style={[s.root, { paddingTop: topPad }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity style={s.backBtn} onPress={back}>
-          <Feather name="arrow-left" size={20} color={FG} />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={s.title}>Store Builder</Text>
-          <View style={s.liveRow}>
-            <View style={s.liveDot} />
-            <Text style={s.liveText}>Live · brandthread.co/devonsbrand</Text>
+    <View style={[s.root, { backgroundColor: BG }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PURPLE} />}
+      >
+        {/* HEADER */}
+        <LinearGradient
+          colors={[...GRAD_PRIMARY]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[s.header, { paddingTop: insets.top + SP.md }]}
+        >
+          <Text style={s.headerSubtitle}>Store Builder</Text>
+          <Text style={s.headerHeading}>Build your brand's home.</Text>
+          <Text style={s.headerDesc}>
+            Create a complete storefront with Brandthread AI or start with a professionally designed theme.
+          </Text>
+        </LinearGradient>
+
+        <View style={s.content}>
+          {/* CURRENT STORE STATUS CARD */}
+          {hasStore && store && (
+            <GradientCard colors={GRAD_CARD_GLOW} glow style={s.storeStatusCard}>
+              <View style={s.storeStatusTop}>
+                <View style={s.storeStatusLeft}>
+                  <Text style={s.storeName} numberOfLines={1}>
+                    {store.settings.storeName || 'My Store'}
+                  </Text>
+                  <View style={s.storeStatusRow}>
+                    <StatusBadge
+                      label={getStatusLabel(store.publishStatus)}
+                      variant={getStatusVariant(store.publishStatus)}
+                      small
+                    />
+                    <Text style={s.lastEdited}>
+                      Last edited: {timeAgo(store.lastEditedAt)}
+                    </Text>
+                  </View>
+                </View>
+                <Feather
+                  name={store.publishStatus === 'published' ? 'check-circle' : 'edit-2'}
+                  size={ICON.lg}
+                  color={store.publishStatus === 'published' ? SUCCESS : MUTED}
+                />
+              </View>
+              <View style={s.quickActions}>
+                {[
+                  { label: 'Preview', route: '/store-preview' },
+                  { label: 'Edit Store', route: '/store-editor' },
+                  { label: 'Publish', route: '/store-publish' },
+                  { label: 'Settings', route: '/store-settings' },
+                ].map(({ label, route }) => (
+                  <TouchableOpacity
+                    key={label}
+                    style={s.quickActionBtn}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      router.push(route as never);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={s.quickActionText}>{label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </GradientCard>
+          )}
+
+          {/* PRIMARY OPTIONS */}
+          <View style={s.section}>
+            {/* Option 1: Build with AI — full width hero */}
+            <GradientCard
+              colors={[...GRAD_PRIMARY]}
+              glow
+              style={s.heroCard}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                router.push('/store-generate' as never);
+              }}
+            >
+              <View style={s.heroCardBadgeRow}>
+                <View style={s.popularBadge}>
+                  <Text style={s.popularBadgeText}>Most popular</Text>
+                </View>
+              </View>
+              <View style={s.heroCardRow}>
+                <Feather name="zap" size={ICON.xl} color={GOLD} />
+                <View style={s.heroCardText}>
+                  <Text style={s.heroCardTitle}>Build with AI</Text>
+                  <Text style={s.heroCardDesc}>
+                    Describe your brand and we'll generate a complete storefront.
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={s.heroCardButton}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  router.push('/store-generate' as never);
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={s.heroCardButtonText}>Start AI Build →</Text>
+              </TouchableOpacity>
+            </GradientCard>
+
+            {/* 2-column grid options */}
+            <View style={s.optionsGrid}>
+              {/* Option 2: Choose a Theme */}
+              <BrandthreadCard
+                style={s.halfCard}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push('/store-theme-picker' as never);
+                }}
+              >
+                <Feather name="layout" size={ICON.md} color={PURPLE} />
+                <Text style={s.halfCardTitle}>Choose a Theme</Text>
+                <Text style={s.halfCardDesc}>Browse professionally designed themes.</Text>
+              </BrandthreadCard>
+
+              {/* Option 3: From Logo */}
+              <BrandthreadCard
+                style={s.halfCard}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push('/store-from-logo' as never);
+                }}
+              >
+                <Feather name="image" size={ICON.md} color={CYAN} />
+                <Text style={s.halfCardTitle}>From Logo</Text>
+                <Text style={s.halfCardDesc}>Upload your logo to generate a storefront.</Text>
+              </BrandthreadCard>
+
+              {/* Option 4: From Mood Board */}
+              <BrandthreadCard
+                style={s.halfCard}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push('/store-from-moodboard' as never);
+                }}
+              >
+                <Feather name="grid" size={ICON.md} color={BLUE} />
+                <Text style={s.halfCardTitle}>From Mood Board</Text>
+                <Text style={s.halfCardDesc}>Upload images that inspire your brand.</Text>
+              </BrandthreadCard>
+
+              {/* Option 5: From Social */}
+              <BrandthreadCard
+                style={s.halfCard}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push('/store-from-social' as never);
+                }}
+              >
+                <Feather name="share-2" size={ICON.md} color={ORANGE} />
+                <Text style={s.halfCardTitle}>From Social</Text>
+                <Text style={s.halfCardDesc}>Use your existing social content.</Text>
+                <View style={s.demoBadge}>
+                  <Text style={s.demoBadgeText}>Upload only — no scraping</Text>
+                </View>
+              </BrandthreadCard>
+
+              {/* Option 6: Continue Editing / Start fresh */}
+              <BrandthreadCard
+                style={s.halfCard}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  router.push('/store-editor' as never);
+                }}
+              >
+                <Feather name="edit-2" size={ICON.md} color={SUCCESS} />
+                <Text style={s.halfCardTitle}>
+                  {store && store.publishStatus !== 'not_started' ? 'Continue Editing' : 'Start Fresh'}
+                </Text>
+                <Text style={s.halfCardDesc}>
+                  {store && store.publishStatus !== 'not_started'
+                    ? 'Pick up where you left off.'
+                    : 'Build from a blank canvas.'}
+                </Text>
+              </BrandthreadCard>
+            </View>
+          </View>
+
+          {/* STORE MANAGEMENT */}
+          <View style={s.section}>
+            <SectionHeader title="Manage Your Store" />
+            {managementRows.map((row, rowIdx) => (
+              <View key={rowIdx} style={s.mgmtRow}>
+                {row.map(({ label, icon, route }) => (
+                  <TouchableOpacity
+                    key={label}
+                    style={s.mgmtCard}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      router.push(route as never);
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <View style={s.mgmtIconWrap}>
+                      <Feather name={icon} size={ICON.md} color={PURPLE_LIGHT} />
+                    </View>
+                    <Text style={s.mgmtLabel}>{label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ))}
+          </View>
+
+          {/* AI IMPROVE STORE */}
+          <View style={[s.section, s.lastSection]}>
+            <GradientCard colors={GRAD_CARD_GLOW} glow>
+              <View style={s.aiImproveRow}>
+                <View style={s.aiImproveIconWrap}>
+                  <Feather name="zap" size={ICON.lg} color={GOLD} />
+                  {suggestionCount > 0 && (
+                    <View style={s.suggestionBadge}>
+                      <Text style={s.suggestionBadgeText}>{suggestionCount}</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={s.aiImproveText}>
+                  <Text style={s.aiImproveTitle}>Improve Store with AI</Text>
+                  <Text style={s.aiImproveDesc}>
+                    Get personalized recommendations for your storefront.
+                  </Text>
+                </View>
+              </View>
+              <PrimaryButton
+                label="Open Suggestions →"
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  router.push('/store-ai-improve' as never);
+                }}
+                style={s.aiImproveBtn}
+              />
+            </GradientCard>
           </View>
         </View>
-        <TouchableOpacity style={s.publishBtn} onPress={publishStore} activeOpacity={0.85}>
-          <Text style={s.publishText}>Publish</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Tab bar */}
-      <View style={s.tabBar}>
-        {(['overview', 'theme', 'sections'] as const).map(tab => (
-          <TouchableOpacity
-            key={tab}
-            style={[s.tab, activeTab === tab && s.tabActive]}
-            onPress={() => { setActiveTab(tab); Haptics.selectionAsync(); }}
-            activeOpacity={0.8}
-          >
-            <Text style={[s.tabText, activeTab === tab && s.tabTextActive]}>
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16, paddingBottom: 120, gap: 16 }}>
-
-        {/* ── Overview tab ── */}
-        {activeTab === 'overview' && (
-          <>
-            {/* Store preview card */}
-            <LinearGradient
-              colors={['#1A0B35', '#0A1540', '#070D1A']}
-              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-              style={s.previewCard}
-            >
-              <View style={s.previewMockup}>
-                <View style={s.previewPhone}>
-                  <View style={s.previewHeader} />
-                  <View style={s.previewHero} />
-                  <View style={s.previewGrid}>
-                    {[0,1,2,3].map(i => <View key={i} style={s.previewProduct} />)}
-                  </View>
-                </View>
-              </View>
-              <View style={{ flex: 1, gap: 8 }}>
-                <Text style={s.previewTitle}>Devon's Brand</Text>
-                <Text style={s.previewUrl}>brandthread.co/devonsbrand</Text>
-                <View style={s.previewStats}>
-                  <View style={s.previewStat}>
-                    <Text style={s.previewStatVal}>3,241</Text>
-                    <Text style={s.previewStatLabel}>Visitors</Text>
-                  </View>
-                  <View style={s.previewStat}>
-                    <Text style={s.previewStatVal}>1.5%</Text>
-                    <Text style={s.previewStatLabel}>Conv.</Text>
-                  </View>
-                  <View style={s.previewStat}>
-                    <Text style={s.previewStatVal}>$18.4K</Text>
-                    <Text style={s.previewStatLabel}>Revenue</Text>
-                  </View>
-                </View>
-                <TouchableOpacity style={s.previewBtn} onPress={() => {}} activeOpacity={0.85}>
-                  <Text style={s.previewBtnText}>Preview Store</Text>
-                  <Feather name="external-link" size={12} color={PURPLE} />
-                </TouchableOpacity>
-              </View>
-            </LinearGradient>
-
-            {/* Nav sections */}
-            <View style={s.navCard}>
-              {NAV_SECTIONS.map((item, i) => (
-                <TouchableOpacity
-                  key={item.label}
-                  style={[s.navRow, i > 0 && s.navBorder]}
-                  onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
-                  activeOpacity={0.8}
-                >
-                  <View style={s.navIcon}>
-                    <Feather name={item.icon} size={16} color={MUTED} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.navLabel}>{item.label}</Text>
-                    <Text style={s.navDesc}>{item.desc}</Text>
-                  </View>
-                  <Feather name="chevron-right" size={15} color={MUTED} />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </>
-        )}
-
-        {/* ── Theme tab ── */}
-        {activeTab === 'theme' && (
-          <>
-            <Text style={s.sectionTitle}>Brand accent colour</Text>
-            <View style={s.colourRow}>
-              {THEME_COLORS.map(c => (
-                <TouchableOpacity
-                  key={c}
-                  style={[s.colourSwatch, { backgroundColor: c, borderWidth: accentColor === c ? 3 : 0, borderColor: FG }]}
-                  onPress={() => { setAccentColor(c); Haptics.selectionAsync(); }}
-                  activeOpacity={0.85}
-                />
-              ))}
-            </View>
-
-            {[
-              { label: 'Logo',             icon: 'image'       as const, desc: 'Upload your brand logo' },
-              { label: 'Typography',       icon: 'type'        as const, desc: 'Headings: Inter Bold · Body: Inter Regular' },
-              { label: 'Button style',     icon: 'square'      as const, desc: 'Rounded · Filled' },
-              { label: 'Product cards',    icon: 'grid'        as const, desc: '2-column grid with price and name' },
-              { label: 'Announcement bar', icon: 'alert-circle'as const, desc: 'Free shipping on orders over $80' },
-            ].map((item, i) => (
-              <TouchableOpacity key={item.label} style={[s.themeRow, i > 0 && { marginTop: -1 }]} onPress={() => {}} activeOpacity={0.8}>
-                <View style={s.themeIcon}><Feather name={item.icon} size={16} color={MUTED} /></View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.themeLabel}>{item.label}</Text>
-                  <Text style={s.themeDesc}>{item.desc}</Text>
-                </View>
-                <Feather name="chevron-right" size={15} color={MUTED} />
-              </TouchableOpacity>
-            ))}
-          </>
-        )}
-
-        {/* ── Sections tab ── */}
-        {activeTab === 'sections' && (
-          <>
-            <View style={s.sectHead}>
-              <Text style={s.sectionTitle}>Homepage sections</Text>
-              <TouchableOpacity
-                style={s.addSectionBtn}
-                onPress={() => Alert.alert('Add Section', 'Choose a section type to add to your homepage.')}
-                activeOpacity={0.85}
-              >
-                <Feather name="plus" size={14} color={GREEN} />
-                <Text style={s.addSectionText}>Add</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={s.navCard}>
-              {sections.map((sec, i) => (
-                <View key={sec.id} style={[s.sectionRow, i > 0 && s.navBorder]}>
-                  <TouchableOpacity style={s.dragHandle}>
-                    <Feather name="menu" size={14} color={MUTED} />
-                  </TouchableOpacity>
-                  <View style={[s.sectionIcon, { backgroundColor: sec.color + '20' }]}>
-                    <Feather name={sec.icon} size={14} color={sec.color} />
-                  </View>
-                  <Text style={[s.sectionType, !sec.visible && { color: MUTED }]}>{sec.type}</Text>
-                  <View style={s.sectionActions}>
-                    <TouchableOpacity style={s.sectionBtn} onPress={() => {}}>
-                      <Feather name="edit-2" size={13} color={MUTED} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={s.sectionBtn}
-                      onPress={() => toggleSection(sec.id)}
-                    >
-                      <Feather name={sec.visible ? 'eye' : 'eye-off'} size={13} color={sec.visible ? GREEN : MUTED} />
-                    </TouchableOpacity>
-                    <TouchableOpacity style={s.sectionBtn} onPress={() => {}}>
-                      <Feather name="trash-2" size={13} color={MUTED} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
-            </View>
-
-            <TouchableOpacity style={s.previewFullBtn} onPress={() => {}} activeOpacity={0.85}>
-              <Feather name="eye" size={15} color={GREEN} />
-              <Text style={s.previewFullText}>Preview full homepage</Text>
-            </TouchableOpacity>
-          </>
-        )}
-
       </ScrollView>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  root:    { flex: 1, backgroundColor: BG },
-  header:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
-  backBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  title:   { fontSize: 18, fontFamily: 'Inter_700Bold', color: FG },
-  liveRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
-  liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: GREEN },
-  liveText:{ fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
-  publishBtn: { backgroundColor: GREEN, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
-  publishText:{ fontSize: 13, fontFamily: 'Inter_700Bold', color: '#0A0B0A' },
-
-  tabBar:      { flexDirection: 'row', paddingHorizontal: 16, gap: 6, marginBottom: 4 },
-  tab:         { flex: 1, paddingVertical: 10, borderRadius: 10, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
-  tabActive:   { backgroundColor: GREEN + '20', borderColor: GREEN },
-  tabText:     { fontSize: 13, fontFamily: 'Inter_500Medium', color: MUTED },
-  tabTextActive: { color: GREEN, fontFamily: 'Inter_700Bold' },
-
-  previewCard:  { borderRadius: 18, padding: 16, flexDirection: 'row', gap: 16, borderWidth: 1, borderColor: PURPLE + '30' },
-  previewPhone: { width: 70, height: 110, borderRadius: 10, backgroundColor: '#1A1C2A', overflow: 'hidden', gap: 4, padding: 6 },
-  previewHeader:{ height: 8, backgroundColor: '#2A2C3A', borderRadius: 3 },
-  previewHero:  { height: 36, backgroundColor: '#3A3C4A', borderRadius: 6 },
-  previewGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: 3 },
-  previewProduct:{ width: 24, height: 20, backgroundColor: '#2A2C3A', borderRadius: 3 },
-  previewMockup:{ alignItems: 'center', justifyContent: 'center' },
-  previewTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
-  previewUrl:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
-  previewStats: { flexDirection: 'row', gap: 12 },
-  previewStat:  { gap: 2 },
-  previewStatVal:{ fontSize: 13, fontFamily: 'Inter_700Bold', color: FG },
-  previewStatLabel: { fontSize: 9, fontFamily: 'Inter_400Regular', color: MUTED },
-  previewBtn:   { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: PURPLE + '20', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  previewBtnText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: PURPLE },
-
-  navCard:    { backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
-  navRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 13 },
-  navBorder:  { borderTopWidth: 1, borderTopColor: BORDER },
-  navIcon:    { width: 32, height: 32, borderRadius: 9, backgroundColor: '#1A1E1A', alignItems: 'center', justifyContent: 'center' },
-  navLabel:   { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: FG },
-  navDesc:    { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 1 },
-
-  sectionTitle:{ fontSize: 16, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 12 },
-  colourRow:   { flexDirection: 'row', gap: 10, flexWrap: 'wrap', marginBottom: 20 },
-  colourSwatch:{ width: 36, height: 36, borderRadius: 18 },
-
-  themeRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 14, paddingVertical: 13 },
-  themeIcon: { width: 32, height: 32, borderRadius: 9, backgroundColor: '#1A1E1A', alignItems: 'center', justifyContent: 'center' },
-  themeLabel:{ fontSize: 14, fontFamily: 'Inter_600SemiBold', color: FG },
-  themeDesc: { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 1 },
-
-  sectHead:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  addSectionBtn:{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: GREEN + '18', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, borderWidth: 1, borderColor: GREEN + '33' },
-  addSectionText:{ fontSize: 12, fontFamily: 'Inter_600SemiBold', color: GREEN },
-
-  sectionRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
-  dragHandle:    { padding: 4 },
-  sectionIcon:   { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  sectionType:   { flex: 1, fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
-  sectionActions:{ flexDirection: 'row', gap: 4 },
-  sectionBtn:    { width: 28, height: 28, borderRadius: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1A1E1A' },
-
-  previewFullBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: GREEN + '15', borderRadius: 12, paddingVertical: 14, borderWidth: 1, borderColor: GREEN + '33' },
-  previewFullText:{ fontSize: 14, fontFamily: 'Inter_600SemiBold', color: GREEN },
+  root: { flex: 1 },
+  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: BG },
+  header: {
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.xl,
+  },
+  headerSubtitle: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    color: 'rgba(255,255,255,0.7)',
+    letterSpacing: 0.5,
+    marginBottom: SP.xs,
+  },
+  headerHeading: {
+    fontSize: FS.h2,
+    fontFamily: FONT.bold,
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
+    marginBottom: SP.sm,
+  },
+  headerDesc: {
+    fontSize: FS.base,
+    fontFamily: FONT.regular,
+    color: 'rgba(255,255,255,0.75)',
+    lineHeight: 22,
+  },
+  content: {
+    paddingHorizontal: SP.md,
+    paddingTop: SP.lg,
+    gap: SP.lg,
+  },
+  section: { gap: SP.md },
+  lastSection: { marginBottom: SP.lg },
+  // Store status card
+  storeStatusCard: { marginBottom: SP.xs },
+  storeStatusTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: SP.md,
+  },
+  storeStatusLeft: { flex: 1, gap: SP.xs },
+  storeName: {
+    fontSize: FS.md,
+    fontFamily: FONT.bold,
+    color: FG,
+  },
+  storeStatusRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
+  lastEdited: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  quickActions: { flexDirection: 'row', gap: SP.sm, flexWrap: 'wrap' },
+  quickActionBtn: {
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.xs,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: BORDER_ACTIVE,
+  },
+  quickActionText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
+  // Hero card
+  heroCard: { marginBottom: SP.sm },
+  heroCardBadgeRow: { flexDirection: 'row', marginBottom: SP.sm },
+  popularBadge: {
+    backgroundColor: GOLD + '30',
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.sm,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: GOLD + '60',
+  },
+  popularBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: GOLD },
+  heroCardRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.md, marginBottom: SP.md },
+  heroCardText: { flex: 1, gap: SP.xs },
+  heroCardTitle: { fontSize: 18, fontFamily: FONT.bold, color: '#FFFFFF' },
+  heroCardDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: 'rgba(255,255,255,0.8)' },
+  heroCardButton: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: RADIUS.md,
+    paddingVertical: SP.sm,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.35)',
+  },
+  heroCardButtonText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
+  // Options grid
+  optionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
+  halfCard: {
+    width: '48%',
+    gap: SP.xs,
+  },
+  halfCardTitle: { fontSize: 14, fontFamily: FONT.bold, color: FG, marginTop: SP.xs },
+  halfCardDesc: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, lineHeight: 16 },
+  demoBadge: {
+    marginTop: SP.xs,
+    backgroundColor: CYAN_DIM,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.sm,
+    paddingVertical: 2,
+    alignSelf: 'flex-start',
+  },
+  demoBadgeText: { fontSize: 9, fontFamily: FONT.semibold, color: CYAN },
+  // Management grid
+  mgmtRow: { flexDirection: 'row', gap: SP.sm },
+  mgmtCard: {
+    flex: 1,
+    backgroundColor: CARD,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: SP.md,
+    alignItems: 'center',
+    gap: SP.xs,
+  },
+  mgmtIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.sm,
+    backgroundColor: PURPLE_DIM,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mgmtLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, textAlign: 'center' },
+  // AI improve
+  aiImproveRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, marginBottom: SP.md },
+  aiImproveIconWrap: { position: 'relative' },
+  suggestionBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: PURPLE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  suggestionBadgeText: { fontSize: 9, fontFamily: FONT.bold, color: '#FFFFFF' },
+  aiImproveText: { flex: 1, gap: SP.xs },
+  aiImproveTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
+  aiImproveDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+  aiImproveBtn: {},
 });
