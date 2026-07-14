@@ -372,68 +372,242 @@ export async function getMyReposts(): Promise<RepostRecord[]> {
 // ─── Seller posts (Thread-eligible) ──────────────────────────────────────────
 
 const SELLER_POSTS_KEY = 'bt:social:seller-posts:v1';
+const SELLER_SEED_KEY  = 'bt:social:seller-posts:seeded:v1';
+
+export interface SellerPostProductTag {
+  productId:   string;
+  productName: string;
+  price:       number;
+  variantId?:  string;
+  slideIndex?: number;
+  timestamp?:  number;
+}
+
+export interface SellerPostSound {
+  soundId:    string;
+  soundTitle: string;
+  artist:     string;
+  startTime:  number;
+  volume:     number;
+}
 
 export interface SellerThreadPost {
-  id: string;
-  authorId: string;
-  authorName: string;
-  authorHandle: string;
-  authorInitials: string;
-  authorColor: string;
-  caption: string;
-  hashtags: string[];
-  productTagIds: string[];
-  contentType: string;
-  isDraft: boolean;
-  isArchived: boolean;
-  scheduledAt: string | null;
-  createdAt: string;
-  updatedAt: string;
+  id:                string;
+  authorId:          string;
+  authorAccountType: 'seller';
+  authorName:        string;
+  authorHandle:      string;
+  authorInitials:    string;
+  authorColor:       string;
+  sellerId:          string;
+  brandId:           string;
+  feedEligibility:   'thread_eligible';
+  caption:           string;
+  hashtags:          string[];
+  mediaUris:         string[];
+  thumbnailUri?:     string;
+  aspectRatio:       '9:16' | '3:4' | '1:1';
+  contentType:       string;
+  postStatus:        'draft' | 'scheduled' | 'published' | 'archived' | 'deleted';
+  isDraft:           boolean;
+  isArchived:        boolean;
+  isDeleted:         boolean;
+  sound?:            SellerPostSound;
+  productTags:       SellerPostProductTag[];
+  visibility:        { allowComments: boolean; allowReposts: boolean; showLikeCount: boolean };
+  scheduledAt:       string | null;
+  publishedAt?:      string;
+  createdAt:         string;
+  updatedAt:         string;
+  likesCount:        number;
+  commentsCount:     number;
+  repostsCount:      number;
+  savedCount:        number;
+  likedByMe:         boolean;
+  savedByMe:         boolean;
+  repostedByMe:      boolean;
 }
+
+// ─── Seed data ─────────────────────────────────────────────────────────────────
+
+const SELLER_POSTS_SEED: SellerThreadPost[] = [
+  {
+    id: 'sp_seed_001', authorId: 'u_dropsociety', authorAccountType: 'seller',
+    authorName: 'Drop Society', authorHandle: '@dropsociety', authorInitials: 'DS', authorColor: '#7C3AED',
+    sellerId: 'seller_dropsociety', brandId: 'brand_dropsociety', feedEligibility: 'thread_eligible',
+    caption: 'Limited-run canvas jacket just dropped. 50 units. First come, first served. Tap the bag to shop.',
+    hashtags: ['#streetwear', '#newdrop', '#limitededition', '#brandthread'],
+    mediaUris: ['https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4'],
+    aspectRatio: '9:16', contentType: 'video', postStatus: 'published',
+    isDraft: false, isArchived: false, isDeleted: false,
+    productTags: [{ productId: 'prod_canvas_jacket', productName: 'Canvas Cargo Jacket', price: 189 }],
+    visibility: { allowComments: true, allowReposts: true, showLikeCount: true },
+    scheduledAt: null, publishedAt: '2026-07-10T15:00:00Z',
+    createdAt: '2026-07-10T14:22:00Z', updatedAt: '2026-07-10T15:00:00Z',
+    likesCount: 1240, commentsCount: 48, repostsCount: 118, savedCount: 230,
+    likedByMe: false, savedByMe: false, repostedByMe: false,
+  },
+  {
+    id: 'sp_seed_002', authorId: 'u_formstudio', authorAccountType: 'seller',
+    authorName: 'FORM Studio', authorHandle: '@formstudio', authorInitials: 'FS', authorColor: '#0F766E',
+    sellerId: 'seller_formstudio', brandId: 'brand_formstudio', feedEligibility: 'thread_eligible',
+    caption: 'Minimalist tees. Eight colorways. Basics done right — tap to shop.',
+    hashtags: ['#minimalist', '#essentials', '#tees', '#brandthread'],
+    mediaUris: ['https://test-videos.co.uk/vids/sintel/mp4/h264/720/Sintel_720_10s_1MB.mp4'],
+    aspectRatio: '9:16', contentType: 'video', postStatus: 'published',
+    isDraft: false, isArchived: false, isDeleted: false,
+    productTags: [{ productId: 'prod_essential_tee', productName: 'Essential Relaxed Tee', price: 48 }],
+    visibility: { allowComments: true, allowReposts: true, showLikeCount: true },
+    scheduledAt: null, publishedAt: '2026-07-09T12:00:00Z',
+    createdAt: '2026-07-09T11:30:00Z', updatedAt: '2026-07-09T12:00:00Z',
+    likesCount: 892, commentsCount: 22, repostsCount: 44, savedCount: 160,
+    likedByMe: false, savedByMe: false, repostedByMe: false,
+  },
+  {
+    id: 'sp_seed_003', authorId: 'u_midnight', authorAccountType: 'seller',
+    authorName: 'Midnight Thread', authorHandle: '@midnightthread', authorInitials: 'MT', authorColor: '#B45309',
+    sellerId: 'seller_midnight', brandId: 'brand_midnight', feedEligibility: 'thread_eligible',
+    caption: 'The cargo trousers everyone asked about. Back in stock. Limited sizes remaining.',
+    hashtags: ['#cargo', '#restock', '#streetwear', '#brandthread'],
+    mediaUris: ['https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'],
+    aspectRatio: '9:16', contentType: 'video', postStatus: 'published',
+    isDraft: false, isArchived: false, isDeleted: false,
+    productTags: [{ productId: 'prod_ripstop_cargo', productName: 'Ripstop Cargo Trousers', price: 134 }],
+    visibility: { allowComments: true, allowReposts: true, showLikeCount: true },
+    scheduledAt: null, publishedAt: '2026-07-08T18:00:00Z',
+    createdAt: '2026-07-08T17:00:00Z', updatedAt: '2026-07-08T18:00:00Z',
+    likesCount: 3410, commentsCount: 91, repostsCount: 215, savedCount: 540,
+    likedByMe: false, savedByMe: false, repostedByMe: false,
+  },
+];
+
+async function ensureSellerPostsSeed(): Promise<void> {
+  const done = await load<boolean>(SELLER_SEED_KEY, false);
+  if (done) return;
+  const existing = await load<SellerThreadPost[]>(SELLER_POSTS_KEY, []);
+  if (existing.length === 0) {
+    await save(SELLER_POSTS_KEY, SELLER_POSTS_SEED);
+  }
+  await save(SELLER_SEED_KEY, true);
+}
+
+// ─── CRUD ──────────────────────────────────────────────────────────────────────
 
 export async function createSellerPost(params: {
   contentType: string;
   caption: string;
   hashtags: string[];
-  productTagIds: string[];
+  mediaUris?: string[];
+  thumbnailUri?: string;
+  aspectRatio?: '9:16' | '3:4' | '1:1';
+  productTags?: SellerPostProductTag[];
+  /** @deprecated use productTags instead */
+  productTagIds?: string[];
+  sound?: SellerPostSound | null;
+  visibility?: { allowComments: boolean; allowReposts: boolean; showLikeCount: boolean };
   isDraft?: boolean;
   scheduledAt?: string | null;
 }): Promise<SellerThreadPost> {
+  await ensureSellerPostsSeed();
   const profile = await getMyProfile();
   const existing = await load<SellerThreadPost[]>(SELLER_POSTS_KEY, []);
+  const isDraft = params.isDraft ?? false;
+  const now = iso();
   const post: SellerThreadPost = {
     id: uid(),
     authorId: MY_USER_ID,
+    authorAccountType: 'seller',
     authorName: profile.name,
     authorHandle: '@' + profile.username,
     authorInitials: profile.avatarInitials,
     authorColor: profile.avatarColor,
+    sellerId: MY_USER_ID,
+    brandId: MY_USER_ID,
+    feedEligibility: 'thread_eligible',
     caption: params.caption,
     hashtags: params.hashtags,
-    productTagIds: params.productTagIds,
+    mediaUris: params.mediaUris ?? [],
+    thumbnailUri: params.thumbnailUri,
+    aspectRatio: params.aspectRatio ?? '9:16',
     contentType: params.contentType,
-    isDraft: params.isDraft ?? false,
+    postStatus: isDraft ? 'draft' : (params.scheduledAt ? 'scheduled' : 'published'),
+    isDraft,
     isArchived: false,
+    isDeleted: false,
+    sound: params.sound ?? undefined,
+    productTags: params.productTags ?? [],
+    visibility: params.visibility ?? { allowComments: true, allowReposts: true, showLikeCount: true },
     scheduledAt: params.scheduledAt ?? null,
-    createdAt: iso(),
-    updatedAt: iso(),
+    publishedAt: !isDraft ? now : undefined,
+    createdAt: now,
+    updatedAt: now,
+    likesCount: 0, commentsCount: 0, repostsCount: 0, savedCount: 0,
+    likedByMe: false, savedByMe: false, repostedByMe: false,
   };
   await save(SELLER_POSTS_KEY, [post, ...existing]);
   notify();
   return post;
 }
 
+export async function updateSellerPost(
+  id: string,
+  patch: Partial<Pick<SellerThreadPost,
+    'caption' | 'hashtags' | 'mediaUris' | 'thumbnailUri' | 'aspectRatio' |
+    'contentType' | 'postStatus' | 'isDraft' | 'isArchived' | 'isDeleted' |
+    'sound' | 'productTags' | 'visibility' | 'scheduledAt' | 'publishedAt'
+  >>,
+): Promise<void> {
+  await ensureSellerPostsSeed();
+  const posts = await load<SellerThreadPost[]>(SELLER_POSTS_KEY, []);
+  const idx = posts.findIndex(p => p.id === id);
+  if (idx < 0) return;
+  posts[idx] = { ...posts[idx], ...patch, updatedAt: iso() };
+  await save(SELLER_POSTS_KEY, posts);
+  notify();
+}
+
+export async function archiveSellerPost(id: string): Promise<void> {
+  await updateSellerPost(id, { isArchived: true, postStatus: 'archived' });
+}
+
+export async function deleteSellerPost(id: string): Promise<void> {
+  await updateSellerPost(id, { isDeleted: true, postStatus: 'deleted' });
+}
+
+export async function likeSellerPost(id: string): Promise<void> {
+  const posts = await load<SellerThreadPost[]>(SELLER_POSTS_KEY, []);
+  const idx = posts.findIndex(p => p.id === id);
+  if (idx < 0) return;
+  const liked = !posts[idx].likedByMe;
+  posts[idx] = { ...posts[idx], likedByMe: liked, likesCount: posts[idx].likesCount + (liked ? 1 : -1), updatedAt: iso() };
+  await save(SELLER_POSTS_KEY, posts);
+  notify();
+}
+
+export async function saveSellerPost(id: string): Promise<void> {
+  const posts = await load<SellerThreadPost[]>(SELLER_POSTS_KEY, []);
+  const idx = posts.findIndex(p => p.id === id);
+  if (idx < 0) return;
+  const saved = !posts[idx].savedByMe;
+  posts[idx] = { ...posts[idx], savedByMe: saved, savedCount: posts[idx].savedCount + (saved ? 1 : -1), updatedAt: iso() };
+  await save(SELLER_POSTS_KEY, posts);
+  notify();
+}
+
 export async function getSellerPosts(): Promise<SellerThreadPost[]> {
+  await ensureSellerPostsSeed();
   return load<SellerThreadPost[]>(SELLER_POSTS_KEY, []);
 }
 
-/** Returns published, non-archived seller posts that are past their schedule date. */
+/** Returns published, non-archived, non-deleted seller posts whose schedule date has passed. */
 export async function getThreadPosts(): Promise<SellerThreadPost[]> {
   const posts = await getSellerPosts();
   const now = new Date().toISOString();
   return posts.filter(p =>
+    p.postStatus === 'published' &&
     !p.isDraft &&
     !p.isArchived &&
+    !p.isDeleted &&
     (!p.scheduledAt || p.scheduledAt <= now),
   );
 }

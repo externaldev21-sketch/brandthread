@@ -17,3 +17,4 @@
 - [expo-file-system v19 API](expo-file-system-v19.md) — legacy API (readAsStringAsync/writeAsStringAsync/EncodingType/cacheDirectory) removed; use File+Paths classes; for reading images before API call, request base64:true in ImagePicker instead.
 - [Background Removal Architecture](bg-removal-architecture.md) — GCS+local-file dual cache; named wildcard gotcha; ProductMedia required fields; integration actions pattern.
 - [EXPO_PUBLIC_API_BASE_URL](expo-public-api-base-url.md) — set in shared env to the Replit dev domain root; needed by designService.ts for all AI calls (bg-removal, photoshoot, mockup-to-model, text-to-design).
+- [Content Publishing Architecture](content-publishing-architecture.md) — seller post → AsyncStorage → Thread feed; SellerThreadPost expanded to 30+ fields; seed data; feed.tsx dynamic loading; create-post purple theme.

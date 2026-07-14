@@ -22,13 +22,12 @@ import type {
 } from '@/services/types';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
-const BG     = '#0A0B0A';
-const CARD   = '#111311';
-const BORDER = '#1E221E';
+const BG     = '#0D0E0D';
+const CARD   = '#131713';
+const BORDER = '#232523';
 const FG     = '#EAF2ED';
-const MUTED  = '#5A6B5C';
-const GREEN  = '#39FF88';
-const PURPLE = '#8B5CF6';
+const MUTED  = '#6B7A6D';
+const PURPLE = '#7C3AED';
 const BLUE   = '#3B82F6';
 const ORANGE = '#F97316';
 const CYAN   = '#06B6D4';
@@ -330,7 +329,7 @@ export default function CreatePostScreen() {
     }> = [
       { label: 'Video', icon: 'video', color: PURPLE, type: 'video', nextStep: 'video-pick' },
       { label: 'Photo Slideshow', icon: 'layers', color: CYAN, type: 'slideshow', nextStep: 'slide-pick' },
-      { label: 'Product Announcement', icon: 'tag', color: GREEN, type: 'announcement', nextStep: 'post-details' },
+      { label: 'Product Announcement', icon: 'tag', color: PURPLE, type: 'announcement', nextStep: 'post-details' },
       { label: 'Drop Announcement', icon: 'bell', color: ORANGE, type: 'countdown', nextStep: 'post-details' },
       { label: 'Behind the Scenes', icon: 'camera', color: '#EC4899', type: 'behind_scenes', nextStep: 'post-details' },
       { label: 'Story', icon: 'circle', color: BLUE, type: 'story', nextStep: 'post-details' },
@@ -403,8 +402,8 @@ export default function CreatePostScreen() {
             activeOpacity={0.8}
             onPress={pickVideo}
           >
-            <View style={[s.pickIconCircle, { backgroundColor: GREEN + '22' }]}>
-              <Feather name="upload" size={28} color={GREEN} />
+            <View style={[s.pickIconCircle, { backgroundColor: PURPLE + '22' }]}>
+              <Feather name="upload" size={28} color={PURPLE} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.pickCardTitle}>Upload from library</Text>
@@ -447,7 +446,7 @@ export default function CreatePostScreen() {
             onPress={() => hapticNav(() => setStep('video-duration'))}
           >
             <LinearGradient
-              colors={videoClips.length > 0 ? [GREEN, '#20C060'] : [BORDER, BORDER]}
+              colors={videoClips.length > 0 ? [PURPLE, '#6D28D9'] : [BORDER, BORDER]}
               style={s.nextBtnGrad}
             >
               <Text style={[s.nextBtnText, videoClips.length === 0 && { color: MUTED }]}>Next →</Text>
@@ -488,8 +487,8 @@ export default function CreatePostScreen() {
                   activeOpacity={0.8}
                   onPress={() => { Haptics.selectionAsync(); setMaxDuration(d); }}
                 >
-                  <Text style={[s.durationNum, sel && { color: GREEN }]}>{d}s</Text>
-                  <Text style={[s.durationLabel, sel && { color: GREEN }]}>
+                  <Text style={[s.durationNum, sel && { color: PURPLE }]}>{d}s</Text>
+                  <Text style={[s.durationLabel, sel && { color: PURPLE }]}>
                     {d === 10 ? 'Short' : d === 15 ? 'Standard' : d === 30 ? 'Extended' : 'Long-form'}
                   </Text>
                 </TouchableOpacity>
@@ -503,7 +502,7 @@ export default function CreatePostScreen() {
             activeOpacity={0.85}
             onPress={() => hapticNav(() => setStep('video-edit'))}
           >
-            <LinearGradient colors={[GREEN, '#20C060']} style={s.nextBtnGrad}>
+            <LinearGradient colors={[PURPLE, '#6D28D9']} style={s.nextBtnGrad}>
               <Text style={s.nextBtnText}>Next →</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -581,7 +580,7 @@ export default function CreatePostScreen() {
                   left: trimLeftFraction * timelineWidth,
                   width: trimFraction * timelineWidth,
                   height: 4,
-                  backgroundColor: GREEN,
+                  backgroundColor: PURPLE,
                   borderRadius: 2,
                 }}
               />
@@ -619,7 +618,7 @@ export default function CreatePostScreen() {
                     style={[s.speedPill, playbackSpeed === sp && s.speedPillActive]}
                     onPress={() => { Haptics.selectionAsync(); setPlaybackSpeed(sp); }}
                   >
-                    <Text style={[s.speedPillText, playbackSpeed === sp && { color: GREEN }]}>{sp}x</Text>
+                    <Text style={[s.speedPillText, playbackSpeed === sp && { color: PURPLE }]}>{sp}x</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -641,7 +640,7 @@ export default function CreatePostScreen() {
           {/* Selected sound strip */}
           {selectedSound && (
             <View style={s.soundStrip}>
-              <Feather name="music" size={14} color={GREEN} />
+              <Feather name="music" size={14} color={PURPLE} />
               <Text style={s.soundStripText} numberOfLines={1}>{selectedSound.soundTitle} – {selectedSound.artist}</Text>
               <TouchableOpacity onPress={() => setSelectedSound(null)}>
                 <Feather name="x" size={16} color={MUTED} />
@@ -656,8 +655,8 @@ export default function CreatePostScreen() {
             <Switch
               value={beatSyncEnabled}
               onValueChange={setBeatSyncEnabled}
-              thumbColor={beatSyncEnabled ? GREEN : MUTED}
-              trackColor={{ false: BORDER, true: GREEN + '44' }}
+              thumbColor={beatSyncEnabled ? PURPLE : MUTED}
+              trackColor={{ false: BORDER, true: PURPLE + '44' }}
             />
           </View>
         </ScrollView>
@@ -756,7 +755,7 @@ export default function CreatePostScreen() {
             onPress={() => hapticNav(() => setStep('slide-ratio'))}
           >
             <LinearGradient
-              colors={slidePhotos.length > 0 ? [GREEN, '#20C060'] : [BORDER, BORDER]}
+              colors={slidePhotos.length > 0 ? [PURPLE, '#6D28D9'] : [BORDER, BORDER]}
               style={s.nextBtnGrad}
             >
               <Text style={[s.nextBtnText, slidePhotos.length === 0 && { color: MUTED }]}>Next →</Text>
@@ -785,7 +784,7 @@ export default function CreatePostScreen() {
         </View>
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
           <View style={[s.infoCard, { marginBottom: 20 }]}>
-            <Ionicons name="trending-up" size={14} color={GREEN} style={{ marginRight: 8 }} />
+            <Ionicons name="trending-up" size={14} color={PURPLE} style={{ marginRight: 8 }} />
             <Text style={[s.infoCardText, { flex: 1 }]}>9:16 gets the most reach on Thread.</Text>
           </View>
           {ratios.map((r) => {
@@ -799,14 +798,14 @@ export default function CreatePostScreen() {
               >
                 <View style={[s.ratioPreview, { width: r.w, height: r.h }]} />
                 <View style={{ flex: 1, marginLeft: 16 }}>
-                  <Text style={[s.ratioLabel, sel && { color: GREEN }]}>{r.label}</Text>
+                  <Text style={[s.ratioLabel, sel && { color: PURPLE }]}>{r.label}</Text>
                   {r.recommended && (
                     <View style={s.recommendedBadge}>
                       <Text style={s.recommendedText}>Recommended</Text>
                     </View>
                   )}
                 </View>
-                {sel && <Feather name="check-circle" size={20} color={GREEN} />}
+                {sel && <Feather name="check-circle" size={20} color={PURPLE} />}
               </TouchableOpacity>
             );
           })}
@@ -817,7 +816,7 @@ export default function CreatePostScreen() {
             activeOpacity={0.85}
             onPress={() => hapticNav(() => setStep('slide-edit'))}
           >
-            <LinearGradient colors={[GREEN, '#20C060']} style={s.nextBtnGrad}>
+            <LinearGradient colors={[PURPLE, '#6D28D9']} style={s.nextBtnGrad}>
               <Text style={s.nextBtnText}>Next →</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -889,7 +888,7 @@ export default function CreatePostScreen() {
                   style={[s.transitionPill, transition === tr && s.transitionPillActive]}
                   onPress={() => { Haptics.selectionAsync(); setTransition(tr); }}
                 >
-                  <Text style={[s.transitionPillText, transition === tr && { color: '#0A0B0A' }]}>
+                  <Text style={[s.transitionPillText, transition === tr && { color: '#FFFFFF' }]}>
                     {transitionLabels[tr]}
                   </Text>
                 </TouchableOpacity>
@@ -936,7 +935,7 @@ export default function CreatePostScreen() {
           {/* Selected sound */}
           {selectedSound && (
             <View style={[s.soundStrip, { marginTop: 12 }]}>
-              <Feather name="music" size={14} color={GREEN} />
+              <Feather name="music" size={14} color={PURPLE} />
               <Text style={s.soundStripText} numberOfLines={1}>{selectedSound.soundTitle} – {selectedSound.artist}</Text>
               <TouchableOpacity onPress={() => setSelectedSound(null)}>
                 <Feather name="x" size={16} color={MUTED} />
@@ -990,7 +989,7 @@ export default function CreatePostScreen() {
       countdown: 'Drop Announcement', behind_scenes: 'Behind the Scenes', story: 'Story',
     };
     const typeColor: Record<string, string> = {
-      video: PURPLE, slideshow: CYAN, announcement: GREEN,
+      video: PURPLE, slideshow: CYAN, announcement: PURPLE,
       countdown: ORANGE, behind_scenes: '#EC4899', story: BLUE,
     };
     const ct = contentType ?? 'video';
@@ -1073,7 +1072,7 @@ export default function CreatePostScreen() {
                     style={s.suggestedChip}
                     onPress={() => { if (!hashtags.find(hh => hh.tag === h.tag)) setHashtags(prev => [...prev, h]); }}
                   >
-                    {h.trending && <Feather name="trending-up" size={10} color={GREEN} style={{ marginRight: 3 }} />}
+                    {h.trending && <Feather name="trending-up" size={10} color={PURPLE} style={{ marginRight: 3 }} />}
                     <Text style={s.suggestedChipText}>{h.tag}</Text>
                   </TouchableOpacity>
                 ))}
@@ -1085,7 +1084,7 @@ export default function CreatePostScreen() {
                 {hashtags.map((h) => (
                   <TouchableOpacity key={h.tag} style={s.hashtagChip} onPress={() => removeHashtag(h.tag)}>
                     <Text style={s.hashtagChipText}>{h.tag}</Text>
-                    <Feather name="x" size={11} color={GREEN} style={{ marginLeft: 4 }} />
+                    <Feather name="x" size={11} color={PURPLE} style={{ marginLeft: 4 }} />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -1096,7 +1095,7 @@ export default function CreatePostScreen() {
             {productTags.length > 0 && (
               <View style={s.hashtagWrap}>
                 {productTags.map((pt) => (
-                  <View key={pt.productId} style={[s.hashtagChip, { backgroundColor: GREEN + '11', borderColor: GREEN + '33' }]}>
+                  <View key={pt.productId} style={[s.hashtagChip, { backgroundColor: PURPLE + '11', borderColor: PURPLE + '33' }]}>
                     <Text style={[s.hashtagChipText, { color: FG }]}>{pt.productName}</Text>
                     <TouchableOpacity onPress={() => setProductTags(prev => prev.filter(t => t.productId !== pt.productId))}>
                       <Feather name="x" size={11} color={MUTED} style={{ marginLeft: 4 }} />
@@ -1135,8 +1134,8 @@ export default function CreatePostScreen() {
                 <Switch
                   value={visibility[key] as boolean}
                   onValueChange={(v) => setVisibility(prev => ({ ...prev, [key]: v }))}
-                  thumbColor={(visibility[key] as boolean) ? GREEN : MUTED}
-                  trackColor={{ false: BORDER, true: GREEN + '44' }}
+                  thumbColor={(visibility[key] as boolean) ? PURPLE : MUTED}
+                  trackColor={{ false: BORDER, true: PURPLE + '44' }}
                 />
               </View>
             ))}
@@ -1148,15 +1147,15 @@ export default function CreatePostScreen() {
                 style={[s.schedulePill, scheduleMode === 'now' && s.schedulePillActive]}
                 onPress={() => setScheduleMode('now')}
               >
-                {scheduleMode === 'now' && <Feather name="check" size={12} color={GREEN} style={{ marginRight: 4 }} />}
-                <Text style={[s.schedulePillText, scheduleMode === 'now' && { color: GREEN }]}>Publish now</Text>
+                {scheduleMode === 'now' && <Feather name="check" size={12} color={PURPLE} style={{ marginRight: 4 }} />}
+                <Text style={[s.schedulePillText, scheduleMode === 'now' && { color: PURPLE }]}>Publish now</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[s.schedulePill, scheduleMode === 'schedule' && s.schedulePillActive]}
                 onPress={() => setScheduleMode('schedule')}
               >
-                {scheduleMode === 'schedule' && <Feather name="check" size={12} color={GREEN} style={{ marginRight: 4 }} />}
-                <Text style={[s.schedulePillText, scheduleMode === 'schedule' && { color: GREEN }]}>Schedule</Text>
+                {scheduleMode === 'schedule' && <Feather name="check" size={12} color={PURPLE} style={{ marginRight: 4 }} />}
+                <Text style={[s.schedulePillText, scheduleMode === 'schedule' && { color: PURPLE }]}>Schedule</Text>
               </TouchableOpacity>
             </View>
             {scheduleMode === 'schedule' && (
@@ -1180,7 +1179,13 @@ export default function CreatePostScreen() {
                     contentType: contentType ?? 'video',
                     caption,
                     hashtags: hashtags.map(h => h.tag),
-                    productTagIds: productTags.map(p => p.productId),
+                    mediaUris: contentType === 'video'
+                      ? videoClips.map(c => c.uri)
+                      : slidePhotos.map(p => p.uri),
+                    aspectRatio,
+                    productTags: productTags.map(p => ({ productId: p.productId, productName: p.productName, price: p.price })),
+                    sound: selectedSound ?? undefined,
+                    visibility,
                     isDraft: true,
                   });
                   Alert.alert('Draft saved', 'Your draft has been saved.', [{ text: 'OK', onPress: () => router.back() }]);
@@ -1206,7 +1211,13 @@ export default function CreatePostScreen() {
                     contentType: contentType ?? 'video',
                     caption,
                     hashtags: hashtags.map(h => h.tag),
-                    productTagIds: productTags.map(p => p.productId),
+                    mediaUris: contentType === 'video'
+                      ? videoClips.map(c => c.uri)
+                      : slidePhotos.map(p => p.uri),
+                    aspectRatio,
+                    productTags: productTags.map(p => ({ productId: p.productId, productName: p.productName, price: p.price })),
+                    sound: selectedSound ?? undefined,
+                    visibility,
                     isDraft: false,
                     scheduledAt: scheduleMode === 'schedule' ? scheduledAt : null,
                   });
@@ -1219,8 +1230,8 @@ export default function CreatePostScreen() {
                 }
               }}
             >
-              <LinearGradient colors={[GREEN, '#20C060']} style={s.publishBtn}>
-                <Feather name="send" size={16} color="#0A0B0A" style={{ marginRight: 8 }} />
+              <LinearGradient colors={[PURPLE, '#6D28D9']} style={s.publishBtn}>
+                <Feather name="send" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
                 <Text style={s.publishBtnText}>Publish now</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -1246,13 +1257,13 @@ export default function CreatePostScreen() {
     return (
       <View style={[s.root, s.fullCenter, { paddingTop: topPad, paddingBottom: botPad }]}>
         <Animated.View style={[s.publishCircle, { transform: [{ scale: pulseAnim }] }]}>
-          <LinearGradient colors={[GREEN + '44', GREEN + '22']} style={s.publishCircleGrad}>
-            <Feather name="upload-cloud" size={36} color={GREEN} />
+          <LinearGradient colors={[PURPLE + '44', PURPLE + '22']} style={s.publishCircleGrad}>
+            <Feather name="upload-cloud" size={36} color={PURPLE} />
           </LinearGradient>
         </Animated.View>
         <Text style={[s.doneTitle, { marginTop: 24 }]}>Publishing...</Text>
         <Text style={s.doneSub}>Your content is being prepared for Thread.</Text>
-        <ActivityIndicator color={GREEN} style={{ marginTop: 24 }} />
+        <ActivityIndicator color={PURPLE} style={{ marginTop: 24 }} />
       </View>
     );
   }
@@ -1261,8 +1272,8 @@ export default function CreatePostScreen() {
   if (step === 'done') {
     return (
       <View style={[s.root, s.fullCenter, { paddingTop: topPad, paddingBottom: botPad }]}>
-        <LinearGradient colors={[GREEN + '44', GREEN + '22']} style={s.doneCircle}>
-          <Feather name="check" size={44} color={GREEN} />
+        <LinearGradient colors={[PURPLE + '44', PURPLE + '22']} style={s.doneCircle}>
+          <Feather name="check" size={44} color={PURPLE} />
         </LinearGradient>
         <Text style={s.doneTitle}>Posted!</Text>
         <Text style={s.doneSub}>Your post has been saved and will appear on your profile.</Text>
@@ -1271,7 +1282,7 @@ export default function CreatePostScreen() {
           activeOpacity={0.85}
           onPress={() => hapticNav(() => router.replace('/(tabs)/profile' as never))}
         >
-          <LinearGradient colors={[GREEN, '#20C060']} style={s.doneBtnGrad}>
+          <LinearGradient colors={[PURPLE, '#6D28D9']} style={s.doneBtnGrad}>
             <Text style={s.doneBtnText2}>View Profile</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -1345,7 +1356,7 @@ function SoundModal({ visible, onClose, soundTab, setSoundTab, soundSearch, setS
                 style={[sm.tabPill, soundTab === t.id && sm.tabPillActive]}
                 onPress={() => setSoundTab(t.id)}
               >
-                <Text style={[sm.tabText, soundTab === t.id && { color: GREEN }]}>{t.label}</Text>
+                <Text style={[sm.tabText, soundTab === t.id && { color: PURPLE }]}>{t.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -1446,7 +1457,7 @@ function TextModal({ visible, onClose, newTextInput, setNewTextInput, newTextCol
             ))}
           </View>
           <TouchableOpacity style={{ marginTop: 8 }} onPress={onAdd} activeOpacity={0.85}>
-            <LinearGradient colors={[GREEN, '#20C060']} style={sm.addTextBtn}>
+            <LinearGradient colors={[PURPLE, '#6D28D9']} style={sm.addTextBtn}>
               <Text style={sm.addTextBtnText}>Add Text</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -1486,7 +1497,7 @@ function ProductModal({ visible, onClose, productSearch, setProductSearch, produ
   const filtered = taggableProducts.filter(p =>
     productSearch === '' || p.name.toLowerCase().includes(productSearch.toLowerCase())
   );
-  const statusColor = (st: string) => st === 'active' ? GREEN : st === 'scheduled' ? ORANGE : MUTED;
+  const statusColor = (st: string) => st === 'active' ? PURPLE : st === 'scheduled' ? ORANGE : MUTED;
 
   return (
     <Modal
@@ -1512,7 +1523,7 @@ function ProductModal({ visible, onClose, productSearch, setProductSearch, produ
                   <View key={pt.productId} style={sm.taggedChip}>
                     <Text style={sm.taggedChipText}>{pt.productName}</Text>
                     <TouchableOpacity onPress={() => prod && onTag(prod)}>
-                      <Feather name="x" size={11} color={GREEN} style={{ marginLeft: 4 }} />
+                      <Feather name="x" size={11} color={PURPLE} style={{ marginLeft: 4 }} />
                     </TouchableOpacity>
                   </View>
                 );
@@ -1548,7 +1559,7 @@ function ProductModal({ visible, onClose, productSearch, setProductSearch, produ
                   style={[sm.tagBtn, isTagged && sm.tagBtnActive]}
                   onPress={() => { Haptics.selectionAsync(); onTag(p); }}
                 >
-                  <Text style={[sm.tagBtnText, isTagged && { color: '#0A0B0A' }]}>{isTagged ? 'Remove' : 'Tag'}</Text>
+                  <Text style={[sm.tagBtnText, isTagged && { color: '#FFFFFF' }]}>{isTagged ? 'Remove' : 'Tag'}</Text>
                 </TouchableOpacity>
               </View>
             );
@@ -1556,7 +1567,7 @@ function ProductModal({ visible, onClose, productSearch, setProductSearch, produ
         </ScrollView>
         <View style={{ paddingHorizontal: 16 }}>
           <TouchableOpacity onPress={onClose} activeOpacity={0.85}>
-            <LinearGradient colors={[GREEN, '#20C060']} style={sm.addTextBtn}>
+            <LinearGradient colors={[PURPLE, '#6D28D9']} style={sm.addTextBtn}>
               <Text style={sm.addTextBtnText}>Done</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -1578,8 +1589,8 @@ const s = StyleSheet.create({
   },
   headerTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', color: FG },
   backBtn:  { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
-  doneBtn:  { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: GREEN + '22', borderRadius: 8, borderWidth: 1, borderColor: GREEN + '44' },
-  doneBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: GREEN },
+  doneBtn:  { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: PURPLE + '22', borderRadius: 8, borderWidth: 1, borderColor: PURPLE + '44' },
+  doneBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: PURPLE },
 
   // type-select
   typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
@@ -1617,7 +1628,7 @@ const s = StyleSheet.create({
   nextBtn:   { borderRadius: 14, overflow: 'hidden' },
   nextBtnDisabled: { opacity: 0.5 },
   nextBtnGrad: { paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
-  nextBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#0A0B0A' },
+  nextBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
 
   // video-duration
   stepSubtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 12 },
@@ -1628,7 +1639,7 @@ const s = StyleSheet.create({
     width: '46%', backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER,
     alignItems: 'center', paddingVertical: 28, gap: 6,
   },
-  durationCardSel: { backgroundColor: GREEN + '11', borderColor: GREEN },
+  durationCardSel: { backgroundColor: PURPLE + '11', borderColor: PURPLE },
   durationNum:   { fontSize: 28, fontFamily: 'Inter_700Bold', color: FG },
   durationLabel: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
 
@@ -1641,17 +1652,17 @@ const s = StyleSheet.create({
   durChipText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: MUTED },
   trimHandle: {
     position: 'absolute', top: -8, width: 16, height: 20,
-    backgroundColor: GREEN, borderRadius: 3,
+    backgroundColor: PURPLE, borderRadius: 3,
   },
   controlsRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, marginTop: 14, gap: 10 },
   controlBtn: { width: 38, height: 38, backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   speedPill: { backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 6 },
-  speedPillActive: { backgroundColor: GREEN + '22', borderColor: GREEN },
+  speedPillActive: { backgroundColor: PURPLE + '22', borderColor: PURPLE },
   speedPillText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: MUTED },
   toolCard: { backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12, gap: 6 },
   toolLabel: { fontSize: 10, fontFamily: 'Inter_400Regular', color: MUTED },
-  soundStrip: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 12, backgroundColor: GREEN + '11', borderRadius: 10, borderWidth: 1, borderColor: GREEN + '33', paddingHorizontal: 12, paddingVertical: 8 },
-  soundStripText: { flex: 1, fontSize: 12, fontFamily: 'Inter_500Medium', color: GREEN },
+  soundStrip: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 12, backgroundColor: PURPLE + '11', borderRadius: 10, borderWidth: 1, borderColor: PURPLE + '33', paddingHorizontal: 12, paddingVertical: 8 },
+  soundStripText: { flex: 1, fontSize: 12, fontFamily: 'Inter_500Medium', color: PURPLE },
   beatSyncRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 10, paddingVertical: 8 },
   beatSyncLabel: { flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium', color: MUTED },
 
@@ -1660,16 +1671,16 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', backgroundColor: CARD,
     borderRadius: 14, borderWidth: 1, borderColor: BORDER, padding: 16, marginBottom: 12,
   },
-  ratioCardSel: { backgroundColor: GREEN + '11', borderColor: GREEN },
+  ratioCardSel: { backgroundColor: PURPLE + '11', borderColor: PURPLE },
   ratioPreview: { backgroundColor: BORDER, borderRadius: 6 },
   ratioLabel: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
-  recommendedBadge: { backgroundColor: GREEN + '22', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', marginTop: 4 },
-  recommendedText: { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: GREEN },
+  recommendedBadge: { backgroundColor: PURPLE + '22', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', marginTop: 4 },
+  recommendedText: { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: PURPLE },
 
   // slide-edit
   slidePreviewArea: { marginHorizontal: 16, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: BORDER },
   transitionPill: { backgroundColor: CARD, borderRadius: 20, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 16, paddingVertical: 8 },
-  transitionPillActive: { backgroundColor: GREEN, borderColor: GREEN },
+  transitionPillActive: { backgroundColor: PURPLE, borderColor: PURPLE },
   transitionPillText: { fontSize: 13, fontFamily: 'Inter_500Medium', color: MUTED },
   stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   stepperBtn: { width: 38, height: 38, backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
@@ -1698,8 +1709,8 @@ const s = StyleSheet.create({
   suggestedChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 10, paddingVertical: 5 },
   suggestedChipText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: MUTED },
   hashtagWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  hashtagChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: GREEN + '11', borderRadius: 14, borderWidth: 1, borderColor: GREEN + '33', paddingHorizontal: 10, paddingVertical: 5 },
-  hashtagChipText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: GREEN },
+  hashtagChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: PURPLE + '11', borderRadius: 14, borderWidth: 1, borderColor: PURPLE + '33', paddingHorizontal: 10, paddingVertical: 5 },
+  hashtagChipText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: PURPLE },
 
   locationRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 10 },
   locationInput: { flex: 1, color: FG, fontFamily: 'Inter_400Regular', fontSize: 14 },
@@ -1709,7 +1720,7 @@ const s = StyleSheet.create({
 
   scheduleRow: { flexDirection: 'row', gap: 10 },
   schedulePill: { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 20, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 16, paddingVertical: 8 },
-  schedulePillActive: { backgroundColor: GREEN + '11', borderColor: GREEN + '44' },
+  schedulePillActive: { backgroundColor: PURPLE + '11', borderColor: PURPLE + '44' },
   schedulePillText: { fontSize: 13, fontFamily: 'Inter_500Medium', color: MUTED },
 
   outlineBtn: {
@@ -1720,7 +1731,7 @@ const s = StyleSheet.create({
   outlineBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: FG },
 
   publishBtn: { borderRadius: 14, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  publishBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#0A0B0A' },
+  publishBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
 
   sectionLabel: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: MUTED, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
 
@@ -1734,7 +1745,7 @@ const s = StyleSheet.create({
   doneSub: { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center', marginBottom: 4, paddingHorizontal: 32 },
   doneBtn2: { marginTop: 32, borderRadius: 14, overflow: 'hidden', width: 200 },
   doneBtnGrad: { paddingVertical: 14, alignItems: 'center' },
-  doneBtnText2: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#0A0B0A' },
+  doneBtnText2: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
 });
 
 // ─── Modal Styles ─────────────────────────────────────────────────────────────
@@ -1748,7 +1759,7 @@ const sm = StyleSheet.create({
   searchInput: { flex: 1, color: FG, fontFamily: 'Inter_400Regular', fontSize: 14 },
 
   tabPill: { backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 14, paddingVertical: 6 },
-  tabPillActive: { backgroundColor: GREEN + '22', borderColor: GREEN + '44' },
+  tabPillActive: { backgroundColor: PURPLE + '22', borderColor: PURPLE + '44' },
   tabText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: MUTED },
 
   soundRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: BORDER },
@@ -1769,9 +1780,9 @@ const sm = StyleSheet.create({
   stepperBtn: { width: 36, height: 36, backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   stepperVal: { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG, minWidth: 50, textAlign: 'center' },
   swatch: { width: 32, height: 32, borderRadius: 16 },
-  swatchActive: { borderWidth: 3, borderColor: GREEN },
+  swatchActive: { borderWidth: 3, borderColor: PURPLE },
   addTextBtn: { borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
-  addTextBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#0A0B0A' },
+  addTextBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
   overlayChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
   overlayChipText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
 
@@ -1783,8 +1794,8 @@ const sm = StyleSheet.create({
   statusBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   statusBadgeText: { fontSize: 10, fontFamily: 'Inter_600SemiBold' },
   tagBtn: { backgroundColor: CARD, borderRadius: 8, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 6 },
-  tagBtnActive: { backgroundColor: GREEN, borderColor: GREEN },
+  tagBtnActive: { backgroundColor: PURPLE, borderColor: PURPLE },
   tagBtnText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: FG },
-  taggedChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: GREEN + '22', borderRadius: 14, borderWidth: 1, borderColor: GREEN + '44', paddingHorizontal: 10, paddingVertical: 5 },
-  taggedChipText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: GREEN },
+  taggedChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: PURPLE + '22', borderRadius: 14, borderWidth: 1, borderColor: PURPLE + '44', paddingHorizontal: 10, paddingVertical: 5 },
+  taggedChipText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: PURPLE },
 });

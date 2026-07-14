@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
   useColorScheme, Dimensions, Animated, Alert, Share, TextInput, Modal,
@@ -7,6 +7,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { getThreadPosts, subscribeSocial } from '@/services/socialService';
+import type { SellerThreadPost } from '@/services/socialService';
 import * as Haptics from 'expo-haptics';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import type { ViewToken } from 'react-native';
@@ -426,6 +428,36 @@ function CommentsModal({
   );
 }
 
+// ─── Map a service SellerThreadPost to the feed display format ────────────────
+
+function mapSellerPost(post: SellerThreadPost): SpotlightItem {
+  const tag = post.productTags[0];
+  return {
+    id: post.id,
+    creator: post.authorName,
+    handle: post.authorHandle,
+    avatarColor: post.authorColor,
+    initials: post.authorInitials,
+    verified: false,
+    videoUri: post.mediaUris[0] ?? 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4',
+    caption: post.caption,
+    sound: post.sound
+      ? `${post.sound.soundTitle} · ${post.sound.artist}`
+      : `Original Sound · ${post.authorHandle.slice(1)}`,
+    productName: tag?.productName ?? 'Shop Now',
+    productPrice: tag ? `${Number(tag.price).toFixed(0)}` : '',
+    productOriginalPrice: null as string | null,
+    accentColor: post.authorColor,
+    likes: post.likesCount,
+    comments: [] as { id: string; user: string; text: string }[],
+    reposts: post.repostsCount,
+    shares: 0,
+    // Extra fields used by handleShop via `(item as any).productId`
+    productId: tag?.productId,
+    sellerId: post.authorId,
+  } as unknown as SpotlightItem;
+}
+
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function FeedScreen() {
@@ -445,15 +477,45 @@ export default function FeedScreen() {
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
   const [showNotifs, setShowNotifs] = useState(false);
   const [hasUnread, setHasUnread] = useState(true);
+  const [sellerFeedPosts, setSellerFeedPosts] = useState<SpotlightItem[]>([]);
+
+  // Load published seller posts and subscribe to real-time changes
+  useEffect(() => {
+    async function loadFeed() {
+      try {
+        const posts = await getThreadPosts();
+        setSellerFeedPosts(posts.map(mapSellerPost));
+      } catch {}
+    }
+    loadFeed();
+    const unsub = subscribeSocial(loadFeed);
+    return unsub;
+  }, []);
+
+  // Add engagement entries for newly loaded seller posts
+  useEffect(() => {
+    if (sellerFeedPosts.length === 0) return;
+    setEngagements(prev => {
+      const next = { ...prev };
+      sellerFeedPosts.forEach(item => { if (!next[item.id]) next[item.id] = initialEngagement(item); });
+      return next;
+    });
+  }, [sellerFeedPosts]);
+
+  // Real published seller posts first; demo items fill the rest
+  const allItems = useMemo(
+    () => [...sellerFeedPosts, ...SPOTLIGHT_ITEMS.filter(s => !sellerFeedPosts.some(sp => sp.id === s.id))],
+    [sellerFeedPosts],
+  );
 
   const displayItems = searchQuery.trim()
-    ? SPOTLIGHT_ITEMS.filter(item => {
+    ? allItems.filter(item => {
         const q = searchQuery.toLowerCase();
         return item.creator.toLowerCase().includes(q) ||
           item.handle.toLowerCase().includes(q) ||
           item.productName.toLowerCase().includes(q);
       })
-    : SPOTLIGHT_ITEMS;
+    : allItems;
 
   function update(id: string, patch: Partial<EngagementState> | ((e: EngagementState) => Partial<EngagementState>)) {
     setEngagements(prev => {
@@ -500,7 +562,7 @@ export default function FeedScreen() {
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
 
-  const commentsItem = commentsFor ? SPOTLIGHT_ITEMS.find(i => i.id === commentsFor) ?? null : null;
+  const commentsItem = commentsFor ? allItems.find(i => i.id === commentsFor) ?? null : null;
   const commentsEngagement = commentsFor ? engagements[commentsFor] : null;
   const commentsItemWithLive = commentsItem && commentsEngagement
     ? { ...commentsItem, comments: commentsEngagement.comments }
