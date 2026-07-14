@@ -400,6 +400,28 @@ export const DEFAULT_NOTIFICATION_PREFS: NotificationPreference[] = [
   { category: 'system',         push: true,  email: true,  sms: false, inApp: true },
 ];
 
+// ─── Comments ────────────────────────────────────────────────────────────────
+
+export interface Comment {
+  id: string;
+  postId: string;
+  authorId: string;
+  authorName: string;
+  authorHandle: string;
+  authorInitials: string;
+  authorColor: string;
+  text: string;
+  /** id of the comment being replied to (one level deep) */
+  replyToId?: string;
+  /** display name of the person being replied to */
+  replyToAuthorName?: string;
+  /** short preview of the parent comment text */
+  replyToText?: string;
+  likedByMe: boolean;
+  likesCount: number;
+  createdAt: string;
+}
+
 // ─── Search ───────────────────────────────────────────────────────────────────
 
 export interface ProfileSearchResult {

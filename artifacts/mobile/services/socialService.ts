@@ -14,6 +14,7 @@ import type {
   Notification, NotificationCategory, NotificationPreference,
   BlockRecord, MuteRecord, Report, ReportReason, ReportTargetType,
   SavedItem, SavedItemType, PrivacySettings, ProfileSearchResult,
+  Comment,
 } from './socialTypes';
 import { DEFAULT_PRIVACY_SETTINGS, DEFAULT_NOTIFICATION_PREFS } from './socialTypes';
 
@@ -27,6 +28,7 @@ const K = {
   requests:      'bt:social:requests:v1',
   conversations: 'bt:social:convs:v1',
   messages:      (id: string) => `bt:social:msgs:${id}:v1`,
+  comments:      (postId: string) => `bt:social:comments:${postId}:v1`,
   stories:       'bt:social:stories:v1',
   notifications: 'bt:social:notifs:v1',
   notifPrefs:    'bt:social:notif_prefs:v1',
@@ -217,6 +219,41 @@ const DEMO_SAVED: SavedItem[] = [
   { id: 'sav4', type: 'collection', targetId: 'coll_summer', title: 'Summer Drops 2026',         subtitle: '12 products',                 accentColor: '#F59E0B', savedAt: new Date(now - 10 * 24 * 3600000).toISOString() },
 ];
 
+const DEMO_COMMENTS: Record<string, Comment[]> = {
+  post_me_1: [
+    { id: 'c1', postId: 'post_me_1', authorId: 'u_maya', authorName: 'Maya Chen', authorHandle: '@mayachen', authorInitials: 'MC', authorColor: '#BE185D', text: 'This fits so well on you!! 😍', likedByMe: false, likesCount: 3, createdAt: new Date(Date.now() - 2 * 3600000).toISOString() },
+    { id: 'c2', postId: 'post_me_1', authorId: 'u_kai', authorName: 'Kai Nakamura', authorHandle: '@kainakamura', authorInitials: 'KN', authorColor: '#00C853', text: 'The colorway is everything 🔥', likedByMe: false, likesCount: 1, createdAt: new Date(Date.now() - 90 * 60000).toISOString() },
+    { id: 'c3', postId: 'post_me_1', authorId: MY_USER_ID, authorName: MY_NAME, authorHandle: MY_HANDLE, authorInitials: MY_INITIALS, authorColor: MY_COLOR, text: 'Thanks!! Vault really went off with this drop', likedByMe: false, likesCount: 0, replyToId: 'c1', replyToAuthorName: 'Maya Chen', replyToText: 'This fits so well on you!! 😍', createdAt: new Date(Date.now() - 80 * 60000).toISOString() },
+    { id: 'c4', postId: 'post_me_1', authorId: 'u_sofia', authorName: 'Sofia Reyes', authorHandle: '@sofiareyes', authorInitials: 'SR', authorColor: '#B45309', text: 'Where did you get it? I cannot find it on the app', likedByMe: false, likesCount: 0, createdAt: new Date(Date.now() - 60 * 60000).toISOString() },
+    { id: 'c5', postId: 'post_me_1', authorId: MY_USER_ID, authorName: MY_NAME, authorHandle: MY_HANDLE, authorInitials: MY_INITIALS, authorColor: MY_COLOR, text: 'Search "Canvas Cargo" on Discover — it was a limited drop!', likedByMe: false, likesCount: 2, replyToId: 'c4', replyToAuthorName: 'Sofia Reyes', replyToText: 'Where did you get it? I cannot find it on the app', createdAt: new Date(Date.now() - 45 * 60000).toISOString() },
+  ],
+  post_me_2: [
+    { id: 'd1', postId: 'post_me_2', authorId: 'u_amir', authorName: 'Amir Patel', authorHandle: '@amirpatel', authorInitials: 'AP', authorColor: '#0F766E', text: 'Great review! Did the sizing run true?', likedByMe: false, likesCount: 2, createdAt: new Date(Date.now() - 8 * 3600000).toISOString() },
+    { id: 'd2', postId: 'post_me_2', authorId: MY_USER_ID, authorName: MY_NAME, authorHandle: MY_HANDLE, authorInitials: MY_INITIALS, authorColor: MY_COLOR, text: 'Yeah, I went true to size — fits perfectly', likedByMe: false, likesCount: 1, replyToId: 'd1', replyToAuthorName: 'Amir Patel', replyToText: 'Great review! Did the sizing run true?', createdAt: new Date(Date.now() - 7.5 * 3600000).toISOString() },
+    { id: 'd3', postId: 'post_me_2', authorId: 'u_kai', authorName: 'Kai Nakamura', authorHandle: '@kainakamura', authorInitials: 'KN', authorColor: '#00C853', text: 'NxGen never misses 🙌', likedByMe: false, likesCount: 5, createdAt: new Date(Date.now() - 6 * 3600000).toISOString() },
+  ],
+  post_me_3: [
+    { id: 'e1', postId: 'post_me_3', authorId: 'u_maya', authorName: 'Maya Chen', authorHandle: '@mayachen', authorInitials: 'MC', authorColor: '#BE185D', text: 'The first one is a 10/10 no debate', likedByMe: false, likesCount: 7, createdAt: new Date(Date.now() - 15 * 3600000).toISOString() },
+    { id: 'e2', postId: 'post_me_3', authorId: 'u_sofia', authorName: 'Sofia Reyes', authorHandle: '@sofiareyes', authorInitials: 'SR', authorColor: '#B45309', text: '3rd one lowkey fire too', likedByMe: false, likesCount: 4, createdAt: new Date(Date.now() - 14 * 3600000).toISOString() },
+    { id: 'e3', postId: 'post_me_3', authorId: 'u_amir', authorName: 'Amir Patel', authorHandle: '@amirpatel', authorInitials: 'AP', authorColor: '#0F766E', text: 'Add the Vault cargo to this list!', likedByMe: false, likesCount: 2, createdAt: new Date(Date.now() - 12 * 3600000).toISOString() },
+    { id: 'e4', postId: 'post_me_3', authorId: MY_USER_ID, authorName: MY_NAME, authorHandle: MY_HANDLE, authorInitials: MY_INITIALS, authorColor: MY_COLOR, text: 'Already on the list 👀', likedByMe: false, likesCount: 3, replyToId: 'e3', replyToAuthorName: 'Amir Patel', replyToText: 'Add the Vault cargo to this list!', createdAt: new Date(Date.now() - 11 * 3600000).toISOString() },
+  ],
+  // Friend posts on the Friends feed
+  fp1: [
+    { id: 'f1', postId: 'fp1', authorId: MY_USER_ID, authorName: MY_NAME, authorHandle: MY_HANDLE, authorInitials: MY_INITIALS, authorColor: MY_COLOR, text: 'That colourway is 🔥', likedByMe: false, likesCount: 0, createdAt: new Date(Date.now() - 1.5 * 3600000).toISOString() },
+    { id: 'f2', postId: 'fp1', authorId: 'u_kai', authorName: 'Kai Nakamura', authorHandle: '@kainakamura', authorInitials: 'KN', authorColor: '#00C853', text: 'Vault dropping heat this season!', likedByMe: false, likesCount: 2, createdAt: new Date(Date.now() - 60 * 60000).toISOString() },
+  ],
+  fp2: [
+    { id: 'g1', postId: 'fp2', authorId: 'u_sofia', authorName: 'Sofia Reyes', authorHandle: '@sofiareyes', authorInitials: 'SR', authorColor: '#B45309', text: 'Convinced me — ordering tonight', likedByMe: false, likesCount: 3, createdAt: new Date(Date.now() - 4 * 3600000).toISOString() },
+    { id: 'g2', postId: 'fp2', authorId: MY_USER_ID, authorName: MY_NAME, authorHandle: MY_HANDLE, authorInitials: MY_INITIALS, authorColor: MY_COLOR, text: "Do it, you won't regret it!", likedByMe: false, likesCount: 1, replyToId: 'g1', replyToAuthorName: 'Sofia Reyes', replyToText: 'Convinced me — ordering tonight', createdAt: new Date(Date.now() - 3.5 * 3600000).toISOString() },
+  ],
+  fp3: [
+    { id: 'h1', postId: 'fp3', authorId: MY_USER_ID, authorName: MY_NAME, authorHandle: MY_HANDLE, authorInitials: MY_INITIALS, authorColor: MY_COLOR, text: '1. 10/10  2. 9/10  3. 8/10  4. 7/10  5. 10/10', likedByMe: false, likesCount: 4, createdAt: new Date(Date.now() - 22 * 3600000).toISOString() },
+    { id: 'h2', postId: 'fp3', authorId: 'u_amir', authorName: 'Amir Patel', authorHandle: '@amirpatel', authorInitials: 'AP', authorColor: '#0F766E', text: '#2 is slept on', likedByMe: false, likesCount: 1, createdAt: new Date(Date.now() - 20 * 3600000).toISOString() },
+    { id: 'h3', postId: 'fp3', authorId: 'u_maya', authorName: 'Maya Chen', authorHandle: '@mayachen', authorInitials: 'MC', authorColor: '#BE185D', text: 'Agreed, #2 is so underrated', likedByMe: false, likesCount: 2, replyToId: 'h2', replyToAuthorName: 'Amir Patel', replyToText: '#2 is slept on', createdAt: new Date(Date.now() - 19 * 3600000).toISOString() },
+  ],
+};
+
 const DEMO_POSTS: BuyerPost[] = [
   {
     id: 'post_me_1', authorId: MY_USER_ID, authorName: MY_NAME, authorHandle: MY_HANDLE, authorInitials: MY_INITIALS, authorColor: MY_COLOR,
@@ -260,6 +297,7 @@ async function seedIfNeeded(): Promise<void> {
     save(K.privacy, DEFAULT_PRIVACY_SETTINGS),
     save(K.notifPrefs, DEFAULT_NOTIFICATION_PREFS),
     ...Object.entries(DEMO_MESSAGES).map(([id, msgs]) => save(K.messages(id), msgs)),
+    ...Object.entries(DEMO_COMMENTS).map(([postId, comments]) => save(K.comments(postId), comments)),
   ]);
   await AsyncStorage.setItem(K.seeded, 'true');
 }
@@ -367,6 +405,71 @@ export async function repostPost(id: string): Promise<void> {
 }
 export async function getMyReposts(): Promise<RepostRecord[]> {
   return load<RepostRecord[]>(K.reposts, []);
+}
+
+// ─── Comments ────────────────────────────────────────────────────────────────
+
+export async function getComments(postId: string): Promise<Comment[]> {
+  return load<Comment[]>(K.comments(postId), DEMO_COMMENTS[postId] ?? []);
+}
+
+export async function postComment(params: {
+  postId: string;
+  text: string;
+  replyToId?: string;
+  replyToAuthorName?: string;
+  replyToText?: string;
+}): Promise<Comment> {
+  const comment: Comment = {
+    id: uid(),
+    postId: params.postId,
+    authorId: MY_USER_ID,
+    authorName: MY_NAME,
+    authorHandle: MY_HANDLE,
+    authorInitials: MY_INITIALS,
+    authorColor: MY_COLOR,
+    text: params.text.trim(),
+    replyToId: params.replyToId,
+    replyToAuthorName: params.replyToAuthorName,
+    replyToText: params.replyToText,
+    likedByMe: false,
+    likesCount: 0,
+    createdAt: iso(),
+  };
+  const existing = await getComments(params.postId);
+  await save(K.comments(params.postId), [...existing, comment]);
+  // Bump commentsCount on the parent post
+  const posts = await getMyPosts();
+  const idx = posts.findIndex(p => p.id === params.postId);
+  if (idx >= 0) {
+    posts[idx].commentsCount += 1;
+    await save(K.posts, posts);
+  }
+  notify();
+  return comment;
+}
+
+export async function likeComment(postId: string, commentId: string): Promise<void> {
+  const comments = await getComments(postId);
+  const idx = comments.findIndex(c => c.id === commentId);
+  if (idx < 0) return;
+  comments[idx].likedByMe = !comments[idx].likedByMe;
+  comments[idx].likesCount += comments[idx].likedByMe ? 1 : -1;
+  await save(K.comments(postId), comments);
+  notify();
+}
+
+export async function deleteComment(postId: string, commentId: string): Promise<void> {
+  const comments = await getComments(postId);
+  const next = comments.filter(c => c.id !== commentId);
+  await save(K.comments(postId), next);
+  const posts = await getMyPosts();
+  const idx = posts.findIndex(p => p.id === postId);
+  if (idx >= 0) {
+    posts[idx].commentsCount = Math.max(0, posts[idx].commentsCount - 1);
+    await save(K.posts, posts);
+  }
+  notify();
 }
 
 // ─── Seller posts (Thread-eligible) ──────────────────────────────────────────

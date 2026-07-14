@@ -78,10 +78,12 @@ function PostCard({
   post,
   onRepost,
   onSave,
+  onOpenComments,
 }: {
   post: BuyerPost;
   onRepost: (id: string) => void;
   onSave: (post: BuyerPost) => void;
+  onOpenComments: (post: BuyerPost) => void;
 }) {
   const router = useRouter();
 
@@ -121,21 +123,23 @@ function PostCard({
       </View>
 
       {/* Media */}
-      <LinearGradient
-        colors={post.mediaColors as [string, string]}
-        style={s.media}
-      >
-        <Feather
-          name={post.type === 'video' ? 'video' : 'image'}
-          size={44}
-          color="rgba(255,255,255,0.3)"
-        />
-        {post.type === 'video' && (
-          <View style={s.playBtn}>
-            <Feather name="play" size={ICON.md} color={PURPLE} />
-          </View>
-        )}
-      </LinearGradient>
+      <TouchableOpacity activeOpacity={0.9} onPress={() => onOpenComments(post)}>
+        <LinearGradient
+          colors={post.mediaColors as [string, string]}
+          style={s.media}
+        >
+          <Feather
+            name={post.type === 'video' ? 'video' : 'image'}
+            size={44}
+            color="rgba(255,255,255,0.3)"
+          />
+          {post.type === 'video' && (
+            <View style={s.playBtn}>
+              <Feather name="play" size={ICON.md} color={PURPLE} />
+            </View>
+          )}
+        </LinearGradient>
+      </TouchableOpacity>
 
       {/* Actions */}
       <View style={s.actionRow}>
@@ -147,7 +151,7 @@ function PostCard({
           />
           <Text style={s.actionCount}>{post.likesCount}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.actionItem}>
+        <TouchableOpacity style={s.actionItem} onPress={() => onOpenComments(post)}>
           <Feather name="message-circle" size={ICON.lg} color={MUTED} />
           <Text style={s.actionCount}>{post.commentsCount}</Text>
         </TouchableOpacity>
@@ -249,6 +253,20 @@ export default function FriendsScreen() {
       title: post.authorName + ' post',
       accentColor: post.authorColor,
     });
+  }
+
+  function handleOpenComments(post: BuyerPost) {
+    const params = new URLSearchParams({
+      postId: post.id,
+      postAuthorName: post.authorName,
+      postAuthorInitials: post.authorInitials,
+      postAuthorColor: post.authorColor,
+      postCaption: post.caption,
+      postMediaColor1: post.mediaColors?.[0] ?? '#1a1a2e',
+      postMediaColor2: post.mediaColors?.[1] ?? '#0d0d1a',
+      postType: post.type,
+    });
+    router.push(`/buyer-post-comments?${params.toString()}` as never);
   }
 
   async function handleMessageFriend(f: Friendship) {
@@ -430,7 +448,7 @@ export default function FriendsScreen() {
           ) : null
         }
         renderItem={({ item }) => (
-          <PostCard post={item} onRepost={handleRepost} onSave={handleSave} />
+          <PostCard post={item} onRepost={handleRepost} onSave={handleSave} onOpenComments={handleOpenComments} />
         )}
       />
     </View>

@@ -82,10 +82,17 @@ export default function ProfileScreen() {
   };
 
   const handlePostTap = (post: BuyerPost) => {
-    Alert.alert(
-      post.type.charAt(0).toUpperCase() + post.type.slice(1),
-      `${post.caption}\n\n❤️ ${post.likesCount} likes`,
-    );
+    const params = new URLSearchParams({
+      postId: post.id,
+      postAuthorName: post.authorName,
+      postAuthorInitials: post.authorInitials,
+      postAuthorColor: post.authorColor,
+      postCaption: post.caption,
+      postMediaColor1: post.mediaColors?.[0] ?? '#1a1a2e',
+      postMediaColor2: post.mediaColors?.[1] ?? '#0d0d1a',
+      postType: post.type,
+    });
+    router.push(`/buyer-post-comments?${params.toString()}` as never);
   };
 
   const postTypeIcon = (type: BuyerPost['type']): string => {
