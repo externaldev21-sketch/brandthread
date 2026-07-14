@@ -364,69 +364,7 @@ function SpotlightPage({
   );
 }
 
-// ─── Comments modal ─────────────────────────────────────────────────────────
-
-function CommentsModal({
-  visible, item, onClose, onAddComment,
-}: {
-  visible: boolean;
-  item: SpotlightItem | null;
-  onClose: () => void;
-  onAddComment: (id: string, text: string) => void;
-}) {
-  const insets = useSafeAreaInsets();
-  const [text, setText] = useState('');
-  if (!item) return null;
-
-  function submit() {
-    const trimmed = text.trim();
-    if (!trimmed || !item) return;
-    onAddComment(item.id, trimmed);
-    setText('');
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }
-
-  return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalBackdrop}>
-        <TouchableWithoutFeedback onPress={onClose}>
-          <View style={StyleSheet.absoluteFill} />
-        </TouchableWithoutFeedback>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={[styles.commentsSheet, { paddingBottom: Math.max(insets.bottom, 16) }]}
-        >
-          <View style={styles.commentsHandle} />
-          <Text style={styles.commentsTitle}>{item.comments.length} comments</Text>
-          <ScrollView style={{ maxHeight: SCREEN_H * 0.42 }} contentContainerStyle={{ paddingBottom: 8 }}>
-            {item.comments.length === 0 ? (
-              <Text style={styles.commentsEmpty}>Be the first to comment.</Text>
-            ) : item.comments.map(c => (
-              <View key={c.id} style={styles.commentRow}>
-                <Text style={styles.commentUser}>{c.user}</Text>
-                <Text style={styles.commentText}>{c.text}</Text>
-              </View>
-            ))}
-          </ScrollView>
-          <View style={styles.commentInputRow}>
-            <TextInput
-              style={styles.commentInput}
-              placeholder="Add a comment…"
-              placeholderTextColor="#8C8577"
-              value={text}
-              onChangeText={setText}
-              onSubmitEditing={submit}
-              returnKeyType="send"
-            />
-            <TouchableOpacity style={styles.commentSendBtn} activeOpacity={0.75} onPress={submit}>
-              <Feather name="send" size={17} color="#FFF" />
-            </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
-      </View>
-    </Modal>
-  );
-}
+// CommentsModal replaced by navigation to /buyer-post-comments (see handleOpenComments).
 
 // ─── Map a service SellerThreadPost to the feed display format ────────────────
 
@@ -474,7 +412,6 @@ export default function FeedScreen() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [commentsFor, setCommentsFor] = useState<string | null>(null);
   const [showNotifs, setShowNotifs] = useState(false);
   const [hasUnread, setHasUnread] = useState(true);
   const [sellerFeedPosts, setSellerFeedPosts] = useState<SpotlightItem[]>([]);
@@ -543,9 +480,21 @@ export default function FeedScreen() {
   })), []);
   const handleFollow = useCallback((id: string) => update(id, e => ({ following: !e.following })), []);
 
-  const handleAddComment = useCallback((id: string, text: string) => {
-    update(id, e => ({ comments: [...e.comments, { id: `c${Date.now()}`, user: '@you', text }] }));
-  }, []);
+  function handleOpenComments(id: string) {
+    const item = allItems.find(i => i.id === id);
+    if (!item) return;
+    const params = new URLSearchParams({
+      postId: item.id,
+      postAuthorName: item.creator,
+      postAuthorInitials: item.initials,
+      postAuthorColor: item.avatarColor,
+      postCaption: item.caption,
+      postMediaColor1: '#0a0a0a',
+      postMediaColor2: '#1a1a1a',
+      postType: 'video',
+    });
+    router.push((`/buyer-post-comments?${params.toString()}`) as never);
+  }
 
   function handleShop(item: SpotlightItem) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -561,12 +510,6 @@ export default function FeedScreen() {
   }).current;
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
-
-  const commentsItem = commentsFor ? allItems.find(i => i.id === commentsFor) ?? null : null;
-  const commentsEngagement = commentsFor ? engagements[commentsFor] : null;
-  const commentsItemWithLive = commentsItem && commentsEngagement
-    ? { ...commentsItem, comments: commentsEngagement.comments }
-    : null;
 
   return (
     <View style={styles.container}>
@@ -591,14 +534,14 @@ export default function FeedScreen() {
         renderItem={({ item, index }) => (
           <SpotlightPage
             item={item}
-            isActive={index === activeIndex && !commentsFor && !showNotifs}
+            isActive={index === activeIndex && !showNotifs}
             engagement={engagements[item.id]}
             onLike={handleLike}
             onDoubleTapLike={handleDoubleTapLike}
             onSave={handleSave}
             onRepost={handleRepost}
             onFollow={handleFollow}
-            onOpenComments={setCommentsFor}
+            onOpenComments={handleOpenComments}
             onShop={handleShop}
           />
         )}
@@ -693,12 +636,6 @@ export default function FeedScreen() {
         </View>
       </Modal>
 
-      <CommentsModal
-        visible={!!commentsFor}
-        item={commentsItemWithLive}
-        onClose={() => setCommentsFor(null)}
-        onAddComment={handleAddComment}
-      />
     </View>
   );
 }
