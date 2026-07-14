@@ -1,0 +1,400 @@
+Focus only on Brandthread Seller → Products → Create Product.
+
+Do not build new features.
+Do not redesign unrelated screens.
+Do not create placeholder success states.
+Do not claim it works unless you test the full flow on mobile.
+
+Goal:
+
+A Seller creates a product, saves it as a draft, closes the app, reopens it, finishes the product, publishes it, and sees the same product everywhere it should appear.
+
+First inspect the project and identify:
+
+- Current backend
+- Current database
+- Current storage provider
+- Existing Product service
+- Existing Product model
+- Existing Create Product screen
+- Existing Inventory connection
+- Existing Seller Profile connection
+- Existing Storefront connection
+- Existing Content tagging connection
+
+Do not install a second backend.
+
+PRODUCT CREATION FLOW
+
+Make these steps fully functional:
+
+1. Basic information
+2. Media
+3. Pricing
+4. Variants
+5. Inventory
+6. Sales model
+7. Fulfillment
+8. Store visibility
+9. Review
+10. Publish
+
+BASIC INFORMATION
+
+Make these fields save correctly:
+
+- Product name
+- Description
+- Category
+- Collection
+- Tags
+- Vendor
+- Product type
+
+Validate required fields.
+
+MEDIA
+
+Make these work:
+
+- Upload image
+- Upload multiple images
+- Upload video if currently supported
+- Reorder media
+- Delete media
+- Choose cover image
+- Retry failed upload
+- Preserve media after app restart
+
+Use the current storage provider.
+
+Do not store large Base64 files in AsyncStorage.
+
+PRICING
+
+Make these work:
+
+- Retail price
+- Compare-at price
+- Product cost
+- Estimated fees
+- Estimated shipping cost
+- Profit calculation
+- Margin calculation
+
+Block invalid values.
+
+VARIANTS
+
+Make these work:
+
+- Size
+- Color
+- Material
+- Custom option
+- Variant combinations
+- Variant image
+- SKU
+- Barcode
+- Price override
+- Cost override
+- Inventory quantity
+- Variant status
+
+Prevent duplicate combinations.
+
+INVENTORY
+
+Connect to the existing inventory source of truth.
+
+Make these work:
+
+- Track quantity
+- On-hand
+- Available
+- Reserved
+- Incoming
+- Low-stock threshold
+- Overselling
+- Location
+
+Do not create separate conflicting inventory values.
+
+SALES MODEL
+
+Make these work:
+
+- Pre-order
+- Pre-made
+- Both
+
+For pre-order, save:
+
+- Open date
+- Close date
+- Minimum quantity
+- Maximum quantity
+- Production date
+- Estimated ship date
+- Disclaimer
+
+For pre-made, save:
+
+- Available stock
+- Ready-to-ship status
+- Processing time
+
+FULFILLMENT
+
+Make these work:
+
+- Seller fulfilled
+- Manufacturer fulfilled
+- Mixed fulfillment
+
+Save:
+
+- Weight
+- Package dimensions
+- Processing time
+- Shipping profile
+- Country of origin
+
+STORE VISIBILITY
+
+Make these work:
+
+- Draft
+- Active
+- Scheduled
+- Hidden
+- Archived
+
+Save:
+
+- Collection
+- Product handle
+- SEO title
+- SEO description
+- Featured toggle
+
+REVIEW SCREEN
+
+Show the actual entered data.
+
+Do not show stale demo values.
+
+Show missing required fields clearly.
+
+SAVE DRAFT
+
+Save draft must:
+
+- Persist to backend or the current correct persistence layer
+- Preserve all completed fields
+- Preserve media
+- Preserve variants
+- Preserve inventory
+- Preserve selected sales model
+- Preserve fulfillment
+- Preserve store settings
+- Prevent duplicate draft creation
+
+PUBLISH
+
+Publish must:
+
+- Revalidate required fields
+- Revalidate media
+- Revalidate variants
+- Revalidate inventory
+- Revalidate product status
+- Prevent duplicate taps
+- Show loading
+- Create one product only
+- Route to Product Details after success
+- Keep the product after app restart
+
+PRODUCT DETAILS
+
+Confirm the published product appears correctly in:
+
+- Products list
+- Product Details
+- Seller Profile Products tab
+- Storefront preview
+- Seller content product picker
+- Buyer product page
+- Inventory
+- Analytics
+- Manufacturer Hub product picker
+
+EDIT PRODUCT
+
+Make edits persist everywhere.
+
+Test:
+
+- Name
+- Price
+- Variant
+- Inventory
+- Media
+- Description
+- Status
+
+Editing must not create a duplicate product.
+
+DUPLICATE PRODUCT
+
+Make Duplicate work correctly.
+
+Copy:
+
+- Basic information
+- Media
+- Pricing
+- Variants
+- Fulfillment
+- Store settings
+
+Do not copy:
+
+- Orders
+- Reviews
+- Analytics
+- Production history
+- Revenue
+
+Create duplicate as Draft.
+
+ARCHIVE
+
+Archive must:
+
+- Remove product from public Storefront
+- Remove product from new content tagging
+- Preserve historical orders
+- Preserve analytics
+- Allow restore
+
+DELETE
+
+Delete must:
+
+- Require confirmation
+- Warn if active orders exist
+- Remove from active Seller views
+- Show safe unavailable state on old links
+- Prevent new tags
+
+ERROR HANDLING
+
+Handle:
+
+- Failed save
+- Failed media upload
+- Session expired
+- Network loss
+- Duplicate SKU
+- Duplicate handle
+- Invalid price
+- Invalid date range
+- Invalid inventory
+- Backend unavailable
+
+Show readable Brandthread errors.
+
+Do not show raw provider errors.
+
+DESIGN
+
+Keep the current premium Brandthread design.
+
+Fix any:
+
+- Narrow cards
+- Text wrapping one letter per line
+- Keyboard overlap
+- Hidden buttons
+- Broken progress bar
+- Old green and gray layout
+- White flashes
+
+TEST THIS EXACT PRODUCT
+
+Create:
+
+Name:
+Brandthread Heavyweight Hoodie
+
+Price:
+88
+
+Compare-at:
+110
+
+Cost:
+29
+
+Sizes:
+S, M, L, XL
+
+Colors:
+Black, Heather Gray
+
+Create all 8 variant combinations.
+
+Set inventory for each variant.
+
+Choose:
+Pre-made
+
+Upload at least 3 images.
+
+Save draft.
+
+Close app.
+
+Reopen app.
+
+Resume draft.
+
+Publish.
+
+Then verify it appears in:
+
+- Products
+- Seller Profile
+- Storefront
+- Product picker in Content Creator
+- Buyer product page
+
+Then:
+
+- Edit price
+- Edit inventory
+- Duplicate
+- Archive
+- Restore
+- Delete duplicate
+
+Fix all:
+
+- TypeScript errors
+- Route errors
+- Storage errors
+- Duplicate records
+- Broken imports
+- Runtime errors
+- Console errors
+- Dead buttons
+
+Do not stop after changing the UI.
+
+When complete, respond with:
+
+1. Whether draft persistence was verified
+2. Whether publish was verified
+3. Whether Product appeared in all connected screens
+4. Any remaining blocker

@@ -1,0 +1,226 @@
+Focus only on Brandthread Studio → Remove Background.
+
+Do not build any new features.
+Do not change unrelated screens.
+Do not claim success unless the full flow works on mobile.
+
+Goal:
+
+A Seller uploads a photo, the app removes the background for real, returns a transparent PNG, saves it, and lets the Seller use it in Design Studio, Products, Content Creator, and Store Builder.
+
+First inspect the current project and identify:
+
+- Existing AI or image-processing provider
+- Existing backend
+- Existing storage provider
+- Existing upload service
+- Existing Remove Background screen
+- Existing environment variables
+- Existing server functions
+
+Do not install a second backend.
+
+Do not put secret API keys in the Expo client.
+
+If a real background-removal provider already exists, use it.
+
+If no provider exists, wire the app to a secure server-side background-removal service using the project’s current backend architecture.
+
+The mobile app must only:
+
+1. Select or capture image
+2. Upload image securely
+3. Start background-removal job
+4. Show progress
+5. Poll or subscribe for completion
+6. Download or load transparent result
+7. Save result to storage
+8. Return result URL and metadata to the app
+
+REMOVE BACKGROUND SCREEN
+
+Use the current Brandthread design system.
+
+Include:
+
+- Upload from device
+- Take photo
+- Selected image preview
+- Remove Background button
+- Processing state
+- Progress state
+- Cancel button where supported
+- Error state
+- Retry
+- Before and after comparison
+- Checkerboard transparency preview
+- Save result
+- Export transparent PNG
+- Add to Design Studio
+- Add to Product media
+- Add to Content Creator
+- Add to Store Builder
+- Save to Brand Assets
+
+Do not fake transparency with a white background.
+
+The output must be a real transparent PNG with alpha.
+
+VALIDATION
+
+Accept:
+
+- PNG
+- JPG
+- JPEG
+- HEIC only if conversion is supported
+
+Reject or handle:
+
+- Unsupported file types
+- Corrupt files
+- Extremely large images
+- Empty uploads
+- Network failures
+
+Resize safely before upload only when needed.
+
+Do not destroy image quality unnecessarily.
+
+RESULT STORAGE
+
+Store:
+
+- Original image URL
+- Transparent result URL
+- Width
+- Height
+- File size
+- MIME type
+- Processing status
+- Created time
+- User ID
+- Brand ID
+- Source screen
+
+Do not store giant Base64 values in AsyncStorage.
+
+Save the transparent PNG to the project’s existing storage provider.
+
+SECURITY
+
+Validate ownership server-side.
+
+A Seller must only access their own uploaded and generated files unless they intentionally share them.
+
+Do not expose provider secrets.
+
+Do not log sensitive tokens.
+
+Do not allow arbitrary remote URLs without validation.
+
+ERROR HANDLING
+
+Handle:
+
+- Upload failed
+- Provider unavailable
+- Provider rejected image
+- Timeout
+- Rate limit
+- Invalid response
+- Storage save failed
+- Session expired
+- Cancelled job
+
+Show readable Brandthread-styled messages.
+
+Do not show raw provider errors to the user.
+
+INTEGRATIONS
+
+After successful processing, these buttons must work:
+
+Add to Design Studio:
+- Open a new or existing project
+- Insert result as an image layer
+- Preserve transparency
+
+Add to Product media:
+- Select Product
+- Add image to media gallery
+- Preserve transparency
+
+Add to Content Creator:
+- Open content flow with asset preloaded
+
+Add to Store Builder:
+- Add to Brand Assets or selected store section
+
+Save to Brand Assets:
+- Save under transparent graphics or logos
+
+Export:
+- Share or save PNG where supported
+
+PERSISTENCE
+
+Test:
+
+- Process image
+- Close app
+- Reopen app
+- Open recent results
+- Confirm transparent PNG still loads
+- Confirm all integration actions still work
+
+DEVELOPMENT STATUS
+
+If no real provider is configured, do not show fake success.
+
+Show a developer-only status message explaining exactly what is missing.
+
+Do not expose secret values.
+
+TEST THESE EXACT CASES
+
+1. Upload JPG with a person
+2. Remove background
+3. Confirm transparent PNG
+4. Save result
+5. Reopen result
+6. Add to Design Studio
+7. Add to Product media
+8. Add to Content Creator
+9. Add to Store Builder
+10. Save to Brand Assets
+11. Export PNG
+12. Test failed upload
+13. Test network loss
+14. Test retry
+15. Test provider timeout
+16. Test large image
+17. Test unsupported file
+18. Restart app
+19. Confirm result persists
+20. Confirm no white background is baked into output
+
+Fix all:
+
+- TypeScript errors
+- Broken imports
+- Route errors
+- Storage errors
+- Upload bugs
+- Provider integration errors
+- Console errors
+- Dead buttons
+
+Do not stop after changing the UI.
+
+When complete, respond with:
+
+1. Whether a real provider is connected
+2. Whether transparent PNG output was verified
+3. Which integrations were tested
+4. Any remaining blocker

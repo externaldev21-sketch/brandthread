@@ -15,4 +15,5 @@
 - [Social System Architecture](social-system-architecture.md) — socialTypes.ts + socialService.ts; feedEligibility enforced at write; 11 new screens + 3 rebuilt tabs; bt:social:*:v1 keys; subscribeSocial() cleanup pattern.
 - [AI Brain Architecture](ai-brain-architecture.md) — unified seller AI; api-server /api/ai/chat route; AIBrainFAB on 9 screens; 3 new screens; bt:ai:*:v1 keys; nanoid replaced with inline fn; mock fallback always present.
 - [expo-file-system v19 API](expo-file-system-v19.md) — legacy API (readAsStringAsync/writeAsStringAsync/EncodingType/cacheDirectory) removed; use File+Paths classes; for reading images before API call, request base64:true in ImagePicker instead.
+- [Background Removal Architecture](bg-removal-architecture.md) — GCS+local-file dual cache; named wildcard gotcha; ProductMedia required fields; integration actions pattern.
 - [EXPO_PUBLIC_API_BASE_URL](expo-public-api-base-url.md) — set in shared env to the Replit dev domain root; needed by designService.ts for all AI calls (bg-removal, photoshoot, mockup-to-model, text-to-design).

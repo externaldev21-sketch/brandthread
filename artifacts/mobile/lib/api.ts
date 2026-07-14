@@ -86,7 +86,18 @@ export function createApi(getToken: GetToken) {
       generate: (images: string[], prompt: string) => post<any>('/api/photography/generate', { images, prompt }),
     },
     bgRemoval: {
-      remove: (image: string) => post<any>('/api/bg-removal/remove', { image }),
+      /**
+       * Remove the background from a base64 data-URL image.
+       * Returns: { b64_json, storageKey, size, mime, createdAt, id }
+       */
+      remove: (image: string) => post<{
+        b64_json: string;
+        storageKey: string | null;
+        size: number;
+        mime: string;
+        createdAt: string;
+        id: string;
+      }>('/api/bg-removal/remove', { image }),
     },
     lifestyle: {
       generate: (referenceImages: string[], productImages: string[], prompt: string) =>

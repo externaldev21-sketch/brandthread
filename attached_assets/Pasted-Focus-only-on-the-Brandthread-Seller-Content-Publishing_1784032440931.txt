@@ -1,0 +1,514 @@
+Focus only on the Brandthread Seller Content Publishing flow and its connection to Buyer Thread.
+
+Do not build new major features.
+Do not redesign unrelated screens.
+Do not create fake success states.
+Do not claim it works unless you test the full flow on mobile.
+
+Goal:
+
+A Seller creates a real post, tags a real product, publishes it, sees it on Seller Profile, and the same post appears correctly in Buyer Thread.
+
+The Buyer must be able to tap the tagged product and open the correct Buyer product page.
+
+First inspect the current project and identify:
+
+- Existing Seller Content Creator
+- Existing Seller Profile posts tab
+- Existing Buyer Thread feed
+- Existing Product picker
+- Existing Product service
+- Existing Post service
+- Existing media upload service
+- Existing storage provider
+- Existing backend
+- Existing account-type and feed-eligibility rules
+
+Do not install a second backend.
+
+CORE FEED RULE
+
+Only Seller posts may appear in Buyer Thread.
+
+Buyer posts must never appear in Thread.
+
+Store explicit fields such as:
+
+- authorAccountType
+- sellerId
+- brandId
+- feedEligibility
+- postStatus
+- visibility
+- publishedAt
+
+Do not infer eligibility from route location.
+
+SELLER POST TYPES
+
+Make these existing types work:
+
+- Video
+- Photo slideshow
+- Product announcement
+- Drop announcement
+- Behind the scenes
+- Story where already supported
+
+VIDEO RULES
+
+Seller videos must always publish as 9:16.
+
+Do not ask for video aspect ratio.
+
+Support maximum duration choices:
+
+- 10 seconds
+- 15 seconds
+- 30 seconds
+- 60 seconds
+
+Validate actual media duration.
+
+If longer than selected maximum:
+
+- Require trim
+- Prevent publish until valid
+
+If shorter:
+
+- Allow original duration
+
+SLIDESHOW RULES
+
+Only slideshow posts should ask for aspect ratio.
+
+Support:
+
+- 9:16
+- 3:4
+- 1:1
+
+Default:
+9:16
+
+Save selected ratio with the post.
+
+MEDIA
+
+Make these work:
+
+- Upload from device
+- Record video if currently supported
+- Upload multiple slideshow images
+- Reorder slideshow images
+- Delete media
+- Retry failed upload
+- Preserve draft media
+- Generate or save thumbnail
+- Load media after app restart
+
+Use the current storage provider.
+
+Do not store large Base64 media in AsyncStorage.
+
+VIDEO EDITING
+
+Only verify and fix the tools that already exist.
+
+Test:
+
+- Trim
+- Split
+- Reorder clips
+- Delete clip
+- Original audio volume
+- Added sound volume
+- Mute
+- 9:16 crop
+- Text overlay
+- Save edit instructions
+- Final publish processing
+
+If final video rendering is not truly connected:
+
+- Do not show fake success
+- Clearly mark the missing processing provider in development mode
+- Preserve edit instructions
+- Keep publishing disabled until a valid final media file exists
+
+Do not pretend edit instructions equal a rendered video.
+
+SOUND
+
+Make current sound flow work.
+
+Support:
+
+- Select sound
+- Preview sound
+- Choose start point
+- Adjust sound volume
+- Adjust original audio
+- Remove sound
+- Save attribution
+
+Do not claim access to copyrighted commercial music unless a licensed provider exists.
+
+Use current licensed, royalty-free, or demo sound library only.
+
+CAPTION AND HASHTAGS
+
+Make these save correctly:
+
+- Caption
+- Line breaks
+- Hashtags
+- Mentions if supported
+- Character count
+
+Do not lose caption when navigating back.
+
+PRODUCT TAGGING
+
+This is required.
+
+Make the Product picker use the real Product system.
+
+Allow the Seller to:
+
+- Search products
+- Select product
+- Select variant where relevant
+- Add one or more product tags
+- Remove product tag
+- Attach tag to entire post
+- Attach tag to slideshow slide where currently supported
+- Attach video tag timestamp where currently supported
+
+Only allow new tags for:
+
+- Active products
+- Scheduled products when saving draft
+- Draft products when saving post as draft
+
+Do not allow:
+
+- Archived products
+- Deleted products
+- Unavailable broken records
+
+Save:
+
+- productId
+- variantId
+- slideIndex
+- timestamp
+- sticker position where supported
+
+POST DETAILS
+
+Make these work:
+
+- Caption
+- Hashtags
+- Product tags
+- Location
+- Allow comments
+- Allow reposts
+- Show like count
+- Schedule
+- Save draft
+- Publish
+
+POST PREVIEW
+
+Show the actual post before publishing.
+
+For video:
+
+- 9:16 preview
+- Seller profile image
+- Brand name
+- Caption
+- Hashtags
+- Sound
+- Product card
+- Shopping bag button
+
+For slideshow:
+
+- Selected ratio
+- Correct images
+- Product tags per slide
+- Caption
+- Hashtags
+
+Do not show stale demo content.
+
+SAVE DRAFT
+
+Draft save must preserve:
+
+- Media
+- Edit instructions
+- Caption
+- Hashtags
+- Sound
+- Product tags
+- Aspect ratio
+- Duration choice
+- Visibility
+- Comments settings
+- Repost settings
+
+Close the app and reopen.
+
+Resume draft successfully.
+
+PUBLISH
+
+Publish must:
+
+- Revalidate media
+- Revalidate account type
+- Revalidate product tags
+- Revalidate product status
+- Revalidate duration
+- Revalidate slideshow ratio
+- Prevent duplicate taps
+- Show processing
+- Create one post only
+- Set postStatus to Published
+- Set feedEligibility to Seller Thread
+- Save publishedAt
+- Route to published post or Seller Profile
+
+Do not publish drafts early.
+
+Do not publish scheduled posts before schedule.
+
+SELLER PROFILE
+
+Confirm published post appears on:
+
+- Seller Profile Posts tab
+- Correct thumbnail
+- Correct post type indicator
+- Correct aspect ratio
+- Correct product-tag indicator
+- Correct view state
+
+Allow:
+
+- Open
+- Edit
+- Archive
+- Delete
+- Pin
+- View analytics
+
+BUYER THREAD
+
+Make Buyer Thread load only valid published Seller content.
+
+Include only:
+
+- Published Seller posts
+- Valid media
+- Active Seller
+- feedEligibility allowed
+- Not archived
+- Not deleted
+- Not scheduled for future
+- Not failed
+
+Exclude:
+
+- Buyer posts
+- Drafts
+- Scheduled future posts
+- Archived posts
+- Deleted posts
+- Failed uploads
+- Private content
+
+THREAD POST
+
+Show:
+
+- Seller profile image
+- Brand name
+- Follow button
+- Media
+- Caption
+- Hashtags
+- Sound
+- Like
+- Comment
+- Repost
+- Save
+- Share
+- Shopping bag
+- Product card
+
+PRODUCT TAG INTERACTION
+
+Buyer taps:
+
+- Shopping bag
+- Product card
+- Product sticker
+- View product
+
+Open the correct Buyer product page.
+
+Preserve selected variant where relevant.
+
+Track:
+
+- Product click
+- Add to cart
+- Checkout
+- Purchase attribution
+
+Do not double-count analytics.
+
+SELLER PROFILE FROM THREAD
+
+Tapping Seller name or profile image must open the correct Seller Profile.
+
+Do not route to an old or duplicate profile screen.
+
+ARCHIVE AND DELETE
+
+Archive:
+
+- Remove post from Thread
+- Preserve Seller access
+- Preserve analytics
+- Prevent new feed delivery
+
+Delete:
+
+- Remove post from Thread
+- Remove from Seller Profile active view
+- Keep safe unavailable state on old links
+- Preserve required historical analytics references where needed
+
+SCHEDULED POSTS
+
+Test:
+
+- Schedule future post
+- Confirm it does not appear early
+- Confirm it publishes at correct time when scheduler exists
+
+If no scheduler exists:
+
+- Do not fake publication
+- Clearly identify missing backend scheduler
+- Keep scheduled post private
+
+ERROR HANDLING
+
+Handle:
+
+- Upload failed
+- Render failed
+- Save failed
+- Publish failed
+- Invalid product tag
+- Deleted product
+- Archived product
+- Session expired
+- Backend unavailable
+- Network loss
+- Duplicate publish attempt
+
+Show Brandthread-styled errors.
+
+Do not show raw provider errors.
+
+DESIGN
+
+Keep the current premium Brandthread visual system.
+
+Fix:
+
+- Old green and gray screens
+- Narrow cards
+- Text wrapping one letter per line
+- Keyboard overlap
+- Hidden publish button
+- Broken safe areas
+- White flashes
+- Inconsistent buttons
+- Broken preview sizing
+
+TEST THIS EXACT FLOW
+
+1. Sign in as Seller.
+2. Open Content Creator.
+3. Create a 15-second video post.
+4. Upload or record video.
+5. Trim to valid length.
+6. Add caption.
+7. Add hashtags.
+8. Select sound.
+9. Tag Brandthread Heavyweight Hoodie.
+10. Select Black / Medium variant.
+11. Preview post.
+12. Save draft.
+13. Close app.
+14. Reopen app.
+15. Resume draft.
+16. Publish post.
+17. Confirm it appears on Seller Profile.
+18. Sign in as Buyer.
+19. Open Thread.
+20. Confirm post appears.
+21. Tap Seller name.
+22. Confirm correct Seller Profile opens.
+23. Return to Thread.
+24. Tap product tag.
+25. Confirm correct Buyer product page opens.
+26. Confirm selected variant is preserved where supported.
+27. Add product to cart.
+28. Confirm attribution record is created.
+29. Archive post.
+30. Confirm it disappears from Thread.
+31. Restore if supported.
+32. Delete test post.
+33. Confirm old links show safe unavailable state.
+
+Then test one slideshow:
+
+- 9:16
+- 3:4
+- 1:1
+
+Confirm each publishes and displays correctly.
+
+Fix all:
+
+- TypeScript errors
+- Route errors
+- Storage errors
+- Feed query errors
+- Duplicate posts
+- Broken product tags
+- Broken imports
+- Runtime errors
+- Console errors
+- Dead buttons
+
+Do not stop after changing UI.
+
+When complete, respond with:
+
+1. Whether real Seller post publishing was verified
+2. Whether product tagging was verified
+3. Whether Buyer Thread delivery was verified
+4. Whether Buyer product navigation was verified
+5. Any remaining blocker
