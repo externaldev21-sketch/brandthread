@@ -483,17 +483,17 @@ export default function FeedScreen() {
   function handleOpenComments(id: string) {
     const item = allItems.find(i => i.id === id);
     if (!item) return;
-    const params = new URLSearchParams({
-      postId: item.id,
-      postAuthorName: item.creator,
-      postAuthorInitials: item.initials,
-      postAuthorColor: item.avatarColor,
-      postCaption: item.caption,
-      postMediaColor1: '#0a0a0a',
-      postMediaColor2: '#1a1a1a',
-      postType: 'video',
-    });
-    router.push((`/buyer-post-comments?${params.toString()}`) as never);
+    const qs = [
+      'postId=' + encodeURIComponent(item.id),
+      'postAuthorName=' + encodeURIComponent(item.creator),
+      'postAuthorInitials=' + encodeURIComponent(item.initials),
+      'postAuthorColor=' + encodeURIComponent(item.avatarColor),
+      'postCaption=' + encodeURIComponent(item.caption),
+      'postMediaColor1=' + encodeURIComponent('#0a0a0a'),
+      'postMediaColor2=' + encodeURIComponent('#1a1a1a'),
+      'postType=video',
+    ].join('&');
+    router.push(('/buyer-post-comments?' + qs) as never);
   }
 
   function handleShop(item: SpotlightItem) {
