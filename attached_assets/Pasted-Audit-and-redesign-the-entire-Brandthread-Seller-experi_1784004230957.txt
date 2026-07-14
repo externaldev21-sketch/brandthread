@@ -1,0 +1,611 @@
+Audit and redesign the entire Brandthread Seller experience so it visually and functionally matches the premium onboarding flow.
+
+Do not redesign the onboarding flow. The onboarding design is the source of truth.
+
+The current problem is:
+
+* Onboarding looks premium, modern and polished.
+* The main Seller app looks like a different product.
+* Colors, spacing, cards, buttons, typography and layout do not feel consistent.
+* The Seller experience may feel confusing because there are too many tools and it is not always clear where to go next.
+
+Your job is to unify the visual system across the entire Seller app and create a simple navigation and guidance system for new Sellers.
+
+Do not give me instructions or explanations.
+
+Inspect the current project, edit it directly, run it and fix all errors.
+
+PRIMARY GOAL
+
+A Seller should be able to:
+
+1. Create an account.
+2. Finish onboarding.
+3. Enter the Seller app.
+4. Immediately understand where everything is.
+5. Know what to do next.
+6. Reach any major tool in one or two taps.
+7. Never feel overwhelmed by the number of features.
+
+The Seller app must feel like a continuation of onboarding.
+
+GLOBAL BRANDTHREAD DESIGN SYSTEM
+
+Use the onboarding visual system as the design foundation for the entire Seller app.
+
+Match the same:
+
+* Deep black and charcoal backgrounds
+* Purple, blue, cyan and green gradient accents
+* Soft glows
+* Rounded cards
+* Rounded inputs
+* Rounded buttons
+* Large premium headings
+* Medium-weight readable typography
+* Subtle borders
+* High contrast
+* Spacious mobile layout
+* Smooth animations
+* Premium loading states
+* Consistent icons
+* Consistent shadows
+* Consistent safe-area spacing
+* Consistent page transitions
+* Consistent button heights
+* Consistent section spacing
+
+The main app should not look like a generic admin dashboard.
+
+It should feel like a premium fashion operating system.
+
+CREATE SHARED GLOBAL COMPONENTS
+
+Audit the app and replace inconsistent active components with shared components.
+
+Create or reuse:
+
+* BrandthreadScreen
+* BrandthreadHeader
+* BrandthreadCard
+* GradientCard
+* PrimaryButton
+* SecondaryButton
+* IconButton
+* SearchBar
+* FilterChip
+* StatusBadge
+* EmptyState
+* ErrorState
+* LoadingSkeleton
+* SectionHeader
+* BottomSheet
+* ConfirmationModal
+* Toast
+* FormInput
+* SelectField
+* UploadField
+* StatCard
+* QuickActionCard
+* NavigationCard
+* ProgressCard
+* GuidedTip
+* NewFeatureBadge
+
+Do not allow individual screens to create random new color systems or button styles.
+
+GLOBAL THEME TOKENS
+
+Create one reusable theme file containing:
+
+* Colors
+* Background colors
+* Surface colors
+* Border colors
+* Text colors
+* Gradient colors
+* Font sizes
+* Font weights
+* Border radiuses
+* Spacing
+* Shadows
+* Animation timing
+* Icon sizes
+
+Update every active Seller screen to use these shared theme values.
+
+Remove hardcoded conflicting green, gray, blue, white or other legacy styles that do not match onboarding.
+
+Do not remove green entirely.
+
+Use green only as a controlled accent for:
+
+* Success
+* Revenue growth
+* Completed tasks
+* Available status
+* Positive analytics
+
+Do not use green as the main app background or primary button color.
+
+SELLER NAVIGATION
+
+Create a simple five-tab bottom navigation system:
+
+1. Home
+2. Studio
+3. Products
+4. Orders
+5. More
+
+Use clear labels and icons.
+
+The active tab should use the premium Brandthread gradient or purple accent.
+
+Inactive tabs should remain readable but visually quieter.
+
+Keep the bottom navigation visible on main Seller screens.
+
+Do not place too many primary destinations in the bottom tab bar.
+
+HOME
+
+The Home tab should answer:
+
+* What is happening?
+* What needs my attention?
+* What should I do next?
+* How is my brand performing?
+
+Include:
+
+* Personalized greeting
+* Brand name
+* Setup progress
+* Today’s priorities
+* Quick actions
+* Revenue
+* Orders
+* Visitors
+* Conversion
+* Production updates
+* Inventory alerts
+* Recent activity
+
+The Home screen must not overload the Seller with every feature at once.
+
+Show the most important information first.
+
+STUDIO
+
+The Studio tab should group all creative tools.
+
+Include clear sections:
+
+* Create design
+* Create content
+* AI photoshoot
+* Mockup to model
+* Background removal
+* Recent creative projects
+
+Do not mix operational tools into Studio.
+
+PRODUCTS
+
+The Products tab should include:
+
+* Product catalog
+* Add product
+* Draft products
+* Active products
+* Inventory status
+* Pre-orders
+* Product analytics
+
+ORDERS
+
+The Orders tab should include:
+
+* New orders
+* Processing
+* Ready to ship
+* Shipped
+* Returns
+* Refunds
+* Disputes
+
+MORE
+
+The More tab should organize secondary systems into understandable groups.
+
+Group the page as:
+
+OPERATIONS
+
+* Manufacturer Hub
+* Inventory
+* Shipping
+* Payouts
+
+GROWTH
+
+* Content
+* Customers
+* Marketing
+* Analytics
+
+STORE
+
+* Store Builder
+* Collections
+* Discounts
+* Domains
+
+ACCOUNT
+
+* Subscription
+* Integrations
+* Team
+* Notifications
+* Settings
+* Help
+
+Do not display one large unorganized list.
+
+Use section headings, icons and descriptions.
+
+SELLER GUIDED NAVIGATION
+
+Create a first-time Seller guidance system.
+
+After onboarding, do not simply drop the Seller into a complicated dashboard.
+
+Show a premium welcome card:
+
+Heading:
+“Your brand workspace is ready.”
+
+Description:
+“Let’s build your first product and prepare your store.”
+
+Buttons:
+
+* Start setup
+* Explore on my own
+
+START SETUP FLOW
+
+Create an optional guided setup flow.
+
+The guided setup should walk the Seller through:
+
+1. Add brand profile
+2. Create first product
+3. Add product media
+4. Set product pricing
+5. Choose pre-order or pre-made
+6. Connect payouts
+7. Set shipping preferences
+8. Add or find a manufacturer
+9. Customize storefront
+10. Create first Seller post
+11. Publish store
+
+Allow the Seller to:
+
+* Continue
+* Go back
+* Skip a step
+* Save and exit
+* Resume later
+
+Do not force the Seller to complete the entire setup at once.
+
+SETUP CHECKLIST
+
+Add a persistent setup checklist on Home.
+
+Show:
+
+* Completion percentage
+* Completed tasks
+* Remaining tasks
+* Next recommended action
+* Continue setup button
+
+Checklist items:
+
+* Complete brand profile
+* Upload brand logo
+* Create first product
+* Add product images
+* Set product price
+* Choose sales model
+* Connect payouts
+* Configure shipping
+* Add manufacturer
+* Customize store
+* Create first post
+* Publish store
+
+When a task is completed, automatically update the checklist.
+
+NEXT BEST ACTION
+
+Add a “Next best action” card on the Seller Home screen.
+
+Examples:
+
+* “Finish your first product”
+* “Add pricing to your hoodie”
+* “Connect payouts before publishing”
+* “Your product is ready for content”
+* “You have three orders ready to ship”
+* “Review your manufacturer quote”
+
+This card must change based on the Seller’s current state.
+
+NEW BUTTONS AND BADGES
+
+Add small “New” badges only where helpful.
+
+Use them for:
+
+* Newly added features
+* Tools the Seller has not opened
+* New orders
+* New manufacturer messages
+* New notifications
+* New setup tasks
+
+Do not put “New” on everything.
+
+Once the Seller opens or completes the item, remove the badge.
+
+DISCOVERY TIPS
+
+Create small contextual tips throughout the app.
+
+Examples:
+
+On Studio:
+“Create product designs, mockups and content here.”
+
+On Products:
+“Products you create here can be tagged in Seller posts.”
+
+On Manufacturer Hub:
+“Send your product details to a manufacturer and compare quotes.”
+
+On Store Builder:
+“Customize the store Buyers see when they shop your brand.”
+
+On Content Creator:
+“Only Seller posts can appear in the public Thread.”
+
+Tips should:
+
+* Appear only when useful
+* Be dismissible
+* Not block the screen
+* Not repeat after being dismissed
+* Match the Brandthread design
+
+GLOBAL SEARCH
+
+Add one global Seller search accessible from the Home header.
+
+Allow search across:
+
+* Products
+* Orders
+* Customers
+* Manufacturers
+* Content
+* Settings
+* Features
+
+Search results should show:
+
+* Icon
+* Result title
+* Result type
+* Short description
+* Tap to open
+
+COMMAND MENU
+
+Add a fast navigation menu accessible from the Seller Home screen.
+
+Button label:
+“Go to”
+
+Show common actions:
+
+* Create product
+* Create design
+* Create post
+* View orders
+* Find manufacturer
+* Open inventory
+* Build store
+* View analytics
+* Open settings
+
+This menu should make major tools reachable in one or two taps.
+
+BREADCRUMBS AND PAGE CONTEXT
+
+For deeper Seller screens, show clear context.
+
+Examples:
+
+Products → Add Product → Pricing
+
+Manufacturer Hub → Quote → Review
+
+Orders → Order #1042 → Shipping
+
+Studio → Video Editor → Post Details
+
+Use compact mobile-friendly breadcrumbs, headers or step labels.
+
+Do not use desktop-style oversized breadcrumb bars.
+
+FORM PROGRESS
+
+For long creation flows such as Add Product, Store Setup and Content Creation:
+
+* Show current step
+* Show total steps
+* Show completion progress
+* Preserve entered data
+* Allow back navigation
+* Allow saving as draft
+* Warn before discarding unsaved changes
+
+EMPTY STATES
+
+Every empty screen must explain what it is and what to do next.
+
+Example for Products:
+
+Heading:
+“Your first product starts here.”
+
+Description:
+“Add your product details, pricing, media and inventory.”
+
+Button:
+“Create product”
+
+Example for Manufacturer Hub:
+
+Heading:
+“Build your production network.”
+
+Description:
+“Find a manufacturer or invite one you already work with.”
+
+Buttons:
+
+* Find manufacturer
+* Invite manufacturer
+
+Do not show empty blank pages.
+
+CONSISTENCY AUDIT
+
+Audit all current Seller screens, including:
+
+* Seller Dashboard
+* Seller Profile
+* Content Creator
+* Video Editor
+* Slideshow Editor
+* Studio
+* Products
+* Product Creation
+* Product Details
+* Orders
+* Order Details
+* Manufacturer Hub
+* Inventory
+* Store Builder
+* Customers
+* Marketing
+* Analytics
+* Payouts
+* Subscription
+* Settings
+* Notifications
+* Help
+* All modals
+* All bottom sheets
+* All empty states
+* All loading screens
+* All error screens
+
+Update every active Seller screen to match the onboarding design.
+
+Remove active references to old app styles.
+
+Do not leave only some screens updated.
+
+BUYER CONSISTENCY
+
+Do not fully redesign the Buyer app during this task, but make sure shared Brandthread components do not break Buyer screens.
+
+Preserve:
+
+* Buyer Thread
+* Buyer Profile
+* Buyer navigation
+* Buyer authentication
+* Buyer onboarding
+
+ACCESSIBILITY AND MOBILE QUALITY
+
+Ensure:
+
+* Large touch targets
+* Readable text
+* Strong contrast
+* Safe-area support
+* Keyboard avoidance
+* Screen-reader labels
+* Smooth scrolling
+* No clipped text
+* No horizontal overflow
+* No white flashes
+* No broken back gestures
+* No confusing duplicate buttons
+* No dead buttons
+
+TESTING
+
+Test these exact paths:
+
+1. Complete Seller onboarding.
+2. Enter the Seller app.
+3. Confirm the Home screen feels like a visual continuation of onboarding.
+4. Open every bottom tab.
+5. Confirm every tab uses the same design system.
+6. Open More.
+7. Confirm features are grouped clearly.
+8. Start guided setup.
+9. Complete one setup task.
+10. Exit setup.
+11. Confirm progress is saved.
+12. Resume setup.
+13. Test the Next best action card.
+14. Test the Go to navigation menu.
+15. Test global search.
+16. Open Studio.
+17. Open Products.
+18. Open Orders.
+19. Open Manufacturer Hub.
+20. Open Store Builder.
+21. Open Seller Profile.
+22. Open Create Content.
+23. Confirm every screen feels like the same app.
+24. Test New badges.
+25. Confirm badges disappear after being opened.
+26. Test dismissible tips.
+27. Restart the app.
+28. Confirm progress, tips and completed tasks persist.
+29. Fix all TypeScript errors.
+30. Fix all routing errors.
+31. Fix all runtime errors.
+32. Fix all console errors caused by this system.
+33. Confirm onboarding remains unchanged.
+34. Confirm Buyer accounts still work.
+
+Do not stop after changing the colors on the Home screen.
+
+Unify the entire active Seller experience and simplify its navigation.
+
+When complete, respond with only:
+
+“The Brandthread Seller app now matches onboarding and is easy to navigate.”

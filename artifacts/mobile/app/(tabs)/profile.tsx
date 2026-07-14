@@ -29,10 +29,10 @@ const PROFILE_STATS = [
 ];
 
 const QUICK_ACTIONS: { icon: keyof typeof Feather.glyphMap; label: string; route: string }[] = [
+  { icon: 'video',      label: 'Create Post',   route: '/create-post' },
   { icon: 'tag',        label: 'Add Product',   route: '/products'  },
-  { icon: 'box',        label: 'Create Drop',   route: '/products'  },
   { icon: 'send',       label: 'New Campaign',  route: '/(tabs)/marketing' },
-  { icon: 'share',      label: 'Share Store',   route: '/share-store' },
+  { icon: 'user',       label: 'My Profile',    route: '/seller-profile?isOwner=true' },
 ];
 
 const CONTENT_TABS = ['Posts', 'Drafts', 'Scheduled', 'Analytics'];

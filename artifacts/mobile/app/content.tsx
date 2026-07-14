@@ -56,9 +56,7 @@ export default function ContentScreen() {
   const router  = useRouter();
   const topPad  = Platform.OS === 'web' ? 20 : insets.top;
 
-  const [tab,         setTab]         = useState<FilterTab>('all');
-  const [showCreate,  setShowCreate]  = useState(false);
-  const [selectedType, setSelectedType] = useState<ContentType | null>(null);
+  const [tab, setTab] = useState<FilterTab>('all');
 
   function back() { router.back(); }
 
@@ -72,19 +70,8 @@ export default function ContentScreen() {
   };
 
   function createPost(type: ContentType) {
-    setSelectedType(type);
-    setShowCreate(true);
-  }
-
-  function publish() {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert('Post Published', 'Your content is now live on the Thread.', [
-      { text: 'OK', onPress: () => { setShowCreate(false); setSelectedType(null); } },
-    ]);
-  }
-
-  if (showCreate && selectedType) {
-    return <CreatePostScreen type={selectedType} onBack={() => setShowCreate(false)} onPublish={publish} />;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push(('/create-post?type=' + type) as never);
   }
 
   return (
@@ -97,7 +84,7 @@ export default function ContentScreen() {
         <Text style={s.title}>Content</Text>
         <TouchableOpacity
           style={s.createBtn}
-          onPress={() => setShowCreate(true)}
+          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/create-post' as never); }}
           activeOpacity={0.85}
         >
           <Feather name="plus" size={15} color="#0A0B0A" />
@@ -124,7 +111,7 @@ export default function ContentScreen() {
         </ScrollView>
 
         {/* Create options */}
-        {!showCreate && (
+        {(
           <View style={s.section}>
             <Text style={s.sectionTitle}>Create new</Text>
             <View style={s.typeGrid}>
@@ -220,109 +207,6 @@ export default function ContentScreen() {
   );
 }
 
-// ─── Create post inline screen ────────────────────────────────────────────────
-function CreatePostScreen({
-  type, onBack, onPublish,
-}: {
-  type: ContentType; onBack: () => void; onPublish: () => void;
-}) {
-  const [caption, setCaption]   = useState('');
-  const [hashtags, setHashtags] = useState('');
-  const [scheduleMode, setScheduleMode] = useState<'now' | 'schedule'>('now');
-
-  const typeLabel = CONTENT_TYPES.find(t => t.type === type)?.label ?? type;
-  const typeColor = CONTENT_TYPES.find(t => t.type === type)?.color ?? GREEN;
-
-  return (
-    <View style={[cs.root]}>
-      <View style={cs.header}>
-        <TouchableOpacity style={s.backBtn} onPress={onBack}>
-          <Feather name="arrow-left" size={20} color={FG} />
-        </TouchableOpacity>
-        <Text style={cs.title}>New {typeLabel}</Text>
-        <TouchableOpacity style={cs.draftBtn} onPress={onBack}>
-          <Text style={cs.draftText}>Save Draft</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 140, gap: 20 }}>
-        {/* Media upload */}
-        <TouchableOpacity style={cs.uploadZone} activeOpacity={0.8} onPress={() => {}}>
-          <View style={[cs.uploadIcon, { backgroundColor: typeColor + '20' }]}>
-            <Feather name={CONTENT_TYPES.find(t => t.type === type)?.icon ?? 'video'} size={28} color={typeColor} />
-          </View>
-          <Text style={cs.uploadTitle}>Upload {type === 'video' ? 'video' : 'media'}</Text>
-          <Text style={cs.uploadDesc}>Tap to choose from your library</Text>
-        </TouchableOpacity>
-
-        {/* Caption */}
-        <View style={cs.fieldWrap}>
-          <Text style={cs.label}>Caption</Text>
-          <TextInput
-            style={cs.captionInput}
-            placeholder="Write a caption…"
-            placeholderTextColor={MUTED}
-            value={caption}
-            onChangeText={setCaption}
-            multiline
-          />
-        </View>
-
-        {/* Hashtags */}
-        <View style={cs.fieldWrap}>
-          <Text style={cs.label}>Hashtags</Text>
-          <TextInput
-            style={cs.input}
-            placeholder="#streetwear #fashion #clothing"
-            placeholderTextColor={MUTED}
-            value={hashtags}
-            onChangeText={setHashtags}
-          />
-        </View>
-
-        {/* Tag products */}
-        <View style={cs.fieldWrap}>
-          <Text style={cs.label}>Tag products</Text>
-          <TouchableOpacity style={cs.tagBtn} onPress={() => {}} activeOpacity={0.8}>
-            <Feather name="tag" size={15} color={MUTED} />
-            <Text style={cs.tagBtnText}>Select products to tag</Text>
-            <Feather name="chevron-right" size={15} color={MUTED} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Schedule */}
-        <View style={cs.fieldWrap}>
-          <Text style={cs.label}>When to post</Text>
-          <View style={cs.scheduleRow}>
-            {(['now', 'schedule'] as const).map(m => (
-              <TouchableOpacity
-                key={m}
-                style={[cs.scheduleTab, scheduleMode === m && cs.scheduleTabActive]}
-                onPress={() => { setScheduleMode(m); Haptics.selectionAsync(); }}
-                activeOpacity={0.8}
-              >
-                <Text style={[cs.scheduleText, scheduleMode === m && cs.scheduleTextActive]}>
-                  {m === 'now' ? 'Publish now' : 'Schedule'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      </ScrollView>
-
-      {/* Footer */}
-      <View style={cs.footer}>
-        <TouchableOpacity style={cs.publishBtn} onPress={onPublish} activeOpacity={0.85}>
-          <LinearGradient colors={[GREEN, '#00C853']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={cs.publishGrad}>
-            <Feather name={scheduleMode === 'now' ? 'send' : 'clock'} size={16} color="#0A0B0A" />
-            <Text style={cs.publishText}>{scheduleMode === 'now' ? 'Publish to Thread' : 'Schedule Post'}</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
-
 const s = StyleSheet.create({
   root:    { flex: 1, backgroundColor: BG },
   header:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
@@ -361,29 +245,3 @@ const s = StyleSheet.create({
   emptyDesc: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
 });
 
-const cs = StyleSheet.create({
-  root:    { flex: 1, backgroundColor: BG },
-  header:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 60, paddingVertical: 12, gap: 12 },
-  title:   { flex: 1, fontSize: 18, fontFamily: 'Inter_700Bold', color: FG },
-  draftBtn:{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: BORDER },
-  draftText:{ fontSize: 13, fontFamily: 'Inter_500Medium', color: MUTED },
-  uploadZone: { backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, borderStyle: 'dashed', padding: 32, alignItems: 'center', gap: 10 },
-  uploadIcon: { width: 60, height: 60, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  uploadTitle:{ fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
-  uploadDesc: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
-  fieldWrap:  { gap: 8 },
-  label:      { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, letterSpacing: 0.2 },
-  captionInput: { backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, paddingVertical: 13, paddingHorizontal: 14, fontSize: 14, fontFamily: 'Inter_400Regular', color: FG, height: 100, textAlignVertical: 'top' },
-  input:      { backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, paddingVertical: 13, paddingHorizontal: 14, fontSize: 14, fontFamily: 'Inter_400Regular', color: FG },
-  tagBtn:     { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 14, paddingVertical: 13 },
-  tagBtnText: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED },
-  scheduleRow:{ flexDirection: 'row', gap: 8 },
-  scheduleTab:{ flex: 1, backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, paddingVertical: 12, alignItems: 'center' },
-  scheduleTabActive: { backgroundColor: GREEN + '20', borderColor: GREEN },
-  scheduleText: { fontSize: 13, fontFamily: 'Inter_500Medium', color: MUTED },
-  scheduleTextActive: { color: GREEN, fontFamily: 'Inter_700Bold' },
-  footer:     { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: BG, borderTopWidth: 1, borderTopColor: BORDER, padding: 16, paddingBottom: 36 },
-  publishBtn: { borderRadius: 14, overflow: 'hidden' },
-  publishGrad:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 },
-  publishText:{ fontSize: 16, fontFamily: 'Inter_700Bold', color: '#0A0B0A' },
-});

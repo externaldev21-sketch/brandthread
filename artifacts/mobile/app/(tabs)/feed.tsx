@@ -167,6 +167,7 @@ function SpotlightPage({
   onShop: (id: string) => void;
 }) {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   // Clear the floating pill tab bar (see (tabs)/_layout.tsx: bottomOffset + height 72 + margin).
   const tabBarClearance = Math.max(insets.bottom, 8) + 12 + 72 + 14;
   const player = useVideoPlayer(item.videoUri, p => { p.loop = true; p.muted = false; });
@@ -243,16 +244,28 @@ function SpotlightPage({
 
       {/* ─ Right action rail ─ */}
       <View style={[styles.rail, { bottom: tabBarClearance }]}>
-        <TouchableOpacity activeOpacity={0.8} onPress={() => onFollow(item.id)} style={styles.railAvatarWrap}>
-          <View style={[styles.railAvatar, { backgroundColor: item.avatarColor }]}>
-            <Text style={styles.railAvatarText}>{item.initials}</Text>
-          </View>
-          {!engagement.following && (
-            <View style={[styles.railFollowBadge, { backgroundColor: item.accentColor }]}>
-              <Feather name="plus" size={11} color="#FFF" />
+        <View style={styles.railAvatarWrap}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push(('/seller-profile?id=' + item.id) as never);
+            }}
+          >
+            <View style={[styles.railAvatar, { backgroundColor: item.avatarColor }]}>
+              <Text style={styles.railAvatarText}>{item.initials}</Text>
             </View>
+          </TouchableOpacity>
+          {!engagement.following && (
+            <TouchableOpacity
+              onPress={() => onFollow(item.id)}
+              activeOpacity={0.8}
+              style={[styles.railFollowBadge, { backgroundColor: item.accentColor }]}
+            >
+              <Feather name="plus" size={11} color="#FFF" />
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
+        </View>
 
         <TouchableOpacity
           style={styles.railBtn}
@@ -325,10 +338,18 @@ function SpotlightPage({
           <Text style={styles.shopBtnText}>SHOP</Text>
         </TouchableOpacity>
 
-        <View style={styles.creatorRow}>
-          <Text style={styles.creatorName}>{item.creator}</Text>
-          {item.verified && <Feather name="check-circle" size={13} color="#4FA8FF" style={{ marginLeft: 4 }} />}
-        </View>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push(('/seller-profile?id=' + item.id) as never);
+          }}
+        >
+          <View style={styles.creatorRow}>
+            <Text style={styles.creatorName}>{item.creator}</Text>
+            {item.verified && <Feather name="check-circle" size={13} color="#4FA8FF" style={{ marginLeft: 4 }} />}
+          </View>
+        </TouchableOpacity>
 
         <Text style={styles.caption} numberOfLines={2}>{item.caption}</Text>
 

@@ -1,62 +1,58 @@
 ---
 name: Seller Dashboard Architecture
-description: Full structure of the seller tab system, services layer, and navigation decisions from the Phase 1-3 build.
+description: Seller-side screen inventory, color system, service layer, and navigation patterns for Brandthread mobile app.
 ---
 
-## Tab structure (Home · Studio · Products · Orders · More)
+## Seller design tokens
+- BG `#0A0B0A`, CARD `#111311`, BORDER `#1E221E`, FG `#EAF2ED`, MUTED `#5A6B5C`
+- GREEN `#39FF88` (primary seller accent), PURPLE `#8B5CF6`, BLUE `#3B82F6`, ORANGE `#F97316`, CYAN `#06B6D4`
+- Note: seller screens use GREEN as primary, NOT purple (purple is buyer/onboarding)
 
-`app/(tabs)/_layout.tsx` defines 5 tabs: `index` (Home), `studio`, `products`, `orders`, `more`.
-Hidden (href: null): `feed`, `profile`, `following`, `analytics`, `marketing`, `wishlist`.
+## Tab layout (seller)
+`(tabs)/` group: Home (index) · Studio · Products · Orders · More
+- Profile tab is `(tabs)/profile.tsx` — "My Brand" dashboard (not public profile)
+- Public brand profile is a separate route: `app/seller-profile.tsx`
 
-- Profile is accessible via More screen → `/(tabs)/profile`.
-- Analytics and Marketing are hidden tabs, accessible via More with routes `/(tabs)/analytics` and `/(tabs)/marketing`.
-- `app/orders.tsx` (root level) is a redirect shim → `/(tabs)/orders`.
+## Services layer (`artifacts/mobile/services/`)
+- `types.ts` — All entity interfaces: Product, Order, SellerProfile, SellerPost, Sound, PostAnalytics, PostOverlay, PostProductTag, PostHashtag, PostVisibility, SlideshowEdit, VideoEdit, VideoClip, PostMedia, BeatMarker, SoundSelection, etc.
+- `data.ts` — DEMO_PRODUCTS, DEMO_ORDERS, DEMO_CONTENT, DEMO_ANALYTICS, etc.
+- `sellerContent.ts` — DEMO_SELLER_PROFILE, DEMO_SELLER_POSTS, DEMO_SOUNDS, DEMO_PRODUCTS_FOR_TAG, SUGGESTED_HASHTAGS, getSellerPosts(), getPostById(), getPostAnalytics(), getThreadEligiblePosts()
 
-## Services layer
+## Screen inventory (seller-specific)
+- `(tabs)/index.tsx` — Seller home/dashboard
+- `(tabs)/profile.tsx` — "My Brand" dashboard (avatar, stats, quick actions, content grid)
+- `(tabs)/studio.tsx` — Design studio
+- `(tabs)/products.tsx` — Product list
+- `(tabs)/orders.tsx` — Orders
+- `(tabs)/more.tsx` — More menu
+- `seller-profile.tsx` — PUBLIC brand profile (buyers see this; sellers see with isOwner=true param)
+- `create-post.tsx` — Full content creation flow (10 steps: type-select → video/slide flow → post details → publishing → done)
+- `post-analytics.tsx` — Per-post analytics with animated charts
+- `content.tsx` — Content management hub (routes to create-post for creation)
+- `edit-profile.tsx` — Edit seller brand profile
+- `brand.tsx` — AI Brand Creation tool (name generator, logo AI, checklist) — NOT the public profile
 
-`artifacts/mobile/services/types.ts` — all TypeScript interfaces.
-`artifacts/mobile/services/data.ts` — all demo data + helper types (SetupTask, Priority, ActivityItem).
+## Navigation entry points
+- Seller Quick Actions bar in `(tabs)/profile.tsx`: "Create Post" → `/create-post`, "My Profile" → `/seller-profile?isOwner=true`
+- Content hub "Create" button and type cards → `/create-post?type=xxx`
+- Thread feed: tapping creator avatar or name → `/seller-profile?id=xxx`
+- Action sheet in seller-profile: "View analytics" → `/post-analytics?id=xxx`, "Edit" → `/create-post?editId=xxx`
 
-Import pattern: `import { DEMO_PRODUCTS } from '@/services/data'`
-Import pattern: `import type { Product } from '@/services/types'`
-
-**Why separate services layer:** UI components stay clean; real API calls slot in without changing screen code.
-
-## Screen inventory built this session
-
-| Screen | Path | Note |
-|--------|------|------|
-| Studio tab | `(tabs)/studio.tsx` | Creation options 3×3, recent projects, templates |
-| Orders tab | `(tabs)/orders.tsx` | Summary strip, filter chips, order cards |
-| Dashboard | `(tabs)/index.tsx` | Setup checklist, stat grid, priorities, snapshots, quick actions |
-| Products | `(tabs)/products.tsx` | Summary cards, enhanced product cards with metrics |
-| More | `(tabs)/more.tsx` | Grouped menu with pro banner and logout |
-| Order Detail | `app/order-detail.tsx` | Customer, items, payments, timeline, actions, inline shipping label |
-| Add Product | `app/add-product.tsx` | 9-step flow: Basic Info → Media → Pricing → Variants → Inventory → Fulfillment → Sales Model → Visibility → Review |
-| Inventory | `app/inventory.tsx` | Summary cards, low-stock alerts, adjustment, history |
-| Store Builder | `app/store-builder.tsx` | Overview/Theme/Sections tabs |
-| Content | `app/content.tsx` | Create types, library, scheduling, inline create view |
-| Product Detail | `app/product-detail.tsx` | 6 tabs: Overview / Variants / Inventory / Orders / Analytics / Content |
-
-## Root layout screen registrations
-
-`app/_layout.tsx` — manually registered (no auto-discovery needed):
-`order-detail`, `add-product`, `product-detail`, `inventory`, `store-builder`, `content`,
-`notifications-settings`, `help`, `bg-removal`, `tech-pack-generator`
-
-Already registered before: `manufacturer`, `customers`, `payments`, `plans`, `settings`, `shipping`, `team`, `ai-studio`, `design-canvas`, `edit-profile`, `integrations/klaviyo`, `finance`, `community`, `automation`, `website`, `brand`, `ai-assistant`.
-
-## Color system (Seller app)
-
-Primary: `#39FF88` (neon green) — CTA buttons, active states, profit metrics
-Accents: `#8B5CF6` (purple), `#3B82F6` (blue), `#06B6D4` (cyan), `#F97316` (orange), `#EF4444` (red), `#FBBF24` (gold)
-Dark BG: `#0A0B0A` / Card: `#111311` / Border: `#1E221E` / FG: `#EAF2ED` / Muted: `#5A6B5C`
-
-**Why:** Keep consistent with existing seller app green theme (NOT purple — purple is the buyer app primary).
+## Thread eligibility rule
+`getThreadEligiblePosts()` in sellerContent.ts filters: status=published + isSellerContent=true + scheduled date ≤ now.
+Buyer posts must NEVER appear in Thread. Only SellerPost entities with `isSellerContent: true` are eligible.
 
 ## Navigation gotchas
+- `router.back()` triggers GO_BACK warning in dev when no stack history exists — dev-only, not a crash.
+- `SpotlightPage` in feed.tsx is a function component; needs its own `useRouter()` call (does not inherit from parent).
+- Route groups: `/(tabs)/` for seller, `/(buyer)/` for buyer — do not mix them.
+- `_layout.tsx` Stack.Screen entries: seller-profile (slide_from_right), create-post (fullScreenModal from bottom), post-analytics (slide_from_right).
 
-- Hidden tab screens (`analytics`, `marketing`) must be navigated to via `/(tabs)/analytics`, NOT `/analytics`.
-- `(tabs)/studio` replaces the old `feed` center pill tab slot.
-- All new seller push screens open with `animation: 'slide_from_right'`.
-- Store Builder uses modal presentation; Add Product is a full push screen.
+## Key type notes
+- `SellerPost.isSellerContent: true` — literal type, always true, enforces Thread eligibility at type level.
+- `PostStatus` includes 'failed' and 'archived' (beyond old ContentStatus 'draft'|'scheduled'|'published').
+- Video always `aspectRatio: '9:16'` — never prompt seller to choose video ratio.
+- Slideshows: 9:16 | 3:4 | 1:1 — user selects in slide-ratio step.
+- Video max durations: 10 | 15 | 30 | 60 seconds (MaxVideoDuration union).
+
+**Why:** Seller content system added July 2026. Keeping these patterns consistent prevents route mismatches and Thread contamination bugs.

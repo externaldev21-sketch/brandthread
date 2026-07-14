@@ -272,6 +272,209 @@ export interface AnalyticsPoint {
   conversion: number;
 }
 
+// ─── Seller profile & content extended types ─────────────────────────────────
+
+export type PostStatus       = 'draft' | 'processing' | 'scheduled' | 'published' | 'failed' | 'archived';
+export type AspectRatio      = '9:16' | '3:4' | '1:1';
+export type MaxVideoDuration = 10 | 15 | 30 | 60;
+export type OverlayType      = 'text' | 'sticker' | 'product' | 'price' | 'countdown' | 'logo' | 'image';
+export type TransitionStyle  = 'cut' | 'fade' | 'slide' | 'zoom' | 'flash' | 'blur';
+export type SoundCategory    = 'trending' | 'saved' | 'recent' | 'original' | 'royalty_free';
+
+export interface SellerProfile {
+  id:            string;
+  sellerId:      string;
+  brandName:     string;
+  username:      string;
+  bio:           string;
+  website?:      string;
+  location?:     string;
+  category?:     string;
+  contactEmail?: string;
+  avatarColor:   string;
+  initials:      string;
+  verified:      boolean;
+  isPublic:      boolean;
+  followers:     number;
+  following:     number;
+  totalLikes:    number;
+  productCount:  number;
+  postCount:     number;
+  createdAt:     string;
+}
+
+export interface PostMedia {
+  id:            string;
+  uri:           string;
+  type:          'video' | 'image';
+  width:         number;
+  height:        number;
+  duration?:     number;
+  thumbnailUri?: string;
+}
+
+export interface VideoClip {
+  id:            string;
+  media:         PostMedia;
+  trimStart:     number;
+  trimEnd:       number;
+  volume:        number;
+  playbackSpeed: number;
+  rotation:      number;
+  cropX:         number;
+  cropY:         number;
+  cropScale:     number;
+  order:         number;
+}
+
+export interface BeatMarker {
+  time:     number;
+  strength: number;
+}
+
+export interface Sound {
+  id:           string;
+  title:        string;
+  artist:       string;
+  duration:     number;
+  genre?:       string;
+  category:     SoundCategory;
+  uri:          string;
+  isOriginal:   boolean;
+  isTrending:   boolean;
+  useCount:     number;
+  attribution?: string;
+}
+
+export interface SoundSelection {
+  soundId:    string;
+  soundTitle: string;
+  artist:     string;
+  startTime:  number;
+  duration:   number;
+  volume:     number;
+  uri?:       string;
+}
+
+export interface PostOverlay {
+  id:          string;
+  type:        OverlayType;
+  text?:       string;
+  fontFamily?: string;
+  fontSize?:   number;
+  textColor?:  string;
+  bgColor?:    string;
+  textAlign?:  'left' | 'center' | 'right';
+  startTime?:  number;
+  endTime?:    number;
+  x:           number;
+  y:           number;
+  width:       number;
+  height:      number;
+  rotation:    number;
+  scale:       number;
+  productId?:  string;
+}
+
+export interface PostProductTag {
+  productId:   string;
+  productName: string;
+  price:       number;
+  imageUri?:   string;
+  timestamp?:  number;
+  slideIndex?: number;
+}
+
+export interface PostHashtag {
+  tag:       string;
+  trending?: boolean;
+  postCount?: number;
+}
+
+export interface PostVisibility {
+  isPublic:      boolean;
+  allowComments: boolean;
+  allowReposts:  boolean;
+  showLikeCount: boolean;
+}
+
+export interface PostSchedule {
+  scheduledAt: string;
+  timezone:    string;
+}
+
+export interface VideoEdit {
+  clips:               VideoClip[];
+  maxDuration:         MaxVideoDuration;
+  originalAudioVolume: number;
+  sound?:              SoundSelection;
+  beatSyncEnabled:     boolean;
+  beatMarkers:         BeatMarker[];
+  overlays:            PostOverlay[];
+  aspectRatio:         '9:16';
+}
+
+export interface SlideshowEdit {
+  slides:          PostMedia[];
+  slideOrder:      string[];
+  slideDuration:   number;
+  transition:      TransitionStyle;
+  transitionSpeed: 'slow' | 'normal' | 'fast';
+  sound?:          SoundSelection;
+  overlays:        PostOverlay[];
+  aspectRatio:     AspectRatio;
+}
+
+export interface PostAnalytics {
+  postId:             string;
+  views:              number;
+  uniqueViewers:      number;
+  likes:              number;
+  comments:           number;
+  reposts:            number;
+  saves:              number;
+  shares:             number;
+  profileVisits:      number;
+  productClicks:      number;
+  addToCartActions:   number;
+  purchases:          number;
+  revenue:            number;
+  avgWatchTime:       number;
+  completionRate:     number;
+  retentionData:      { second: number; viewerPct: number }[];
+  slideshowSwipeRate?: number;
+  topCountries:       { country: string; pct: number }[];
+  peakHour:           number;
+}
+
+export interface SellerPost {
+  id:              string;
+  sellerId:        string;
+  brandId:         string;
+  type:            ContentType;
+  status:          PostStatus;
+  caption:         string;
+  hashtags:        PostHashtag[];
+  thumbnailUri?:   string;
+  aspectRatio:     AspectRatio;
+  videoDuration?:  number;
+  maxDuration?:    MaxVideoDuration;
+  mediaUrls:       string[];
+  sound?:          SoundSelection;
+  videoEdit?:      VideoEdit;
+  slideshowEdit?:  SlideshowEdit;
+  overlays:        PostOverlay[];
+  productTags:     PostProductTag[];
+  visibility:      PostVisibility;
+  schedule?:       PostSchedule;
+  isPinned:        boolean;
+  isSellerContent: true;
+  analytics:       PostAnalytics;
+  createdAt:       string;
+  scheduledAt?:    string;
+  publishedAt?:    string;
+}
+
 // ─── Subscription plans ───────────────────────────────────────────────────────
 export interface PlanFeature {
   name:      string;
