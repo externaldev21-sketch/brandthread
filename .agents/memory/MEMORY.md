@@ -4,3 +4,4 @@
 - [Inbox structural flattening](inbox-flattening-pattern.md) — Brandthread screens (profile, inbox) use flat Instagram-style rows, no card chrome; keep new screens consistent.
 - [Buyer/Seller only — no Both](buyer-seller-nav.md) — "Both" account type fully removed; buyer home is Thread (video feed at index); buyer tabs are Thread·Discover·Friends·Inbox·Profile.
 - [Onboarding architecture](onboarding-architecture.md) — embedded Clerk auth mid-flow; AsyncStorage draft persistence; dev reset via 1.5s long-press on success checkmark.
+- [Seller Dashboard Architecture](seller-dashboard-architecture.md) — tabs (Home·Studio·Products·Orders·More), services layer at @/services/, screen inventory, color system, navigation gotchas.

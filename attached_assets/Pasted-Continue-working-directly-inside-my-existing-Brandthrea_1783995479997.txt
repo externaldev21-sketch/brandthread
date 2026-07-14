@@ -1,0 +1,1255 @@
+Continue working directly inside my existing Brandthread Expo React Native project.
+
+Do not give me instructions, explanations, sample code, or ask me to edit files manually.
+
+Your job is to build and install the complete Seller Dashboard experience inside the app.
+
+Do not rebuild the onboarding flow. Keep the current onboarding working exactly as it is.
+
+Inspect the existing project first, reuse the current routes, components, theme, authentication, storage and database structure, and then directly edit the project.
+
+APP:
+Brandthread
+
+PURPOSE:
+Brandthread is an all-in-one operating system for clothing brand owners.
+
+A seller should eventually be able to:
+
+* Design products
+* Create mockups
+* Generate fashion photoshoots
+* Find and work with manufacturers
+* Manage samples
+* Manage production
+* Manage inventory
+* Build their online store
+* Create social content
+* Process orders
+* Buy shipping labels
+* Track shipments
+* Manage customers
+* Run marketing
+* View analytics
+* Handle refunds, returns and disputes
+* Manage payouts
+* Run their entire clothing brand without leaving Brandthread
+
+TECH:
+
+* Expo
+* React Native
+* TypeScript
+* Expo Router
+* Mobile-first
+* Must work in Replit and Expo Go
+
+IMPORTANT RULES:
+
+* Inspect the current code before changing anything.
+* Reuse existing routes whenever possible.
+* Do not create duplicate pages.
+* Do not delete working features.
+* Do not break Buyer accounts.
+* Do not break onboarding.
+* Do not replace the entire project.
+* Build reusable components.
+* Use proper TypeScript types.
+* Fix all TypeScript errors.
+* Fix all routing errors.
+* Fix all console errors.
+* Fix all runtime errors.
+* Install only compatible Expo dependencies.
+* Every button must work.
+* Every card must open the correct screen.
+* Do not leave dead buttons.
+* Do not use lorem ipsum.
+* Do not leave obviously unfinished placeholder layouts.
+* Empty states are allowed when no real data exists, but they must look polished and explain the next action.
+* Use realistic demo data where backend data is unavailable.
+* Keep backend access separated into services so real APIs can be connected later.
+* Run the app after completing the work.
+* Test every main route.
+* Continue fixing problems until the Seller Dashboard is stable.
+
+DESIGN DIRECTION:
+The Seller experience must feel premium, powerful, clean and global.
+
+Visual inspiration:
+
+* Apple
+* Shopify
+* Stripe
+* Linear
+* Pinterest
+* Procreate
+* Alibaba
+
+Use:
+
+* Black and deep charcoal backgrounds
+* Light and dark theme support
+* Purple, blue, cyan and green gradient accents
+* High contrast
+* Large readable headings
+* Medium-weight typography
+* Rounded premium cards
+* Subtle borders
+* Soft glass effects
+* Smooth animations
+* Fast transitions
+* Clear hierarchy
+* Large touch targets
+* Skeleton loading
+* Haptic feedback
+* Safe-area support
+* Strong mobile spacing
+
+Do not make it look:
+
+* Childish
+* Cheap
+* Overly colorful
+* Cluttered
+* Like TikTok
+* Like a generic admin template
+* Like a basic Shopify clone
+
+SELLER NAVIGATION:
+
+Create a seller navigation system with five main bottom tabs:
+
+1. Home
+2. Studio
+3. Products
+4. Orders
+5. More
+
+The Seller account must always open on Home after onboarding or login.
+
+Use appropriate icons and clear active states.
+
+TAB 1 — HOME / DASHBOARD
+
+Create a premium seller dashboard.
+
+TOP AREA:
+
+* Greeting based on time of day
+* Seller first name
+* Brand name
+* Profile avatar
+* Notification button
+* Search button
+
+Example greeting:
+“Good evening, Devon”
+
+BRAND SETUP CHECKLIST:
+For new sellers, show a setup progress card before regular analytics become the main focus.
+
+Checklist items:
+
+* Add brand logo
+* Create first product
+* Connect payouts
+* Build storefront
+* Add manufacturer
+* Set shipping preferences
+* Publish first post
+
+Show:
+
+* Progress percentage
+* Completed item count
+* Continue setup button
+
+The checklist must update as tasks are completed.
+
+Once most setup tasks are finished, the dashboard should prioritize analytics while keeping setup accessible.
+
+PERFORMANCE SUMMARY:
+Create cards for:
+
+* Revenue
+* Orders
+* Store visitors
+* Conversion rate
+* Average order value
+* Pending payout
+
+Each card should include:
+
+* Current value
+* Percentage change
+* Comparison period
+* Small visual trend indicator
+
+Use realistic demo data when no backend data exists.
+
+REVENUE CHART:
+Create a clean interactive chart section.
+
+Time filters:
+
+* Today
+* 7 days
+* 30 days
+* 90 days
+
+Include:
+
+* Revenue
+* Orders
+* Visitors
+
+Use an Expo-compatible chart library only if necessary.
+
+TODAY’S PRIORITIES:
+Create a prioritized task list.
+
+Examples:
+
+* Approve manufacturer quote
+* Ship three orders
+* Review sample photos
+* Restock black medium hoodie
+* Finish product description
+* Respond to customer dispute
+
+Each task must include:
+
+* Icon
+* Title
+* Category
+* Due status
+* Button or tap action
+* Completed state
+
+ORDERS SNAPSHOT:
+Show:
+
+* New
+* Processing
+* Ready to ship
+* Shipped
+* Returns
+
+Allow tapping each status to open filtered Orders.
+
+PRODUCTION SNAPSHOT:
+Show active production jobs with:
+
+* Product
+* Manufacturer
+* Current stage
+* Units
+* Estimated completion
+* Progress bar
+
+Stages:
+
+* Quote
+* Sample
+* Approved
+* Production
+* Quality check
+* Shipping
+* Delivered
+
+INVENTORY ALERTS:
+Show low-stock and out-of-stock products.
+
+Include:
+
+* Product image
+* Product name
+* Variant
+* Units remaining
+* Restock button
+
+QUICK ACTIONS:
+Create quick-action buttons for:
+
+* Create design
+* Add product
+* Find manufacturer
+* Create content
+* View orders
+* Build store
+* Buy shipping label
+* Create discount
+
+RECENT ACTIVITY:
+Show:
+
+* New orders
+* Customer messages
+* Manufacturer updates
+* Payout updates
+* Inventory changes
+* Reviews
+* Refund requests
+
+Each activity item should open the relevant screen.
+
+TAB 2 — STUDIO
+
+Create the Design Studio landing page.
+
+This is not the full drawing engine yet, but it must be a polished working product hub.
+
+TOP SECTION:
+Headline:
+“Create without limits.”
+
+Description:
+“Turn an idea into a design, mockup or campaign in minutes.”
+
+MAIN CREATION OPTIONS:
+
+* Start blank canvas
+* Text to design
+* Upload sketch
+* Upload garment
+* Mockup to model
+* AI photoshoot
+* Remove background
+* Edit with prompt
+* Manual design
+
+Each option must open a dedicated working screen or modal.
+
+RECENT PROJECTS:
+Show design project cards with:
+
+* Thumbnail
+* Project name
+* Type
+* Last edited date
+* Status
+* More menu
+
+PROJECT FILTERS:
+
+* All
+* Designs
+* Mockups
+* Photoshoots
+* Drafts
+
+TEMPLATES:
+Show categories:
+
+* T-shirts
+* Hoodies
+* Sweatpants
+* Jackets
+* Hats
+* Bags
+* Packaging
+* Social posts
+
+CREATE DESIGN FLOW:
+Build a working creation setup screen that lets the seller choose:
+
+* Garment type
+* Front or back
+* Canvas size
+* Background color
+* Blank template
+* Upload image
+
+The actual advanced Procreate-like editor can be built later, but this screen must route into a functional basic canvas workspace.
+
+BASIC CANVAS WORKSPACE:
+Include:
+
+* Canvas
+* Add text
+* Upload image
+* Move
+* Resize
+* Rotate
+* Layer list
+* Undo
+* Redo
+* Delete
+* Duplicate
+* Background color
+* Save project
+* Export preview
+
+Use an Expo-compatible canvas or gesture approach.
+
+Do not attempt to build hundreds of advanced brushes yet.
+
+The basic editor must work reliably before advanced tools are added.
+
+AI TOOL SCREENS:
+Create polished forms for:
+
+* Text to design
+* Mockup to model
+* AI photoshoot
+* Prompt edit
+* Background removal
+
+Each form must include:
+
+* Input area
+* Upload area where needed
+* Style options
+* Generate button
+* Loading state
+* Result state
+* Retry button
+* Save to project button
+
+If no AI API exists, create a clearly separated mock AI service that returns realistic demo results without breaking the UI.
+
+TAB 3 — PRODUCTS
+
+Create a complete Products hub.
+
+PRODUCTS HEADER:
+
+* Product search
+* Filter button
+* Add product button
+* Import button
+
+SUMMARY CARDS:
+
+* Active products
+* Drafts
+* Low stock
+* Pre-orders
+* Total inventory value
+
+PRODUCT FILTERS:
+
+* All
+* Active
+* Draft
+* Archived
+* Pre-order
+* Pre-made
+* Low stock
+* Out of stock
+
+PRODUCT LIST:
+Each product card must show:
+
+* Product image
+* Name
+* Status
+* Product type
+* Price
+* Inventory
+* Sales
+* Variants
+* More menu
+
+PRODUCT ACTIONS:
+
+* Edit
+* Duplicate
+* Archive
+* Delete
+* Share
+* View store page
+* Create content
+* Send to manufacturer
+
+ADD PRODUCT FLOW:
+
+Step 1:
+Basic information
+
+* Product name
+* Description
+* Category
+* Product type
+* Vendor
+* Tags
+
+Step 2:
+Media
+
+* Product images
+* Product video
+* Design mockups
+* Reorder media
+
+Step 3:
+Pricing
+
+* Retail price
+* Compare-at price
+* Product cost
+* Estimated profit
+* Margin
+
+Step 4:
+Variants
+
+* Size
+* Color
+* Material
+* Custom variant option
+* Variant images
+* Variant pricing
+* Variant inventory
+
+Step 5:
+Inventory
+
+* Track quantity
+* SKU
+* Barcode
+* Current stock
+* Low-stock threshold
+* Inventory location
+
+Step 6:
+Fulfillment
+
+* Weight
+* Package dimensions
+* Shipping profile
+* Fulfilled by seller
+* Fulfilled by manufacturer
+
+Step 7:
+Sales model
+
+* Pre-order
+* Pre-made inventory
+* Both
+
+For pre-order products include:
+
+* Pre-order opening date
+* Closing date
+* Minimum order quantity
+* Expected production date
+* Expected ship date
+* Pre-order disclaimer
+* Funding progress display
+
+Step 8:
+Store visibility
+
+* Active
+* Draft
+* Scheduled
+* Collections
+* SEO title
+* SEO description
+* URL handle
+
+Step 9:
+Review and publish
+
+PRODUCT DETAILS PAGE:
+Create sections for:
+
+* Overview
+* Variants
+* Inventory
+* Orders
+* Production
+* Analytics
+* Content
+* Store page
+
+TAB 4 — ORDERS
+
+Create a full Orders hub.
+
+ORDER SUMMARY:
+
+* New orders
+* Processing
+* Ready to ship
+* Shipped
+* Delivered
+* Returns
+* Disputes
+
+FILTERS:
+
+* All
+* Unfulfilled
+* Partially fulfilled
+* Fulfilled
+* Cancelled
+* Refunded
+* Pre-order
+* High risk
+
+ORDER LIST:
+Each order must show:
+
+* Order number
+* Customer
+* Date
+* Total
+* Payment status
+* Fulfillment status
+* Product count
+* Delivery method
+
+ORDER DETAILS:
+Include:
+
+* Customer information
+* Shipping address
+* Billing address
+* Ordered products
+* Variants
+* Quantities
+* Discounts
+* Taxes
+* Shipping
+* Total
+* Payment status
+* Fulfillment status
+* Tracking information
+* Internal notes
+* Customer timeline
+
+ORDER ACTIONS:
+
+* Mark processing
+* Mark ready to ship
+* Buy shipping label
+* Add tracking
+* Mark shipped
+* Contact customer
+* Cancel order
+* Refund
+* Create return
+* Report issue
+
+SHIPPING LABEL FLOW:
+Create a working interface for:
+
+* Package size
+* Weight
+* Shipping carrier
+* Shipping service
+* Estimated delivery
+* Label price
+* Buy label
+* Print or share label
+
+If no shipping API exists, create a mock shipping service separated from the UI.
+
+HELD FUNDS DISPLAY:
+For relevant orders, show:
+
+* Customer payment
+* Funds currently held
+* Manufacturer allocation
+* Shipping-label allocation
+* Seller amount
+* Payout release status
+
+PAYOUT RELEASE RULE:
+The interface should explain that held funds are released according to shipment and delivery milestones.
+
+Do not claim to actually hold or move money without a real payment backend.
+
+RETURNS AND REFUNDS:
+Create:
+
+* Return request list
+* Refund request list
+* Dispute list
+* Request details
+* Approve
+* Deny
+* Partial refund
+* Full refund
+* Message customer
+* Add evidence
+
+TAB 5 — MORE
+
+Create a More menu with:
+
+* Manufacturer Hub
+* Inventory
+* Store Builder
+* Content
+* Customers
+* Marketing
+* Analytics
+* Payouts
+* Notifications
+* Team
+* Subscription
+* Integrations
+* Settings
+* Help
+
+MANUFACTURER HUB
+
+Create a complete Manufacturer Hub.
+
+MAIN SECTIONS:
+
+* Discover
+* My manufacturers
+* Quotes
+* Samples
+* Production
+* Messages
+
+DISCOVER:
+Manufacturer cards must show:
+
+* Company name
+* Country
+* Specialties
+* Minimum order quantity
+* Price range
+* Rating
+* Verification status
+* Lead time
+* Response time
+
+FILTERS:
+
+* Country
+* Category
+* MOQ
+* Price
+* Lead time
+* Verified
+* Material
+* Production capability
+
+MANUFACTURER PROFILE:
+Include:
+
+* Company details
+* Factory photos
+* Capabilities
+* Certifications
+* Products
+* MOQ
+* Pricing
+* Lead time
+* Reviews
+* Contact
+* Request quote
+* Invite to Brandthread
+
+REQUEST QUOTE FLOW:
+Include:
+
+* Select product
+* Upload tech pack
+* Quantity
+* Materials
+* Colors
+* Sizes
+* Target price
+* Needed-by date
+* Notes
+* Submit request
+
+QUOTE CARD:
+Show:
+
+* Unit price
+* Sample cost
+* Tooling cost
+* Shipping estimate
+* MOQ
+* Production time
+* Payment terms
+* Expiration date
+* Accept
+* Decline
+* Counteroffer
+
+SAMPLE TRACKING:
+Stages:
+
+* Requested
+* Paid
+* In development
+* Shipped
+* Delivered
+* Review needed
+* Approved
+* Revisions requested
+
+PRODUCTION WORKSPACE:
+Include:
+
+* Product
+* Manufacturer
+* Quantity
+* Total cost
+* Deposit
+* Remaining balance
+* Timeline
+* Current stage
+* Photos
+* Documents
+* Messages
+* Quality checks
+* Shipping information
+
+INVENTORY
+
+Create:
+
+* Inventory overview
+* Inventory value
+* Units in stock
+* Low-stock count
+* Out-of-stock count
+* Locations
+* Product and variant inventory
+* Stock adjustments
+* Inventory history
+* Transfer inventory
+* Restock workflows
+
+STORE BUILDER
+
+Create a mobile store-management experience.
+
+MAIN SECTIONS:
+
+* Store overview
+* Theme
+* Pages
+* Navigation
+* Collections
+* Domains
+* Payments
+* Shipping
+* Taxes
+* Policies
+* SEO
+
+STORE PREVIEW:
+Show mobile storefront preview.
+
+THEME SETTINGS:
+
+* Logo
+* Colors
+* Typography
+* Buttons
+* Product cards
+* Header
+* Footer
+* Announcement bar
+* Homepage sections
+
+HOMEPAGE SECTIONS:
+
+* Hero
+* Featured collection
+* Product grid
+* Video
+* Image with text
+* Reviews
+* Newsletter
+* Brand story
+* Countdown
+* Social feed
+
+Allow:
+
+* Add section
+* Reorder section
+* Hide section
+* Edit section
+* Delete section
+* Preview
+* Publish
+
+CONTENT
+
+Create a seller content creator hub.
+
+CONTENT TYPES:
+
+* Video post
+* Image post
+* Slideshow
+* Story
+* Product announcement
+* Drop countdown
+* Behind the scenes
+* Poll
+
+CONTENT CREATION:
+Allow:
+
+* Upload media
+* Add caption
+* Add hashtags
+* Tag products
+* Schedule post
+* Save draft
+* Publish to Thread
+
+CONTENT LIBRARY:
+
+* Drafts
+* Scheduled
+* Published
+* Performance
+
+CUSTOMERS
+
+Create a customer-management hub.
+
+CUSTOMER LIST:
+
+* Name
+* Email
+* Orders
+* Total spent
+* Last order
+* Customer status
+* Tags
+
+CUSTOMER DETAILS:
+
+* Contact information
+* Order history
+* Lifetime value
+* Average order value
+* Returns
+* Notes
+* Tags
+* Marketing consent
+* Message customer
+
+SEGMENTS:
+
+* New customers
+* Returning customers
+* VIP
+* At risk
+* High spenders
+* Abandoned checkout
+* Pre-order customers
+
+MARKETING
+
+Create:
+
+* Campaign overview
+* Discounts
+* Email
+* SMS
+* Abandoned checkout
+* Automations
+* Influencers
+* Referral program
+
+DISCOUNTS:
+
+* Percentage
+* Fixed amount
+* Free shipping
+* Buy one get one
+* Automatic discount
+* Discount code
+* Start and end dates
+* Usage limits
+* Customer eligibility
+* Product eligibility
+
+ANALYTICS
+
+Create analytics pages for:
+
+* Overview
+* Sales
+* Products
+* Customers
+* Content
+* Store
+* Marketing
+* Production
+
+METRICS:
+
+* Revenue
+* Profit
+* Orders
+* Units sold
+* Conversion
+* Visitors
+* Average order value
+* Returning customer rate
+* Refund rate
+* Best products
+* Best content
+* Customer acquisition cost
+* Lifetime value
+
+Add:
+
+* Date filters
+* Comparison periods
+* Charts
+* Top lists
+* Export button
+
+PAYOUTS
+
+Create:
+
+* Available balance
+* Pending balance
+* Held funds
+* Next payout
+* Payout history
+* Bank account
+* Tax information
+
+Do not simulate real payouts beyond demo data unless the existing project already has a real payment integration.
+
+SUBSCRIPTION
+
+Brandthread seller accounts must support:
+
+* Three-day trial
+* Tiered monthly subscriptions
+* Current plan
+* Trial countdown
+* Upgrade
+* Downgrade
+* Cancel
+* Billing history
+* Payment method
+* Feature comparison
+
+Use configurable plan data rather than hardcoding plan logic across multiple screens.
+
+SETTINGS
+
+Create sections for:
+
+* Account
+* Brand profile
+* Notifications
+* Payments
+* Shipping
+* Taxes
+* Policies
+* Security
+* Privacy
+* Team permissions
+* Theme
+* Connected accounts
+* Delete account
+* Log out
+
+NOTIFICATIONS
+
+Create notifications for:
+
+* Orders
+* Messages
+* Manufacturer updates
+* Production updates
+* Inventory
+* Payouts
+* Refunds
+* Returns
+* Disputes
+* Reviews
+* Content engagement
+
+DATABASE AND SERVICES
+
+Inspect the project for an existing backend.
+
+Look for:
+
+* Supabase
+* Firebase
+* Clerk
+* Custom API
+* Existing database types
+
+Use what already exists.
+
+Do not install a second backend.
+
+If the backend is incomplete, create service files for:
+
+* Products
+* Orders
+* Manufacturers
+* Inventory
+* Customers
+* Analytics
+* Content
+* Payouts
+* Storefront
+* Design projects
+
+Use strongly typed models.
+
+Create realistic local demo data so every screen can be tested.
+
+Keep the demo data separate from UI components.
+
+GLOBAL COMPONENTS
+
+Create reusable components such as:
+
+* AppHeader
+* BottomTabBar
+* StatCard
+* ActionCard
+* ProductCard
+* OrderCard
+* ManufacturerCard
+* EmptyState
+* LoadingSkeleton
+* SearchBar
+* FilterChips
+* ProgressCard
+* SectionHeader
+* ConfirmationModal
+* Toast
+* ErrorState
+* ChartCard
+* StatusBadge
+* BottomSheet
+* FormInput
+* SelectField
+* UploadField
+
+ACCESSIBILITY AND MOBILE QUALITY
+
+Ensure:
+
+* Minimum touch target sizes
+* Readable contrast
+* Screen-reader labels
+* Keyboard avoidance
+* Small-screen scrolling
+* Loading states
+* Error states
+* Empty states
+* Pull to refresh
+* Safe-area spacing
+* No clipped text
+* No horizontal overflow
+* No white flashes
+* No broken back gestures
+
+TESTING REQUIREMENTS
+
+After completing the build:
+
+1. Run the project.
+2. Log in as a Seller.
+3. Confirm Seller opens on Dashboard.
+4. Test every bottom tab.
+5. Test every dashboard quick action.
+6. Test product creation.
+7. Test editing a product.
+8. Test order filters.
+9. Test opening an order.
+10. Test shipping-label demo flow.
+11. Test Manufacturer Hub.
+12. Test quote request flow.
+13. Test sample tracking.
+14. Test production tracking.
+15. Test inventory screens.
+16. Test Store Builder navigation.
+17. Test content creation.
+18. Test customer pages.
+19. Test analytics date filters.
+20. Test dark and light themes.
+21. Test logout.
+22. Confirm Buyer routes still work.
+23. Confirm onboarding still works.
+24. Fix all visible errors.
+25. Fix all TypeScript errors.
+26. Fix all routing errors.
+27. Fix all console warnings that indicate actual problems.
+
+BUILD PRIORITY
+
+Do not attempt every advanced backend capability before the core app works.
+
+Build in this order:
+
+Phase 1:
+
+* Seller navigation
+* Dashboard
+* Reusable components
+* Demo data services
+
+Phase 2:
+
+* Products
+* Product creation
+* Product details
+
+Phase 3:
+
+* Orders
+* Shipping-label demo
+* Returns and refunds
+
+Phase 4:
+
+* Manufacturer Hub
+* Quotes
+* Samples
+* Production
+
+Phase 5:
+
+* Studio landing
+* Basic canvas workspace
+* AI tool forms
+
+Phase 6:
+
+* Inventory
+* Store Builder
+* Content
+
+Phase 7:
+
+* Customers
+* Marketing
+* Analytics
+* Payouts
+* Subscription
+* Settings
+
+Complete each phase inside the project before moving to the next.
+
+Do not stop after creating only navigation or empty pages.
+
+Do not tell me to continue later.
+
+Use the current session to complete as much as possible, beginning with Phase 1 and continuing in order.
+
+When your work is fully complete and the project runs successfully, respond with only:
+
+“Brandthread Seller Dashboard is installed and working.”

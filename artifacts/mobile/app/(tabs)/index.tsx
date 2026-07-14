@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   ScrollView, View, Text, TouchableOpacity, StyleSheet,
-  Platform, Dimensions, useWindowDimensions,
+  Platform, Dimensions, useWindowDimensions, RefreshControl,
 } from 'react-native';
 import Svg, { Path, Circle } from 'react-native-svg';
 import { Feather } from '@expo/vector-icons';
@@ -9,704 +9,628 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import palette from '@/constants/colors';
-import DateRangePicker, { DateRange, buildPresets } from '@/components/DateRangePicker';
+import {
+  DEMO_ORDERS, DEMO_PRODUCTION, DEMO_INVENTORY,
+  SETUP_TASKS, TODAY_PRIORITIES, RECENT_ACTIVITY, DEMO_ANALYTICS,
+} from '@/services/data';
+import type { Priority, ActivityItem, SetupTask } from '@/services/data';
+import type { OrderStatus } from '@/services/types';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
+const BG     = '#0A0B0A';
+const CARD   = '#111311';
+const BORDER = '#1E221E';
+const FG     = '#EAF2ED';
+const MUTED  = '#5A6B5C';
+const GREEN  = '#39FF88';
+const PURPLE = '#8B5CF6';
+const BLUE   = '#3B82F6';
+const CYAN   = '#06B6D4';
+const ORANGE = '#F97316';
+const RED    = '#EF4444';
+const GOLD   = '#FBBF24';
 
-const C = {
-  bg:        '#0D0E0D',
-  surface:   '#161716',
-  border:    '#232523',
-  fg:        '#EAF2ED',
-  muted:     '#6B7A6D',
-  green:     '#39FF88',
-  greenDim:  '#1A3D28',
-  purple:    '#8B5CF6',
-  orange:    '#F97316',
-  blue:      '#3B82F6',
-  red:       '#EF4444',
-};
+// ─── Greeting ─────────────────────────────────────────────────────────────────
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-
-const SPARK_REVENUE  = [30, 38, 35, 52, 47, 65, 55, 78, 70, 83, 79, 100];
-const SPARK_ORDERS   = [40, 45, 38, 60, 52, 70, 58, 80, 72, 88, 82, 95];
-const SPARK_PRODUCTS = [25, 35, 30, 48, 42, 58, 50, 70, 64, 80, 75, 92];
-const SPARK_VISITORS = [55, 60, 52, 72, 65, 78, 68, 85, 77, 90, 84, 98];
+// ─── Hero stats ───────────────────────────────────────────────────────────────
+const SPARK_1 = [30, 38, 35, 52, 47, 65, 55, 78, 70, 83, 79, 100];
+const SPARK_2 = [40, 45, 38, 60, 52, 70, 58, 80, 72, 88, 82, 95];
+const SPARK_3 = [55, 60, 52, 72, 65, 78, 68, 85, 77, 90, 84, 98];
+const SPARK_4 = [25, 35, 30, 48, 42, 58, 50, 70, 64, 80, 75, 92];
+const SPARK_5 = [18, 25, 22, 34, 30, 42, 36, 52, 46, 60, 55, 72];
+const SPARK_6 = [60, 55, 58, 70, 65, 78, 70, 82, 76, 88, 83, 95];
 
 const HERO_STATS = [
-  { label: 'Revenue',       value: '$83,491', change: '+37.5%', up: true,  icon: 'shopping-bag' as const, color: C.green,  spark: SPARK_REVENUE  },
-  { label: 'Orders',        value: '1,892',   change: '+24.1%', up: true,  icon: 'package'      as const, color: C.blue,   spark: SPARK_ORDERS   },
-  { label: 'Products Sold', value: '3,271',   change: '+28.4%', up: true,  icon: 'tag'          as const, color: C.orange, spark: SPARK_PRODUCTS },
-  { label: 'Visitors',      value: '98,241',  change: '+19.6%', up: true,  icon: 'users'        as const, color: C.purple, spark: SPARK_VISITORS },
+  { label: 'Revenue',      value: '$83,491', change: '+37.5%', up: true,  icon: 'trending-up'  as const, color: GREEN,  spark: SPARK_1 },
+  { label: 'Orders',       value: '1,892',   change: '+24.1%', up: true,  icon: 'shopping-bag' as const, color: BLUE,   spark: SPARK_2 },
+  { label: 'Visitors',     value: '98,241',  change: '+19.6%', up: true,  icon: 'users'        as const, color: CYAN,   spark: SPARK_3 },
+  { label: 'Conversion',   value: '1.53%',   change: '+0.12%', up: true,  icon: 'percent'      as const, color: PURPLE, spark: SPARK_4 },
+  { label: 'Avg Order',    value: '$44.10',  change: '+8.7%',  up: true,  icon: 'tag'          as const, color: ORANGE, spark: SPARK_5 },
+  { label: 'Pend. Payout', value: '$1,842',  change: 'Jul 21', up: true,  icon: 'dollar-sign'  as const, color: GOLD,   spark: SPARK_6 },
 ];
 
+// ─── Chart data ───────────────────────────────────────────────────────────────
+const CHART_PERIODS: { id: string; label: string }[] = [
+  { id: 'today', label: 'Today' },
+  { id: '7d',    label: '7 days' },
+  { id: '30d',   label: '30 days' },
+  { id: '90d',   label: '90 days' },
+];
 const CHART_DATA   = [8, 18, 14, 30, 24, 42, 35, 55, 48, 63, 58, 72, 65, 80, 74, 83];
 const CHART_LABELS = ['Jun 11', 'Jun 18', 'Jun 25', 'Jul 2', 'Jul 9'];
 
-const AI_INSIGHTS = [
-  { id: '1', title: 'High Performer',     desc: 'Your Vintage Wash Tee is performing 73% better than usual.', color: C.purple, icon: 'trending-up'    as const },
-  { id: '2', title: 'Low Stock Alert',    desc: '5 products are running low on inventory.',                   color: C.orange, icon: 'alert-triangle' as const },
-  { id: '3', title: 'Growth Opportunity', desc: 'TikTok traffic is up 41%. Consider increasing ad spend.',   color: C.green,  icon: 'zap'            as const },
-  { id: '4', title: 'Marketing Tip',      desc: 'Email campaigns bring in 28% of your revenue.',             color: C.blue,   icon: 'mail'           as const },
+// ─── Quick actions ────────────────────────────────────────────────────────────
+const QUICK_ACTIONS = [
+  { label: 'Create Design', icon: 'pen-tool'      as const, color: PURPLE, route: '/design-canvas' },
+  { label: 'Add Product',   icon: 'plus-circle'   as const, color: GREEN,  route: '/add-product'  },
+  { label: 'Manufacturer',  icon: 'tool'          as const, color: CYAN,   route: '/manufacturer' },
+  { label: 'Create Content',icon: 'video'         as const, color: ORANGE, route: '/content'      },
+  { label: 'View Orders',   icon: 'shopping-bag'  as const, color: BLUE,   route: '/orders'       },
+  { label: 'Store Builder', icon: 'layout'        as const, color: '#EC4899', route: '/store-builder' },
+  { label: 'Ship Label',    icon: 'truck'         as const, color: GOLD,   route: '/shipping-label' },
+  { label: 'Discount',      icon: 'tag'           as const, color: RED,    route: '/marketing'    },
 ];
 
-const TOP_PRODUCTS = [
-  { name: 'Vintage Washed Tee',  sold: 1827, revenue: '$54,812.00', change: '+37.5%', up: true  },
-  { name: 'Oversized Hoodie',    sold: 1241, revenue: '$43,285.00', change: '+12.1%', up: true  },
-  { name: 'Graphic Zip Hoodie',  sold: 892,  revenue: '$35,760.00', change: '+8.3%',  up: true  },
-  { name: 'Cargo Sweatpants',    sold: 721,  revenue: '$28,420.00', change: '-2.1%',  up: false },
-];
+// ─── Order snapshot ───────────────────────────────────────────────────────────
+function orderSnapshot() {
+  const all = DEMO_ORDERS;
+  return [
+    { label: 'New',     count: all.filter(o => o.status === 'new').length,           color: BLUE,   filter: 'unfulfilled' },
+    { label: 'Process', count: all.filter(o => o.status === 'processing').length,    color: PURPLE, filter: 'processing' },
+    { label: 'Ready',   count: all.filter(o => o.status === 'ready_to_ship').length, color: CYAN,   filter: 'ready_to_ship' },
+    { label: 'Shipped', count: all.filter(o => o.status === 'shipped').length,       color: GREEN,  filter: 'shipped' },
+    { label: 'Returns', count: all.filter(o => o.status === 'refunded').length,      color: RED,    filter: 'returns' },
+  ];
+}
 
-const RECENT_ORDERS = [
-  { id: '#BT-78291', customer: 'Jonah B.',   amount: '$129.99', status: 'Paid' },
-  { id: '#BT-78290', customer: 'Lucas M.',   amount: '$89.99',  status: 'Paid' },
-  { id: '#BT-78289', customer: 'David K.',   amount: '$159.99', status: 'Paid' },
-  { id: '#BT-78288', customer: 'Anthony L.', amount: '$99.99',  status: 'Paid' },
-  { id: '#BT-78287', customer: 'Brandon G.', amount: '$129.99', status: 'Paid' },
-];
+// ─── Production stages ────────────────────────────────────────────────────────
+const STAGE_ORDER = ['quote', 'sample', 'approved', 'production', 'quality_check', 'shipping', 'delivered'];
 
-const BRAND_HEALTH = {
-  score: 94,
-  label: 'Excellent',
-  bars: [
-    { label: 'Store Performance',    value: 95 },
-    { label: 'Marketing',            value: 92 },
-    { label: 'Customer Satisfaction',value: 96 },
-    { label: 'Product Quality',      value: 93 },
-    { label: 'Shipping & Fulfilment',value: 94 },
-  ],
-};
+function stageIndex(s: string) { return STAGE_ORDER.indexOf(s); }
 
-const SIDEBAR_NAV = [
-  { label: 'Dashboard',    icon: 'home'          as const, route: '/'             },
-  { label: 'Products',     icon: 'box'           as const, route: '/products'     },
-  { label: 'Orders',       icon: 'shopping-bag'  as const, route: '/orders'       },
-  { label: 'Customers',    icon: 'users'         as const, route: '/customers'    },
-  { label: 'Analytics',    icon: 'bar-chart-2'   as const, route: '/analytics'    },
-  { label: 'Marketing',    icon: 'send'          as const, route: '/marketing'    },
-  { label: 'Design Studio',icon: 'zap'           as const, route: '/ai-studio'    },
-  { label: 'AI Assistant', icon: 'message-circle'as const, route: '/ai-assistant' },
-  { label: 'Finances',     icon: 'dollar-sign'   as const, route: '/finance'      },
-  { label: 'Integrations', icon: 'link'          as const, route: '/more'         },
-  { label: 'Community',    icon: 'heart'         as const, route: '/more'         },
-  { label: 'Settings',     icon: 'settings'      as const, route: '/general-settings' },
-];
-
-// ─── Mini sparkline ───────────────────────────────────────────────────────────
-
-function MiniSparkline({ data, color, width, height = 44 }: { data: number[]; color: string; width: number; height?: number }) {
+// ─── Sparkline ────────────────────────────────────────────────────────────────
+function Sparkline({ data, color, width, height = 40 }: { data: number[]; color: string; width: number; height?: number }) {
   if (data.length < 2) return null;
-  const padY = 4;
-  const plotH = height - padY * 2;
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
+  const padY = 4; const plotH = height - padY * 2;
+  const min = Math.min(...data); const max = Math.max(...data); const range = max - min || 1;
   const stepX = width / (data.length - 1);
   const pts = data.map((v, i) => ({ x: i * stepX, y: padY + plotH - ((v - min) / range) * plotH }));
   const line = pts.reduce((a, p, i) => {
     if (i === 0) return `M ${p.x} ${p.y}`;
-    const prev = pts[i - 1];
-    const mx = (prev.x + p.x) / 2;
+    const prev = pts[i - 1]; const mx = (prev.x + p.x) / 2;
     return `${a} C ${mx} ${prev.y}, ${mx} ${p.y}, ${p.x} ${p.y}`;
   }, '');
   const area = `${line} L ${width} ${height} L 0 ${height} Z`;
   const last = pts[pts.length - 1];
   return (
     <Svg width={width} height={height}>
-      <Path d={area} fill={color} fillOpacity={0.15} />
+      <Path d={area} fill={color} fillOpacity={0.12} />
       <Path d={line} stroke={color} strokeWidth={1.8} fill="none" strokeLinecap="round" />
       <Circle cx={last.x} cy={last.y} r={3} fill={color} />
     </Svg>
   );
 }
 
-// ─── Revenue chart (full) ─────────────────────────────────────────────────────
-
-function RevenueChart({ width, height = 160 }: { width: number; height?: number }) {
-  const data = CHART_DATA;
-  const padL = 48; const padR = 16; const padTop = 12; const padBottom = 28;
-  const plotW = width - padL - padR;
-  const plotH = height - padTop - padBottom;
-  const max = 100;
-  const stepX = plotW / (data.length - 1);
-  const pts = data.map((v, i) => ({ x: padL + i * stepX, y: padTop + plotH - (v / max) * plotH }));
+// ─── Revenue chart ────────────────────────────────────────────────────────────
+function RevenueChart({ width, height = 150 }: { width: number; height?: number }) {
+  const padL = 44; const padR = 12; const padTop = 10; const padBot = 26;
+  const plotW = width - padL - padR; const plotH = height - padTop - padBot;
+  const max = 100; const stepX = plotW / (CHART_DATA.length - 1);
+  const pts = CHART_DATA.map((v, i) => ({ x: padL + i * stepX, y: padTop + plotH - (v / max) * plotH }));
   const line = pts.reduce((a, p, i) => {
     if (i === 0) return `M ${p.x} ${p.y}`;
-    const prev = pts[i - 1];
-    const mx = (prev.x + p.x) / 2;
+    const prev = pts[i - 1]; const mx = (prev.x + p.x) / 2;
     return `${a} C ${mx} ${prev.y}, ${mx} ${p.y}, ${p.x} ${p.y}`;
   }, '');
   const area = `${line} L ${pts[pts.length - 1].x} ${padTop + plotH} L ${padL} ${padTop + plotH} Z`;
   const yLabels = ['$100K', '$75K', '$50K', '$25K', '$0'];
   const last = pts[pts.length - 1];
-
   return (
     <View>
       <Svg width={width} height={height}>
-        {/* Y-axis lines */}
         {yLabels.map((_, i) => {
           const y = padTop + (i / (yLabels.length - 1)) * plotH;
-          return <Path key={i} d={`M ${padL} ${y} L ${width - padR} ${y}`} stroke={C.border} strokeWidth={1} />;
+          return <Path key={i} d={`M ${padL} ${y} L ${width - padR} ${y}`} stroke={BORDER} strokeWidth={1} />;
         })}
-        {/* Area + line */}
-        <Path d={area} fill={C.green} fillOpacity={0.12} />
-        <Path d={line} stroke={C.green} strokeWidth={2.5} fill="none" strokeLinecap="round" />
-        {/* Tooltip dot */}
-        <Circle cx={last.x} cy={last.y} r={5} fill={C.green} />
-        <Circle cx={last.x} cy={last.y} r={9} fill={C.green} fillOpacity={0.2} />
+        <Path d={area} fill={GREEN} fillOpacity={0.1} />
+        <Path d={line} stroke={GREEN} strokeWidth={2} fill="none" strokeLinecap="round" />
+        <Circle cx={last.x} cy={last.y} r={5} fill={GREEN} />
+        <Circle cx={last.x} cy={last.y} r={9} fill={GREEN} fillOpacity={0.2} />
       </Svg>
-      {/* Y-axis labels */}
-      <View style={[StyleSheet.absoluteFill, { paddingTop: padTop, paddingBottom: padBottom }]} pointerEvents="none">
-        {yLabels.map((l) => (
-          <Text key={l} style={ch.yLabel}>{l}</Text>
-        ))}
+      <View style={[StyleSheet.absoluteFill, { paddingTop: padTop, paddingBottom: padBot }]} pointerEvents="none">
+        {yLabels.map(l => <Text key={l} style={ch.yLabel}>{l}</Text>)}
       </View>
-      {/* X-axis labels */}
       <View style={[ch.xRow, { paddingLeft: padL, paddingRight: padR }]}>
-        {CHART_LABELS.map((l) => <Text key={l} style={ch.xLabel}>{l}</Text>)}
+        {CHART_LABELS.map(l => <Text key={l} style={ch.xLabel}>{l}</Text>)}
       </View>
     </View>
   );
 }
-
 const ch = StyleSheet.create({
-  yLabel: { position: 'absolute', left: 0, fontSize: 9, fontFamily: 'Inter_400Regular', color: C.muted, width: 44, textAlign: 'right' },
+  yLabel: { position: 'absolute', left: 0, fontSize: 9, fontFamily: 'Inter_400Regular', color: MUTED, width: 40, textAlign: 'right' },
   xRow:   { flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 },
-  xLabel: { fontSize: 9, fontFamily: 'Inter_400Regular', color: C.muted },
+  xLabel: { fontSize: 9, fontFamily: 'Inter_400Regular', color: MUTED },
 });
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function defaultRange(): DateRange {
-  const p = buildPresets().find((x) => x.id === 'last30')!;
-  const { start, end } = p.range();
-  return { start, end, presetId: 'last30', label: 'Last 30 days' };
-}
-
-// ─── Mobile Dashboard ─────────────────────────────────────────────────────────
-
-function MobileDashboard() {
-  const insets = useSafeAreaInsets();
+// ─── Setup checklist ──────────────────────────────────────────────────────────
+function SetupChecklist({ onDismiss }: { onDismiss: () => void }) {
+  const [tasks, setTasks] = useState(SETUP_TASKS);
+  const done = tasks.filter(t => t.done).length;
+  const pct  = Math.round((done / tasks.length) * 100);
   const router = useRouter();
-  const [pickerVisible, setPickerVisible] = useState(false);
-  const [range, setRange] = useState<DateRange>(defaultRange);
-  const { width: W } = useWindowDimensions();
-  const cardW = (W - 48) / 2;
 
-  function nav(r: string) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(r as never); }
+  function toggle(id: string) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t));
+  }
 
   return (
-    <>
-      <ScrollView
-        style={m.root}
-        contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 110 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={m.header}>
-          <View style={m.logoRow}>
-            <View style={m.logoBadge}><Text style={m.logoText}>B</Text></View>
-            <Text style={m.logoLabel}>Brandthread</Text>
+    <View style={sc.wrap}>
+      <View style={sc.head}>
+        <View style={{ flex: 1 }}>
+          <Text style={sc.title}>Brand setup</Text>
+          <Text style={sc.sub}>{done} of {tasks.length} complete · {pct}%</Text>
+        </View>
+        <TouchableOpacity onPress={onDismiss} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Feather name="x" size={16} color={MUTED} />
+        </TouchableOpacity>
+      </View>
+      {/* Progress bar */}
+      <View style={sc.track}>
+        <View style={[sc.fill, { width: `${pct}%` as any }]} />
+      </View>
+      {/* Task rows */}
+      {tasks.map(task => (
+        <TouchableOpacity
+          key={task.id}
+          style={sc.taskRow}
+          onPress={() => toggle(task.id)}
+          activeOpacity={0.8}
+        >
+          <View style={[sc.check, task.done && sc.checkDone]}>
+            {task.done && <Feather name="check" size={10} color="#0A0B0A" />}
           </View>
-          <View style={m.headerIcons}>
-            <TouchableOpacity style={m.iconBtn} onPress={() => nav('/search')}><Feather name="search" size={18} color={C.fg} /></TouchableOpacity>
-            <TouchableOpacity style={m.iconBtn} onPress={() => nav('/notifications-settings')}><Feather name="bell" size={18} color={C.fg} /></TouchableOpacity>
-            <TouchableOpacity style={m.iconBtn} onPress={() => nav('/ai-assistant')}><Feather name="message-circle" size={18} color={C.fg} /></TouchableOpacity>
+          <View style={[sc.taskIcon, { backgroundColor: task.done ? GREEN + '15' : BORDER }]}>
+            <Feather name={task.icon as keyof typeof Feather.glyphMap} size={13} color={task.done ? GREEN : MUTED} />
+          </View>
+          <Text style={[sc.taskLabel, task.done && sc.taskLabelDone]}>{task.label}</Text>
+          {!task.done && (
+            <TouchableOpacity
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(task.route as never); }}
+              style={sc.goBtn}
+            >
+              <Text style={sc.goBtnText}>Go</Text>
+              <Feather name="arrow-right" size={11} color={GREEN} />
+            </TouchableOpacity>
+          )}
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
+const sc = StyleSheet.create({
+  wrap:  { backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: GREEN + '33', padding: 16, gap: 10 },
+  head:  { flexDirection: 'row', alignItems: 'flex-start' },
+  title: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+  sub:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 2 },
+  track: { height: 4, backgroundColor: BORDER, borderRadius: 2, overflow: 'hidden' },
+  fill:  { height: 4, backgroundColor: GREEN, borderRadius: 2 },
+  taskRow:   { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  check:     { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  checkDone: { backgroundColor: GREEN, borderColor: GREEN },
+  taskIcon:  { width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  taskLabel: { flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium', color: FG },
+  taskLabelDone: { color: MUTED, textDecorationLine: 'line-through' },
+  goBtn:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: GREEN + '15', borderRadius: 8 },
+  goBtnText:  { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: GREEN },
+});
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+export default function DashboardScreen() {
+  const insets  = useSafeAreaInsets();
+  const router  = useRouter();
+  const { width: W } = useWindowDimensions();
+  const topPad  = Platform.OS === 'web' ? 20 : insets.top;
+  const cardW   = (W - 48) / 2;
+  const [period,  setPeriod]  = useState('30d');
+  const [showSetup, setShowSetup] = useState(true);
+  const [priorities, setPriorities] = useState(TODAY_PRIORITIES);
+  const [refresh,  setRefresh]  = useState(false);
+
+  const snap   = orderSnapshot();
+  const lowStk = DEMO_INVENTORY.filter(i => i.quantity <= i.lowStockThreshold);
+
+  function nav(r: string) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push(r as never);
+  }
+
+  function togglePriority(id: string) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setPriorities(prev => prev.map(p => p.id === id ? { ...p, done: !p.done } : p));
+  }
+
+  function onRefresh() {
+    setRefresh(true);
+    setTimeout(() => setRefresh(false), 900);
+  }
+
+  return (
+    <ScrollView
+      style={d.root}
+      contentContainerStyle={{ paddingTop: topPad + 6, paddingBottom: 120 }}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refresh} onRefresh={onRefresh} tintColor={GREEN} />}
+    >
+      {/* ── Header ── */}
+      <View style={d.header}>
+        <View style={d.logoRow}>
+          <LinearGradient colors={[PURPLE, '#5B21B6']} style={d.avatarBadge}>
+            <Text style={d.avatarText}>D</Text>
+          </LinearGradient>
+          <View>
+            <Text style={d.brandName}>Devon's Brand</Text>
+            <Text style={d.planBadge}>Pro Plan</Text>
           </View>
         </View>
-
-        {/* Greeting */}
-        <View style={m.greetRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={m.greetTitle}>Good evening, Devon 👋</Text>
-            <Text style={m.greetSub}>Here's what's happening with your brand today.</Text>
-          </View>
-          <TouchableOpacity style={m.weekPill} onPress={() => setPickerVisible(true)} activeOpacity={0.8}>
-            <Text style={m.weekText}>{range.label.replace('Last ', 'Last ')}</Text>
-            <Feather name="chevron-down" size={12} color={C.fg} />
+        <View style={d.headerRight}>
+          <TouchableOpacity style={d.iconBtn} onPress={() => nav('/notifications-settings')}>
+            <Feather name="bell" size={17} color={FG} />
+            <View style={d.notifDot} />
+          </TouchableOpacity>
+          <TouchableOpacity style={d.iconBtn} onPress={() => nav('/ai-assistant')}>
+            <Feather name="message-circle" size={17} color={FG} />
           </TouchableOpacity>
         </View>
+      </View>
 
-        {/* 2×2 stat cards */}
-        <View style={m.statGrid}>
-          {HERO_STATS.map((s) => (
+      {/* ── Greeting ── */}
+      <View style={d.greetRow}>
+        <Text style={d.greetTitle}>{greeting()}, Devon 👋</Text>
+        <Text style={d.greetSub}>Here's your brand overview for today.</Text>
+      </View>
+
+      {/* ── Setup checklist ── */}
+      {showSetup && (
+        <View style={d.section}>
+          <SetupChecklist onDismiss={() => setShowSetup(false)} />
+        </View>
+      )}
+
+      {/* ── Stat cards 2×3 ── */}
+      <View style={d.section}>
+        <View style={d.sectionHead}>
+          <Text style={d.sectionTitle}>Performance</Text>
+          <View style={d.periodRow}>
+            {CHART_PERIODS.map(p => (
+              <TouchableOpacity
+                key={p.id}
+                style={[d.periodPill, period === p.id && d.periodPillActive]}
+                onPress={() => { setPeriod(p.id); Haptics.selectionAsync(); }}
+                activeOpacity={0.8}
+              >
+                <Text style={[d.periodText, period === p.id && d.periodTextActive]}>{p.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+        <View style={d.statGrid}>
+          {HERO_STATS.map(s => (
             <TouchableOpacity
               key={s.label}
-              style={[m.statCard, { width: cardW }]}
+              style={[d.statCard, { width: cardW }]}
               activeOpacity={0.8}
-              onPress={() => nav(s.label === 'Orders' || s.label === 'Products Sold' ? '/orders' : '/analytics')}
+              onPress={() => nav(s.label === 'Orders' ? '/orders' : '/analytics')}
             >
-              <View style={m.statCardTop}>
-                <Text style={m.statCardLabel}>{s.label}</Text>
-                <View style={[m.statIconBox, { backgroundColor: s.color + '22' }]}>
-                  <Feather name={s.icon} size={14} color={s.color} />
+              <View style={d.statTop}>
+                <Text style={d.statLabel}>{s.label}</Text>
+                <View style={[d.statIconWrap, { backgroundColor: s.color + '22' }]}>
+                  <Feather name={s.icon} size={13} color={s.color} />
                 </View>
               </View>
-              <Text style={m.statCardValue}>{s.value}</Text>
-              <Text style={[m.statCardChange, { color: s.up ? C.green : C.red }]}>↑ {s.change}</Text>
-              <MiniSparkline data={s.spark} color={s.color} width={cardW - 28} />
+              <Text style={d.statValue}>{s.value}</Text>
+              <Text style={[d.statChange, { color: s.up ? GREEN : RED }]}>
+                {s.up ? '↑' : '↓'} {s.change}
+              </Text>
+              <Sparkline data={s.spark} color={s.color} width={cardW - 28} />
             </TouchableOpacity>
           ))}
         </View>
-
-        {/* Revenue Overview */}
-        <View style={m.section}>
-          <View style={m.sectionHead}>
-            <Text style={m.sectionTitle}>Revenue Overview</Text>
-            <TouchableOpacity style={m.pillBtn} onPress={() => setPickerVisible(true)} activeOpacity={0.8}>
-              <Text style={m.pillBtnText}>{range.label}</Text>
-              <Feather name="chevron-down" size={11} color={C.fg} />
-            </TouchableOpacity>
-          </View>
-          <View style={m.card}>
-            <Text style={m.chartBigAmt}>$83,491.23</Text>
-            <Text style={[m.chartChange, { color: C.green }]}>↑ 37.5%</Text>
-            <View style={{ marginTop: 12 }}>
-              <RevenueChart width={W - 72} />
-            </View>
-          </View>
-        </View>
-
-        {/* AI Insights */}
-        <View style={m.section}>
-          <View style={m.sectionHead}>
-            <Text style={m.sectionTitle}>AI Insights</Text>
-            <TouchableOpacity onPress={() => nav('/ai-assistant')}><Text style={m.viewAll}>View All</Text></TouchableOpacity>
-          </View>
-          <View style={m.card}>
-            {AI_INSIGHTS.map((ins, i) => (
-              <TouchableOpacity
-                key={ins.id}
-                style={[m.insightRow, i > 0 && { borderTopWidth: 1, borderTopColor: C.border }]}
-                activeOpacity={0.75}
-                onPress={() => nav('/ai-assistant')}
-              >
-                <View style={[m.insightIcon, { backgroundColor: ins.color + '22' }]}>
-                  <Feather name={ins.icon} size={15} color={ins.color} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[m.insightTitle, { color: ins.color }]}>{ins.title}</Text>
-                  <Text style={m.insightDesc}>{ins.desc}</Text>
-                </View>
-                <Feather name="chevron-right" size={14} color={C.muted} />
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Top Products */}
-        <View style={m.section}>
-          <View style={m.sectionHead}>
-            <Text style={m.sectionTitle}>Top Products</Text>
-            <TouchableOpacity onPress={() => nav('/products')}><Text style={m.viewAll}>View All</Text></TouchableOpacity>
-          </View>
-          <View style={m.card}>
-            {TOP_PRODUCTS.slice(0, 2).map((p, i) => (
-              <TouchableOpacity
-                key={p.name}
-                style={[m.productRow, i > 0 && { borderTopWidth: 1, borderTopColor: C.border }]}
-                activeOpacity={0.75}
-                onPress={() => nav('/products')}
-              >
-                <View style={m.productThumb}>
-                  <Feather name="tag" size={16} color={C.muted} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={m.productName}>{p.name}</Text>
-                  <Text style={m.productSold}>{p.sold.toLocaleString()} sold</Text>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={m.productRev}>{p.revenue}</Text>
-                  <Text style={[m.productChange, { color: p.up ? C.green : C.red }]}>{p.up ? '↑' : '↓'} {p.change}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Create New Product CTA */}
-        <View style={{ paddingHorizontal: 20, marginTop: 8 }}>
-          <LinearGradient
-            colors={['#0D2B1A', '#0A1F13', '#081A0F']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-            style={m.ctaBanner}
-          >
-            <View style={{ flex: 1 }}>
-              <View style={m.ctaIconRow}>
-                <Feather name="zap" size={18} color={C.green} />
-                <Text style={m.ctaTitle}>Create New Product</Text>
-              </View>
-              <Text style={m.ctaDesc}>Use AI to generate unique designs in seconds.</Text>
-              <TouchableOpacity style={m.ctaBtn} activeOpacity={0.85} onPress={() => nav('/ai-studio')}>
-                <Text style={m.ctaBtnText}>Generate Now  →</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={m.ctaImage}>
-              <Feather name="shopping-bag" size={48} color={C.green} style={{ opacity: 0.3 }} />
-            </View>
-          </LinearGradient>
-        </View>
-      </ScrollView>
-
-      <DateRangePicker
-        visible={pickerVisible}
-        current={range}
-        onApply={(r) => { setRange(r); setPickerVisible(false); }}
-        onClose={() => setPickerVisible(false)}
-      />
-    </>
-  );
-}
-
-const m = StyleSheet.create({
-  root:          { flex: 1, backgroundColor: C.bg },
-  header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 20 },
-  logoRow:       { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  logoBadge:     { width: 30, height: 30, borderRadius: 8, backgroundColor: C.green, alignItems: 'center', justifyContent: 'center' },
-  logoText:      { fontSize: 16, fontFamily: 'Inter_700Bold', color: '#0B0B0B' },
-  logoLabel:     { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.fg },
-  headerIcons:   { flexDirection: 'row', gap: 6 },
-  iconBtn:       { width: 36, height: 36, borderRadius: 10, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center' },
-  greetRow:      { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 20, marginBottom: 20, gap: 12 },
-  greetTitle:    { fontSize: 20, fontFamily: 'Inter_700Bold', color: C.fg, marginBottom: 4 },
-  greetSub:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: C.muted },
-  weekPill:      { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
-  weekText:      { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: C.fg },
-  statGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 20, marginBottom: 8 },
-  statCard:      { backgroundColor: C.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 14, gap: 4, overflow: 'hidden' },
-  statCardTop:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
-  statCardLabel: { fontSize: 11, fontFamily: 'Inter_500Medium', color: C.muted },
-  statIconBox:   { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
-  statCardValue: { fontSize: 22, fontFamily: 'Inter_700Bold', color: C.fg, letterSpacing: -0.5 },
-  statCardChange:{ fontSize: 11, fontFamily: 'Inter_600SemiBold', marginBottom: 8 },
-  section:       { paddingHorizontal: 20, marginTop: 20 },
-  sectionHead:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  sectionTitle:  { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.fg },
-  viewAll:       { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: C.green },
-  card:          { backgroundColor: C.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
-  pillBtn:       { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
-  pillBtnText:   { fontSize: 11, fontFamily: 'Inter_500Medium', color: C.fg },
-  chartBigAmt:   { fontSize: 26, fontFamily: 'Inter_700Bold', color: C.fg, paddingHorizontal: 18, paddingTop: 18, letterSpacing: -0.5 },
-  chartChange:   { fontSize: 12, fontFamily: 'Inter_600SemiBold', paddingHorizontal: 18, marginTop: 2 },
-  insightRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
-  insightIcon:   { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  insightTitle:  { fontSize: 13, fontFamily: 'Inter_700Bold', marginBottom: 2 },
-  insightDesc:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.muted },
-  productRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
-  productThumb:  { width: 44, height: 44, borderRadius: 10, backgroundColor: C.greenDim, alignItems: 'center', justifyContent: 'center' },
-  productName:   { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: C.fg },
-  productSold:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.muted, marginTop: 2 },
-  productRev:    { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: C.fg },
-  productChange: { fontSize: 11, fontFamily: 'Inter_600SemiBold', marginTop: 2 },
-  ctaBanner:     { borderRadius: 20, padding: 22, flexDirection: 'row', alignItems: 'center', overflow: 'hidden', borderWidth: 1, borderColor: '#1A3D28' },
-  ctaIconRow:    { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
-  ctaTitle:      { fontSize: 15, fontFamily: 'Inter_700Bold', color: C.fg },
-  ctaDesc:       { fontSize: 12, fontFamily: 'Inter_400Regular', color: C.muted, marginBottom: 16 },
-  ctaBtn:        { backgroundColor: C.green, borderRadius: 22, paddingHorizontal: 18, paddingVertical: 10, alignSelf: 'flex-start' },
-  ctaBtnText:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#0A0B0A' },
-  ctaImage:      { width: 80, alignItems: 'center', justifyContent: 'center' },
-});
-
-// ─── Desktop Sidebar ──────────────────────────────────────────────────────────
-
-function DesktopSidebar({ active, onNav }: { active: string; onNav: (r: string) => void }) {
-  return (
-    <View style={d.sidebar}>
-      {/* Logo */}
-      <View style={d.sideLogoRow}>
-        <View style={d.sideLogoBadge}><Text style={d.sideLogoText}>B</Text></View>
-        <Text style={d.sideLogoLabel}>Brandthread</Text>
       </View>
 
-      {/* Nav items */}
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-        {SIDEBAR_NAV.map((item) => {
-          const isActive = item.label === active;
-          return (
+      {/* ── Revenue chart ── */}
+      <View style={d.section}>
+        <View style={d.sectionHead}>
+          <Text style={d.sectionTitle}>Revenue</Text>
+          <TouchableOpacity onPress={() => nav('/analytics')}><Text style={d.viewAll}>Analytics →</Text></TouchableOpacity>
+        </View>
+        <View style={d.card}>
+          <Text style={d.chartAmt}>$83,491.23</Text>
+          <Text style={[d.chartChange, { color: GREEN }]}>↑ 37.5% vs last period</Text>
+          <View style={{ marginTop: 12 }}>
+            <RevenueChart width={W - 72} />
+          </View>
+        </View>
+      </View>
+
+      {/* ── Today's priorities ── */}
+      <View style={d.section}>
+        <View style={d.sectionHead}>
+          <Text style={d.sectionTitle}>Today's priorities</Text>
+          <View style={d.pillBadge}>
+            <Text style={d.pillBadgeText}>{priorities.filter(p => !p.done).length} left</Text>
+          </View>
+        </View>
+        <View style={d.card}>
+          {priorities.map((p, i) => (
+            <TouchableOpacity
+              key={p.id}
+              style={[d.priorityRow, i > 0 && d.rowBorder]}
+              onPress={() => togglePriority(p.id)}
+              activeOpacity={0.8}
+            >
+              <View style={[d.priorityCheck, p.done && { backgroundColor: GREEN, borderColor: GREEN }]}>
+                {p.done && <Feather name="check" size={10} color="#0A0B0A" />}
+              </View>
+              <View style={[d.priorityIcon, { backgroundColor: p.color + '20' }]}>
+                <Feather name={p.icon as keyof typeof Feather.glyphMap} size={14} color={p.color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[d.priorityTitle, p.done && d.strikethrough]}>{p.title}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                  <Text style={d.priorityCat}>{p.category}</Text>
+                  <View style={[d.dueDot, { backgroundColor: p.due === 'overdue' ? RED : p.due === 'today' ? ORANGE : MUTED }]} />
+                  <Text style={[d.dueText, { color: p.due === 'overdue' ? RED : p.due === 'today' ? ORANGE : MUTED }]}>
+                    {p.due === 'overdue' ? 'Overdue' : p.due === 'today' ? 'Today' : 'Upcoming'}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                onPress={() => nav(p.route)}
+                style={d.openBtn}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Feather name="arrow-right" size={14} color={MUTED} />
+              </TouchableOpacity>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* ── Orders snapshot ── */}
+      <View style={d.section}>
+        <View style={d.sectionHead}>
+          <Text style={d.sectionTitle}>Orders</Text>
+          <TouchableOpacity onPress={() => nav('/orders')}><Text style={d.viewAll}>View All</Text></TouchableOpacity>
+        </View>
+        <View style={d.snapRow}>
+          {snap.map(item => (
             <TouchableOpacity
               key={item.label}
-              style={[d.navItem, isActive && d.navItemActive]}
-              onPress={() => onNav(item.route)}
-              activeOpacity={0.75}
-            >
-              <Feather name={item.icon} size={16} color={isActive ? C.green : C.muted} />
-              <Text style={[d.navLabel, isActive && d.navLabelActive]}>{item.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
-      {/* User */}
-      <View style={d.sideUser}>
-        <View style={d.sideAvatar}><Text style={d.sideAvatarText}>D</Text></View>
-        <View style={{ flex: 1 }}>
-          <Text style={d.sideUserName}>Devon Walker</Text>
-          <Text style={d.sideUserPlan}>Premium Plan</Text>
-        </View>
-        <TouchableOpacity><Feather name="more-horizontal" size={16} color={C.muted} /></TouchableOpacity>
-      </View>
-    </View>
-  );
-}
-
-// ─── Desktop Dashboard ────────────────────────────────────────────────────────
-
-function DesktopDashboard() {
-  const router = useRouter();
-  const { width: W } = useWindowDimensions();
-  const [pickerVisible, setPickerVisible] = useState(false);
-  const [range, setRange] = useState<DateRange>(defaultRange);
-
-  function nav(r: string) { router.push(r as never); }
-
-  return (
-    <View style={d.root}>
-      <DesktopSidebar active="Dashboard" onNav={nav} />
-
-      <ScrollView style={d.main} contentContainerStyle={d.mainContent} showsVerticalScrollIndicator={false}>
-        {/* Top bar */}
-        <View style={d.topBar}>
-          <View>
-            <Text style={d.topGreet}>Good evening, Devon 👋</Text>
-            <Text style={d.topSub}>Here's what's happening with your brand today.</Text>
-          </View>
-          <View style={d.topRight}>
-            <TouchableOpacity style={d.searchBox} onPress={() => nav('/search')} activeOpacity={0.8}>
-              <Feather name="search" size={14} color={C.muted} />
-              <Text style={d.searchText}>Search anything...</Text>
-              <View style={d.searchKbd}><Text style={d.searchKbdText}>⌘K</Text></View>
-            </TouchableOpacity>
-            <TouchableOpacity style={d.topIconBtn} onPress={() => nav('/notifications-settings')}><Feather name="bell" size={16} color={C.muted} /></TouchableOpacity>
-            <TouchableOpacity style={d.topIconBtn} onPress={() => nav('/ai-assistant')}><Feather name="message-circle" size={16} color={C.muted} /></TouchableOpacity>
-            <TouchableOpacity style={d.exportBtn} activeOpacity={0.85}>
-              <Text style={d.exportBtnText}>Export Report</Text>
-              <Feather name="chevron-down" size={14} color={C.fg} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* 4 stat cards */}
-        <View style={d.statsRow}>
-          {HERO_STATS.map((s) => (
-            <TouchableOpacity
-              key={s.label}
-              style={d.dStatCard}
+              style={d.snapCard}
+              onPress={() => nav('/orders')}
               activeOpacity={0.8}
-              onPress={() => nav(s.label === 'Orders' || s.label === 'Products Sold' ? '/orders' : '/analytics')}
             >
-              <View style={d.dStatTop}>
-                <Text style={d.dStatLabel}>{s.label}</Text>
-                <View style={[d.dStatIcon, { backgroundColor: s.color + '22' }]}>
-                  <Feather name={s.icon} size={14} color={s.color} />
+              <Text style={[d.snapCount, { color: item.color }]}>{item.count}</Text>
+              <Text style={d.snapLabel}>{item.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* ── Production snapshot ── */}
+      {DEMO_PRODUCTION.length > 0 && (
+        <View style={d.section}>
+          <View style={d.sectionHead}>
+            <Text style={d.sectionTitle}>Production</Text>
+            <TouchableOpacity onPress={() => nav('/manufacturer')}><Text style={d.viewAll}>View All</Text></TouchableOpacity>
+          </View>
+          <View style={d.card}>
+            {DEMO_PRODUCTION.map((job, i) => (
+              <TouchableOpacity
+                key={job.id}
+                style={[d.prodRow, i > 0 && d.rowBorder]}
+                onPress={() => nav('/manufacturer')}
+                activeOpacity={0.8}
+              >
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={d.prodProduct}>{job.product}</Text>
+                  <Text style={d.prodMfg}>{job.manufacturer} · {job.quantity} units</Text>
+                  <View style={d.prodTrack}>
+                    <LinearGradient
+                      colors={[PURPLE, CYAN]}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                      style={[d.prodFill, { width: `${job.progress}%` as any }]}
+                    />
+                  </View>
+                  <Text style={d.prodETA}>Est. {job.estimatedCompletion}</Text>
                 </View>
+                <View style={[d.stageBadge]}>
+                  <Text style={d.stageText}>
+                    {job.stage.replace('_', ' ').replace(/^\w/, c => c.toUpperCase())}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* ── Inventory alerts ── */}
+      {lowStk.length > 0 && (
+        <View style={d.section}>
+          <View style={d.sectionHead}>
+            <Text style={d.sectionTitle}>Inventory alerts</Text>
+            <TouchableOpacity onPress={() => nav('/inventory')}><Text style={d.viewAll}>View All</Text></TouchableOpacity>
+          </View>
+          <View style={d.card}>
+            {lowStk.slice(0, 4).map((item, i) => (
+              <TouchableOpacity
+                key={item.id}
+                style={[d.invRow, i > 0 && d.rowBorder]}
+                onPress={() => nav('/inventory')}
+                activeOpacity={0.8}
+              >
+                <View style={d.invAlert}>
+                  <Feather name={item.quantity === 0 ? 'alert-circle' : 'alert-triangle'} size={14} color={item.quantity === 0 ? RED : ORANGE} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={d.invProduct}>{item.productName}</Text>
+                  <Text style={d.invVariant}>{item.variant}</Text>
+                </View>
+                <View>
+                  <Text style={[d.invQty, { color: item.quantity === 0 ? RED : ORANGE }]}>
+                    {item.quantity === 0 ? 'Out of stock' : `${item.quantity} left`}
+                  </Text>
+                  <View style={d.restockBtn}>
+                    <Text style={d.restockText}>Restock</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* ── Quick actions ── */}
+      <View style={d.section}>
+        <Text style={d.sectionTitle}>Quick actions</Text>
+        <View style={d.actionGrid}>
+          {QUICK_ACTIONS.map(a => (
+            <TouchableOpacity key={a.label} style={d.actionCard} onPress={() => nav(a.route)} activeOpacity={0.8}>
+              <View style={[d.actionIcon, { backgroundColor: a.color + '20' }]}>
+                <Feather name={a.icon} size={18} color={a.color} />
               </View>
-              <Text style={d.dStatValue}>{s.value}</Text>
-              <Text style={[d.dStatChange, { color: s.up ? C.green : C.red }]} numberOfLines={1}>↑ {s.change}  <Text style={{ color: C.muted, fontFamily: 'Inter_400Regular' }}>from last 30 days</Text></Text>
-              <View style={{ marginTop: 12 }}>
-                <MiniSparkline data={s.spark} color={s.color} width={160} height={50} />
+              <Text style={d.actionLabel}>{a.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* ── Recent activity ── */}
+      <View style={d.section}>
+        <View style={d.sectionHead}>
+          <Text style={d.sectionTitle}>Recent activity</Text>
+        </View>
+        <View style={d.card}>
+          {RECENT_ACTIVITY.map((item, i) => (
+            <TouchableOpacity
+              key={item.id}
+              style={[d.actRow, i > 0 && d.rowBorder]}
+              onPress={() => nav(item.route)}
+              activeOpacity={0.8}
+            >
+              {item.unread && <View style={d.unreadDot} />}
+              <View style={[d.actIcon, { backgroundColor: item.color + '20' }]}>
+                <Feather name={item.icon as keyof typeof Feather.glyphMap} size={14} color={item.color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={d.actTitle}>{item.title}</Text>
+                <Text style={d.actDesc}>{item.desc}</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                <Text style={d.actTime}>{item.time}</Text>
+                <Feather name="chevron-right" size={13} color={MUTED} />
               </View>
             </TouchableOpacity>
           ))}
         </View>
-
-        {/* Chart + AI Insights row */}
-        <View style={d.midRow}>
-          {/* Revenue overview */}
-          <View style={[d.panel, { flex: 6 }]}>
-            <View style={d.panelHead}>
-              <Text style={d.panelTitle}>Revenue Overview</Text>
-              <TouchableOpacity style={d.pillBtn} onPress={() => setPickerVisible(true)} activeOpacity={0.8}>
-                <Text style={d.pillBtnText}>{range.label}</Text>
-                <Feather name="chevron-down" size={11} color={C.fg} />
-              </TouchableOpacity>
-            </View>
-            <RevenueChart width={(W - 240 - 80) * 0.58} height={200} />
-          </View>
-
-          {/* AI Insights */}
-          <View style={[d.panel, { flex: 4 }]}>
-            <View style={d.panelHead}>
-              <Text style={d.panelTitle}>AI Insights</Text>
-              <TouchableOpacity onPress={() => nav('/ai-assistant')}><Text style={d.viewAll}>View All</Text></TouchableOpacity>
-            </View>
-            {AI_INSIGHTS.map((ins) => (
-              <TouchableOpacity key={ins.id} style={d.insightRow} activeOpacity={0.75} onPress={() => nav('/ai-assistant')}>
-                <View style={[d.insightIcon, { backgroundColor: ins.color + '22' }]}>
-                  <Feather name={ins.icon} size={14} color={ins.color} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[d.insightTitle, { color: ins.color }]}>{ins.title}</Text>
-                  <Text style={d.insightDesc}>{ins.desc}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Bottom 3-column row */}
-        <View style={d.bottomRow}>
-          {/* Top Products */}
-          <View style={[d.panel, { flex: 4 }]}>
-            <View style={d.panelHead}>
-              <Text style={d.panelTitle}>Top Products</Text>
-              <TouchableOpacity onPress={() => nav('/products')}><Text style={d.viewAll}>View All</Text></TouchableOpacity>
-            </View>
-            {TOP_PRODUCTS.map((p, i) => (
-              <TouchableOpacity key={p.name} style={[d.productRow, i > 0 && { borderTopWidth: 1, borderTopColor: C.border }]} activeOpacity={0.75} onPress={() => nav('/products')}>
-                <View style={d.productThumb}><Feather name="tag" size={14} color={C.muted} /></View>
-                <View style={{ flex: 1 }}>
-                  <Text style={d.productName}>{p.name}</Text>
-                  <Text style={d.productSold}>{p.sold.toLocaleString()} sold</Text>
-                </View>
-                <Text style={d.productRev}>{p.revenue}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Recent Orders */}
-          <View style={[d.panel, { flex: 4 }]}>
-            <View style={d.panelHead}>
-              <Text style={d.panelTitle}>Recent Orders</Text>
-              <TouchableOpacity onPress={() => nav('/orders')}><Text style={d.viewAll}>View All</Text></TouchableOpacity>
-            </View>
-            {RECENT_ORDERS.map((o, i) => (
-              <TouchableOpacity key={o.id} style={[d.orderRow, i > 0 && { borderTopWidth: 1, borderTopColor: C.border }]} activeOpacity={0.75} onPress={() => nav('/orders')}>
-                <View style={{ flex: 1 }}>
-                  <Text style={d.orderId}>{o.id}</Text>
-                  <Text style={d.orderCustomer}>{o.customer}</Text>
-                </View>
-                <Text style={d.orderAmt}>{o.amount}</Text>
-                <View style={d.paidBadge}><Text style={d.paidText}>{o.status}</Text></View>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Brand Health */}
-          <View style={[d.panel, { flex: 3 }]}>
-            <Text style={d.panelTitle}>Brand Health</Text>
-            {/* Score circle */}
-            <View style={d.healthCircleRow}>
-              <View style={d.healthCircle}>
-                <Svg width={96} height={96}>
-                  <Circle cx={48} cy={48} r={40} stroke={C.border} strokeWidth={8} fill="none" />
-                  <Circle
-                    cx={48} cy={48} r={40}
-                    stroke={C.green} strokeWidth={8} fill="none"
-                    strokeDasharray={`${2 * Math.PI * 40 * 0.94} ${2 * Math.PI * 40 * 0.06}`}
-                    strokeLinecap="round"
-                    rotation={-90} originX={48} originY={48}
-                  />
-                </Svg>
-                <View style={d.healthScoreBox}>
-                  <Text style={d.healthScore}>{BRAND_HEALTH.score}</Text>
-                  <Text style={d.healthLabel}>{BRAND_HEALTH.label}</Text>
-                </View>
-              </View>
-            </View>
-            {/* Bars */}
-            {BRAND_HEALTH.bars.map((b) => (
-              <View key={b.label} style={d.healthBar}>
-                <View style={d.healthBarLabelRow}>
-                  <Text style={d.healthBarLabel}>{b.label}</Text>
-                  <Text style={d.healthBarVal}>{b.value}</Text>
-                </View>
-                <View style={d.healthTrack}>
-                  <View style={[d.healthFill, { width: `${b.value}%` as any }]} />
-                </View>
-              </View>
-            ))}
-          </View>
-        </View>
-      </ScrollView>
-
-      <DateRangePicker
-        visible={pickerVisible}
-        current={range}
-        onApply={(r) => { setRange(r); setPickerVisible(false); }}
-        onClose={() => setPickerVisible(false)}
-      />
-    </View>
+      </View>
+    </ScrollView>
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
 const d = StyleSheet.create({
-  root:           { flexDirection: 'row', backgroundColor: C.bg },
-  sidebar:        { width: 220, backgroundColor: '#0A0B0A', borderRightWidth: 1, borderRightColor: C.border, paddingTop: 24, paddingBottom: 16 },
-  sideLogoRow:    { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, marginBottom: 28 },
-  sideLogoBadge:  { width: 28, height: 28, borderRadius: 7, backgroundColor: C.green, alignItems: 'center', justifyContent: 'center' },
-  sideLogoText:   { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#0B0B0B' },
-  sideLogoLabel:  { fontSize: 15, fontFamily: 'Inter_700Bold', color: C.fg },
-  navItem:        { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 20, paddingVertical: 10, marginHorizontal: 8, borderRadius: 10 },
-  navItemActive:  { backgroundColor: '#0D2B1A' },
-  navLabel:       { fontSize: 13, fontFamily: 'Inter_500Medium', color: C.muted },
-  navLabelActive: { color: C.fg, fontFamily: 'Inter_600SemiBold' },
-  sideUser:       { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: C.border },
-  sideAvatar:     { width: 32, height: 32, borderRadius: 16, backgroundColor: C.greenDim, alignItems: 'center', justifyContent: 'center' },
-  sideAvatarText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: C.green },
-  sideUserName:   { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.fg },
-  sideUserPlan:   { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.green, marginTop: 1 },
-  main:           { flex: 1 },
-  mainContent:    { padding: 24, gap: 16, paddingBottom: 40 },
-  topBar:         { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 },
-  topGreet:       { fontSize: 22, fontFamily: 'Inter_700Bold', color: C.fg, marginBottom: 4 },
-  topSub:         { fontSize: 13, fontFamily: 'Inter_400Regular', color: C.muted },
-  topRight:       { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  searchBox:      { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9, minWidth: 200 },
-  searchText:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: C.muted, flex: 1 },
-  searchKbd:      { backgroundColor: C.border, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
-  searchKbdText:  { fontSize: 10, fontFamily: 'Inter_500Medium', color: C.muted },
-  topIconBtn:     { width: 36, height: 36, borderRadius: 9, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center' },
-  exportBtn:      { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: C.surface, borderWidth: 1, borderColor: C.border, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9 },
-  exportBtnText:  { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: C.fg },
-  statsRow:       { flexDirection: 'row', gap: 12 },
-  dStatCard:      { flex: 1, backgroundColor: C.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 18 },
-  dStatTop:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
-  dStatLabel:     { fontSize: 13, fontFamily: 'Inter_500Medium', color: C.muted },
-  dStatIcon:      { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  dStatValue:     { fontSize: 28, fontFamily: 'Inter_700Bold', color: C.fg, letterSpacing: -0.5 },
-  dStatChange:    { fontSize: 11, fontFamily: 'Inter_600SemiBold', marginTop: 4 },
-  midRow:         { flexDirection: 'row', gap: 16 },
-  bottomRow:      { flexDirection: 'row', gap: 16 },
-  panel:          { backgroundColor: C.surface, borderRadius: 16, borderWidth: 1, borderColor: C.border, padding: 18 },
-  panelHead:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  panelTitle:     { fontSize: 15, fontFamily: 'Inter_700Bold', color: C.fg },
-  pillBtn:        { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: C.border, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
-  pillBtnText:    { fontSize: 11, fontFamily: 'Inter_500Medium', color: C.fg },
-  viewAll:        { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.green },
-  insightRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: C.border },
-  insightIcon:    { width: 34, height: 34, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  insightTitle:   { fontSize: 12, fontFamily: 'Inter_700Bold', marginBottom: 2 },
-  insightDesc:    { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.muted },
-  productRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
-  productThumb:   { width: 38, height: 38, borderRadius: 9, backgroundColor: C.greenDim, alignItems: 'center', justifyContent: 'center' },
-  productName:    { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.fg },
-  productSold:    { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.muted, marginTop: 1 },
-  productRev:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.fg },
-  orderRow:       { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
-  orderId:        { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.green },
-  orderCustomer:  { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.muted, marginTop: 1 },
-  orderAmt:       { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.fg, marginRight: 8 },
-  paidBadge:      { backgroundColor: '#0D2B1A', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  paidText:       { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: C.green },
-  healthCircleRow:{ alignItems: 'center', paddingVertical: 12 },
-  healthCircle:   { width: 96, height: 96, position: 'relative' },
-  healthScoreBox: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-  healthScore:    { fontSize: 24, fontFamily: 'Inter_700Bold', color: C.fg, lineHeight: 28 },
-  healthLabel:    { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.muted },
-  healthBar:      { marginBottom: 10 },
-  healthBarLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
-  healthBarLabel: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.muted },
-  healthBarVal:   { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: C.fg },
-  healthTrack:    { height: 4, backgroundColor: C.border, borderRadius: 2, overflow: 'hidden' },
-  healthFill:     { height: 4, backgroundColor: C.green, borderRadius: 2 },
+  root:       { flex: 1, backgroundColor: BG },
+  header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 16 },
+  logoRow:    { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avatarBadge:{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+  brandName:  { fontSize: 14, fontFamily: 'Inter_700Bold', color: FG },
+  planBadge:  { fontSize: 10, fontFamily: 'Inter_500Medium', color: GREEN },
+  headerRight:{ flexDirection: 'row', gap: 6 },
+  iconBtn:    { width: 36, height: 36, borderRadius: 10, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
+  notifDot:   { position: 'absolute', top: 7, right: 7, width: 6, height: 6, borderRadius: 3, backgroundColor: RED, borderWidth: 1.5, borderColor: BG },
+
+  greetRow:   { paddingHorizontal: 20, marginBottom: 20 },
+  greetTitle: { fontSize: 22, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.4 },
+  greetSub:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 4 },
+
+  section:    { paddingHorizontal: 20, marginBottom: 20 },
+  sectionHead:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  sectionTitle:{ fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
+  viewAll:    { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: GREEN },
+  card:       { backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
+  rowBorder:  { borderTopWidth: 1, borderTopColor: BORDER },
+
+  periodRow:   { flexDirection: 'row', gap: 4 },
+  periodPill:  { paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+  periodPillActive: { backgroundColor: GREEN + '20', borderColor: GREEN },
+  periodText:  { fontSize: 10, fontFamily: 'Inter_500Medium', color: MUTED },
+  periodTextActive: { color: GREEN },
+
+  statGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  statCard:   { backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, padding: 14, gap: 4 },
+  statTop:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  statLabel:  { fontSize: 10, fontFamily: 'Inter_500Medium', color: MUTED },
+  statIconWrap:{ width: 24, height: 24, borderRadius: 7, alignItems: 'center', justifyContent: 'center' },
+  statValue:  { fontSize: 20, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.3 },
+  statChange: { fontSize: 10, fontFamily: 'Inter_600SemiBold', marginBottom: 6 },
+
+  chartAmt:   { fontSize: 24, fontFamily: 'Inter_700Bold', color: FG, paddingHorizontal: 18, paddingTop: 16, letterSpacing: -0.5 },
+  chartChange:{ fontSize: 12, fontFamily: 'Inter_600SemiBold', paddingHorizontal: 18, marginTop: 2 },
+
+  pillBadge:     { backgroundColor: ORANGE + '20', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  pillBadgeText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: ORANGE },
+
+  priorityRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 13 },
+  priorityCheck: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  priorityIcon:  { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  priorityTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
+  strikethrough: { color: MUTED, textDecorationLine: 'line-through' },
+  priorityCat:   { fontSize: 10, fontFamily: 'Inter_400Regular', color: MUTED },
+  dueDot:        { width: 4, height: 4, borderRadius: 2 },
+  dueText:       { fontSize: 10, fontFamily: 'Inter_600SemiBold' },
+  openBtn:       { padding: 6 },
+
+  snapRow:    { flexDirection: 'row', gap: 8 },
+  snapCard:   { flex: 1, backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, alignItems: 'center', paddingVertical: 14, gap: 4 },
+  snapCount:  { fontSize: 22, fontFamily: 'Inter_700Bold' },
+  snapLabel:  { fontSize: 9, fontFamily: 'Inter_500Medium', color: MUTED, textAlign: 'center' },
+
+  prodRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
+  prodProduct: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
+  prodMfg:     { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
+  prodTrack:   { height: 3, backgroundColor: BORDER, borderRadius: 2, overflow: 'hidden', marginTop: 4 },
+  prodFill:    { height: 3, borderRadius: 2 },
+  prodETA:     { fontSize: 10, fontFamily: 'Inter_400Regular', color: MUTED },
+  stageBadge:  { backgroundColor: PURPLE + '20', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5 },
+  stageText:   { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: PURPLE },
+
+  invRow:     { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 13 },
+  invAlert:   { width: 32, height: 32, borderRadius: 9, backgroundColor: ORANGE + '15', alignItems: 'center', justifyContent: 'center' },
+  invProduct: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
+  invVariant: { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 1 },
+  invQty:     { fontSize: 11, fontFamily: 'Inter_700Bold', textAlign: 'right' },
+  restockBtn: { backgroundColor: ORANGE + '20', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4 },
+  restockText:{ fontSize: 10, fontFamily: 'Inter_600SemiBold', color: ORANGE },
+
+  actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  actionCard: { width: '22.5%', backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, alignItems: 'center', paddingVertical: 14, gap: 8 },
+  actionIcon: { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  actionLabel:{ fontSize: 10, fontFamily: 'Inter_500Medium', color: MUTED, textAlign: 'center' },
+
+  actRow:   { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13 },
+  unreadDot:{ position: 'absolute', left: 6, top: 13, width: 6, height: 6, borderRadius: 3, backgroundColor: GREEN },
+  actIcon:  { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  actTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
+  actDesc:  { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 1 },
+  actTime:  { fontSize: 10, fontFamily: 'Inter_400Regular', color: MUTED },
 });
-
-// ─── Root export ──────────────────────────────────────────────────────────────
-
-export default function SellerDashboard() {
-  const { width } = useWindowDimensions();
-  if (Platform.OS === 'web' && width >= 768) return <DesktopDashboard />;
-  return <MobileDashboard />;
-}
