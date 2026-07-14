@@ -763,8 +763,8 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
     try {
       if (isSignedIn) await signOut();
       await onDevClear();
-    } catch (e) {
-      console.warn('[Auth] Clear session error:', e);
+    } catch {
+      // session may already be cleared
     } finally {
       setClearSession(false);
     }
@@ -773,13 +773,6 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
   // ── Sign-up ──────────────────────────────────────────────────────────────────
   async function handleSignUp() {
     if (!canSubmit || loading) return;
-
-    // DEV LOGGING ─────────────────────────────────────────────────────────────
-    console.log('[Auth] ── handleSignUp ──────────────────────────────────────');
-    console.log('[Auth] Email submitted  :', email.trim().toLowerCase());
-    console.log('[Auth] Session exists   :', isSignedIn);
-    console.log('[Auth] Provider         : Clerk email/password');
-    // ─────────────────────────────────────────────────────────────────────────
 
     // CRITICAL: if a session already exists Clerk returns session_exists, which
     // the old code misclassified as "email already taken". Block this early.
@@ -800,16 +793,6 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
         lastName:  nameParts.slice(1).join(' ') || undefined,
       });
 
-      // DEV LOGGING ───────────────────────────────────────────────────────────
-      if (err) {
-        console.log('[Auth] Sign-up error code       :', (err as any).code);
-        console.log('[Auth] Sign-up error message    :', (err as any).message);
-        console.log('[Auth] Sign-up error longMessage:', (err as any).longMessage);
-      } else {
-        console.log('[Auth] Sign-up password step succeeded — sending verification code');
-      }
-      // ───────────────────────────────────────────────────────────────────────
-
       if (err) {
         const inner = (err as any)?.errors?.[0] ?? err;
         const errCode = ((inner as any)?.code ?? '').toLowerCase();
@@ -824,8 +807,6 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
       await signUp.verifications.sendEmailCode();
       setPhase('verify');
     } catch (e: any) {
-      console.log('[Auth] Sign-up exception code   :', e?.code);
-      console.log('[Auth] Sign-up exception message:', e?.message);
       const excInner = e?.errors?.[0] ?? e;
       const excCode  = (excInner?.code ?? '').toLowerCase();
       if (excCode === 'form_identifier_exists') {
@@ -846,11 +827,7 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
     try {
       await signUp.verifications.verifyEmailCode({ code });
 
-      console.log('[Auth] Verification status:', signUp.status);
-      console.log('[Auth] Profile creation ran: true');
-
       if (signUp.status === 'complete') {
-        console.log('[Auth] Finalizing session…');
         await signUp.finalize({
           navigate: ({ decorateUrl }: { decorateUrl: (url: string) => string }) => {
             const url = decorateUrl('/onboarding');
@@ -864,7 +841,6 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
         onAuthComplete();
       }
     } catch (e: any) {
-      console.log('[Auth] Verify exception:', e?.code, e?.message);
       setError(mapClerkError(e));
     } finally {
       setLoading(false);

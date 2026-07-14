@@ -69,12 +69,13 @@ const CREATIVE: NavItem[] = [
 ];
 
 const ACCOUNT: NavItem[] = [
-  { icon: 'star',         label: 'Subscription',   desc: 'Manage your Brandthread plan',    accent: GOLD,   badge: true },
-  { icon: 'link',         label: 'Integrations',   desc: 'Connect third-party services',    accent: PURPLE },
+  { icon: 'star',         label: 'Subscription',   desc: 'Manage your Brandthread plan',    accent: GOLD,   badge: true, route: '/subscription' },
+  { icon: 'dollar-sign',  label: 'Payouts',        desc: 'Bank account and payout history', accent: SUCCESS, route: '/payouts' },
+  { icon: 'link',         label: 'Integrations',   desc: 'Connect third-party services',    accent: PURPLE, route: '/integrations/klaviyo' },
   { icon: 'users',        label: 'Team',           desc: 'Invite collaborators',            accent: BLUE },
-  { icon: 'bell',         label: 'Notifications',  desc: 'Push and email preferences',      accent: ORANGE },
-  { icon: 'settings',     label: 'Settings',       desc: 'App and account settings',        accent: MUTED },
-  { icon: 'help-circle',  label: 'Help & Support', desc: 'Guides, FAQs and contact us',    accent: CYAN },
+  { icon: 'bell',         label: 'Notifications',  desc: 'Push and email preferences',      accent: ORANGE, route: '/notifications-settings' },
+  { icon: 'settings',     label: 'Settings',       desc: 'App and account settings',        accent: MUTED,  route: '/settings' },
+  { icon: 'help-circle',  label: 'Help & Support', desc: 'Guides, FAQs and contact us',    accent: CYAN,   route: '/help' },
 ];
 
 // ─── Main Component ───────────────────────────────────────────────────────────

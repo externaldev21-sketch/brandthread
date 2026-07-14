@@ -277,6 +277,42 @@ function RootLayoutNav() {
         <Stack.Screen name="design-mockup-preview"    options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="design-export"            options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
         <Stack.Screen name="design-versions"          options={{ headerShown: false, animation: 'slide_from_right' }} />
+        {/* Settings sub-screens */}
+        <Stack.Screen name="billing"            options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="users"              options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="roles"              options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="security"           options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="general-settings"   options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="push-notifications" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="biometric-unlock"   options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="app-icon"           options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="plan-details"       options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="payouts"            options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="subscription"       options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="share-store"        options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
+        <Stack.Screen name="story-picker"       options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
+        <Stack.Screen name="community-chat"     options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="manufacturer-onboard" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="request-sample"     options={{ headerShown: false, animation: 'slide_from_right' }} />
+        {/* AI Studio sub-screens */}
+        <Stack.Screen name="ai-mockup-chat"     options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="ai-photography-chat" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="lifestyle-images"   options={{ headerShown: false, animation: 'slide_from_right' }} />
+        {/* Store settings sub-screens */}
+        <Stack.Screen name="customer-accounts"  options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="customer-privacy"   options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="customer-events"    options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="taxes-duties"       options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="shipping-delivery"  options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="locations"          options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="languages"          options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="metafields"         options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="mobile-app-builder" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="orders"             options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="checkout"           options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="shopping-preferences"    options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="account-type-settings"   options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="login-methods"           options={{ headerShown: false, animation: 'slide_from_right' }} />
       </Stack>
     </AuthGate>
   );

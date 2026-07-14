@@ -388,10 +388,14 @@ export async function getProductAnalytics(productId: string): Promise<ProductAna
     bestSize: 'M',
     bestColor: 'Black',
     sellThroughRate: p && p.inventory.totalStock > 0 ? unitsSold / (unitsSold + p.inventory.totalStock) : 0,
-    revenueByDay: Array.from({ length: 14 }, (_, i) => ({
-      date: new Date(Date.now() - (13 - i) * 86400000).toISOString().slice(0, 10),
-      revenue: Math.round(totalRevenue * (0.04 + Math.random() * 0.12)),
-    })),
+    revenueByDay: Array.from({ length: 14 }, (_, i) => {
+      // Deterministic per-product-per-day value — stable across renders
+      const seed = ((productId ?? 'p').charCodeAt(0) * 31 + i * 17) % 100;
+      return {
+        date: new Date(Date.now() - (13 - i) * 86400000).toISOString().slice(0, 10),
+        revenue: Math.round(totalRevenue * (0.04 + (seed / 100) * 0.12)),
+      };
+    }),
   };
 }
 

@@ -1,57 +1,75 @@
 /**
- * Brandthread design tokens — "Neon Studio" theme.
- * Dark, near-black surfaces with an electric green accent, matching the
- * brand's holographic "B" mark. Light palette mirrors the same accent
- * on a clean paper surface for contexts that need it.
+ * Brandthread design tokens — "Deep Purple" premium theme.
+ *
+ * These values are consumed by the legacy `useColors()` hook used in
+ * secondary/settings screens. They must match the canonical tokens in
+ * `lib/theme.ts` so the whole app is visually consistent.
+ *
+ * Key mappings to lib/theme constants:
+ *   background      → BG           #07070F
+ *   foreground      → FG           #F4F4FF
+ *   card            → CARD         #12121F
+ *   primary         → PURPLE       #8B5CF6
+ *   tint            → PURPLE       #8B5CF6
+ *   mutedForeground → MUTED        rgba(244,244,255,0.50)
+ *   border          → BORDER       rgba(255,255,255,0.07)
+ *   success         → SUCCESS      #10B981
+ *   destructive     → RED          #F87171
  */
+
 const colors = {
+  /** Light palette — not used in the app (forced dark), kept for completeness. */
   light: {
-    text: '#0B0D0C',
-    tint: '#00C853',
-    background: '#F4F6F5',
-    foreground: '#0B0D0C',
-    card: '#FFFFFF',
-    cardForeground: '#0B0D0C',
-    primary: '#00C853',
-    primaryForeground: '#03150B',
-    secondary: '#E7EFEA',
-    secondaryForeground: '#0B3B1F',
-    muted: '#EDF2EF',
-    mutedForeground: '#5B6560',
-    accent: '#E7EFEA',
-    accentForeground: '#0B3B1F',
-    destructive: '#DC2626',
+    text:                '#0B0B1A',
+    tint:                '#8B5CF6',
+    background:          '#F6F4FF',
+    foreground:          '#0B0B1A',
+    card:                '#FFFFFF',
+    cardForeground:      '#0B0B1A',
+    primary:             '#8B5CF6',
+    primaryForeground:   '#FFFFFF',
+    secondary:           '#EDE9FE',
+    secondaryForeground: '#3B1FA3',
+    muted:               '#F3F0FE',
+    mutedForeground:     '#6B7280',
+    accent:              '#DDD6FE',
+    accentForeground:    '#4C1D95',
+    destructive:         '#EF4444',
     destructiveForeground: '#FFFFFF',
-    border: '#DDE4E0',
-    input: '#EEF2F0',
-    success: '#12A150',
-    warning: '#A66A1E',
-    info: '#3D5A80',
+    border:              'rgba(0,0,0,0.08)',
+    input:               '#F3F0FE',
+    success:             '#10B981',
+    warning:             '#F59E0B',
+    info:                '#22D3EE',
   },
+
+  /** Dark palette — the active Brandthread theme. */
   dark: {
-    text: '#EAF2ED',
-    tint: '#39FF88',
-    background: '#0A0B0A',
-    foreground: '#EAF2ED',
-    card: '#131513',
-    cardForeground: '#EAF2ED',
-    primary: '#39FF88',
-    primaryForeground: '#03150B',
-    secondary: '#1A1C1A',
-    secondaryForeground: '#D8E8DE',
-    muted: '#171917',
-    mutedForeground: '#8B958F',
-    accent: '#1A1C1A',
-    accentForeground: '#D8E8DE',
-    destructive: '#EF4444',
+    text:                '#F4F4FF',
+    tint:                '#8B5CF6',
+    background:          '#07070F',
+    foreground:          '#F4F4FF',
+    card:                '#12121F',
+    cardForeground:      '#F4F4FF',
+    primary:             '#8B5CF6',
+    primaryForeground:   '#FFFFFF',
+    secondary:           '#18182E',
+    secondaryForeground: '#F4F4FF',
+    muted:               '#18182E',
+    mutedForeground:     'rgba(244,244,255,0.50)',
+    accent:              '#2D1B6B',
+    accentForeground:    '#A78BFA',
+    destructive:         '#F87171',
     destructiveForeground: '#FFFFFF',
-    border: '#242724',
-    input: '#181A18',
-    success: '#39FF88',
-    warning: '#D9A441',
-    info: '#5B8CD8',
+    border:              'rgba(255,255,255,0.07)',
+    input:               '#12121F',
+    success:             '#10B981',
+    warning:             '#F59E0B',
+    info:                '#22D3EE',
   },
-  radius: 6,
+
+  /** Shared shape token — matches RADIUS.lg in lib/theme. */
+  radius: 12,
 };
 
 export default colors;

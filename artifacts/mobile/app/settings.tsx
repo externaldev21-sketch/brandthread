@@ -44,8 +44,9 @@ const STATIC_GROUPS: SettingsGroup[] = [
     title: 'Store settings',
     items: [
       { label: 'General',                    icon: 'home',          route: '/general-settings' },
-      { label: 'Plan',                       icon: 'file-text',     route: '/plan-details' },
-      { label: 'Billing',                    icon: 'clipboard',     route: '/billing' },
+      { label: 'Plan & subscription',        icon: 'star',          route: '/subscription' },
+      { label: 'Payouts',                    icon: 'dollar-sign',   route: '/payouts' },
+      { label: 'Billing history',            icon: 'clipboard',     route: '/billing' },
       { label: 'Users',                      icon: 'users',         route: '/users' },
       { label: 'Roles',                      icon: 'users',         route: '/roles' },
       { label: 'Security',                   icon: 'shield',        route: '/security' },
