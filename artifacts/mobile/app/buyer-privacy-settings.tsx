@@ -277,13 +277,13 @@ export default function BuyerPrivacySettings() {
             icon="slash"
             label="Blocked accounts"
             value="Manage"
-            onPress={() => router.push('/buyer-blocked')}
+            onPress={() => router.push({ pathname: '/buyer-blocked' } as never)}
           />
           <PickerRow
             icon="volume-x"
             label="Muted accounts"
             value="Manage"
-            onPress={() => router.push('/buyer-blocked?tab=muted')}
+            onPress={() => router.push({ pathname: '/buyer-blocked', params: { tab: 'muted' } } as never)}
           />
         </View>
       </ScrollView>
