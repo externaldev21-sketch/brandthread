@@ -1,139 +1,167 @@
 import React from 'react';
-import { Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 
-// ─── Seller tab layout ────────────────────────────────────────────────────────
-// Tabs: Home · Studio · Products · Orders · More
+import {
+  PURPLE,
+  BORDER,
+  BG,
+  MUTED,
+  FG,
+  FONT,
+  FS,
+  SP,
+} from '@/lib/theme';
 
-const BG     = '#0A0B0A';
-const BORDER = '#1E221E';
-const GREEN  = '#39FF88';
-const MUTED  = '#4A5A4C';
+// ─── Tab definitions ──────────────────────────────────────────────────────────
 
-export default function TabLayout() {
-  const insets      = useSafeAreaInsets();
-  const { width }   = useWindowDimensions();
-  const isDesktopWeb = Platform.OS === 'web' && width >= 768;
+const TABS: {
+  name: string;
+  label: string;
+  icon: keyof typeof Feather.glyphMap;
+}[] = [
+  { name: 'index',    label: 'Home',     icon: 'home' },
+  { name: 'studio',   label: 'Studio',   icon: 'zap' },
+  { name: 'products', label: 'Products', icon: 'package' },
+  { name: 'orders',   label: 'Orders',   icon: 'shopping-bag' },
+  { name: 'more',     label: 'More',     icon: 'grid' },
+];
 
-  const tabBarStyle = isDesktopWeb ? { display: 'none' as const } : {
-    position:        'relative' as const,
-    height:          54 + insets.bottom,
-    paddingBottom:   insets.bottom,
-    borderTopWidth:  1,
-    borderTopColor:  BORDER,
-    backgroundColor: BG + 'F8',
-    elevation:       0,
-    shadowOpacity:   0,
-  };
+const INACTIVE_COLOR = 'rgba(244,244,255,0.40)';
+
+// ─── Custom Tab Bar ───────────────────────────────────────────────────────────
+
+function CustomTabBar({ state, descriptors, navigation }: any) {
+  const insets = useSafeAreaInsets();
+
+  if (Platform.OS === 'web') return null;
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown:          false,
-        tabBarActiveTintColor: GREEN,
-        tabBarInactiveTintColor: MUTED,
-        tabBarShowLabel:      true,
-        tabBarLabelStyle: {
-          fontSize:    9,
-          fontFamily: 'Inter_600SemiBold',
-          marginTop:  -2,
-          letterSpacing: 0.2,
+    <View
+      style={[
+        styles.bar,
+        {
+          height: 72 + insets.bottom,
+          paddingBottom: insets.bottom,
         },
-        tabBarItemStyle:  { paddingVertical: 6 },
-        tabBarStyle,
-        tabBarBackground: () => (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: BG + 'F8' }]} />
-        ),
-      }}
+      ]}
     >
-      {/* Home */}
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon name={focused ? 'home' : 'home'} color={color} focused={focused} />
-          ),
-        }}
-      />
+      {state.routes.map((route: any, index: number) => {
+        const descriptor = descriptors[route.key];
+        // Only render routes that are in our visible TABS list
+        const tabDef = TABS.find((t) => t.name === route.name);
+        if (!tabDef) return null;
 
-      {/* Studio */}
-      <Tabs.Screen
-        name="studio"
-        options={{
-          title: 'Studio',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="pen-tool" color={color} focused={focused} />
-          ),
-        }}
-      />
+        const isFocused = state.index === index;
+        const color = isFocused ? PURPLE : INACTIVE_COLOR;
 
-      {/* Products */}
-      <Tabs.Screen
-        name="products"
-        options={{
-          title: 'Products',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="box" color={color} focused={focused} />
-          ),
-        }}
-      />
+        const onPress = () => {
+          const event = navigation.emit({
+            type: 'tabPress',
+            target: route.key,
+            canPreventDefault: true,
+          });
+          if (!isFocused && !event.defaultPrevented) {
+            navigation.navigate(route.name);
+          }
+        };
 
-      {/* Orders */}
-      <Tabs.Screen
-        name="orders"
-        options={{
-          title: 'Orders',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="shopping-bag" color={color} focused={focused} />
-          ),
-        }}
-      />
+        const onLongPress = () => {
+          navigation.emit({ type: 'tabLongPress', target: route.key });
+        };
 
-      {/* More */}
-      <Tabs.Screen
-        name="more"
-        options={{
-          title: 'More',
-          tabBarIcon: ({ color, focused }) => (
-            <TabIcon name="grid" color={color} focused={focused} />
-          ),
-        }}
-      />
+        return (
+          <Pressable
+            key={route.key}
+            accessibilityRole="button"
+            accessibilityState={isFocused ? { selected: true } : {}}
+            accessibilityLabel={descriptor.options.tabBarAccessibilityLabel}
+            onPress={onPress}
+            onLongPress={onLongPress}
+            style={styles.tab}
+          >
+            {/* Purple pill indicator above icon */}
+            <View style={styles.pillWrap}>
+              {isFocused && <View style={styles.pill} />}
+            </View>
 
-      {/* Hidden routes — still resolve but not shown in tab bar */}
-      <Tabs.Screen name="profile"    options={{ href: null }} />
-      <Tabs.Screen name="feed"       options={{ href: null }} />
-      <Tabs.Screen name="following"  options={{ href: null }} />
-      <Tabs.Screen name="analytics"  options={{ href: null }} />
-      <Tabs.Screen name="marketing"  options={{ href: null }} />
-      <Tabs.Screen name="wishlist"   options={{ href: null }} />
-    </Tabs>
-  );
-}
+            <Feather name={tabDef.icon} size={22} color={color} />
 
-// ─── Tab icon with active dot ─────────────────────────────────────────────────
-
-function TabIcon({
-  name,
-  color,
-  focused,
-}: {
-  name:    keyof typeof Feather.glyphMap;
-  color:   string;
-  focused: boolean;
-}) {
-  return (
-    <View style={ti.wrap}>
-      <Feather name={name} size={20} color={color} />
-      {focused && <View style={ti.dot} />}
+            <Text style={[styles.label, { color }]} numberOfLines={1}>
+              {tabDef.label}
+            </Text>
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
 
-const ti = StyleSheet.create({
-  wrap: { alignItems: 'center', gap: 3 },
-  dot:  { width: 3, height: 3, borderRadius: 1.5, backgroundColor: GREEN },
+// ─── Layout ───────────────────────────────────────────────────────────────────
+
+export default function TabLayout() {
+  return (
+    <Tabs
+      tabBar={(props) => <CustomTabBar {...props} />}
+      screenOptions={{ headerShown: false }}
+    >
+      {/* Visible tabs */}
+      <Tabs.Screen name="index"    options={{ title: 'Home' }} />
+      <Tabs.Screen name="studio"   options={{ title: 'Studio' }} />
+      <Tabs.Screen name="products" options={{ title: 'Products' }} />
+      <Tabs.Screen name="orders"   options={{ title: 'Orders' }} />
+      <Tabs.Screen name="more"     options={{ title: 'More' }} />
+
+      {/* Hidden routes — resolve but not shown in tab bar */}
+      <Tabs.Screen name="profile"   options={{ href: null }} />
+      <Tabs.Screen name="feed"      options={{ href: null }} />
+      <Tabs.Screen name="following" options={{ href: null }} />
+      <Tabs.Screen name="analytics" options={{ href: null }} />
+      <Tabs.Screen name="marketing" options={{ href: null }} />
+      <Tabs.Screen name="wishlist"  options={{ href: null }} />
+    </Tabs>
+  );
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const styles = StyleSheet.create({
+  bar: {
+    flexDirection:   'row',
+    backgroundColor: '#07070F',
+    borderTopWidth:  StyleSheet.hairlineWidth,
+    borderTopColor:  'rgba(255,255,255,0.07)',
+    paddingTop:      8,
+  },
+  tab: {
+    flex:           1,
+    alignItems:     'center',
+    justifyContent: 'flex-start',
+    gap:            4,
+  },
+  pillWrap: {
+    height:      3,
+    width:       '100%',
+    alignItems:  'center',
+    marginBottom: 6,
+  },
+  pill: {
+    width:           28,
+    height:          3,
+    borderRadius:    1.5,
+    backgroundColor: PURPLE,
+  },
+  label: {
+    fontSize:   10,
+    fontFamily: FONT.medium,
+    lineHeight: 12,
+  },
 });

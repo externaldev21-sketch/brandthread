@@ -1,265 +1,329 @@
-import React from 'react';
-import {
-  ScrollView, View, Text, TouchableOpacity,
-  StyleSheet, Platform, Alert,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+/**
+ * More Screen — Brandthread Seller App
+ * Hub for operations, growth, store settings and account management.
+ */
+
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useUser } from '@clerk/expo';
+import { useUser, useAuth } from '@clerk/expo';
+import { getSetupState, completionPercent, SetupState } from '@/lib/setupStore';
+import {
+  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
+  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
+  CYAN, CYAN_DIM, SUCCESS, GREEN_BRIGHT, BLUE, ORANGE,
+  RED, GOLD, GRAD_PRIMARY, GRAD_CARD_GLOW,
+  FONT, FS, SP, RADIUS, COMP, ICON, SHADOW_PURPLE,
+} from '@/lib/theme';
+import {
+  BrandthreadScreen, BrandthreadCard, GradientCard, PrimaryButton,
+  SecondaryButton, IconButton, NavigationCard, SectionHeader,
+  StatusBadge, NewFeatureBadge, EmptyState, GuidedTip,
+} from '@/components/BrandthreadUI';
 
-// ─── Theme ────────────────────────────────────────────────────────────────────
-const BG     = '#0A0B0A';
-const CARD   = '#111311';
-const BORDER = '#1E221E';
-const FG     = '#EAF2ED';
-const MUTED  = '#5A6B5C';
-const GREEN  = '#39FF88';
-const PURPLE = '#8B5CF6';
-const BLUE   = '#3B82F6';
-const CYAN   = '#06B6D4';
-const ORANGE = '#F97316';
-const RED    = '#EF4444';
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-// ─── Menu structure ───────────────────────────────────────────────────────────
-interface MenuItem {
+interface NavItem {
+  icon: keyof typeof Feather.glyphMap;
   label: string;
-  desc:  string;
-  icon:  keyof typeof Feather.glyphMap;
-  color: string;
-  bg:    string;
-  route: string;
-  badge?: string;
+  desc: string;
+  accent: string;
+  badge?: boolean;
+  route?: string;
 }
 
-interface MenuGroup {
-  title: string;
-  items: MenuItem[];
-}
+// ─── Section data ─────────────────────────────────────────────────────────────
 
-const MENU_GROUPS: MenuGroup[] = [
-  {
-    title: 'Operations',
-    items: [
-      { label: 'Manufacturer Hub', desc: 'Find partners & track production.', icon: 'tool',       color: PURPLE, bg: '#2A1A4A', route: '/manufacturer' },
-      { label: 'Inventory',        desc: 'Manage stock and restocks.',         icon: 'layers',     color: CYAN,   bg: '#0E2830', route: '/inventory'    },
-      { label: 'Store Builder',    desc: 'Customise your online storefront.',  icon: 'layout',     color: BLUE,   bg: '#0E1B30', route: '/store-builder', badge: 'Pro' },
-    ],
-  },
-  {
-    title: 'Content & Customers',
-    items: [
-      { label: 'Content',   desc: 'Create and schedule posts.',           icon: 'video',  color: '#EC4899', bg: '#2A0D22', route: '/content'   },
-      { label: 'Customers', desc: 'CRM, orders and lifetime value.',      icon: 'users',  color: GREEN,     bg: '#0D2420', route: '/customers' },
-      { label: 'Marketing', desc: 'Discounts, email and automations.',    icon: 'send',   color: ORANGE,    bg: '#2A1508', route: '/(tabs)/marketing', badge: 'New' },
-    ],
-  },
-  {
-    title: 'Finance & Growth',
-    items: [
-      { label: 'Analytics',   desc: 'Sales, traffic and product reports.', icon: 'bar-chart-2', color: BLUE,   bg: '#0E1B30', route: '/(tabs)/analytics'   },
-      { label: 'Payouts',     desc: 'Balance, history and bank accounts.', icon: 'dollar-sign', color: GREEN,  bg: '#0D2420', route: '/payments'    },
-      { label: 'Subscription',desc: 'Plan, billing and features.',         icon: 'credit-card', color: '#FBBF24', bg: '#2A200A', route: '/plans'    },
-    ],
-  },
-  {
-    title: 'Account',
-    items: [
-      { label: 'Notifications', desc: 'Orders, payouts and alerts.',      icon: 'bell',    color: ORANGE, bg: '#2A1508', route: '/notifications-settings' },
-      { label: 'Team',          desc: 'Manage roles and permissions.',     icon: 'users',   color: CYAN,   bg: '#0E2830', route: '/team'          },
-      { label: 'Integrations',  desc: 'Connect third-party services.',    icon: 'link',    color: PURPLE, bg: '#2A1A4A', route: '/integrations'  },
-    ],
-  },
+const OPERATIONS: NavItem[] = [
+  { icon: 'tool',        label: 'Manufacturer Hub', desc: 'Find and manage manufacturers',  accent: PURPLE,       badge: true },
+  { icon: 'archive',     label: 'Inventory',         desc: 'Track stock levels',             accent: BLUE },
+  { icon: 'truck',       label: 'Shipping',          desc: 'Rates, zones and carriers',      accent: ORANGE },
+  { icon: 'credit-card', label: 'Payouts',           desc: 'Bank accounts and earnings',     accent: SUCCESS },
 ];
 
-const BOTTOM_ITEMS = [
-  { label: 'Profile',  icon: 'user'        as const, route: '/(tabs)/profile'   },
-  { label: 'Settings', icon: 'settings'    as const, route: '/settings'          },
-  { label: 'Help',     icon: 'help-circle' as const, route: '/help'              },
+const GROWTH: NavItem[] = [
+  { icon: 'video',        label: 'Content',    desc: 'Posts, drafts and scheduled',   accent: CYAN,         route: '/content' },
+  { icon: 'users',        label: 'Customers',  desc: 'Browse your customer list',      accent: PURPLE_LIGHT },
+  { icon: 'trending-up',  label: 'Marketing',  desc: 'Campaigns and promotions',       accent: ORANGE,       route: '/(tabs)/marketing' },
+  { icon: 'bar-chart-2',  label: 'Analytics',  desc: 'Sales, traffic and insights',    accent: BLUE,         route: '/(tabs)/analytics' },
 ];
 
-// ─────────────────────────────────────────────────────────────────────────────
+const STORE: NavItem[] = [
+  { icon: 'layout', label: 'Store Builder', desc: 'Customize your storefront', accent: PURPLE },
+  { icon: 'grid',   label: 'Collections',   desc: 'Group products',            accent: CYAN },
+  { icon: 'tag',    label: 'Discounts',     desc: 'Coupon codes and offers',   accent: GOLD },
+  { icon: 'globe',  label: 'Domains',       desc: 'Custom domain settings',    accent: BLUE },
+];
+
+const ACCOUNT: NavItem[] = [
+  { icon: 'star',         label: 'Subscription',   desc: 'Manage your Brandthread plan',    accent: GOLD,   badge: true },
+  { icon: 'link',         label: 'Integrations',   desc: 'Connect third-party services',    accent: PURPLE },
+  { icon: 'users',        label: 'Team',           desc: 'Invite collaborators',            accent: BLUE },
+  { icon: 'bell',         label: 'Notifications',  desc: 'Push and email preferences',      accent: ORANGE },
+  { icon: 'settings',     label: 'Settings',       desc: 'App and account settings',        accent: MUTED },
+  { icon: 'help-circle',  label: 'Help & Support', desc: 'Guides, FAQs and contact us',    accent: CYAN },
+];
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function MoreScreen() {
-  const insets = useSafeAreaInsets();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { user } = useUser();
-  const topPad = Platform.OS === 'web' ? 20 : insets.top;
+  const { signOut } = useAuth();
+  const [setupState, setSetupState] = useState<SetupState | null>(null);
 
-  function go(route: string) {
+  useEffect(() => {
+    getSetupState().then(setSetupState);
+  }, []);
+
+  const percent = setupState ? completionPercent(setupState) : 0;
+
+  const firstName = user?.firstName ?? 'Seller';
+  const lastName = user?.lastName ?? '';
+  const displayName = lastName ? `${firstName} ${lastName}` : firstName;
+  const email = user?.primaryEmailAddress?.emailAddress ?? '';
+  const avatarLetter = (user?.firstName?.[0] ?? 'S').toUpperCase();
+
+  // ─── Handlers ───────────────────────────────────────────────────────────────
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      await AsyncStorage.removeItem('@brandthread/onboarding_complete');
+      router.replace('/sign-in');
+    } catch (e) {
+      Alert.alert('Error', 'Failed to sign out. Please try again.');
+    }
+  };
+
+  const handleNavPress = (item: NavItem) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push(route as never);
-  }
+    if (item.route) {
+      try {
+        router.push(item.route as any);
+      } catch {
+        Alert.alert(item.label, 'Coming soon');
+      }
+    } else {
+      Alert.alert(item.label, 'Coming soon');
+    }
+  };
 
-  function handleLogout() {
-    Alert.alert('Log out', 'Are you sure you want to log out of Brandthread?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Log out',
-        style: 'destructive',
-        onPress: async () => {
-          await AsyncStorage.multiRemove(['onboarding_complete', 'user_role', 'onboarding_draft', 'splash_seen']);
-          router.replace('/sign-in' as never);
-        },
-      },
-    ]);
-  }
+  // ─── Render helpers ──────────────────────────────────────────────────────────
 
-  const initials = user?.firstName
-    ? user.firstName.charAt(0).toUpperCase() + (user.lastName?.charAt(0).toUpperCase() ?? '')
-    : 'D';
+  const renderSection = (title: string, items: NavItem[]) => (
+    <>
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionHeaderText}>{title}</Text>
+      </View>
+      <View style={styles.sectionItems}>
+        {items.map((item) => (
+          <NavigationCard
+            key={item.label}
+            icon={item.icon}
+            label={item.label}
+            description={item.desc}
+            accent={item.accent}
+            badge={item.badge}
+            onPress={() => handleNavPress(item)}
+          />
+        ))}
+      </View>
+    </>
+  );
+
+  // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <View style={[s.root, { paddingTop: topPad }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <View style={s.avatarWrap}>
-          <View style={s.avatar}>
-            <Text style={s.avatarText}>{initials}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={s.userName}>{user?.firstName ?? 'Devon'} {user?.lastName ?? 'Walker'}</Text>
-            <Text style={s.userEmail}>{user?.primaryEmailAddress?.emailAddress ?? 'seller@brandthread.co'}</Text>
-          </View>
-          <TouchableOpacity
-            style={s.editBtn}
-            onPress={() => go('/edit-profile')}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Feather name="edit-2" size={15} color={MUTED} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
+    <View style={[styles.root, { paddingTop: insets.top }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 140, paddingTop: 8, gap: 20 }}
+        contentContainerStyle={styles.scrollContent}
       >
-        {/* ── Subscription banner ── */}
-        <TouchableOpacity style={s.proBanner} onPress={() => go('/plans')} activeOpacity={0.85}>
-          <View style={[s.proIconWrap]}>
-            <Feather name="award" size={20} color={GREEN} />
-          </View>
-          <View style={{ flex: 1, gap: 2 }}>
-            <View style={s.proTitleRow}>
-              <Text style={s.proTitle}>Brandthread Pro</Text>
-              <View style={s.proPill}><Text style={s.proPillText}>Active</Text></View>
+        {/* 1. USER HEADER */}
+        <GradientCard
+          glow
+          colors={['rgba(139,92,246,0.18)', 'rgba(34,211,238,0.06)']}
+          style={styles.userCard}
+        >
+          <View style={styles.userRow}>
+            {/* Avatar */}
+            <View style={styles.avatar}>
+              <Text style={styles.avatarLetter}>{avatarLetter}</Text>
             </View>
-            <Text style={s.proSub}>All features unlocked. Renews Aug 14, 2026.</Text>
-          </View>
-          <Feather name="chevron-right" size={16} color={MUTED} />
-        </TouchableOpacity>
-
-        {/* ── Menu groups ── */}
-        {MENU_GROUPS.map(group => (
-          <View key={group.title} style={s.group}>
-            <Text style={s.groupTitle}>{group.title}</Text>
-            <View style={s.groupCard}>
-              {group.items.map((item, i) => (
-                <TouchableOpacity
-                  key={item.label}
-                  style={[s.menuRow, i > 0 && s.menuBorder]}
-                  onPress={() => go(item.route)}
-                  activeOpacity={0.8}
-                >
-                  <View style={[s.menuIcon, { backgroundColor: item.bg }]}>
-                    <Feather name={item.icon} size={17} color={item.color} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={s.menuLabelRow}>
-                      <Text style={s.menuLabel}>{item.label}</Text>
-                      {item.badge && (
-                        <View style={[s.badge, { backgroundColor: item.badge === 'Pro' ? BLUE + 'CC' : GREEN + 'CC' }]}>
-                          <Text style={s.badgeText}>{item.badge}</Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text style={s.menuDesc}>{item.desc}</Text>
-                  </View>
-                  <Feather name="chevron-right" size={15} color={MUTED} />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        ))}
-
-        {/* ── Account links ── */}
-        <View style={s.group}>
-          <Text style={s.groupTitle}>More</Text>
-          <View style={s.groupCard}>
-            {BOTTOM_ITEMS.map((item, i) => (
-              <TouchableOpacity
-                key={item.label}
-                style={[s.simpleRow, i > 0 && s.menuBorder]}
-                onPress={() => go(item.route)}
-                activeOpacity={0.8}
-              >
-                <View style={s.simpleIconWrap}>
-                  <Feather name={item.icon} size={16} color={MUTED} />
-                </View>
-                <Text style={s.simpleLabel}>{item.label}</Text>
-                <Feather name="chevron-right" size={15} color={MUTED} style={{ marginLeft: 'auto' }} />
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity
-              style={[s.simpleRow, s.menuBorder]}
-              onPress={handleLogout}
-              activeOpacity={0.8}
-            >
-              <View style={[s.simpleIconWrap, { backgroundColor: RED + '15' }]}>
-                <Feather name="log-out" size={16} color={RED} />
+            {/* User info */}
+            <View style={styles.userInfo}>
+              <Text style={styles.userName}>{displayName}</Text>
+              {!!email && <Text style={styles.userEmail}>{email}</Text>}
+              <View style={styles.badgeRow}>
+                <StatusBadge label="PRO" variant="purple" />
               </View>
-              <Text style={[s.simpleLabel, { color: RED }]}>Log out</Text>
-            </TouchableOpacity>
+            </View>
           </View>
-        </View>
+          <SecondaryButton
+            label="Edit profile"
+            small
+            accent={PURPLE}
+            onPress={() => router.push('/edit-profile' as any)}
+            style={styles.editProfileBtn}
+          />
+        </GradientCard>
 
-        <Text style={s.version}>Brandthread v2.0.0 · Seller Dashboard</Text>
+        {/* 2. SETUP PROGRESS */}
+        <BrandthreadCard style={styles.setupCard}>
+          <View style={styles.setupRow}>
+            <Text style={[styles.setupLabel, { color: MUTED, fontSize: FS.sm }]}>Store setup</Text>
+            <Text style={[styles.setupLabel, { color: PURPLE_LIGHT, fontSize: FS.sm, fontFamily: FONT.bold }]}>
+              {percent}%
+            </Text>
+          </View>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${percent}%` }]} />
+          </View>
+          <TouchableOpacity
+            onPress={() => Alert.alert('Setup', 'Guided setup coming soon')}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Text style={styles.continueSetup}>Continue setup →</Text>
+          </TouchableOpacity>
+        </BrandthreadCard>
+
+        {/* 3. SECTIONS */}
+        {renderSection('OPERATIONS', OPERATIONS)}
+        {renderSection('GROWTH', GROWTH)}
+        {renderSection('STORE', STORE)}
+        {renderSection('ACCOUNT', ACCOUNT)}
+
+        {/* 4. SIGN OUT */}
+        <View style={styles.signOutWrap}>
+          <SecondaryButton
+            label="Sign out"
+            accent="#F87171"
+            onPress={handleSignOut}
+          />
+        </View>
       </ScrollView>
     </View>
   );
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const s = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: BG },
-  header: { paddingHorizontal: 16, paddingBottom: 14, paddingTop: 6 },
-  avatarWrap: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatar:   { width: 44, height: 44, borderRadius: 22, backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center' },
-  avatarText:{ fontSize: 17, fontFamily: 'Inter_700Bold', color: FG },
-  userName:  { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
-  userEmail: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 1 },
-  editBtn:   { padding: 6 },
 
-  proBanner: {
-    backgroundColor: '#0D1A12', borderRadius: 18, borderWidth: 1, borderColor: GREEN + '33',
-    padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12,
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: BG,
   },
-  proIconWrap: { width: 40, height: 40, borderRadius: 11, backgroundColor: '#0F2A1A', borderWidth: 1, borderColor: GREEN + '33', alignItems: 'center', justifyContent: 'center' },
-  proTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  proTitle:    { fontSize: 14, fontFamily: 'Inter_700Bold', color: FG },
-  proPill:     { backgroundColor: GREEN, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-  proPillText: { fontSize: 9, fontFamily: 'Inter_700Bold', color: '#0A0B0A' },
-  proSub:      { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
+  scrollContent: {
+    paddingBottom: 160,
+  },
 
-  group:      { gap: 8 },
-  groupTitle: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, letterSpacing: 0.5, textTransform: 'uppercase', marginLeft: 4 },
-  groupCard:  { backgroundColor: CARD, borderRadius: 18, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
+  // User card
+  userCard: {
+    marginHorizontal: SP.md,
+    marginBottom: SP.md,
+  },
+  userRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.md,
+    marginBottom: SP.sm,
+  },
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: PURPLE_DIM,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarLetter: {
+    fontSize: FS.xl,
+    fontFamily: FONT.bold,
+    color: PURPLE_LIGHT,
+  },
+  userInfo: {
+    flex: 1,
+    gap: 3,
+  },
+  userName: {
+    fontSize: FS.md,
+    fontFamily: FONT.bold,
+    color: FG,
+  },
+  userEmail: {
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    color: MUTED,
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    marginTop: 2,
+  },
+  editProfileBtn: {
+    alignSelf: 'flex-start',
+  },
 
-  menuRow:    { flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingVertical: 13 },
-  menuBorder: { borderTopWidth: 1, borderTopColor: BORDER },
-  menuIcon:   { width: 38, height: 38, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
-  menuLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
-  menuLabel:  { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: FG },
-  menuDesc:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
-  badge:      { borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 },
-  badgeText:  { fontSize: 9, fontFamily: 'Inter_700Bold', color: '#0A0B0A' },
+  // Setup progress
+  setupCard: {
+    marginHorizontal: SP.md,
+    marginBottom: SP.sm,
+  },
+  setupRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SP.sm,
+  },
+  setupLabel: {
+    fontFamily: FONT.regular,
+  },
+  progressTrack: {
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 99,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: PURPLE,
+    borderRadius: 99,
+  },
+  continueSetup: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: PURPLE_LIGHT,
+    marginTop: SP.sm,
+  },
 
-  simpleRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 13 },
-  simpleIconWrap:{ width: 34, height: 34, borderRadius: 10, backgroundColor: '#1A1E1A', alignItems: 'center', justifyContent: 'center' },
-  simpleLabel:   { fontSize: 14, fontFamily: 'Inter_500Medium', color: FG },
+  // Sections
+  sectionHeaderRow: {
+    marginHorizontal: SP.md,
+    marginTop: SP.md,
+    marginBottom: SP.sm,
+  },
+  sectionHeaderText: {
+    fontSize: 10,
+    fontFamily: FONT.bold,
+    color: SUBTLE,
+    textTransform: 'uppercase',
+    letterSpacing: 1.5,
+  },
+  sectionItems: {
+    marginHorizontal: SP.md,
+    gap: SP.sm,
+  },
 
-  version: { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center', marginTop: 4 },
+  // Sign out
+  signOutWrap: {
+    marginHorizontal: SP.md,
+    marginTop: SP.sm,
+    marginBottom: 32,
+  },
 });

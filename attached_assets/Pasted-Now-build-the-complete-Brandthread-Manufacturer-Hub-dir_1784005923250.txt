@@ -1,0 +1,916 @@
+Now build the complete Brandthread Manufacturer Hub directly inside my existing project.
+
+Do not explain the code to me.
+
+Inspect the current app, edit it directly, run it, test it, and fix all errors.
+
+Do not redesign onboarding.
+
+Do not break the Seller Dashboard, Products system, Seller Profile, Content Creator, Buyer Thread, Orders, authentication, or navigation.
+
+CORE GOAL
+
+A Seller must be able to:
+
+* Find manufacturers
+* Invite manufacturers they already know
+* Request quotes
+* Compare quotes
+* Order samples
+* Track sample progress
+* Approve or request revisions
+* Start production
+* Track production stages
+* Store files and messages
+* Track payments and shipping information
+* Connect products to manufacturers
+
+MANUFACTURER HUB NAVIGATION
+
+Create a premium Manufacturer Hub matching the Brandthread onboarding design system.
+
+Main sections:
+
+1. Discover
+2. My Manufacturers
+3. Quotes
+4. Samples
+5. Production
+6. Messages
+
+The Manufacturer Hub must be reachable from:
+
+* More
+* Seller Dashboard quick actions
+* Product details
+* Add Product manufacturing step
+* Global search
+* Go To menu
+
+DISCOVER SCREEN
+
+Create manufacturer discovery cards with:
+
+* Manufacturer name
+* Profile image or factory image
+* Country
+* City or region
+* Specialties
+* Product categories
+* Minimum order quantity
+* Sample price range
+* Unit price range
+* Lead time
+* Response time
+* Rating
+* Review count
+* Verified badge
+* Certifications
+* Saved status
+* Contact button
+* View profile button
+
+DISCOVER FILTERS
+
+Include:
+
+* Country
+* Product category
+* MOQ
+* Price range
+* Lead time
+* Verified only
+* Material capability
+* Production capability
+* Rating
+* Sample availability
+
+Allow filters to be cleared individually or all at once.
+
+MANUFACTURER SEARCH
+
+Search by:
+
+* Company name
+* Country
+* Category
+* Material
+* Capability
+* Certification
+* Product type
+
+MANUFACTURER PROFILE
+
+Create a detailed manufacturer profile page.
+
+Include:
+
+* Company name
+* Verified status
+* Factory images
+* Country and location
+* Company description
+* Years in business
+* Team size
+* Production capacity
+* Specialties
+* Materials
+* Product categories
+* Certifications
+* MOQ
+* Sample pricing
+* Unit price range
+* Lead time
+* Response time
+* Reviews
+* Rating
+* Policies
+* Shipping regions
+* Contact information
+* Save manufacturer
+* Message
+* Request quote
+* Invite to Brandthread
+
+MANUFACTURER GALLERY
+
+Allow viewing:
+
+* Factory photos
+* Product examples
+* Machinery
+* Materials
+* Packaging
+* Quality control
+* Shipping setup
+
+MY MANUFACTURERS
+
+Create a saved and active manufacturer list.
+
+Each card must show:
+
+* Manufacturer
+* Relationship status
+* Active products
+* Active quotes
+* Active samples
+* Active production jobs
+* Last message
+* Response status
+* More menu
+
+Statuses:
+
+* Saved
+* Invited
+* Connected
+* Active
+* Paused
+* Archived
+
+A Seller must be able to:
+
+* Save
+* Unsave
+* Invite
+* Remove
+* Archive
+* Message
+* Request quote
+* Assign product
+* View history
+
+INVITE MANUFACTURER
+
+Create an Invite Manufacturer flow.
+
+Fields:
+
+* Manufacturer or company name
+* Contact name
+* Email
+* Phone
+* Country
+* Website
+* Notes
+* Products to collaborate on
+
+Create a shareable invitation link if supported.
+
+Do not claim an email or invitation was sent unless a real email service is connected.
+
+Use a clearly labeled demo state when no email service exists.
+
+REQUEST QUOTE FLOW
+
+Allow a Seller to request a quote from:
+
+* Manufacturer profile
+* Product details
+* Add Product flow
+* My Manufacturers
+
+QUOTE REQUEST STEPS
+
+Step 1:
+Select product
+
+Include:
+
+* Existing product
+* Draft product
+* New product placeholder
+
+Step 2:
+Production details
+
+Fields:
+
+* Quantity
+* Target price
+* Needed-by date
+* Sample required
+* Production type
+* Packaging requirements
+* Shipping destination
+
+Step 3:
+Materials and variants
+
+Include:
+
+* Material
+* Colorways
+* Sizes
+* Variant quantities
+* Print method
+* Embroidery
+* Wash
+* Hardware
+* Labels
+* Packaging
+
+Step 4:
+Files
+
+Allow:
+
+* Tech pack
+* Design files
+* Measurements
+* Mockups
+* Reference images
+* Packaging files
+* Notes document
+
+Step 5:
+Review and submit
+
+Show:
+
+* Product
+* Manufacturer
+* Quantity
+* Target price
+* Needed-by date
+* Files
+* Notes
+* Missing information
+* Warnings
+
+Buttons:
+
+* Save draft
+* Submit quote request
+
+QUOTE REQUEST STATUS
+
+Statuses:
+
+* Draft
+* Sent
+* Viewed
+* Questions asked
+* Quote received
+* Counteroffer sent
+* Accepted
+* Declined
+* Expired
+* Cancelled
+
+QUOTE CARDS
+
+Show:
+
+* Manufacturer
+* Product
+* Quantity
+* Unit price
+* Sample cost
+* Setup or tooling cost
+* Packaging cost
+* Shipping estimate
+* Total estimate
+* MOQ
+* Lead time
+* Production time
+* Payment terms
+* Expiration date
+* Status
+
+QUOTE ACTIONS
+
+Allow:
+
+* View details
+* Accept
+* Decline
+* Counteroffer
+* Message manufacturer
+* Request revision
+* Compare
+* Download or share summary
+
+QUOTE COMPARISON
+
+Allow comparing multiple quotes side by side.
+
+Compare:
+
+* Unit price
+* MOQ
+* Sample cost
+* Tooling
+* Packaging
+* Shipping estimate
+* Total
+* Lead time
+* Payment terms
+* Rating
+* Verification status
+* Production capacity
+
+Use a mobile-friendly stacked comparison layout.
+
+COUNTEROFFER FLOW
+
+Allow the Seller to submit:
+
+* Desired unit price
+* Desired MOQ
+* Desired production time
+* Desired payment terms
+* Notes
+
+Show previous quote and counteroffer history.
+
+SAMPLES
+
+Create a Samples hub.
+
+Statuses:
+
+* Requested
+* Awaiting payment
+* Paid
+* In development
+* Revision requested
+* Shipped
+* Delivered
+* Review needed
+* Approved
+* Rejected
+* Cancelled
+
+SAMPLE CARD
+
+Show:
+
+* Product
+* Manufacturer
+* Sample type
+* Cost
+* Current status
+* Estimated completion
+* Tracking
+* Latest image
+* Last update
+
+SAMPLE DETAILS
+
+Include:
+
+* Product
+* Manufacturer
+* Quote
+* Sample cost
+* Payment status
+* Development timeline
+* Images
+* Videos
+* Messages
+* Files
+* Tracking
+* Delivery status
+* Review notes
+* Approval status
+
+SAMPLE REVIEW
+
+Allow the Seller to:
+
+* Approve sample
+* Request revision
+* Reject sample
+* Upload annotated image
+* Add notes
+* Rate quality
+* Rate fit
+* Rate material
+* Rate color
+* Rate print or embroidery
+* Rate packaging
+
+REVISION FLOW
+
+Allow:
+
+* Revision request title
+* Detailed notes
+* Image annotations
+* Reference uploads
+* Priority
+* Deadline
+
+Maintain revision history.
+
+PRODUCTION
+
+Create a Production hub.
+
+Production stages:
+
+1. Quote accepted
+2. Deposit pending
+3. Deposit paid
+4. Materials sourcing
+5. Cutting
+6. Printing or embroidery
+7. Sewing
+8. Finishing
+9. Quality control
+10. Packaging
+11. Ready to ship
+12. Shipped
+13. Delivered
+
+PRODUCTION CARD
+
+Show:
+
+* Product
+* Manufacturer
+* Units
+* Current stage
+* Progress percentage
+* Start date
+* Estimated completion
+* Total cost
+* Amount paid
+* Remaining balance
+* Status alert
+
+PRODUCTION DETAILS
+
+Include:
+
+* Product
+* Manufacturer
+* Quantity
+* Variants
+* Total cost
+* Deposit
+* Remaining balance
+* Payment schedule
+* Production timeline
+* Current stage
+* Stage history
+* Images
+* Videos
+* Files
+* Messages
+* Quality-control checklist
+* Shipping information
+* Tracking
+* Estimated delivery
+* Issues
+* Approvals
+
+PRODUCTION UPDATES
+
+Allow the manufacturer or demo service to add:
+
+* Status update
+* Photos
+* Videos
+* Files
+* Estimated completion change
+* Delay notice
+* Issue report
+* Approval request
+
+SELLER ACTIONS
+
+Allow the Seller to:
+
+* Approve stage
+* Request changes
+* Report issue
+* Message manufacturer
+* Upload file
+* View payment summary
+* Add internal note
+* Cancel production with warning
+* Confirm delivery
+
+QUALITY CONTROL
+
+Create a quality-control checklist.
+
+Include:
+
+* Measurements
+* Stitching
+* Fabric
+* Color
+* Print
+* Embroidery
+* Hardware
+* Labels
+* Packaging
+* Quantity
+* Damage check
+
+Allow:
+
+* Pass
+* Fail
+* Needs review
+* Add notes
+* Add images
+
+PRODUCTION ISSUES
+
+Create issue types:
+
+* Delay
+* Quality issue
+* Quantity mismatch
+* Material issue
+* Color mismatch
+* Print issue
+* Packaging issue
+* Shipping issue
+* Payment issue
+* Other
+
+Allow:
+
+* Severity
+* Description
+* Images
+* Files
+* Requested resolution
+* Status
+* Message thread
+
+MESSAGING
+
+Create Manufacturer messaging.
+
+Include:
+
+* Conversation list
+* Unread count
+* Manufacturer name
+* Product context
+* Quote context
+* Sample context
+* Production context
+* Last message
+* Timestamp
+
+MESSAGE THREAD
+
+Allow:
+
+* Text
+* Images
+* Videos
+* Files
+* Product attachment
+* Quote attachment
+* Sample attachment
+* Production attachment
+* Internal note, visible only to Seller team
+
+Do not claim real-time messaging if no real-time backend exists.
+
+Use polling or local demo data when necessary.
+
+PRICE CARDS
+
+Create reusable manufacturer price cards.
+
+Include:
+
+* Product
+* Quantity break
+* Unit price
+* Sample price
+* Setup cost
+* Packaging cost
+* Shipping estimate
+* Lead time
+* Valid until
+
+Allow price cards to be attached to products and quotes.
+
+PAYMENTS
+
+Show payment information only as tracked data unless a real payment system already exists.
+
+Include:
+
+* Sample payment
+* Deposit
+* Milestone payment
+* Final payment
+* Shipping payment
+* Amount paid
+* Amount remaining
+* Due date
+* Status
+
+Do not claim money was moved unless the payment provider confirms it.
+
+FILES
+
+Create file organization for:
+
+* Tech packs
+* Designs
+* Measurements
+* Quotes
+* Invoices
+* Sample photos
+* Revision notes
+* Production images
+* Quality-control reports
+* Shipping documents
+
+Allow:
+
+* Upload
+* Preview
+* Download or share if supported
+* Rename
+* Delete
+* Attach to product
+* Attach to quote
+* Attach to sample
+* Attach to production
+
+PRODUCT INTEGRATION
+
+Connect Manufacturer Hub to Products.
+
+From a Product, allow:
+
+* Assign manufacturer
+* Request quote
+* View active quote
+* View sample
+* View production
+* View price cards
+* Send product files
+* Change manufacturer
+
+From Manufacturer Hub, allow:
+
+* View assigned products
+* Open product details
+* Create quote request from product
+* Start sample from accepted quote
+* Start production from approved sample
+
+DASHBOARD INTEGRATION
+
+Add Manufacturer Hub updates to Seller Home:
+
+* Quote received
+* Quote expiring
+* Sample ready for review
+* Revision update
+* Production delayed
+* Approval needed
+* Production ready to ship
+* Manufacturer message
+
+Add these to:
+
+* Today’s priorities
+* Recent activity
+* Notifications
+* Next best action
+
+NOTIFICATIONS
+
+Create notifications for:
+
+* Quote viewed
+* Quote received
+* Counteroffer response
+* Quote expiring
+* Sample payment due
+* Sample shipped
+* Sample delivered
+* Review required
+* Revision completed
+* Production started
+* Production stage changed
+* Delay
+* Quality issue
+* Approval required
+* Production shipped
+* Message received
+
+DATA MODELS
+
+Create or update typed models for:
+
+* Manufacturer
+* ManufacturerProfile
+* ManufacturerCapability
+* ManufacturerCertification
+* ManufacturerReview
+* ManufacturerRelationship
+* QuoteRequest
+* Quote
+* QuoteLineItem
+* QuoteComparison
+* Counteroffer
+* Sample
+* SampleRevision
+* SampleReview
+* ProductionOrder
+* ProductionStage
+* ProductionUpdate
+* QualityControlCheck
+* ProductionIssue
+* ManufacturerMessage
+* ManufacturerConversation
+* ManufacturerFile
+* ManufacturerPriceCard
+* ManufacturerPaymentRecord
+* ManufacturerInvitation
+
+SERVICES
+
+Use the existing backend.
+
+Do not install a second backend.
+
+Create or update services for:
+
+* Search manufacturers
+* Filter manufacturers
+* Save manufacturer
+* Invite manufacturer
+* Create quote request
+* Submit quote request
+* Receive demo quote
+* Accept quote
+* Decline quote
+* Counteroffer
+* Create sample
+* Update sample
+* Review sample
+* Create production order
+* Update production stage
+* Add production update
+* Add quality-control result
+* Report production issue
+* Send manufacturer message
+* Upload manufacturer file
+* Track manufacturer payments
+* Attach manufacturer to product
+
+If backend features are incomplete, create separate realistic demo services.
+
+Do not put demo logic directly inside screen components.
+
+DESIGN CONSISTENCY
+
+Every Manufacturer Hub screen must match the Brandthread onboarding and Seller design system.
+
+Use:
+
+* Black and charcoal backgrounds
+* Purple and blue primary accents
+* Controlled cyan and green accents
+* Rounded cards
+* Rounded buttons
+* Premium typography
+* Subtle borders
+* Smooth transitions
+* Consistent headers
+* Consistent progress bars
+* Consistent status badges
+* Styled loading states
+* Styled empty states
+* Styled errors
+
+Do not use the old green and gray layout.
+
+EMPTY STATES
+
+Discover:
+“Find the right production partner.”
+
+My Manufacturers:
+“Build your production network.”
+
+Quotes:
+“Request your first production quote.”
+
+Samples:
+“Your samples will appear here.”
+
+Production:
+“Approved products move into production here.”
+
+Messages:
+“Manufacturer conversations will appear here.”
+
+Each empty state must include a useful action button.
+
+TESTING
+
+Test these exact paths:
+
+1. Open Manufacturer Hub.
+2. Search manufacturers.
+3. Apply filters.
+4. Open a manufacturer profile.
+5. Save the manufacturer.
+6. Invite a manufacturer.
+7. Request a quote from a Product.
+8. Upload quote files.
+9. Save quote request as draft.
+10. Submit quote request.
+11. Receive or generate a demo quote.
+12. Compare two quotes.
+13. Send a counteroffer.
+14. Accept a quote.
+15. Create a sample.
+16. Update sample status.
+17. Add sample images.
+18. Review sample.
+19. Request revision.
+20. Approve sample.
+21. Start production.
+22. Update production stages.
+23. Add production images.
+24. Complete quality-control checks.
+25. Report a production issue.
+26. Resolve an issue.
+27. Add shipping information.
+28. Confirm delivery.
+29. Message manufacturer.
+30. Attach a Product.
+31. Attach a Quote.
+32. Attach a Sample.
+33. Attach a Production order.
+34. Restart the app.
+35. Confirm quotes persist.
+36. Confirm samples persist.
+37. Confirm production persists.
+38. Confirm manufacturer relationships persist.
+39. Confirm Seller Home shows updates.
+40. Confirm Product Details shows manufacturer information.
+41. Fix all TypeScript errors.
+42. Fix all routing errors.
+43. Fix all runtime errors.
+44. Fix all console errors caused by this system.
+45. Confirm onboarding remains unchanged.
+46. Confirm Buyer accounts still work.
+
+Do not stop after creating static screens.
+
+Build the full Manufacturer Hub flow, typed models, demo services where needed, Product integration, Seller Home integration, messaging, quotes, samples, production, files, and testing.
+
+When complete, respond with only:
+
+“The Brandthread Manufacturer Hub is installed and working.”

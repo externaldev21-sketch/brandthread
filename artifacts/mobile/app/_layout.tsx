@@ -156,6 +156,7 @@ function RootLayoutNav() {
         <Stack.Screen name="seller-profile"   options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="create-post"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
         <Stack.Screen name="post-analytics"   options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="setup"            options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
         <Stack.Screen name="ai-studio"        options={{ headerShown: false }} />
         <Stack.Screen name="product-editor"   options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
         <Stack.Screen name="plans"            options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />

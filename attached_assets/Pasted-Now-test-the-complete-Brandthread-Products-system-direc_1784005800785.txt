@@ -1,0 +1,637 @@
+Now test the complete Brandthread Products system directly inside my project.
+
+Do not explain the code to me.
+
+Do not only inspect the screens.
+
+Actually run the app, go through the complete Seller product flow, identify every broken part, and fix it.
+
+TEST ENVIRONMENT
+
+Use the existing project, authentication, navigation, backend, demo services, local storage, and product data structure.
+
+Do not install a second backend.
+
+Do not redesign onboarding.
+
+Do not change the new Seller design system unless a visual inconsistency needs to be fixed.
+
+Do not remove working features to make errors disappear.
+
+PRIMARY TEST PRODUCT
+
+Create one complete test product using realistic data:
+
+Product name:
+“Brandthread Heavyweight Hoodie”
+
+Description:
+“A premium heavyweight hoodie with an oversized fit, dropped shoulders, double-layer hood, ribbed cuffs, and soft brushed interior.”
+
+Category:
+Hoodie
+
+Collection:
+Core Essentials
+
+Tags:
+
+* heavyweight
+* hoodie
+* streetwear
+* oversized
+* unisex
+
+Product type:
+Physical product
+
+MEDIA
+
+Add or use safe demo media for:
+
+* Front image
+* Back image
+* Detail image
+* Product video
+* Cover image
+
+Confirm:
+
+* Media uploads or demo uploads work
+* Upload progress displays
+* Failed uploads can retry
+* Media can be reordered
+* Media can be deleted
+* Cover image can be changed
+* Product preview updates correctly
+
+PRICING
+
+Use:
+
+Retail price:
+$88.00
+
+Compare-at price:
+$110.00
+
+Product cost:
+$29.00
+
+Estimated shipping cost:
+$8.00
+
+Confirm the app correctly calculates:
+
+* Estimated profit
+* Margin percentage
+* Break-even price
+
+Fix any incorrect formulas, NaN values, formatting problems, negative values, or currency issues.
+
+VARIANTS
+
+Create size options:
+
+* S
+* M
+* L
+* XL
+
+Create color options:
+
+* Black
+* Heather Gray
+
+Confirm the app creates eight valid variant combinations.
+
+Test:
+
+* Variant images
+* SKU
+* Barcode
+* Price override
+* Cost override
+* Inventory quantity
+* Weight
+* Variant status
+
+Use realistic test SKUs.
+
+Confirm:
+
+* Duplicate combinations are not created
+* Invalid combinations can be removed
+* Variant edits persist
+* Bulk editing works
+* Deleted variants disappear everywhere they should
+
+INVENTORY
+
+Set inventory quantities:
+
+Black:
+
+* S: 10
+* M: 15
+* L: 12
+* XL: 6
+
+Heather Gray:
+
+* S: 8
+* M: 11
+* L: 9
+* XL: 4
+
+Set low-stock threshold:
+5 units
+
+Confirm:
+
+* Total inventory is calculated correctly
+* Inventory is tracked by variant
+* Low-stock states display correctly
+* Reserved stock is handled correctly
+* Available stock is correct
+* Incoming stock is shown correctly when used
+* Inventory adjustments save
+* Inventory history updates
+* Overselling setting works
+* Out-of-stock variants cannot be purchased unless overselling is enabled
+
+SALES MODEL
+
+Test all three product sales models separately:
+
+1. Pre-order
+2. Pre-made inventory
+3. Both
+
+PRE-ORDER TEST
+
+Use:
+
+Opening date:
+A valid future or current test date
+
+Closing date:
+After opening date
+
+Minimum order quantity:
+25
+
+Maximum order quantity:
+200
+
+Expected production date:
+After closing date
+
+Expected ship date:
+After expected production date
+
+Pre-order disclaimer:
+“This item is produced after the pre-order period closes. Estimated shipping dates may change due to production delays.”
+
+Confirm:
+
+* Date validation works
+* Invalid date order is blocked
+* Minimum and maximum order validation works
+* Funding progress displays correctly
+* Units ordered display correctly
+* Units required to fund production display correctly
+* Pre-order information appears on the Buyer product page
+* Pre-order badges appear on Seller Profile and Products
+* Pre-order details are saved after restarting the app
+
+PRE-MADE TEST
+
+Confirm:
+
+* Ready stock displays
+* Available quantity is accurate
+* Ready-to-ship status works
+* Low-stock warnings work
+* Product can be purchased while stock exists
+* Out-of-stock behavior works correctly
+
+BOTH TEST
+
+Confirm:
+
+* Ready inventory sells first
+* Pre-order can begin after ready stock is unavailable if that is the configured behavior
+* Buyer-facing messaging clearly explains whether the item is ready to ship or pre-order
+* Inventory and pre-order counts do not get mixed together
+
+FULFILLMENT
+
+Test:
+
+* Fulfilled by Seller
+* Fulfilled by Manufacturer
+* Mixed fulfillment
+
+Use:
+
+Weight:
+2.1 lb
+
+Package:
+14 x 12 x 4 inches
+
+Processing time:
+2–4 business days
+
+Country of origin:
+United States
+
+Confirm:
+
+* Shipping fields validate correctly
+* Package fields save
+* Fulfillment choice persists
+* Product detail page shows the correct fulfillment information
+* Shipping estimate does not show impossible dates
+* Missing required fulfillment data blocks publishing only when appropriate
+
+MANUFACTURING
+
+Test:
+
+* No manufacturer assigned
+* Existing manufacturer assigned
+* Request quote action
+* Send product details action
+* Upload tech pack
+* Upload measurement file
+* Add target cost
+* Add required quantity
+* Add production deadline
+
+Confirm:
+
+* Product can publish without a manufacturer
+* Assigned manufacturer displays correctly
+* Quote request connects to Manufacturer Hub
+* Product files stay attached to the product
+* Manufacturer-related routes do not break
+* Back buttons return to the correct product screen
+
+STOREFRONT
+
+Set product status to:
+
+Active
+
+Configure:
+
+* Product collection
+* Homepage featured toggle
+* URL handle
+* SEO title
+* SEO description
+* Search visibility
+* Product badge
+* Related products
+
+Confirm:
+
+* URL handle validation works
+* Duplicate handles are prevented
+* SEO fields save
+* Active product appears in Seller Products
+* Active product appears on Seller Profile
+* Active product appears in storefront preview
+* Hidden product does not appear publicly
+* Draft product does not appear publicly
+* Archived product does not appear publicly
+* Scheduled product does not appear before its scheduled time
+
+REVIEW AND PUBLISH
+
+Before publishing, confirm the review screen shows:
+
+* Product images
+* Product name
+* Price
+* Compare-at price
+* Variants
+* Inventory
+* Sales model
+* Fulfillment
+* Manufacturer
+* Store visibility
+* SEO
+* Missing information
+* Warnings
+
+Confirm:
+
+* Required fields are enforced
+* Optional fields do not incorrectly block publishing
+* Save draft works
+* Publish works
+* Schedule works
+* Loading state appears
+* Double tapping Publish does not create duplicate products
+* Failed publish shows a retry option
+* Successful publish routes to Product Details
+
+PRODUCT DETAILS
+
+Test every tab:
+
+1. Overview
+2. Variants
+3. Inventory
+4. Orders
+5. Production
+6. Content
+7. Analytics
+8. Store page
+
+Confirm every tab:
+
+* Opens correctly
+* Shows the correct product
+* Has a working back button
+* Has loading, empty, and error states
+* Does not show fake broken values
+* Uses the current Brandthread design system
+* Does not use old green and gray layouts
+
+EDIT PRODUCT
+
+Edit:
+
+* Product name
+* Description
+* Price
+* One variant
+* One inventory quantity
+* Product badge
+* SEO title
+
+Confirm:
+
+* Changes save
+* Product list updates
+* Seller Profile updates
+* Store preview updates
+* Existing product tags still point to the correct product
+* Editing does not create a duplicate product
+
+DUPLICATE PRODUCT
+
+Duplicate the test product.
+
+Confirm copied fields include:
+
+* Basic information
+* Media
+* Variants
+* Pricing
+* Inventory settings
+* Fulfillment
+* Store settings
+
+Confirm duplicated product does not copy:
+
+* Orders
+* Analytics
+* Reviews
+* Production history
+* Revenue
+* Existing content performance
+
+Confirm the duplicate starts as Draft unless the current system intentionally uses another safe status.
+
+ARCHIVE PRODUCT
+
+Archive the original product.
+
+Confirm:
+
+* Product leaves active storefront visibility
+* Product remains accessible to the Seller
+* Historical orders remain intact
+* Existing analytics remain intact
+* Existing Seller post tags handle the archived product safely
+* Archived product cannot be newly tagged
+* Restore or Unarchive works
+
+DELETE PRODUCT
+
+Attempt to delete the product.
+
+Confirm:
+
+* Confirmation appears
+* Active-order warning appears when relevant
+* Accidental one-tap deletion is impossible
+* Delete works only after confirmation
+* Deleted product is removed from active Seller views
+* Deleted product is not taggable
+* Old product links show a safe unavailable state instead of crashing
+
+PRODUCT SEARCH
+
+Test searches using:
+
+* Product name
+* SKU
+* Barcode
+* Tag
+* Collection
+* Status
+* Variant
+* Manufacturer
+
+Confirm:
+
+* Search results are accurate
+* Search clears correctly
+* No-results state is styled properly
+* Search does not freeze the app
+* Search handles uppercase and lowercase properly
+
+PRODUCT FILTERS
+
+Test:
+
+* All
+* Active
+* Draft
+* Scheduled
+* Archived
+* Pre-order
+* Pre-made
+* Low stock
+* Out of stock
+
+Confirm filter counts and results are correct.
+
+CONTENT TAGGING
+
+Create a Seller post using the test product.
+
+Confirm:
+
+* Product search finds the product
+* Product can be tagged
+* Variant selection works
+* Product sticker works if implemented
+* Product tag saves
+* Post preview shows the product
+* Published post appears on Seller Profile
+* Published post appears in Buyer Thread
+* Shopping bag action opens the correct product
+* Correct variant is preserved where relevant
+* Product click analytics update
+
+BUYER PRODUCT PAGE
+
+Open the product as a Buyer.
+
+Test:
+
+* Media gallery
+* Product video
+* Price
+* Compare-at price
+* Variant selection
+* Stock state
+* Pre-order information
+* Add to cart
+* Buy now
+* Description
+* Materials
+* Care instructions
+* Shipping estimate
+* Return policy
+* Seller Profile link
+* Related products
+
+Confirm:
+
+* Unavailable variants cannot be selected incorrectly
+* Price updates correctly when variants have overrides
+* Product type is explained clearly
+* Pre-order dates are visible
+* Add to cart uses the selected variant
+* Buyer is not routed to a Seller-only screen
+* Back navigation works
+
+PERSISTENCE
+
+Test:
+
+* Save a product draft
+* Close the app
+* Reopen the app
+* Resume the draft
+* Confirm all completed steps and fields remain
+* Publish the draft
+* Close and reopen again
+* Confirm the published product remains
+* Confirm variants, inventory, media, status, and settings persist
+
+ERROR TESTING
+
+Trigger and fix:
+
+* Missing product name
+* Invalid price
+* Negative price
+* Compare-at price below retail price
+* Invalid inventory quantity
+* Duplicate SKU
+* Duplicate barcode where blocked
+* Invalid date range
+* Failed media upload
+* Failed save
+* Failed publish
+* Network interruption
+* Missing backend configuration
+* Session expiration
+* Unauthorized Seller action
+
+Show styled Brandthread errors.
+
+Do not use raw provider errors or default system alerts unless absolutely necessary.
+
+DESIGN CONSISTENCY
+
+Confirm every Products screen matches onboarding and the current Seller app:
+
+* Black and charcoal background
+* Purple and blue primary accents
+* Controlled cyan and green accents
+* Rounded cards
+* Rounded inputs
+* Premium headings
+* Consistent spacing
+* Consistent buttons
+* Consistent progress bars
+* Consistent back buttons
+* Consistent loading states
+* No old green and gray layouts
+* No white flashes
+
+NAVIGATION TESTING
+
+Confirm Products is reachable from:
+
+* Seller bottom navigation
+* Seller Home
+* Seller Profile
+* More
+* Global search
+* Go to menu
+
+Confirm Add Product is reachable from:
+
+* Products tab
+* Seller Dashboard quick actions
+* Empty state
+* Studio export
+* Manufacturer quote flow where applicable
+
+Confirm every back button goes to the correct screen.
+
+FINAL TECHNICAL CHECK
+
+Run:
+
+* TypeScript checking
+* Expo build or startup check
+* Route validation
+* Import validation
+* Console inspection
+
+Fix:
+
+* TypeScript errors
+* Broken imports
+* Missing dependencies
+* Duplicate keys
+* Invalid hook usage
+* Navigation warnings
+* State update warnings
+* Unhandled promise errors
+* Broken media references
+* Incorrect storage calls
+* Duplicate product creation
+* Runtime crashes
+
+Do not stop after documenting bugs.
+
+Fix every issue you find.
+
+Do not respond with a long explanation.
+
+When all testing and fixes are complete, respond with only:
+
+“The Brandthread Products system has been fully tested and fixed.”

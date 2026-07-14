@@ -1,58 +1,69 @@
 ---
 name: Seller Dashboard Architecture
-description: Seller-side screen inventory, color system, service layer, and navigation patterns for Brandthread mobile app.
+description: Seller-side screen inventory, color system, service layer, shared component system, and navigation patterns for Brandthread mobile app.
 ---
 
-## Seller design tokens
-- BG `#0A0B0A`, CARD `#111311`, BORDER `#1E221E`, FG `#EAF2ED`, MUTED `#5A6B5C`
-- GREEN `#39FF88` (primary seller accent), PURPLE `#8B5CF6`, BLUE `#3B82F6`, ORANGE `#F97316`, CYAN `#06B6D4`
-- Note: seller screens use GREEN as primary, NOT purple (purple is buyer/onboarding)
+## Design System (lib/theme.ts)
+Single source of truth — all seller screens MUST import from here, no local color redefinitions.
+- BG='#07070F', SURFACE='#0C0C17', CARD='#12121F', CARD_ELEVATED='#18182E'
+- BORDER='rgba(255,255,255,0.07)', BORDER_ACTIVE='rgba(139,92,246,0.45)'
+- FG='#F4F4FF', MUTED='rgba(244,244,255,0.50)', SUBTLE='rgba(244,244,255,0.28)'
+- PURPLE='#8B5CF6', CYAN='#22D3EE' — primary brand accents (NOT green)
+- SUCCESS='#10B981', GREEN_BRIGHT='#39FF88' — green ONLY for revenue/success/completion
+- GRAD_PRIMARY=['#8B5CF6','#22D3EE'] — primary button gradient
+- GRAD_CARD_GLOW=['rgba(139,92,246,0.12)','rgba(34,211,238,0.04)'] — card glow
+
+## Shared Components (components/BrandthreadUI.tsx)
+All screens must use these — never create one-off buttons or cards in screens.
+Components exported: BrandthreadScreen, BrandthreadHeader, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SearchBar, FilterChip, StatusBadge, EmptyState, SectionHeader, StatCard, QuickActionCard, GuidedTip, NewFeatureBadge, FormInput, ProgressCard, NavigationCard, LoadingSkeleton, Toast, SheetHandle
+
+## Setup Store (lib/setupStore.ts)
+AsyncStorage-backed seller setup progress. 12 tasks from brand_profile → publish_store.
+Functions: getSetupState, markSetupStarted, dismissWelcome, completeTask, skipTask, dismissTip, markFeatureOpened, completionPercent, nextTask, nextBestAction, resetSetupState
 
 ## Tab layout (seller)
 `(tabs)/` group: Home (index) · Studio · Products · Orders · More
-- Profile tab is `(tabs)/profile.tsx` — "My Brand" dashboard (not public profile)
-- Public brand profile is a separate route: `app/seller-profile.tsx`
-
-## Services layer (`artifacts/mobile/services/`)
-- `types.ts` — All entity interfaces: Product, Order, SellerProfile, SellerPost, Sound, PostAnalytics, PostOverlay, PostProductTag, PostHashtag, PostVisibility, SlideshowEdit, VideoEdit, VideoClip, PostMedia, BeatMarker, SoundSelection, etc.
-- `data.ts` — DEMO_PRODUCTS, DEMO_ORDERS, DEMO_CONTENT, DEMO_ANALYTICS, etc.
-- `sellerContent.ts` — DEMO_SELLER_PROFILE, DEMO_SELLER_POSTS, DEMO_SOUNDS, DEMO_PRODUCTS_FOR_TAG, SUGGESTED_HASHTAGS, getSellerPosts(), getPostById(), getPostAnalytics(), getThreadEligiblePosts()
+Tab bar: purple active indicator, PURPLE accent for active tab, dark BG '#07070F'
 
 ## Screen inventory (seller-specific)
-- `(tabs)/index.tsx` — Seller home/dashboard
-- `(tabs)/profile.tsx` — "My Brand" dashboard (avatar, stats, quick actions, content grid)
-- `(tabs)/studio.tsx` — Design studio
-- `(tabs)/products.tsx` — Product list
-- `(tabs)/orders.tsx` — Orders
-- `(tabs)/more.tsx` — More menu
-- `seller-profile.tsx` — PUBLIC brand profile (buyers see this; sellers see with isOwner=true param)
-- `create-post.tsx` — Full content creation flow (10 steps: type-select → video/slide flow → post details → publishing → done)
-- `post-analytics.tsx` — Per-post analytics with animated charts
-- `content.tsx` — Content management hub (routes to create-post for creation)
-- `edit-profile.tsx` — Edit seller brand profile
-- `brand.tsx` — AI Brand Creation tool (name generator, logo AI, checklist) — NOT the public profile
+- `(tabs)/index.tsx` — Seller home: welcome card, next-best-action, setup progress, stats, quick actions, "Go to" command menu, global search modal
+- `(tabs)/studio.tsx` — Creative hub: tool cards (Design, Content, AI Photoshoot, Mockup to Model, BG Removal, Brand Kit), recent projects, templates
+- `(tabs)/products.tsx` — Products: search/filter, stat strip, product list with status badges
+- `(tabs)/orders.tsx` — Orders: stat strip, search/filter, order cards with status actions
+- `(tabs)/more.tsx` — Organized sections: Operations · Growth · Store · Account + sign out
+- `(tabs)/profile.tsx` — "My Brand" dashboard (uses OLD green tokens — if updating, migrate to theme.ts)
+- `app/setup.tsx` — Guided setup: 12-task checklist, progress bar, skip/complete/save-and-exit
+- `app/seller-profile.tsx` — PUBLIC brand profile (buyers see this; sellers via isOwner=true)
+- `app/create-post.tsx` — Full content creation flow (10 steps)
+- `app/post-analytics.tsx` — Per-post analytics with animated charts
+- `app/content.tsx` — Content management hub (routes to create-post for creation)
+- `app/edit-profile.tsx` — Edit seller brand profile
+- `app/brand.tsx` — AI Brand Creation tool — NOT the public profile
 
 ## Navigation entry points
-- Seller Quick Actions bar in `(tabs)/profile.tsx`: "Create Post" → `/create-post`, "My Profile" → `/seller-profile?isOwner=true`
-- Content hub "Create" button and type cards → `/create-post?type=xxx`
+- Home quick actions: Create Post, Add Product, View Orders, Studio
+- Home "Go to" command menu: 9 destinations in one tap
+- Seller Quick Actions in `(tabs)/profile.tsx`: "Create Post" → `/create-post`, "My Profile" → `/seller-profile?isOwner=true`
 - Thread feed: tapping creator avatar or name → `/seller-profile?id=xxx`
-- Action sheet in seller-profile: "View analytics" → `/post-analytics?id=xxx`, "Edit" → `/create-post?editId=xxx`
+- More tab: Content → `/content`, Analytics → `/(tabs)/analytics`, Marketing → `/(tabs)/marketing`
+- `app/setup.tsx` registered in `app/_layout.tsx` as modal (slide_from_bottom)
+
+## Registered routes in _layout.tsx (seller)
+- seller-profile (slide_from_right)
+- create-post (fullScreenModal from bottom)  
+- post-analytics (slide_from_right)
+- setup (modal from bottom)
 
 ## Thread eligibility rule
-`getThreadEligiblePosts()` in sellerContent.ts filters: status=published + isSellerContent=true + scheduled date ≤ now.
-Buyer posts must NEVER appear in Thread. Only SellerPost entities with `isSellerContent: true` are eligible.
+`getThreadEligiblePosts()` in sellerContent.ts filters: status=published + isSellerContent=true + scheduled date ≤ now. Buyer posts must NEVER appear in Thread.
 
 ## Navigation gotchas
-- `router.back()` triggers GO_BACK warning in dev when no stack history exists — dev-only, not a crash.
-- `SpotlightPage` in feed.tsx is a function component; needs its own `useRouter()` call (does not inherit from parent).
+- `router.back()` triggers GO_BACK warning in dev when no stack history — dev-only, not a crash.
+- `SpotlightPage` in feed.tsx is a function component; needs its own `useRouter()` call.
 - Route groups: `/(tabs)/` for seller, `/(buyer)/` for buyer — do not mix them.
-- `_layout.tsx` Stack.Screen entries: seller-profile (slide_from_right), create-post (fullScreenModal from bottom), post-analytics (slide_from_right).
+- `(tabs)/profile.tsx` still uses OLD green (#39FF88) design tokens — next migration: update to use theme.ts + BrandthreadUI components.
 
-## Key type notes
-- `SellerPost.isSellerContent: true` — literal type, always true, enforces Thread eligibility at type level.
-- `PostStatus` includes 'failed' and 'archived' (beyond old ContentStatus 'draft'|'scheduled'|'published').
-- Video always `aspectRatio: '9:16'` — never prompt seller to choose video ratio.
-- Slideshows: 9:16 | 3:4 | 1:1 — user selects in slide-ratio step.
-- Video max durations: 10 | 15 | 30 | 60 seconds (MaxVideoDuration union).
+## Key design rule
+Seller tabs use PURPLE/CYAN as primary (matches onboarding). GREEN is ONLY for: success states, revenue growth, completed tasks, available status, positive analytics. Never use green as a button color or tab bar color.
 
-**Why:** Seller content system added July 2026. Keeping these patterns consistent prevents route mismatches and Thread contamination bugs.
+**Why:** July 2026 full visual unification of seller app with onboarding design system. Keeping these patterns consistent prevents future regressions to old green-first design.

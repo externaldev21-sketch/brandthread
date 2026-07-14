@@ -1,255 +1,276 @@
-import React, { useState } from 'react';
+/**
+ * Studio Screen — Brandthread Creative Workspace
+ */
+
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  ScrollView, View, Text, TouchableOpacity, StyleSheet,
-  Platform, RefreshControl,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  FlatList, Dimensions, Alert,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { DEMO_DESIGN_PROJECTS } from '@/services/data';
-import type { DesignProjectType } from '@/services/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { dismissTip, markFeatureOpened, getSetupState } from '@/lib/setupStore';
+import {
+  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
+  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
+  CYAN, CYAN_DIM, SUCCESS, BLUE, ORANGE, RED, GOLD,
+  GRAD_PRIMARY, GRAD_CARD_GLOW,
+  FONT, FS, SP, RADIUS, COMP, ICON, SHADOW_PURPLE,
+} from '@/lib/theme';
+import {
+  BrandthreadScreen, BrandthreadCard, GradientCard, PrimaryButton,
+  SecondaryButton, IconButton, SectionHeader, QuickActionCard,
+  NavigationCard, EmptyState, GuidedTip, NewFeatureBadge, StatusBadge,
+} from '@/components/BrandthreadUI';
 
-// ─── Theme ────────────────────────────────────────────────────────────────────
-const BG     = '#07080D';
-const CARD   = '#0F1018';
-const BORDER = '#1C1D28';
-const FG     = '#F0F2F8';
-const MUTED  = '#64718A';
-const GREEN  = '#39FF88';
-const PURPLE = '#8B5CF6';
-const BLUE   = '#3B82F6';
-const CYAN   = '#06B6D4';
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-// ─── Creation options ─────────────────────────────────────────────────────────
+const DISMISSED_TIPS_KEY = '@brandthread/dismissed_tips';
 
-interface CreationOption {
-  label:    string;
-  desc:     string;
-  icon:     keyof typeof Feather.glyphMap;
-  color:    string;
-  bg:       string;
-  route:    string;
-  badge?:   string;
+const FILTER_CHIPS = ['All', 'Design', 'Content', 'AI', 'Photos'];
+
+interface HeroTool {
+  title: string;
+  icon: keyof typeof Feather.glyphMap;
+  accent: string;
+  desc: string;
+  badge?: boolean;
+  route?: string;
 }
 
-const CREATION_OPTIONS: CreationOption[] = [
-  { label: 'Blank Canvas',     desc: 'Start from scratch',           icon: 'square',      color: FG,     bg: '#1C1D28', route: '/design-canvas' },
-  { label: 'Text to Design',   desc: 'Describe and generate',        icon: 'zap',         color: PURPLE, bg: '#2A1A4A', route: '/ai-studio', badge: 'AI' },
-  { label: 'Upload Sketch',    desc: 'Trace your drawing',           icon: 'edit-3',      color: CYAN,   bg: '#0E2830', route: '/design-canvas' },
-  { label: 'Upload Garment',   desc: 'Place graphics on a blank',    icon: 'upload',      color: BLUE,   bg: '#0E1B30', route: '/design-canvas' },
-  { label: 'Mockup to Model',  desc: 'AI model photoshoot',          icon: 'user',        color: '#F472B6', bg: '#2A0D22', route: '/ai-studio', badge: 'AI' },
-  { label: 'AI Photoshoot',    desc: 'Studio-quality shots',         icon: 'camera',      color: '#FBBF24', bg: '#2A200A', route: '/ai-studio', badge: 'AI' },
-  { label: 'Remove BG',        desc: 'Clean product cutouts',        icon: 'scissors',    color: GREEN,  bg: '#0D2420', route: '/bg-removal' },
-  { label: 'Edit with Prompt', desc: 'Describe changes to make',     icon: 'message-square', color: '#F97316', bg: '#2A1508', route: '/ai-studio', badge: 'AI' },
-  { label: 'Manual Design',    desc: 'Full drawing tools',           icon: 'pen-tool',    color: BLUE,   bg: '#0E1B30', route: '/design-canvas' },
+const HERO_TOOLS: HeroTool[] = [
+  { title: 'Design Studio',       icon: 'edit-3',   accent: PURPLE,  desc: 'Create product artwork',          badge: true, route: '/design' },
+  { title: 'Create Content',      icon: 'video',    accent: CYAN,    desc: 'Film and edit Seller posts',      badge: true, route: '/create-post' },
+  { title: 'AI Photoshoot',       icon: 'camera',   accent: BLUE,    desc: 'Generate product photos' },
+  { title: 'Mockup to Model',     icon: 'user',     accent: ORANGE,  desc: 'Wear your design on a model' },
+  { title: 'Remove Background',   icon: 'scissors', accent: SUCCESS, desc: 'Clean image backgrounds' },
+  { title: 'Brand Kit',           icon: 'layers',   accent: GOLD,    desc: 'Logos, colors and fonts',                  route: '/brand' },
 ];
 
-// ─── Template categories ──────────────────────────────────────────────────────
+interface DemoProject {
+  name: string;
+  type: string;
+  colors: [string, string];
+}
 
-const TEMPLATE_CATS = ['T-Shirts', 'Hoodies', 'Sweatpants', 'Jackets', 'Hats', 'Bags', 'Packaging', 'Social'];
+const DEMO_PROJECTS: DemoProject[] = [
+  { name: 'Summer Collection Mockup', type: 'Design',  colors: ['#8B5CF6', '#22D3EE'] },
+  { name: 'Product Launch Video',     type: 'Content', colors: ['#22D3EE', '#3B82F6'] },
+  { name: 'Hoodie AI Photo',          type: 'AI',      colors: ['#3B82F6', '#8B5CF6'] },
+];
 
-const PROJECT_FILTERS: Array<{ id: string; label: string }> = [
-  { id: 'all',        label: 'All' },
-  { id: 'design',     label: 'Designs' },
-  { id: 'mockup',     label: 'Mockups' },
-  { id: 'photoshoot', label: 'Photoshoots' },
-  { id: 'draft',      label: 'Drafts' },
+const TEMPLATES = [
+  { label: 'Product Card',  colors: ['#8B5CF6', '#3B82F6'] as [string, string] },
+  { label: 'Story Reel',    colors: ['#22D3EE', '#8B5CF6'] as [string, string] },
+  { label: 'Lookbook',      colors: ['#F97316', '#F59E0B'] as [string, string] },
+  { label: 'Launch Teaser', colors: ['#10B981', '#22D3EE'] as [string, string] },
 ];
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function StudioScreen() {
-  const insets    = useSafeAreaInsets();
-  const router    = useRouter();
-  const [filter,  setFilter]  = useState('all');
-  const [refresh, setRefresh] = useState(false);
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
 
-  const topPad = Platform.OS === 'web' ? 20 : insets.top;
+  const [activeFilter, setActiveFilter] = useState('All');
+  const [dismissedTips, setDismissedTips] = useState<string[]>([]);
+  const [openedFeatures, setOpenedFeatures] = useState<string[]>([]);
 
-  function go(route: string) {
+  // Load dismissed tips + opened features from setupStore / AsyncStorage
+  useEffect(() => {
+    (async () => {
+      try {
+        const state = await getSetupState();
+        setDismissedTips(state.dismissedTips);
+        setOpenedFeatures(state.openedFeatures);
+      } catch {
+        // fallback: read directly
+        try {
+          const raw = await AsyncStorage.getItem(DISMISSED_TIPS_KEY);
+          if (raw) setDismissedTips(JSON.parse(raw));
+        } catch { /* non-fatal */ }
+      }
+    })();
+  }, []);
+
+  const handleDismissTip = useCallback(async (id: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push(route as never);
-  }
+    await dismissTip(id);
+    setDismissedTips(prev => [...prev, id]);
+  }, []);
 
-  const projects = DEMO_DESIGN_PROJECTS.filter(p =>
-    filter === 'all' || p.type === filter as DesignProjectType,
-  );
-
-  const statusColor = (s: string) =>
-    s === 'complete' ? GREEN : s === 'in_progress' ? CYAN : MUTED;
-
-  const typeIcon = (t: string): keyof typeof Feather.glyphMap =>
-    t === 'mockup' ? 'image' : t === 'photoshoot' ? 'camera' : t === 'draft' ? 'file-text' : 'pen-tool';
-
-  function onRefresh() {
-    setRefresh(true);
-    setTimeout(() => setRefresh(false), 800);
-  }
+  const handleToolPress = useCallback(async (tool: HeroTool) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Mark feature as opened to clear "New" badge
+    if (tool.badge) {
+      await markFeatureOpened(tool.title);
+      setOpenedFeatures(prev => [...prev, tool.title]);
+    }
+    if (tool.route) {
+      router.push(tool.route as never);
+    } else {
+      Alert.alert('Coming Soon', `${tool.title} is coming soon!`);
+    }
+  }, [router]);
 
   return (
-    <View style={[s.root, { paddingTop: topPad }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={s.title}>Studio</Text>
-          <Text style={s.subtitle}>Create without limits.</Text>
-        </View>
-        <TouchableOpacity style={s.projectsBtn} onPress={() => go('/ai-studio')} activeOpacity={0.8}>
-          <Feather name="folder" size={16} color={GREEN} />
-          <Text style={s.projectsBtnText}>Projects</Text>
-        </TouchableOpacity>
-      </View>
-
+    <View style={[styles.root, { paddingTop: insets.top }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 120 }}
-        refreshControl={<RefreshControl refreshing={refresh} onRefresh={onRefresh} tintColor={GREEN} />}
+        contentContainerStyle={styles.scrollContent}
       >
-        {/* ── Hero gradient banner ── */}
-        <LinearGradient
-          colors={['#1A0B35', '#0A1540', '#070D1A']}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={s.heroBanner}
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={s.heroTitle}>Turn any idea into a product.</Text>
-            <Text style={s.heroDesc}>AI-powered design, mockups and photoshoots in one place.</Text>
-            <TouchableOpacity
-              style={s.heroBtn}
-              onPress={() => go('/design-canvas')}
-              activeOpacity={0.85}
+        {/* ── 1. HEADER ── */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.headerTitle}>Studio</Text>
+            <Text style={styles.headerSubtitle}>Your creative workspace</Text>
+          </View>
+        </View>
+
+        {/* ── 2. GUIDED TIP ── */}
+        <GuidedTip
+          id="studio-tip"
+          text="Create designs, content and AI photos for your brand here. Only Seller posts can appear on the public Thread."
+          dismissedIds={dismissedTips}
+          onDismiss={handleDismissTip}
+          style={styles.tip}
+        />
+
+        {/* ── 3. HERO TOOL CARDS ── */}
+        <SectionHeader title="Start creating" style={styles.sectionHeader} />
+        <View style={styles.toolGrid}>
+          {HERO_TOOLS.map((tool) => (
+            <GradientCard
+              key={tool.title}
+              colors={GRAD_CARD_GLOW}
+              onPress={() => handleToolPress(tool)}
+              style={[styles.toolCard, { borderColor: tool.accent + '44' }]}
             >
-              <Feather name="plus" size={14} color="#0A0B0A" />
-              <Text style={s.heroBtnText}>New Creation</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={s.heroDeco}>
-            <Feather name="pen-tool" size={56} color={PURPLE} style={{ opacity: 0.4 }} />
-          </View>
-        </LinearGradient>
-
-        {/* ── Creation options ── */}
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Start creating</Text>
-          <View style={s.optionGrid}>
-            {CREATION_OPTIONS.map((opt) => (
-              <TouchableOpacity
-                key={opt.label}
-                style={s.optionCard}
-                onPress={() => go(opt.route)}
-                activeOpacity={0.8}
-              >
-                {opt.badge && (
-                  <View style={[s.aiBadge, { backgroundColor: opt.color + 'CC' }]}>
-                    <Text style={s.aiBadgeText}>{opt.badge}</Text>
-                  </View>
+              {/* Icon + badge row */}
+              <View style={styles.toolCardTop}>
+                <View style={[styles.toolIconCircle, { backgroundColor: tool.accent + '18' }]}>
+                  <Feather name={tool.icon} size={ICON.md} color={tool.accent} />
+                </View>
+                {tool.badge && (
+                  <NewFeatureBadge
+                    featureId={tool.title}
+                    openedIds={openedFeatures}
+                    style={styles.toolBadge}
+                  />
                 )}
-                <View style={[s.optionIcon, { backgroundColor: opt.bg }]}>
-                  <Feather name={opt.icon} size={18} color={opt.color} />
-                </View>
-                <Text style={s.optionLabel}>{opt.label}</Text>
-                <Text style={s.optionDesc}>{opt.desc}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+              </View>
+              {/* Title */}
+              <Text style={styles.toolTitle}>{tool.title}</Text>
+              {/* Desc */}
+              <Text style={styles.toolDesc}>{tool.desc}</Text>
+              {/* CTA */}
+              <Text style={[styles.toolCta, { color: tool.accent }]}>Open →</Text>
+            </GradientCard>
+          ))}
         </View>
 
-        {/* ── Recent projects ── */}
-        <View style={s.section}>
-          <View style={s.sectionHead}>
-            <Text style={s.sectionTitle}>Recent projects</Text>
-            <TouchableOpacity onPress={() => go('/ai-studio')}>
-              <Text style={s.viewAll}>View All</Text>
+        {/* ── 4. FILTER CHIPS ── */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+          style={styles.filterScroll}
+        >
+          {FILTER_CHIPS.map((chip) => (
+            <TouchableOpacity
+              key={chip}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setActiveFilter(chip);
+              }}
+              style={[styles.filterChip, activeFilter === chip && styles.filterChipActive]}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.filterChipText, activeFilter === chip && styles.filterChipTextActive]}>
+                {chip}
+              </Text>
             </TouchableOpacity>
-          </View>
+          ))}
+        </ScrollView>
 
-          {/* Filter chips */}
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-            <View style={s.chipRow}>
-              {PROJECT_FILTERS.map((f) => (
-                <TouchableOpacity
-                  key={f.id}
-                  style={[s.chip, filter === f.id && s.chipActive]}
-                  onPress={() => { setFilter(f.id); Haptics.selectionAsync(); }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[s.chipText, filter === f.id && s.chipTextActive]}>{f.label}</Text>
-                </TouchableOpacity>
-              ))}
+        {/* ── RECENT PROJECTS ── */}
+        <SectionHeader
+          title="Recent projects"
+          action={{ label: 'View all', onPress: () => Alert.alert('Projects', 'Full project list coming soon.') }}
+          style={styles.sectionHeader}
+        />
+        {DEMO_PROJECTS.map((proj) => (
+          <BrandthreadCard
+            key={proj.name}
+            onPress={() => Alert.alert('Open Project', `Opening "${proj.name}"…`)}
+            style={styles.projectCard}
+          >
+            <View style={styles.projectRow}>
+              {/* Thumbnail */}
+              <LinearGradient
+                colors={proj.colors}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.projectThumb}
+              />
+              {/* Info */}
+              <View style={styles.projectInfo}>
+                <Text style={styles.projectName}>{proj.name}</Text>
+                <View style={styles.projectMeta}>
+                  <StatusBadge
+                    label={proj.type}
+                    variant={
+                      proj.type === 'Design'  ? 'purple'  :
+                      proj.type === 'Content' ? 'info'    :
+                      proj.type === 'AI'      ? 'warning' : 'neutral'
+                    }
+                    small
+                  />
+                  <Text style={styles.projectAge}>3 days ago</Text>
+                </View>
+                <Text style={styles.projectCta}>Tap to open →</Text>
+              </View>
             </View>
-          </ScrollView>
+          </BrandthreadCard>
+        ))}
 
-          {projects.length === 0 ? (
-            <View style={s.emptyCard}>
-              <Feather name="folder" size={28} color={MUTED} />
-              <Text style={s.emptyText}>No projects yet</Text>
-              <Text style={s.emptyDesc}>Create your first design to get started.</Text>
-            </View>
-          ) : (
-            projects.map((proj) => (
-              <TouchableOpacity
-                key={proj.id}
-                style={s.projectRow}
-                onPress={() => go('/design-canvas')}
-                activeOpacity={0.8}
+        {/* ── 5. TEMPLATES ── */}
+        <SectionHeader
+          title="Templates"
+          action={{ label: 'Browse all', onPress: () => Alert.alert('Templates', 'Full template library coming soon.') }}
+          style={styles.sectionHeader}
+        />
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.templatesRow}
+        >
+          {TEMPLATES.map((tmpl) => (
+            <TouchableOpacity
+              key={tmpl.label}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                Alert.alert('Template', `Opening template: ${tmpl.label}`);
+              }}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={tmpl.colors}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.templateCard}
               >
-                <View style={s.projectThumb}>
-                  <Feather name={typeIcon(proj.type)} size={18} color={MUTED} />
+                <View style={styles.templateLabelWrap}>
+                  <Text style={styles.templateLabel}>{tmpl.label}</Text>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.projectName}>{proj.name}</Text>
-                  <Text style={s.projectMeta}>{proj.type.charAt(0).toUpperCase() + proj.type.slice(1)} · Edited {proj.lastEdited}</Text>
-                </View>
-                <View style={[s.statusDot, { backgroundColor: statusColor(proj.status) }]} />
-                <Feather name="chevron-right" size={15} color={MUTED} style={{ marginLeft: 6 }} />
-              </TouchableOpacity>
-            ))
-          )}
-        </View>
-
-        {/* ── Templates ── */}
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Templates</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              {TEMPLATE_CATS.map((cat) => (
-                <TouchableOpacity
-                  key={cat}
-                  style={s.templateCard}
-                  onPress={() => go('/design-canvas')}
-                  activeOpacity={0.8}
-                >
-                  <View style={s.templateIcon}>
-                    <Feather name="tag" size={20} color={MUTED} />
-                  </View>
-                  <Text style={s.templateLabel}>{cat}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
-        </View>
-
-        {/* ── Quick tools ── */}
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Quick tools</Text>
-          <View style={s.quickRow}>
-            {[
-              { icon: 'image'    as const, label: 'Mockups',  color: PURPLE, route: '/ai-studio' },
-              { icon: 'camera'   as const, label: 'Photoshoot', color: CYAN, route: '/ai-studio' },
-              { icon: 'scissors' as const, label: 'Remove BG', color: GREEN, route: '/bg-removal' },
-              { icon: 'file-text'as const, label: 'Tech Pack', color: BLUE,  route: '/tech-pack-generator' },
-            ].map((t) => (
-              <TouchableOpacity key={t.label} style={s.quickCard} onPress={() => go(t.route)} activeOpacity={0.8}>
-                <View style={[s.quickIcon, { backgroundColor: t.color + '22' }]}>
-                  <Feather name={t.icon} size={18} color={t.color} />
-                </View>
-                <Text style={s.quickLabel}>{t.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+              </LinearGradient>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </ScrollView>
     </View>
   );
@@ -257,59 +278,189 @@ export default function StudioScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: BG },
-  header: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 20, paddingBottom: 14, paddingTop: 6, gap: 12 },
-  title:  { fontSize: 28, fontFamily: 'Inter_700Bold', color: FG },
-  subtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 2 },
-  projectsBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: GREEN + '18', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: GREEN + '30' },
-  projectsBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: GREEN },
-
-  heroBanner: { marginHorizontal: 16, borderRadius: 20, padding: 22, flexDirection: 'row', alignItems: 'center', overflow: 'hidden', borderWidth: 1, borderColor: PURPLE + '30', marginBottom: 8 },
-  heroTitle:  { fontSize: 18, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 6, letterSpacing: -0.3 },
-  heroDesc:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 16, lineHeight: 18 },
-  heroBtn:    { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: GREEN, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9, alignSelf: 'flex-start' },
-  heroBtnText:{ fontSize: 13, fontFamily: 'Inter_700Bold', color: '#0A0B0A' },
-  heroDeco:   { width: 80, alignItems: 'center', justifyContent: 'center' },
-
-  section:      { paddingHorizontal: 16, marginTop: 24 },
-  sectionHead:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  sectionTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 12 },
-  viewAll:      { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: GREEN },
-
-  optionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  optionCard: {
-    width: '30.5%', backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER,
-    padding: 12, gap: 8, overflow: 'hidden',
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: BG,
   },
-  aiBadge:     { position: 'absolute', top: 8, right: 8, borderRadius: 5, paddingHorizontal: 5, paddingVertical: 2 },
-  aiBadgeText: { fontSize: 9, fontFamily: 'Inter_700Bold', color: '#0A0B0A' },
-  optionIcon:  { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  optionLabel: { fontSize: 12, fontFamily: 'Inter_700Bold', color: FG },
-  optionDesc:  { fontSize: 10, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 14 },
+  scrollContent: {
+    paddingBottom: 160,
+  },
 
-  chipRow:     { flexDirection: 'row', gap: 8, paddingLeft: 0 },
-  chip:        { backgroundColor: CARD, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7, borderWidth: 1, borderColor: BORDER },
-  chipActive:  { backgroundColor: GREEN + '22', borderColor: GREEN },
-  chipText:    { fontSize: 12, fontFamily: 'Inter_500Medium', color: MUTED },
-  chipTextActive: { color: GREEN },
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SP.md,
+    paddingTop: SP.sm,
+    paddingBottom: SP.md,
+  },
+  headerTitle: {
+    fontSize: FS.xl,
+    fontFamily: FONT.bold,
+    color: PURPLE_LIGHT,
+    letterSpacing: -0.3,
+  },
+  headerSubtitle: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: MUTED,
+    marginTop: 2,
+  },
 
-  projectRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: BORDER },
-  projectThumb:{ width: 44, height: 44, borderRadius: 10, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  projectName: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: FG },
-  projectMeta: { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 2 },
-  statusDot:   { width: 6, height: 6, borderRadius: 3 },
+  // Tip
+  tip: {
+    marginBottom: SP.md,
+  },
 
-  emptyCard: { alignItems: 'center', paddingVertical: 32, gap: 8 },
-  emptyText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: FG },
-  emptyDesc: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
+  // Section header spacing
+  sectionHeader: {
+    marginTop: SP.lg,
+    marginBottom: SP.sm,
+  },
 
-  templateCard:  { width: 96, backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, alignItems: 'center', paddingVertical: 16, gap: 8 },
-  templateIcon:  { width: 40, height: 40, borderRadius: 10, backgroundColor: '#1C1D28', alignItems: 'center', justifyContent: 'center' },
-  templateLabel: { fontSize: 11, fontFamily: 'Inter_500Medium', color: MUTED, textAlign: 'center' },
+  // Hero tool grid
+  toolGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    paddingHorizontal: SP.md,
+  },
+  toolCard: {
+    width: '48%',
+    padding: SP.md,
+    gap: 12,
+  },
+  toolCardTop: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+  },
+  toolIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toolBadge: {
+    // positioned at top-right via the top row layout
+  },
+  toolTitle: {
+    fontSize: FS.base,
+    fontFamily: FONT.bold,
+    color: FG,
+    letterSpacing: -0.1,
+  },
+  toolDesc: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: MUTED,
+    lineHeight: 16,
+  },
+  toolCta: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    marginTop: 2,
+  },
 
-  quickRow:  { flexDirection: 'row', gap: 10 },
-  quickCard: { flex: 1, backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, alignItems: 'center', paddingVertical: 16, gap: 8 },
-  quickIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  quickLabel:{ fontSize: 11, fontFamily: 'Inter_500Medium', color: MUTED, textAlign: 'center' },
+  // Filter chips
+  filterScroll: {
+    marginTop: SP.lg,
+  },
+  filterRow: {
+    flexDirection: 'row',
+    gap: SP.sm,
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.sm,
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: RADIUS.pill,
+    backgroundColor: CARD,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  filterChipActive: {
+    backgroundColor: PURPLE_DIM,
+    borderColor: BORDER_ACTIVE,
+  },
+  filterChipText: {
+    fontSize: FS.sm,
+    fontFamily: FONT.medium,
+    color: MUTED,
+  },
+  filterChipTextActive: {
+    color: PURPLE_LIGHT,
+    fontFamily: FONT.semibold,
+  },
+
+  // Project cards
+  projectCard: {
+    marginHorizontal: SP.md,
+    marginBottom: SP.sm,
+  },
+  projectRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.md,
+  },
+  projectThumb: {
+    width: 56,
+    height: 56,
+    borderRadius: RADIUS.sm,
+  },
+  projectInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  projectName: {
+    fontSize: FS.base,
+    fontFamily: FONT.bold,
+    color: FG,
+    letterSpacing: -0.1,
+  },
+  projectMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+  },
+  projectAge: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: MUTED,
+  },
+  projectCta: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: SUBTLE,
+  },
+
+  // Templates
+  templatesRow: {
+    flexDirection: 'row',
+    gap: SP.sm,
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.sm,
+  },
+  templateCard: {
+    width: 90,
+    height: 120,
+    borderRadius: RADIUS.md,
+    overflow: 'hidden',
+    justifyContent: 'flex-end',
+  },
+  templateLabelWrap: {
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    paddingHorizontal: SP.sm,
+    paddingVertical: 5,
+  },
+  templateLabel: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: FG,
+    textAlign: 'center',
+  },
 });

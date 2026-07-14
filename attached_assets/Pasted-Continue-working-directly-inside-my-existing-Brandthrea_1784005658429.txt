@@ -1,0 +1,701 @@
+Continue working directly inside my existing Brandthread Expo React Native project.
+
+Do not explain the code to me. Inspect the project, edit it directly, run it, and fix all errors.
+
+Build the complete Seller Products system.
+
+Do not redesign onboarding.
+
+Do not break the new Seller navigation, Seller Profile, Seller content system, Buyer Thread, authentication, Orders, Studio, or Dashboard.
+
+CORE GOAL
+
+A Seller must be able to create, manage, publish, duplicate, archive, and tag products throughout Brandthread.
+
+Products must connect to:
+
+* Seller Profile
+* Seller posts
+* Buyer Thread product tags
+* Storefront
+* Orders
+* Inventory
+* Manufacturer Hub
+* Analytics
+* Pre-order workflows
+* Pre-made inventory workflows
+
+PRODUCTS TAB
+
+Create a premium Products home screen matching the onboarding visual system.
+
+HEADER
+
+Include:
+
+* Products title
+* Search button
+* Filter button
+* Import button
+* Add product button
+
+SUMMARY CARDS
+
+Show:
+
+* Active products
+* Draft products
+* Low stock
+* Out of stock
+* Pre-orders
+* Inventory value
+
+FILTERS
+
+Include:
+
+* All
+* Active
+* Draft
+* Scheduled
+* Archived
+* Pre-order
+* Pre-made
+* Low stock
+* Out of stock
+
+PRODUCT LIST
+
+Each product card must show:
+
+* Product image
+* Product name
+* Status
+* Price
+* Compare-at price when applicable
+* Pre-order or pre-made badge
+* Total inventory
+* Variant count
+* Total sales
+* Store visibility
+* More menu
+
+PRODUCT CARD ACTIONS
+
+Include:
+
+* Edit
+* Duplicate
+* Archive
+* Unarchive
+* Delete
+* Share
+* View store page
+* Create content
+* Tag in post
+* Send to manufacturer
+* View analytics
+
+EMPTY STATE
+
+Heading:
+“Your first product starts here.”
+
+Description:
+“Add product details, media, pricing, variants and inventory.”
+
+Button:
+“Create product”
+
+ADD PRODUCT FLOW
+
+Create a polished multi-step product creation flow.
+
+Show:
+
+* Current step
+* Total steps
+* Progress bar
+* Back
+* Next
+* Save draft
+* Exit
+* Unsaved changes warning
+
+Preserve all entered data between steps.
+
+STEP 1 — BASIC INFORMATION
+
+Fields:
+
+* Product name
+* Description
+* Product category
+* Product type
+* Vendor
+* Collection
+* Tags
+
+Product categories should include:
+
+* T-shirt
+* Hoodie
+* Sweatshirt
+* Sweatpants
+* Shorts
+* Jacket
+* Denim
+* Dress
+* Skirt
+* Hat
+* Bag
+* Shoes
+* Accessories
+* Other
+
+Description should support:
+
+* Paragraphs
+* Bullet points
+* Size and fit details
+* Materials
+* Care instructions
+
+STEP 2 — MEDIA
+
+Allow:
+
+* Upload product images
+* Upload product video
+* Upload mockups
+* Upload front view
+* Upload back view
+* Upload detail images
+* Reorder media
+* Delete media
+* Choose cover image
+* Add alt text
+
+Show upload progress, retry, and failure states.
+
+STEP 3 — PRICING
+
+Fields:
+
+* Retail price
+* Compare-at price
+* Product cost
+* Estimated shipping cost
+* Estimated fees
+
+Calculate and display:
+
+* Estimated profit
+* Margin percentage
+* Break-even price
+
+Do not hardcode financial calculations inside UI components.
+
+Create reusable calculation utilities.
+
+STEP 4 — VARIANTS
+
+Allow the Seller to create variants using:
+
+* Size
+* Color
+* Material
+* Style
+* Custom option
+
+Include common size presets:
+
+* XXS
+* XS
+* S
+* M
+* L
+* XL
+* XXL
+* 3XL
+
+Allow custom sizes.
+
+Allow common color presets and custom colors.
+
+Each variant must support:
+
+* Variant image
+* SKU
+* Barcode
+* Price override
+* Cost override
+* Inventory quantity
+* Weight
+* Status
+
+Create variant combinations automatically.
+
+Allow deleting invalid combinations.
+
+STEP 5 — INVENTORY
+
+Include:
+
+* Track quantity toggle
+* Current stock
+* Available stock
+* Reserved stock
+* Incoming stock
+* Low-stock threshold
+* Inventory location
+* Allow overselling toggle
+
+Show inventory by variant.
+
+Support multiple inventory locations in the data model even if only one location exists now.
+
+STEP 6 — SALES MODEL
+
+Allow:
+
+* Pre-order
+* Pre-made inventory
+* Both
+
+PRE-ORDER SETTINGS
+
+Include:
+
+* Opening date
+* Closing date
+* Minimum order quantity
+* Maximum order quantity
+* Production start date
+* Estimated completion date
+* Estimated shipping date
+* Deposit requirement if supported
+* Pre-order disclaimer
+* Funding progress
+* Units ordered
+* Units needed to fund production
+
+PRE-MADE SETTINGS
+
+Include:
+
+* Available inventory
+* Restock threshold
+* Fulfillment location
+* Ready-to-ship status
+
+BOTH
+
+Allow the Seller to maintain ready stock and accept pre-orders after stock runs out.
+
+STEP 7 — FULFILLMENT
+
+Include:
+
+* Fulfilled by Seller
+* Fulfilled by Manufacturer
+* Mixed fulfillment
+
+Fields:
+
+* Product weight
+* Package length
+* Package width
+* Package height
+* Shipping profile
+* Processing time
+* Country of origin
+* Customs information
+* Harmonized code field
+
+STEP 8 — MANUFACTURING
+
+Allow:
+
+* No manufacturer yet
+* Assign existing manufacturer
+* Request quote
+* Send product details
+* Upload tech pack
+* Upload design files
+* Upload measurements
+* Add target cost
+* Add required quantity
+* Add production deadline
+
+Do not require a manufacturer to publish the product.
+
+STEP 9 — STOREFRONT
+
+Include:
+
+* Active
+* Draft
+* Scheduled
+* Hidden
+* Archived
+
+Allow:
+
+* Add to collection
+* Feature on homepage
+* Product URL handle
+* SEO title
+* SEO description
+* Search visibility
+* Product badge
+* Related products
+
+STEP 10 — REVIEW AND PUBLISH
+
+Show a complete product preview.
+
+Include:
+
+* Product media
+* Name
+* Price
+* Variants
+* Inventory
+* Sales model
+* Fulfillment
+* Manufacturer assignment
+* Store visibility
+* SEO
+* Warnings
+* Missing required information
+
+Buttons:
+
+* Save draft
+* Publish product
+* Schedule product
+
+Do not allow publishing until required fields are valid.
+
+PRODUCT DETAIL PAGE
+
+Create tabs:
+
+1. Overview
+2. Variants
+3. Inventory
+4. Orders
+5. Production
+6. Content
+7. Analytics
+8. Store page
+
+OVERVIEW
+
+Show:
+
+* Product status
+* Sales model
+* Price
+* Inventory
+* Units sold
+* Revenue
+* Profit estimate
+* Manufacturer
+* Store visibility
+* Last updated
+
+VARIANTS
+
+Allow:
+
+* Add variant
+* Edit variant
+* Bulk edit price
+* Bulk edit inventory
+* Bulk edit status
+* Delete variant
+
+INVENTORY
+
+Show:
+
+* Inventory by location
+* Inventory by variant
+* Adjust stock
+* Transfer stock
+* Inventory history
+* Reserved stock
+* Incoming stock
+* Low-stock alerts
+
+ORDERS
+
+Show all orders containing this product.
+
+PRODUCTION
+
+Show:
+
+* Manufacturer
+* Quote
+* Sample status
+* Production stage
+* Units in production
+* Estimated completion
+* Quality check
+* Shipment tracking
+
+CONTENT
+
+Show Seller posts where the product is tagged.
+
+Include:
+
+* Thumbnail
+* Views
+* Product clicks
+* Add-to-cart actions
+* Purchases
+* Revenue attributed to post
+
+Allow:
+
+* Create post with this product
+* Remove invalid product tags
+* View post analytics
+
+ANALYTICS
+
+Show:
+
+* Revenue
+* Units sold
+* Conversion rate
+* Product page views
+* Add-to-cart rate
+* Refund rate
+* Return rate
+* Best variant
+* Best size
+* Best color
+* Inventory sell-through
+* Sales over time
+
+STORE PAGE
+
+Show a realistic Buyer product-page preview.
+
+Include:
+
+* Media gallery
+* Product name
+* Price
+* Sale price
+* Variant selector
+* Stock status
+* Pre-order information
+* Add to cart
+* Buy now
+* Description
+* Materials
+* Care
+* Shipping estimate
+* Return policy
+* Reviews
+* Related products
+* Seller profile link
+
+PRODUCT SEARCH
+
+Search by:
+
+* Product name
+* SKU
+* Barcode
+* Tag
+* Collection
+* Status
+* Variant
+* Manufacturer
+
+PRODUCT IMPORT
+
+Create an import screen for:
+
+* CSV import
+* Shopify import placeholder
+* Manual bulk entry
+
+Do not claim Shopify import works unless it is actually connected.
+
+Create a separated import service and demo flow where necessary.
+
+DUPLICATE PRODUCT
+
+Allow duplicating:
+
+* Basic info
+* Media
+* Variants
+* Pricing
+* Inventory settings
+* Fulfillment
+* Store settings
+
+Do not copy:
+
+* Orders
+* Analytics
+* Reviews
+* Production history
+
+ARCHIVE AND DELETE
+
+Archive should preserve the product and remove it from active store visibility.
+
+Delete should require confirmation.
+
+Do not allow deleting a product tied to active orders without showing a warning.
+
+PRODUCT TAGGING IN CONTENT
+
+Update the Seller content system so Sellers can tag products created in this Products system.
+
+Only allow tagging products that are:
+
+* Active
+* Scheduled
+* Draft, when saving content as draft
+
+Do not allow archived or deleted products to be newly tagged.
+
+THREAD SHOPPING
+
+When a Seller post includes a product tag:
+
+* Show shopping bag action
+* Show product card
+* Open product detail
+* Preserve the correct selected variant where relevant
+* Track product click analytics
+
+DATA MODELS
+
+Create or update typed models for:
+
+* Product
+* ProductMedia
+* ProductVariant
+* ProductOption
+* ProductInventory
+* InventoryLocation
+* InventoryAdjustment
+* ProductPricing
+* ProductFulfillment
+* ProductPreorderSettings
+* ProductManufacturing
+* ProductStoreSettings
+* ProductSEO
+* ProductAnalytics
+* ProductCollection
+* ProductTag
+
+SERVICES
+
+Use the existing backend.
+
+Do not install a second backend.
+
+Create or update strongly typed services for:
+
+* Create product
+* Update product
+* Duplicate product
+* Archive product
+* Delete product
+* Publish product
+* Schedule product
+* Upload product media
+* Create variants
+* Adjust inventory
+* Search products
+* Filter products
+* Product analytics
+* Product tagging
+* Store visibility
+
+If backend features are incomplete, create separate local demo services without mixing demo logic into the UI.
+
+NAVIGATION
+
+Products must be reachable from:
+
+* Seller bottom navigation
+* Seller Dashboard
+* Seller Profile
+* More menu
+* Global search
+* Go to menu
+
+Add Product must be reachable from:
+
+* Products tab
+* Dashboard quick actions
+* Empty state
+* Studio project export
+* Manufacturer quote flow
+
+TESTING
+
+Test these exact paths:
+
+1. Open Products.
+2. Create a draft product.
+3. Add product media.
+4. Add price and cost.
+5. Create size variants.
+6. Create color variants.
+7. Generate variant combinations.
+8. Set inventory.
+9. Set low-stock threshold.
+10. Choose pre-order.
+11. Choose pre-made.
+12. Choose both.
+13. Assign a manufacturer.
+14. Configure fulfillment.
+15. Configure storefront.
+16. Publish a product.
+17. Open product details.
+18. Edit a product.
+19. Duplicate a product.
+20. Archive a product.
+21. Restore an archived product.
+22. Search products.
+23. Filter products.
+24. Create content from a product.
+25. Tag the product in a Seller post.
+26. Confirm the product appears on Seller Profile.
+27. Confirm the product appears in Thread shopping.
+28. Open the Buyer product page.
+29. Test variant selection.
+30. Test pre-order information.
+31. Test inventory updates.
+32. Test low-stock alerts.
+33. Test delete confirmation.
+34. Restart the app.
+35. Confirm drafts persist.
+36. Confirm published products persist.
+37. Fix all TypeScript errors.
+38. Fix all routing errors.
+39. Fix all runtime errors.
+40. Fix all console errors caused by this system.
+
+Do not stop after creating static product screens.
+
+Build the complete working product flow, typed data models, navigation, validation, demo services where necessary, product details, inventory integration, content tagging, and Buyer product preview.
+
+When complete, respond with only:
+
+“The Brandthread Products system is installed and working.”
