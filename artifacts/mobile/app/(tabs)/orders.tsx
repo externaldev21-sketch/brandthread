@@ -531,6 +531,11 @@ export default function OrdersScreen() {
   const headerRight = (
     <View style={s.headerRight}>
       <IconButton
+        name="bar-chart-2"
+        onPress={() => router.push('/(tabs)/analytics' as never)}
+        color={FG}
+      />
+      <IconButton
         name="search"
         onPress={() => {
           setSearchActive(v => !v);

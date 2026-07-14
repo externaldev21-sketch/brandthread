@@ -10,3 +10,4 @@
 - [Inventory System Architecture](inventory-system-architecture.md) — inventoryTypes.ts + inventoryService.ts; 7 screens (hub + 6 detail); AsyncStorage inv:*:v1 keys; demo seeds 6 items + 2 locations.
 - [Store Builder Architecture](store-builder-architecture.md) — storeTypes.ts + storeService.ts; 20 screens; bt:store:v1 key; no dynamic imports in service; StoreValidationResult from storeService not storeTypes.
 - [Design Studio Architecture](design-studio-architecture.md) — designTypes.ts + designService.ts; 17 screens; bt:design:*:v1 keys; mock AI in service; textColor/fillColor field names; no local color names.
+- [Analytics System Architecture](analytics-system-architecture.md) — 10 screens, 2 service files, all 9 nav entry points wired; no chart library (custom View bars); useColors() avoided; bt:analytics:*:v1 keys.

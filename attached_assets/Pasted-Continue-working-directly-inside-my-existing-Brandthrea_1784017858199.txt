@@ -1,0 +1,929 @@
+Continue working directly inside my existing Brandthread Expo React Native project.
+
+Do not explain the code to me.
+Do not give me an outline.
+Do not give me sample code.
+Do not ask me to manually edit files.
+
+Inspect the current project, edit it directly, run the app, test everything, and fix all errors.
+
+Build the complete Brandthread Seller Analytics system.
+
+Do not redesign onboarding.
+
+Do not break:
+
+- Authentication
+- Seller Dashboard
+- Seller Profile
+- Seller content creation
+- Buyer Thread
+- Products
+- Orders
+- Inventory
+- Manufacturer Hub
+- Store Builder
+- Design Studio
+- Customers
+- Marketing
+- Existing navigation
+- Existing Brandthread logo integration
+
+CORE GOAL
+
+Create one premium Analytics system that helps Sellers understand:
+
+- How much money they are making
+- What products are performing best
+- What content is driving sales
+- Where customers are coming from
+- How their storefront is performing
+- Which marketing campaigns are profitable
+- Which inventory needs attention
+- Whether production is profitable
+- What they should do next
+
+Analytics must use the same premium Brandthread design system as onboarding.
+
+Do not use the old green and gray design.
+
+ANALYTICS NAVIGATION
+
+Analytics must be reachable from:
+
+- More
+- Seller Home
+- Global search
+- Go To menu
+- Products
+- Seller Profile
+- Content hub
+- Marketing
+- Customers
+- Store Builder
+- Orders
+
+Create these main Analytics sections:
+
+1. Overview
+2. Sales
+3. Products
+4. Customers
+5. Content
+6. Store
+7. Marketing
+8. Inventory
+9. Production
+10. Profit
+
+ANALYTICS HOME
+
+Create a premium analytics overview screen.
+
+Top area:
+
+- “Analytics”
+- Current date range
+- Comparison period
+- Export button
+- Refresh button
+- Last updated time
+
+DATE FILTERS
+
+Support:
+
+- Today
+- Yesterday
+- 7 days
+- 30 days
+- 90 days
+- This month
+- Last month
+- This year
+- Custom range
+
+COMPARISON OPTIONS
+
+Support:
+
+- Previous period
+- Previous month
+- Previous year
+- No comparison
+
+Preserve selected filters when moving between analytics sections.
+
+OVERVIEW METRICS
+
+Show:
+
+- Gross revenue
+- Net revenue
+- Profit estimate
+- Orders
+- Units sold
+- Store visitors
+- Conversion rate
+- Average order value
+- Returning customer rate
+- Refund rate
+- Product clicks
+- Content-attributed revenue
+- Marketing-attributed revenue
+- Pending payouts
+
+Each metric card must show:
+
+- Current value
+- Percentage change
+- Positive or negative direction
+- Comparison period
+- Small sparkline
+- Tap to open details
+
+Do not show fake random changes that move every time the screen reloads.
+
+Use stable demo data when real analytics are unavailable.
+
+REVENUE CHART
+
+Create an interactive revenue chart.
+
+Allow switching between:
+
+- Revenue
+- Orders
+- Profit
+- Visitors
+- Conversion
+
+Support:
+
+- Daily
+- Weekly
+- Monthly grouping
+
+Allow tapping chart points to show:
+
+- Date
+- Revenue
+- Orders
+- Units
+- Profit
+- Visitors
+
+Use an Expo-compatible chart solution.
+
+Do not install an incompatible dependency.
+
+If a chart library already exists, reuse it.
+
+SALES ANALYTICS
+
+Create a complete Sales Analytics screen.
+
+Show:
+
+- Gross sales
+- Discounts
+- Returns
+- Refunds
+- Shipping revenue
+- Taxes
+- Net sales
+- Cost of goods
+- Estimated fees
+- Estimated profit
+- Profit margin
+
+Include charts for:
+
+- Sales over time
+- Orders over time
+- Units sold over time
+- Average order value
+- Refunds over time
+
+SALES BREAKDOWNS
+
+Allow breakdown by:
+
+- Product
+- Collection
+- Order source
+- Storefront
+- Thread post
+- Marketing campaign
+- Customer type
+- Location
+- Discount code
+- Pre-order
+- Pre-made
+- Seller fulfilled
+- Manufacturer fulfilled
+
+PRODUCT ANALYTICS
+
+Create Product Analytics.
+
+Show:
+
+- Top products by revenue
+- Top products by units sold
+- Top products by profit
+- Most viewed products
+- Highest conversion products
+- Lowest conversion products
+- Most returned products
+- Most refunded products
+- Best pre-order products
+- Low-performing products
+
+Each product row must show:
+
+- Product image
+- Product name
+- Revenue
+- Units sold
+- Conversion rate
+- Profit
+- Refund rate
+- Inventory status
+- Tap to open Product Details
+
+PRODUCT DETAIL ANALYTICS
+
+For each product show:
+
+- Product-page views
+- Unique visitors
+- Add-to-cart rate
+- Checkout-start rate
+- Purchase conversion
+- Units sold
+- Revenue
+- Profit estimate
+- Average selling price
+- Discount usage
+- Refund rate
+- Return rate
+- Best size
+- Best color
+- Best variant
+- Inventory sell-through
+- Days of stock remaining
+- Content-attributed sales
+- Campaign-attributed sales
+
+CONTENT ANALYTICS
+
+Create analytics for Seller posts.
+
+Show:
+
+- Views
+- Unique viewers
+- Likes
+- Comments
+- Reposts
+- Saves
+- Shares
+- Profile visits
+- Product clicks
+- Add-to-cart actions
+- Purchases
+- Revenue attributed
+- Average watch time
+- Completion rate
+- Audience retention
+- Slideshow swipe-through rate
+- Follower growth
+
+CONTENT RANKINGS
+
+Show:
+
+- Best-performing videos
+- Best-performing slideshows
+- Highest-revenue posts
+- Highest product-click posts
+- Highest completion-rate posts
+- Lowest-performing posts
+
+Each post card must show:
+
+- Thumbnail
+- Post type
+- Views
+- Engagement
+- Product clicks
+- Revenue
+- Publish date
+- Open post analytics
+
+VIDEO RETENTION
+
+Create a retention graph for video posts.
+
+Show:
+
+- 0%
+- 25%
+- 50%
+- 75%
+- 100%
+
+Show drop-off points.
+
+Compare:
+
+- Average watch time
+- Video duration
+- Completion rate
+
+Allow filters for:
+
+- 10-second videos
+- 15-second videos
+- 30-second videos
+- 60-second videos
+
+STOREFRONT ANALYTICS
+
+Create Store Analytics.
+
+Show:
+
+- Store visitors
+- Unique visitors
+- Sessions
+- Product-page views
+- Collection views
+- Search usage
+- Add-to-cart rate
+- Checkout-start rate
+- Purchase conversion
+- Bounce estimate
+- Average session duration
+- Returning visitors
+- Mobile traffic
+- Top landing pages
+- Top exit pages
+
+STOREFRONT FUNNEL
+
+Create a conversion funnel:
+
+1. Store visit
+2. Product view
+3. Added to cart
+4. Checkout started
+5. Purchase completed
+
+Show:
+
+- Count at each stage
+- Percentage conversion
+- Drop-off percentage
+
+Allow opening the affected Store Builder section.
+
+STORE SECTION PERFORMANCE
+
+Show performance for:
+
+- Hero section
+- Product grid
+- Featured collection
+- Seller content section
+- Email signup
+- Drop countdown
+- Announcement bar
+- Product recommendations
+
+Show:
+
+- Views
+- Clicks
+- Click-through rate
+- Purchases influenced
+
+CUSTOMER ANALYTICS
+
+Create Customer Analytics.
+
+Show:
+
+- Total customers
+- New customers
+- Returning customers
+- Repeat customer rate
+- Average customer value
+- Customer lifetime value
+- Purchase frequency
+- Average days between orders
+- Customer retention
+- Churn risk
+- VIP customer count
+- At-risk customer count
+
+CUSTOMER COHORTS
+
+Create cohort views by:
+
+- First purchase month
+- Acquisition source
+- First product purchased
+- First campaign
+- First Seller post interaction
+
+Show repeat purchase behavior over time.
+
+CUSTOMER LOCATION
+
+Show customer breakdown by:
+
+- Country
+- State or region
+- City when available
+
+Do not expose exact customer addresses in analytics.
+
+MARKETING ANALYTICS
+
+Create Marketing Analytics.
+
+Show:
+
+- Marketing revenue
+- Campaign revenue
+- Email revenue
+- SMS revenue
+- Discount revenue
+- Automation revenue
+- Influencer revenue
+- Referral revenue
+- Abandoned checkout recovered
+- Return on marketing spend where cost data exists
+
+CAMPAIGN METRICS
+
+Show:
+
+- Recipients
+- Delivered
+- Opens
+- Clicks
+- Orders
+- Revenue
+- Conversion rate
+- Unsubscribes
+- Failed deliveries
+- Revenue per recipient
+
+Do not show open-rate metrics as verified when the provider does not supply them.
+
+INFLUENCER ANALYTICS
+
+Show:
+
+- Influencer
+- Views
+- Clicks
+- Orders
+- Revenue
+- Commission
+- Return on cost
+- Discount usage
+- Referral link performance
+
+REFERRAL ANALYTICS
+
+Show:
+
+- Shares
+- Clicks
+- Referred customers
+- Orders
+- Revenue
+- Rewards issued
+- Top advocates
+
+INVENTORY ANALYTICS
+
+Create Inventory Analytics.
+
+Show:
+
+- Inventory value
+- Units on hand
+- Units available
+- Units reserved
+- Units incoming
+- Low-stock products
+- Out-of-stock products
+- Dead stock estimate
+- Sell-through rate
+- Inventory turnover
+- Days of stock remaining
+- Damaged inventory value
+
+Show:
+
+- Fastest-selling products
+- Slowest-selling products
+- Most overstocked products
+- Products likely to run out
+- Restock recommendations
+
+PRODUCTION ANALYTICS
+
+Create Manufacturer and Production Analytics.
+
+Show:
+
+- Active production jobs
+- Units in production
+- Production value
+- Average lead time
+- Average sample time
+- On-time completion rate
+- Delayed jobs
+- Quality-control failure rate
+- Average manufacturer response time
+- Average unit cost
+
+MANUFACTURER PERFORMANCE
+
+Show:
+
+- Manufacturer
+- Products produced
+- Total units
+- Total spend
+- Average unit cost
+- Average lead time
+- Delay rate
+- Quality issue rate
+- Sample approval rate
+- Seller rating
+
+Do not present demo ratings as verified.
+
+PROFIT ANALYTICS
+
+Create a Profit Analytics screen.
+
+Show:
+
+- Gross revenue
+- Net revenue
+- Product cost
+- Manufacturer cost
+- Packaging cost
+- Shipping cost
+- Platform fees
+- Payment fees
+- Refunds
+- Marketing cost
+- Influencer cost
+- Estimated profit
+- Profit margin
+
+Allow:
+
+- Product-level profit
+- Order-level profit
+- Campaign-level profit
+- Collection-level profit
+- Date-based profit
+
+Clearly label estimates when exact costs are missing.
+
+Do not confuse revenue with profit.
+
+PAYOUT ANALYTICS
+
+Show:
+
+- Available balance
+- Pending balance
+- Held funds
+- Next payout
+- Total paid out
+- Manufacturer allocation
+- Shipping allocation
+- Dispute holds
+- Refund impact
+
+Do not claim money movement unless confirmed by the payment provider.
+
+ATTRIBUTION
+
+Create a shared attribution model.
+
+Support:
+
+- Seller post attribution
+- Marketing campaign attribution
+- Discount attribution
+- Influencer attribution
+- Referral attribution
+- Storefront section attribution
+
+Use configurable windows such as:
+
+- Same session
+- 1 day
+- 7 days
+- 30 days
+
+Do not double-count the same order across multiple sources.
+
+Show primary attribution and assisted attribution separately where possible.
+
+INSIGHTS
+
+Create a premium “Brandthread Insights” section.
+
+Generate useful recommendations based on available data.
+
+Examples:
+
+- “Your 15-second videos convert better than 30-second videos.”
+- “Black medium hoodies may sell out in six days.”
+- “Your Store hero receives views but few product clicks.”
+- “Returning customers spend more than first-time customers.”
+- “Your latest email campaign drove 18 orders.”
+- “This product has high views but low conversion.”
+- “Your manufacturer’s average lead time increased.”
+
+Each insight must include:
+
+- What happened
+- Why it matters
+- Recommended action
+- Open relevant screen
+- Dismiss
+- Mark completed
+
+Do not create random or unsupported insights.
+
+Use stable demo insights only when real data is unavailable.
+
+NEXT BEST ACTION
+
+Connect Analytics to Seller Home’s Next Best Action.
+
+Examples:
+
+- Restock a product
+- Improve a low-converting product page
+- Create content for a high-performing product
+- Review a delayed manufacturer job
+- Send a campaign to an at-risk segment
+- Fix a storefront drop-off point
+
+REAL-TIME AND REFRESH
+
+When supported:
+
+- Pull to refresh
+- Refresh button
+- Loading state
+- Last updated time
+
+Do not claim analytics are real-time unless the backend is truly real-time.
+
+Use accurate wording such as:
+
+- Updated recently
+- Updated 5 minutes ago
+- Data through yesterday
+
+EXPORTS
+
+Allow analytics export by:
+
+- Overview
+- Sales
+- Products
+- Customers
+- Content
+- Store
+- Marketing
+- Inventory
+- Production
+- Profit
+
+Support:
+
+- CSV
+- Shareable summary
+- PDF only if PDF export already exists
+
+Do not claim export succeeded until the file is generated.
+
+ANALYTICS EMPTY STATES
+
+Use polished empty states.
+
+Overview:
+“Your analytics will appear after your brand starts receiving activity.”
+
+Products:
+“Product performance will appear after products receive views or orders.”
+
+Content:
+“Publish Seller content to begin tracking performance.”
+
+Marketing:
+“Campaign performance will appear after campaigns are sent.”
+
+Customers:
+“Customer insights will appear as customers shop your brand.”
+
+Inventory:
+“Inventory insights will appear after products and stock are added.”
+
+Production:
+“Production performance will appear after working with manufacturers.”
+
+Each empty state must include a useful next action.
+
+DATA MODELS
+
+Create or update typed models for:
+
+- AnalyticsDateRange
+- AnalyticsComparison
+- AnalyticsMetric
+- AnalyticsPoint
+- AnalyticsOverview
+- SalesAnalytics
+- ProductAnalytics
+- ProductVariantAnalytics
+- CustomerAnalytics
+- CustomerCohort
+- ContentAnalytics
+- VideoRetentionPoint
+- StoreAnalytics
+- StoreFunnel
+- StoreSectionAnalytics
+- MarketingAnalytics
+- CampaignAnalytics
+- InfluencerAnalytics
+- ReferralAnalytics
+- InventoryAnalytics
+- ProductionAnalytics
+- ManufacturerAnalytics
+- ProfitAnalytics
+- PayoutAnalytics
+- AttributionRecord
+- AnalyticsInsight
+- AnalyticsExport
+
+SERVICES
+
+Use the existing backend.
+
+Do not install a second backend.
+
+Create or update strongly typed services for:
+
+- Get analytics overview
+- Get sales analytics
+- Get product analytics
+- Get customer analytics
+- Get content analytics
+- Get video retention
+- Get store analytics
+- Get marketing analytics
+- Get inventory analytics
+- Get production analytics
+- Get manufacturer analytics
+- Get profit analytics
+- Get payout analytics
+- Calculate attribution
+- Generate analytics insights
+- Export analytics
+- Refresh analytics cache
+
+Keep mock analytics services separate from UI components.
+
+Do not generate random values directly inside screens.
+
+DESIGN CONSISTENCY
+
+Every Analytics screen must match the Brandthread onboarding and Seller design system.
+
+Use:
+
+- Deep black and charcoal backgrounds
+- Purple and blue primary accents
+- Controlled green for positive performance
+- Controlled red or orange for warnings
+- Rounded cards
+- Premium typography
+- Clear metric hierarchy
+- Smooth chart animations
+- Styled filters
+- Styled loading states
+- Styled empty states
+- Styled error states
+- No old green and gray layouts
+- No white flashes
+
+Use the official Brandthread B logo only where system branding is appropriate.
+
+Do not replace Seller-owned profile logos.
+
+MOBILE LAYOUT
+
+Make charts readable on mobile.
+
+Avoid:
+
+- Tiny labels
+- Cramped cards
+- Horizontal overflow
+- Text wrapping one letter per line
+- Overloaded dashboards
+
+Use:
+
+- Responsive card grids
+- Horizontal chart scrolling only when necessary
+- Bottom sheets for filters
+- Full-screen chart mode
+- Clear touch targets
+
+TESTING
+
+Test these exact paths:
+
+1. Open Analytics.
+2. Change date range.
+3. Change comparison period.
+4. Open Overview.
+5. Open Sales.
+6. Open Products.
+7. Open Customers.
+8. Open Content.
+9. Open Store.
+10. Open Marketing.
+11. Open Inventory.
+12. Open Production.
+13. Open Profit.
+14. Open Payout analytics.
+15. Test revenue chart.
+16. Switch chart metric.
+17. Switch daily, weekly, and monthly grouping.
+18. Tap chart points.
+19. Open a Product from analytics.
+20. Open a Seller post from analytics.
+21. Open a campaign from analytics.
+22. Open a customer segment from analytics.
+23. Open inventory alert from analytics.
+24. Open manufacturer performance.
+25. Test storefront funnel.
+26. Test video retention graph.
+27. Test campaign attribution.
+28. Test Seller-post attribution.
+29. Test discount attribution.
+30. Confirm refunded orders adjust revenue.
+31. Confirm cancelled orders do not count as completed sales.
+32. Confirm profit differs from revenue.
+33. Confirm inventory value uses cost, not retail price.
+34. Test insights.
+35. Apply an insight action.
+36. Dismiss an insight.
+37. Test Next Best Action integration.
+38. Pull to refresh.
+39. Export CSV.
+40. Restart the app.
+41. Confirm filters persist where appropriate.
+42. Confirm demo data remains stable.
+43. Confirm no random metric changes occur on refresh.
+44. Confirm Seller Home analytics update.
+45. Confirm Product analytics update.
+46. Confirm Content analytics update.
+47. Confirm Marketing analytics update.
+48. Confirm Inventory analytics update.
+49. Confirm Manufacturer analytics update.
+50. Fix all TypeScript errors.
+51. Fix all routing errors.
+52. Fix all runtime errors.
+53. Fix all console errors caused by this system.
+54. Confirm onboarding remains unchanged.
+55. Confirm Buyer and Seller accounts still work.
+56. Confirm the official Brandthread logo still displays correctly.
+
+Do not stop after creating static analytics cards.
+
+Build the complete working Analytics system, responsive charts, stable data services, attribution, insights, exports, integrations, typed models, navigation, and full testing.
+
+When complete, respond with only:
+
+“The Brandthread Analytics system is installed and working.”

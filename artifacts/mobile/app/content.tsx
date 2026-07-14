@@ -82,14 +82,23 @@ export default function ContentScreen() {
           <Feather name="arrow-left" size={20} color={FG} />
         </TouchableOpacity>
         <Text style={s.title}>Content</Text>
-        <TouchableOpacity
-          style={s.createBtn}
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/create-post' as never); }}
-          activeOpacity={0.85}
-        >
-          <Feather name="plus" size={15} color="#0A0B0A" />
-          <Text style={s.createText}>Create</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            style={s.analyticsBtn}
+            onPress={() => router.push('/(tabs)/analytics' as never)}
+            activeOpacity={0.8}
+          >
+            <Feather name="bar-chart-2" size={17} color={FG} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={s.createBtn}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/create-post' as never); }}
+            activeOpacity={0.85}
+          >
+            <Feather name="plus" size={15} color="#0A0B0A" />
+            <Text style={s.createText}>Create</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
@@ -212,6 +221,7 @@ const s = StyleSheet.create({
   header:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
   backBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   title:   { flex: 1, fontSize: 22, fontFamily: 'Inter_700Bold', color: FG },
+  analyticsBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   createBtn:{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: GREEN, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 9 },
   createText:{ fontSize: 13, fontFamily: 'Inter_700Bold', color: '#0A0B0A' },
   statsRow: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 12 },

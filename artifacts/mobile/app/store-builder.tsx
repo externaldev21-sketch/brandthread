@@ -160,6 +160,7 @@ export default function StoreBuilderScreen() {
                 {[
                   { label: 'Preview', route: '/store-preview' },
                   { label: 'Edit Store', route: '/store-editor' },
+                  { label: 'Analytics', route: '/(tabs)/analytics' },
                   { label: 'Publish', route: '/store-publish' },
                   { label: 'Settings', route: '/store-settings' },
                 ].map(({ label, route }) => (

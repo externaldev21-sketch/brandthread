@@ -32,7 +32,20 @@ export default function CustomersScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScreenHeader title="Customers" subtitle="CRM, loyalty & rewards" />
+      <ScreenHeader
+        title="Customers"
+        subtitle="CRM, loyalty & rewards"
+        rightElement={
+          <TouchableOpacity
+            onPress={() => router.push('/(tabs)/analytics' as never)}
+            hitSlop={10}
+            activeOpacity={0.7}
+            style={[styles.analyticsBtnHdr, { borderColor: colors.border, backgroundColor: colors.card }]}
+          >
+            <Feather name="bar-chart-2" size={18} color={colors.foreground} />
+          </TouchableOpacity>
+        }
+      />
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
@@ -151,6 +164,7 @@ const styles = StyleSheet.create({
   stat: { flex: 1, borderRadius: 12, padding: 10, borderWidth: 1, alignItems: 'center', gap: 3 },
   statVal: { fontSize: 14, fontFamily: 'Inter_700Bold' },
   statLabel: { fontSize: 10, fontFamily: 'Inter_400Regular' },
+  analyticsBtnHdr: { width: 36, height: 36, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   loyaltyCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderRadius: 14, padding: 14, borderWidth: 1, marginBottom: 16 },
   loyaltyLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   loyaltyTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },

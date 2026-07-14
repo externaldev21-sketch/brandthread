@@ -90,10 +90,18 @@ export default function MarketingScreen() {
         >
           <Feather name="chevron-left" size={20} color={colors.foreground} />
         </TouchableOpacity>
-        <View>
+        <View style={{ flex: 1 }}>
           <Text style={[styles.pageTitle, { color: colors.foreground }]}>Marketing</Text>
           <Text style={[styles.pageSubtitle, { color: colors.mutedForeground }]}>Campaigns, discounts & automation</Text>
         </View>
+        <TouchableOpacity
+          onPress={() => router.push('/(tabs)/analytics' as never)}
+          hitSlop={10}
+          activeOpacity={0.7}
+          style={[styles.backBtn, { borderColor: colors.border, backgroundColor: colors.card }]}
+        >
+          <Feather name="bar-chart-2" size={18} color={colors.foreground} />
+        </TouchableOpacity>
       </View>
 
       {/* Stats Row */}
