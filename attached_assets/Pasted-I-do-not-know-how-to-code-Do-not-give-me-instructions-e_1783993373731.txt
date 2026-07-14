@@ -1,0 +1,482 @@
+I do not know how to code. Do not give me instructions, explanations, partial code, or ask me to manually edit files.
+
+You must directly update my Brandthread Expo React Native project for me.
+
+Your task is to completely replace my current onboarding process with a polished, fully working mobile onboarding flow.
+
+Do not redesign the rest of the app. Only work on onboarding and connect the final screens to the existing Buyer and Seller home screens.
+
+APP NAME:
+Brandthread
+
+TECH:
+
+* Expo
+* React Native
+* TypeScript
+* Expo Router
+* Mobile-first
+* Must work inside Replit and Expo Go
+
+IMPORTANT RULES:
+
+* Inspect my current project before editing anything.
+* Reuse my current routing structure when possible.
+* Fix all TypeScript, dependency, routing, import, and runtime errors yourself.
+* Do not leave placeholder buttons.
+* Every button must work.
+* Every screen must fit correctly on a mobile phone.
+* The keyboard must not cover inputs.
+* Add smooth animations and haptic feedback.
+* Preserve any existing Buyer Thread and Seller Dashboard pages.
+* Do not delete important existing app features.
+* Do not make me create files manually.
+* Install any required compatible Expo packages yourself.
+* Run the app and fix every error before telling me it is finished.
+
+DESIGN STYLE:
+Create a premium global fashion-tech design.
+
+The app should feel like a combination of:
+
+* Apple
+* Shopify
+* Pinterest
+* Instagram
+* Procreate
+* Alibaba
+
+Use:
+
+* Dark black background
+* Soft purple, blue, cyan, and green gradient accents
+* Large clean headings
+* Rounded cards
+* Strong contrast
+* Modern typography
+* Soft glass effects
+* Subtle glows
+* Smooth transitions
+* Premium loading animations
+* Fast and fluid interactions
+
+Do not make it look childish, overly colorful, cheap, cluttered, or like TikTok.
+
+BRANDTHREAD ACCOUNT TYPES:
+There are only two account types:
+
+1. Buyer
+2. Seller
+
+BUYER HOME:
+The Buyer home page is called “Thread.”
+
+SELLER HOME:
+The Seller home page is called “Dashboard.”
+
+CREATE THIS COMPLETE ONBOARDING FLOW:
+
+SCREEN 1 — SPLASH SCREEN
+
+* Full black background
+* Animated Brandthread logo in the center
+* Text: “BRANDTHREAD”
+* Subtitle: “Build it. Wear it. Scale it.”
+* Automatically continue after about 2 seconds
+* Add a smooth fade and scale animation
+
+SCREEN 2 — WELCOME SCREEN
+Headline:
+“Your entire fashion world, in one place.”
+
+Description:
+“Discover the next brand or build a million-dollar clothing company from your phone.”
+
+Show four small feature cards:
+
+* Design
+* Manufacture
+* Sell
+* Scale
+
+Main button:
+“Get started”
+
+Small legal text:
+“By continuing, you agree to Brandthread’s Terms and Privacy Policy.”
+
+SCREEN 3 — ACCOUNT TYPE
+Headline:
+“How will you use Brandthread?”
+
+Description:
+“You can explore both sides later. We’ll personalize your first experience now.”
+
+Two large selectable cards:
+
+Buyer card:
+Title: “I’m here to shop”
+Description:
+“Discover brands, watch content and buy products directly from the Thread.”
+
+Seller card:
+Title: “I’m building a brand”
+Description:
+“Design, manufacture, launch, sell and manage everything in one workspace.”
+
+The Continue button must stay disabled until one option is selected.
+
+BUYER FLOW:
+
+SCREEN 4 — BUYER NAME
+Headline:
+“What should we call you?”
+
+Input:
+First name
+
+Continue should stay disabled until at least two characters are entered.
+
+SCREEN 5 — BUYER STYLE
+Headline:
+“What do you want to see?”
+
+Description:
+“Choose at least three. Your Thread will keep learning from what you watch and buy.”
+
+Selectable interests:
+
+* Streetwear
+* Luxury
+* Vintage
+* Athleisure
+* Basics
+* Accessories
+* Sneakers
+* Denim
+* Graphic tees
+* Minimal
+* Avant-garde
+* Sustainable fashion
+
+Require at least three selections.
+
+SCREEN 6 — BUYER ACCOUNT
+Headline:
+“Create your account”
+
+Inputs:
+
+* Email
+* Password
+
+Password must require at least eight characters.
+
+Also include:
+
+* Continue with Apple
+* Continue with Google
+
+Do not fake authentication. Connect these buttons to the project’s current authentication system if one exists. If authentication is not currently configured, create a clean temporary local development flow without breaking the app.
+
+SCREEN 7 — BUYER PERSONALIZATION LOADING
+Show an animated Brandthread logo.
+
+Loading steps:
+
+* Learning your style
+* Curating your Thread
+* Finding brands you’ll love
+* Finishing your profile
+
+Each step should animate and show a checkmark when complete.
+
+SCREEN 8 — BUYER PREVIEW
+Headline:
+“Your Thread is ready.”
+
+Show a realistic preview card of the Buyer Thread containing:
+
+* Brand name
+* Fashion video or image placeholder
+* Caption
+* Like icon
+* Comment icon
+* Repost icon
+* Save icon
+* Shopping bag icon
+* Tagged product area
+
+Button:
+“Enter my Thread”
+
+SCREEN 9 — BUYER NOTIFICATIONS
+Headline:
+“Never miss what matters.”
+
+Description:
+“Get drop alerts, friend requests, messages and order updates.”
+
+Show a notification toggle.
+
+Buttons:
+
+* Enable notifications
+* Not now
+
+SCREEN 10 — BUYER SUCCESS
+Headline:
+“Welcome to Brandthread.”
+
+Description:
+“Your next favorite brand is one swipe away.”
+
+Button:
+“Start exploring”
+
+The button must open the existing Buyer Thread home screen.
+
+SELLER FLOW:
+
+SCREEN 4 — SELLER NAME
+Headline:
+“What should we call you?”
+
+Input:
+First name
+
+SCREEN 5 — BRAND NAME
+Headline:
+“What are you building?”
+
+Description:
+“Use your current name, a working name, or change it later.”
+
+Input:
+Brand name
+
+Helper text:
+“Brandthread AI will use this to shape your workspace.”
+
+SCREEN 6 — BRAND STAGE
+Headline:
+“Where is your brand today?”
+
+Options:
+
+* Just an idea
+  “I’m starting from zero.”
+
+* Building now
+  “I’m designing or sourcing products.”
+
+* Already selling
+  “I have customers and active orders.”
+
+* Ready to scale
+  “I need stronger systems and growth.”
+
+SCREEN 7 — PRODUCT MODEL
+Headline:
+“How will you sell products?”
+
+Options:
+
+* Pre-order
+  “Collect orders first, then fund production.”
+
+* Pre-made inventory
+  “Stock products before customers purchase.”
+
+* Both
+  “Use pre-orders and stocked drops together.”
+
+SCREEN 8 — SELLER GOALS
+Headline:
+“What do you need help with?”
+
+Description:
+“Choose everything that matters right now.”
+
+Selectable goals:
+
+* Create designs
+* Find manufacturers
+* Launch my store
+* Manage production
+* Grow sales
+* Build content
+* Manage inventory
+* Ship orders
+* Understand analytics
+* Manage customers
+
+Require at least one selection.
+
+Button:
+“Build my workspace”
+
+SCREEN 9 — SELLER ACCOUNT
+Headline:
+“Create your account”
+
+Inputs:
+
+* Email
+* Password
+
+Also include:
+
+* Continue with Apple
+* Continue with Google
+
+Password must require at least eight characters.
+
+SCREEN 10 — SELLER WORKSPACE LOADING
+Show an animated Brandthread logo.
+
+Loading steps:
+
+* Mapping your brand workspace
+* Preparing your product pipeline
+* Connecting your growth tools
+* Finishing your dashboard
+
+Show each step completing with an animation and checkmark.
+
+SCREEN 11 — SELLER DASHBOARD PREVIEW
+Headline:
+“Your brand is ready.”
+
+Use the brand name entered by the user.
+
+Show a realistic preview of the Seller Dashboard containing:
+
+* Greeting using the seller’s first name
+* Revenue card
+* Orders card
+* Visitors card
+* Conversion card
+* Setup progress
+* Design Studio
+* Products
+* Manufacturer Hub
+* Store Builder
+* Orders
+* Analytics
+
+Button:
+“Open my dashboard”
+
+SCREEN 12 — SELLER NOTIFICATIONS
+Headline:
+“Never miss what matters.”
+
+Description:
+“Get order, production, payout and customer alerts instantly.”
+
+Show a notification toggle.
+
+Buttons:
+
+* Enable notifications
+* Not now
+
+SCREEN 13 — SELLER SUCCESS
+Headline:
+“Welcome to Brandthread.”
+
+Description:
+“Your brand now has one home for design, production, selling and growth.”
+
+Button:
+“Go to Dashboard”
+
+The button must open the existing Seller Dashboard.
+
+GLOBAL ONBOARDING REQUIREMENTS:
+
+* Show a progress bar after account type selection
+* Include a working back button
+* Save every answer as the user moves forward
+* Preserve answers when going backward
+* Save onboarding completion locally
+* Do not show onboarding again after completion
+* Add a developer reset option somewhere safe so onboarding can be tested again
+* Buyer and Seller must have separate flows
+* Use reusable components
+* Use proper TypeScript types
+* Use SafeAreaView
+* Use KeyboardAvoidingView
+* Make scrolling work on small phones
+* Handle validation properly
+* Buttons must clearly show disabled states
+* Add loading states
+* Add error handling
+* Add haptic feedback
+* Add smooth screen transitions
+* Avoid text overflowing
+* Avoid white flashes between screens
+* Keep the status bar styled correctly
+* Make the layout look polished on iPhone and Android
+
+DATA TO SAVE:
+
+* Account type
+* First name
+* Email
+* Brand name for Seller
+* Brand stage
+* Product model
+* Seller goals
+* Buyer interests
+* Notification preference
+* Onboarding completion status
+
+AUTHENTICATION:
+First inspect the project for:
+
+* Supabase
+* Firebase
+* Clerk
+* Existing custom authentication
+
+Use the authentication system already installed.
+
+Do not install a second authentication system.
+
+If no backend authentication exists, create a safe temporary development authentication service with clearly separated functions so real authentication can be connected later.
+
+ROUTING:
+
+* Buyer completion must route to the current Buyer Thread screen
+* Seller completion must route to the current Seller Dashboard screen
+* Do not create duplicate home screens if they already exist
+* Find the correct existing route names yourself
+* Fix redirect loops
+* Prevent completed users from being sent back to onboarding
+
+FINAL CHECK:
+After building everything:
+
+1. Run the project.
+2. Test the Buyer flow from beginning to end.
+3. Test the Seller flow from beginning to end.
+4. Test back buttons.
+5. Test disabled buttons.
+6. Test account input validation.
+7. Test keyboard behavior.
+8. Test local saved progress.
+9. Test restarting the app.
+10. Fix every visible error.
+11. Fix every console error.
+12. Fix every TypeScript error.
+13. Confirm Buyer routes to Thread.
+14. Confirm Seller routes to Dashboard.
+
+Do not stop after writing code.
+
+Actually edit the project, run it, and fix it.
+
+When everything is working, respond with only:
+“Brandthread onboarding is fully installed and working.”
