@@ -478,7 +478,7 @@ export default function SellerProfileScreen() {
             style={styles.statItem}
             onPress={() => Alert.alert('Following', 'Following list coming soon')}
           >
-            <Text style={styles.statNumber}>{formatCount(profile.following)}</Text>
+            <Text style={styles.statNumber}>{formatCount(profile?.following ?? 0)}</Text>
             <Text style={styles.statLabel}>Following</Text>
           </TouchableOpacity>
           <View style={styles.statDivider} />

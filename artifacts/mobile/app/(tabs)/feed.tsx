@@ -147,6 +147,10 @@ function initialEngagement(item: SpotlightItem): EngagementState {
   };
 }
 
+const DEFAULT_ENGAGEMENT: EngagementState = {
+  liked: false, likes: 0, saved: false, reposted: false, reposts: 0, following: false, comments: [],
+};
+
 function formatCount(n: number) {
   if (n >= 1000) return `${(n / 1000).toFixed(n % 1000 >= 100 ? 1 : 0)}K`;
   return String(n);
@@ -159,7 +163,7 @@ function SpotlightPage({
 }: {
   item: SpotlightItem;
   isActive: boolean;
-  engagement: EngagementState;
+  engagement: EngagementState | undefined;
   onLike: (id: string) => void;
   onDoubleTapLike: (id: string) => void;
   onSave: (id: string) => void;
@@ -258,7 +262,7 @@ function SpotlightPage({
               <Text style={styles.railAvatarText}>{item.initials}</Text>
             </View>
           </TouchableOpacity>
-          {!engagement.following && (
+          {!(engagement?.following) && (
             <TouchableOpacity
               onPress={() => onFollow(item.id)}
               activeOpacity={0.8}
@@ -276,9 +280,9 @@ function SpotlightPage({
           onPress={() => { onLike(item.id); bumpHeart(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
         >
           <Animated.View style={{ transform: [{ scale: heartScale }] }}>
-            <Ionicons name="heart" size={30} color={engagement.liked ? '#EF4444' : '#FFFFFF'} />
+            <Ionicons name="heart" size={30} color={engagement?.liked ? '#EF4444' : '#FFFFFF'} />
           </Animated.View>
-          <Text style={styles.railCount}>{formatCount(engagement.likes)}</Text>
+          <Text style={styles.railCount}>{formatCount(engagement?.likes ?? 0)}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -288,7 +292,7 @@ function SpotlightPage({
           onPress={() => onOpenComments(item.id)}
         >
           <Ionicons name="chatbubble" size={26} color="#FFFFFF" />
-          <Text style={styles.railCount}>{formatCount(engagement.comments.length)}</Text>
+          <Text style={styles.railCount}>{formatCount((engagement?.comments ?? []).length)}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -300,8 +304,8 @@ function SpotlightPage({
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           }}
         >
-          <Ionicons name="repeat" size={28} color={engagement.reposted ? item.accentColor : '#FFFFFF'} />
-          <Text style={styles.railCount}>{formatCount(engagement.reposts)}</Text>
+          <Ionicons name="repeat" size={28} color={engagement?.reposted ? item.accentColor : '#FFFFFF'} />
+          <Text style={styles.railCount}>{formatCount(engagement?.reposts ?? 0)}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -310,7 +314,7 @@ function SpotlightPage({
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
           onPress={() => { onSave(item.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
         >
-          <Ionicons name="bookmark" size={27} color={engagement.saved ? item.accentColor : '#FFFFFF'} />
+          <Ionicons name="bookmark" size={27} color={engagement?.saved ? item.accentColor : '#FFFFFF'} />
           <Text style={styles.railCount}>Save</Text>
         </TouchableOpacity>
 
@@ -456,7 +460,7 @@ export default function FeedScreen() {
 
   function update(id: string, patch: Partial<EngagementState> | ((e: EngagementState) => Partial<EngagementState>)) {
     setEngagements(prev => {
-      const cur = prev[id];
+      const cur = prev[id] ?? DEFAULT_ENGAGEMENT;
       const delta = typeof patch === 'function' ? patch(cur) : patch;
       return { ...prev, [id]: { ...cur, ...delta } };
     });
@@ -468,7 +472,7 @@ export default function FeedScreen() {
 
   const handleDoubleTapLike = useCallback((id: string) => {
     setEngagements(prev => {
-      const e = prev[id];
+      const e = prev[id] ?? DEFAULT_ENGAGEMENT;
       if (e.liked) return prev;
       return { ...prev, [id]: { ...e, liked: true, likes: e.likes + 1 } };
     });
@@ -535,7 +539,7 @@ export default function FeedScreen() {
           <SpotlightPage
             item={item}
             isActive={index === activeIndex && !showNotifs}
-            engagement={engagements[item.id]}
+            engagement={engagements[item.id] ?? initialEngagement(item)}
             onLike={handleLike}
             onDoubleTapLike={handleDoubleTapLike}
             onSave={handleSave}
