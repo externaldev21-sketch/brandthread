@@ -23,7 +23,7 @@ export default function Slide04SignUp() {
           <div style={{fontSize:'2vh',fontWeight:800,color:'#FFF',letterSpacing:'-0.02em',marginBottom:'2vh'}}>ACCOUNT</div>
           {/* OAuth */}
           <div style={{border:'0.15vh solid #333',borderRadius:'1.2vh',padding:'1.2vh',display:'flex',alignItems:'center',justifyContent:'center',gap:'1vh',marginBottom:'1vh'}}>
-            <span style={{fontSize:'1.5vh'}}>🇬</span>
+            <img src="/google-logo.png" style={{width:'1.5vh',height:'1.5vh',objectFit:'contain'}} />
             <span style={{fontSize:'1.3vh',color:'rgba(255,255,255,0.8)',fontWeight:600}}>Continue with Google</span>
           </div>
           <div style={{background:'#FFF',borderRadius:'1.2vh',padding:'1.2vh',display:'flex',alignItems:'center',justifyContent:'center',gap:'1vh',marginBottom:'1.5vh'}}>
