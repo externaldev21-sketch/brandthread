@@ -27,7 +27,7 @@ export default function Slide04SignUp() {
             <span style={{fontSize:'1.3vh',color:'rgba(255,255,255,0.8)',fontWeight:600}}>Continue with Google</span>
           </div>
           <div style={{background:'#FFF',borderRadius:'1.2vh',padding:'1.2vh',display:'flex',alignItems:'center',justifyContent:'center',gap:'1vh',marginBottom:'1.5vh'}}>
-            <span style={{fontSize:'1.5vh'}}>🍎</span>
+            <img src="/apple-logo.png" style={{width:'1.5vh',height:'1.5vh',objectFit:'contain'}} />
             <span style={{fontSize:'1.3vh',color:'#000',fontWeight:600}}>Continue with Apple</span>
           </div>
           {/* Divider */}
