@@ -12,9 +12,7 @@ export default function Slide12BuildAnimation() {
         <div style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'0 4vh',gap:'2.5vh'}}>
           <div style={{position:'relative'}}>
             <div style={{position:'absolute',inset:'-3vh',borderRadius:'50%',background:'rgba(0,200,83,0.1)',filter:'blur(2vh)'}} />
-            <div style={{width:'9vh',height:'9vh',borderRadius:'2vh',background:'#00C853',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 0 5vh 2vh rgba(0,200,83,0.5)',position:'relative'}}>
-              <span style={{fontSize:'5vh',fontWeight:800,color:'#FFF'}}>B</span>
-            </div>
+            <img src="/brandthread-logo.png" style={{width:'9vh',height:'9vh',borderRadius:'2vh',objectFit:'cover',boxShadow:'0 0 5vh 2vh rgba(0,200,83,0.5)',position:'relative'}} alt="Brandthread" />
           </div>
           <div style={{textAlign:'center'}}>
             <div style={{fontSize:'2.2vh',fontWeight:800,color:'#FFF',letterSpacing:'-0.02em',marginBottom:'0.8vh'}}>Building your workspace</div>

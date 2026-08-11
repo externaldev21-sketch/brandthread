@@ -14,9 +14,7 @@ export default function Slide05SignIn() {
         <div style={{flex:1,overflow:'hidden',padding:'1.5vh 3vh 0'}}>
           <div style={{fontSize:'1.8vh',color:'rgba(255,255,255,0.4)',marginBottom:'1.5vh'}}>←</div>
           <div style={{display:'flex',alignItems:'center',gap:'1vh',marginBottom:'2.5vh'}}>
-            <div style={{width:'3vh',height:'3vh',borderRadius:'0.7vh',background:'#00C853',display:'flex',alignItems:'center',justifyContent:'center'}}>
-              <span style={{fontSize:'1.6vh',fontWeight:800,color:'#FFF'}}>B</span>
-            </div>
+            <img src="/brandthread-logo.png" style={{width:'3vh',height:'3vh',borderRadius:'0.7vh',objectFit:'cover'}} alt="Brandthread" />
             <span style={{fontSize:'1.4vh',fontWeight:700,color:'#FFF'}}>Brandthread</span>
           </div>
           <div style={{fontSize:'2.8vh',fontWeight:800,color:'#FFF',letterSpacing:'-0.03em',marginBottom:'0.5vh'}}>Welcome back.</div>

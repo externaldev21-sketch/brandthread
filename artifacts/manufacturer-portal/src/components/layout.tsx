@@ -31,9 +31,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <aside className="w-64 border-r border-border bg-card flex flex-col hidden md:flex shrink-0 z-10">
         <div className="h-16 flex items-center px-6 border-b border-border">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-primary text-primary-foreground rounded-sm flex items-center justify-center font-bold tracking-tighter">
-              B
-            </div>
+            <img src="/brandthread-logo.png" className="w-8 h-8 rounded-sm object-cover" alt="Brandthread" />
             <span className="font-semibold tracking-tight text-sm uppercase opacity-90">Brandthread</span>
           </div>
         </div>
@@ -83,9 +81,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         
         <header className="h-16 border-b border-border bg-background/80 backdrop-blur-sm flex items-center justify-between px-6 shrink-0 z-10 sticky top-0">
           <div className="flex items-center md:hidden">
-            <div className="w-8 h-8 bg-primary text-primary-foreground rounded-sm flex items-center justify-center font-bold tracking-tighter">
-              B
-            </div>
+            <img src="/brandthread-logo.png" className="w-8 h-8 rounded-sm object-cover" alt="Brandthread" />
           </div>
           
           <div className="flex-1"></div>

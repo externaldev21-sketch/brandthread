@@ -12,9 +12,7 @@ export default function Slide03Welcome() {
         <div style={{flex:1,overflow:'hidden',padding:'2vh 3vh 0'}}>
           {/* Brand row */}
           <div style={{display:'flex',alignItems:'center',gap:'1vh',marginBottom:'4vh'}}>
-            <div style={{width:'3.5vh',height:'3.5vh',borderRadius:'0.8vh',background:'#00C853',display:'flex',alignItems:'center',justifyContent:'center'}}>
-              <span style={{fontSize:'2vh',fontWeight:800,color:'#FFF'}}>B</span>
-            </div>
+            <img src="/brandthread-logo.png" style={{width:'3.5vh',height:'3.5vh',borderRadius:'0.8vh',objectFit:'cover'}} alt="Brandthread" />
             <span style={{fontSize:'1.6vh',fontWeight:700,color:'#FFF'}}>Brandthread</span>
           </div>
           {/* Headline */}
