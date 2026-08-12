@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, Alert,
-  StyleSheet, Dimensions,
+  View, Text, ScrollView, TouchableOpacity, Alert, Modal,
+  StyleSheet, Dimensions, Share, Pressable, RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -9,9 +9,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
+  BG, CARD, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN,
-  GRAD_PRIMARY, FONT, FS, SP, RADIUS, COMP, ICON,
+  GRAD_PRIMARY, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
   getMyProfile, getMyPosts, getMyReposts, getSavedItems,
@@ -62,17 +62,23 @@ export default function ProfileScreen() {
     return unsub;
   }, [loadData]);
 
+  const [menuVisible, setMenuVisible] = useState(false);
+
   const handleMenu = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert('Menu', undefined, [
-      { text: 'My Orders', onPress: () => router.push('/(buyer)/orders') },
-      { text: 'Edit Profile', onPress: () => router.push('/(buyer)/edit-profile') },
-      { text: 'Notifications', onPress: () => router.push('/buyer-notifications' as any) },
-      { text: 'Privacy', onPress: () => router.push('/buyer-privacy-settings' as any) },
-      { text: 'Help', onPress: () => {} },
-      { text: 'Sign out', style: 'destructive', onPress: () => {} },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    setMenuVisible(true);
+  };
+
+  const handleShareProfile = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const handle = profile?.username || 'jordan';
+    try {
+      await Share.share({
+        message: `Check out ${handle} on Brandthread: https://brandthread.app/u/${handle}`,
+        url: `https://brandthread.app/u/${handle}`,
+        title: `${handle} on Brandthread`,
+      });
+    } catch {}
   };
 
   const handlePostLongPress = (post: BuyerPost) => {
@@ -117,22 +123,49 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Owner Menu Bottom Sheet */}
+      <Modal visible={menuVisible} transparent animationType="slide" onRequestClose={() => setMenuVisible(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setMenuVisible(false)}>
+          <Pressable style={styles.menuSheet} onPress={e => e.stopPropagation()}>
+            <View style={styles.menuHandle} />
+            {[
+              { label: 'Settings & activity', icon: 'settings', route: '/buyer-settings' },
+              { label: 'Archive', icon: 'archive', route: '/buyer-settings-detail?section=archive' },
+              { label: 'Your activity', icon: 'activity', route: '/buyer-activity' },
+              { label: 'QR code', icon: 'grid', route: '/buyer-qr' },
+              { label: 'Saved', icon: 'bookmark', route: '/buyer-saved' },
+              { label: 'Close Friends', icon: 'star', route: '/buyer-close-friends' },
+              { label: 'My orders', icon: 'package', route: '/(buyer)/orders' },
+            ].map((item, i, arr) => (
+              <React.Fragment key={item.label}>
+                <TouchableOpacity
+                  style={styles.menuRow}
+                  onPress={() => { setMenuVisible(false); Haptics.selectionAsync(); router.push(item.route as never); }}
+                  activeOpacity={0.7}
+                >
+                  <Feather name={item.icon as any} size={19} color={FG} />
+                  <Text style={styles.menuRowText}>{item.label}</Text>
+                  <Feather name="chevron-right" size={17} color={SUBTLE} />
+                </TouchableOpacity>
+                {i < arr.length - 1 && <View style={styles.menuDivider} />}
+              </React.Fragment>
+            ))}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* Top Bar */}
       <View style={styles.topBar}>
         <View style={styles.topBarLeft}>
-          <Feather
-            name={isPrivate ? 'lock' : 'globe'}
-            size={ICON.sm}
-            color={MUTED}
-          />
+          <Feather name={isPrivate ? 'lock' : 'globe'} size={ICON.sm} color={MUTED} />
           <Text style={styles.topHandle}>{profile?.username ? `@${profile.username}` : MY_HANDLE}</Text>
         </View>
         <View style={styles.topBarRight}>
-          <TouchableOpacity
-            onPress={() => router.push('/buyer-notifications' as any)}
-            style={styles.iconBtn}
-          >
+          <TouchableOpacity onPress={() => router.push('/buyer-notifications' as any)} style={styles.iconBtn}>
             <Feather name="bell" size={ICON.md} color={FG} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/buyer-settings' as never)} style={styles.iconBtn}>
+            <Feather name="settings" size={ICON.md} color={FG} />
           </TouchableOpacity>
           <TouchableOpacity onPress={handleMenu} style={styles.iconBtn}>
             <Feather name="menu" size={ICON.md} color={FG} />
@@ -153,7 +186,7 @@ export default function ProfileScreen() {
           </TouchableOpacity>
 
           <View style={styles.statsRow}>
-            <TouchableOpacity style={styles.statCol}>
+            <TouchableOpacity style={styles.statCol} onPress={() => setActiveTab('Posts')}>
               <Text style={styles.statNum}>{posts.length}</Text>
               <Text style={styles.statLabel}>Posts</Text>
             </TouchableOpacity>
@@ -201,10 +234,7 @@ export default function ProfileScreen() {
           >
             <Text style={styles.actionBtnText}>Edit Profile</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionBtn}
-            onPress={() => Alert.alert('Share', 'Profile link copied!')}
-          >
+          <TouchableOpacity style={styles.actionBtn} onPress={handleShareProfile}>
             <Text style={styles.actionBtnText}>Share Profile</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -658,4 +688,21 @@ const styles = StyleSheet.create({
     fontSize: FS.sm,
     color: PURPLE,
   },
+  modalBackdrop: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end',
+  },
+  menuSheet: {
+    backgroundColor: CARD, borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    borderTopWidth: 1, borderColor: BORDER, paddingBottom: 32,
+  },
+  menuHandle: {
+    width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER,
+    alignSelf: 'center', marginTop: 10, marginBottom: 8,
+  },
+  menuRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    paddingHorizontal: SP.lg, paddingVertical: 14,
+  },
+  menuRowText: { flex: 1, color: FG, fontFamily: FONT.medium, fontSize: FS.base },
+  menuDivider: { height: 1, backgroundColor: BORDER, marginLeft: SP.lg + 14 + 14 },
 });

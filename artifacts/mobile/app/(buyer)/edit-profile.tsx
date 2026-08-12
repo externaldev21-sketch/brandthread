@@ -140,28 +140,6 @@ export default function BuyerEditProfileScreen() {
           <TouchableOpacity
             style={styles.row}
             activeOpacity={0.7}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/story-creator' as never); }}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.rowLabel, { color: fg, width: 'auto' }]}>Banners</Text>
-              <Text style={[styles.rowHint, { color: muted }]}>Add music, profiles and more.</Text>
-            </View>
-            <Text style={[styles.chevronLabel, { color: muted }]}>Add banners</Text>
-            <Feather name="chevron-right" size={17} color={muted} />
-          </TouchableOpacity>
-          <Divider color={border} />
-          <TouchableOpacity
-            style={styles.row}
-            activeOpacity={0.7}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/ai-studio' as never); }}
-          >
-            <Text style={[styles.rowLabel, { color: fg, width: 'auto', flex: 1 }]}>Reorder grid</Text>
-            <Feather name="chevron-right" size={17} color={muted} />
-          </TouchableOpacity>
-          <Divider color={border} />
-          <TouchableOpacity
-            style={styles.row}
-            activeOpacity={0.7}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               Alert.alert('Gender', 'Choose how your gender is displayed.', [
@@ -174,7 +152,7 @@ export default function BuyerEditProfileScreen() {
             }}
           >
             <Text style={[styles.rowLabel, { color: fg, width: 'auto', flex: 1 }]}>Gender</Text>
-            <Text style={[styles.chevronLabel, { color: muted }]}>{fields.gender || 'Gender'}</Text>
+            <Text style={[styles.chevronLabel, { color: muted }]}>{fields.gender || 'Set gender'}</Text>
             <Feather name="chevron-right" size={17} color={muted} />
           </TouchableOpacity>
           <Divider color={border} />
@@ -182,9 +160,6 @@ export default function BuyerEditProfileScreen() {
             <View style={{ flex: 1 }}>
               <Text style={[styles.rowLabel, { color: fg, width: 'auto' }]}>AI creator</Text>
               <Text style={[styles.rowHint, { color: muted }]}>Add this label to your profile if your content often uses AI.</Text>
-            </View>
-            <View style={[styles.newPill, { backgroundColor: accent }]}>
-              <Text style={styles.newPillText}>New</Text>
             </View>
             <Switch
               value={fields.aiCreator}
@@ -199,25 +174,17 @@ export default function BuyerEditProfileScreen() {
           <TouchableOpacity
             style={styles.linkRow}
             activeOpacity={0.7}
-            onPress={() => router.push('/(tabs)/profile' as never)}
+            onPress={() => router.push('/buyer-settings' as never)}
           >
-            <Text style={[styles.linkText, { color: accent }]}>Switch to professional account</Text>
+            <Text style={[styles.linkText, { color: accent }]}>Settings &amp; activity</Text>
           </TouchableOpacity>
           <Divider color={border} />
           <TouchableOpacity
             style={styles.linkRow}
             activeOpacity={0.7}
-            onPress={() => router.push('/settings' as never)}
+            onPress={() => router.push('/buyer-privacy-settings' as never)}
           >
-            <Text style={[styles.linkText, { color: accent }]}>Personal information settings</Text>
-          </TouchableOpacity>
-          <Divider color={border} />
-          <TouchableOpacity
-            style={styles.linkRow}
-            activeOpacity={0.7}
-            onPress={() => router.push('/settings' as never)}
-          >
-            <Text style={[styles.linkText, { color: accent }]}>Show your profile is verified</Text>
+            <Text style={[styles.linkText, { color: accent }]}>Privacy settings</Text>
           </TouchableOpacity>
         </View>
 
