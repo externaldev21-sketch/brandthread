@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
-  useColorScheme, Dimensions, Animated, Alert, Share, TextInput, Modal,
+  Dimensions, Animated, Alert, Share, TextInput, Modal,
   KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,6 +12,13 @@ import type { SellerThreadPost } from '@/services/socialService';
 import * as Haptics from 'expo-haptics';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import type { ViewToken } from 'react-native';
+import {
+  BG, SURFACE, CARD, OVERLAY,
+  BORDER, BORDER_SUBTLE,
+  FG, MUTED, SUBTLE, ON_DARK,
+  PURPLE, PURPLE_LIGHT, CYAN, SUCCESS, RED,
+  FONT, FS, SP, RADIUS, COMP, ICON, ANIM
+} from '@/lib/theme';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -268,7 +275,7 @@ function SpotlightPage({
               activeOpacity={0.8}
               style={[styles.railFollowBadge, { backgroundColor: item.accentColor }]}
             >
-              <Feather name="plus" size={11} color="#FFF" />
+              <Feather name="plus" size={11} color={ON_DARK} />
             </TouchableOpacity>
           )}
         </View>
@@ -304,7 +311,7 @@ function SpotlightPage({
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           }}
         >
-          <Ionicons name="repeat" size={28} color={engagement?.reposted ? item.accentColor : '#FFFFFF'} />
+          <Ionicons name="repeat" size={28} color={engagement?.reposted ? PURPLE : '#FFFFFF'} />
           <Text style={styles.railCount}>{formatCount(engagement?.reposts ?? 0)}</Text>
         </TouchableOpacity>
 
@@ -314,7 +321,7 @@ function SpotlightPage({
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
           onPress={() => { onSave(item.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
         >
-          <Ionicons name="bookmark" size={27} color={engagement?.saved ? item.accentColor : '#FFFFFF'} />
+          <Ionicons name="bookmark" size={27} color={engagement?.saved ? PURPLE : '#FFFFFF'} />
           <Text style={styles.railCount}>Save</Text>
         </TouchableOpacity>
 
@@ -335,7 +342,7 @@ function SpotlightPage({
       {/* ─ Bottom-left overlay: shop CTA, creator, caption, sound ─ */}
       <View style={[styles.bottomInfo, { bottom: tabBarClearance }]} pointerEvents="box-none">
         <TouchableOpacity
-          style={[styles.shopBtn, { backgroundColor: item.accentColor }]}
+          style={[styles.shopBtn, { backgroundColor: PURPLE }]}
           activeOpacity={0.85}
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
           onPress={() => onShop(item)}
@@ -405,8 +412,6 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem {
 export default function FeedScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const scheme = useColorScheme();
-  const isDark = scheme !== 'light';
 
   const [engagements, setEngagements] = useState<Record<string, EngagementState>>(() => {
     const init: Record<string, EngagementState> = {};
@@ -560,7 +565,7 @@ export default function FeedScreen() {
               value={searchQuery}
               onChangeText={setSearchQuery}
               placeholder="Search creators, products…"
-              placeholderTextColor="#FFFFFF99"
+              placeholderTextColor={SUBTLE}
               autoFocus
               returnKeyType="search"
               onSubmitEditing={() => setShowSearch(false)}
@@ -570,7 +575,7 @@ export default function FeedScreen() {
               activeOpacity={0.7}
               onPress={() => { setShowSearch(false); setSearchQuery(''); }}
             >
-              <Feather name="x" size={20} color="#FFF" />
+              <Feather name="x" size={20} color={ON_DARK} />
             </TouchableOpacity>
           </View>
         ) : (
@@ -581,8 +586,8 @@ export default function FeedScreen() {
               hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
               onPress={() => { setShowNotifs(true); setHasUnread(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
             >
-              <View style={[styles.topAvatar, { backgroundColor: isDark ? '#33302A' : '#DBD3C0' }]}>
-                <Feather name="user" size={16} color="#FFF" />
+              <View style={[styles.topAvatar, { backgroundColor: SURFACE }]}>
+                <Feather name="user" size={16} color={ON_DARK} />
               </View>
               {hasUnread && <View style={styles.unreadDot} />}
             </TouchableOpacity>
@@ -593,7 +598,7 @@ export default function FeedScreen() {
               hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowSearch(true); }}
             >
-              <Feather name="search" size={21} color="#FFF" />
+              <Feather name="search" size={21} color={ON_DARK} />
             </TouchableOpacity>
 
             <Text style={styles.topTitle}>Spotlight</Text>
@@ -607,7 +612,7 @@ export default function FeedScreen() {
                 (async () => { const { Share } = await import('react-native'); Share.share({ message: 'Join me on Brandthread! https://brandthread.app' }); })();
               }}
             >
-              <Feather name="user-plus" size={20} color="#FFF" />
+              <Feather name="user-plus" size={20} color={ON_DARK} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -616,7 +621,7 @@ export default function FeedScreen() {
               hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/story-picker' as never); }}
             >
-              <Feather name="plus-square" size={21} color="#FFF" />
+              <Feather name="plus-square" size={21} color={ON_DARK} />
             </TouchableOpacity>
           </View>
         )}
@@ -685,33 +690,33 @@ const styles = StyleSheet.create({
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   topAvatarBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   topAvatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  unreadDot: { position: 'absolute', top: 4, right: 4, width: 9, height: 9, borderRadius: 4.5, backgroundColor: '#EF4444', borderWidth: 1.5, borderColor: '#000' },
+  unreadDot: { position: 'absolute', top: 4, right: 4, width: 9, height: 9, borderRadius: 4.5, backgroundColor: RED, borderWidth: 1.5, borderColor: BG },
   topIconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   topTitle: { flex: 1, textAlign: 'center', fontSize: 16, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
 
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   searchInput: {
-    flex: 1, height: 40, borderRadius: 20, borderWidth: 1, borderColor: '#FFFFFF40',
-    backgroundColor: '#00000066', paddingHorizontal: 14, fontSize: 14, fontFamily: 'Inter_400Regular', color: '#FFFFFF',
+    flex: 1, height: 40, borderRadius: 20, borderWidth: 1, borderColor: BORDER,
+    backgroundColor: SURFACE, paddingHorizontal: 14, fontSize: FS.sm, fontFamily: FONT.regular, color: FG,
   },
 
-  modalBackdrop: { flex: 1, backgroundColor: '#00000090', justifyContent: 'flex-end' },
+  modalBackdrop: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },
   commentsSheet: {
-    backgroundColor: '#0B0C0B', borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    backgroundColor: SURFACE, borderTopLeftRadius: 20, borderTopRightRadius: 20,
     paddingTop: 10, paddingHorizontal: 18,
   },
-  commentsHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: '#4A463D', alignSelf: 'center', marginBottom: 14 },
-  commentsTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF', marginBottom: 6 },
-  commentsEmpty: { fontSize: 13, fontFamily: 'Inter_400Regular', color: '#8C8577', paddingVertical: 20, textAlign: 'center' },
-  commentRow: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#232823' },
-  commentUser: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#39FF88', marginBottom: 3 },
-  commentText: { fontSize: 14, fontFamily: 'Inter_400Regular', color: '#EDE7D9' },
+  commentsHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: 14 },
+  commentsTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 6 },
+  commentsEmpty: { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, paddingVertical: 20, textAlign: 'center' },
+  commentRow: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: BORDER },
+  commentUser: { fontSize: 13, fontFamily: 'Inter_700Bold', color: PURPLE_LIGHT, marginBottom: 3 },
+  commentText: { fontSize: 14, fontFamily: 'Inter_400Regular', color: FG },
   commentInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 14, paddingBottom: 4 },
   commentInput: {
-    flex: 1, height: 44, borderRadius: 22, backgroundColor: '#1B1D1B',
-    paddingHorizontal: 16, fontSize: 14, fontFamily: 'Inter_400Regular', color: '#FFFFFF',
+    flex: 1, height: 44, borderRadius: 22, backgroundColor: SURFACE,
+    paddingHorizontal: 16, fontSize: FS.sm, fontFamily: FONT.regular, color: FG,
   },
-  commentSendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#39FF88', alignItems: 'center', justifyContent: 'center' },
+  commentSendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center' },
 
-  notifRow: { fontSize: 13.5, fontFamily: 'Inter_400Regular', color: '#EDE7D9', paddingBottom: 14 },
+  notifRow: { fontSize: 13.5, fontFamily: FONT.regular, color: FG, paddingBottom: 14 },
 });

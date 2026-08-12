@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Platform, TextInput, Switch, useColorScheme, Alert, Image,
+  Platform, TextInput, Switch, Alert, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -11,20 +11,18 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { loadStyleBadge, saveStyleBadge, DEFAULT_STYLE_BADGE, type StyleBadgeState } from '@/lib/styleBadge';
 import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields } from '@/lib/buyerProfile';
+import { BG, CARD, BORDER, FG, MUTED, PURPLE, CYAN, GRAD_PRIMARY } from '@/lib/theme';
 
 export default function BuyerEditProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const scheme = useColorScheme();
-  const isDark = scheme !== 'light';
-
-  const bg      = isDark ? '#121110' : '#F5F1E7';
-  const card    = isDark ? '#1B1917' : '#FFFFFF';
-  const border  = isDark ? '#33302A' : '#E3DCC9';
-  const fg      = isDark ? '#EDE7D9' : '#17140F';
-  const muted   = isDark ? '#8C8577' : '#6E6759';
-  const primary = isDark ? '#39FF88' : '#00C853';
-  const accent  = isDark ? '#7C9CFF' : '#3B5BDB';
+  const bg      = BG;
+  const card    = CARD;
+  const border  = BORDER;
+  const fg      = FG;
+  const muted   = MUTED;
+  const primary = PURPLE;
+  const accent  = CYAN;
 
   const [badge, setBadge] = useState<StyleBadgeState>({ ...DEFAULT_STYLE_BADGE, enabled: true });
   const [fields, setFields] = useState<BuyerProfileFields>({ ...DEFAULT_BUYER_PROFILE });
@@ -107,7 +105,7 @@ export default function BuyerEditProfileScreen() {
               {avatarUri ? (
                 <Image source={{ uri: avatarUri }} style={styles.avatar} />
               ) : (
-                <LinearGradient colors={[primary, isDark ? '#0F5C33' : '#0A8C3D']} style={styles.avatar}>
+                <LinearGradient colors={GRAD_PRIMARY} style={styles.avatar}>
                   <Text style={styles.avatarText}>😎</Text>
                 </LinearGradient>
               )}

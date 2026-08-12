@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN,
@@ -62,6 +63,7 @@ export default function ProfileScreen() {
   }, [loadData]);
 
   const handleMenu = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert('Menu', undefined, [
       { text: 'My Orders', onPress: () => router.push('/(buyer)/orders') },
       { text: 'Edit Profile', onPress: () => router.push('/(buyer)/edit-profile') },
@@ -74,6 +76,7 @@ export default function ProfileScreen() {
   };
 
   const handlePostLongPress = (post: BuyerPost) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert('Post', post.caption, [
       { text: 'Archive', onPress: () => archivePost(post.id) },
       { text: 'Delete', style: 'destructive', onPress: () => deletePost(post.id) },
@@ -82,6 +85,7 @@ export default function ProfileScreen() {
   };
 
   const handlePostTap = (post: BuyerPost) => {
+    Haptics.selectionAsync();
     const params = new URLSearchParams({
       postId: post.id,
       postAuthorName: post.authorName,

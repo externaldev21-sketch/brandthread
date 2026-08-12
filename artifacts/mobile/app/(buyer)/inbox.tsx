@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -112,11 +113,13 @@ export default function InboxScreen() {
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   function openConversation(conv: Conversation) {
+    Haptics.selectionAsync();
     markConversationRead(conv.id);
     router.push(`/buyer-conversation?id=${conv.id}` as never);
   }
 
   function longPressConversation(conv: Conversation) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert('Options', undefined, [
       { text: 'Archive', onPress: () => archiveConversation(conv.id), style: 'destructive' },
       { text: 'Cancel', style: 'cancel' },
@@ -124,6 +127,7 @@ export default function InboxScreen() {
   }
 
   function openCompose() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert(
       'New Conversation',
       'Start a conversation with:',

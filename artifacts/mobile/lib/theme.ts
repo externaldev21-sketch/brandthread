@@ -26,6 +26,7 @@ export const FG      = '#F4F4FF';                       // primary foreground
 export const MUTED   = 'rgba(244,244,255,0.50)';        // secondary text
 export const SUBTLE  = 'rgba(244,244,255,0.28)';        // tertiary / placeholder
 export const ON_DARK = '#FFFFFF';                        // on gradient/colored bg
+export const ON_DARK_MUTED = 'rgba(255,255,255,0.72)';   // secondary text on gradient/colored bg
 
 // ─── Brand Accents ────────────────────────────────────────────────────────────
 export const PURPLE        = '#8B5CF6';   // primary brand

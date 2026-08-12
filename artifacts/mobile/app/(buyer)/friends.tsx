@@ -8,6 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -250,6 +251,7 @@ export default function FriendsScreen() {
   }, []);
 
   function handleLike(post: BuyerPost) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     // Optimistic update
     setFeedPosts(prev =>
       prev.map(p =>
@@ -267,6 +269,7 @@ export default function FriendsScreen() {
   }
 
   function handleRepost(postId: string) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setFeedPosts(prev =>
       prev.map(p =>
         p.id === postId
@@ -282,6 +285,7 @@ export default function FriendsScreen() {
   }
 
   function handleSave(post: BuyerPost) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     saveItem({
       type: 'post',
       targetId: post.id,

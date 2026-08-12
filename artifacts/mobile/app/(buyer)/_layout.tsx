@@ -5,6 +5,8 @@ import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
+import { BG, SURFACE, BORDER, FG, SUBTLE, PURPLE } from '@/lib/theme';
+
 // ─── Buyer tab layout ─────────────────────────────────────────────────────────
 // Tabs: Thread · Discover · Friends · Inbox · Profile
 
@@ -14,9 +16,9 @@ function BuyerTabLayout() {
   const isIOS   = Platform.OS === 'ios';
   const insets  = useSafeAreaInsets();
 
-  const pillBg       = isDark ? '#1B1917F0' : '#FAF7EEF0';
-  const activeTint   = isDark ? '#39FF88'   : '#00C853';
-  const inactiveTint = isDark ? '#6E685C'   : '#A69C87';
+  const pillBg       = 'rgba(12,12,23,0.96)'; // SURFACE with opacity
+  const activeTint   = FG;
+  const inactiveTint = SUBTLE;
 
   const tabBarStyle = {
     position: 'relative' as const,
@@ -24,7 +26,7 @@ function BuyerTabLayout() {
     paddingBottom: insets.bottom,
     borderRadius: 0,
     borderTopWidth: 1,
-    borderTopColor: isDark ? '#232823' : '#E6E0D2',
+    borderTopColor: BORDER,
     backgroundColor: pillBg,
     elevation: 0,
     shadowOpacity: 0,
@@ -164,7 +166,7 @@ function TabIcon({
     <View style={{ alignItems: 'center', gap: 4 }}>
       <Feather name={name} size={20} color={color} />
       {focused && (
-        <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#39FF88' }} />
+        <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: PURPLE }} />
       )}
     </View>
   );

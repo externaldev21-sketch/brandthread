@@ -5,12 +5,20 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Animated, Platform, RefreshControl, ScrollView, StyleSheet,
-  Text, TouchableOpacity, View, useColorScheme,
+  Text, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import {
+  BG, SURFACE, CARD, CARD_ELEVATED,
+  BORDER, BORDER_ACTIVE,
+  FG, MUTED, SUBTLE, ON_DARK, ON_DARK_MUTED,
+  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
+  CYAN, SUCCESS, RED,
+  FONT, FS, SP, RADIUS
+} from '@/lib/theme';
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
@@ -18,7 +26,7 @@ const HERO_DROP = {
   brand: 'Vault Studio',
   handle: '@vaultstudio',
   initials: 'VS',
-  brandColor: '#00C853',
+  brandColor: PURPLE,
   name: 'Canvas Cargo Jacket',
   tag: 'DROPPING TODAY',
   price: '$189',
@@ -121,23 +129,23 @@ function LiveDot({ color }: { color: string }) {
 
 // ─── Hero card ────────────────────────────────────────────────────────────────
 
-function HeroCard({ isDark }: { isDark: boolean }) {
+function HeroCard() {
   const router  = useRouter();
   const time    = useCountdown(HERO_DROP.countdown);
   const [saved, setSaved] = useState(false);
   const soldPct = Math.round(((HERO_DROP.units - HERO_DROP.remaining) / HERO_DROP.units) * 100);
 
-  const card    = isDark ? '#1B1917' : '#FFFFFF';
-  const border  = isDark ? '#33302A' : '#E3DCC9';
-  const fg      = isDark ? '#EDE7D9' : '#17140F';
-  const muted   = isDark ? '#8C8577' : '#8080A0';
-  const divider = isDark ? '#33302A' : '#EDE8DC';
+  const card    = CARD;
+  const border  = BORDER;
+  const fg      = FG;
+  const muted   = MUTED;
+  const divider = BORDER;
 
   return (
     <View style={[s.hero, { backgroundColor: card, borderColor: border }]}>
       <View style={[s.heroVisual, { backgroundColor: HERO_DROP.brandColor }]}>
         <View style={s.heroTagRow}>
-          <LiveDot color="#FFFFFF" />
+          <LiveDot color={ON_DARK} />
           <Text style={s.heroTag}>{HERO_DROP.tag}</Text>
         </View>
         <View style={s.heroBrandRow}>
@@ -182,7 +190,7 @@ function HeroCard({ isDark }: { isDark: boolean }) {
             activeOpacity={0.85}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/buyer-product-detail?productId=prod_canvas_cargo&productName=Canvas+Cargo+Jacket' as never); }}
           >
-            <Feather name="shopping-bag" size={15} color="#FFF" />
+            <Feather name="shopping-bag" size={15} color={ON_DARK} />
             <Text style={s.heroShopText}>Shop Drop — {HERO_DROP.price}</Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -200,13 +208,13 @@ function HeroCard({ isDark }: { isDark: boolean }) {
 
 // ─── For-You card ─────────────────────────────────────────────────────────────
 
-function ForYouCard({ item, isDark }: { item: ForYouItem; isDark: boolean }) {
+function ForYouCard({ item }: { item: ForYouItem }) {
   const router = useRouter();
   const [saved, setSaved] = useState(false);
-  const card   = isDark ? '#1B1917' : '#FFFFFF';
-  const border = isDark ? '#33302A' : '#E3DCC9';
-  const fg     = isDark ? '#EDE7D9' : '#17140F';
-  const muted  = isDark ? '#8C8577' : '#8080A0';
+  const card   = CARD;
+  const border = BORDER;
+  const fg     = FG;
+  const muted  = MUTED;
 
   return (
     <TouchableOpacity
@@ -228,7 +236,7 @@ function ForYouCard({ item, isDark }: { item: ForYouItem; isDark: boolean }) {
           onPress={() => { setSaved(v => !v); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
           activeOpacity={0.8}
         >
-          <Feather name="bookmark" size={14} color={saved ? '#FFFFFF' : '#FFFFFFB0'} />
+          <Feather name="bookmark" size={14} color={saved ? FG : MUTED} />
         </TouchableOpacity>
       </View>
       <View style={fy.body}>
@@ -253,13 +261,13 @@ function ForYouCard({ item, isDark }: { item: ForYouItem; isDark: boolean }) {
 const fy = StyleSheet.create({
   card:      { width: 158, borderRadius: 6, borderWidth: 1, overflow: 'hidden' },
   visual:    { height: 130, alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  visualIcon:{ width: 40, height: 40, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
-  tagPill:   { position: 'absolute', top: 8, left: 8, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 4, backgroundColor: '#FFFFFF' },
-  tagText:   { fontSize: 9, fontFamily: 'Inter_700Bold', color: '#17140F', letterSpacing: 0.5, textTransform: 'uppercase' },
+  visualIcon:{ width: 40, height: 40, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: BG },
+  tagPill:   { position: 'absolute', top: 8, left: 8, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 4, backgroundColor: BG },
+  tagText:   { fontSize: 9, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: 0.5, textTransform: 'uppercase' },
   saveBtn:   { position: 'absolute', top: 8, right: 8, width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
   body:      { padding: 11 },
   dot:       { width: 15, height: 15, borderRadius: 3, alignItems: 'center', justifyContent: 'center' },
-  dotText:   { fontSize: 7, fontFamily: 'Inter_700Bold', color: '#FFF' },
+  dotText:   { fontSize: 7, fontFamily: 'Inter_700Bold', color: ON_DARK },
   brand:     { fontSize: 10, fontFamily: 'Inter_500Medium', flex: 1 },
   name:      { fontSize: 12, fontFamily: 'Inter_700Bold', lineHeight: 16 },
   price:     { fontSize: 14, fontFamily: 'Inter_700Bold' },
@@ -268,12 +276,12 @@ const fy = StyleSheet.create({
 
 // ─── Dropping-soon row ────────────────────────────────────────────────────────
 
-function DroppingRow({ item, isDark }: { item: typeof DROPPING_SOON[0]; isDark: boolean }) {
+function DroppingRow({ item }: { item: typeof DROPPING_SOON[0] }) {
   const router = useRouter();
-  const card   = isDark ? '#1B1917' : '#FFFFFF';
-  const border = isDark ? '#33302A' : '#E3DCC9';
-  const fg     = isDark ? '#EDE7D9' : '#17140F';
-  const muted  = isDark ? '#8C8577' : '#8080A0';
+  const card   = CARD;
+  const border = BORDER;
+  const fg     = FG;
+  const muted  = MUTED;
 
   return (
     <TouchableOpacity
@@ -292,7 +300,7 @@ function DroppingRow({ item, isDark }: { item: typeof DROPPING_SOON[0]; isDark: 
         <Text style={[dr.price, { color: fg }]}>{item.price}</Text>
         {item.live ? (
           <View style={dr.liveRow}>
-            <LiveDot color="#EF4444" />
+            <LiveDot color={RED} />
             <Text style={dr.liveText}>Live now</Text>
           </View>
         ) : (
@@ -306,24 +314,24 @@ function DroppingRow({ item, isDark }: { item: typeof DROPPING_SOON[0]; isDark: 
 const dr = StyleSheet.create({
   row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: 6, borderWidth: 1 },
   avatar:   { width: 40, height: 40, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-  initials: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#FFF' },
+  initials: { fontSize: 13, fontFamily: 'Inter_700Bold', color: ON_DARK },
   name:     { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   brand:    { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
   price:    { fontSize: 13, fontFamily: 'Inter_700Bold' },
   liveRow:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  liveText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: '#EF4444' },
+  liveText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: RED },
   eta:      { fontSize: 11, fontFamily: 'Inter_400Regular' },
 });
 
 // ─── Trending row ─────────────────────────────────────────────────────────────
 
-function TrendingRow({ item, isDark }: { item: typeof TRENDING[0]; isDark: boolean }) {
+function TrendingRow({ item }: { item: typeof TRENDING[0] }) {
   const router  = useRouter();
-  const card    = isDark ? '#1B1917' : '#FFFFFF';
-  const border  = isDark ? '#33302A' : '#E3DCC9';
-  const fg      = isDark ? '#EDE7D9' : '#17140F';
-  const muted   = isDark ? '#8C8577' : '#8080A0';
-  const primary = isDark ? '#39FF88' : '#00C853';
+  const card    = CARD;
+  const border  = BORDER;
+  const fg      = FG;
+  const muted   = MUTED;
+  const primary = PURPLE;
 
   return (
     <TouchableOpacity
@@ -351,21 +359,19 @@ const tr = StyleSheet.create({
   row:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13, borderRadius: 6, borderWidth: 1 },
   rank:     { fontSize: 14, fontFamily: 'Inter_700Bold', width: 28 },
   avatar:   { width: 40, height: 40, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
-  initials: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#FFF' },
+  initials: { fontSize: 13, fontFamily: 'Inter_700Bold', color: ON_DARK },
   name:     { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   brand:    { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
   price:    { fontSize: 13, fontFamily: 'Inter_700Bold' },
-  hype:     { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: '#39FF88' },
+  hype:     { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: PURPLE },
 });
 
 // ─── Section header ───────────────────────────────────────────────────────────
 
 function SectionHead({ title, sub, action, onAction }: { title: string; sub?: string; action?: string; onAction?: () => void }) {
-  const scheme   = useColorScheme();
-  const isDark   = scheme !== 'light';
-  const fg       = isDark ? '#EDE7D9' : '#17140F';
-  const muted    = isDark ? '#8C8577' : '#8080A0';
-  const primary  = isDark ? '#39FF88' : '#00C853';
+  const fg       = FG;
+  const muted    = MUTED;
+  const primary  = PURPLE;
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -385,16 +391,14 @@ function SectionHead({ title, sub, action, onAction }: { title: string; sub?: st
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function DiscoverScreen() {
-  const scheme  = useColorScheme();
   const insets  = useSafeAreaInsets();
   const router  = useRouter();
-  const isDark  = scheme !== 'light';
 
-  const bg      = isDark ? '#121110' : '#F4F3FA';
-  const fg      = isDark ? '#EDE7D9' : '#17140F';
-  const muted   = isDark ? '#8C8577' : '#8080A0';
-  const border  = isDark ? '#1A1A28' : '#E3DCC9';
-  const primary = isDark ? '#39FF88' : '#00C853';
+  const bg      = BG;
+  const fg      = FG;
+  const muted   = MUTED;
+  const border  = BORDER;
+  const primary = PURPLE;
   const topPad  = Platform.OS === 'web' ? 67 : insets.top;
 
   const [discoverItems, setDiscoverItems] = useState<ForYouItem[]>(() => shuffle(UNFOLLOWED_BRAND_POOL).slice(0, 4));
@@ -426,26 +430,26 @@ export default function DiscoverScreen() {
         </View>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <TouchableOpacity
-            style={[s.headerBtn, { backgroundColor: isDark ? '#1B1917' : '#FFFFFF', borderColor: border }]}
+            style={[s.headerBtn, { backgroundColor: CARD, borderColor: border }]}
             activeOpacity={0.75}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/search' as never); }}
           >
             <Feather name="search" size={18} color={muted} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[s.headerBtn, { backgroundColor: isDark ? '#1B1917' : '#FFFFFF', borderColor: border }]}
+            style={[s.headerBtn, { backgroundColor: CARD, borderColor: border }]}
             activeOpacity={0.75}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/inbox' as never); }}
           >
             <Feather name="bell" size={18} color={muted} />
-            <View style={[s.notifDot, { backgroundColor: '#EF4444' }]} />
+            <View style={[s.notifDot, { backgroundColor: RED }]} />
           </TouchableOpacity>
         </View>
       </View>
 
       {/* ─ Hero drop ─ */}
       <View style={{ paddingHorizontal: 20, marginBottom: 28 }}>
-        <HeroCard isDark={isDark} />
+        <HeroCard />
       </View>
 
       {/* ─ For You ─ */}
@@ -463,7 +467,7 @@ export default function DiscoverScreen() {
         contentContainerStyle={{ paddingHorizontal: 20, gap: 12, paddingBottom: 4 }}
         style={{ marginBottom: 32 }}
       >
-        {FOR_YOU.map(item => <ForYouCard key={item.id} item={item} isDark={isDark} />)}
+        {FOR_YOU.map(item => <ForYouCard key={item.id} item={item} />)}
       </ScrollView>
 
       {/* ─ Discover — brands you don't follow, reshuffled on pull-to-refresh ─ */}
@@ -481,7 +485,7 @@ export default function DiscoverScreen() {
         contentContainerStyle={{ paddingHorizontal: 20, gap: 12, paddingBottom: 4 }}
         style={{ marginBottom: 32 }}
       >
-        {discoverItems.map(item => <ForYouCard key={item.id} item={item} isDark={isDark} />)}
+        {discoverItems.map(item => <ForYouCard key={item.id} item={item} />)}
       </ScrollView>
 
       {/* ─ Dropping Soon ─ */}
@@ -494,7 +498,7 @@ export default function DiscoverScreen() {
         />
       </View>
       <View style={{ paddingHorizontal: 20, gap: 10, marginBottom: 32 }}>
-        {DROPPING_SOON.map(item => <DroppingRow key={item.id} item={item} isDark={isDark} />)}
+        {DROPPING_SOON.map(item => <DroppingRow key={item.id} item={item} />)}
       </View>
 
       {/* ─ Trending ─ */}
@@ -502,7 +506,7 @@ export default function DiscoverScreen() {
         <SectionHead title="Trending" sub="Most saved this week" />
       </View>
       <View style={{ paddingHorizontal: 20, gap: 10 }}>
-        {TRENDING.map(item => <TrendingRow key={item.id} item={item} isDark={isDark} />)}
+        {TRENDING.map(item => <TrendingRow key={item.id} item={item} />)}
       </View>
     </ScrollView>
   );
@@ -522,12 +526,12 @@ const s = StyleSheet.create({
   heroVisual: { padding: 18, minHeight: 150, justifyContent: 'space-between' },
 
   heroBrandRow:      { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  heroBrandAvatar:   { width: 34, height: 34, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' },
+  heroBrandAvatar:   { width: 34, height: 34, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: BG },
   heroBrandInitials: { fontSize: 12, fontFamily: 'Inter_700Bold' },
-  heroBrandName:     { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
-  heroBrandHandle:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: '#FFFFFFB0', marginTop: 1 },
+  heroBrandName:     { fontSize: 14, fontFamily: 'Inter_700Bold', color: ON_DARK },
+  heroBrandHandle:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: ON_DARK_MUTED, marginTop: 1 },
   heroTagRow:        { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
-  heroTag:           { fontSize: 10, fontFamily: 'Inter_700Bold', color: '#FFFFFF', letterSpacing: 0.8, textTransform: 'uppercase' },
+  heroTag:           { fontSize: 10, fontFamily: 'Inter_700Bold', color: ON_DARK, letterSpacing: 0.8, textTransform: 'uppercase' },
 
   heroProductName: { flex: 1, fontSize: 20, fontFamily: 'Inter_700Bold', letterSpacing: -0.3, lineHeight: 25, marginRight: 12 },
   heroPrice:       { fontSize: 20, fontFamily: 'Inter_700Bold', letterSpacing: -0.3 },
@@ -545,6 +549,6 @@ const s = StyleSheet.create({
 
   heroActions:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
   heroShopBtn:  { flex: 1, borderRadius: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13 },
-  heroShopText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  heroShopText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: ON_DARK },
   heroSaveBtn:  { width: 46, height: 46, borderRadius: 6, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
 });

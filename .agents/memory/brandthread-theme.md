@@ -1,18 +1,15 @@
 ---
-name: Brandthread theme — Vault Archive
-description: Editorial lookbook theme (bone/black ink + blood-orange accent) replacing the earlier purple/violet SaaS palette
+name: Brandthread theme — canonical palette
+description: Which color system is canonical in the mobile app, which older palettes are retired, and how to catch stragglers after any rebrand
 ---
 
-The app was rebranded from a purple/violet gradient-heavy "AI SaaS" look to **Vault Archive**: an editorial fashion-lookbook aesthetic — bone/paper backgrounds, near-black ink text, a single blood-orange accent, warm hairline borders, sharper corners, and flattened (non-neon) gradients.
+**Canonical system:** `lib/theme.ts` module constants (BG `#07070F`, SURFACE, CARD, FG `#F4F4FF`, PURPLE `#8B5CF6`, CYAN, FONT/FS/SP/RADIUS scales). The app is effectively **dark-only**: screens import these constants directly, so there is no runtime light mode. Buyer AND seller sides are both unified on it, including the buyer tab bar, Thread feed, Discover, Search, and Edit Profile.
 
-**Light mode** (`colors.light`): background `#F2EEE3` (bone), text/foreground `#17140F` (warm ink), card `#FFFFFF`, primary `#B33F1E`, secondary `#E8E1CF` (oat/tan), border `#DBD3C0`, mutedForeground `#6E6759`.
+**Retired palettes — do not resurrect:**
+- "Vault Archive" bone/ink/blood-orange palette (`#F5F1E7`/`#F2EEE3` cream, `#EDE7D9`, `#17140F`, `#121110`, rust/orange primaries) — an older rebrand that survived in stragglers long after the purple system replaced it.
+- Green accents `#00C853`/`#39FF88` as UI chrome (GREEN_BRIGHT remains a token strictly for revenue highlights; per-seller `brandColor`/`avatarColor` fields in demo data may be any hue as small accents only).
+- `constants/colors.ts` + `useColors()` light palette — still in the repo but unused by screens; don't build new screens on it.
 
-**Dark mode** (`colors.dark`): background `#121110` (warm near-black), card `#1B1917`, foreground `#EDE7D9` (cream), primary `#C94D1F`, secondary `#201D18`, border `#33302A`, mutedForeground `#8C8577`.
+**Why:** the buyer side shipped with three palettes at once (purple tokens, Vault Archive cream/green leftovers, and a bespoke Discover palette), which read as two different apps. Stale theme memory describing an old rebrand as current made this worse.
 
-Shared `radius` token dropped from 12 → 6 for a flatter, less "rounded SaaS card" feel.
-
-**Why:** User explicitly said the app "looked AI-made" — the tell was purple/violet gradients, heavy glow shadows, and generic rounded SaaS card style. Chose an editorial/fashion-lookbook direction to match the clothing-brand-management domain instead of a generic tech palette.
-
-**How to apply:** Always source colors via `useColors()` / `constants/colors.ts` tokens, not new hardcoded hex. Multi-color "brand differentiator" chips (e.g. per-brand avatar rings: blue, teal, rose, amber) were intentionally left alone — only the *system-wide* purple/lavender tokens and neon story/tab gradients were converted to the warm rust/orange family. When adding new UI, keep gradients duotone/flat (e.g. `['#D9714B', '#C1440E', '#B33F1E']`) rather than multi-hue neon, and prefer hairline `border` dividers over heavy colored shadows/glows.
-
-A global hex-remapping script (Node, longest-key-first substring replace) was used to convert ~34 files at once — a fast way to do consistent app-wide rebrands when a design-token system already exists, faster than hand-editing each file. Also watch for stray non-token hex values the automated pass misses (e.g. one-off colors in mock data or muted label text) — grep for old hue's hex range after any bulk rebrand and re-run a targeted architect review for leftovers + contrast regressions (e.g. white text on a newly-brightened accent color can drop below AA contrast).
+**How to apply:** all UI chrome colors must come from `lib/theme.ts`; if a shade is missing (e.g. ON_DARK_MUTED for secondary text on colored surfaces), add it there once. After any rebrand, grep for the previous palette's hexes across ALL screens — including secondary screens reachable one tap away (search, edit-profile, settings-type screens); tab screens get attention, stragglers hide behind buttons. Verify text-on-accent contrast: low-opacity "subtle" tokens are unreadable on solid accent surfaces.

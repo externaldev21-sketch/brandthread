@@ -1,28 +1,26 @@
 import React, { useMemo, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Platform, TextInput, useColorScheme,
+  Platform, TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { searchCatalogue, SEARCH_BRANDS, type SearchResult } from '@/lib/searchData';
+import { BG, CARD, BORDER, FG, MUTED, PURPLE } from '@/lib/theme';
 
 const RECENT_SEARCHES = ['Vault Studio', 'Archive Hoodie', 'Coldform'];
 
 export default function SearchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const scheme = useColorScheme();
-  const isDark = scheme !== 'light';
-
-  const bg      = isDark ? '#121110' : '#F5F1E7';
-  const card    = isDark ? '#1B1917' : '#FFFFFF';
-  const border  = isDark ? '#33302A' : '#E3DCC9';
-  const fg      = isDark ? '#EDE7D9' : '#17140F';
-  const muted   = isDark ? '#8C8577' : '#6E6759';
-  const primary = isDark ? '#39FF88' : '#00C853';
+  const bg      = BG;
+  const card    = CARD;
+  const border  = BORDER;
+  const fg      = FG;
+  const muted   = MUTED;
+  const primary = PURPLE;
 
   const [query, setQuery] = useState('');
   const results = useMemo(() => searchCatalogue(query), [query]);
