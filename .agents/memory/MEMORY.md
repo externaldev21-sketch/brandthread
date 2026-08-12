@@ -18,4 +18,4 @@
 - [Background Removal Architecture](bg-removal-architecture.md) — GCS+local-file dual cache; named wildcard gotcha; ProductMedia required fields; integration actions pattern.
 - [EXPO_PUBLIC_API_BASE_URL](expo-public-api-base-url.md) — set in shared env to the Replit dev domain root; needed by designService.ts for all AI calls (bg-removal, photoshoot, mockup-to-model, text-to-design).
 - [Content Publishing Architecture](content-publishing-architecture.md) — seller post → AsyncStorage → Thread feed; SellerThreadPost expanded to 30+ fields; seed data; feed.tsx dynamic loading; create-post purple theme.
-- [Expo web boot & root route](expo-web-boot.md) — boot must never render null/blank; AuthGate branches must handle bare "/" (empty segments); Screenshot tool can't observe async boot — use testing subagent.
+- [Expo web boot & root route](expo-web-boot.md) — boot never blank; AuthGate must handle bare "/"; ?bt_preview=buyer|seller (dev+web) bypasses auth for captures/canvas frames; static screenshots catch FOIT.

@@ -13,5 +13,10 @@ The app must render something visible at every moment of boot, and every AuthGat
 - Font gate and `<ClerkLoading>` both render `BootScreen`, never `null`.
 - Web body background is painted dark at module scope in `_layout.tsx` (guarded for SSR).
 
+## Dev preview bypass (?bt_preview)
+Opening the web app with `?bt_preview=buyer` or `?bt_preview=seller` (dev builds, web only, handled in the root layout) seeds local onboarding/role state at module scope and skips the Clerk gate + auth redirects, so any auth-gated screen can be loaded directly by URL with no sign-in. Group segments are stripped from web URLs (`/(buyer)/discover` → `/discover`); bare `/` auto-redirects to the previewed role's home.
+**Why:** the screenshot browser and canvas iframes are stateless — no Clerk session, no localStorage — so without this, no auth-gated screen can ever be shown or captured outside a tester run.
+**How to apply:** use these URLs for canvas live frames and design review. Screens tied to the Clerk user render fallbacks. Inert without the param; never ships to production behavior.
+
 ## Debugging gotcha
 The Screenshot tool captures web pages before async boot completes (sub-second), so it shows the loading state even when the app works — it cannot observe anything time-based. Use the Playwright testing subagent to watch a page over tens of seconds (console timeline, network failures, final render). Verifying signed-in flows: Clerk programmatic login + seeding localStorage (`onboarding_complete`, `user_role`, `splash_seen`) reproduces any auth/role state.

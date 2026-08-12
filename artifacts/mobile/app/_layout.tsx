@@ -28,6 +28,24 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
   document.body.style.backgroundColor = '#07070F';
 }
 
+// ─── DEV design-preview bypass (web + dev builds only) ───────────────────────
+// Opening the web app with ?bt_preview=buyer or ?bt_preview=seller seeds the
+// local onboarding/role state and skips the Clerk auth gate, so individual
+// screens can be viewed/captured directly without signing in (used for design
+// review). Inert on native, in production builds, and without the param.
+const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
+  if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  const v = new URLSearchParams(window.location.search).get('bt_preview');
+  return v === 'buyer' || v === 'seller' ? v : null;
+})();
+if (PREVIEW_ROLE && typeof localStorage !== 'undefined') {
+  // AsyncStorage on web is backed by localStorage with raw keys, so seeding
+  // here (before any React render) is picked up by all storage reads.
+  localStorage.setItem('splash_seen', 'true');
+  localStorage.setItem('onboarding_complete', 'true');
+  localStorage.setItem('user_role', PREVIEW_ROLE);
+}
+
 const queryClient = new QueryClient();
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
@@ -100,6 +118,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     // must always be redirected away from once auth state is known.
     const atRoot          = !segments[0] || (segments[0] as string) === 'index';
     const inProtectedArea = !inAuthScreen && !inOnboarding && !inAccountType;
+
+    // DEV preview bypass: no auth redirects; only route "/" to the previewed
+    // role's home so deep links land directly on real screens.
+    if (PREVIEW_ROLE) {
+      if (atRoot) {
+        router.replace((PREVIEW_ROLE === 'buyer' ? '/(buyer)/' : '/(tabs)/') as never);
+      }
+      return;
+    }
 
     if (!isLoaded) return;
     if (splashSeen === null) return; // still reading AsyncStorage
@@ -347,26 +374,35 @@ export default function RootLayout() {
 
   if (!fontsLoaded && !fontError) return <BootScreen />;
 
+  const appTree = (
+    <SafeAreaProvider>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <GestureHandlerRootView style={{ flex: 1 }}>
+            <RoleProvider>
+              <KeyboardProvider>
+                <RootLayoutNav />
+              </KeyboardProvider>
+            </RoleProvider>
+          </GestureHandlerRootView>
+        </QueryClientProvider>
+      </ErrorBoundary>
+    </SafeAreaProvider>
+  );
+
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache} proxyUrl={proxyUrl}>
-      <ClerkLoading>
-        <BootScreen />
-      </ClerkLoading>
-      <ClerkLoaded>
-        <SafeAreaProvider>
-          <ErrorBoundary>
-            <QueryClientProvider client={queryClient}>
-              <GestureHandlerRootView style={{ flex: 1 }}>
-                <RoleProvider>
-                  <KeyboardProvider>
-                    <RootLayoutNav />
-                  </KeyboardProvider>
-                </RoleProvider>
-              </GestureHandlerRootView>
-            </QueryClientProvider>
-          </ErrorBoundary>
-        </SafeAreaProvider>
-      </ClerkLoaded>
+      {PREVIEW_ROLE ? (
+        // DEV preview bypass: don't wait for clerk-js — render screens directly.
+        appTree
+      ) : (
+        <>
+          <ClerkLoading>
+            <BootScreen />
+          </ClerkLoading>
+          <ClerkLoaded>{appTree}</ClerkLoaded>
+        </>
+      )}
     </ClerkProvider>
   );
 }
