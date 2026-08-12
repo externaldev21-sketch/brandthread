@@ -1,0 +1,1055 @@
+You are working inside my existing Brandthread mobile app. Do NOT create a new app, do NOT replace my existing navigation, authentication, buyer/seller structure, theme system, or working features.
+
+Your job is to completely rebuild and finish the BUYER PROFILE + BUYER SETTINGS experience.
+
+IMPORTANT:
+
+Only modify the BUYER side.
+Do not change the Seller Dashboard or Seller Settings.
+Reuse the existing Brandthread design system, components, fonts, colors, dark/light themes, navigation, API services, and user data wherever possible.
+Do not create duplicate screens if an equivalent screen already exists.
+If an existing screen exists but is unfinished, upgrade it instead.
+Remove fake buttons, dead buttons, "Coming Soon" placeholders, Alert-based menus, and navigation that leads nowhere.
+Every visible button should perform a real action or navigate to a real screen.
+Keep the app compiling after every change.
+Use TypeScript.
+Make the experience feel as complete as Instagram's social profile/settings system, but designed specifically for Brandthread buyers.
+1. BUYER PROFILE SCREEN
+
+Rebuild the Buyer Profile screen into a premium social profile.
+
+Top header:
+
+Username
+Private-account lock icon when account is private
+Notifications/activity icon if appropriate
+Settings gear icon
+Gear opens /buyer/settings or the correct existing Buyer Settings route
+
+Profile header:
+
+Circular avatar
+Edit avatar support
+Display name
+@username
+Bio
+Optional location
+Optional website/social link
+Style/interests badges
+Friend count
+Post count
+Saved count should ONLY be visible to the owner
+Proper friend/follow state when viewing another buyer
+
+Owner buttons:
+
+Edit Profile
+Share Profile
+
+Other-user buttons:
+
+Add Friend
+Requested
+Friends
+Message
+More menu
+
+Friend behavior:
+
+Send friend request
+Cancel outgoing request
+Accept incoming request
+Decline incoming request
+Remove friend
+Block
+Restrict
+Mute
+
+Messages should follow Brandthread's existing rule:
+BUYERS CAN ONLY DIRECT MESSAGE USERS THEY ARE FRIENDS WITH.
+
+2. PROFILE BIO
+
+Support:
+
+Display name
+Username
+Pronouns optional
+Bio
+Location optional
+Website/social link optional
+Style interests
+Favorite categories
+Preferred brands if user chooses to display them
+
+Make URLs and mentions clickable where applicable.
+
+3. PROFILE CONTENT TABS
+
+Add polished tabs:
+
+Posts
+Tagged
+Reposts
+Saved
+
+Rules:
+
+POSTS
+Buyer-created posts only appear on the buyer's profile.
+Buyer posts DO NOT enter the main Thread feed.
+
+TAGGED
+Posts/content the buyer has been tagged in.
+
+REPOSTS
+Brand Thread posts the buyer has reposted.
+
+SAVED
+Only visible to the profile owner.
+
+Use a clean 3-column media grid similar to modern social apps.
+
+Support:
+
+Images
+Video thumbnails
+Multi-image indicator
+Video indicator
+Empty states
+Loading states
+Pull to refresh
+
+Tapping content opens a full-screen/profile post viewer.
+
+4. PROFILE POST VIEWER
+
+Build a post detail/viewer screen.
+
+Include:
+
+User avatar/name
+Media
+Carousel support
+Video playback
+Like
+Comment
+Repost
+Share
+Save
+Caption
+Timestamp
+Tagged users/products
+Delete if owner
+Edit caption if owner
+Report if not owner
+Hide like count preference when applicable
+5. STORY HIGHLIGHTS
+
+Add Instagram-style Story Highlights underneath the bio.
+
+Support:
+
+Circular highlight covers
+Highlight title
+Create highlight button for owner
+Add archived stories
+Edit title
+Edit cover
+Add/remove stories
+Delete highlight
+Reorder highlights
+
+Do not copy Instagram branding.
+
+Use Brandthread styling.
+
+6. PROFILE MENU
+
+Remove Alert.alert based profile menus.
+
+Use real modal/bottom-sheet menus.
+
+Owner profile menu:
+
+Settings & Activity
+Archive
+Your Activity
+QR/Profile Code
+Saved
+Close Friends
+Share Profile
+
+Other user menu:
+
+About this account
+Share profile
+Restrict
+Mute
+Block
+Report
+7. BUYER SETTINGS HOME
+
+Create a dedicated Buyer Settings screen titled:
+
+Settings & Activity
+
+DO NOT use Seller settings.
+
+Sections:
+
+ACCOUNTS CENTER
+
+Personal details
+Password and security
+Login methods
+Connected accounts
+Account ownership and control
+
+HOW YOU USE BRANDTHREAD
+
+Saved
+Archive
+Your Activity
+Notifications
+Time spent
+
+WHO CAN SEE YOUR CONTENT
+
+Account Privacy
+Close Friends
+Blocked Accounts
+Story
+Tags and Mentions
+
+HOW OTHERS CAN INTERACT WITH YOU
+
+Messages
+Comments
+Hidden Words
+Restricted Accounts
+Muted Accounts
+Activity Status
+
+WHAT YOU SEE
+
+Favorites
+Content Preferences
+Suggested Content
+Sensitive Content
+Hidden Brands
+
+SHOPPING
+
+Shopping Preferences
+Sizes & Fit
+Favorite Brands
+Favorite Categories
+Recently Viewed
+Drop Alerts
+Restock Alerts
+Price Drop Alerts
+Shipping Addresses
+Payment Methods
+Orders
+
+YOUR APP AND MEDIA
+
+Accessibility
+Language
+Media Quality
+Dark/Light/System Appearance
+Data Usage
+Autoplay Videos
+
+MORE INFO AND SUPPORT
+
+Help Center
+Report a Problem
+Privacy Policy
+Terms
+About Brandthread
+
+LOGIN
+
+Add Account if architecture supports it
+Log Out
+
+DANGER ZONE
+
+Deactivate Account
+Delete Account
+8. ACCOUNT PRIVACY
+
+Create/fix Account Privacy.
+
+Include toggles:
+
+Private Account
+
+When private:
+
+New friends require approval
+Only approved friends can see friend-only content
+Buyer profile visibility follows existing Brandthread privacy rules
+
+Allow:
+
+Who can see posts
+Everyone
+Friends
+
+Who can see stories:
+
+Everyone
+Friends
+Close Friends
+Custom
+
+Allow profile discovery:
+
+On/off
+
+Allow search engine/external discovery if relevant:
+
+On/off
+9. CLOSE FRIENDS
+
+Build Close Friends screen.
+
+Features:
+
+Search friends
+Add/remove users
+Show selected state
+Persist selection
+Close Friends count
+Story audience integration
+10. BLOCKED ACCOUNTS
+
+Build Blocked Accounts.
+
+Features:
+
+List blocked users
+Search
+Unblock
+Confirmation before unblocking
+
+Blocked users should not:
+
+Friend request
+Message
+View private content
+Interact normally
+11. RESTRICTED ACCOUNTS
+
+Build Restrict.
+
+Restricted-user behavior:
+
+Comments can be limited/hidden
+Message interactions limited where applicable
+Restricted person isn't prominently notified
+
+Create Restricted Accounts management screen.
+
+12. MUTED ACCOUNTS
+
+Allow muting:
+
+Posts
+Stories
+Notifications/activity if relevant
+
+Create Muted Accounts screen.
+
+Muting should not remove friendship.
+
+13. STORY SETTINGS
+
+Story Settings:
+
+Who can see your story:
+
+Everyone
+Friends
+Close Friends
+Hide story from...
+
+Allow story replies:
+
+Everyone eligible
+Friends
+Off
+
+Allow sharing:
+
+On/off
+
+Automatically save stories to archive:
+
+On/off
+14. TAGS AND MENTIONS
+
+Settings:
+
+Who can tag you:
+
+Everyone
+Friends
+No one
+
+Who can mention you:
+
+Everyone
+Friends
+No one
+
+Manual tag approval:
+
+Toggle
+
+Pending Tags screen.
+
+15. COMMENTS
+
+Settings:
+
+Allow comments from:
+
+Everyone
+Friends
+People you follow/favorite if supported
+Off
+
+Block comments from specific users
+
+Hide offensive comments toggle
+
+Manual custom words integration.
+
+16. HIDDEN WORDS
+
+Build Hidden Words.
+
+Options:
+
+Hide offensive comments
+Advanced comment filtering
+Hide message requests containing offensive terms
+Custom words and phrases
+
+Allow user to add custom:
+
+Words
+Phrases
+Emojis
+
+Persist them.
+
+17. MESSAGES SETTINGS
+
+Respect existing Brandthread friendship messaging restriction.
+
+Settings:
+
+Message notifications
+Read receipts
+Activity status
+Typing indicators if supported
+Calls
+Video calls
+Message requests where appropriate
+
+Because Brandthread only permits Buyer messaging between friends, DO NOT introduce Instagram-style random DMs from strangers.
+
+18. ACTIVITY STATUS
+
+Toggle:
+Show Activity Status
+
+If off:
+
+Don't show online/last-active status
+User should also lose access to others' active status if appropriate
+19. SAVED
+
+Upgrade Saved.
+
+Support collections.
+
+Default:
+All Posts
+
+Allow:
+
+Create collection
+Rename collection
+Delete collection
+Add/remove saved items
+Grid layout
+Collection covers
+
+Saved content is private.
+
+20. YOUR ACTIVITY
+
+Create Your Activity dashboard.
+
+Include:
+
+Likes
+Comments
+Reposts
+Saved
+Search history
+Recently viewed
+Links visited if supported
+Account history
+Time spent
+
+Allow relevant bulk management:
+
+Unlike
+Delete comments
+Remove reposts
+Clear searches
+21. ARCHIVE
+
+Archive screen:
+
+Sections:
+
+Story Archive
+Post Archive if buyers may archive profile posts
+
+Allow:
+
+Restore
+Delete
+Add archived stories to Highlights
+22. QR / PROFILE CODE
+
+Create a Brandthread profile sharing screen.
+
+Generate a profile code/QR based on the user's public profile URL or app deep link.
+
+Features:
+
+Brandthread logo/style
+Username
+QR/profile code
+Share
+Copy link
+
+Do not fake a QR image. Generate a functional QR.
+
+23. NOTIFICATIONS SETTINGS
+
+Categories:
+
+Orders & Shopping:
+
+Order updates
+Shipping updates
+Delivery updates
+Refund updates
+Drop alerts
+Restocks
+Price drops
+
+Social:
+
+Likes
+Comments
+Reposts
+Tags
+Mentions
+Friend requests
+Friend request accepted
+Messages
+Calls
+Stories
+
+Brands:
+
+Brand posts
+New releases
+Brands followed/favorited
+
+System:
+
+Security alerts
+Product updates
+Recommendations
+
+Support:
+
+Push
+In-app
+Email where backend supports it
+24. SHOPPING PREFERENCES
+
+Replace any "Coming Soon" page.
+
+Sizes:
+
+Tops:
+
+XXS
+XS
+S
+M
+L
+XL
+XXL
+3XL+
+
+Bottoms:
+
+Standard alpha sizes
+Waist size if applicable
+
+Shoes:
+
+US sizes
+Men's/Women's/Unisex preference where needed
+
+Fit:
+
+Slim
+Regular
+Relaxed
+Oversized
+
+Favorite Categories:
+
+Tees
+Hoodies
+Sweats
+Denim
+Jackets
+Outerwear
+Shoes
+Accessories
+Hats
+Bags
+Jewelry
+Shorts
+Pants
+Other
+
+Favorite styles/aesthetics should use Brandthread's existing fashion taxonomy if available.
+
+Favorite brands:
+
+Search Brandthread sellers
+Add/remove favorites
+
+Preferred price range:
+
+Min
+Max
+
+Preferred colors:
+
+Multi-select
+
+Personalized recommendations:
+
+Toggle
+
+Use shopping activity for recommendations:
+
+Toggle
+25. SHOPPING ALERTS
+
+Separate controls for:
+
+Drop Alerts
+Restock Alerts
+Price Drop Alerts
+
+Allow:
+
+All favorite brands
+Selected brands
+Selected products where appropriate
+26. RECENTLY VIEWED
+
+Real recently viewed screen.
+
+Include:
+
+Product
+Seller/brand
+Price
+Image
+Timestamp/grouping
+Clear all
+Remove individual item
+27. SHIPPING ADDRESSES
+
+Create shipping address manager.
+
+Allow:
+
+Add
+Edit
+Delete
+Set default
+
+Fields:
+
+Full name
+Address line 1
+Address line 2
+City
+State
+ZIP
+Country
+Phone
+
+Validate fields.
+
+28. PAYMENT METHODS
+
+Create saved payment methods UI only using the app's approved payment provider/tokenization system.
+
+NEVER store raw card numbers or CVV in the app/database.
+
+Allow:
+
+View saved tokenized cards
+Default payment method
+Remove card
+Add card through payment provider
+29. SECURITY
+
+Password & Security screen:
+
+Change password
+Login methods
+Two-factor authentication if backend supports it
+Login activity
+Trusted devices
+Security alerts
+Biometric app lock if technically supported
+Recovery information
+
+Do not fake security functionality.
+
+If backend implementation is missing, build proper service interfaces and label incomplete server-dependent pieces internally in code, NOT as ugly "Coming Soon" UI.
+
+30. LOGIN ACTIVITY
+
+Show active sessions/devices if backend supports them.
+
+Display:
+
+Device
+Approximate location
+Last active
+Current session
+
+Allow logout from other devices.
+
+31. PERSONAL DETAILS
+
+Fields:
+
+Name
+Username
+Email
+Phone
+Birthday
+
+Email/phone changes should use verification if backend supports it.
+
+32. ACCOUNT CONTROL
+
+Add:
+Deactivate Account
+
+Explain:
+Temporarily hides account and allows later return.
+
+Delete Account
+
+Require:
+
+Confirmation
+Password/re-auth if supported
+Clear warning
+
+Never delete instantly from one accidental tap.
+
+33. DOWNLOAD YOUR DATA
+
+Add a Request Your Data flow.
+
+Data categories:
+
+Profile
+Posts
+Messages
+Friends
+Saved
+Shopping activity
+Orders
+Account history
+
+This requires backend generation.
+
+Build the UI/service interface but DO NOT pretend a download completed if backend endpoint doesn't exist.
+
+34. CONTENT PREFERENCES
+
+Create Content Preferences.
+
+Include:
+
+Favorite categories
+Favorite brands
+Not interested history
+Sensitive-content control
+Suggested posts preference
+Personalized recommendations
+35. FAVORITES
+
+Favorites should let buyers prioritize selected brands.
+
+Create a Favorites screen.
+
+Favorite brands can receive priority in recommendations/Thread where the algorithm supports it.
+
+Do not break the existing Thread ranking algorithm.
+
+36. HIDDEN BRANDS
+
+Allow buyer to hide a brand.
+
+Hidden brand content should no longer appear in recommendations/Thread where filtering is supported.
+
+Screen:
+Hidden Brands
+
+Allow unhide.
+
+37. ACCESSIBILITY
+
+Settings:
+
+Reduce motion
+Larger text / respect system font scaling
+High contrast where possible
+Captions for videos where available
+Screen-reader-friendly labels
+Haptic feedback toggle if supported
+
+Use React Native accessibility props properly.
+
+38. LANGUAGE
+
+Build language preference UI.
+
+Default:
+Use device/system language.
+
+Do not pretend translations exist if the app doesn't yet have localization resources.
+
+Prepare the architecture for localization.
+
+39. MEDIA QUALITY
+
+Settings:
+
+Upload at highest quality
+Data saver
+Autoplay videos
+Autoplay on Wi-Fi only if applicable
+40. APPEARANCE
+
+Options:
+
+System
+Light
+Dark
+
+Connect to the EXISTING Brandthread theme system.
+
+Do not create a competing theme implementation.
+
+41. HELP & SUPPORT
+
+Build functional Help screen.
+
+Sections:
+
+Help Center
+Report a Problem
+Report a Buyer
+Report a Brand
+Order Problem
+Safety
+Privacy
+Account Access
+
+Report a Problem form:
+
+Category
+Description
+Screenshot optional if supported
+Submit
+
+Use existing support API if present.
+
+42. EDIT PROFILE CLEANUP
+
+Clean existing Edit Profile.
+
+REMOVE:
+
+"Switch to professional account"
+Seller/business options
+"Reorder grid" routing into AI Studio
+"Banners" routing into Story Creator
+Anything copied from Instagram that doesn't logically belong to Brandthread
+
+Keep:
+
+Avatar
+Name
+Username
+Pronouns optional
+Bio
+Links
+Location optional
+Style interests
+Profile visibility controls where appropriate
+43. SHARE PROFILE
+
+Create native Share Profile.
+
+Share:
+
+Brandthread profile URL/deep link
+Username
+Optional profile preview
+
+Use React Native Share API where possible.
+
+44. FRIEND LIST
+
+Profile friend count should open Friends screen.
+
+Tabs if needed:
+
+Friends
+Requests
+
+Support:
+
+Search
+Remove friend
+Message
+View profile
+
+Incoming Requests:
+
+Accept
+Decline
+
+Outgoing:
+
+Cancel request
+45. ACCOUNT SEARCH / DISCOVERY
+
+Allow buyers to control whether their account appears in:
+
+People suggestions
+Contact-based recommendations if contact syncing exists
+Search/discovery
+
+Do not implement contact uploading unless permission and backend support already exist.
+
+46. EMPTY STATES
+
+Create polished Brandthread empty states for:
+
+No Posts
+No Tagged Posts
+No Reposts
+No Saved Items
+No Highlights
+No Close Friends
+No Blocked Accounts
+No Muted Accounts
+No Notifications
+No Archived Stories
+No Recently Viewed Items
+
+Do not use generic ugly placeholders.
+
+47. LOADING + ERROR STATES
+
+Every data-driven screen must have:
+
+Loading state
+Error state
+Retry
+Empty state
+
+Avoid blank screens.
+
+48. PERSISTENCE
+
+For settings that can work locally:
+Persist them using the app's EXISTING storage architecture.
+
+Do not create random separate AsyncStorage keys everywhere if a centralized preferences/store system exists.
+
+If no centralized preference system exists:
+Create one buyer preferences service/store.
+
+Organize settings into types/interfaces.
+
+Example conceptual structure:
+
+BuyerPreferences
+
+privacy
+story
+messaging
+notifications
+content
+shopping
+accessibility
+media
+appearance
+49. BACKEND
+
+Inspect the existing backend/API before creating anything new.
+
+Reuse existing:
+
+User endpoints
+Profile endpoints
+Friends
+Posts
+Stories
+Saved
+Orders
+Notifications
+Preferences
+
+Only add endpoints/services where needed.
+
+Do not make fake frontend-only success messages for server actions.
+
+50. DESIGN
+
+The entire buyer profile/settings area should feel like one premium product.
+
+Style:
