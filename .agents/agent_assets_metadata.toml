@@ -27,3 +27,10 @@ uri = "file://screenshots/buyer-profile.jpg"
 type = "image"
 title = "Profile — new look"
 description = "Dark purple identity, consistent bottom bar."
+
+[[outputs]]
+id = "3sw-GrFlPNmdnytjn5tPE"
+uri = "file://brandthread-mobile.zip"
+type = "unspecified"
+title = "Brandthread Mobile — source code"
+description = "All app files, excluding node_modules and build artifacts. 3.8 MB."
