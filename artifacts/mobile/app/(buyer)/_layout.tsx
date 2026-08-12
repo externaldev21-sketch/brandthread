@@ -85,19 +85,8 @@ function BuyerTabLayout() {
         }}
       />
 
-      {/* Cart */}
-      <Tabs.Screen
-        name="cart"
-        options={{
-          title: 'Cart',
-          tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
-              <SymbolView name={focused ? 'cart.fill' : 'cart'} tintColor={color} size={20} />
-            ) : (
-              <TabIcon name="shopping-bag" color={color} focused={focused} />
-            ),
-        }}
-      />
+      {/* Cart — hidden from tab bar */}
+      <Tabs.Screen name="cart" options={{ href: null }} />
 
       {/* Friends */}
       <Tabs.Screen
