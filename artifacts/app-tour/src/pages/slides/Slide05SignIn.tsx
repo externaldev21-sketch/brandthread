@@ -21,7 +21,7 @@ export default function Slide05SignIn() {
           <div style={{fontSize:'1.3vh',color:'rgba(255,255,255,0.4)',marginBottom:'2.5vh'}}>Sign in to continue building your Brandthread.</div>
           {/* OAuth */}
           <div style={{border:'0.15vh solid #333',borderRadius:'1.2vh',padding:'1.2vh',display:'flex',alignItems:'center',justifyContent:'center',gap:'1vh',marginBottom:'1.5vh'}}>
-            <span style={{fontSize:'1.5vh'}}>🇬</span>
+            <img src="/google-logo.png" style={{width:'1.5vh',height:'1.5vh',objectFit:'contain'}} />
             <span style={{fontSize:'1.3vh',color:'rgba(255,255,255,0.8)',fontWeight:600}}>Continue with Google</span>
           </div>
           <div style={{display:'flex',alignItems:'center',gap:'1vh',marginBottom:'1.5vh'}}>
