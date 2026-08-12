@@ -33,18 +33,30 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 // local onboarding/role state and skips the Clerk auth gate, so individual
 // screens can be viewed/captured directly without signing in (used for design
 // review). Inert on native, in production builds, and without the param.
+// ─── DEV: bypass all auth + onboarding on every platform ─────────────────────
+// Set to 'buyer' or 'seller' to jump straight to that dashboard on device.
+// Set back to null when you're ready to test real sign-in.
+const DEV_BYPASS_ROLE: 'buyer' | 'seller' | null = 'buyer';
+
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
   if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined') return null;
   const v = new URLSearchParams(window.location.search).get('bt_preview');
   // Default to buyer in dev/web so the preview pane skips sign-in automatically.
   return v === 'seller' ? 'seller' : 'buyer';
 })();
+
+// Seed storage so AuthGate doesn't loop waiting on onboarding data.
 if (PREVIEW_ROLE && typeof localStorage !== 'undefined') {
-  // AsyncStorage on web is backed by localStorage with raw keys, so seeding
-  // here (before any React render) is picked up by all storage reads.
   localStorage.setItem('splash_seen', 'true');
   localStorage.setItem('onboarding_complete', 'true');
   localStorage.setItem('user_role', PREVIEW_ROLE);
+}
+if (DEV_BYPASS_ROLE && Platform.OS !== 'web') {
+  AsyncStorage.multiSet([
+    ['splash_seen', 'true'],
+    ['onboarding_complete', 'true'],
+    ['user_role', DEV_BYPASS_ROLE],
+  ]);
 }
 
 const queryClient = new QueryClient();
@@ -120,11 +132,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const atRoot          = !segments[0] || (segments[0] as string) === 'index';
     const inProtectedArea = !inAuthScreen && !inOnboarding && !inAccountType;
 
-    // DEV preview bypass: no auth redirects; only route "/" to the previewed
-    // role's home so deep links land directly on real screens.
-    if (PREVIEW_ROLE) {
-      if (atRoot) {
-        router.replace((PREVIEW_ROLE === 'buyer' ? '/(buyer)/' : '/(tabs)/') as never);
+    // DEV bypass (all platforms): skip auth and go straight to dashboard.
+    const devRole = DEV_BYPASS_ROLE ?? PREVIEW_ROLE;
+    if (devRole) {
+      if (atRoot || inAuthScreen || inOnboarding || inAccountType) {
+        router.replace((devRole === 'buyer' ? '/(buyer)/' : '/(tabs)/') as never);
       }
       return;
     }
