@@ -36,7 +36,8 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
   if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined') return null;
   const v = new URLSearchParams(window.location.search).get('bt_preview');
-  return v === 'buyer' || v === 'seller' ? v : null;
+  // Default to buyer in dev/web so the preview pane skips sign-in automatically.
+  return v === 'seller' ? 'seller' : 'buyer';
 })();
 if (PREVIEW_ROLE && typeof localStorage !== 'undefined') {
   // AsyncStorage on web is backed by localStorage with raw keys, so seeding
