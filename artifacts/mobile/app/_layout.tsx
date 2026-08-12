@@ -11,14 +11,22 @@ import {
   Inter_700Bold,
   useFonts,
 } from '@expo-google-fonts/inter';
+import { Platform } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { ClerkProvider, ClerkLoaded, useAuth } from '@clerk/expo';
+import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth } from '@clerk/expo';
 import { tokenCache } from '@/lib/tokenCache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RoleProvider } from '@/contexts/RoleContext';
+import BootScreen from '@/components/BootScreen';
 
 SplashScreen.preventAutoHideAsync();
+
+// On web, the document body is white by default — paint it dark so the
+// pre-render moment matches the app instead of flashing a white screen.
+if (Platform.OS === 'web' && typeof document !== 'undefined') {
+  document.body.style.backgroundColor = '#07070F';
+}
 
 const queryClient = new QueryClient();
 
@@ -88,6 +96,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const inPlans         = segments[0] === 'plans';
     const inBuyerGroup    = segments[0] === '(buyer)';
     const inTabsGroup     = segments[0] === '(tabs)';
+    // The index route ("/") has no segment — it only shows BootScreen and
+    // must always be redirected away from once auth state is known.
+    const atRoot          = !segments[0] || (segments[0] as string) === 'index';
     const inProtectedArea = !inAuthScreen && !inOnboarding && !inAccountType;
 
     if (!isLoaded) return;
@@ -117,8 +128,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Onboarding done → route away from auth/onboarding screens to correct dashboard
-    if (onboardingDone && (inAuthScreen || inOnboarding || inAccountType)) {
+    // Onboarding done → route away from auth/onboarding screens and the
+    // bare "/" boot route to the correct dashboard
+    if (onboardingDone && (inAuthScreen || inOnboarding || inAccountType || atRoot)) {
       const dest = storedRole === 'buyer' ? '/(buyer)/' : '/(tabs)/';
       router.replace(dest as never);
       return;
@@ -139,6 +151,8 @@ function RootLayoutNav() {
   return (
     <AuthGate>
       <Stack screenOptions={{ headerShown: false }}>
+        {/* Boot: "/" renders BootScreen until AuthGate redirects */}
+        <Stack.Screen name="index"          options={{ headerShown: false, animation: 'fade' }} />
         {/* Auth & onboarding */}
         <Stack.Screen name="splash"         options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="welcome"        options={{ headerShown: false, animation: 'fade' }} />
@@ -331,10 +345,13 @@ export default function RootLayout() {
     if (fontsLoaded || fontError) SplashScreen.hideAsync();
   }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) return null;
+  if (!fontsLoaded && !fontError) return <BootScreen />;
 
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache} proxyUrl={proxyUrl}>
+      <ClerkLoading>
+        <BootScreen />
+      </ClerkLoading>
       <ClerkLoaded>
         <SafeAreaProvider>
           <ErrorBoundary>
