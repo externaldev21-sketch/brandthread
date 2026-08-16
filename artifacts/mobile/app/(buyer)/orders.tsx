@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native';
@@ -238,6 +238,9 @@ export default function BuyerOrdersScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [filter, setFilter] = useState<BuyerFilterKey>('all');
+  // Track whether the very first load has completed so re-focuses and
+  // polling intervals don't flash the full-screen spinner.
+  const hasLoadedRef = useRef(false);
 
   const load = useCallback(async () => {
     setLoadError(false);
@@ -246,11 +249,13 @@ export default function BuyerOrdersScreen() {
       setOrders(rows.map(adaptOrder));
     } catch { setLoadError(true); }
     setLoading(false);
+    hasLoadedRef.current = true;
   }, [api]);
 
   // Refresh immediately on focus, then poll every 30 s while on this screen.
+  // Spinner only shows on the very first load; subsequent refreshes are silent.
   useFocusEffect(useCallback(() => {
-    setLoading(true);
+    if (!hasLoadedRef.current) setLoading(true);
     load();
     const timer = setInterval(load, 30_000);
     return () => clearInterval(timer);
