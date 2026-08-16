@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useApi } from '@/hooks/useApi';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE,
@@ -36,7 +37,11 @@ const HERO_DROP = {
 };
 
 type ForYouItem = {
-  id: string; brand: string; name: string; price: string;
+  id: string;
+  /** Real DB product UUID — set for API-backed items so the detail screen
+   *  loads the live product with correct variant IDs for checkout. */
+  productId?: string;
+  brand: string; name: string; price: string;
   originalPrice: string | null; color: string; initials: string; tag: string;
 };
 
@@ -220,7 +225,13 @@ function ForYouCard({ item }: { item: ForYouItem }) {
     <TouchableOpacity
       style={[fy.card, { backgroundColor: card, borderColor: border }]}
       activeOpacity={0.85}
-      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push(('/buyer-product-detail?productId=prod_essential_tee&productName=' + encodeURIComponent(item.name)) as never); }}
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        // Use real DB UUID when available (API-backed item), else fall back to the item's id
+        const pid = encodeURIComponent(item.productId ?? item.id);
+        const name = encodeURIComponent(item.name);
+        router.push((`/buyer-product-detail?productId=${pid}&productName=${name}`) as never);
+      }}
     >
       <View style={[fy.visual, { backgroundColor: item.color }]}>
         <View style={fy.visualIcon}>
@@ -393,6 +404,7 @@ function SectionHead({ title, sub, action, onAction }: { title: string; sub?: st
 export default function DiscoverScreen() {
   const insets  = useSafeAreaInsets();
   const router  = useRouter();
+  const api     = useApi();
 
   const bg      = BG;
   const fg      = FG;
@@ -403,6 +415,33 @@ export default function DiscoverScreen() {
 
   const [discoverItems, setDiscoverItems] = useState<ForYouItem[]>(() => shuffle(UNFOLLOWED_BRAND_POOL).slice(0, 4));
   const [refreshing, setRefreshing] = useState(false);
+  // API-backed products replace the hardcoded FOR_YOU list when available
+  const [liveForYou, setLiveForYou] = useState<ForYouItem[]>([]);
+
+  useEffect(() => {
+    api.publicProducts.list({ limit: 8 })
+      .then((rows) => {
+        const items: ForYouItem[] = rows.map((row: any, i: number) => {
+          const firstVariant = (row.variants ?? [])[0];
+          const priceDollars = firstVariant ? (firstVariant.priceCents / 100).toFixed(0) : '0';
+          return {
+            id:            `live_${i}`,
+            productId:     row.id,   // real DB UUID — used for navigation + checkout
+            brand:         row.sellerDisplayName ?? 'Seller',
+            name:          row.name,
+            price:         `$${priceDollars}`,
+            originalPrice: null,
+            color:         PURPLE,
+            initials:      (row.name ?? 'P')[0].toUpperCase(),
+            tag:           (row.tags as string[] | undefined)?.[0] ?? 'New',
+          };
+        });
+        if (items.length > 0) setLiveForYou(items);
+      })
+      .catch(() => { /* silent — fall back to static FOR_YOU */ });
+  }, []);
+
+  const forYouItems = liveForYou.length > 0 ? liveForYou : FOR_YOU;
 
   function handleRefresh() {
     setRefreshing(true);
@@ -467,7 +506,7 @@ export default function DiscoverScreen() {
         contentContainerStyle={{ paddingHorizontal: 20, gap: 12, paddingBottom: 4 }}
         style={{ marginBottom: 32 }}
       >
-        {FOR_YOU.map(item => <ForYouCard key={item.id} item={item} />)}
+        {forYouItems.map(item => <ForYouCard key={item.id} item={item} />)}
       </ScrollView>
 
       {/* ─ Discover — brands you don't follow, reshuffled on pull-to-refresh ─ */}

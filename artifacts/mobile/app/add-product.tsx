@@ -29,9 +29,10 @@ import {
 } from '@/components/BrandthreadUI';
 
 import {
-  createProduct, updateProduct, getProduct, saveDraft, loadDraft, deleteDraft,
+  getProduct, saveDraft, loadDraft, deleteDraft,
   getCollections, DEMO_FULL_PRODUCTS,
 } from '@/services/productService';
+import { useApi } from '@/hooks/useApi';
 
 import {
   Product, ProductDraft, ProductCategory, PRODUCT_CATEGORIES,
@@ -85,6 +86,7 @@ export default function AddProductScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const insets = useSafeAreaInsets();
+  const api = useApi();
 
   const [step, setStep] = useState(1);
   const [draftData, setDraftData] = useState<Partial<Product>>({
@@ -500,11 +502,41 @@ export default function AddProductScreen() {
       },
     };
 
+    // Map the mobile product payload → server DTO
+    const productVariantsForServer = (productPayload.variants ?? []).map((v: any) => ({
+      size:              v.size,
+      color:             v.color,
+      sku:               v.sku || ((productPayload.name ?? 'SKU').replace(/\s+/g, '-').toUpperCase() + '-' + (v.id ?? 'DEFAULT')),
+      priceCents:        Math.round(((v.price ?? productPayload.pricing?.price ?? 0) as number) * 100),
+      stock:             typeof v.inventoryQuantity === 'number' ? v.inventoryQuantity : 0,
+      lowStockThreshold: (productPayload.inventory as any)?.lowStockThreshold ?? 10,
+    })).filter((v: any) => v.priceCents > 0);
+
+    const serverCreatePayload = {
+      name:        productPayload.name ?? '',
+      description: productPayload.description,
+      category:    typeof productPayload.category === 'string' ? productPayload.category : 'apparel',
+      status:      'active',
+      images:      (productPayload.media ?? []).map((m: any) => m.uri ?? m.url ?? '').filter(Boolean),
+      tags:        productPayload.tags ?? [],
+      variants:    productVariantsForServer,
+    };
+
+    // Update only touches top-level product metadata (variants managed separately)
+    const serverUpdatePayload = {
+      name:        productPayload.name,
+      description: productPayload.description,
+      category:    typeof productPayload.category === 'string' ? productPayload.category : undefined,
+      status:      'active',
+      images:      (productPayload.media ?? []).map((m: any) => m.uri ?? m.url ?? '').filter(Boolean),
+      tags:        productPayload.tags ?? [],
+    };
+
     try {
       const name = draftData.name ?? 'Product';
       if (isEditMode && editProductId) {
         // ── Update existing product ──
-        await updateProduct(editProductId, productPayload);
+        await api.products.update(editProductId, serverUpdatePayload);
         await deleteDraft(draftId.current);
         Alert.alert('Product updated!', name + ' has been updated.', [
           { text: 'View product', onPress: () => router.replace('/product-detail?id=' + editProductId as never) },
@@ -512,7 +544,7 @@ export default function AddProductScreen() {
         ]);
       } else {
         // ── Create new product ──
-        const newProduct = await createProduct(productPayload);
+        const newProduct = await api.products.create(serverCreatePayload) as any;
         await deleteDraft(draftId.current);
         // Fix #2: success alert with view/done options
         Alert.alert('Product published!', name + ' is now live.', [

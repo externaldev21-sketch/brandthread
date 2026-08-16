@@ -125,6 +125,74 @@ export function createApi(getToken: GetToken) {
       klaviyoSync:        () => post<any>('/api/integrations/klaviyo/sync', {}),
       klaviyoDisconnect:  () => del<any>('/api/integrations/klaviyo'),
     },
+    buyer: {
+      checkout: {
+        /** Create a Stripe Checkout Session. Returns { sessionId, url }. */
+        createSession: (
+          items: { variantId: string; productId: string; quantity: number }[],
+          opts: {
+            contactEmail?: string;
+            shippingAddress?: {
+              name?: string; street: string; city: string;
+              state: string; zip: string; country?: string;
+            };
+            /** Per-seller idempotency key (format: {checkoutSessionId}_{sellerId}).
+             *  The server uses this to detect and reuse an identical in-flight session
+             *  (e.g. after a component remount) without creating a duplicate Stripe charge.
+             *  A UNIQUE DB index makes this race-condition-safe server-side. */
+            clientIdempotencyKey?: string;
+          } = {},
+        ) =>
+          post<{ sessionId: string; url: string }>('/api/buyer/checkout/session', {
+            items,
+            successUrl: 'mobile://checkout/return?session_id={CHECKOUT_SESSION_ID}',
+            cancelUrl:  'mobile://checkout/cancel',
+            ...(opts.contactEmail          ? { contactEmail:          opts.contactEmail          } : {}),
+            ...(opts.shippingAddress       ? { shippingAddress:       opts.shippingAddress       } : {}),
+            ...(opts.clientIdempotencyKey  ? { clientIdempotencyKey:  opts.clientIdempotencyKey  } : {}),
+          }),
+        /** Verify payment status after Stripe redirect.
+         *  Returns { status, paymentStatus, amountTotal, orderId?, orderNumber? }. */
+        verifySession: (sessionId: string) =>
+          get<{
+            status: string;
+            paymentStatus: string;
+            amountTotal: number | null;  // Stripe's authoritative charge in cents
+            orderId: string | null;
+            orderNumber: string | null;
+          }>(`/api/buyer/checkout/session/${encodeURIComponent(sessionId)}`),
+      },
+      orders: {
+        list: () => get<any[]>('/api/buyer/orders'),
+        get:  (id: string) => get<any>(`/api/buyer/orders/${encodeURIComponent(id)}`),
+      },
+    },
+    /** Unauthenticated public endpoints — no Authorization header needed. */
+    publicProducts: {
+      list: (opts: { limit?: number; category?: string; tag?: string } = {}) => {
+        const params = new URLSearchParams();
+        if (opts.limit)    params.set('limit',    String(opts.limit));
+        if (opts.category) params.set('category', opts.category);
+        if (opts.tag)      params.set('tag',       opts.tag);
+        const q = params.toString();
+        return get<any[]>(`/api/public/products${q ? `?${q}` : ''}`);
+      },
+      get: (id: string) => get<any>(`/api/public/products/${encodeURIComponent(id)}`),
+    },
+    seller: {
+      connect: {
+        /** Initiate Stripe Connect Express onboarding. Returns { url, stripeAccountId }. */
+        onboard: () => post<{ url: string; stripeAccountId: string }>('/api/seller/connect/onboard', {}),
+        /** Get current Connect account status. */
+        status:  () => get<{
+          connected: boolean;
+          stripeAccountId: string | null;
+          chargesEnabled: boolean;
+          payoutsEnabled: boolean;
+          status: string;
+        }>('/api/seller/connect/status'),
+      },
+    },
   };
 }
 

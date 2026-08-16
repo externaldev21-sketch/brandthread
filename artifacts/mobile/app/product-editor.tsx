@@ -15,6 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Badge } from '@/components/Badge';
+import { useApi } from '@/hooks/useApi';
 
 const CHANNELS = 'Online Store, Point of Sale, Shop, Faire: Sell Wholesale';
 
@@ -70,10 +71,12 @@ export default function ProductEditorScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const api = useApi();
 
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState('');
   const [available, setAvailable] = useState(0);
+  const [saving, setSaving] = useState(false);
 
   const topPad = Platform.OS === 'web' ? 24 : insets.top;
   const bottomPad = Platform.OS === 'web' ? 24 : insets.bottom;
@@ -82,15 +85,34 @@ export default function ProductEditorScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
 
-  function handleSave() {
+  async function handleSave() {
     haptic();
     if (!title.trim()) {
       Alert.alert('Add a product title', 'Give your product a name before saving.');
       return;
     }
-    Alert.alert('Product saved', `"${title}" has been added to your store.`, [
-      { text: 'OK', onPress: () => router.back() },
-    ]);
+    setSaving(true);
+    const priceDollars = parseFloat(price);
+    try {
+      await api.products.create({
+        name:     title.trim(),
+        status:   'active',
+        ...(priceDollars > 0 ? {
+          variants: [{
+            sku:        title.trim().replace(/\s+/g, '-').toUpperCase() + '-DEFAULT',
+            priceCents: Math.round(priceDollars * 100),
+            stock:      available,
+          }],
+        } : {}),
+      });
+      Alert.alert('Product saved', `"${title}" has been added to your store.`, [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    } catch {
+      Alert.alert('Error', 'Could not save product. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   function handleCancel() {

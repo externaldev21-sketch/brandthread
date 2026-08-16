@@ -15,7 +15,8 @@ import {
   getBuyerProduct, getBuyerProductByName, addToCart, createBuyNowSession,
   getCart, calculateCartSummary,
 } from '@/services/cartService';
-import { BuyerProduct, BuyerProductVariant, CheckoutAttribution } from '@/services/cartTypes';
+import { BuyerProduct, BuyerProductOption, BuyerProductVariant, CheckoutAttribution } from '@/services/cartTypes';
+import { useApi } from '@/hooks/useApi';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, BORDER_FOCUS,
   FG, MUTED, SUBTLE,
@@ -28,6 +29,61 @@ import {
   FONT, FS, SP, RADIUS, COMP, ICON,
   SHADOW_PURPLE,
 } from '@/lib/theme';
+
+// ─── API → BuyerProduct adapter ───────────────────────────────────────────────
+// Converts a raw row from GET /api/public/products/:id to the BuyerProduct
+// shape expected by addToCart. Variant UUIDs from the DB are preserved so the
+// checkout server can look them up correctly.
+
+function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
+  const apiVariants: any[] = row.variants ?? [];
+
+  // Derive options from unique size / color values across all variants
+  const sizes  = [...new Set<string>(apiVariants.map((v: any) => v.size).filter(Boolean))] as string[];
+  const colors = [...new Set<string>(apiVariants.map((v: any) => v.color).filter(Boolean))] as string[];
+
+  const options: BuyerProductOption[] = [];
+  if (sizes.length  > 0) options.push({ id: 'opt_size',  name: 'Size',  values: sizes.map (s => ({ id: `size_${s}`,  label: s })) });
+  if (colors.length > 0) options.push({ id: 'opt_color', name: 'Color', values: colors.map(c => ({ id: `color_${c}`, label: c })) });
+
+  const firstImage: string | undefined = (row.images ?? [])[0];
+
+  const variants: BuyerProductVariant[] = apiVariants.map((v: any) => {
+    const ovs: { optionId: string; valueId: string }[] = [];
+    if (v.size)  ovs.push({ optionId: 'opt_size',  valueId: `size_${v.size}`  });
+    if (v.color) ovs.push({ optionId: 'opt_color', valueId: `color_${v.color}` });
+    return {
+      id:                v.id,
+      title:             [v.size, v.color].filter(Boolean).join(' / ') || 'Default',
+      optionValues:      ovs,
+      price:             (v.priceCents ?? 0) / 100,
+      inventoryQuantity: v.stock ?? 0,
+      isAvailable:       (v.stock ?? 0) > 0,
+      imageUri:          firstImage,
+    };
+  });
+
+  const lowestPrice = variants.length > 0 ? Math.min(...variants.map(v => v.price)) : 0;
+
+  return {
+    id:                 row.id,
+    sellerId:           row.ownerId,
+    sellerName:         row.sellerDisplayName ?? 'Seller',
+    sellerHandle:       '',
+    name:               row.name,
+    description:        row.description ?? '',
+    price:              lowestPrice,
+    imageUris:          row.images ?? [],
+    category:           row.category ?? 'apparel',
+    isPreOrder:         false,
+    cancellationPolicy: 'All sales final unless the item arrives damaged.',
+    refundPolicy:       'Contact seller within 7 days of delivery for returns.',
+    options,
+    variants,
+    isActive:           true,
+    tags:               row.tags ?? [],
+  };
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -194,6 +250,7 @@ export default function BuyerProductDetailScreen() {
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const api    = useApi();
 
   const [product, setProduct] = useState<BuyerProduct | null>(null);
   const [loading, setLoading] = useState(true);
@@ -207,8 +264,23 @@ export default function BuyerProductDetailScreen() {
     (async () => {
       try {
         let prod: BuyerProduct | null = null;
-        if (productId) prod = await getBuyerProduct(productId);
-        else if (productName) prod = await getBuyerProductByName(productName);
+
+        if (productId) {
+          // Attempt to load the live product from the public API first.
+          // This ensures that DB product UUIDs from the discover feed carry real
+          // variant IDs so the checkout server can look them up.
+          try {
+            const row = await api.publicProducts.get(productId);
+            if (row && !row.error) prod = adaptApiProductToBuyerProduct(row);
+          } catch { /* fall through to demo data */ }
+
+          // Fall back to local demo data (for hardcoded discover items that use
+          // non-UUID ids like prod_canvas_cargo, or when the server is offline).
+          if (!prod) prod = await getBuyerProduct(productId);
+        } else if (productName) {
+          prod = await getBuyerProductByName(productName);
+        }
+
         setProduct(prod);
       } catch {}
       setLoading(false);

@@ -164,20 +164,40 @@ async function handleCheckoutPaid(session: any) {
   const cartItems = [...aggregated.values()];
 
   const subtotalCents = cartItems.reduce((s, i) => s + i.priceCents * i.quantity, 0);
-  const shippingCents = 0;
-  const totalCents    = subtotalCents + shippingCents;
+  // Use Stripe's authoritative charged total; fall back to computed subtotal if absent.
+  // This ensures the stored order total always matches the amount Stripe captured.
+  const totalCents    = typeof session.amount_total === "number" ? session.amount_total : subtotalCents;
+  // Derive shipping as the difference between what Stripe charged and item subtotal
+  const shippingCents = Math.max(0, totalCents - subtotalCents);
 
-  const shipDetails = session.shipping_details;
-  const shippingAddress = shipDetails?.address
-    ? {
+  // Prefer the buyer-provided address stored in the server-side checkout record
+  // (captured before Stripe was opened, so it always has the address).
+  // Fall back to session.shipping_details if the csRecord address is missing
+  // (e.g. older sessions or sessions created with shipping_address_collection).
+  let shippingAddress: { name?: string; street: string; city: string; state: string; zip: string; country: string } | undefined;
+  if (csRecord.shippingAddress && (csRecord.shippingAddress as any).street) {
+    const sa = csRecord.shippingAddress as any;
+    shippingAddress = {
+      name:    sa.name    ?? undefined,
+      street:  sa.street,
+      city:    sa.city,
+      state:   sa.state,
+      zip:     sa.zip,
+      country: sa.country ?? "US",
+    };
+  } else {
+    const shipDetails = session.shipping_details;
+    if (shipDetails?.address) {
+      shippingAddress = {
         name:    shipDetails.name ?? undefined,
         street:  shipDetails.address.line1 ?? "",
         city:    shipDetails.address.city ?? "",
         state:   shipDetails.address.state ?? "",
         zip:     shipDetails.address.postal_code ?? "",
         country: shipDetails.address.country ?? "US",
-      }
-    : undefined;
+      };
+    }
+  }
 
   // ── All-or-nothing stock reservation inside transaction ───────────────────
   let oversoldItems: string[] = [];

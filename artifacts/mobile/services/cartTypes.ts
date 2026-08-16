@@ -166,6 +166,13 @@ export interface CheckoutSession {
   idempotencyKey: string;
   createdAt: string;
   updatedAt: string;
+  /**
+   * Durably tracks which seller groups have already been charged this session.
+   * Persisted to AsyncStorage after each successful payment so the ref is
+   * restored correctly if the component remounts before the loop finishes.
+   * Maps sellerId → { stripeSessionId, orderNumber, amountTotalCents }.
+   */
+  paidGroups?: Record<string, { stripeSessionId: string; orderNumber: string; amountTotalCents: number }>;
 }
 
 export interface CheckoutAcknowledgment {

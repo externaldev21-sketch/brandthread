@@ -17,8 +17,10 @@ import {
   getCart, createCheckoutSession, getCheckoutSession, saveCheckoutProgress,
   clearCheckoutSession, clearCart, applyDiscount, removeDiscount,
   getDemoPaymentMethods, calculateDemoTax, getDemoShippingMethods,
-  calculateCartSummary, placeOrder,
+  calculateCartSummary,
 } from '@/services/cartService';
+import * as WebBrowser from 'expo-web-browser';
+import { useApi } from '@/hooks/useApi';
 import {
   CheckoutSession, CheckoutStep, CheckoutContact, CheckoutAddress,
   CheckoutDeliveryGroup, CheckoutDiscount, CheckoutPaymentMethod,
@@ -739,6 +741,7 @@ export default function BuyerCheckoutScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
+  const api = useApi();
   const [session, setSession] = useState<CheckoutSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [contact, setContact] = useState<Partial<CheckoutContact>>({ orderUpdates: 'email', marketingConsent: false });
@@ -749,6 +752,14 @@ export default function BuyerCheckoutScreen() {
   const [placedOrderNumbers, setPlacedOrderNumbers] = useState<string[]>([]);
   const [placedTotal, setPlacedTotal] = useState(0);
   const [failureMessage, setFailureMessage] = useState('');
+
+  /**
+   * Tracks which seller groups have already been charged this checkout session.
+   * Maps sellerId → { stripeSessionId, orderNumber, amountTotalCents (from Stripe) }.
+   * Persists across re-renders (and is also persisted to AsyncStorage after each
+   * payment) so a retry or component remount never re-charges a paid seller.
+   */
+  const paidGroupsRef = useRef<Map<string, { stripeSessionId: string; orderNumber: string; amountTotalCents: number }>>(new Map());
 
   const placeOrderIdempotencyRef = useRef<string>('');
 
@@ -765,6 +776,16 @@ export default function BuyerCheckoutScreen() {
       if (s.shippingAddress) setAddress(s.shippingAddress);
       if (s.paymentMethod) setPaymentMethod(s.paymentMethod);
       placeOrderIdempotencyRef.current = s.idempotencyKey;
+
+      // Restore any durably-persisted group-payment state from AsyncStorage so
+      // that a component remount between seller A paid and seller B paid will
+      // correctly skip re-charging seller A.
+      if (s.paidGroups) {
+        for (const [sid, entry] of Object.entries(s.paidGroups)) {
+          paidGroupsRef.current.set(sid, entry);
+        }
+      }
+
       setLoading(false);
     })();
   }, []);
@@ -865,24 +886,130 @@ export default function BuyerCheckoutScreen() {
       setPlacing(true);
       setFailureMessage('');
       try {
-        const result = await placeOrder({
-          session: { ...sess, paymentMethod, contact: contact as CheckoutContact, shippingAddress: address as CheckoutAddress } as CheckoutSession,
-          cardNumber: cardLast4,
-          idempotencyKey: placeOrderIdempotencyRef.current,
-        });
-        if (result.success) {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          setPlacedOrderNumbers(result.orderNumbers);
-          setPlacedTotal(result.totalCharged);
-          if (!sess.isBuyNow) await clearCart();
-          await clearCheckoutSession();
-          setSession({ ...sess, step: 'confirmation' } as CheckoutSession);
-        } else {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          setFailureMessage(result.failureMessage ?? 'Payment failed. Please try again.');
+        // Split checkout by seller — the server enforces single-seller per session.
+        // paidGroupsRef persists across retries so a failed-then-retried session
+        // never creates a duplicate Stripe charge for a seller already paid.
+        for (const group of sess.deliveryGroups) {
+          // Skip groups already successfully paid in a prior attempt this session
+          if (paidGroupsRef.current.has(group.sellerId)) continue;
+
+          // Seller-scoped items only
+          const groupItems = group.items.map(i => ({
+            variantId: i.variantId,
+            productId: i.productId,
+            quantity:  i.quantity,
+          }));
+
+          // Map the mobile CheckoutAddress → server shipping DTO
+          const sa = sess.shippingAddress;
+          const serverShipping = sa
+            ? {
+                name:    [sa.firstName, sa.lastName].filter(Boolean).join(' ') || undefined,
+                street:  [sa.line1, sa.line2].filter(Boolean).join(', '),
+                city:    sa.city,
+                state:   sa.state,
+                zip:     sa.postalCode,
+                country: sa.country ?? 'US',
+              }
+            : undefined;
+
+          // Derive a stable per-attempt key: checkoutId + sellerId.
+          // Changes when a new checkout session is created (cart edit → fresh idempotencyKey).
+          // Stable on retries within the same checkout → server returns the existing session.
+          const clientIdempotencyKey = `${sess.idempotencyKey}_${group.sellerId}`;
+
+          const { sessionId, url } = await api.buyer.checkout.createSession(groupItems, {
+            contactEmail:        contact.email ?? undefined,
+            shippingAddress:     serverShipping,
+            clientIdempotencyKey,
+          });
+
+          // Open Stripe Checkout in the in-app browser
+          const browserResult = await WebBrowser.openAuthSessionAsync(url, 'mobile://checkout/return');
+
+          if (browserResult.type === 'cancel') {
+            setFailureMessage('Checkout was cancelled. Tap "Place Order" to try again.');
+            setPlacing(false);
+            return;
+          }
+
+          // Parse session_id from the redirect URL if Stripe returned it
+          let verifyId = sessionId;
+          if (browserResult.type === 'success' && browserResult.url) {
+            try {
+              const parsed = new URL(browserResult.url);
+              const sid = parsed.searchParams.get('session_id');
+              if (sid) verifyId = sid;
+            } catch {}
+          }
+
+          // Verify payment status for this seller
+          const verification = await api.buyer.checkout.verifySession(verifyId);
+          if (verification.paymentStatus !== 'paid') {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            setFailureMessage(
+              verification.paymentStatus === 'unpaid'
+                ? `Payment for ${group.sellerName} was not completed. Please try again.`
+                : `Payment for ${group.sellerName} is pending. Check your Orders for updates.`,
+            );
+            setPlacing(false);
+            return;
+          }
+
+          // Record this seller as paid and immediately persist to AsyncStorage so
+          // that the state survives a component remount between seller payments.
+          paidGroupsRef.current.set(group.sellerId, {
+            stripeSessionId: verifyId,
+            orderNumber: verification.orderNumber ?? '',
+            amountTotalCents: verification.amountTotal ?? 0,
+          });
+          // Durably persist paidGroups so a remount can restore paidGroupsRef
+          // and avoid re-charging sellers already confirmed via Stripe.
+          const durablePaidGroups: CheckoutSession['paidGroups'] = {};
+          for (const [sid, entry] of paidGroupsRef.current.entries()) {
+            durablePaidGroups[sid] = entry;
+          }
+          await saveCheckoutProgress({ ...sess, paidGroups: durablePaidGroups } as CheckoutSession);
         }
-      } catch {
-        setFailureMessage('Something went wrong. Please try again.');
+
+        // All sellers paid — poll for webhook-created order numbers before
+        // showing the confirmation screen. The webhook may be slightly behind.
+        const MAX_POLL_ATTEMPTS = 6;
+        const POLL_INTERVAL_MS  = 2000;
+        for (const [, entry] of paidGroupsRef.current.entries()) {
+          if (entry.orderNumber) continue; // already have it
+          for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt++) {
+            await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+            try {
+              const polled = await api.buyer.checkout.verifySession(entry.stripeSessionId);
+              if (polled.orderNumber) {
+                entry.orderNumber = polled.orderNumber;
+                break;
+              }
+            } catch { /* continue polling */ }
+          }
+        }
+
+        // Collect final order numbers and Stripe totals from the ref
+        const allOrderNumbers = [...paidGroupsRef.current.values()]
+          .map(v => v.orderNumber)
+          .filter(Boolean);
+
+        // Use the sum of Stripe's authoritative amountTotal values (in cents → dollars)
+        // so the confirmation screen shows the exact amount charged, not a local estimate.
+        const stripeChargedTotal = [...paidGroupsRef.current.values()]
+          .reduce((s, v) => s + v.amountTotalCents, 0) / 100;
+        const confirmedTotal = stripeChargedTotal > 0 ? stripeChargedTotal : sess.summary.total;
+
+        // All sellers paid successfully
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setPlacedOrderNumbers(allOrderNumbers);
+        setPlacedTotal(confirmedTotal);
+        if (!sess.isBuyNow) await clearCart();
+        await clearCheckoutSession();
+        setSession({ ...sess, step: 'confirmation' } as CheckoutSession);
+      } catch (err: any) {
+        setFailureMessage(err?.message ?? 'Something went wrong. Please try again.');
       }
       setPlacing(false);
     }

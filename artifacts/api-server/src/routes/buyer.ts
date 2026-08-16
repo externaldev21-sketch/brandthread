@@ -6,7 +6,7 @@ import { Router } from "express";
 import {
   db, checkoutSessions, orders, orderItems, productVariants, products, users,
 } from "@workspace/db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireStripe } from "../lib/stripe";
 
@@ -31,7 +31,7 @@ router.post("/checkout/session", async (req, res) => {
   try {
     const stripe = requireStripe();
     const buyerId = (req as any).clerkUserId as string;
-    const { items, successUrl, cancelUrl, contactEmail } = req.body;
+    const { items, successUrl, cancelUrl, contactEmail, shippingAddress, clientIdempotencyKey } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
       res.status(400).json({ error: "items required" });
@@ -164,35 +164,164 @@ router.post("/checkout/session", async (req, res) => {
       return;
     }
 
-    // ── Persist cart server-side before calling Stripe ────────────────────
-    // This record is the single source of truth for the webhook; Stripe
-    // metadata only carries the record's UUID (no per-field keys, no 50-key limit).
-    const [csRecord] = await db
-      .insert(checkoutSessions)
-      .values({ buyerId, sellerId, items: cartItems })
-      .returning({ id: checkoutSessions.id });
+    const hasKey = !!clientIdempotencyKey && typeof clientIdempotencyKey === "string";
 
-    // ── Create Stripe Checkout Session ────────────────────────────────────
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      line_items: lineItems,
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      client_reference_id: buyerId,
-      // Single metadata key — immune to the 50-key limit
-      metadata: { csRef: csRecord.id },
-      payment_intent_data: {
-        metadata: { buyerId },
-        transfer_data: { destination: seller.stripeAccountId },
+    // Validated shipping DTO (set once, used below)
+    const validatedShipping = shippingAddress && typeof shippingAddress === "object"
+      && shippingAddress.street && shippingAddress.city && shippingAddress.state && shippingAddress.zip
+      ? {
+          name:    shippingAddress.name ?? undefined,
+          street:  shippingAddress.street,
+          city:    shippingAddress.city,
+          state:   shippingAddress.state,
+          zip:     shippingAddress.zip,
+          country: shippingAddress.country ?? "US",
+        }
+      : undefined;
+
+    // ── Server-side idempotency (when client supplies a key) ──────────────
+    //
+    // Design:
+    //  1. Check DB for an existing record with this key.
+    //     • Open Stripe session → return it immediately (safe reuse).
+    //     • Paid Stripe session (order exists or Stripe says paid) → return it
+    //       so the client can proceed to verify/poll without re-charging.
+    //     • Expired/cancelled Stripe session → return 410 so the client can
+    //       restart checkout with a new key (new checkout session → new idempKey).
+    //     • DB record exists but stripeSessionId is null → Stripe creation never
+    //       completed; treat the same as expired: return 410.
+    //     • No DB record → proceed to create one.
+    //  2. Call Stripe BEFORE inserting the DB record.
+    //     → A Stripe failure leaves no poisoned DB row; the same key can be
+    //       retried immediately and Stripe's own idempotency key returns the
+    //       same result if the network had already accepted the request.
+    //  3. Upsert the DB record with stripeSessionId already set.
+    //     → Concurrent requests that both passed step 1 both call Stripe with
+    //       the same idempotency key (identical Stripe session returned).
+    //       The ON CONFLICT DO UPDATE merges them into one DB row; both callers
+    //       get the same session URL.
+
+    if (hasKey) {
+      const [existingCS] = await db
+        .select({
+          id:              checkoutSessions.id,
+          stripeSessionId: checkoutSessions.stripeSessionId,
+        })
+        .from(checkoutSessions)
+        .where(eq(checkoutSessions.clientIdempotencyKey, clientIdempotencyKey))
+        .limit(1);
+
+      if (existingCS) {
+        if (!existingCS.stripeSessionId) {
+          // DB record exists but Stripe never finished — treat as expired.
+          res.status(410).json({
+            error: "Your previous checkout attempt did not complete. Please retry — your cart is intact.",
+            code: "SESSION_INCOMPLETE",
+          });
+          return;
+        }
+
+        // Retrieve the Stripe session to get current status and URL
+        let existingStripeSession: any;
+        try {
+          existingStripeSession = await stripe.checkout.sessions.retrieve(existingCS.stripeSessionId);
+        } catch {
+          // Stripe retrieve failed — treat as expired to allow a clean retry
+          res.status(410).json({
+            error: "Could not retrieve your checkout session. Please retry.",
+            code: "SESSION_RETRIEVE_FAILED",
+          });
+          return;
+        }
+
+        if (existingStripeSession.status === "open") {
+          // Safe to return immediately — buyer hasn't paid yet
+          res.json({ sessionId: existingCS.stripeSessionId, url: existingStripeSession.url });
+          return;
+        }
+
+        if (
+          existingStripeSession.payment_status === "paid" ||
+          existingStripeSession.status === "complete"
+        ) {
+          // Already paid — let client proceed to verifySession (webhook may be delayed)
+          res.json({
+            sessionId: existingCS.stripeSessionId,
+            url: existingStripeSession.url ?? "",
+          });
+          return;
+        }
+
+        // Expired or cancelled — buyer must restart checkout with a new key
+        res.status(410).json({
+          error: "Your checkout session expired. Please review your cart and try again.",
+          code: "SESSION_EXPIRED",
+        });
+        return;
+      }
+    }
+
+    // ── Call Stripe FIRST (idempotent via key) — no DB record yet ─────────
+    // A Stripe failure at this point leaves no poisoned DB row.
+    // Two concurrent requests with the same key get the same Stripe session back.
+    const session = await stripe.checkout.sessions.create(
+      {
+        mode: "payment",
+        line_items: lineItems,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        client_reference_id: buyerId,
+        // metadata.csRef is back-filled after the DB upsert below
+        metadata: {},
+        payment_intent_data: {
+          metadata: { buyerId },
+          transfer_data: { destination: seller.stripeAccountId },
+        },
+        ...(contactEmail ? { customer_email: contactEmail } : {}),
       },
-      ...(contactEmail ? { customer_email: contactEmail } : {}),
-    });
+      hasKey ? { idempotencyKey: `cs_${clientIdempotencyKey}` } : {},
+    );
 
-    // Back-fill the Stripe session ID so the webhook can also look up by it
-    await db
-      .update(checkoutSessions)
-      .set({ stripeSessionId: session.id })
-      .where(eq(checkoutSessions.id, csRecord.id));
+    // ── Upsert DB record (cart + stripeSessionId in one shot) ─────────────
+    // ON CONFLICT on clientIdempotencyKey covers concurrent requests that both
+    // cleared the lookup above and both called Stripe (same session returned).
+    // The DO UPDATE just re-applies the same stripeSessionId — safe no-op.
+    const insertValues = {
+      buyerId,
+      sellerId,
+      items: cartItems,
+      stripeSessionId: session.id,
+      ...(validatedShipping ? { shippingAddress: validatedShipping } : {}),
+      ...(hasKey ? { clientIdempotencyKey } : {}),
+    };
+
+    let csId: string;
+    if (hasKey) {
+      const [csRecord] = await db
+        .insert(checkoutSessions)
+        .values(insertValues)
+        .onConflictDoUpdate({
+          target: checkoutSessions.clientIdempotencyKey,
+          set: { stripeSessionId: session.id },
+        })
+        .returning({ id: checkoutSessions.id });
+      csId = csRecord.id;
+    } else {
+      const [csRecord] = await db
+        .insert(checkoutSessions)
+        .values(insertValues)
+        .returning({ id: checkoutSessions.id });
+      csId = csRecord.id;
+    }
+
+    // Back-fill csRef in Stripe metadata so the webhook can find the cart row.
+    // Best-effort: failure here is non-fatal because the webhook also falls back
+    // to looking up by stripe_session_id.
+    try {
+      await stripe.checkout.sessions.update(session.id, { metadata: { csRef: csId } });
+    } catch (metaErr) {
+      console.warn("Could not back-fill csRef metadata on Stripe session:", metaErr);
+    }
 
     res.json({ sessionId: session.id, url: session.url });
   } catch (err: any) {
@@ -230,10 +359,11 @@ router.get("/checkout/session/:sessionId", async (req, res) => {
       .limit(1);
 
     res.json({
-      status: session.status,
+      status:        session.status,
       paymentStatus: session.payment_status,
-      orderId: order?.id ?? null,
-      orderNumber: order?.orderNumber ?? null,
+      amountTotal:   session.amount_total ?? null,  // Stripe's authoritative charged amount in cents
+      orderId:       order?.id ?? null,
+      orderNumber:   order?.orderNumber ?? null,
     });
   } catch (err: any) {
     const status = err.status ?? 500;
@@ -252,8 +382,23 @@ router.get("/orders", async (req, res) => {
   try {
     const buyerId = (req as any).clerkUserId as string;
     const rows = await db
-      .select()
+      .select({
+        id:                      orders.id,
+        orderNumber:             orders.orderNumber,
+        ownerId:                 orders.ownerId,
+        sellerDisplayName:       users.displayName,
+        status:                  orders.status,
+        totalCents:              orders.totalCents,
+        subtotalCents:           orders.subtotalCents,
+        shippingCents:           orders.shippingCents,
+        trackingNumber:          orders.trackingNumber,
+        carrier:                 orders.carrier,
+        shippingAddress:         orders.shippingAddress,
+        stripePaymentIntentId:   orders.stripePaymentIntentId,
+        createdAt:               orders.createdAt,
+      })
       .from(orders)
+      .leftJoin(users, eq(users.clerkId, orders.ownerId))
       .where(eq(orders.buyerId, buyerId))
       .orderBy(desc(orders.createdAt));
     res.json(rows);
@@ -266,13 +411,28 @@ router.get("/orders", async (req, res) => {
 router.get("/orders/:id", async (req, res) => {
   try {
     const buyerId = (req as any).clerkUserId as string;
-    const [order] = await db
-      .select()
+    const [row] = await db
+      .select({
+        id:                      orders.id,
+        orderNumber:             orders.orderNumber,
+        ownerId:                 orders.ownerId,
+        sellerDisplayName:       users.displayName,
+        status:                  orders.status,
+        totalCents:              orders.totalCents,
+        subtotalCents:           orders.subtotalCents,
+        shippingCents:           orders.shippingCents,
+        trackingNumber:          orders.trackingNumber,
+        carrier:                 orders.carrier,
+        shippingAddress:         orders.shippingAddress,
+        stripePaymentIntentId:   orders.stripePaymentIntentId,
+        createdAt:               orders.createdAt,
+      })
       .from(orders)
+      .leftJoin(users, eq(users.clerkId, orders.ownerId))
       .where(and(eq(orders.id, req.params.id), eq(orders.buyerId, buyerId)))
       .limit(1);
 
-    if (!order) {
+    if (!row) {
       res.status(404).json({ error: "Order not found" });
       return;
     }
@@ -280,9 +440,9 @@ router.get("/orders/:id", async (req, res) => {
     const items = await db
       .select()
       .from(orderItems)
-      .where(eq(orderItems.orderId, order.id));
+      .where(eq(orderItems.orderId, row.id));
 
-    res.json({ ...order, items });
+    res.json({ ...row, items });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch order" });

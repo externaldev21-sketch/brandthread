@@ -3,7 +3,7 @@
  * Mounted at /api/public — no requireAuth middleware.
  */
 import { Router } from "express";
-import { db, products, productVariants } from "@workspace/db";
+import { db, products, productVariants, users } from "@workspace/db";
 import { eq, and, desc, inArray } from "drizzle-orm";
 
 const router = Router();
@@ -58,8 +58,18 @@ router.get("/products", async (req, res) => {
       variantsByProduct[v.productId].push(v);
     }
 
+    // Attach seller display name (best-effort; null if seller row not found)
+    const ownerIds = [...new Set(filtered.map((p) => p.ownerId))];
+    const sellerRows = ownerIds.length > 0
+      ? await db.select({ clerkId: users.clerkId, displayName: users.displayName })
+          .from(users)
+          .where(inArray(users.clerkId, ownerIds))
+      : [];
+    const sellerMap = Object.fromEntries(sellerRows.map((u) => [u.clerkId, u.displayName]));
+
     const result = filtered.map((p) => ({
       ...p,
+      sellerDisplayName: sellerMap[p.ownerId] ?? null,
       variants: variantsByProduct[p.id] ?? [],
     }));
 
@@ -89,7 +99,14 @@ router.get("/products/:id", async (req, res) => {
       .from(productVariants)
       .where(eq(productVariants.productId, product.id));
 
-    res.json({ ...product, variants });
+    // Attach seller display name
+    const [seller] = await db
+      .select({ displayName: users.displayName })
+      .from(users)
+      .where(eq(users.clerkId, product.ownerId))
+      .limit(1);
+
+    res.json({ ...product, sellerDisplayName: seller?.displayName ?? null, variants });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch product" });

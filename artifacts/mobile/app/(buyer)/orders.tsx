@@ -7,8 +7,8 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { getBuyerOrders } from '@/services/orderService';
 import { BuyerOrderView, TrackingStatus, OrderStatus } from '@/services/orderTypes';
+import { useApi } from '@/hooks/useApi';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
@@ -24,6 +24,61 @@ import {
   BrandthreadScreen, BrandthreadHeader, FilterChip,
   StatusBadge, EmptyState, PrimaryButton,
 } from '@/components/BrandthreadUI';
+
+// ─── API → BuyerOrderView adapter ─────────────────────────────────────────────
+
+function adaptOrder(row: any): BuyerOrderView {
+  const dbAddr = row.shippingAddress;
+  const shippingAddress: import('@/services/orderTypes').OrderAddress = dbAddr
+    ? {
+        name:    dbAddr.name ?? '',
+        line1:   dbAddr.street ?? '',
+        line2:   '',
+        city:    dbAddr.city ?? '',
+        state:   dbAddr.state ?? '',
+        zip:     dbAddr.zip ?? '',
+        country: dbAddr.country ?? 'US',
+        phone:   '',
+      }
+    : { name: '', line1: '', city: '', state: '', zip: '', country: 'US' };
+
+  return {
+    id:                row.id,
+    orderNumber:       row.orderNumber,
+    sellerId:          row.ownerId ?? '',
+    sellerName:        row.sellerDisplayName ?? 'Seller',
+    sellerHandle:      '',
+    status:            (row.status ?? 'new') as OrderStatus,
+    paymentStatus:     row.stripePaymentIntentId ? 'paid' : 'pending',
+    fulfillmentStatus: 'unfulfilled',
+    lineItems:         [],
+    shippingAddress,
+    payment: {
+      subtotal:      (row.subtotalCents ?? 0) / 100,
+      shippingTotal: (row.shippingCents  ?? 0) / 100,
+      taxTotal:      0,
+      total:         (row.totalCents     ?? 0) / 100,
+    },
+    trackingNumber:  row.trackingNumber ?? undefined,
+    trackingCarrier: row.carrier ?? undefined,
+    isPreOrder:       false,
+    hasReturnRequest: false,
+    createdAt:        row.createdAt ?? new Date().toISOString(),
+  };
+}
+
+function adaptOrderDetail(row: any): BuyerOrderView {
+  const base = adaptOrder(row);
+  return {
+    ...base,
+    lineItems: (row.items ?? []).map((item: any) => ({
+      productName: item.productName,
+      variant:     item.variantLabel ?? '',
+      quantity:    item.quantity,
+      unitPrice:   item.priceCents / 100,
+    })),
+  };
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -177,6 +232,7 @@ function BuyerOrderCard({ order, onPress }: { order: BuyerOrderView; onPress: ()
 export default function BuyerOrdersScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const api = useApi();
 
   const [orders, setOrders] = useState<BuyerOrderView[]>([]);
   const [loading, setLoading] = useState(true);
@@ -184,11 +240,11 @@ export default function BuyerOrdersScreen() {
 
   const load = useCallback(async () => {
     try {
-      const data = await getBuyerOrders();
-      setOrders(data);
+      const rows = await api.buyer.orders.list();
+      setOrders(rows.map(adaptOrder));
     } catch {}
     setLoading(false);
-  }, []);
+  }, [api]);
 
   useFocusEffect(useCallback(() => {
     setLoading(true);

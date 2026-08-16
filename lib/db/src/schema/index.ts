@@ -182,6 +182,20 @@ export const checkoutSessions = pgTable('checkout_sessions', {
     quantity:     number;   // already aggregated by variantId
     priceCents:   number;
   }>>().notNull(),
+  // Buyer-provided shipping address, persisted before Stripe session is opened.
+  // The webhook uses this to attach a fulfillment address to the order.
+  shippingAddress: json('shipping_address').$type<{
+    name?:    string;
+    street:   string;
+    city:     string;
+    state:    string;
+    zip:      string;
+    country:  string;
+  }>(),
+  // Per-attempt idempotency key supplied by the client (format: {checkoutId}_{sellerId}).
+  // The UNIQUE index on this column guarantees that concurrent duplicate submissions
+  // hit a DB constraint rather than creating two Stripe sessions.
+  clientIdempotencyKey: text('client_idempotency_key').unique(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 

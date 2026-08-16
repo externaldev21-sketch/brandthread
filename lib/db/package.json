@@ -10,7 +10,7 @@
   "scripts": {
     "push": "drizzle-kit push --config ./drizzle.config.ts",
     "push-force": "drizzle-kit push --force --config ./drizzle.config.ts",
-    "migrate": "psql $DATABASE_URL -f ./migrations/001_add_buyer_stripe_social.sql"
+    "migrate": "psql $DATABASE_URL -f ./migrations/001_add_buyer_stripe_social.sql && psql $DATABASE_URL -f ./migrations/002_checkout_sessions_shipping.sql && psql $DATABASE_URL -f ./migrations/003_checkout_session_idempotency.sql"
   },
   "dependencies": {
     "drizzle-orm": "catalog:",

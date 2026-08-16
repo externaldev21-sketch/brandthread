@@ -7,9 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
-import { getBuyerOrder } from '@/services/orderService';
 import { BuyerOrderView, OrderStatus, TrackingStatus } from '@/services/orderTypes';
-import { getAllDemoProducts } from '@/services/cartService';
+import { useApi } from '@/hooks/useApi';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, BORDER_FOCUS,
   FG, MUTED, SUBTLE, ON_DARK,
@@ -138,18 +137,66 @@ const row = StyleSheet.create({
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
+// ─── API → BuyerOrderView adapter (detail) ────────────────────────────────────
+
+function adaptOrderDetail(row: any): BuyerOrderView {
+  const dbAddr = row.shippingAddress;
+  const shippingAddress: import('@/services/orderTypes').OrderAddress = dbAddr
+    ? {
+        name:    dbAddr.name ?? '',
+        line1:   dbAddr.street ?? '',
+        line2:   '',
+        city:    dbAddr.city ?? '',
+        state:   dbAddr.state ?? '',
+        zip:     dbAddr.zip ?? '',
+        country: dbAddr.country ?? 'US',
+        phone:   '',
+      }
+    : { name: '', line1: '', city: '', state: '', zip: '', country: 'US' };
+
+  return {
+    id:                row.id,
+    orderNumber:       row.orderNumber,
+    sellerId:          row.ownerId ?? '',
+    sellerName:        row.sellerDisplayName ?? 'Seller',
+    sellerHandle:      '',
+    status:            (row.status ?? 'new') as OrderStatus,
+    paymentStatus:     row.stripePaymentIntentId ? 'paid' : 'pending',
+    fulfillmentStatus: 'unfulfilled',
+    lineItems: (row.items ?? []).map((item: any) => ({
+      productName: item.productName,
+      variant:     item.variantLabel ?? '',
+      quantity:    item.quantity,
+      unitPrice:   item.priceCents / 100,
+    })),
+    shippingAddress,
+    payment: {
+      subtotal:      (row.subtotalCents ?? 0) / 100,
+      shippingTotal: (row.shippingCents  ?? 0) / 100,
+      taxTotal:      0,
+      total:         (row.totalCents     ?? 0) / 100,
+    },
+    trackingNumber:  row.trackingNumber ?? undefined,
+    trackingCarrier: row.carrier ?? undefined,
+    isPreOrder:       false,
+    hasReturnRequest: false,
+    createdAt:        row.createdAt ?? new Date().toISOString(),
+  };
+}
+
 export default function BuyerOrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const api = useApi();
 
   const [order, setOrder] = useState<BuyerOrderView | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!id) return;
-    getBuyerOrder(id).then(o => {
-      setOrder(o ?? null);
+    api.buyer.orders.get(id).then(row => {
+      setOrder(adaptOrderDetail(row));
       setLoading(false);
     }).catch(() => setLoading(false));
   }, [id]);
@@ -206,29 +253,20 @@ export default function BuyerOrderDetailScreen() {
     router.push(('/buyer-problem-report?orderId=' + order.id) as never);
   }
 
-  async function handleBuyAgain() {
+  function handleBuyAgain() {
     if (!order) return;
     const firstItem = order.lineItems[0];
     if (!firstItem) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // Look up demo catalog by product name to find the productId
-    const allProducts = getAllDemoProducts();
-    const match = allProducts.find(p =>
-      p.name.toLowerCase() === firstItem.productName.toLowerCase()
+    // Navigate to Discover so the buyer can find the product again
+    Alert.alert(
+      'Buy Again',
+      `Looking for ${firstItem.productName}? Browse Discover to find it.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Discover', onPress: () => router.push('/(buyer)/discover' as never) },
+      ]
     );
-    if (match) {
-      router.push(('/buyer-product-detail?productId=' + match.id + '&productName=' + encodeURIComponent(match.name)) as never);
-    } else {
-      // Product not in demo catalog — navigate to discover
-      Alert.alert(
-        'Buy Again',
-        `${firstItem.productName} — tap Discover to find similar items.`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Discover', onPress: () => router.push('/(buyer)/discover' as never) },
-        ]
-      );
-    }
   }
 
   if (loading) {

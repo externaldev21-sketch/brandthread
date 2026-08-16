@@ -34,24 +34,66 @@ router.get("/", async (req, res) => {
 // POST /api/products
 router.post("/", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const { name, description, category = "apparel", status = "draft", images = [], tags = [], variant } = req.body;
+  const { name, description, category = "apparel", status = "draft", images = [], tags = [], variant, variants } = req.body;
   if (!name || typeof name !== "string" || name.trim() === "") {
     res.status(400).json({ error: "name required" }); return;
   }
 
-  const [product] = await db.insert(products)
-    .values({ ownerId, name: name.trim(), description, category, status, images, tags })
-    .returning();
+  // Reject if `variants` is present but is not an array — silently treating it as
+  // "no variants" would create an active product with no purchasable SKUs.
+  if (variants !== undefined && !Array.isArray(variants)) {
+    res.status(400).json({ error: "variants must be an array" }); return;
+  }
 
-  if (variant) {
-    const { size, color, sku, priceCents, stock = 0, lowStockThreshold = 10 } = variant;
-    if (!sku || !priceCents || priceCents <= 0) {
-      res.status(400).json({ error: "variant requires sku and positive priceCents" }); return;
+  // Accept both `variant` (singular, legacy) and `variants` (array, preferred)
+  const rawVariantList: any[] = Array.isArray(variants) ? variants : (variant ? [variant] : []);
+
+  // Validate ALL variants before any DB writes so we never leave a partial product
+  const validatedVariants: Array<{
+    size?: string; color?: string; sku: string;
+    priceCents: number; stock: number; lowStockThreshold: number;
+  }> = [];
+  for (let i = 0; i < rawVariantList.length; i++) {
+    const v = rawVariantList[i];
+    if (!v.sku || typeof v.sku !== "string" || v.sku.trim() === "") {
+      res.status(400).json({ error: `variants[${i}]: sku is required` }); return;
     }
-    await db.insert(productVariants).values({
-      productId: product.id, size, color, sku, priceCents, stock, lowStockThreshold,
+    if (!Number.isInteger(v.priceCents) || v.priceCents <= 0) {
+      res.status(400).json({ error: `variants[${i}] (${v.sku}): priceCents must be a positive integer` }); return;
+    }
+    const stock = v.stock ?? 0;
+    if (!Number.isInteger(stock) || stock < 0) {
+      res.status(400).json({ error: `variants[${i}] (${v.sku}): stock must be a non-negative integer` }); return;
+    }
+    const threshold = v.lowStockThreshold ?? 10;
+    if (!Number.isInteger(threshold) || threshold < 0) {
+      res.status(400).json({ error: `variants[${i}] (${v.sku}): lowStockThreshold must be a non-negative integer` }); return;
+    }
+    validatedVariants.push({
+      size:              v.size,
+      color:             v.color,
+      sku:               v.sku.trim(),
+      priceCents:        v.priceCents,
+      stock,
+      lowStockThreshold: threshold,
     });
   }
+
+  // Insert product + all variants atomically so a partial failure leaves no orphan records
+  const product = await db.transaction(async (tx) => {
+    const [prod] = await tx
+      .insert(products)
+      .values({ ownerId, name: name.trim(), description, category, status, images, tags })
+      .returning();
+
+    if (validatedVariants.length > 0) {
+      await tx.insert(productVariants).values(
+        validatedVariants.map((v) => ({ productId: prod.id, ...v })),
+      );
+    }
+
+    return prod;
+  });
 
   res.status(201).json(product);
 });
