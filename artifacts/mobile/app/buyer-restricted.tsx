@@ -1,44 +1,44 @@
 /**
- * Restricted Accounts — manage restricted users
+ * Restricted Accounts — manage restricted users.
+ * Data persisted via socialService (bt:social:restricts:v1).
+ * Restricting limits a user's comment visibility without blocking them.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
-  TextInput, Alert,
+  TextInput, Modal,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, FONT, FS, SP, RADIUS } from '@/lib/theme';
-
-// Restricted is stored alongside mutes/blocks in socialService
-// Using local stub state — wire to backend when available
-type RestrictedUser = {
-  id: string; name: string; handle: string;
-  avatarColor: string; avatarInitials: string; restrictedAt: string;
-};
-
-const STUB: RestrictedUser[] = [];
+import { BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, FONT, FS, SP, RADIUS, OVERLAY } from '@/lib/theme';
+import { getRestrictedUsers, unrestrictUser } from '@/services/socialService';
+import type { RestrictRecord } from '@/services/socialTypes';
 
 export default function RestrictedAccountsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [restricted, setRestricted] = useState<RestrictedUser[]>(STUB);
+  const [restricted, setRestricted] = useState<RestrictRecord[]>([]);
   const [query, setQuery] = useState('');
+  const [confirmUser, setConfirmUser] = useState<RestrictRecord | null>(null);
 
-  const unrestrict = (user: RestrictedUser) => {
+  useFocusEffect(useCallback(() => {
+    getRestrictedUsers().then(setRestricted);
+  }, []));
+
+  const handleUnrestrict = async (user: RestrictRecord) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert('Unrestrict', `Unrestrict ${user.name}?`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Unrestrict', onPress: () => setRestricted(r => r.filter(u => u.id !== user.id)) },
-    ]);
+    await unrestrictUser(user.restrictedUserId);
+    setRestricted(r => r.filter(u => u.restrictedUserId !== user.restrictedUserId));
+    setConfirmUser(null);
   };
 
   const filtered = restricted.filter(u =>
-    u.name.toLowerCase().includes(query.toLowerCase()) ||
-    u.handle.toLowerCase().includes(query.toLowerCase())
+    u.restrictedUserName.toLowerCase().includes(query.toLowerCase()) ||
+    u.restrictedUserHandle.toLowerCase().includes(query.toLowerCase())
   );
 
   return (
@@ -84,21 +84,53 @@ export default function RestrictedAccountsScreen() {
         renderItem={({ item }) => (
           <View style={styles.row}>
             <LinearGradient
-              colors={[item.avatarColor || PURPLE, '#22D3EE']}
+              colors={[item.restrictedUserColor || PURPLE, '#22D3EE']}
               style={styles.avatar}
             >
-              <Text style={styles.avatarText}>{item.avatarInitials}</Text>
+              <Text style={styles.avatarText}>{item.restrictedUserInitials}</Text>
             </LinearGradient>
             <View style={{ flex: 1 }}>
-              <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.handle}>{item.handle}</Text>
+              <Text style={styles.name}>{item.restrictedUserName}</Text>
+              <Text style={styles.handle}>{item.restrictedUserHandle}</Text>
             </View>
-            <TouchableOpacity style={styles.unrestrictBtn} onPress={() => unrestrict(item)}>
+            <TouchableOpacity
+              style={styles.unrestrictBtn}
+              onPress={() => { Haptics.selectionAsync(); setConfirmUser(item); }}
+            >
               <Text style={styles.unrestrictText}>Unrestrict</Text>
             </TouchableOpacity>
           </View>
         )}
       />
+
+      {/* Confirmation modal */}
+      <Modal
+        visible={!!confirmUser}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirmUser(null)}
+      >
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => setConfirmUser(null)}>
+          <TouchableOpacity activeOpacity={1} style={[styles.sheet, { paddingBottom: insets.bottom + SP.md }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>Unrestrict {confirmUser?.restrictedUserName}?</Text>
+            <Text style={styles.sheetDesc}>
+              Their future comments on your posts will be visible to everyone. They won't be notified.
+            </Text>
+            <View style={styles.sheetActions}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setConfirmUser(null)}>
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmBtn}
+                onPress={() => confirmUser && handleUnrestrict(confirmUser)}
+              >
+                <Text style={styles.confirmText}>Unrestrict</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -126,10 +158,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.md, paddingVertical: 10,
     borderBottomWidth: 1, borderBottomColor: BORDER,
   },
-  avatar: {
-    width: 44, height: 44, borderRadius: 22,
-    alignItems: 'center', justifyContent: 'center',
-  },
+  avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   avatarText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.base },
   name: { color: FG, fontFamily: FONT.medium, fontSize: FS.base },
   handle: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm },
@@ -141,4 +170,14 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: SP.lg },
   emptyTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.md, marginTop: SP.md },
   emptySub: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: SP.sm, textAlign: 'center' },
+  backdrop: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },
+  sheet: { backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, padding: SP.lg },
+  sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: SP.md },
+  sheetTitle: { fontFamily: FONT.bold, fontSize: FS.lg, color: FG, marginBottom: SP.xs },
+  sheetDesc: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, lineHeight: 20, marginBottom: SP.lg },
+  sheetActions: { flexDirection: 'row', gap: SP.sm },
+  cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
+  cancelText: { fontFamily: FONT.medium, fontSize: FS.base, color: MUTED },
+  confirmBtn: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, backgroundColor: PURPLE, alignItems: 'center' },
+  confirmText: { fontFamily: FONT.bold, fontSize: FS.base, color: '#FFF' },
 });

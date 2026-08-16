@@ -314,6 +314,16 @@ export interface MuteRecord {
   createdAt: string;
 }
 
+export interface RestrictRecord {
+  id: string;
+  restrictedUserId: string;
+  restrictedUserName: string;
+  restrictedUserHandle: string;
+  restrictedUserInitials: string;
+  restrictedUserColor: string;
+  createdAt: string;
+}
+
 // ─── Reporting ────────────────────────────────────────────────────────────────
 
 export type ReportTargetType = 'profile' | 'post' | 'story' | 'message' | 'seller' | 'product';

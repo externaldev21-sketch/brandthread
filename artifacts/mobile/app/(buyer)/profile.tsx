@@ -1,23 +1,28 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, Alert, Modal,
-  StyleSheet, Dimensions, Share, Pressable, RefreshControl,
+  View, Text, ScrollView, TouchableOpacity,
+  StyleSheet, Dimensions, Modal, Animated, Share,
+  RefreshControl, Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useAuth } from '@clerk/expo';
 import {
-  BG, CARD, BORDER, BORDER_ACTIVE,
+  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN,
-  GRAD_PRIMARY, FONT, FS, SP, RADIUS, ICON,
+  GRAD_PRIMARY, FONT, FS, SP, RADIUS, COMP, ICON, OVERLAY,
+  RED, RED_DIM,
 } from '@/lib/theme';
 import {
   getMyProfile, getMyPosts, getMyReposts, getSavedItems,
-  getPrivacySettings, archivePost, deletePost, likePost, repostPost,
+  getPrivacySettings, archivePost, deletePost,
   subscribeSocial, MY_USER_ID, MY_COLOR, MY_INITIALS, MY_HANDLE,
 } from '@/services/socialService';
+import { loadBuyerProfile } from '@/lib/buyerProfile';
+import { loadHighlights, type Highlight } from '@/lib/highlightsService';
 import type {
   BuyerSocialProfile, BuyerPost, RepostRecord, SavedItem, PrivacySettings,
 } from '@/services/socialTypes';
@@ -29,9 +34,70 @@ const CELL_SIZE = (width - SP.md * 2 - GRID_GAP * 2) / 3;
 const TABS = ['Posts', 'Tagged', 'Reposts', 'Saved'] as const;
 type Tab = typeof TABS[number];
 
+// ─── Bottom Sheet ─────────────────────────────────────────────────────────────
+function BottomSheet({
+  visible,
+  onClose,
+  children,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  const insets = useSafeAreaInsets();
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(anim, {
+      toValue: visible ? 1 : 0,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [visible, anim]);
+
+  if (!visible) return null;
+
+  return (
+    <Modal transparent animationType="none" onRequestClose={onClose} visible={visible}>
+      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose}>
+        <Animated.View
+          style={[
+            styles.sheet,
+            { paddingBottom: insets.bottom + SP.md },
+            { opacity: anim, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [120, 0] }) }] },
+          ]}
+        >
+          <TouchableOpacity activeOpacity={1}>
+            <View style={styles.sheetHandle} />
+            {children}
+          </TouchableOpacity>
+        </Animated.View>
+      </TouchableOpacity>
+    </Modal>
+  );
+}
+
+function SheetRow({
+  icon, label, destructive, onPress,
+}: {
+  icon: keyof typeof Feather.glyphMap;
+  label: string;
+  destructive?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity style={styles.sheetRow} onPress={onPress} activeOpacity={0.7}>
+      <Feather name={icon} size={ICON.md} color={destructive ? RED : FG} />
+      <Text style={[styles.sheetRowText, destructive && { color: RED }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { signOut } = useAuth();
 
   const [profile, setProfile] = useState<BuyerSocialProfile | null>(null);
   const [posts, setPosts] = useState<BuyerPost[]>([]);
@@ -39,21 +105,38 @@ export default function ProfileScreen() {
   const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
   const [privacySettings, setPrivacySettings] = useState<PrivacySettings | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('Posts');
+  const [refreshing, setRefreshing] = useState(false);
+  const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [highlights, setHighlights] = useState<Highlight[]>([]);
+
+  // Sheets
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [postSheet, setPostSheet] = useState<BuyerPost | null>(null);
 
   const loadData = useCallback(async () => {
-    const [p, po, rp, sv, pr] = await Promise.all([
+    const [p, po, rp, sv, pr, bp, hl] = await Promise.all([
       getMyProfile(),
       getMyPosts(),
       getMyReposts(),
       getSavedItems(),
       getPrivacySettings(),
+      loadBuyerProfile(),
+      loadHighlights(),
     ]);
     setProfile(p);
     setPosts(po.filter(x => !x.isArchived && !x.isDraft));
     setReposts(rp);
     setSavedItems(sv);
     setPrivacySettings(pr);
+    setAvatarUri(bp.avatarUri || null);
+    setHighlights(hl);
   }, []);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  }, [loadData]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
@@ -62,32 +145,57 @@ export default function ProfileScreen() {
     return unsub;
   }, [loadData]);
 
-  const [menuVisible, setMenuVisible] = useState(false);
-
+  // ── Menu actions ──
   const handleMenu = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setMenuVisible(true);
+    setMenuOpen(true);
   };
 
   const handleShareProfile = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const handle = profile?.username || 'jordan';
+    setMenuOpen(false);
+    const handle = profile?.username ? `@${profile.username}` : MY_HANDLE;
     try {
-      await Share.share({
-        message: `Check out ${handle} on Brandthread: https://brandthread.app/u/${handle}`,
-        url: `https://brandthread.app/u/${handle}`,
-        title: `${handle} on Brandthread`,
-      });
+      await Share.share({ message: `Find me on Brandthread: ${handle}`, title: 'Share Profile' });
     } catch {}
   };
 
+  const handleSignOut = async () => {
+    setMenuOpen(false);
+    try { await signOut(); } catch {}
+    router.replace('/welcome' as never);
+  };
+
+  // ── Post sheet ──
   const handlePostLongPress = (post: BuyerPost) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    Alert.alert('Post', post.caption, [
-      { text: 'Archive', onPress: () => archivePost(post.id) },
-      { text: 'Delete', style: 'destructive', onPress: () => deletePost(post.id) },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    setPostSheet(post);
+  };
+
+  const handleArchivePost = async () => {
+    if (!postSheet) return;
+    setPostSheet(null);
+    await archivePost(postSheet.id);
+    await loadData();
+  };
+
+  const handleDeletePost = async () => {
+    if (!postSheet) return;
+    setPostSheet(null);
+    await deletePost(postSheet.id);
+    await loadData();
+  };
+
+  const handleShareCurrentPost = async () => {
+    const post = postSheet;
+    setPostSheet(null);
+    if (!post) return;
+    const handle = profile?.username ? `@${profile.username}` : MY_HANDLE;
+    try {
+      await Share.share({
+        message: `${handle} on Brandthread: "${post.caption || 'Check this out'}"`,
+        title: 'Share Post',
+      });
+    } catch {}
   };
 
   const handlePostTap = (post: BuyerPost) => {
@@ -102,16 +210,17 @@ export default function ProfileScreen() {
       postMediaColor2: post.mediaColors?.[1] ?? '#0d0d1a',
       postType: post.type,
     });
-    router.push(`/buyer-post-comments?${params.toString()}` as never);
+    // Navigate to the full post detail viewer
+    router.push(`/buyer-post-viewer?${params.toString()}` as never);
   };
 
-  const postTypeIcon = (type: BuyerPost['type']): string => {
+  const postTypeIcon = (type: BuyerPost['type']): keyof typeof Feather.glyphMap => {
     if (type === 'photo') return 'image';
     if (type === 'slideshow') return 'layers';
     return 'video';
   };
 
-  const savedTypeIcon = (type: string): string => {
+  const savedTypeIcon = (type: string): keyof typeof Feather.glyphMap => {
     if (type === 'post') return 'bookmark';
     if (type === 'product') return 'shopping-bag';
     if (type === 'collection') return 'folder';
@@ -123,37 +232,6 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Owner Menu Bottom Sheet */}
-      <Modal visible={menuVisible} transparent animationType="slide" onRequestClose={() => setMenuVisible(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setMenuVisible(false)}>
-          <Pressable style={styles.menuSheet} onPress={e => e.stopPropagation()}>
-            <View style={styles.menuHandle} />
-            {[
-              { label: 'Settings & activity', icon: 'settings', route: '/buyer-settings' },
-              { label: 'Archive', icon: 'archive', route: '/buyer-settings-detail?section=archive' },
-              { label: 'Your activity', icon: 'activity', route: '/buyer-activity' },
-              { label: 'QR code', icon: 'grid', route: '/buyer-qr' },
-              { label: 'Saved', icon: 'bookmark', route: '/buyer-saved' },
-              { label: 'Close Friends', icon: 'star', route: '/buyer-close-friends' },
-              { label: 'My orders', icon: 'package', route: '/(buyer)/orders' },
-            ].map((item, i, arr) => (
-              <React.Fragment key={item.label}>
-                <TouchableOpacity
-                  style={styles.menuRow}
-                  onPress={() => { setMenuVisible(false); Haptics.selectionAsync(); router.push(item.route as never); }}
-                  activeOpacity={0.7}
-                >
-                  <Feather name={item.icon as any} size={19} color={FG} />
-                  <Text style={styles.menuRowText}>{item.label}</Text>
-                  <Feather name="chevron-right" size={17} color={SUBTLE} />
-                </TouchableOpacity>
-                {i < arr.length - 1 && <View style={styles.menuDivider} />}
-              </React.Fragment>
-            ))}
-          </Pressable>
-        </Pressable>
-      </Modal>
-
       {/* Top Bar */}
       <View style={styles.topBar}>
         <View style={styles.topBarLeft}>
@@ -164,45 +242,44 @@ export default function ProfileScreen() {
           <TouchableOpacity onPress={() => router.push('/buyer-notifications' as any)} style={styles.iconBtn}>
             <Feather name="bell" size={ICON.md} color={FG} />
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => router.push('/buyer-settings' as never)} style={styles.iconBtn}>
-            <Feather name="settings" size={ICON.md} color={FG} />
-          </TouchableOpacity>
           <TouchableOpacity onPress={handleMenu} style={styles.iconBtn}>
             <Feather name="menu" size={ICON.md} color={FG} />
           </TouchableOpacity>
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PURPLE} />}
+      >
         {/* Hero Row */}
         <View style={styles.heroRow}>
           <TouchableOpacity onPress={() => router.push('/buyer-story-create' as any)} style={styles.avatarWrap}>
-            <View style={[styles.avatar, { backgroundColor: MY_COLOR }]}>
-              <Text style={styles.avatarText}>{profile?.avatarInitials || MY_INITIALS}</Text>
-            </View>
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={[styles.avatar, { resizeMode: 'cover' }]} />
+            ) : (
+              <LinearGradient colors={GRAD_PRIMARY} style={styles.avatar}>
+                <Text style={styles.avatarText}>{profile?.avatarInitials || MY_INITIALS}</Text>
+              </LinearGradient>
+            )}
             <View style={styles.avatarBadge}>
               <Feather name="plus-circle" size={20} color={PURPLE} />
             </View>
           </TouchableOpacity>
 
           <View style={styles.statsRow}>
-            <TouchableOpacity style={styles.statCol} onPress={() => setActiveTab('Posts')}>
+            <TouchableOpacity style={styles.statCol}>
               <Text style={styles.statNum}>{posts.length}</Text>
               <Text style={styles.statLabel}>Posts</Text>
             </TouchableOpacity>
             <View style={styles.statDivider} />
-            <TouchableOpacity
-              style={styles.statCol}
-              onPress={() => router.push('/buyer-friend-requests' as any)}
-            >
+            <TouchableOpacity style={styles.statCol} onPress={() => router.push('/buyer-friend-requests' as any)}>
               <Text style={styles.statNum}>{profile?.friendsCount ?? 0}</Text>
               <Text style={styles.statLabel}>Friends</Text>
             </TouchableOpacity>
             <View style={styles.statDivider} />
-            <TouchableOpacity
-              style={styles.statCol}
-              onPress={() => router.push('/buyer-saved' as any)}
-            >
+            <TouchableOpacity style={styles.statCol} onPress={() => router.push('/buyer-saved' as any)}>
               <Text style={styles.statNum}>{savedItems.length}</Text>
               <Text style={styles.statLabel}>Saved</Text>
             </TouchableOpacity>
@@ -212,14 +289,18 @@ export default function ProfileScreen() {
         {/* Name Section */}
         <View style={styles.nameSection}>
           <Text style={styles.profileName}>{profile?.name || 'Jordan'}</Text>
-          {profile?.pronouns ? (
-            <Text style={styles.pronouns}>({profile.pronouns})</Text>
-          ) : null}
+          {profile?.pronouns ? <Text style={styles.pronouns}>({profile.pronouns})</Text> : null}
           <Text style={styles.handleYear}>
             {profile?.username ? `@${profile.username}` : MY_HANDLE}{joinedYear ? ` · Joined ${joinedYear}` : ''}
           </Text>
           {profile?.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
           {profile?.website ? <Text style={styles.website}>{profile.website}</Text> : null}
+          {profile?.location ? (
+            <View style={styles.locationRow}>
+              <Feather name="map-pin" size={12} color={MUTED} />
+              <Text style={styles.locationText}>{profile.location}</Text>
+            </View>
+          ) : null}
           <View style={styles.privacyBadge}>
             <Feather name={isPrivate ? 'lock' : 'globe'} size={12} color={PURPLE} />
             <Text style={styles.privacyBadgeText}>{isPrivate ? 'Private' : 'Public'}</Text>
@@ -228,22 +309,43 @@ export default function ProfileScreen() {
 
         {/* Action Buttons */}
         <View style={styles.actionRow}>
-          <TouchableOpacity
-            style={styles.actionBtn}
-            onPress={() => router.push('/(buyer)/edit-profile')}
-          >
+          <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/(buyer)/edit-profile')}>
             <Text style={styles.actionBtnText}>Edit Profile</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionBtn} onPress={handleShareProfile}>
             <Text style={styles.actionBtnText}>Share Profile</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionIconBtn}
-            onPress={() => router.push('/buyer-friend-requests' as any)}
-          >
+          <TouchableOpacity style={styles.actionIconBtn} onPress={() => router.push('/buyer-friend-requests' as any)}>
             <Feather name="user-plus" size={ICON.md} color={FG} />
           </TouchableOpacity>
         </View>
+
+        {/* Story Highlights Row — real highlights from highlightsService + New button */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.highlightsRow}>
+          {/* New / Manage button */}
+          <TouchableOpacity
+            style={styles.highlightNew}
+            onPress={() => router.push('/buyer-highlights-manager' as any)}
+          >
+            <View style={styles.highlightCircle}>
+              <Feather name="plus" size={22} color={PURPLE} />
+            </View>
+            <Text style={styles.highlightLabel}>New</Text>
+          </TouchableOpacity>
+          {/* Saved highlights */}
+          {highlights.map(h => (
+            <TouchableOpacity
+              key={h.id}
+              style={styles.highlight}
+              onPress={() => router.push('/buyer-highlights-manager' as any)}
+            >
+              <View style={[styles.highlightCircleGrad, { backgroundColor: h.coverColor }]}>
+                <Text style={styles.highlightEmoji}>{h.emoji}</Text>
+              </View>
+              <Text style={styles.highlightLabel} numberOfLines={1}>{h.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
         {/* Tab Bar */}
         <View style={styles.tabBar}>
@@ -253,9 +355,7 @@ export default function ProfileScreen() {
               style={[styles.tabPill, activeTab === tab && styles.tabPillActive]}
               onPress={() => setActiveTab(tab)}
             >
-              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                {tab}
-              </Text>
+              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -268,10 +368,7 @@ export default function ProfileScreen() {
                 <Feather name="image" size={32} color={MUTED} />
                 <Text style={styles.emptyTitle}>No posts yet</Text>
                 <Text style={styles.emptyDesc}>Your posts will appear here.</Text>
-                <TouchableOpacity
-                  style={styles.emptyAction}
-                  onPress={() => router.push('/buyer-post-create' as any)}
-                >
+                <TouchableOpacity style={styles.emptyAction} onPress={() => router.push('/buyer-post-create' as any)}>
                   <Text style={styles.emptyActionText}>Create Post</Text>
                 </TouchableOpacity>
               </View>
@@ -288,7 +385,7 @@ export default function ProfileScreen() {
                       colors={(post.mediaColors?.length >= 2 ? post.mediaColors : ['#1a1a2e', '#0d0d1a']) as [string, string]}
                       style={styles.gridCellInner}
                     >
-                      <Feather name={postTypeIcon(post.type) as any} size={ICON.md} color={MUTED} />
+                      <Feather name={postTypeIcon(post.type)} size={ICON.md} color={MUTED} />
                       {post.caption ? (
                         <Text style={styles.gridCaption} numberOfLines={1}>{post.caption}</Text>
                       ) : null}
@@ -305,10 +402,7 @@ export default function ProfileScreen() {
             <Feather name="tag" size={32} color={MUTED} />
             <Text style={styles.emptyTitle}>No tagged posts</Text>
             <Text style={styles.emptyDesc}>Posts that tag you will appear here.</Text>
-            <TouchableOpacity
-              style={styles.emptyAction}
-              onPress={() => router.push('/(buyer)/discover')}
-            >
+            <TouchableOpacity style={styles.emptyAction} onPress={() => router.push('/(buyer)/discover')}>
               <Text style={styles.emptyActionText}>Discover</Text>
             </TouchableOpacity>
           </View>
@@ -325,6 +419,10 @@ export default function ProfileScreen() {
             ) : (
               reposts.map(rp => (
                 <View key={rp.id} style={styles.repostRow}>
+                  <View style={styles.repostHeader}>
+                    <Feather name="repeat" size={12} color={MUTED} />
+                    <Text style={styles.repostMeta}>You reposted</Text>
+                  </View>
                   <Text style={styles.repostAuthor}>{rp.originalAuthorName}</Text>
                   <Text style={styles.repostHandle}>{rp.originalAuthorHandle}</Text>
                   <Text style={styles.repostCaption} numberOfLines={2}>{rp.originalCaption}</Text>
@@ -341,10 +439,7 @@ export default function ProfileScreen() {
                 <Feather name="bookmark" size={32} color={MUTED} />
                 <Text style={styles.emptyTitle}>Nothing saved yet</Text>
                 <Text style={styles.emptyDesc}>Items you save will appear here.</Text>
-                <TouchableOpacity
-                  style={styles.emptyAction}
-                  onPress={() => router.push('/buyer-saved' as any)}
-                >
+                <TouchableOpacity style={styles.emptyAction} onPress={() => router.push('/buyer-saved' as any)}>
                   <Text style={styles.emptyActionText}>View Saved</Text>
                 </TouchableOpacity>
               </View>
@@ -356,11 +451,9 @@ export default function ProfileScreen() {
                     style={styles.savedTile}
                     onPress={() => router.push('/buyer-saved' as any)}
                   >
-                    <Feather name={savedTypeIcon(item.type) as any} size={ICON.md} color={item.accentColor || PURPLE} />
+                    <Feather name={savedTypeIcon(item.type)} size={ICON.md} color={item.accentColor || PURPLE} />
                     <Text style={styles.savedTitle} numberOfLines={2}>{item.title}</Text>
-                    {item.subtitle ? (
-                      <Text style={styles.savedSubtitle} numberOfLines={1}>{item.subtitle}</Text>
-                    ) : null}
+                    {item.subtitle ? <Text style={styles.savedSubtitle} numberOfLines={1}>{item.subtitle}</Text> : null}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -368,6 +461,31 @@ export default function ProfileScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* ── Profile Menu Sheet ── */}
+      <BottomSheet visible={menuOpen} onClose={() => setMenuOpen(false)}>
+        <Text style={styles.sheetTitle}>Profile</Text>
+        <SheetRow icon="edit-3" label="Edit Profile" onPress={() => { setMenuOpen(false); router.push('/(buyer)/edit-profile'); }} />
+        <SheetRow icon="share-2" label="Share Profile" onPress={handleShareProfile} />
+        <SheetRow icon="star" label="Close Friends" onPress={() => { setMenuOpen(false); router.push('/buyer-close-friends' as any); }} />
+        <SheetRow icon="archive" label="Archive" onPress={() => { setMenuOpen(false); router.push('/buyer-archive' as any); }} />
+        <SheetRow icon="activity" label="Your Activity" onPress={() => { setMenuOpen(false); router.push('/buyer-your-activity' as any); }} />
+        <SheetRow icon="package" label="My Orders" onPress={() => { setMenuOpen(false); router.push('/(buyer)/orders'); }} />
+        <SheetRow icon="bookmark" label="Saved Items" onPress={() => { setMenuOpen(false); router.push('/buyer-saved' as any); }} />
+        <SheetRow icon="grid" label="QR Code" onPress={() => { setMenuOpen(false); router.push('/buyer-qr-code' as any); }} />
+        <SheetRow icon="settings" label="Settings" onPress={() => { setMenuOpen(false); router.push('/buyer-settings' as any); }} />
+        <View style={styles.sheetDivider} />
+        <SheetRow icon="log-out" label="Sign Out" destructive onPress={handleSignOut} />
+      </BottomSheet>
+
+      {/* ── Post Long-Press Sheet ── */}
+      <BottomSheet visible={!!postSheet} onClose={() => setPostSheet(null)}>
+        <Text style={styles.sheetTitle} numberOfLines={1}>{postSheet?.caption || 'Post'}</Text>
+        <SheetRow icon="share-2" label="Share Post" onPress={handleShareCurrentPost} />
+        <SheetRow icon="archive" label="Archive" onPress={handleArchivePost} />
+        <View style={styles.sheetDivider} />
+        <SheetRow icon="trash-2" label="Delete Post" destructive onPress={handleDeletePost} />
+      </BottomSheet>
     </View>
   );
 }
@@ -375,334 +493,84 @@ export default function ProfileScreen() {
 const SAVED_TILE = (width - SP.md * 2 - SP.sm) / 2;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: BG,
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.sm,
-  },
-  topBarLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.xs,
-  },
-  topHandle: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.sm,
-    color: FG,
-    marginLeft: SP.xs,
-  },
-  topBarRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.xs,
-  },
-  iconBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  heroRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    marginTop: SP.md,
-    gap: SP.lg,
-  },
-  avatarWrap: {
-    position: 'relative',
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontFamily: FONT.bold,
-    fontSize: FS.lg,
-    color: '#FFFFFF',
-  },
-  avatarBadge: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    backgroundColor: BG,
-    borderRadius: 12,
-    padding: 1,
-  },
-  statsRow: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-  },
-  statCol: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statNum: {
-    fontFamily: FONT.bold,
-    fontSize: FS.lg,
-    color: FG,
-  },
-  statLabel: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    color: MUTED,
-    marginTop: 2,
-  },
-  statDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: BORDER,
-  },
-  nameSection: {
-    paddingHorizontal: SP.md,
-    marginTop: SP.md,
-    gap: 4,
-  },
-  profileName: {
-    fontFamily: FONT.bold,
-    fontSize: FS.md,
-    color: FG,
-  },
-  pronouns: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: MUTED,
-  },
-  handleYear: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    color: SUBTLE,
-  },
-  bio: {
-    fontFamily: FONT.regular,
-    fontSize: FS.base,
-    color: FG,
-    marginTop: 4,
-  },
-  website: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: CYAN,
-  },
-  privacyBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: PURPLE_DIM,
-    borderWidth: 1,
-    borderColor: BORDER_ACTIVE,
-    borderRadius: RADIUS.pill,
-    paddingHorizontal: SP.sm,
-    paddingVertical: 4,
-    marginTop: SP.xs,
-    gap: 4,
-  },
-  privacyBadgeText: {
-    fontFamily: FONT.medium,
-    fontSize: FS.xs,
-    color: PURPLE,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    marginTop: SP.md,
-    gap: SP.sm,
-  },
-  actionBtn: {
-    flex: 1,
-    height: 40,
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: RADIUS.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionBtnText: {
-    fontFamily: FONT.medium,
-    fontSize: FS.sm,
-    color: FG,
-  },
-  actionIconBtn: {
-    width: 44,
-    height: 44,
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabBar: {
-    flexDirection: 'row',
-    paddingHorizontal: SP.md,
-    marginTop: SP.md,
-    gap: SP.xs,
-  },
-  tabPill: {
-    flex: 1,
-    paddingVertical: SP.xs + 2,
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: RADIUS.pill,
-    alignItems: 'center',
-  },
-  tabPillActive: {
-    backgroundColor: PURPLE_DIM,
-    borderColor: BORDER_ACTIVE,
-  },
-  tabText: {
-    fontFamily: FONT.medium,
-    fontSize: FS.xs,
-    color: MUTED,
-  },
-  tabTextActive: {
-    color: PURPLE,
-  },
-  gridContainer: {
-    marginTop: SP.md,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: SP.md,
-    gap: GRID_GAP,
-  },
-  gridCell: {
-    width: CELL_SIZE,
-    height: CELL_SIZE,
-    borderRadius: RADIUS.sm,
-    overflow: 'hidden',
-  },
-  gridCellInner: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: SP.xs,
-  },
-  gridCaption: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    color: MUTED,
-    position: 'absolute',
-    bottom: SP.xs,
-    left: SP.xs,
-    right: SP.xs,
-  },
-  repostRow: {
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: RADIUS.md,
-    marginHorizontal: SP.md,
-    marginVertical: SP.xs,
-    padding: SP.md,
-  },
-  repostAuthor: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.sm,
-    color: FG,
-  },
-  repostHandle: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: MUTED,
-    marginTop: 2,
-  },
-  repostCaption: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: SUBTLE,
-    marginTop: SP.xs,
-  },
-  savedGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: SP.md,
-    gap: SP.sm,
-    marginTop: SP.sm,
-  },
-  savedTile: {
-    width: SAVED_TILE,
-    aspectRatio: 1,
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: RADIUS.md,
-    padding: SP.sm,
-    justifyContent: 'space-between',
-  },
-  savedTitle: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.sm,
-    color: FG,
-    marginTop: SP.xs,
-  },
-  savedSubtitle: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    color: MUTED,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingHorizontal: SP.lg,
-    paddingVertical: SP.xl,
-  },
-  emptyTitle: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.md,
-    color: FG,
-    marginTop: SP.md,
-  },
-  emptyDesc: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: MUTED,
-    textAlign: 'center',
-    marginTop: SP.sm,
-  },
-  emptyAction: {
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER_ACTIVE,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SP.lg,
-    paddingVertical: SP.sm,
-    marginTop: SP.md,
-  },
-  emptyActionText: {
-    fontFamily: FONT.medium,
-    fontSize: FS.sm,
-    color: PURPLE,
-  },
-  modalBackdrop: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end',
-  },
-  menuSheet: {
-    backgroundColor: CARD, borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    borderTopWidth: 1, borderColor: BORDER, paddingBottom: 32,
-  },
-  menuHandle: {
-    width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER,
-    alignSelf: 'center', marginTop: 10, marginBottom: 8,
-  },
-  menuRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-    paddingHorizontal: SP.lg, paddingVertical: 14,
-  },
-  menuRowText: { flex: 1, color: FG, fontFamily: FONT.medium, fontSize: FS.base },
-  menuDivider: { height: 1, backgroundColor: BORDER, marginLeft: SP.lg + 14 + 14 },
+  container: { flex: 1, backgroundColor: BG },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  topBarLeft: { flexDirection: 'row', alignItems: 'center', gap: SP.xs },
+  topHandle: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, marginLeft: SP.xs },
+  topBarRight: { flexDirection: 'row', alignItems: 'center', gap: SP.xs },
+  iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+
+  heroRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, marginTop: SP.md, gap: SP.lg },
+  avatarWrap: { position: 'relative' },
+  avatar: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontFamily: FONT.bold, fontSize: FS.lg, color: '#FFFFFF' },
+  avatarBadge: { position: 'absolute', bottom: -2, right: -2, backgroundColor: BG, borderRadius: 12, padding: 1 },
+  statsRow: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
+  statCol: { alignItems: 'center', flex: 1 },
+  statNum: { fontFamily: FONT.bold, fontSize: FS.lg, color: FG },
+  statLabel: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
+  statDivider: { width: 1, height: 24, backgroundColor: BORDER },
+
+  nameSection: { paddingHorizontal: SP.md, marginTop: SP.md, gap: 4 },
+  profileName: { fontFamily: FONT.bold, fontSize: FS.md, color: FG },
+  pronouns: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED },
+  handleYear: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE },
+  bio: { fontFamily: FONT.regular, fontSize: FS.base, color: FG, marginTop: 4 },
+  website: { fontFamily: FONT.regular, fontSize: FS.sm, color: CYAN },
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  locationText: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
+  privacyBadge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', backgroundColor: PURPLE_DIM, borderWidth: 1, borderColor: BORDER_ACTIVE, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 4, marginTop: SP.xs, gap: 4 },
+  privacyBadgeText: { fontFamily: FONT.medium, fontSize: FS.xs, color: PURPLE },
+
+  actionRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, marginTop: SP.md, gap: SP.sm },
+  actionBtn: { flex: 1, height: 40, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
+  actionBtnText: { fontFamily: FONT.medium, fontSize: FS.sm, color: FG },
+  actionIconBtn: { width: 44, height: 44, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+
+  highlightsRow: { paddingHorizontal: SP.md, paddingVertical: SP.md, gap: SP.md },
+  highlight: { alignItems: 'center', gap: 6 },
+  highlightNew: { alignItems: 'center', gap: 6 },
+  highlightCircle: { width: 60, height: 60, borderRadius: 30, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  highlightCircleGrad: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
+  highlightEmoji: { fontSize: 22 },
+  highlightLabel: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
+
+  tabBar: { flexDirection: 'row', paddingHorizontal: SP.md, marginTop: SP.sm, gap: SP.xs },
+  tabPill: { flex: 1, paddingVertical: SP.xs + 2, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.pill, alignItems: 'center' },
+  tabPillActive: { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
+  tabText: { fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED },
+  tabTextActive: { color: PURPLE },
+
+  gridContainer: { marginTop: SP.md },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: SP.md, gap: GRID_GAP },
+  gridCell: { width: CELL_SIZE, height: CELL_SIZE, borderRadius: RADIUS.sm, overflow: 'hidden' },
+  gridCellInner: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xs },
+  gridCaption: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, position: 'absolute', bottom: SP.xs, left: SP.xs, right: SP.xs },
+
+  repostRow: { backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, marginHorizontal: SP.md, marginVertical: SP.xs, padding: SP.md },
+  repostHeader: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
+  repostMeta: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
+  repostAuthor: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
+  repostHandle: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, marginTop: 2 },
+  repostCaption: { fontFamily: FONT.regular, fontSize: FS.sm, color: SUBTLE, marginTop: SP.xs },
+
+  savedGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: SP.md, gap: SP.sm, marginTop: SP.sm },
+  savedTile: { width: SAVED_TILE, aspectRatio: 1, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, padding: SP.sm, justifyContent: 'space-between' },
+  savedTitle: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, marginTop: SP.xs },
+  savedSubtitle: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
+
+  emptyState: { alignItems: 'center', paddingHorizontal: SP.lg, paddingVertical: SP.xl },
+  emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: FG, marginTop: SP.md },
+  emptyDesc: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', marginTop: SP.sm },
+  emptyAction: { backgroundColor: CARD, borderWidth: 1, borderColor: BORDER_ACTIVE, borderRadius: RADIUS.md, paddingHorizontal: SP.lg, paddingVertical: SP.sm, marginTop: SP.md },
+  emptyActionText: { fontFamily: FONT.medium, fontSize: FS.sm, color: PURPLE },
+
+  // Bottom sheet
+  backdrop: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },
+  sheet: { backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, paddingTop: SP.sm, paddingHorizontal: SP.md },
+  sheetHandle: { width: 36, height: 4, backgroundColor: BORDER, borderRadius: 2, alignSelf: 'center', marginBottom: SP.md },
+  sheetTitle: { fontFamily: FONT.semibold, fontSize: FS.base, color: MUTED, paddingVertical: SP.sm, paddingHorizontal: SP.xs, marginBottom: SP.xs },
+  sheetRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: 14, paddingHorizontal: SP.xs, borderRadius: RADIUS.md },
+  sheetRowText: { fontFamily: FONT.medium, fontSize: FS.base, color: FG },
+  sheetDivider: { height: 1, backgroundColor: BORDER, marginVertical: SP.xs },
 });

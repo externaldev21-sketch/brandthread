@@ -20,7 +20,7 @@ import {
   MY_USER_ID, MY_COLOR, MY_INITIALS, MY_NAME,
   getAcceptedFriends, getFriendRequests, getStories,
   subscribeSocial, getMyPosts,
-  repostPost, saveItem, createOrGetConversation,
+  repostPost, saveItem, getRepostedPostIds, createOrGetConversation,
   likeFriendPost, getFriendPostEngagements, getComments,
 } from '@/services/socialService';
 import type { Friendship, Story, BuyerPost } from '@/services/socialTypes';
@@ -230,15 +230,18 @@ export default function FriendsScreen() {
     const now = Date.now();
     setStories(sts.filter(s => s.expiresAt > now));
 
-    // Merge persisted like state and real comment counts into feed posts
+    // Merge persisted like + repost state and real comment counts into feed posts
+    const repostedIds = await getRepostedPostIds();
     setFeedPosts(DEMO_FRIEND_POSTS.map((post, i) => {
       const eng = (engagements as Record<string, { likedByMe: boolean; likesCount: number }>)[post.id];
       const commentCount = (commentArrays[i] as { length: number }).length;
+      const repostedByMe = repostedIds.has(post.id);
       return {
         ...post,
-        likedByMe:    eng ? eng.likedByMe  : post.likedByMe,
-        likesCount:   eng ? eng.likesCount : post.likesCount,
+        likedByMe:     eng ? eng.likedByMe  : post.likedByMe,
+        likesCount:    eng ? eng.likesCount : post.likesCount,
         commentsCount: commentCount,
+        repostedByMe,
       };
     }));
   }
@@ -281,7 +284,13 @@ export default function FriendsScreen() {
           : p,
       ),
     );
-    repostPost(postId);
+    // Pass friend post metadata so repostPost can create/remove a RepostRecord
+    // even though the post is not in getMyPosts()
+    const post = DEMO_FRIEND_POSTS.find(p => p.id === postId);
+    repostPost(postId, post
+      ? { authorId: post.authorId, authorName: post.authorName, authorHandle: post.authorHandle, caption: post.caption }
+      : undefined
+    );
   }
 
   function handleSave(post: BuyerPost) {

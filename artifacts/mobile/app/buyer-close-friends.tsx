@@ -1,75 +1,114 @@
 /**
- * Close Friends — manage close friends list
+ * Close Friends — manage close friends list with star toggle.
+ * Selection is persisted to AsyncStorage under bt:close-friends:v1.
+ * Only friends in this list can see Close Friends-gated posts/stories.
  */
-import React, { useState, useEffect } from 'react';
-import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
-  TextInput,
-} from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, FONT, FS, SP, RADIUS } from '@/lib/theme';
+import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE,
+  FONT, FS, SP, RADIUS, GRAD_PRIMARY,
+} from '@/lib/theme';
 import { getAcceptedFriends } from '@/services/socialService';
 import type { Friendship } from '@/services/socialTypes';
 
-export default function CloseFriendsScreen() {
-  const router = useRouter();
+const STORAGE_KEY = 'bt:close-friends:v1';
+
+async function loadCloseFriendIds(): Promise<string[]> {
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as string[]) : [];
+  } catch { return []; }
+}
+
+async function saveCloseFriendIds(ids: string[]): Promise<void> {
+  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
+}
+
+export default function BuyerCloseFriends() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [friends, setFriends] = useState<Friendship[]>([]);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [closeFriends, setCloseFriends] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
 
-  useEffect(() => {
-    getAcceptedFriends().then(setFriends);
-  }, []);
-
-  const toggle = (id: string) => {
-    Haptics.selectionAsync();
-    setSelected(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
+  useFocusEffect(useCallback(() => {
+    Promise.all([getAcceptedFriends(), loadCloseFriendIds()]).then(([list, ids]) => {
+      setFriends(list);
+      setCloseFriends(new Set(ids));
     });
-  };
+  }, []));
 
   const filtered = friends.filter(f =>
     f.name.toLowerCase().includes(query.toLowerCase()) ||
     f.handle.toLowerCase().includes(query.toLowerCase())
   );
 
+  // Key on userId (e.g. "u_maya") so isCloseFriendOf() can match correctly
+  function toggle(userId: string) {
+    Haptics.selectionAsync();
+    setCloseFriends(prev => {
+      const next = new Set(prev);
+      next.has(userId) ? next.delete(userId) : next.add(userId);
+      return next;
+    });
+  }
+
+  async function handleSave() {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    await saveCloseFriendIds(Array.from(closeFriends));
+    router.back();
+  }
+
+  function renderFriend({ item }: { item: Friendship }) {
+    const isCF = closeFriends.has(item.userId);
+    return (
+      <TouchableOpacity style={s.row} onPress={() => toggle(item.userId)} activeOpacity={0.7}>
+        <View style={[s.avatar, { backgroundColor: item.color }]}>
+          <Text style={s.avatarText}>{item.initials}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={s.name}>{item.name}</Text>
+          <Text style={s.handle}>{item.handle}</Text>
+        </View>
+        <View style={[s.radio, isCF && s.radioActive]}>
+          {isCF && <Feather name="star" size={14} color="#FFF" />}
+        </View>
+      </TouchableOpacity>
+    );
+  }
+
   return (
-    <View style={[styles.page, { paddingTop: insets.top }]}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
+    <View style={[s.page, { paddingTop: insets.top }]}>
+      <View style={s.header}>
+        <TouchableOpacity style={s.iconBtn} onPress={() => router.back()}>
           <Feather name="arrow-left" size={21} color={FG} />
         </TouchableOpacity>
-        <Text style={styles.title}>Close Friends</Text>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
-          <Text style={styles.doneText}>Done</Text>
-        </TouchableOpacity>
+        <Text style={s.title}>Close Friends</Text>
+        <View style={s.iconBtn} />
       </View>
 
-      {/* Intro */}
-      <View style={styles.intro}>
-        <View style={styles.starBadge}>
-          <Feather name="star" size={18} color={PURPLE} />
-        </View>
-        <Text style={styles.introText}>
-          Only people you add can see your Close Friends stories and posts.
+      {/* Info banner */}
+      <View style={s.banner}>
+        <Feather name="star" size={16} color={PURPLE} />
+        <Text style={s.bannerText}>
+          Manage your close friends list. People on this list get priority in notifications and future close-friends features. They won't be notified when you add or remove them.
         </Text>
       </View>
 
-      {/* Count */}
-      <Text style={styles.countLabel}>{selected.size} selected</Text>
-
       {/* Search */}
-      <View style={styles.search}>
+      <View style={s.searchWrap}>
         <Feather name="search" size={16} color={MUTED} />
         <TextInput
-          style={styles.searchInput}
+          style={s.searchInput}
           value={query}
           onChangeText={setQuery}
           placeholder="Search friends"
@@ -77,100 +116,65 @@ export default function CloseFriendsScreen() {
         />
       </View>
 
-      {/* List */}
+      {closeFriends.size > 0 && (
+        <Text style={s.countBadge}>
+          {closeFriends.size} {closeFriends.size === 1 ? 'person' : 'people'} selected
+        </Text>
+      )}
+
       <FlatList
         data={filtered}
-        keyExtractor={item => item.id}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
+        keyExtractor={f => f.id}
+        renderItem={renderFriend}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
         ListEmptyComponent={
-          <View style={styles.empty}>
+          <View style={s.empty}>
             <Feather name="users" size={32} color={MUTED} />
-            <Text style={styles.emptyTitle}>{friends.length === 0 ? 'No friends yet' : 'No results'}</Text>
-            <Text style={styles.emptySub}>
+            <Text style={s.emptyTitle}>{friends.length === 0 ? 'No friends yet' : 'No results'}</Text>
+            <Text style={s.emptyDesc}>
               {friends.length === 0
-                ? 'Add friends to build your Close Friends list.'
-                : 'Try a different name or handle.'}
+                ? 'Add friends to create a Close Friends list.'
+                : 'Try a different search term.'}
             </Text>
           </View>
         }
-        renderItem={({ item }) => {
-          const isSelected = selected.has(item.id);
-          return (
-            <TouchableOpacity
-              style={styles.row}
-              onPress={() => toggle(item.id)}
-              activeOpacity={0.7}
-            >
-              <LinearGradient
-                colors={[item.color || PURPLE, '#22D3EE']}
-                style={styles.avatar}
-              >
-                <Text style={styles.avatarText}>{item.initials || item.name[0]}</Text>
-              </LinearGradient>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.name}>{item.name}</Text>
-                <Text style={styles.handle}>{item.handle}</Text>
-              </View>
-              <View style={[styles.check, isSelected && styles.checkActive]}>
-                {isSelected && <Feather name="check" size={14} color="#fff" />}
-              </View>
-            </TouchableOpacity>
-          );
-        }}
+        ItemSeparatorComponent={() => <View style={s.separator} />}
       />
+
+      {/* Save */}
+      <View style={[s.saveBar, { paddingBottom: insets.bottom + SP.md }]}>
+        <TouchableOpacity onPress={handleSave} activeOpacity={0.85} style={{ flex: 1 }}>
+          <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.saveBtn}>
+            <Text style={s.saveBtnText}>Save</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   page: { flex: 1, backgroundColor: BG },
-  header: {
-    height: 58, flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', paddingHorizontal: SP.md,
-    borderBottomWidth: 1, borderBottomColor: BORDER,
-  },
+  header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   title: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
-  doneText: { color: PURPLE, fontFamily: FONT.semibold, fontSize: FS.base },
-  intro: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    margin: SP.md, backgroundColor: CARD, borderRadius: RADIUS.lg,
-    borderWidth: 1, borderColor: BORDER, padding: 14,
-  },
-  starBadge: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: `${PURPLE}20`, alignItems: 'center', justifyContent: 'center',
-  },
-  introText: { color: MUTED, fontFamily: FONT.regular, fontSize: 13, flex: 1, lineHeight: 18 },
-  countLabel: {
-    color: MUTED, fontFamily: FONT.semibold, fontSize: FS.sm,
-    paddingHorizontal: SP.md, marginBottom: 8,
-  },
-  search: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    marginHorizontal: SP.md, marginBottom: SP.sm,
-    backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1,
-    borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 10,
-  },
+  banner: { flexDirection: 'row', gap: 10, padding: SP.md, backgroundColor: 'rgba(139,92,246,0.08)', borderBottomWidth: 1, borderBottomColor: BORDER, alignItems: 'flex-start' },
+  bannerText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, lineHeight: 17 },
+  searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, margin: SP.md, paddingHorizontal: SP.md, height: 40, backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER },
   searchInput: { flex: 1, color: FG, fontFamily: FONT.regular, fontSize: FS.base },
-  row: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: SP.md, paddingVertical: 10,
-  },
-  avatar: {
-    width: 44, height: 44, borderRadius: 22,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  avatarText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.base },
-  name: { color: FG, fontFamily: FONT.medium, fontSize: FS.base },
-  handle: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm },
-  check: {
-    width: 24, height: 24, borderRadius: 12,
-    borderWidth: 2, borderColor: BORDER,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  checkActive: { backgroundColor: PURPLE, borderColor: PURPLE },
-  empty: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: SP.lg },
-  emptyTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.md, marginTop: SP.md },
-  emptySub: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: SP.sm, textAlign: 'center' },
+  countBadge: { fontFamily: FONT.medium, fontSize: FS.xs, color: PURPLE, paddingHorizontal: SP.md, marginBottom: SP.xs },
+  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: 12, gap: 12 },
+  avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: '#FFF' },
+  name: { fontFamily: FONT.semibold, fontSize: FS.base, color: FG },
+  handle: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, marginTop: 2 },
+  radio: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  radioActive: { backgroundColor: PURPLE, borderColor: PURPLE },
+  separator: { height: 1, backgroundColor: BORDER, marginLeft: 68 },
+  empty: { alignItems: 'center', paddingVertical: SP.xxl, gap: SP.sm },
+  emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: FG },
+  emptyDesc: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', maxWidth: 240 },
+  saveBar: { paddingHorizontal: SP.md, paddingTop: SP.sm, borderTopWidth: 1, borderTopColor: BORDER, backgroundColor: BG },
+  saveBtn: { height: 50, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
+  saveBtnText: { color: '#FFF', fontFamily: FONT.bold, fontSize: FS.base },
 });

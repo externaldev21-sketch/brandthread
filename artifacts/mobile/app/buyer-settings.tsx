@@ -14,14 +14,14 @@ const GROUPS: Group[] = [
   { title: 'Your account', rows: [
     { label: 'Accounts Center', subtitle: 'Password, security, personal details and account ownership', icon: 'user', route: '/buyer-account-center' },
     { label: 'Edit profile', icon: 'edit-3', route: '/(buyer)/edit-profile' },
-    { label: 'Your activity', subtitle: 'Likes, comments, searches, links and time spent', icon: 'activity', section: 'activity' },
-    { label: 'Archive', subtitle: 'Archived posts and stories', icon: 'archive', section: 'archive' },
+    { label: 'Your activity', subtitle: 'Likes, comments, searches, links and time spent', icon: 'activity', route: '/buyer-your-activity' },
+    { label: 'Archive', subtitle: 'Archived posts and stories', icon: 'archive', route: '/buyer-archive' },
     { label: 'Saved', subtitle: 'Posts, products and collections', icon: 'bookmark', route: '/buyer-saved' },
-    { label: 'QR code', subtitle: 'Share your Brandthread profile', icon: 'grid', section: 'qr' },
+    { label: 'QR code', subtitle: 'Share your Brandthread profile', icon: 'grid', route: '/buyer-qr-code' },
   ]},
   { title: 'Who can see your content', rows: [
     { label: 'Account privacy', icon: 'lock', route: '/buyer-privacy-settings' },
-    { label: 'Close Friends', icon: 'star', section: 'close-friends' },
+    { label: 'Close Friends', icon: 'star', route: '/buyer-close-friends' },
     { label: 'Blocked', icon: 'slash', route: '/buyer-blocked' },
     { label: 'Hide story and live', icon: 'eye-off', section: 'story' },
   ]},
@@ -86,7 +86,7 @@ export default function BuyerSettingsScreen() {
       return;
     }
     if (row.action === 'delete') {
-      router.push('/buyer-account-center?section=ownership' as never);
+      router.push('/buyer-account-control' as never);
       return;
     }
     if (row.route) router.push(row.route as never);

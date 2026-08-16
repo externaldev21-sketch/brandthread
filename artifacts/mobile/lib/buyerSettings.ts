@@ -27,6 +27,7 @@ export interface BuyerSettingsState {
   messageNotifications: boolean;
   storyNotifications: boolean;
   marketingNotifications: boolean;
+  twoFactor: boolean;
   biometricLock: boolean;
   loginAlerts: boolean;
   saveLoginInfo: boolean;
@@ -38,6 +39,7 @@ export interface BuyerSettingsState {
   sizeBottoms: string;
   sizeShoes: string;
   preferredFit: 'slim' | 'regular' | 'oversized';
+  styleCategories: string[];
   language: string;
   theme: 'system' | 'dark' | 'light';
   reduceMotion: boolean;
@@ -69,6 +71,7 @@ export const DEFAULT_BUYER_SETTINGS: BuyerSettingsState = {
   messageNotifications: true,
   storyNotifications: true,
   marketingNotifications: false,
+  twoFactor: false,
   biometricLock: false,
   loginAlerts: true,
   saveLoginInfo: true,
@@ -80,6 +83,7 @@ export const DEFAULT_BUYER_SETTINGS: BuyerSettingsState = {
   sizeBottoms: '32',
   sizeShoes: '10',
   preferredFit: 'regular',
+  styleCategories: ['streetwear', 'vintage'],
   language: 'English',
   theme: 'system',
   reduceMotion: false,

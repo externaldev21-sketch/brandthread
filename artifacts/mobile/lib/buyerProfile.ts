@@ -8,8 +8,12 @@ export interface BuyerProfileFields {
   pronouns: string;
   bio: string;
   links: string;
+  location: string;
   gender: string;
+  phone: string;
   aiCreator: boolean;
+  /** Local URI of the picked avatar image; persisted so it survives screen nav. */
+  avatarUri: string;
 }
 
 export const DEFAULT_BUYER_PROFILE: BuyerProfileFields = {
@@ -18,8 +22,11 @@ export const DEFAULT_BUYER_PROFILE: BuyerProfileFields = {
   pronouns: '',
   bio: 'Jordan',
   links: '',
+  location: '',
   gender: '',
+  phone: '',
   aiCreator: false,
+  avatarUri: '',
 };
 
 function str(v: unknown, fallback: string): string {
@@ -35,8 +42,11 @@ function sanitize(raw: unknown): BuyerProfileFields {
     pronouns:  str(obj.pronouns, DEFAULT_BUYER_PROFILE.pronouns),
     bio:       str(obj.bio, DEFAULT_BUYER_PROFILE.bio),
     links:     str(obj.links, DEFAULT_BUYER_PROFILE.links),
+    location:  str(obj.location, DEFAULT_BUYER_PROFILE.location),
     gender:    str(obj.gender, DEFAULT_BUYER_PROFILE.gender),
+    phone:     str(obj.phone, DEFAULT_BUYER_PROFILE.phone),
     aiCreator: typeof obj.aiCreator === 'boolean' ? obj.aiCreator : DEFAULT_BUYER_PROFILE.aiCreator,
+    avatarUri: str(obj.avatarUri, DEFAULT_BUYER_PROFILE.avatarUri),
   };
 }
 

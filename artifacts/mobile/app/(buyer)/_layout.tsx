@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Platform, Pressable, StyleSheet, View, useColorScheme } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -6,6 +6,7 @@ import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
 import { BG, SURFACE, BORDER, FG, SUBTLE, PURPLE } from '@/lib/theme';
+import { getDeactivationStatus, reactivate } from '@/lib/accountService';
 
 // ─── Buyer tab layout ─────────────────────────────────────────────────────────
 // Tabs: Thread · Discover · Friends · Inbox · Profile
@@ -162,5 +163,13 @@ function TabIcon({
 }
 
 export default function BuyerLayout() {
+  // When the buyer is authenticated and reaches the tab layout, clear any local
+  // deactivation record — signing back in is the reactivation mechanism.
+  useEffect(() => {
+    getDeactivationStatus().then(status => {
+      if (status?.active) reactivate();
+    });
+  }, []);
+
   return <BuyerTabLayout />;
 }

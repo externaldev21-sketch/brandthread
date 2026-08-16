@@ -270,7 +270,7 @@ export default function BuyerPrivacySettings() {
           />
         </View>
 
-        {/* BLOCKED & MUTED */}
+        {/* BLOCKED & MUTED & RESTRICTED */}
         <SectionHeader title="Blocked & Muted" />
         <View style={[styles.card, styles.cardOverflow]}>
           <PickerRow
@@ -283,7 +283,13 @@ export default function BuyerPrivacySettings() {
             icon="volume-x"
             label="Muted accounts"
             value="Manage"
-            onPress={() => router.push({ pathname: '/buyer-blocked', params: { tab: 'muted' } } as never)}
+            onPress={() => router.push('/buyer-muted' as never)}
+          />
+          <PickerRow
+            icon="user-x"
+            label="Restricted accounts"
+            value="Manage"
+            onPress={() => router.push('/buyer-restricted' as never)}
           />
         </View>
       </ScrollView>

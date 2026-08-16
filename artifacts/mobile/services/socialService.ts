@@ -12,7 +12,7 @@ import type {
   Message, MessageAttachment, MessageReaction,
   Story, StoryMedia, StoryPrivacySettings, StoryViewer,
   Notification, NotificationCategory, NotificationPreference,
-  BlockRecord, MuteRecord, Report, ReportReason, ReportTargetType,
+  BlockRecord, MuteRecord, RestrictRecord, Report, ReportReason, ReportTargetType,
   SavedItem, SavedItemType, PrivacySettings, ProfileSearchResult,
   Comment,
 } from './socialTypes';
@@ -34,6 +34,7 @@ const K = {
   notifPrefs:    'bt:social:notif_prefs:v1',
   blocks:        'bt:social:blocks:v1',
   mutes:         'bt:social:mutes:v1',
+  restricts:     'bt:social:restricts:v1',
   saved:         'bt:social:saved:v1',
   privacy:       'bt:social:privacy:v1',
   seeded:        'bt:social:seeded:v1',
@@ -381,6 +382,11 @@ export async function archivePost(id: string): Promise<void> {
   const idx = posts.findIndex(p => p.id === id);
   if (idx >= 0) { posts[idx].isArchived = true; await save(K.posts, posts); notify(); }
 }
+export async function unarchivePost(id: string): Promise<void> {
+  const posts = await getMyPosts();
+  const idx = posts.findIndex(p => p.id === id);
+  if (idx >= 0) { posts[idx].isArchived = false; await save(K.posts, posts); notify(); }
+}
 export async function likePost(id: string): Promise<void> {
   const posts = await getMyPosts();
   const idx = posts.findIndex(p => p.id === id);
@@ -415,19 +421,43 @@ export async function likeFriendPost(
   notify();
   return next;
 }
-export async function repostPost(id: string): Promise<void> {
+type FriendPostMeta = { authorId: string; authorName: string; authorHandle: string; caption: string };
+
+export async function repostPost(id: string, friendMeta?: FriendPostMeta): Promise<void> {
   const posts = await getMyPosts();
   const idx = posts.findIndex(p => p.id === id);
-  if (idx < 0) return;
-  posts[idx].repostedByMe = !posts[idx].repostedByMe;
-  posts[idx].repostsCount += posts[idx].repostedByMe ? 1 : -1;
-  await save(K.posts, posts);
-  if (posts[idx].repostedByMe) {
-    const reposts = await load<RepostRecord[]>(K.reposts, []);
-    reposts.unshift({ id: uid(), reposterId: MY_USER_ID, originalPostId: id, originalAuthorId: posts[idx].authorId, originalAuthorName: posts[idx].authorName, originalAuthorHandle: posts[idx].authorHandle, originalCaption: posts[idx].caption, feedEligibility: 'profile_only', createdAt: iso() });
-    await save(K.reposts, reposts);
+  const reposts = await load<RepostRecord[]>(K.reposts, []);
+
+  if (idx >= 0) {
+    // Own post — toggle repostedByMe flag in the posts store
+    posts[idx].repostedByMe = !posts[idx].repostedByMe;
+    posts[idx].repostsCount += posts[idx].repostedByMe ? 1 : -1;
+    await save(K.posts, posts);
+    if (posts[idx].repostedByMe) {
+      reposts.unshift({ id: uid(), reposterId: MY_USER_ID, originalPostId: id, originalAuthorId: posts[idx].authorId, originalAuthorName: posts[idx].authorName, originalAuthorHandle: posts[idx].authorHandle, originalCaption: posts[idx].caption, feedEligibility: 'profile_only', createdAt: iso() });
+    } else {
+      const filtered = reposts.filter(r => !(r.originalPostId === id && r.reposterId === MY_USER_ID));
+      reposts.length = 0; reposts.push(...filtered);
+    }
+  } else {
+    // Friend post — not in myPosts; determine state from existing RepostRecord
+    const existing = reposts.findIndex(r => r.originalPostId === id && r.reposterId === MY_USER_ID);
+    if (existing >= 0) {
+      // Currently reposted → unrepost: remove the record
+      reposts.splice(existing, 1);
+    } else if (friendMeta) {
+      // Not yet reposted → repost: create a new record using provided metadata
+      reposts.unshift({ id: uid(), reposterId: MY_USER_ID, originalPostId: id, originalAuthorId: friendMeta.authorId, originalAuthorName: friendMeta.authorName, originalAuthorHandle: friendMeta.authorHandle, originalCaption: friendMeta.caption, feedEligibility: 'profile_only', createdAt: iso() });
+    }
   }
+  await save(K.reposts, reposts);
   notify();
+}
+
+/** Returns a Set of post IDs that the current user has reposted (persisted). */
+export async function getRepostedPostIds(): Promise<Set<string>> {
+  const reposts = await load<RepostRecord[]>(K.reposts, []);
+  return new Set(reposts.filter(r => r.reposterId === MY_USER_ID).map(r => r.originalPostId));
 }
 export async function getMyReposts(): Promise<RepostRecord[]> {
   return load<RepostRecord[]>(K.reposts, []);
@@ -766,6 +796,22 @@ export async function canMessage(userId: string): Promise<boolean> {
   const entry = friends.find(f => f.userId === userId);
   return entry?.status === 'accepted';
 }
+
+/**
+ * Returns true if userId is in the current user's Close Friends list.
+ * The list is stored locally under bt:close-friends:v1 and managed in
+ * the buyer-close-friends screen. Use this to gate Close Friends-only
+ * content visibility when displaying posts from other users.
+ */
+export async function isCloseFriendOf(userId: string): Promise<boolean> {
+  try {
+    const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+    const raw = await AsyncStorage.getItem('bt:close-friends:v1');
+    if (!raw) return false;
+    const ids: string[] = JSON.parse(raw);
+    return Array.isArray(ids) && ids.includes(userId);
+  } catch { return false; }
+}
 export async function sendFriendRequest(params: { userId: string; name: string; handle: string; initials: string; color: string; }): Promise<{ success: boolean; message: string; request?: FriendRequest }> {
   if (params.userId === MY_USER_ID) return { success: false, message: 'You cannot send a request to yourself.' };
   const blocks = await getBlockedUsers();
@@ -1030,6 +1076,22 @@ export async function muteUser(params: { userId: string; name: string; handle: s
 export async function unmuteUser(userId: string): Promise<void> {
   const mutes = await getMutedUsers();
   await save(K.mutes, mutes.filter(m => m.mutedUserId !== userId)); notify();
+}
+
+// ─── Restriction ─────────────────────────────────────────────────────────────
+
+export async function getRestrictedUsers(): Promise<RestrictRecord[]> {
+  return load<RestrictRecord[]>(K.restricts, []);
+}
+export async function restrictUser(params: { userId: string; name: string; handle: string; initials: string; color: string; }): Promise<void> {
+  const restricts = await getRestrictedUsers();
+  if (restricts.some(r => r.restrictedUserId === params.userId)) return;
+  restricts.unshift({ id: uid(), restrictedUserId: params.userId, restrictedUserName: params.name, restrictedUserHandle: params.handle, restrictedUserInitials: params.initials, restrictedUserColor: params.color, createdAt: iso() });
+  await save(K.restricts, restricts); notify();
+}
+export async function unrestrictUser(userId: string): Promise<void> {
+  const restricts = await getRestrictedUsers();
+  await save(K.restricts, restricts.filter(r => r.restrictedUserId !== userId)); notify();
 }
 
 // ─── Reports ─────────────────────────────────────────────────────────────────

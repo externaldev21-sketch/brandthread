@@ -1,21 +1,22 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Alert,
-  StyleSheet, Dimensions,
+  StyleSheet, Dimensions, Modal,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import {
   BG, CARD, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM,
+  FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, RED, OVERLAY,
   GRAD_PRIMARY, FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
 import {
   getFriendships, getFriendRequests, sendFriendRequest,
   acceptFriendRequest, declineFriendRequest, createOrGetConversation,
-  blockUser, subscribeSocial,
+  blockUser, muteUser, restrictUser, subscribeSocial,
 } from '@/services/socialService';
 import type { Friendship, FriendRequest, FriendshipStatus } from '@/services/socialTypes';
 
@@ -48,6 +49,7 @@ export default function BuyerOtherProfileScreen() {
   const [friendshipStatus, setFriendshipStatus] = useState<FriendshipStatus | null>(null);
   const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
   const [loading, setLoading] = useState(false);
+  const [moreSheetOpen, setMoreSheetOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     const [friendships, requests] = await Promise.all([
@@ -129,25 +131,33 @@ export default function BuyerOtherProfileScreen() {
   };
 
   const handleMore = () => {
-    Alert.alert(name, undefined, [
-      {
-        text: 'Block',
-        style: 'destructive',
-        onPress: async () => {
-          await blockUser({ userId, name, handle, initials, color });
-          Alert.alert('Blocked', `${name} has been blocked.`);
-          router.back();
-        },
-      },
-      {
-        text: 'Report',
-        onPress: () =>
-          router.push(
-            `/buyer-report?targetType=profile&targetId=${userId}&targetLabel=${encodeURIComponent(name)}&targetUserId=${userId}` as any,
-          ),
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    Haptics.selectionAsync();
+    setMoreSheetOpen(true);
+  };
+
+  const handleMute = async () => {
+    setMoreSheetOpen(false);
+    await muteUser({ userId, name, handle, initials, color });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const handleRestrict = async () => {
+    setMoreSheetOpen(false);
+    await restrictUser({ userId, name, handle, initials, color });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const handleBlock = async () => {
+    setMoreSheetOpen(false);
+    await blockUser({ userId, name, handle, initials, color });
+    router.back();
+  };
+
+  const handleReport = () => {
+    setMoreSheetOpen(false);
+    router.push(
+      `/buyer-report?targetType=profile&targetId=${userId}&targetLabel=${encodeURIComponent(name)}&targetUserId=${userId}` as any,
+    );
   };
 
   const isAccepted = friendshipStatus === 'accepted';
@@ -341,6 +351,36 @@ export default function BuyerOtherProfileScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* More options bottom sheet */}
+      <Modal visible={moreSheetOpen} transparent animationType="slide" onRequestClose={() => setMoreSheetOpen(false)}>
+        <TouchableOpacity style={styles.moreBackdrop} activeOpacity={1} onPress={() => setMoreSheetOpen(false)}>
+          <TouchableOpacity activeOpacity={1} style={[styles.moreSheet, { paddingBottom: insets.bottom + SP.md }]}>
+            <View style={styles.moreHandle} />
+            <Text style={styles.moreTitle}>{name}</Text>
+
+            <TouchableOpacity style={styles.moreRow} onPress={handleMute} activeOpacity={0.7}>
+              <Feather name="volume-x" size={20} color={FG} />
+              <Text style={styles.moreRowText}>Mute</Text>
+            </TouchableOpacity>
+            <View style={styles.moreDivider} />
+            <TouchableOpacity style={styles.moreRow} onPress={handleRestrict} activeOpacity={0.7}>
+              <Feather name="user-x" size={20} color={FG} />
+              <Text style={styles.moreRowText}>Restrict</Text>
+            </TouchableOpacity>
+            <View style={styles.moreDivider} />
+            <TouchableOpacity style={styles.moreRow} onPress={handleReport} activeOpacity={0.7}>
+              <Feather name="flag" size={20} color={FG} />
+              <Text style={styles.moreRowText}>Report</Text>
+            </TouchableOpacity>
+            <View style={styles.moreDivider} />
+            <TouchableOpacity style={styles.moreRow} onPress={handleBlock} activeOpacity={0.7}>
+              <Feather name="slash" size={20} color={RED} />
+              <Text style={[styles.moreRowText, { color: RED }]}>Block</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -431,6 +471,13 @@ const styles = StyleSheet.create({
     fontSize: FS.sm,
     color: FG,
   },
+  moreBackdrop: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },
+  moreSheet: { backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, paddingHorizontal: SP.md, paddingTop: SP.md },
+  moreHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: SP.md },
+  moreTitle: { fontFamily: FONT.bold, fontSize: FS.md, color: FG, paddingBottom: SP.sm },
+  moreRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 },
+  moreRowText: { fontFamily: FONT.medium, fontSize: FS.base, color: FG },
+  moreDivider: { height: 1, backgroundColor: BORDER },
   moreBtn: {
     width: 40,
     height: 40,

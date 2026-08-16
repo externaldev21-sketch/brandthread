@@ -1,357 +1,296 @@
 /**
  * Shopping Preferences — full buyer preferences screen
- * Sizes, fit, categories, price range, colors, recommendations
+ * Sizes, fit, categories, alerts, and activity toggles
  */
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Switch, TextInput,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Switch,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, FONT, FS, SP, RADIUS } from '@/lib/theme';
-import { loadBuyerSettings, patchBuyerSettings } from '@/lib/buyerSettings';
-import type { BuyerSettingsState } from '@/lib/buyerSettings';
+import {
+  BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, PURPLE, PURPLE_DIM,
+  FONT, FS, SP, RADIUS, GRAD_PRIMARY,
+} from '@/lib/theme';
+import { loadBuyerSettings, patchBuyerSettings, type BuyerSettingsState } from '@/lib/buyerSettings';
 
 const TOPS = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL+'];
 const BOTTOMS = ['28', '29', '30', '31', '32', '33', '34', '36', '38', '40+'];
-const SHOES_M = ['7', '7.5', '8', '8.5', '9', '9.5', '10', '10.5', '11', '11.5', '12', '13', '14'];
-const FIT_OPTIONS: { value: BuyerSettingsState['preferredFit']; label: string; desc: string }[] = [
-  { value: 'slim', label: 'Slim', desc: 'Close to the body' },
-  { value: 'regular', label: 'Regular', desc: 'Classic fit' },
-  { value: 'oversized', label: 'Oversized', desc: 'Relaxed and roomy' },
-];
-const CATEGORIES = [
-  'Tees', 'Hoodies', 'Sweats', 'Denim', 'Jackets', 'Outerwear',
-  'Shoes', 'Accessories', 'Hats', 'Bags', 'Jewelry', 'Shorts', 'Pants', 'Other',
-];
-const COLORS = [
-  { label: 'Black', hex: '#000000' }, { label: 'White', hex: '#FFFFFF' },
-  { label: 'Grey', hex: '#6B7280' }, { label: 'Navy', hex: '#1E3A5F' },
-  { label: 'Brown', hex: '#92400E' }, { label: 'Beige', hex: '#D4B896' },
-  { label: 'Red', hex: '#DC2626' }, { label: 'Blue', hex: '#2563EB' },
-  { label: 'Green', hex: '#16A34A' }, { label: 'Purple', hex: '#8B5CF6' },
-  { label: 'Pink', hex: '#EC4899' }, { label: 'Orange', hex: '#EA580C' },
-  { label: 'Yellow', hex: '#CA8A04' }, { label: 'Multi', hex: '#E5E7EB' },
+const SHOES = ['6', '7', '8', '9', '10', '11', '12', '13', '14'];
+
+const FIT_OPTIONS: { key: BuyerSettingsState['preferredFit']; label: string; desc: string }[] = [
+  { key: 'slim', label: 'Slim', desc: 'Close to the body' },
+  { key: 'regular', label: 'Regular', desc: 'Classic fit' },
+  { key: 'oversized', label: 'Oversized', desc: 'Relaxed & roomy' },
 ];
 
-export default function ShoppingPreferencesScreen() {
+const CATEGORIES = [
+  { key: 'streetwear', label: 'Streetwear', emoji: '🧢' },
+  { key: 'luxury', label: 'Luxury', emoji: '💎' },
+  { key: 'vintage', label: 'Vintage', emoji: '🕰️' },
+  { key: 'athleisure', label: 'Athleisure', emoji: '🏃' },
+  { key: 'minimalist', label: 'Minimalist', emoji: '⚪' },
+  { key: 'y2k', label: 'Y2K', emoji: '✨' },
+  { key: 'techwear', label: 'Techwear', emoji: '🤖' },
+  { key: 'cottagecore', label: 'Cottagecore', emoji: '🌿' },
+  { key: 'darkwear', label: 'Dark Fashion', emoji: '🖤' },
+  { key: 'business', label: 'Business Casual', emoji: '👔' },
+];
+
+function SizeSelector({
+  label, options, selected, onSelect,
+}: {
+  label: string;
+  options: string[];
+  selected: string;
+  onSelect: (v: string) => void;
+}) {
+  return (
+    <View style={s.sizeBlock}>
+      <Text style={s.sizeLabel}>{label}</Text>
+      <View style={s.sizeRow}>
+        {options.map(opt => (
+          <TouchableOpacity
+            key={opt}
+            style={[s.sizeBubble, selected === opt && s.sizeBubbleActive]}
+            onPress={() => { Haptics.selectionAsync(); onSelect(opt); }}
+          >
+            <Text style={[s.sizeBubbleText, selected === opt && s.sizeBubbleTextActive]}>{opt}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+export default function ShoppingPreferences() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [settings, setSettings] = useState<BuyerSettingsState | null>(null);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [selectedColors, setSelectedColors] = useState<string[]>([]);
-  const [minPrice, setMinPrice] = useState('');
-  const [maxPrice, setMaxPrice] = useState('');
+  const [selectedCats, setSelectedCats] = useState<Set<string>>(new Set());
+  const [hasChanges, setHasChanges] = useState(false);
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     loadBuyerSettings().then(s => {
       setSettings(s);
+      setSelectedCats(new Set(s.styleCategories ?? ['streetwear', 'vintage']));
     });
-  }, []);
+  }, []));
 
-  const patch = useCallback(async (update: Partial<BuyerSettingsState>) => {
-    Haptics.selectionAsync();
-    const next = await patchBuyerSettings(update);
+  async function patch(updates: Partial<BuyerSettingsState>) {
+    const next = await patchBuyerSettings(updates);
     setSettings(next);
-  }, []);
+    setHasChanges(true);
+  }
 
-  const toggleCategory = (cat: string) => {
-    Haptics.selectionAsync();
-    setSelectedCategories(prev =>
-      prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
-    );
-  };
+  async function save() {
+    // Persist selected style categories alongside other preferences
+    await patchBuyerSettings({ styleCategories: Array.from(selectedCats) });
+    setHasChanges(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    router.back();
+  }
 
-  const toggleColor = (color: string) => {
+  function toggleCat(key: string) {
     Haptics.selectionAsync();
-    setSelectedColors(prev =>
-      prev.includes(color) ? prev.filter(c => c !== color) : [...prev, color]
-    );
-  };
+    setSelectedCats(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+    setHasChanges(true);
+  }
 
   if (!settings) return <View style={{ flex: 1, backgroundColor: BG }} />;
 
   return (
-    <View style={[styles.page, { paddingTop: insets.top }]}>
+    <View style={[s.page, { paddingTop: insets.top }]}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
+      <View style={s.header}>
+        <TouchableOpacity style={s.iconBtn} onPress={() => router.back()}>
           <Feather name="arrow-left" size={21} color={FG} />
         </TouchableOpacity>
-        <Text style={styles.title}>Shopping preferences</Text>
-        <View style={styles.iconBtn} />
+        <Text style={s.title}>Shopping Preferences</Text>
+        <View style={s.iconBtn} />
       </View>
 
       <ScrollView
-        contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 48 }}
+        contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 100 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── Tops Size ── */}
-        <SectionLabel title="Top size" />
-        <View style={styles.chipRow}>
-          {TOPS.map(s => (
-            <ChipBtn
-              key={s}
-              label={s}
-              active={settings.sizeTops === s}
-              onPress={() => patch({ sizeTops: s })}
-            />
-          ))}
+        {/* Sizes */}
+        <Text style={s.sectionTitle}>Your Sizes</Text>
+        <Text style={s.sectionDesc}>Used for size recommendations and filtering.</Text>
+        <View style={s.card}>
+          <SizeSelector label="Tops" options={TOPS} selected={settings.sizeTops} onSelect={v => patch({ sizeTops: v })} />
+          <View style={s.divider} />
+          <SizeSelector label="Bottoms" options={BOTTOMS} selected={settings.sizeBottoms} onSelect={v => patch({ sizeBottoms: v })} />
+          <View style={s.divider} />
+          <SizeSelector label="Shoes (US)" options={SHOES} selected={settings.sizeShoes} onSelect={v => patch({ sizeShoes: v })} />
         </View>
 
-        {/* ── Bottoms Size ── */}
-        <SectionLabel title="Bottom size (waist)" />
-        <View style={styles.chipRow}>
-          {BOTTOMS.map(s => (
-            <ChipBtn
-              key={s}
-              label={s}
-              active={settings.sizeBottoms === s}
-              onPress={() => patch({ sizeBottoms: s })}
-            />
-          ))}
-        </View>
-
-        {/* ── Shoe Size ── */}
-        <SectionLabel title="Shoe size (US)" />
-        <View style={styles.chipRow}>
-          {SHOES_M.map(s => (
-            <ChipBtn
-              key={s}
-              label={s}
-              active={settings.sizeShoes === s}
-              onPress={() => patch({ sizeShoes: s })}
-            />
-          ))}
-        </View>
-
-        {/* ── Preferred Fit ── */}
-        <SectionLabel title="Preferred fit" />
-        <View style={styles.card}>
+        {/* Fit */}
+        <Text style={s.sectionTitle}>Preferred Fit</Text>
+        <Text style={s.sectionDesc}>We'll show you cuts that match your style.</Text>
+        <View style={s.card}>
           {FIT_OPTIONS.map((opt, i) => (
-            <React.Fragment key={opt.value}>
+            <React.Fragment key={opt.key}>
               <TouchableOpacity
-                style={styles.fitRow}
-                onPress={() => patch({ preferredFit: opt.value })}
+                style={s.fitRow}
+                onPress={() => patch({ preferredFit: opt.key })}
                 activeOpacity={0.7}
               >
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.fitLabel}>{opt.label}</Text>
-                  <Text style={styles.fitDesc}>{opt.desc}</Text>
+                <View style={s.fitRadio}>
+                  {settings.preferredFit === opt.key && <View style={s.fitRadioFill} />}
                 </View>
-                <View style={[styles.radio, settings.preferredFit === opt.value && styles.radioActive]}>
-                  {settings.preferredFit === opt.value && <View style={styles.radioDot} />}
+                <View style={{ flex: 1 }}>
+                  <Text style={s.fitLabel}>{opt.label}</Text>
+                  <Text style={s.fitDesc}>{opt.desc}</Text>
                 </View>
               </TouchableOpacity>
-              {i < FIT_OPTIONS.length - 1 && <View style={styles.divider} />}
+              {i < FIT_OPTIONS.length - 1 && <View style={s.divider} />}
             </React.Fragment>
           ))}
         </View>
 
-        {/* ── Favorite Categories ── */}
-        <SectionLabel title="Favorite categories" subtitle="We'll prioritize these in your Discover feed" />
-        <View style={styles.chipRow}>
+        {/* Categories */}
+        <Text style={s.sectionTitle}>Style Categories</Text>
+        <Text style={s.sectionDesc}>Select all that apply — we'll personalize your Discover feed.</Text>
+        <View style={s.catGrid}>
           {CATEGORIES.map(cat => (
-            <ChipBtn
-              key={cat}
-              label={cat}
-              active={selectedCategories.includes(cat)}
-              onPress={() => toggleCategory(cat)}
-            />
-          ))}
-        </View>
-
-        {/* ── Preferred Colors ── */}
-        <SectionLabel title="Preferred colors" />
-        <View style={styles.colorRow}>
-          {COLORS.map(c => (
             <TouchableOpacity
-              key={c.label}
-              style={[
-                styles.colorSwatch,
-                { backgroundColor: c.hex, borderColor: selectedColors.includes(c.label) ? PURPLE : 'transparent' },
-              ]}
-              onPress={() => toggleColor(c.label)}
-              activeOpacity={0.8}
+              key={cat.key}
+              style={[s.catChip, selectedCats.has(cat.key) && s.catChipActive]}
+              onPress={() => toggleCat(cat.key)}
+              activeOpacity={0.7}
             >
-              {selectedColors.includes(c.label) && (
-                <Feather name="check" size={14} color={c.hex === '#FFFFFF' || c.hex === '#E5E7EB' ? '#000' : '#fff'} />
-              )}
+              <Text style={s.catEmoji}>{cat.emoji}</Text>
+              <Text style={[s.catLabel, selectedCats.has(cat.key) && s.catLabelActive]}>
+                {cat.label}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* ── Price Range ── */}
-        <SectionLabel title="Price range" subtitle="Filter products to your budget" />
-        <View style={styles.priceRow}>
-          <View style={styles.priceInput}>
-            <Text style={styles.priceCurrency}>$</Text>
-            <TextInput
-              style={styles.priceField}
-              value={minPrice}
-              onChangeText={setMinPrice}
-              placeholder="Min"
-              placeholderTextColor={SUBTLE}
-              keyboardType="numeric"
-            />
-          </View>
-          <Text style={styles.priceDash}>—</Text>
-          <View style={styles.priceInput}>
-            <Text style={styles.priceCurrency}>$</Text>
-            <TextInput
-              style={styles.priceField}
-              value={maxPrice}
-              onChangeText={setMaxPrice}
-              placeholder="Max"
-              placeholderTextColor={SUBTLE}
-              keyboardType="numeric"
-            />
-          </View>
+        {/* Alerts */}
+        <Text style={s.sectionTitle}>Alerts &amp; Notifications</Text>
+        <Text style={s.sectionDesc}>Stay in the loop on products you care about.</Text>
+        <View style={s.card}>
+          {([
+            { key: 'dropAlerts' as const, label: 'Drop alerts', sub: 'Notify me when brands drop new collections', icon: 'zap' },
+            { key: 'restockAlerts' as const, label: 'Restock alerts', sub: 'Get notified when sold-out items come back', icon: 'refresh-cw' },
+            { key: 'priceDropAlerts' as const, label: 'Price drop alerts', sub: 'Alert me when saved items go on sale', icon: 'tag' },
+          ]).map((item, i, arr) => (
+            <React.Fragment key={item.key}>
+              <View style={s.alertRow}>
+                <Feather name={item.icon as any} size={19} color={PURPLE} style={{ width: 28 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.alertLabel}>{item.label}</Text>
+                  <Text style={s.alertSub}>{item.sub}</Text>
+                </View>
+                <Switch
+                  value={Boolean(settings[item.key])}
+                  onValueChange={v => { Haptics.selectionAsync(); patch({ [item.key]: v }); }}
+                  trackColor={{ false: '#333344', true: PURPLE }}
+                  thumbColor="#fff"
+                />
+              </View>
+              {i < arr.length - 1 && <View style={s.divider} />}
+            </React.Fragment>
+          ))}
         </View>
 
-        {/* ── Recommendations ── */}
-        <SectionLabel title="Recommendations" />
-        <View style={styles.card}>
-          <ToggleRow
-            label="Personalized recommendations"
-            sub="Tailored to your style and activity"
-            value={settings.personalizedRecommendations}
-            onToggle={v => patch({ personalizedRecommendations: v })}
-          />
-          <View style={styles.divider} />
-          <ToggleRow
-            label="Use shopping activity"
-            sub="Improve recommendations based on what you view and buy"
-            value={settings.showShoppingActivity}
-            onToggle={v => patch({ showShoppingActivity: v })}
-          />
-        </View>
-
-        {/* ── Alerts ── */}
-        <SectionLabel title="Shopping alerts" />
-        <View style={styles.card}>
-          <ToggleRow
-            label="Drop alerts"
-            sub="Notify me when favorite brands drop new items"
-            value={settings.dropAlerts}
-            onToggle={v => patch({ dropAlerts: v })}
-          />
-          <View style={styles.divider} />
-          <ToggleRow
-            label="Restock alerts"
-            sub="Notify me when sold-out items come back"
-            value={settings.restockAlerts}
-            onToggle={v => patch({ restockAlerts: v })}
-          />
-          <View style={styles.divider} />
-          <ToggleRow
-            label="Price drop alerts"
-            sub="Notify me when saved items go on sale"
-            value={settings.priceDropAlerts}
-            onToggle={v => patch({ priceDropAlerts: v })}
-          />
+        {/* Shopping activity */}
+        <View style={[s.card, { marginTop: SP.sm }]}>
+          <View style={s.alertRow}>
+            <Feather name="eye" size={19} color={PURPLE} style={{ width: 28 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={s.alertLabel}>Shopping activity</Text>
+              <Text style={s.alertSub}>Let brands see what you've viewed and saved</Text>
+            </View>
+            <Switch
+              value={Boolean(settings.showShoppingActivity)}
+              onValueChange={v => { Haptics.selectionAsync(); patch({ showShoppingActivity: v }); }}
+              trackColor={{ false: '#333344', true: PURPLE }}
+              thumbColor="#fff"
+            />
+          </View>
+          <View style={s.divider} />
+          <View style={s.alertRow}>
+            <Feather name="sliders" size={19} color={PURPLE} style={{ width: 28 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={s.alertLabel}>Personalized recommendations</Text>
+              <Text style={s.alertSub}>Use your activity to surface relevant products</Text>
+            </View>
+            <Switch
+              value={Boolean(settings.personalizedRecommendations)}
+              onValueChange={v => { Haptics.selectionAsync(); patch({ personalizedRecommendations: v }); }}
+              trackColor={{ false: '#333344', true: PURPLE }}
+              thumbColor="#fff"
+            />
+          </View>
         </View>
       </ScrollView>
-    </View>
-  );
-}
 
-function SectionLabel({ title, subtitle }: { title: string; subtitle?: string }) {
-  return (
-    <View style={{ marginBottom: 10, marginTop: 20 }}>
-      <Text style={styles.sectionTitle}>{title}</Text>
-      {subtitle ? <Text style={styles.sectionSub}>{subtitle}</Text> : null}
-    </View>
-  );
-}
-
-function ChipBtn({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  return (
-    <TouchableOpacity
-      style={[styles.chip, active && styles.chipActive]}
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
-    </TouchableOpacity>
-  );
-}
-
-function ToggleRow({ label, sub, value, onToggle }: { label: string; sub?: string; value: boolean; onToggle: (v: boolean) => void }) {
-  return (
-    <View style={styles.toggleRow}>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.toggleLabel}>{label}</Text>
-        {sub ? <Text style={styles.toggleSub}>{sub}</Text> : null}
+      {/* Save button */}
+      <View style={[s.saveBar, { paddingBottom: insets.bottom + SP.md }]}>
+        <TouchableOpacity onPress={save} activeOpacity={0.85} style={{ flex: 1 }}>
+          <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.saveBtn}>
+            <Text style={s.saveBtnText}>Save Preferences</Text>
+          </LinearGradient>
+        </TouchableOpacity>
       </View>
-      <Switch
-        value={value}
-        onValueChange={onToggle}
-        trackColor={{ false: '#333344', true: PURPLE }}
-        thumbColor="#fff"
-      />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   page: { flex: 1, backgroundColor: BG },
-  header: {
-    height: 58, flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', paddingHorizontal: SP.md,
-    borderBottomWidth: 1, borderBottomColor: BORDER,
-  },
+  header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   title: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
-  sectionTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
-  sectionSub: { color: MUTED, fontFamily: FONT.regular, fontSize: 11.5, marginTop: 2 },
-  card: {
-    backgroundColor: CARD, borderRadius: RADIUS.lg,
-    borderWidth: 1, borderColor: BORDER, overflow: 'hidden',
-  },
-  divider: { height: 1, backgroundColor: BORDER },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: {
-    paddingHorizontal: 14, paddingVertical: 8,
-    borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER,
-    backgroundColor: CARD,
-  },
-  chipActive: { backgroundColor: `${PURPLE}20`, borderColor: PURPLE },
-  chipText: { fontFamily: FONT.medium, fontSize: 13, color: MUTED },
-  chipTextActive: { color: PURPLE },
-  fitRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 14, paddingVertical: 14, gap: 12,
-  },
-  fitLabel: { color: FG, fontFamily: FONT.medium, fontSize: 14 },
-  fitDesc: { color: MUTED, fontFamily: FONT.regular, fontSize: 12, marginTop: 2 },
-  radio: {
-    width: 20, height: 20, borderRadius: 10, borderWidth: 2,
-    borderColor: BORDER, alignItems: 'center', justifyContent: 'center',
-  },
-  radioActive: { borderColor: PURPLE },
-  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: PURPLE },
-  colorRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  colorSwatch: {
-    width: 36, height: 36, borderRadius: 18,
-    borderWidth: 2, alignItems: 'center', justifyContent: 'center',
-  },
-  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  priceInput: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
-    borderRadius: RADIUS.md, paddingHorizontal: 12, paddingVertical: 12,
-  },
-  priceCurrency: { color: MUTED, fontFamily: FONT.medium, fontSize: 14 },
-  priceField: { flex: 1, color: FG, fontFamily: FONT.regular, fontSize: 14 },
-  priceDash: { color: MUTED, fontFamily: FONT.medium },
-  toggleRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: 14, paddingVertical: 14, gap: 12,
-  },
-  toggleLabel: { color: FG, fontFamily: FONT.medium, fontSize: 14 },
-  toggleSub: { color: MUTED, fontFamily: FONT.regular, fontSize: 11.5, marginTop: 2 },
+
+  sectionTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, marginTop: SP.lg, marginBottom: 4 },
+  sectionDesc: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginBottom: SP.sm, lineHeight: 18 },
+
+  card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
+  divider: { height: 1, backgroundColor: BORDER, marginLeft: 16 },
+
+  // Sizes
+  sizeBlock: { paddingHorizontal: SP.md, paddingVertical: 14 },
+  sizeLabel: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED, marginBottom: 10 },
+  sizeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  sizeBubble: { minWidth: 44, height: 36, borderRadius: RADIUS.md, backgroundColor: BG, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
+  sizeBubbleActive: { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
+  sizeBubbleText: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
+  sizeBubbleTextActive: { color: PURPLE },
+
+  // Fit
+  fitRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: 14, gap: 12 },
+  fitRadio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: PURPLE, alignItems: 'center', justifyContent: 'center' },
+  fitRadioFill: { width: 10, height: 10, borderRadius: 5, backgroundColor: PURPLE },
+  fitLabel: { fontFamily: FONT.medium, fontSize: FS.base, color: FG },
+  fitDesc: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
+
+  // Categories
+  catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
+  catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+  catChipActive: { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
+  catEmoji: { fontSize: 14 },
+  catLabel: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
+  catLabelActive: { color: PURPLE },
+
+  // Alerts
+  alertRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: 14, gap: 12 },
+  alertLabel: { fontFamily: FONT.medium, fontSize: FS.base, color: FG },
+  alertSub: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
+
+  // Save
+  saveBar: { paddingHorizontal: SP.md, paddingTop: SP.sm, backgroundColor: BG, borderTopWidth: 1, borderTopColor: BORDER },
+  saveBtn: { height: 50, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
+  saveBtnText: { color: '#FFF', fontFamily: FONT.bold, fontSize: FS.base },
 });

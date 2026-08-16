@@ -309,15 +309,23 @@ function RootLayoutNav() {
         <Stack.Screen name="buyer-notifications"     options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-privacy-settings"  options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-saved"             options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-blocked"           options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-blocked"              options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-muted"               options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-restricted"          options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-settings"        options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-settings-detail" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-account-center"  options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-activity"        options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-personal-details" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-security"        options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-login-activity"  options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-account-control" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-download-data"   options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-close-friends"   options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-restricted"      options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-muted"           options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-qr"              options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-your-activity"   options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-archive"         options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-qr-code"              options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-post-viewer"         options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-highlights-manager"  options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-report"            options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
         <Stack.Screen name="buyer-post-comments"     options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
         <Stack.Screen name="ai-brain"         options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
