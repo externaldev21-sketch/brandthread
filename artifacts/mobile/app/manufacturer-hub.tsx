@@ -11,6 +11,8 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import PlanUpsellModal from '@/components/PlanUpsellModal';
+import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
@@ -130,6 +132,16 @@ export default function ManufacturerHub() {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<Tab>('discover');
 
+  const { hasPlan, loading: planLoading } = useSubscriptionPlan();
+  const [upsellVisible, setUpsellVisible] = useState(false);
+
+  // Show upsell immediately if the seller doesn't have Growth access
+  useEffect(() => {
+    if (!planLoading && !hasPlan('growth')) {
+      setUpsellVisible(true);
+    }
+  }, [planLoading]);
+
   const handleTabPress = (tab: Tab) => {
     Haptics.selectionAsync();
     setActiveTab(tab);
@@ -179,6 +191,21 @@ export default function ManufacturerHub() {
         {activeTab === 'production'       && <ProductionTab router={router} />}
         {activeTab === 'messages'         && <MessagesTab router={router} />}
       </View>
+
+      {/* Plan upsell — shown immediately for Starter sellers */}
+      <PlanUpsellModal
+        visible={upsellVisible}
+        featureName="Manufacturer Hub"
+        requiredPlan="growth"
+        onClose={() => {
+          setUpsellVisible(false);
+          router.back();
+        }}
+        onUpgrade={() => {
+          setUpsellVisible(false);
+          router.push('/subscription' as never);
+        }}
+      />
     </View>
   );
 }

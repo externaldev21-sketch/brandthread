@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { requirePlan } from "../middlewares/requireAuth";
 import healthRouter from "./health";
 import authRouter from "./auth";
 import productsRouter from "./products";
@@ -78,16 +79,18 @@ router.use("/customers",       customersRouter);
 router.use("/drops",           dropsRouter);
 router.use("/analytics",       analyticsRouter);
 router.use("/integrations",    integrationsRouter);
-router.use("/logo",            logoRouter);
-router.use("/mockup",          mockupRouter);
-router.use("/photography",     photographyRouter);
-router.use("/bg-removal",      bgRemovalRouter);
-router.use("/lifestyle",       lifestyleRouter);
+// ─── Growth-plan-gated AI design routes ───────────────────────────────────────
+router.use("/logo",            requirePlan("growth"), logoRouter);
+router.use("/mockup",          requirePlan("growth"), mockupRouter);
+router.use("/photography",     requirePlan("growth"), photographyRouter);
+router.use("/bg-removal",      requirePlan("growth"), bgRemovalRouter);
+router.use("/lifestyle",       requirePlan("growth"), lifestyleRouter);
 router.use("/techpack",        techpackRouter);
 // Specific manufacturer sub-paths BEFORE the catch-all manufacturersRouter
 router.use("/manufacturers/public",          manufacturerPublicRouter);
 router.use("/manufacturers/connect",         manufacturerConnectRouter);
-router.use("/manufacturers",                 manufacturersRouter);
+// Growth-plan-gated Manufacturer Hub
+router.use("/manufacturers",   requirePlan("growth"), manufacturersRouter);
 router.use("/inventory",       inventoryRouter);
 router.use("/seller-hub",      sellerHubRouter);
 router.use("/push",            pushRouter);

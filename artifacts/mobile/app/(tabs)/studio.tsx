@@ -6,6 +6,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import SellerTutorialOverlay from '@/components/SellerTutorialOverlay';
+import PlanUpsellModal from '@/components/PlanUpsellModal';
+import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { useApi } from '@/lib/api';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
@@ -51,6 +53,18 @@ function cardWidth(screenWidth: number, cols: number): number {
 }
 
 // ─── Tool definitions ─────────────────────────────────────────────────────────
+
+/** Tool IDs that require a Growth (or higher) subscription to use. */
+const GROWTH_REQUIRED_TOOLS = new Set([
+  'design-studio',
+  'ai-photoshoot',
+  'mockup-to-model',
+  'remove-bg',
+  'bg-replace',
+  'ai-design',
+  'brand-assets',
+  'campaign-gen',
+]);
 
 interface StudioTool {
   id: string;
@@ -186,11 +200,17 @@ export default function StudioScreen() {
   const toolCardWidth = cardWidth(windowWidth, cols);
 
   const api = useApi();
+  const { hasPlan } = useSubscriptionPlan();
+
   const [dismissedTips,  setDismissedTips]  = useState<string[]>([]);
   const [openedFeatures, setOpenedFeatures] = useState<string[]>([]);
   const [projects,       setProjects]       = useState<DesignProject[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [showTutorial,   setShowTutorial]   = useState(false);
+
+  // Plan upsell state
+  const [upsellVisible,  setUpsellVisible]  = useState(false);
+  const [upsellFeature,  setUpsellFeature]  = useState('');
 
   // load design projects
   useEffect(() => {
@@ -241,12 +261,20 @@ export default function StudioScreen() {
 
   const handleToolPress = useCallback(async (tool: StudioTool) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+    // Gate Growth-only tools for Starter sellers
+    if (GROWTH_REQUIRED_TOOLS.has(tool.id) && !hasPlan('growth')) {
+      setUpsellFeature(tool.title);
+      setUpsellVisible(true);
+      return;
+    }
+
     if (tool.badge) {
       await markFeatureOpened(tool.id);
       setOpenedFeatures(prev => [...prev, tool.id]);
     }
     router.push(tool.route as never);
-  }, [router]);
+  }, [router, hasPlan]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -440,6 +468,18 @@ export default function StudioScreen() {
       </ScrollView>
       <AIBrainFAB context={{ screen: 'design_studio' as const }} bottomOffset={72} />
       <SellerTutorialOverlay visible={showTutorial} onDismiss={handleDismissTutorial} />
+
+      {/* Plan upsell modal — shown when Starter seller taps a Growth-only tool */}
+      <PlanUpsellModal
+        visible={upsellVisible}
+        featureName={upsellFeature}
+        requiredPlan="growth"
+        onClose={() => setUpsellVisible(false)}
+        onUpgrade={() => {
+          setUpsellVisible(false);
+          router.push('/subscription' as never);
+        }}
+      />
     </View>
   );
 }
