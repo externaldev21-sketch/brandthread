@@ -3,9 +3,10 @@
  * Mounted at /api/buyer — all routes require Clerk auth.
  */
 import { Router } from "express";
-import { db, orders, orderItems, productVariants, products, users } from "@workspace/db";
+import {
+  db, checkoutSessions, orders, orderItems, productVariants, products, users,
+} from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
-import { sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireStripe } from "../lib/stripe";
 
@@ -16,20 +17,21 @@ router.use(requireAuth);
 
 /**
  * POST /api/buyer/checkout/session
- * Body: { items: [{ variantId, productId, quantity }], successUrl, cancelUrl, contactEmail, shippingAddress }
+ * Body: { items: [{ variantId, productId, quantity }], successUrl, cancelUrl, contactEmail }
  * Returns: { sessionId, url }
+ *
+ * INVARIANTS:
+ *  1. Duplicate variantIds are rejected — client must deduplicate/merge quantities.
+ *  2. All items must belong to the same seller (single Connect destination).
+ *  3. Seller MUST have an active Stripe Connect account.
+ *  4. Cart is persisted server-side in checkout_sessions; only the record UUID
+ *     is passed to Stripe, avoiding the 50-key metadata limit.
  */
 router.post("/checkout/session", async (req, res) => {
   try {
     const stripe = requireStripe();
     const buyerId = (req as any).clerkUserId as string;
-    const {
-      items,
-      successUrl,
-      cancelUrl,
-      contactEmail,
-      shippingAddress,
-    } = req.body;
+    const { items, successUrl, cancelUrl, contactEmail } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
       res.status(400).json({ error: "items required" });
@@ -40,10 +42,28 @@ router.post("/checkout/session", async (req, res) => {
       return;
     }
 
-    // Resolve server-side prices and build line items
+    // ── Reject duplicate variantIds up front ──────────────────────────────
+    const seenVariants = new Set<string>();
+    for (const item of items) {
+      if (seenVariants.has(item.variantId)) {
+        res.status(400).json({
+          error: `Duplicate variantId ${item.variantId}. Merge quantities before checkout.`,
+        });
+        return;
+      }
+      seenVariants.add(item.variantId);
+    }
+
+    // ── Resolve server-side prices ────────────────────────────────────────
     const lineItems: any[] = [];
-    let sellerAccountId: string | null = null;
-    const cartMetadata: Record<string, string> = {};
+    const cartItems: Array<{
+      variantId: string;
+      productName: string;
+      variantLabel: string;
+      quantity: number;
+      priceCents: number;
+    }> = [];
+    const sellerIds = new Set<string>();
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
@@ -53,7 +73,6 @@ router.post("/checkout/session", async (req, res) => {
         return;
       }
 
-      // Look up variant + product + seller
       const [row] = await db
         .select({
           variantId: productVariants.id,
@@ -71,7 +90,7 @@ router.post("/checkout/session", async (req, res) => {
           and(
             eq(productVariants.id, item.variantId),
             eq(products.id, item.productId),
-          )
+          ),
         )
         .limit(1);
 
@@ -84,14 +103,13 @@ router.post("/checkout/session", async (req, res) => {
         return;
       }
 
-      // Collect seller's Stripe account for Connect transfer
-      if (!sellerAccountId) {
-        const [seller] = await db
-          .select({ stripeAccountId: users.stripeAccountId })
-          .from(users)
-          .where(eq(users.clerkId, row.sellerId))
-          .limit(1);
-        sellerAccountId = seller?.stripeAccountId ?? null;
+      sellerIds.add(row.sellerId);
+      if (sellerIds.size > 1) {
+        res.status(400).json({
+          error:
+            "All items must belong to the same seller. Split multi-seller carts into separate checkout sessions.",
+        });
+        return;
       }
 
       const variantLabel = [row.size, row.color].filter(Boolean).join(" / ");
@@ -110,42 +128,71 @@ router.post("/checkout/session", async (req, res) => {
         quantity: qty,
       });
 
-      // Store cart items in metadata for webhook reconstruction
-      cartMetadata[`item_${i}_variantId`] = row.variantId;
-      cartMetadata[`item_${i}_productName`] = row.productName;
-      cartMetadata[`item_${i}_variantLabel`] = variantLabel;
-      cartMetadata[`item_${i}_quantity`] = String(qty);
-      cartMetadata[`item_${i}_priceCents`] = String(row.priceCents);
+      cartItems.push({
+        variantId: row.variantId,
+        productName: row.productName,
+        variantLabel,
+        quantity: qty,
+        priceCents: row.priceCents,
+      });
     }
-    cartMetadata["itemCount"] = String(items.length);
 
-    // Build session params
-    const sessionParams: any = {
+    // ── Verify seller has an active Connect account ───────────────────────
+    const sellerId = [...sellerIds][0];
+    const [seller] = await db
+      .select({
+        stripeAccountId: users.stripeAccountId,
+        stripeAccountStatus: users.stripeAccountStatus,
+      })
+      .from(users)
+      .where(eq(users.clerkId, sellerId))
+      .limit(1);
+
+    if (!seller?.stripeAccountId) {
+      res.status(400).json({
+        error: "This seller has not set up a payment account yet. Please try again later.",
+      });
+      return;
+    }
+    if (seller.stripeAccountStatus !== "active") {
+      res.status(400).json({
+        error:
+          seller.stripeAccountStatus === "restricted"
+            ? "Seller payment account is restricted. Please try again later."
+            : "Seller payment account is not yet active. Please try again later.",
+      });
+      return;
+    }
+
+    // ── Persist cart server-side before calling Stripe ────────────────────
+    // This record is the single source of truth for the webhook; Stripe
+    // metadata only carries the record's UUID (no per-field keys, no 50-key limit).
+    const [csRecord] = await db
+      .insert(checkoutSessions)
+      .values({ buyerId, sellerId, items: cartItems })
+      .returning({ id: checkoutSessions.id });
+
+    // ── Create Stripe Checkout Session ────────────────────────────────────
+    const session = await stripe.checkout.sessions.create({
       mode: "payment",
       line_items: lineItems,
       success_url: successUrl,
       cancel_url: cancelUrl,
       client_reference_id: buyerId,
-      metadata: cartMetadata,
-      payment_intent_data: { metadata: { buyerId } },
-    };
+      // Single metadata key — immune to the 50-key limit
+      metadata: { csRef: csRecord.id },
+      payment_intent_data: {
+        metadata: { buyerId },
+        transfer_data: { destination: seller.stripeAccountId },
+      },
+      ...(contactEmail ? { customer_email: contactEmail } : {}),
+    });
 
-    if (contactEmail) {
-      sessionParams.customer_email = contactEmail;
-    }
-
-    if (shippingAddress) {
-      sessionParams.shipping_address_collection = undefined; // already collected on mobile
-    }
-
-    // Route payment to seller via Stripe Connect (if seller has Connect account)
-    if (sellerAccountId) {
-      sessionParams.payment_intent_data.transfer_data = {
-        destination: sellerAccountId,
-      };
-    }
-
-    const session = await stripe.checkout.sessions.create(sessionParams);
+    // Back-fill the Stripe session ID so the webhook can also look up by it
+    await db
+      .update(checkoutSessions)
+      .set({ stripeSessionId: session.id })
+      .where(eq(checkoutSessions.id, csRecord.id));
 
     res.json({ sessionId: session.id, url: session.url });
   } catch (err: any) {
@@ -162,7 +209,7 @@ router.post("/checkout/session", async (req, res) => {
 /**
  * GET /api/buyer/checkout/session/:sessionId
  * Verify payment status after Stripe redirects back.
- * Returns: { status: 'complete' | 'open' | 'expired', paymentStatus, orderId? }
+ * Returns: { status, paymentStatus, orderId?, orderNumber? }
  */
 router.get("/checkout/session/:sessionId", async (req, res) => {
   try {
@@ -175,7 +222,7 @@ router.get("/checkout/session/:sessionId", async (req, res) => {
       return;
     }
 
-    // Look up order created by webhook
+    // Webhook may be slightly delayed — order may not exist yet
     const [order] = await db
       .select({ id: orders.id, orderNumber: orders.orderNumber, status: orders.status })
       .from(orders)
@@ -201,7 +248,6 @@ router.get("/checkout/session/:sessionId", async (req, res) => {
 
 // ─── Buyer Orders ─────────────────────────────────────────────────────────────
 
-// GET /api/buyer/orders
 router.get("/orders", async (req, res) => {
   try {
     const buyerId = (req as any).clerkUserId as string;
@@ -217,7 +263,6 @@ router.get("/orders", async (req, res) => {
   }
 });
 
-// GET /api/buyer/orders/:id
 router.get("/orders/:id", async (req, res) => {
   try {
     const buyerId = (req as any).clerkUserId as string;

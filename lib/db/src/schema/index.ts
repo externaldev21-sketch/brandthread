@@ -167,6 +167,24 @@ export const interactions = pgTable('interactions', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
+// ─── Checkout Sessions (server-side cart record for Stripe webhook reconstruction)
+
+export const checkoutSessions = pgTable('checkout_sessions', {
+  id:              uuid('id').primaryKey().defaultRandom(),
+  stripeSessionId: text('stripe_session_id').unique(),  // set after Stripe responds
+  buyerId:         text('buyer_id').notNull(),           // Clerk user ID
+  sellerId:        text('seller_id').notNull(),          // Clerk user ID of seller
+  // Serialized cart items — single DB row replaces per-field Stripe metadata
+  items: json('items').$type<Array<{
+    variantId:    string;
+    productName:  string;
+    variantLabel: string;
+    quantity:     number;   // already aggregated by variantId
+    priceCents:   number;
+  }>>().notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 // ─── Klaviyo Integration ────────────────────────────────────────────────────────
 
 export const klaviyoIntegrations = pgTable('klaviyo_integrations', {
