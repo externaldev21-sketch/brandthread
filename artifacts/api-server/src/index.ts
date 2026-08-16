@@ -1,6 +1,7 @@
 import app from "./app";
 import { logger } from "./lib/logger";
 import { startAbandonedCartJob } from "./jobs/abandonedCartRecovery";
+import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
 
 const rawPort = process.env["PORT"];
 
@@ -23,6 +24,12 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // Ensure Stripe webhook endpoint includes all required event types
+  // (especially customer.subscription.* for live seller subscription updates)
+  ensureWebhookEvents().catch((err) =>
+    logger.error({ err }, "ensureWebhookEvents startup call failed"),
+  );
 
   // Background jobs
   startAbandonedCartJob();
