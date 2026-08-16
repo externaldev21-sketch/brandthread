@@ -1,7 +1,17 @@
 import { Router } from "express";
 import { db, customers, orders } from "@workspace/db";
-import { eq, desc, ilike, or, and } from "drizzle-orm";
+import { eq, desc, ilike, or, and, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+
+// ─── Startup migration — add tags + notes columns ────────────────────────────
+(async () => {
+  try {
+    await db.execute(sql`ALTER TABLE customers ADD COLUMN IF NOT EXISTS tags JSONB NOT NULL DEFAULT '[]'`);
+    await db.execute(sql`ALTER TABLE customers ADD COLUMN IF NOT EXISTS notes TEXT`);
+  } catch (err) {
+    console.error("[customers] migration error:", err);
+  }
+})();
 
 const router = Router();
 router.use(requireAuth);
@@ -58,18 +68,37 @@ router.get("/:id", async (req, res) => {
 // PUT /api/customers/:id
 router.put("/:id", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const { name, phone, address } = req.body;
+  const { name, phone, address, tags, notes } = req.body;
   const [updated] = await db.update(customers)
     .set({
       ...(name    && { name }),
       ...(phone   !== undefined && { phone }),
       ...(address && { address }),
+      ...(tags    !== undefined && { tags: (Array.isArray(tags) ? tags : []) as any }),
+      ...(notes   !== undefined && { notes }),
       updatedAt: new Date(),
     })
     .where(and(eq(customers.id, req.params.id), eq(customers.ownerId, ownerId)))
     .returning();
   if (!updated) { res.status(404).json({ error: "Not found" }); return; }
   res.json(updated);
+});
+
+// GET /api/customers/:id/orders
+router.get("/:id/orders", async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  const [customer] = await db
+    .select({ id: customers.id })
+    .from(customers)
+    .where(and(eq(customers.id, req.params.id), eq(customers.ownerId, ownerId)))
+    .limit(1);
+  if (!customer) { res.status(404).json({ error: "Not found" }); return; }
+  const customerOrders = await db
+    .select()
+    .from(orders)
+    .where(and(eq(orders.customerId, customer.id), eq(orders.ownerId, ownerId)))
+    .orderBy(desc(orders.createdAt));
+  res.json(customerOrders);
 });
 
 export default router;

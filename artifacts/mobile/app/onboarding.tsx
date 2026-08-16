@@ -1325,6 +1325,10 @@ export default function OnboardingScreen() {
     if (/^[a-zA-Z0-9_]{3,30}$/.test(uname)) {
       api.auth.updateProfile({ username: uname }).catch(() => {});
     }
+    // Persist questionnaire answers to DB — fire-and-forget
+    if (styleInterests.length > 0) {
+      api.seller.saveOnboardingData({ styleInterests }).catch(() => {});
+    }
     router.replace('/(buyer)/' as never);
   }
 
@@ -1340,6 +1344,10 @@ export default function OnboardingScreen() {
     const uname = username.trim().toLowerCase();
     if (/^[a-zA-Z0-9_]{3,30}$/.test(uname)) {
       api.auth.updateProfile({ username: uname }).catch(() => {});
+    }
+    // Persist questionnaire answers to DB — fire-and-forget
+    if (goals.length > 0 || brandStage || productModel) {
+      api.seller.saveOnboardingData({ goals, brandStage, sellModel: productModel }).catch(() => {});
     }
     router.replace('/(tabs)/' as never);
   }

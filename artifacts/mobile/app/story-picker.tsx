@@ -4,7 +4,7 @@ import {
   TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as MediaLibrary from 'expo-media-library';
 import * as ImagePicker from 'expo-image-picker';
@@ -18,8 +18,9 @@ const TILE = (W - GAP * (COLS - 1)) / COLS;
 type Mode = 'post' | 'story' | 'reel' | 'live';
 
 export default function StoryPickerScreen() {
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const router  = useRouter();
+  const insets  = useSafeAreaInsets();
+  const params  = useLocalSearchParams<{ accountType?: string }>();
 
   const [permissionStatus, setPermissionStatus] = useState<'unknown' | 'granted' | 'denied'>('unknown');
   const [assets, setAssets] = useState<MediaLibrary.Asset[]>([]);
@@ -57,7 +58,10 @@ export default function StoryPickerScreen() {
 
   function goToEditor(uri: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.replace({ pathname: '/story-creator', params: { uri } } as never);
+    router.replace({
+      pathname: '/story-creator',
+      params: { uri, accountType: params.accountType ?? 'buyer' },
+    } as never);
   }
 
   async function openCamera() {

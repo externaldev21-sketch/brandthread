@@ -18,6 +18,10 @@ type ApiCustomer = {
   email: string;
   phone?: string;
   address?: string;
+  tags?: string[];
+  notes?: string;
+  orderCount?: number;
+  totalSpentCents?: number;
   createdAt: string;
 };
 
@@ -166,6 +170,7 @@ export default function CustomersScreen() {
                 key={c.id}
                 activeOpacity={0.8}
                 style={[styles.custRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
+                onPress={() => router.push(`/customer-orders?customerId=${c.id}` as never)}
               >
                 <View style={[styles.avatar, { backgroundColor: color + '33' }]}>
                   <Text style={[styles.avatarText, { color }]}>{initials}</Text>
@@ -176,9 +181,18 @@ export default function CustomersScreen() {
                   {c.phone ? (
                     <Text style={[styles.custOrders, { color: colors.mutedForeground }]}>{c.phone}</Text>
                   ) : null}
+                  {c.tags && c.tags.length > 0 && (
+                    <View style={styles.tagsRow}>
+                      {c.tags.slice(0, 3).map((tag) => (
+                        <View key={tag} style={[styles.tagChip, { backgroundColor: colors.primary + '22', borderColor: colors.primary + '44' }]}>
+                          <Text style={[styles.tagText, { color: colors.primary }]}>{tag}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  )}
                 </View>
                 <View style={styles.custRight}>
-                  <Badge label="Customer" variant="default" />
+                  <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
                 </View>
               </TouchableOpacity>
             );
@@ -240,7 +254,10 @@ const styles = StyleSheet.create({
   custName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   custEmail: { fontSize: 11, fontFamily: 'Inter_400Regular' },
   custOrders: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  custRight: {},
+  custRight: { alignItems: 'flex-end', justifyContent: 'center' },
+  tagsRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
+  tagChip:   { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10, borderWidth: 1 },
+  tagText:   { fontSize: 9, fontFamily: 'Inter_600SemiBold' },
   sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
   rewardRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   rewardIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },

@@ -55,12 +55,19 @@ import sellerLocationsRouter from "./seller-locations";
 import sellerMetafieldsRouter from "./seller-metafields";
 import sellerSettingsExtRouter from "./seller-settings-route";
 import buyerPaymentsRouter from "./buyer-payments";
+import supportRouter from "./support";
+import sellerExportRouter from "./seller-export";
+import supportChatRouter from "./support-chat";
 
 const router = Router();
 
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/public",          publicRouter);
 router.use("/webhooks",        webhooksRouter);
+router.use("/support",         supportRouter);
+router.use("/support-chat",    supportChatRouter);
+// Specific seller sub-paths BEFORE the seller catch-all
+router.use("/seller/export",   sellerExportRouter);
 
 // ─── Authenticated seller + shared routes ─────────────────────────────────────
 router.use("/healthz",         healthRouter);

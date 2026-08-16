@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput, Animated, Easing,
   Dimensions, PanResponder, StyleSheet, Alert, Modal, FlatList,
+  Image, Linking,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -171,12 +172,19 @@ export default function BuyerStoryViewer() {
 
       {/* CONTENT */}
       <View style={StyleSheet.absoluteFill}>
+        {/* ── Base slide ── */}
         {currentSlide.type === 'text' ? (
           <View style={[styles.slideContent, { backgroundColor: currentSlide.backgroundColor }]}>
             <Text style={[styles.slideText, { color: currentSlide.textColor || '#FFFFFF' }]}>
               {currentSlide.textContent}
             </Text>
           </View>
+        ) : currentSlide.imageUri ? (
+          <Image
+            source={{ uri: currentSlide.imageUri }}
+            style={StyleSheet.absoluteFill}
+            resizeMode="cover"
+          />
         ) : (
           <View style={[styles.slideContent, { backgroundColor: currentSlide.backgroundColor || SURFACE }]}>
             <Feather
@@ -184,9 +192,57 @@ export default function BuyerStoryViewer() {
               size={80}
               color="rgba(255,255,255,0.2)"
             />
-            <Text style={styles.slidePreviewText}>Story content preview</Text>
+            <Text style={styles.slidePreviewText}>Story content</Text>
           </View>
         )}
+
+        {/* ── Overlays (links, GIFs, positioned text) ── */}
+        {(currentSlide.overlays ?? []).map(overlay => {
+          if (overlay.type === 'link') {
+            return (
+              <TouchableOpacity
+                key={overlay.id}
+                style={[styles.linkOverlay, { left: overlay.x, top: overlay.y }]}
+                onPress={() => {
+                  const url = overlay.linkUrl ?? '';
+                  if (url) Linking.openURL(url).catch(() => {});
+                }}
+                activeOpacity={0.82}
+              >
+                <Feather name="link-2" size={12} color="#FFF" />
+                <Text style={styles.linkOverlayText} numberOfLines={1}>
+                  {overlay.linkText || overlay.linkUrl}
+                </Text>
+              </TouchableOpacity>
+            );
+          }
+          if (overlay.type === 'gif' && overlay.gifUrl) {
+            const gH = overlay.gifW && overlay.gifH
+              ? 140 * (overlay.gifH / overlay.gifW)
+              : 140;
+            return (
+              <Image
+                key={overlay.id}
+                source={{ uri: overlay.gifUrl }}
+                style={{ position: 'absolute', left: overlay.x, top: overlay.y, width: 140, height: gH }}
+                resizeMode="contain"
+              />
+            );
+          }
+          if (overlay.type === 'text' && overlay.text) {
+            return (
+              <View
+                key={overlay.id}
+                style={[styles.textOverlay, { left: overlay.x, top: overlay.y }]}
+              >
+                <Text style={{ color: overlay.color ?? '#FFF', fontSize: overlay.size ?? 24, fontFamily: FONT.bold }}>
+                  {overlay.text}
+                </Text>
+              </View>
+            );
+          }
+          return null;
+        })}
       </View>
 
       {/* TAP ZONES */}
@@ -580,6 +636,33 @@ const styles = StyleSheet.create({
     fontFamily: FONT.regular,
     textAlign: 'center',
     padding: SP.lg,
+  },
+  // Overlay styles
+  linkOverlay: {
+    position: 'absolute',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(139,92,246,0.88)',
+    borderRadius: 22,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    maxWidth: 230,
+    zIndex: 8,
+  },
+  linkOverlayText: {
+    color: '#FFF',
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    flexShrink: 1,
+  },
+  textOverlay: {
+    position: 'absolute',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    zIndex: 8,
   },
   likeBtn: {
     flexDirection: 'row',

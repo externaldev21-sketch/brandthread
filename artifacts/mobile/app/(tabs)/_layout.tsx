@@ -20,6 +20,7 @@ import {
   FS,
   SP,
 } from '@/lib/theme';
+import SupportChatBubble from '@/components/SupportChatBubble';
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
@@ -109,25 +110,29 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 
 export default function TabLayout() {
   return (
-    <Tabs
-      tabBar={(props) => <CustomTabBar {...props} />}
-      screenOptions={{ headerShown: false }}
-    >
-      {/* Visible tabs */}
-      <Tabs.Screen name="index"    options={{ title: 'Home' }} />
-      <Tabs.Screen name="studio"   options={{ title: 'Studio' }} />
-      <Tabs.Screen name="products" options={{ title: 'Products' }} />
-      <Tabs.Screen name="orders"   options={{ title: 'Orders' }} />
-      <Tabs.Screen name="more"     options={{ title: 'More' }} />
+    <>
+      <Tabs
+        tabBar={(props) => <CustomTabBar {...props} />}
+        screenOptions={{ headerShown: false }}
+      >
+        {/* Visible tabs */}
+        <Tabs.Screen name="index"    options={{ title: 'Home' }} />
+        <Tabs.Screen name="studio"   options={{ title: 'Studio' }} />
+        <Tabs.Screen name="products" options={{ title: 'Products' }} />
+        <Tabs.Screen name="orders"   options={{ title: 'Orders' }} />
+        <Tabs.Screen name="more"     options={{ title: 'More' }} />
 
-      {/* Hidden routes — resolve but not shown in tab bar */}
-      <Tabs.Screen name="profile"   options={{ href: null }} />
-      <Tabs.Screen name="feed"      options={{ href: null }} />
-      <Tabs.Screen name="following" options={{ href: null }} />
-      <Tabs.Screen name="analytics" options={{ href: null }} />
-      <Tabs.Screen name="marketing" options={{ href: null }} />
-      <Tabs.Screen name="wishlist"  options={{ href: null }} />
-    </Tabs>
+        {/* Hidden routes — resolve but not shown in tab bar */}
+        <Tabs.Screen name="profile"   options={{ href: null }} />
+        <Tabs.Screen name="feed"      options={{ href: null }} />
+        <Tabs.Screen name="following" options={{ href: null }} />
+        <Tabs.Screen name="analytics" options={{ href: null }} />
+        <Tabs.Screen name="marketing" options={{ href: null }} />
+        <Tabs.Screen name="wishlist"  options={{ href: null }} />
+      </Tabs>
+      {/* Support chatbot bubble — bottom-left, above tab bar */}
+      <SupportChatBubble bottomOffset={58} side="left" />
+    </>
   );
 }
 

@@ -16,6 +16,7 @@ async function request<T = any>(
   path: string,
   options: RequestInit,
   getToken: GetToken,
+  asText = false,
 ): Promise<T> {
   const token = await getToken();
   const res = await fetch(`${BASE}${path}`, {
@@ -30,11 +31,13 @@ async function request<T = any>(
     const body = await res.text();
     throw new Error(`API ${res.status}: ${body}`);
   }
+  if (asText) return res.text() as Promise<T>;
   return res.json() as Promise<T>;
 }
 
 export function createApi(getToken: GetToken) {
-  const get  = <T>(path: string) => request<T>(path, { method: 'GET' }, getToken);
+  const get     = <T>(path: string) => request<T>(path, { method: 'GET' }, getToken);
+  const getText  = (path: string)   => request<string>(path, { method: 'GET' }, getToken, true);
   const post  = <T>(path: string, body: unknown) => request<T>(path, { method: 'POST',  body: JSON.stringify(body) }, getToken);
   const put   = <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT',   body: JSON.stringify(body) }, getToken);
   const patch = <T>(path: string, body: unknown) => request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }, getToken);
@@ -85,6 +88,10 @@ export function createApi(getToken: GetToken) {
       get:     (id: string)      => get(`/api/customers/${id}`),
       create:  (body: unknown)   => post('/api/customers', body),
       update:  (id: string, body: unknown) => put(`/api/customers/${id}`, body),
+      /** Overwrite customer tags array */
+      addTag:  (id: string, tags: string[]) => put<any>(`/api/customers/${id}`, { tags }),
+      /** Full order history for one customer */
+      orders:  (id: string) => get<any[]>(`/api/customers/${id}/orders`),
     },
     drops: {
       list:    ()                       => get('/api/drops'),
@@ -347,6 +354,11 @@ export function createApi(getToken: GetToken) {
         rating:     number;
         body?:      string;
       }) => post<any>('/api/reviews', body),
+      /** Seller — all received reviews with buyer + product info (authenticated as seller). */
+      mine:  () => get<any[]>('/api/reviews/mine'),
+      /** Seller — post a public reply to a received review. */
+      reply: (reviewId: string, replyText: string) =>
+        post<any>(`/api/reviews/${encodeURIComponent(reviewId)}/reply`, { replyText }),
       /** Buyer Payment Methods — Stripe-backed saved cards */
       paymentMethods:      () => get<{ paymentMethods: any[] }>('/api/buyer/payment-methods'),
       removePaymentMethod: (pmId: string) => del<{ ok: boolean }>(`/api/buyer/payment-methods/${encodeURIComponent(pmId)}`),
@@ -445,6 +457,34 @@ export function createApi(getToken: GetToken) {
       connectIntegration:   (key: string, settings: Record<string, any>) =>
         post<any>(`/api/seller/settings/integrations/${encodeURIComponent(key)}/connect`, { settings }),
       disconnectIntegration:(key: string) => del<any>(`/api/seller/settings/integrations/${encodeURIComponent(key)}`),
+      /** Mark the one-time seller tutorial overlay as seen (persisted to DB). */
+      markTutorialSeen: () => post<{ ok: boolean }>('/api/seller/tutorial/seen', {}),
+      /** Save questionnaire answers from onboarding to the user's DB record. */
+      saveOnboardingData: (body: {
+        goals?: string[]; brandStage?: string; sellModel?: string; styleInterests?: string[];
+      }) => post<{ ok: boolean }>('/api/seller/onboarding/data', body),
+    },
+    /** In-app support tickets */
+    support: {
+      submitTicket: (body: { subject: string; body: string; category: string; email: string; name: string }) =>
+        post<any>('/api/support/tickets', body),
+      getTickets: () => get<any[]>('/api/support/tickets'),
+    },
+    /** AI Support Chatbot — account-aware chat + human escalation */
+    supportChat: {
+      send: (messages: { role: string; content: string }[]) =>
+        post<{ content: string; shouldEscalate?: boolean; escalateReason?: string; role?: string }>(
+          '/api/support-chat/message', { messages }
+        ),
+      escalate: (summary: string, conversationSnippet: string) =>
+        post<{ ok: boolean; message: string }>(
+          '/api/support-chat/escalate', { summary, conversationSnippet }
+        ),
+    },
+    /** Seller data export */
+    sellerExport: {
+      request: (format: 'json' | 'csv', include: ('products' | 'orders' | 'customers')[]) =>
+        post<any>('/api/seller/export', { format, include }),
     },
     /** Thread-feed posts — create with product tags, read, like/repost */
     posts: {
@@ -664,9 +704,11 @@ export function createApi(getToken: GetToken) {
       deleteDomain: (domainId: string) => del<any>(`/api/store/domains/${encodeURIComponent(domainId)}`),
       // AI generation
       generate:   (answers: Record<string, unknown>) => post<any>('/api/store/ai/generate', { answers }),
-      fromLogo:   (logoUrl: string, answers: Record<string, unknown>) => post<any>('/api/store/ai/from-logo', { logoUrl, answers }),
-      fromMoodboard: (imageUrls: string[], answers: Record<string, unknown>) => post<any>('/api/store/ai/from-moodboard', { imageUrls, answers }),
-      fromSocial:  (socialUrl: string, answers: Record<string, unknown>) => post<any>('/api/store/ai/from-social', { socialUrl, answers }),
+      fromLogo:   (base64: string, answers?: Record<string, unknown>) => post<any>('/api/store/ai/from-logo', { base64, answers }),
+      fromMoodboard: (base64List: string[], answers?: Record<string, unknown>) => post<any>('/api/store/ai/from-moodboard', { base64List, answers }),
+      fromSocial:  (socialUrl: string, context?: Record<string, unknown>) => post<any>('/api/store/ai/from-social', { socialUrl, ...(context ?? {}) }),
+      previewToken: () => get<{ token: string; ttlSeconds: number }>('/api/store/preview-token'),
+      previewHtml:  () => getText('/api/store/preview'),
     },
     /** Disputes / chargebacks — Stripe dispute data and evidence submission */
     disputes: {

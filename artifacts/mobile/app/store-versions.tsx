@@ -1,19 +1,19 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
-  StyleSheet, Alert, FlatList,
+  StyleSheet, Alert,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import {
   BG, CARD, SURFACE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
+  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, StatusBadge, EmptyState } from '@/components/BrandthreadUI';
 import { getStorefront, createVersion, restoreVersion } from '@/services/storeService';
-import { Storefront, StoreVersion } from '@/services/storeTypes';
+import { useApi } from '@/lib/api';
+import { StoreVersion } from '@/services/storeTypes';
 
 function triggerVariant(trigger: StoreVersion['trigger']): { label: string; variant: 'success' | 'purple' | 'info' | 'neutral' } {
   if (trigger === 'publish') return { label: 'Published', variant: 'success' };
@@ -28,24 +28,39 @@ function formatDate(iso: string): string {
     const d = new Date(iso);
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
       ' at ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  } catch {
-    return iso;
-  }
+  } catch { return iso; }
 }
 
 export default function StoreVersionsScreen() {
   const router = useRouter();
+  const api = useApi();
   const [versions, setVersions] = useState<StoreVersion[]>([]);
   const [creating, setCreating] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
+    // Try real API first
+    try {
+      const apiVersions = await (api as any).store.versions() as any[];
+      if (Array.isArray(apiVersions) && apiVersions.length > 0) {
+        setVersions(apiVersions.map((v: any) => ({
+          id:        v.id,
+          label:     v.label ?? 'Version',
+          trigger:   'manual' as const,
+          snapshot:  {},
+          createdAt: v.createdAt ?? new Date().toISOString(),
+        })));
+        return;
+      }
+    } catch { /* fall through to local */ }
+
+    // Fall back to AsyncStorage versions
     const s = await getStorefront();
     setVersions(s.versions);
-  };
+  }, [api]);
 
-  useFocusEffect(useCallback(() => { load(); }, []));
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const handleSaveVersion = async () => {
     if (!newLabel.trim()) return;
@@ -56,6 +71,8 @@ export default function StoreVersionsScreen() {
       setCreating(false);
       setNewLabel('');
       Alert.alert('Saved', 'Version saved successfully.');
+    } catch {
+      Alert.alert('Save failed', 'Could not save version to the server. Check your connection and try again.');
     } finally {
       setSaving(false);
     }
@@ -93,7 +110,6 @@ export default function StoreVersionsScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={vs.scroll}>
 
-        {/* New version input */}
         {creating && (
           <BrandthreadCard style={vs.card}>
             <Text style={vs.fieldLabel}>Version Label</Text>
@@ -101,7 +117,7 @@ export default function StoreVersionsScreen() {
               style={vs.input}
               value={newLabel}
               onChangeText={setNewLabel}
-              placeholder="Version label (e.g. 'Before rebrand')"
+              placeholder="e.g. 'Before rebrand' or 'Summer 2026'"
               placeholderTextColor={SUBTLE}
               autoFocus
             />
@@ -116,7 +132,7 @@ export default function StoreVersionsScreen() {
           <EmptyState
             icon="clock"
             title="No versions yet"
-            description="Published and saved versions will appear here."
+            description="Versions are saved automatically when you publish, change themes, or apply AI changes. You can also save manually."
             action={{ label: 'Save Current Version', onPress: () => setCreating(true), icon: 'plus' }}
             style={vs.emptyState}
           />
@@ -131,14 +147,6 @@ export default function StoreVersionsScreen() {
                 </View>
                 <Text style={vs.verDate}>{formatDate(ver.createdAt)}</Text>
                 <View style={vs.actionRow}>
-                  <SecondaryButton
-                    label="Preview"
-                    small
-                    accent={MUTED}
-                    onPress={() => Alert.alert('Preview', 'Version preview coming soon.')}
-                    icon="eye"
-                    style={{ flex: 1 }}
-                  />
                   <SecondaryButton
                     label="Restore"
                     small

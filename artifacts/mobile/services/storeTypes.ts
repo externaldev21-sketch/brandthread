@@ -196,6 +196,16 @@ export interface StoreGenerationResult {
   suggestedThemeId: string;
   generatedAt: string;
   fromAnswers: StoreGenerationAnswers;
+  /** AI-generated store name — applied to settings.storeName locally and the DB title column */
+  storeTitle?: string;
+  /** AI-generated subtitle persisted to the DB subtitle column */
+  storeSubtitle?: string;
+  /** AI-generated description persisted to the DB description column */
+  storeDescription?: string;
+  /** SEO metadata extracted from the AI response */
+  storeSeo?: { homepageTitle?: string; homepageDescription?: string; keywords?: string[] };
+  /** DB-only branding fields (tagline, mission, targetAudience) not in the local StoreBranding struct */
+  apiBranding?: { tagline?: string; mission?: string; targetAudience?: string };
 }
 
 export type MenuItemTarget = 'product' | 'collection' | 'page' | 'seller_profile' | 'external' | 'none';

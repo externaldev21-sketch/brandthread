@@ -9,34 +9,46 @@ import { Feather } from '@expo/vector-icons';
 import {
   BG, CARD, SURFACE, BORDER,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, SUCCESS,
+  CYAN, CYAN_DIM, SUCCESS, PURPLE as ACCENT,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, StatusBadge } from '@/components/BrandthreadUI';
-import { generateFromLogo, applyGenerationResult, generateStoreFromAnswers } from '@/services/storeService';
+import {
+  generateFromLogo, applyFromLogo,
+} from '@/services/storeService';
 import { StoreColorPalette, TypographyStyle, BrandMood } from '@/services/storeTypes';
 
 export default function StoreFromLogoScreen() {
   const router = useRouter();
   const [logoUri, setLogoUri] = useState<string | null>(null);
+  const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [result, setResult] = useState<{
     dominantColors: string[];
     suggestedPalette: StoreColorPalette;
     suggestedThemeId: string;
     suggestedTypography: TypographyStyle;
     brandMoods: BrandMood[];
+    aiSections: import('@/services/storeTypes').StoreSection[];
   } | null>(null);
 
   const pickLogo = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Permission needed', 'Allow photo access to upload your logo.');
+      return;
+    }
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.8,
+      quality: 0.7,
+      base64: true,
     });
     if (!res.canceled && res.assets[0]) {
       setLogoUri(res.assets[0].uri);
+      setLogoBase64(res.assets[0].base64 ?? null);
       setResult(null);
     }
   };
@@ -45,10 +57,31 @@ export default function StoreFromLogoScreen() {
     if (!logoUri) return;
     setAnalyzing(true);
     try {
-      const r = await generateFromLogo(logoUri);
+      const r = await generateFromLogo(logoUri, logoBase64 ?? undefined);
       setResult(r);
+    } catch {
+      Alert.alert('Analysis failed', 'Could not analyze logo. Please try again.');
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  const handleApply = async () => {
+    if (!logoUri) return;
+    setApplying(true);
+    try {
+      // applyFromLogo calls the vision API, maps ALL config fields (sections,
+      // palette, typography, title, SEO, branding), and awaits backend sync.
+      // It throws on failure so we never navigate as though it succeeded.
+      await applyFromLogo(logoUri, logoBase64);
+      router.push('/store-editor' as never);
+    } catch {
+      Alert.alert(
+        'Could not apply store design',
+        'The generated layout could not be saved. Check your connection and try again.',
+      );
+    } finally {
+      setApplying(false);
     }
   };
 
@@ -62,7 +95,19 @@ export default function StoreFromLogoScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={fl.scroll}>
-        <Text style={fl.subtitle}>Upload your brand logo. We'll extract your colors and suggest a matching storefront.</Text>
+        <Text style={fl.subtitle}>
+          Upload your brand logo. AI will extract your colors and suggest a matching storefront style.
+        </Text>
+
+        {/* AI badge */}
+        <BrandthreadCard style={[fl.card, { borderColor: PURPLE_DIM, backgroundColor: 'rgba(124,58,237,0.08)' }]}>
+          <View style={fl.bannerRow}>
+            <Feather name="zap" size={ICON.sm} color={PURPLE_LIGHT} />
+            <Text style={[fl.bannerText, { color: PURPLE_LIGHT }]}>
+              Powered by GPT-4 — AI analyzes your brand identity and generates a custom color palette, typography recommendation, and theme match.
+            </Text>
+          </View>
+        </BrandthreadCard>
 
         {/* Upload Area */}
         <TouchableOpacity style={fl.uploadArea} onPress={pickLogo} activeOpacity={0.7}>
@@ -75,25 +120,15 @@ export default function StoreFromLogoScreen() {
             <>
               <Feather name="upload" size={ICON.xxl} color={PURPLE} />
               <Text style={fl.uploadLabel}>Tap to upload logo</Text>
+              <Text style={fl.uploadSub}>PNG, JPG, or SVG</Text>
             </>
           )}
         </TouchableOpacity>
 
-        {/* Demo Notice */}
-        <BrandthreadCard style={[fl.card, { borderColor: CYAN, backgroundColor: CYAN_DIM }]}>
-          <View style={fl.bannerRow}>
-            <Feather name="info" size={ICON.sm} color={CYAN} />
-            <Text style={[fl.bannerText, { color: CYAN }]}>
-              Color extraction and mood analysis are simulated in this demo. Connect a vision API for real analysis.
-            </Text>
-          </View>
-        </BrandthreadCard>
-
-        {logoUri && !result && (
+        {logoUri && !result && !analyzing && (
           <PrimaryButton
-            label={analyzing ? 'Analyzing...' : 'Analyze Logo'}
+            label="Analyze Logo"
             onPress={handleAnalyze}
-            loading={analyzing}
             icon="zap"
             style={fl.analyzeBtn}
           />
@@ -102,7 +137,7 @@ export default function StoreFromLogoScreen() {
         {analyzing && (
           <View style={fl.loadingRow}>
             <ActivityIndicator color={PURPLE} />
-            <Text style={fl.loadingText}>Analyzing your logo...</Text>
+            <Text style={fl.loadingText}>Analyzing your logo with AI...</Text>
           </View>
         )}
 
@@ -149,19 +184,24 @@ export default function StoreFromLogoScreen() {
             </BrandthreadCard>
 
             {/* Brand Moods */}
-            <BrandthreadCard style={fl.card}>
-              <Text style={fl.resultSectionLabel}>Brand Moods Detected</Text>
-              <View style={fl.chipWrap}>
-                {result.brandMoods.map(m => (
-                  <StatusBadge key={m} label={m} variant="neutral" />
-                ))}
-              </View>
-            </BrandthreadCard>
+            {result.brandMoods.length > 0 && (
+              <BrandthreadCard style={fl.card}>
+                <Text style={fl.resultSectionLabel}>Brand Moods</Text>
+                <View style={fl.chipWrap}>
+                  {result.brandMoods.map(m => (
+                    <StatusBadge key={m} label={m} variant="neutral" />
+                  ))}
+                </View>
+              </BrandthreadCard>
+            )}
 
             <PrimaryButton
-              label="Use These Settings"
-              onPress={() => router.push('/store-editor' as never)}
+              label={applying ? 'Applying...' : 'Apply to Store'}
+              onPress={handleApply}
+              loading={applying}
+              disabled={!result || applying}
               style={fl.actionBtn}
+              icon="check"
             />
             <SecondaryButton
               label="Generate Full Store with AI"
@@ -190,7 +230,10 @@ const fl = StyleSheet.create({
   },
   headerTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
   scroll: { paddingBottom: 60, paddingTop: SP.md },
-  subtitle: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginHorizontal: SP.md, marginBottom: SP.md },
+  subtitle: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginHorizontal: SP.md, marginBottom: SP.md, lineHeight: 20 },
+  card: { marginHorizontal: SP.md, marginBottom: SP.sm, gap: SP.md },
+  bannerRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start' },
+  bannerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
   uploadArea: {
     width: 200, height: 200, alignSelf: 'center',
     backgroundColor: CARD, borderRadius: RADIUS.lg,
@@ -199,11 +242,9 @@ const fl = StyleSheet.create({
     marginBottom: SP.md,
   },
   logoImage: { width: 160, height: 160, borderRadius: RADIUS.md },
-  uploadLabel: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
+  uploadLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
+  uploadSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
   changeText: { fontSize: FS.xs, fontFamily: FONT.medium, color: PURPLE_LIGHT },
-  card: { marginHorizontal: SP.md, marginBottom: SP.sm, gap: SP.md },
-  bannerRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start' },
-  bannerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
   analyzeBtn: { marginHorizontal: SP.md, marginBottom: SP.md },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, justifyContent: 'center', padding: SP.md },
   loadingText: { fontSize: FS.base, fontFamily: FONT.medium, color: MUTED },

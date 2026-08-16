@@ -11,6 +11,7 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { getSellerPosts, subscribeSocial, type SellerThreadPost } from '@/services/socialService';
+import { useApi } from '@/lib/api';
 
 // ─── Design tokens ─────────────────────────────────────────────────────────
 
@@ -97,8 +98,10 @@ function MiniSparkline({ data, color, width, height = 36 }: { data: number[]; co
 export default function ProfileScreen() {
   const insets  = useSafeAreaInsets();
   const router  = useRouter();
+  const api = useApi();
   const [activeTab, setActiveTab] = useState(0);
   const [sellerPosts, setSellerPosts] = useState<SellerThreadPost[]>([]);
+  const [myStoryIds, setMyStoryIds] = useState<string[]>([]);
 
   const loadPosts = useCallback(async () => {
     try {
@@ -107,11 +110,23 @@ export default function ProfileScreen() {
     } catch {}
   }, []);
 
+  const loadMyStories = useCallback(async () => {
+    try {
+      const rows = await api.social.myStories();
+      const now  = Date.now();
+      const active = (Array.isArray(rows) ? rows : [])
+        .filter((s: any) => s.expiresAt > now)
+        .map((s: any) => s.id as string);
+      setMyStoryIds(active);
+    } catch {}
+  }, [api]);
+
   useEffect(() => {
     loadPosts();
-    const unsub = subscribeSocial(loadPosts);
+    loadMyStories();
+    const unsub = subscribeSocial(() => { loadPosts(); loadMyStories(); });
     return unsub;
-  }, [loadPosts]);
+  }, [loadPosts, loadMyStories]);
 
   function nav(route: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -147,15 +162,49 @@ export default function ProfileScreen() {
 
       {/* Profile card */}
       <View style={s.profileCard}>
-        {/* Avatar with green glow ring */}
+        {/* Avatar — story ring when active stories exist */}
         <View style={s.avatarSection}>
-          <View style={s.avatarGlow}>
-            <View style={s.avatarRing}>
-              <View style={s.avatar}>
-                <BrandthreadLogo size={48} />
+          {/* Tapping avatar views own stories (if any) or opens story creator */}
+          <TouchableOpacity
+            activeOpacity={0.9}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              if (myStoryIds.length > 0) {
+                router.push({
+                  pathname: '/buyer-story-viewer' as any,
+                  params: { storyId: myStoryIds[0], allStoryIds: myStoryIds.join(',') },
+                });
+              } else {
+                router.push({ pathname: '/story-picker' as any, params: { accountType: 'seller' } });
+              }
+            }}
+          >
+            {/* Gradient ring when active story */}
+            {myStoryIds.length > 0 ? (
+              <LinearGradient
+                colors={['#A855F7', '#8B5CF6', '#6D28D9']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={s.avatarGlow}
+              >
+                <View style={s.avatarRing}>
+                  <View style={s.avatar}>
+                    <BrandthreadLogo size={48} />
+                  </View>
+                </View>
+              </LinearGradient>
+            ) : (
+              <View style={s.avatarGlow}>
+                <View style={s.avatarRing}>
+                  <View style={s.avatar}>
+                    <BrandthreadLogo size={48} />
+                  </View>
+                </View>
               </View>
-            </View>
-          </View>
+            )}
+          </TouchableOpacity>
+
+          {/* Camera button — change avatar photo */}
           <TouchableOpacity
             style={s.cameraBtn}
             activeOpacity={0.8}
@@ -167,6 +216,18 @@ export default function ProfileScreen() {
             }}
           >
             <Feather name="camera" size={12} color={FG} />
+          </TouchableOpacity>
+
+          {/* Add Story "+" badge */}
+          <TouchableOpacity
+            style={s.addStoryBtn}
+            activeOpacity={0.85}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              router.push({ pathname: '/story-picker' as any, params: { accountType: 'seller' } });
+            }}
+          >
+            <Feather name="plus" size={12} color={FG} />
           </TouchableOpacity>
         </View>
 
@@ -315,6 +376,7 @@ const s = StyleSheet.create({
   avatar:         { flex: 1, borderRadius: 39, backgroundColor: '#18182E', alignItems: 'center', justifyContent: 'center' },
   avatarText:     { fontSize: 30, fontFamily: 'Inter_700Bold', color: GREEN },
   cameraBtn:      { position: 'absolute', bottom: 0, right: -2, width: 26, height: 26, borderRadius: 13, backgroundColor: '#333', borderWidth: 2, borderColor: BG, alignItems: 'center', justifyContent: 'center' },
+  addStoryBtn:    { position: 'absolute', bottom: 0, left: -2, width: 26, height: 26, borderRadius: 13, backgroundColor: '#8B5CF6', borderWidth: 2, borderColor: BG, alignItems: 'center', justifyContent: 'center' },
 
   // Name
   nameBlock:      { flex: 1, paddingTop: 4 },

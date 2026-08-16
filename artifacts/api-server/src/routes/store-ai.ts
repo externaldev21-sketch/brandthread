@@ -1,8 +1,14 @@
 import { Router } from "express";
 import { db, storefronts } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import OpenAI from "openai";
 import { requireAuth } from "../middlewares/requireAuth";
 import { generateText } from "@workspace/integrations-openai-ai-server/text";
+
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+});
 
 const router = Router();
 router.use(requireAuth);
@@ -38,22 +44,20 @@ Always respond ONLY with valid JSON matching this schema:
   }
 }`;
 
-function parseStoreJson(text: string): Record<string, unknown> {
-  // Strip markdown code fences if present
-  const clean = text.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
+function parseStoreJson(raw: string): Record<string, unknown> {
+  const clean = raw.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
   try { return JSON.parse(clean); } catch { return {}; }
 }
 
 // POST /api/store/ai/generate — generate store from questionnaire answers
-router.post("/generate", async (req, res) => {
+router.post("/generate", async (req, res): Promise<void> => {
   const ownerId = (req as any).clerkUserId as string;
   const { answers } = req.body;
-  if (!answers) return res.status(400).json({ error: "answers required" });
+  if (!answers) { res.status(400).json({ error: "answers required" }); return; }
 
   const prompt = `Generate a store configuration for a seller with these details:\n${JSON.stringify(answers, null, 2)}`;
-
-  const { text } = await generateText({ system: SYSTEM, prompt });
-  const config = parseStoreJson(text);
+  const raw = await generateText(SYSTEM, prompt);
+  const config = parseStoreJson(raw);
 
   // Save generated config to the seller's storefront
   const existing = await db.select().from(storefronts).where(eq(storefronts.ownerId, ownerId)).limit(1);
@@ -73,48 +77,115 @@ router.post("/generate", async (req, res) => {
   res.json({ config });
 });
 
-// POST /api/store/ai/from-logo — extract palette from logo image URL
-router.post("/from-logo", async (req, res) => {
-  const ownerId = (req as any).clerkUserId as string;
-  const { logoUrl, answers } = req.body;
-  if (!logoUrl) return res.status(400).json({ error: "logoUrl required" });
+// POST /api/store/ai/from-logo — extract palette from logo using GPT-4o vision
+router.post("/from-logo", async (req, res): Promise<void> => {
+  const { base64, answers } = req.body;
+  if (!base64) { res.status(400).json({ error: "base64 image required" }); return; }
 
-  // For logo-based generation, describe what we want using text-only for now
-  // (Vision API requires direct openai client which may not be available)
-  const prompt = `Design a store themed around a brand whose logo is at: ${logoUrl}
-Additional context: ${JSON.stringify(answers ?? {})}
-Create a cohesive color scheme and store layout inspired by the brand identity.`;
-
-  const { text } = await generateText({ system: SYSTEM, prompt });
-  const config = parseStoreJson(text);
-  res.json({ config });
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: SYSTEM },
+        {
+          role: "user",
+          content: [
+            {
+              type: "image_url",
+              image_url: { url: `data:image/jpeg;base64,${base64}`, detail: "low" },
+            },
+            {
+              type: "text",
+              text: `Analyze this brand logo and generate a complete store configuration that matches its visual identity, color palette, and brand personality. Additional context: ${JSON.stringify(answers ?? {})}`,
+            },
+          ] as any,
+        },
+      ],
+      max_tokens: 1500,
+    });
+    const config = parseStoreJson(response.choices[0]?.message?.content ?? "{}");
+    res.json({ config });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
 });
 
-// POST /api/store/ai/from-moodboard — generate from moodboard images
-router.post("/from-moodboard", async (req, res) => {
-  const { imageUrls, answers } = req.body;
-  if (!imageUrls?.length) return res.status(400).json({ error: "imageUrls required" });
+// POST /api/store/ai/from-moodboard — generate from moodboard images using GPT-4o vision
+router.post("/from-moodboard", async (req, res): Promise<void> => {
+  const { base64List, answers } = req.body;
+  if (!base64List?.length) { res.status(400).json({ error: "base64List required" }); return; }
 
-  const prompt = `Design a store inspired by this moodboard (${imageUrls.length} images at: ${imageUrls.join(", ")}).
-Additional context: ${JSON.stringify(answers ?? {})}
-Extract the visual aesthetic and apply it to the store design.`;
+  try {
+    // Send up to 4 images to stay within token budget
+    const imageContent = (base64List as string[]).slice(0, 4).map((b64: string) => ({
+      type: "image_url" as const,
+      image_url: { url: `data:image/jpeg;base64,${b64}`, detail: "low" as const },
+    }));
 
-  const { text } = await generateText({ system: SYSTEM, prompt });
-  const config = parseStoreJson(text);
-  res.json({ config });
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: SYSTEM },
+        {
+          role: "user",
+          content: [
+            ...imageContent,
+            {
+              type: "text" as const,
+              text: `Analyze these ${base64List.length} mood board images and generate a store configuration that captures their collective visual aesthetic, color palette, and brand mood. Additional context: ${JSON.stringify(answers ?? {})}`,
+            },
+          ] as any,
+        },
+      ],
+      max_tokens: 1500,
+    });
+    const config = parseStoreJson(response.choices[0]?.message?.content ?? "{}");
+    res.json({ config });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
 });
 
-// POST /api/store/ai/from-social — generate from social media account
-router.post("/from-social", async (req, res) => {
-  const { socialUrl, answers } = req.body;
-  if (!socialUrl) return res.status(400).json({ error: "socialUrl required" });
+// POST /api/store/ai/from-social — generate from social media account or screenshots
+router.post("/from-social", async (req, res): Promise<void> => {
+  const { socialUrl, base64List, ...answers } = req.body;
+  if (!socialUrl) { res.status(400).json({ error: "socialUrl required" }); return; }
 
+  // Vision-based analysis when screenshots are provided
+  if (Array.isArray(base64List) && base64List.length > 0) {
+    try {
+      const imageContent = (base64List as string[]).slice(0, 4).map((b64: string) => ({
+        type: "image_url" as const,
+        image_url: { url: `data:image/jpeg;base64,${b64}`, detail: "low" as const },
+      }));
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: SYSTEM },
+          {
+            role: "user",
+            content: [
+              ...imageContent,
+              {
+                type: "text" as const,
+                text: `Analyze these social media screenshots for brand "${socialUrl}" and create a matching store configuration that mirrors the visual style, color palette, layout, and brand personality.`,
+              },
+            ] as any,
+          },
+        ],
+        max_tokens: 1500,
+      });
+      const config = parseStoreJson(response.choices[0]?.message?.content ?? "{}");
+      res.json({ config }); return;
+    } catch { /* fall through to text-based */ }
+  }
+
+  // Text-based fallback using social URL / post context
   const prompt = `Design a store inspired by the brand aesthetic from this social media account: ${socialUrl}
-Additional context: ${JSON.stringify(answers ?? {})}
+Additional context: ${JSON.stringify(answers)}
 Match the visual style, tone, and target audience of the brand.`;
-
-  const { text } = await generateText({ system: SYSTEM, prompt });
-  const config = parseStoreJson(text);
+  const raw = await generateText(SYSTEM, prompt);
+  const config = parseStoreJson(raw);
   res.json({ config });
 });
 

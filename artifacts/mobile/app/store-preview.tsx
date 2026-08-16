@@ -1,12 +1,14 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Dimensions, Animated,
+  Dimensions, Animated, ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import { WebView } from 'react-native-webview';
+import { useApi } from '@/lib/api';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -43,6 +45,7 @@ const PAGE_LABELS: { value: PageType; label: string }[] = [
 export default function StorePreview() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const api = useApi();
   const [store, setStore] = useState<Storefront | null>(null);
   const [currentPage, setCurrentPage] = useState<PageType>('homepage');
   const [deviceWidth, setDeviceWidth] = useState<DeviceWidth>('standard');
@@ -50,11 +53,33 @@ export default function StorePreview() {
   const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
 
+  // Live HTML preview via WebView
+  const [webViewMode, setWebViewMode] = useState(false);
+  const [webViewHtml, setWebViewHtml] = useState<string | null>(null);
+  const [loadingWebView, setLoadingWebView] = useState(false);
+
   useFocusEffect(
     useCallback(() => {
       getStorefront().then(setStore);
     }, [])
   );
+
+  const handleToggleWebView = async () => {
+    if (webViewMode) {
+      setWebViewMode(false);
+      return;
+    }
+    setLoadingWebView(true);
+    try {
+      const html = await (api as any).store.previewHtml() as string;
+      setWebViewHtml(html);
+      setWebViewMode(true);
+    } catch {
+      // Fall back to native preview
+    } finally {
+      setLoadingWebView(false);
+    }
+  };
 
   const phoneW = DEVICE_WIDTHS[deviceWidth];
   const phoneH = phoneW * 2.1;
@@ -455,11 +480,45 @@ export default function StorePreview() {
           >
             <Feather name="maximize" size={ICON.sm} color={MUTED} />
           </TouchableOpacity>
+          {/* Live WebView toggle */}
+          <TouchableOpacity
+            onPress={handleToggleWebView}
+            style={[styles.deviceBtn, styles.deviceBtnSm, webViewMode && { backgroundColor: PURPLE_DIM }]}
+            disabled={loadingWebView}
+          >
+            {loadingWebView
+              ? <ActivityIndicator size="small" color={PURPLE_LIGHT} />
+              : <Feather name="globe" size={ICON.sm} color={webViewMode ? PURPLE_LIGHT : MUTED} />
+            }
+          </TouchableOpacity>
+        </View>
+      )}
+      {!fullscreen && webViewMode && (
+        <View style={styles.webViewBadge}>
+          <Feather name="globe" size={10} color={PURPLE_LIGHT} />
+          <Text style={styles.webViewBadgeText}>Live HTML Preview — tap 🌐 to return to native preview</Text>
         </View>
       )}
 
-      {/* Phone Frame */}
-      <View
+      {/* Live WebView Mode */}
+      {webViewMode && webViewHtml ? (
+        <View style={[styles.phoneWrapper, { flex: 1 }]}>
+          <View style={[styles.phoneFrame, { width: fullscreen ? screenWidth : phoneW, flex: 1, backgroundColor: '#0f0f1a' }]}>
+            <View style={[styles.statusBar, { backgroundColor: '#000' }]} />
+            <View style={styles.notch} />
+            <WebView
+              source={{ html: webViewHtml, baseUrl: 'about:blank' }}
+              style={{ flex: 1 }}
+              scrollEnabled
+              showsVerticalScrollIndicator={false}
+              originWhitelist={['*']}
+            />
+          </View>
+        </View>
+      ) : null}
+
+      {/* Phone Frame — hidden when live WebView mode is active */}
+      {!webViewMode && <View
         style={[
           styles.phoneWrapper,
           fullscreen && { flex: 1, paddingBottom: insets.bottom },
@@ -500,7 +559,7 @@ export default function StorePreview() {
             <Feather name="x" size={ICON.md} color={FG} />
           </TouchableOpacity>
         )}
-      </View>
+      </View>}
 
       {/* Selected Section Indicator */}
       {selectedSection && !fullscreen && (
@@ -771,6 +830,18 @@ const styles = StyleSheet.create({
   },
   deviceBtnSm: {
     marginLeft: 'auto' as any,
+  },
+  webViewBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.xs,
+  },
+  webViewBadgeText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: PURPLE_LIGHT,
   },
   phoneWrapper: {
     flex: 1,

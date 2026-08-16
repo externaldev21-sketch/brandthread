@@ -6,6 +6,7 @@ import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
 import { BG, SURFACE, BORDER, FG, SUBTLE, PURPLE } from '@/lib/theme';
+import SupportChatBubble from '@/components/SupportChatBubble';
 import { getDeactivationStatus, reactivate } from '@/lib/accountService';
 
 // ─── Buyer tab layout ─────────────────────────────────────────────────────────
@@ -171,5 +172,11 @@ export default function BuyerLayout() {
     });
   }, []);
 
-  return <BuyerTabLayout />;
+  return (
+    <>
+      <BuyerTabLayout />
+      {/* Support chatbot bubble — bottom-left, above tab bar */}
+      <SupportChatBubble bottomOffset={54} side="left" />
+    </>
+  );
 }

@@ -208,15 +208,36 @@ export interface Conversation {
 export type StoryMediaType = 'photo' | 'video' | 'text';
 export type StoryReplyPermission = 'everyone' | 'friends' | 'off';
 
+/** Overlay placed on top of a story slide (link, gif, positioned text) */
+export interface StoryOverlay {
+  id: string;
+  type: 'link' | 'gif' | 'text';
+  x: number;
+  y: number;
+  // link fields
+  linkUrl?: string;
+  linkText?: string;
+  // gif fields
+  gifUrl?: string;
+  gifW?: number;
+  gifH?: number;
+  // positioned text fields (from advanced editor)
+  text?: string;
+  color?: string;
+  size?: number;
+}
+
 export interface StoryMedia {
   id: string;
   type: StoryMediaType;
-  backgroundColor: string;   // Demo color placeholder
+  backgroundColor: string;
   textContent?: string;
   textColor?: string;
   duration: number;          // seconds
   productTagId?: string;     // Seller only
   productTagName?: string;
+  imageUri?: string;         // local URI (photo) or remote URL (after upload)
+  overlays?: StoryOverlay[]; // links, GIFs, and positioned text overlays
 }
 
 export interface StoryPrivacySettings {

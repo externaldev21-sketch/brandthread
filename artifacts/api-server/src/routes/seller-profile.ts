@@ -5,8 +5,19 @@
  */
 import { Router } from "express";
 import { db, users } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+
+// ─── Startup migration — add tutorial flag + questionnaire columns ─────────────
+(async () => {
+  try {
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS has_seen_seller_tutorial BOOLEAN NOT NULL DEFAULT FALSE`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS seller_goals JSONB`);
+    await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS buyer_style_interests JSONB`);
+  } catch (err) {
+    console.error("[seller-profile] migration error:", err);
+  }
+})();
 
 const router = Router();
 router.use(requireAuth);
@@ -60,6 +71,41 @@ router.patch("/policy", async (req, res) => {
 
   if (!updated) return res.status(404).json({ error: "User not found" });
   return res.json(updated);
+});
+
+// ─── POST /api/seller/tutorial/seen ──────────────────────────────────────────
+router.post("/tutorial/seen", async (req, res) => {
+  const clerkId = (req as any).clerkUserId as string;
+  await db.execute(sql`
+    UPDATE users
+    SET    has_seen_seller_tutorial = TRUE,
+           updated_at               = now()
+    WHERE  clerk_id = ${clerkId}
+  `);
+  return res.json({ ok: true });
+});
+
+// ─── POST /api/seller/onboarding/data ────────────────────────────────────────
+router.post("/onboarding/data", async (req, res) => {
+  const clerkId = (req as any).clerkUserId as string;
+  const { goals, brandStage, sellModel, styleInterests } = req.body as {
+    goals?:          string[];
+    brandStage?:     string;
+    sellModel?:      string;
+    styleInterests?: string[];
+  };
+
+  await db.execute(sql`
+    UPDATE users
+    SET
+      seller_goals          = ${JSON.stringify(goals          ?? [])}::jsonb,
+      buyer_style_interests = ${JSON.stringify(styleInterests ?? [])}::jsonb,
+      brand_stage = COALESCE(NULLIF(${brandStage ?? ''}, ''), brand_stage),
+      sell_model  = COALESCE(NULLIF(${sellModel  ?? ''}, ''), sell_model),
+      updated_at  = now()
+    WHERE clerk_id = ${clerkId}
+  `);
+  return res.json({ ok: true });
 });
 
 export default router;

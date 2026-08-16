@@ -619,16 +619,47 @@ async function _createVersionSnapshot(store: Storefront, trigger: StoreVersion['
 export async function createVersion(label: string): Promise<Storefront> {
   const store = await getStorefront();
   await _createVersionSnapshot(store, 'manual', label);
+  // Sync current local state to the backend BEFORE saving the version snapshot.
+  // Not best-effort: if this sync fails we propagate the error so the version is
+  // not saved with stale server state. The caller (handleSaveVersion) already
+  // catches this and shows an Alert.
+  await api.store.save({
+    sections: store.sections as any,
+    branding: store.branding as any,
+    theme: { themeId: store.themeSettings.themeId } as any,
+  });
+  // Save the version snapshot server-side; throws on failure.
+  await api.store.saveVersion(label);
   return saveStorefront(store);
 }
 
 export async function restoreVersion(versionId: string): Promise<Storefront> {
   const store = await getStorefront();
+
+  // Try real API first — returns the restored DB storefront
+  try {
+    const restored = await api.store.restoreVersion(versionId);
+    if (restored) {
+      // Snapshot current state before overwriting
+      await _createVersionSnapshot(store, 'manual', 'Auto-saved before restore');
+      // Apply DB fields (sections / branding / theme) returned by the restore route
+      if (Array.isArray(restored.sections))   store.sections = restored.sections as any;
+      if (restored.branding && typeof restored.branding === 'object') store.branding = restored.branding as any;
+      if (restored.theme    && typeof restored.theme    === 'object') {
+        // Map DB theme shape → local themeSettings.themeId (best-effort)
+        const t = restored.theme as any;
+        if (t.themeId) store.themeSettings.themeId = t.themeId;
+      }
+      return saveStorefront(store);
+    }
+  } catch { /* fall through to local */ }
+
+  // Local fallback — look up snapshot by versionId in AsyncStorage
   const ver = store.versions.find(v => v.id === versionId);
   if (!ver?.snapshot) return store;
   await _createVersionSnapshot(store, 'manual', 'Auto-saved before restore');
-  if (ver.snapshot.sections) store.sections = ver.snapshot.sections;
-  if (ver.snapshot.branding) store.branding = ver.snapshot.branding;
+  if (ver.snapshot.sections)     store.sections     = ver.snapshot.sections;
+  if (ver.snapshot.branding)     store.branding     = ver.snapshot.branding;
   if (ver.snapshot.themeSettings) store.themeSettings = ver.snapshot.themeSettings;
   return saveStorefront(store);
 }
@@ -766,104 +797,276 @@ function _buildSectionsFromAnswers(answers: StoreGenerationAnswers): StoreSectio
 }
 
 export async function generateStoreFromAnswers(answers: StoreGenerationAnswers): Promise<StoreGenerationResult> {
-  // Try real AI API first
-  try {
-    const aiData = await api.store.generate(answers as unknown as Record<string, unknown>);
-    if (aiData?.config?.theme) {
-      const cfg = aiData.config;
-      // Map API response back to local StoreGenerationResult shape
-      const colors: StoreColorPalette = {
-        primary:    cfg.theme?.primaryColor ?? '#7c3aed',
-        secondary:  cfg.theme?.secondaryColor ?? '#5b21b6',
-        accent:     cfg.theme?.accentColor ?? '#a78bfa',
-        background: cfg.theme?.backgroundColor ?? '#0f0f1a',
-        text:       cfg.theme?.textColor ?? '#f4f4ff',
-        buttonText: '#0f0f1a',
-      };
-      const branding: StoreBranding = {
-        logoUri: answers.logoUri,
-        colors,
-        typography: { style: answers.typography, headingFont: 'Inter', bodyFont: 'Inter', buttonFont: 'Inter', fontWeight: '600', letterSpacing: 0, textCase: 'none' },
-        buttonStyle: 'filled',
-        cornerRadius: 'rounded',
-        iconStyle: 'outline',
-        animationLevel: 'standard',
-      };
-      const sections = (cfg.sections ?? []).map((s: any, i: number) => ({
-        id: uid('sec'), type: 'hero_image' as StoreSectionType,
-        label: s.title ?? 'Section', enabled: true, order: i,
-        settings: { heading: s.title, description: s.content } as StoreSectionSettings,
-        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-      }));
-      return { sections, branding, suggestedThemeId: 'vertex', generatedAt: new Date().toISOString(), fromAnswers: answers };
-    }
-  } catch { /* fall through to mock */ }
+  // Call the real AI API — throws on failure so the generating screen can surface
+  // the error and offer a retry. The previous mock fallback was removed because it:
+  //   • silently masked real API/network failures as successful "generation"
+  //   • used a partial inline mapper that hardcoded all sections to hero_image and
+  //     discarded font, border-radius, title, subtitle, description, SEO, and branding
+  // mapAiConfigToResult (shared with logo/moodboard/social paths) extracts every
+  // field the AI returns and populates the full StoreGenerationResult.
+  const currentStore = await getStorefront();
+  const aiData = await api.store.generate(answers as unknown as Record<string, unknown>);
+  const cfg = (aiData?.config ?? {}) as any;
+  return mapAiConfigToResult(cfg, currentStore, answers);
+}
 
-  // Fallback mock generation
-  await new Promise(r => setTimeout(r, 100));
+// ─── Map AI font family name → local TypographyStyle ─────────────────────────
+function mapAiTypography(fontFamily?: string): TypographyStyle {
+  if (!fontFamily) return 'modern';
+  const f = fontFamily.toLowerCase();
+  if (f.includes('serif') && !f.includes('sans')) return 'classic';
+  if (f.includes('mono') || f.includes('code'))   return 'technical';
+  if (f.includes('bold') || f.includes('condensed')) return 'bold';
+  if (f.includes('editorial') || f.includes('vogue')) return 'editorial';
+  if (f.includes('luxury') || f.includes('elegant')) return 'luxury';
+  if (f.includes('minimal') || f.includes('helvetica') || f.includes('neue')) return 'minimal';
+  return 'modern';
+}
 
-  const colors = _pickColorFromAnswers(answers);
-  const themeId = _pickThemeFromAnswers(answers);
-  const theme = BUILTIN_THEMES.find(t => t.id === themeId) ?? BUILTIN_THEMES[0];
-  const typoStyle = answers.typography;
-  const typoEntry = TYPOGRAPHY_STYLES.find(t => t.value === typoStyle) ?? TYPOGRAPHY_STYLES[0];
+// ─── Map raw AI config (from any generation endpoint) → typed StoreSection[] ──
+// The AI returns generic types ("hero", "products", etc.); we map them to the
+// specific StoreSectionType values the editor understands.
+function mapAiConfigToSections(cfg: any): StoreSection[] {
+  const TYPE_MAP: Record<string, StoreSectionType> = {
+    hero:         'hero_image',
+    products:     'product_grid',
+    about:        'image_with_text',
+    story:        'brand_story',
+    testimonials: 'customer_reviews',
+    newsletter:   'newsletter',
+    faq:          'faq',
+    social:       'social_feed',
+    lookbook:     'lookbook',
+    announcement: 'announcement',
+  };
+  const aiSections: any[] = Array.isArray(cfg?.sections) ? cfg.sections : [];
+  return aiSections.map((s: any, idx: number): StoreSection => ({
+    id:        `ai_${Date.now()}_${idx}`,
+    type:      TYPE_MAP[s.type] ?? 'text_banner',
+    label:     s.title ?? s.type ?? 'Section',
+    enabled:   true,
+    order:     idx,
+    settings:  { heading: s.title ?? '', description: s.content ?? '' },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  }));
+}
 
-  const branding: StoreBranding = {
-    logoUri: answers.logoUri,
-    colors,
-    typography: {
-      style: typoStyle,
-      headingFont: typoEntry.heading,
-      bodyFont: typoEntry.body,
-      buttonFont: typoEntry.body,
-      fontWeight: '600',
-      letterSpacing: 0,
-      textCase: 'none',
+// ─── Map AI borderRadius number → local cornerRadius enum ────────────────────
+function mapAiBorderRadius(r?: number): StoreBranding['cornerRadius'] {
+  if (r === undefined || r === null) return 'subtle';
+  if (r === 0)  return 'sharp';
+  if (r <= 8)   return 'subtle';
+  if (r <= 16)  return 'rounded';
+  return 'pill';
+}
+
+// ─── Map a complete raw AI config → StoreGenerationResult ────────────────────
+// Extracts ALL fields the AI returns: palette, typography (including exact font
+// names and border radius), sections, title, subtitle, description, SEO
+// (including keywords), and DB-side branding (tagline/mission/targetAudience).
+function mapAiConfigToResult(
+  cfg: any,
+  currentStore: Storefront,
+  fromAnswers: StoreGenerationAnswers,
+): StoreGenerationResult {
+  const t = cfg?.theme ?? {};
+  const palette: StoreColorPalette = {
+    primary:    t.primaryColor    ?? currentStore.branding.colors.primary,
+    secondary:  t.secondaryColor  ?? currentStore.branding.colors.secondary,
+    accent:     t.accentColor     ?? currentStore.branding.colors.accent,
+    background: t.backgroundColor ?? currentStore.branding.colors.background,
+    text:       t.textColor       ?? currentStore.branding.colors.text,
+    buttonText: currentStore.branding.colors.buttonText,
+  };
+  const aiSections = mapAiConfigToSections(cfg);
+  const b = cfg?.branding ?? {};
+  const hasSeo = cfg?.seo?.metaTitle || cfg?.seo?.metaDescription || cfg?.seo?.keywords?.length;
+  const hasApiBranding = b.tagline || b.mission || b.targetAudience;
+  return {
+    sections: aiSections.length > 0 ? aiSections : currentStore.sections,
+    branding: {
+      ...currentStore.branding,
+      colors: palette,
+      cornerRadius: t.borderRadius !== undefined
+        ? mapAiBorderRadius(t.borderRadius)
+        : currentStore.branding.cornerRadius,
+      typography: {
+        ...currentStore.branding.typography,
+        style:       mapAiTypography(t.fontFamily),
+        // Preserve exact AI font name so the DB receives the real typeface
+        headingFont: t.fontFamily ?? currentStore.branding.typography.headingFont,
+        bodyFont:    t.fontFamily ?? currentStore.branding.typography.bodyFont,
+        buttonFont:  t.fontFamily ?? currentStore.branding.typography.buttonFont,
+      },
     },
-    buttonStyle: answers.moods.includes('clean') || answers.moods.includes('editorial') ? 'outline' : 'filled',
-    cornerRadius: answers.primaryStyle === 'luxury' ? 'sharp' : 'rounded',
-    iconStyle: 'outline',
-    animationLevel: answers.moods.includes('bold') || answers.moods.includes('futuristic') ? 'expressive' : 'standard',
+    suggestedThemeId: t.themeId ?? 'vertex',
+    generatedAt:      new Date().toISOString(),
+    fromAnswers,
+    storeTitle:       cfg?.title       || undefined,
+    storeSubtitle:    cfg?.subtitle    || undefined,
+    storeDescription: cfg?.description || undefined,
+    storeSeo: hasSeo ? {
+      homepageTitle:       cfg.seo?.metaTitle       || undefined,
+      homepageDescription: cfg.seo?.metaDescription || undefined,
+      keywords:            Array.isArray(cfg.seo?.keywords) ? cfg.seo.keywords : [],
+    } : undefined,
+    apiBranding: hasApiBranding ? {
+      tagline:        b.tagline        || undefined,
+      mission:        b.mission        || undefined,
+      targetAudience: b.targetAudience || undefined,
+    } : undefined,
   };
-
-  const sections = _buildSectionsFromAnswers(answers);
-
-  const result: StoreGenerationResult = {
-    sections,
-    branding,
-    suggestedThemeId: themeId,
-    generatedAt: new Date().toISOString(),
-    fromAnswers: answers,
-  };
-
-  return result;
 }
 
 export async function applyGenerationResult(result: StoreGenerationResult): Promise<Storefront> {
   const store = await getStorefront();
   await _createVersionSnapshot(store, 'ai_change', 'Before AI generation');
   store.sections = result.sections;
-  store.branding = result.branding;
+  store.branding  = result.branding;
   store.themeSettings.themeId = result.suggestedThemeId;
   const theme = BUILTIN_THEMES.find(t => t.id === result.suggestedThemeId);
-  if (theme?.presets[0]) {
-    store.themeSettings.activePresetId = theme.presets[0].paletteId;
-  }
+  if (theme?.presets[0]) store.themeSettings.activePresetId = theme.presets[0].paletteId;
   store.generatedFrom = result.fromAnswers;
-  if (store.publishStatus === 'not_started') {
-    store.publishStatus = 'draft';
-  }
-  return saveStorefront(store);
+  if (result.storeTitle)                    store.settings.storeName      = result.storeTitle;
+  if (result.storeSeo?.homepageTitle)       store.seo.homepageTitle       = result.storeSeo.homepageTitle;
+  if (result.storeSeo?.homepageDescription) store.seo.homepageDescription = result.storeSeo.homepageDescription;
+  if (store.publishStatus === 'not_started') store.publishStatus = 'draft';
+  store.lastEditedAt = new Date().toISOString();
+
+  // ── ONE authoritative backend save, performed BEFORE committing local state ──
+  // This eliminates the race between saveStorefront's fire-and-forget PUT and a
+  // subsequent awaited PUT: only one PUT is issued, and local state is committed
+  // only after it succeeds.  Throws on failure; callers must NOT navigate.
+  await api.store.save({
+    title:       result.storeTitle       ?? store.settings.storeName ?? undefined,
+    subtitle:    result.storeSubtitle    ?? undefined,
+    description: result.storeDescription ?? undefined,
+    sections:    store.sections as any,
+    branding: {
+      ...(result.apiBranding ?? {}),
+      logoUrl: store.branding.logoUri ?? '',
+    } as any,
+    theme: {
+      primaryColor:    store.branding.colors.primary,
+      secondaryColor:  store.branding.colors.secondary,
+      accentColor:     store.branding.colors.accent,
+      backgroundColor: store.branding.colors.background,
+      textColor:       store.branding.colors.text,
+      // Persist exact AI font name, not the reduced style enum
+      fontFamily:      store.branding.typography.headingFont,
+      borderRadius:    store.branding.cornerRadius === 'sharp'   ? 0
+                     : store.branding.cornerRadius === 'pill'    ? 24
+                     : store.branding.cornerRadius === 'rounded' ? 12 : 8,
+    } as any,
+    seo: {
+      metaTitle:       result.storeSeo?.homepageTitle,
+      metaDescription: result.storeSeo?.homepageDescription,
+      keywords:        result.storeSeo?.keywords ?? [],
+    },
+  } as any);
+
+  // Commit local state only after the backend confirms success
+  await AsyncStorage.setItem(STORE_KEY, JSON.stringify(store));
+  return store;
+}
+
+// ─── Generate from social (full flow: call API → map complete config → apply) ──
+// Throws on backend-sync failure — callers must catch and surface the error.
+export async function generateFromSocial(
+  profileUrl: string,
+  base64s?: string[],
+  context?: Record<string, unknown>,
+): Promise<Storefront> {
+  const callCtx: Record<string, unknown> = { ...(context ?? {}) };
+  if (base64s?.length) callCtx.base64List = base64s;
+
+  const aiData = await api.store.fromSocial(profileUrl, callCtx);
+  const cfg = aiData?.config as any;
+  const currentStore = await getStorefront();
+
+  const fromAnswers: StoreGenerationAnswers = {
+    primaryStyle: null, secondaryStyles: [], moods: [],
+    colors: currentStore.branding.colors,
+    typography: 'modern' as any,
+    homepagePriority: null, additionalSections: [], brandStory: '',
+    targetCustomers: [], ageRange: null, audienceDescription: '',
+    existingContent: [], features: [], moodBoardUris: [],
+  };
+
+  // mapAiConfigToResult extracts ALL fields: sections, palette, typography,
+  // title, subtitle, description, SEO, and DB branding.
+  return applyGenerationResult(mapAiConfigToResult(cfg, currentStore, fromAnswers));
+}
+
+// ─── Apply from logo (full flow: API → map ALL config → apply → backend sync) ─
+// Throws on backend failure — callers must catch and NOT navigate on error.
+export async function applyFromLogo(logoUri: string, base64?: string | null): Promise<Storefront> {
+  const currentStore = await getStorefront();
+  const fromAnswers: StoreGenerationAnswers = {
+    primaryStyle: null, secondaryStyles: [], moods: [],
+    colors: currentStore.branding.colors, typography: 'modern' as any,
+    homepagePriority: null, additionalSections: [], brandStory: '',
+    targetCustomers: [], ageRange: null, audienceDescription: '',
+    existingContent: [], features: [],
+    logoUri: logoUri ?? undefined, moodBoardUris: [],
+  };
+  const aiData = await (base64 ? api.store.fromLogo(base64, {}) : api.store.fromLogo(logoUri, {}));
+  const cfg = (aiData?.config ?? {}) as any;
+  return applyGenerationResult(mapAiConfigToResult(cfg, currentStore, fromAnswers));
+}
+
+// ─── Apply from moodboard (full flow: API → map ALL config → apply → backend sync) ─
+// Throws on backend failure — callers must catch and NOT navigate on error.
+export async function applyFromMoodboard(imageUris: string[], base64List?: string[]): Promise<Storefront> {
+  const currentStore = await getStorefront();
+  const fromAnswers: StoreGenerationAnswers = {
+    primaryStyle: null, secondaryStyles: [], moods: [],
+    colors: currentStore.branding.colors, typography: 'modern' as any,
+    homepagePriority: null, additionalSections: [], brandStory: '',
+    targetCustomers: [], ageRange: null, audienceDescription: '',
+    existingContent: [], features: [], moodBoardUris: imageUris,
+  };
+  const aiData = await (base64List?.length
+    ? api.store.fromMoodboard(base64List, {})
+    : api.store.fromMoodboard(imageUris, {}));
+  const cfg = (aiData?.config ?? {}) as any;
+  return applyGenerationResult(mapAiConfigToResult(cfg, currentStore, fromAnswers));
 }
 
 // ─── Generate from logo ───────────────────────────────────────────────────────
-export async function generateFromLogo(logoUri: string): Promise<{
+export async function generateFromLogo(logoUri: string, base64?: string | null): Promise<{
   dominantColors: string[];
   suggestedPalette: StoreColorPalette;
   suggestedThemeId: string;
   suggestedTypography: TypographyStyle;
   brandMoods: BrandMood[];
+  aiSections: StoreSection[];
 }> {
+  if (base64) {
+    try {
+      const aiData = await api.store.fromLogo(base64, {});
+      if (aiData?.config?.theme) {
+        const cfg = aiData.config;
+        const palette: StoreColorPalette = {
+          primary:    cfg.theme?.primaryColor ?? '#7c3aed',
+          secondary:  cfg.theme?.secondaryColor ?? '#5b21b6',
+          accent:     cfg.theme?.accentColor ?? '#a78bfa',
+          background: cfg.theme?.backgroundColor ?? '#0f0f1a',
+          text:       cfg.theme?.textColor ?? '#f4f4ff',
+          buttonText: '#0f0f1a',
+        };
+        return {
+          dominantColors: [palette.primary, palette.accent, palette.secondary],
+          suggestedPalette: palette,
+          suggestedThemeId: (cfg.theme as any)?.themeId ?? 'vertex',
+          suggestedTypography: 'modern',
+          brandMoods: ['premium', 'clean'],
+          aiSections: mapAiConfigToSections(cfg),
+        };
+      }
+    } catch { /* fall through to mock */ }
+  }
   try {
     const aiData = await api.store.fromLogo(logoUri, {});
     if (aiData?.config?.theme) {
@@ -882,6 +1085,7 @@ export async function generateFromLogo(logoUri: string): Promise<{
         suggestedThemeId: 'vertex',
         suggestedTypography: 'modern',
         brandMoods: ['premium', 'clean'],
+        aiSections: mapAiConfigToSections(cfg),
       };
     }
   } catch { /* fall through to mock */ }
@@ -896,18 +1100,45 @@ export async function generateFromLogo(logoUri: string): Promise<{
     suggestedThemeId: BUILTIN_THEMES[idx % BUILTIN_THEMES.length].id,
     suggestedTypography: TYPOGRAPHY_STYLES[idx % TYPOGRAPHY_STYLES.length].value,
     brandMoods: ['premium', 'clean'],
+    aiSections: [],
   };
 }
 
 // ─── Generate from mood board ─────────────────────────────────────────────────
-export async function generateFromMoodBoard(imageUris: string[]): Promise<{
+export async function generateFromMoodBoard(imageUris: string[], base64List?: string[]): Promise<{
   colorPalette: StoreColorPalette;
   typographyDirection: TypographyStyle;
   layoutStyle: string;
   imageTreatment: string;
   suggestedThemeId: string;
   suggestedSections: StoreSectionType[];
+  aiSections: StoreSection[];
 }> {
+  if (base64List?.length) {
+    try {
+      const aiData = await api.store.fromMoodboard(base64List, {});
+      if (aiData?.config?.theme) {
+        const cfg = aiData.config;
+        const palette: StoreColorPalette = {
+          primary:    cfg.theme?.primaryColor ?? '#7c3aed',
+          secondary:  cfg.theme?.secondaryColor ?? '#5b21b6',
+          accent:     cfg.theme?.accentColor ?? '#a78bfa',
+          background: cfg.theme?.backgroundColor ?? '#0f0f1a',
+          text:       cfg.theme?.textColor ?? '#f4f4ff',
+          buttonText: '#0f0f1a',
+        };
+        return {
+          colorPalette: palette,
+          typographyDirection: 'modern',
+          layoutStyle: 'editorial',
+          imageTreatment: 'high-contrast with minimal overlay',
+          suggestedThemeId: (cfg.theme as any)?.themeId ?? 'vertex',
+          suggestedSections: ['hero_image', 'lookbook', 'featured_collection', 'brand_story', 'seller_posts', 'newsletter'],
+          aiSections: mapAiConfigToSections(cfg),
+        };
+      }
+    } catch { /* fall through */ }
+  }
   try {
     const aiData = await api.store.fromMoodboard(imageUris, {});
     if (aiData?.config?.theme) {
@@ -927,6 +1158,7 @@ export async function generateFromMoodBoard(imageUris: string[]): Promise<{
         imageTreatment: 'high-contrast with minimal overlay',
         suggestedThemeId: 'vertex',
         suggestedSections: ['hero_image', 'lookbook', 'featured_collection', 'brand_story', 'seller_posts', 'newsletter'],
+        aiSections: mapAiConfigToSections(cfg),
       };
     }
   } catch { /* fall through to mock */ }
@@ -942,6 +1174,7 @@ export async function generateFromMoodBoard(imageUris: string[]): Promise<{
     imageTreatment: 'high-contrast with minimal overlay',
     suggestedThemeId: BUILTIN_THEMES[(idx + 2) % BUILTIN_THEMES.length].id,
     suggestedSections: ['hero_image', 'lookbook', 'featured_collection', 'brand_story', 'seller_posts', 'newsletter'],
+    aiSections: [],
   };
 }
 

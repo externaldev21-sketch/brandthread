@@ -9,11 +9,10 @@ import { Feather } from '@expo/vector-icons';
 import {
   BG, CARD, SURFACE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, StatusBadge } from '@/components/BrandthreadUI';
-import { generateFromMoodBoard } from '@/services/storeService';
+import { generateFromMoodBoard, applyFromMoodboard } from '@/services/storeService';
 import { StoreColorPalette, StoreSectionType } from '@/services/storeTypes';
 
 const MAX_IMAGES = 8;
@@ -21,7 +20,9 @@ const MAX_IMAGES = 8;
 export default function StoreFromMoodboardScreen() {
   const router = useRouter();
   const [imageUris, setImageUris] = useState<string[]>([]);
+  const [imageBase64s, setImageBase64s] = useState<string[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
+  const [applying, setApplying] = useState(false);
   const [result, setResult] = useState<{
     colorPalette: StoreColorPalette;
     typographyDirection: string;
@@ -29,24 +30,34 @@ export default function StoreFromMoodboardScreen() {
     imageTreatment: string;
     suggestedThemeId: string;
     suggestedSections: StoreSectionType[];
+    aiSections: import('@/services/storeTypes').StoreSection[];
   } | null>(null);
 
   const addImages = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Permission needed', 'Allow photo access to upload mood board images.');
+      return;
+    }
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
       selectionLimit: MAX_IMAGES,
-      quality: 0.8,
+      quality: 0.7,
+      base64: true,
     });
     if (!res.canceled && res.assets.length > 0) {
       const newUris = res.assets.map(a => a.uri);
+      const newB64s = res.assets.map(a => a.base64 ?? '');
       setImageUris(prev => [...prev, ...newUris].slice(0, MAX_IMAGES));
+      setImageBase64s(prev => [...prev, ...newB64s].slice(0, MAX_IMAGES));
       setResult(null);
     }
   };
 
   const removeImage = (idx: number) => {
     setImageUris(prev => prev.filter((_, i) => i !== idx));
+    setImageBase64s(prev => prev.filter((_, i) => i !== idx));
     setResult(null);
   };
 
@@ -57,8 +68,10 @@ export default function StoreFromMoodboardScreen() {
     }
     setAnalyzing(true);
     try {
-      const r = await generateFromMoodBoard(imageUris);
+      const r = await generateFromMoodBoard(imageUris, imageBase64s.filter(Boolean));
       setResult(r);
+    } catch {
+      Alert.alert('Analysis failed', 'Could not analyze mood board. Please try again.');
     } finally {
       setAnalyzing(false);
     }
@@ -75,15 +88,15 @@ export default function StoreFromMoodboardScreen() {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={mb.scroll}>
         <Text style={mb.subtitle}>
-          Upload images that represent your brand aesthetic. We'll suggest colors, typography, and a theme.
+          Upload 2–8 images that represent your brand aesthetic. AI will suggest colors, typography, and a theme.
         </Text>
 
-        {/* Demo Notice */}
-        <BrandthreadCard style={[mb.card, { borderColor: CYAN, backgroundColor: CYAN_DIM }]}>
+        {/* AI badge */}
+        <BrandthreadCard style={[mb.card, { borderColor: PURPLE_DIM, backgroundColor: 'rgba(124,58,237,0.08)' }]}>
           <View style={mb.bannerRow}>
-            <Feather name="info" size={ICON.sm} color={CYAN} />
-            <Text style={[mb.bannerText, { color: CYAN }]}>
-              Mood board analysis is simulated in this demo. Add a vision API for real extraction.
+            <Feather name="zap" size={ICON.sm} color={PURPLE_LIGHT} />
+            <Text style={[mb.bannerText, { color: PURPLE_LIGHT }]}>
+              Powered by GPT-4 — AI reads your mood board and extracts a brand direction: palette, layout style, image treatment, and recommended sections.
             </Text>
           </View>
         </BrandthreadCard>
@@ -121,7 +134,7 @@ export default function StoreFromMoodboardScreen() {
         {analyzing && (
           <View style={mb.loadingRow}>
             <ActivityIndicator color={PURPLE} />
-            <Text style={mb.loadingText}>Analyzing your mood board...</Text>
+            <Text style={mb.loadingText}>Analyzing your mood board with AI...</Text>
           </View>
         )}
 
@@ -174,9 +187,28 @@ export default function StoreFromMoodboardScreen() {
             </BrandthreadCard>
 
             <PrimaryButton
-              label="Apply These Settings"
-              onPress={() => router.push('/store-editor' as never)}
+              label={applying ? 'Applying...' : 'Apply These Settings'}
+              loading={applying}
+              disabled={applying}
+              onPress={async () => {
+                setApplying(true);
+                try {
+                  // applyFromMoodboard maps ALL AI config fields (sections, palette,
+                  // typography, title, SEO, branding) and awaits backend sync.
+                  // Throws on failure — we do NOT navigate until it succeeds.
+                  await applyFromMoodboard(imageUris, imageBase64s.filter(Boolean));
+                  router.push('/store-editor' as never);
+                } catch {
+                  Alert.alert(
+                    'Could not apply store design',
+                    'The generated layout could not be saved. Check your connection and try again.',
+                  );
+                } finally {
+                  setApplying(false);
+                }
+              }}
               style={mb.actionBtn}
+              icon="check"
             />
             <SecondaryButton
               label="Generate Full Store"
@@ -205,7 +237,7 @@ const mb = StyleSheet.create({
   },
   headerTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
   scroll: { paddingBottom: 60, paddingTop: SP.md },
-  subtitle: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginHorizontal: SP.md, marginBottom: SP.md },
+  subtitle: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginHorizontal: SP.md, marginBottom: SP.md, lineHeight: 20 },
   card: { marginHorizontal: SP.md, marginBottom: SP.sm, gap: SP.md },
   bannerRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start' },
   bannerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },

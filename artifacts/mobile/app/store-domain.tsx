@@ -12,30 +12,51 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, SectionHeader, StatusBadge } from '@/components/BrandthreadUI';
-import { getStorefront, updateDomain, addCustomDomain } from '@/services/storeService';
-import { Storefront, StoreDomain } from '@/services/storeTypes';
+import { getStorefront, updateDomain } from '@/services/storeService';
+import { useApi } from '@/lib/api';
+import { StoreDomain } from '@/services/storeTypes';
+
+type MergedDomain = StoreDomain & { dnsToken?: string };
 
 export default function StoreDomainScreen() {
   const router = useRouter();
-  const [store, setStore] = useState<Storefront | null>(null);
-  const [domains, setDomains] = useState<StoreDomain[]>([]);
+  const api = useApi();
+  const [domains, setDomains] = useState<MergedDomain[]>([]);
   const [adding, setAdding] = useState(false);
   const [newDomain, setNewDomain] = useState('');
   const [subdomainInput, setSubdomainInput] = useState('');
   const [saving, setSaving] = useState(false);
+  const [verifying, setVerifying] = useState<string | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const s = await getStorefront();
-    setStore(s);
-    setDomains(s.domains);
-    const btDomain = s.domains.find(d => d.type === 'brandthread');
-    if (btDomain) setSubdomainInput(btDomain.subdomain ?? s.settings.storeUrl ?? '');
-  };
+    const localDomains = s.domains;
 
-  useFocusEffect(useCallback(() => { load(); }, []));
+    // Merge: local BT subdomain + real API custom domains
+    const btDomain = localDomains.find(d => d.type === 'brandthread');
+    if (btDomain) setSubdomainInput(btDomain.subdomain ?? s.settings.storeUrl ?? '');
+
+    try {
+      const apiDomains = await (api as any).store.domains() as any[];
+      const customFromApi: MergedDomain[] = (apiDomains ?? []).map((d: any) => ({
+        id:                 d.id,
+        type:               'custom' as const,
+        customDomain:       d.domain,
+        verificationStatus: d.verified ? 'verified' : 'pending',
+        sslStatus:          d.verified ? 'active' : 'pending',
+        isPrimary:          false,
+        dnsToken:           d.verifyToken,
+      }));
+      setDomains([...(btDomain ? [btDomain] : []), ...customFromApi]);
+    } catch {
+      setDomains(localDomains);
+    }
+  }, [api]);
+
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const btDomain = domains.find(d => d.type === 'brandthread');
-  const customDomains = domains.filter(d => d.type === 'custom');
+  const customDomains = domains.filter(d => d.type === 'custom') as MergedDomain[];
 
   const handleSaveSubdomain = async () => {
     if (!btDomain) return;
@@ -54,30 +75,47 @@ export default function StoreDomainScreen() {
   const handleConnectDomain = async () => {
     if (!newDomain.trim()) return;
     try {
-      await addCustomDomain(newDomain.trim());
+      const result = await (api as any).store.addDomain(newDomain.trim());
       await load();
       setNewDomain('');
+      setAdding(false);
+      const instructions = result?.verificationInstructions ?? `Add a TXT record _brandthread-verify.${newDomain} pointing to your verification token.`;
+      Alert.alert('Domain Added', instructions);
     } catch {
-      Alert.alert('Error', 'Failed to connect domain.');
+      Alert.alert('Error', 'Failed to connect domain. Check your internet connection and try again.');
     }
   };
 
-  const handleSimulateVerify = async (domainId: string) => {
-    await updateDomain(domainId, { verificationStatus: 'verified', sslStatus: 'active' });
-    await load();
-    Alert.alert('Verified', 'Domain verified and SSL active (simulated).');
+  const handleVerifyDomain = async (domainId: string) => {
+    setVerifying(domainId);
+    try {
+      await (api as any).store.verifyDomain(domainId);
+      await load();
+      Alert.alert('Verified ✓', 'Your domain is verified and SSL is being issued.');
+    } catch {
+      Alert.alert('Not verified yet', 'DNS changes can take up to 48 hours to propagate. Check your registrar and try again.');
+    } finally {
+      setVerifying(null);
+    }
   };
 
-  const handleSetPrimary = async (domainId: string) => {
-    for (const d of domains) {
-      await updateDomain(d.id, { isPrimary: d.id === domainId });
-    }
-    await load();
+  const handleRemoveDomain = async (domainId: string, domainName: string) => {
+    Alert.alert('Remove Domain?', `Remove ${domainName}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove', style: 'destructive', onPress: async () => {
+          try {
+            await (api as any).store.deleteDomain(domainId);
+          } catch { /* best-effort */ }
+          await load();
+        },
+      },
+    ]);
   };
 
   const verificationBadge = (status: StoreDomain['verificationStatus']) => {
     if (status === 'verified') return <StatusBadge label="Verified" variant="success" small />;
-    if (status === 'pending') return <StatusBadge label="Pending" variant="warning" small />;
+    if (status === 'pending') return <StatusBadge label="Pending DNS" variant="warning" small />;
     if (status === 'failed') return <StatusBadge label="Failed" variant="error" small />;
     return <StatusBadge label="Not Started" variant="neutral" small />;
   };
@@ -92,16 +130,6 @@ export default function StoreDomainScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={dm.scroll}>
-
-        {/* Demo Notice */}
-        <BrandthreadCard style={[dm.card, { borderColor: CYAN }]}>
-          <View style={dm.bannerRow}>
-            <Feather name="info" size={ICON.sm} color={CYAN} />
-            <Text style={[dm.bannerText, { color: CYAN }]}>
-              Domain connection is in development preview. Brandthread subdomain is active immediately. Custom domain DNS verification is simulated.
-            </Text>
-          </View>
-        </BrandthreadCard>
 
         {/* Brandthread Subdomain */}
         <SectionHeader title="BRANDTHREAD SUBDOMAIN" style={dm.sh} />
@@ -129,7 +157,7 @@ export default function StoreDomainScreen() {
           </BrandthreadCard>
         )}
 
-        {/* Custom Domain */}
+        {/* Custom Domains */}
         <SectionHeader title="CUSTOM DOMAIN" style={dm.sh} />
         {customDomains.map(cd => (
           <BrandthreadCard key={cd.id} style={dm.card}>
@@ -148,32 +176,51 @@ export default function StoreDomainScreen() {
 
             {cd.verificationStatus === 'pending' && (
               <BrandthreadCard style={dm.dnsCard}>
-                <Text style={dm.dnsTitle}>Add these DNS records to your domain registrar:</Text>
+                <Text style={dm.dnsTitle}>Add these DNS records to your registrar:</Text>
                 <View style={dm.dnsRow}>
-                  <Text style={dm.dnsCell}>A</Text>
-                  <Text style={dm.dnsCell}>@</Text>
-                  <Text style={[dm.dnsCell, { color: CYAN }]}>76.76.21.21</Text>
+                  <Text style={dm.dnsType}>TXT</Text>
+                  <Text style={dm.dnsHost}>_brandthread-verify.{cd.customDomain}</Text>
                 </View>
+                {cd.dnsToken ? (
+                  <View style={dm.dnsRow}>
+                    <Text style={[dm.dnsType, { color: CYAN }]}>Value</Text>
+                    <Text style={[dm.dnsHost, { color: CYAN, flexWrap: 'wrap', flex: 1 }]}>{cd.dnsToken}</Text>
+                  </View>
+                ) : null}
                 <View style={dm.dnsRow}>
-                  <Text style={dm.dnsCell}>CNAME</Text>
-                  <Text style={dm.dnsCell}>www</Text>
-                  <Text style={[dm.dnsCell, { color: CYAN }]}>cname.brandthread.co</Text>
+                  <Text style={dm.dnsType}>CNAME</Text>
+                  <Text style={dm.dnsHost}>www → cname.brandthread.co</Text>
                 </View>
-                <Text style={dm.dnsNote}>Verification may take up to 48 hours. (Demo: verification is simulated)</Text>
+                <Text style={dm.dnsNote}>DNS changes can take up to 48 hours to propagate.</Text>
                 <SecondaryButton
-                  label="Simulate Verify"
+                  label={verifying === cd.id ? 'Checking...' : 'Verify DNS'}
                   small
                   accent={SUCCESS}
-                  onPress={() => handleSimulateVerify(cd.id)}
+                  onPress={() => handleVerifyDomain(cd.id)}
+                  disabled={verifying === cd.id}
                 />
               </BrandthreadCard>
             )}
 
+            {cd.verificationStatus === 'verified' && (
+              <BrandthreadCard style={[dm.dnsCard, { borderColor: SUCCESS, backgroundColor: SUCCESS_DIM }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm }}>
+                  <Feather name="check-circle" size={ICON.sm} color={SUCCESS} />
+                  <Text style={{ color: SUCCESS, fontFamily: FONT.semibold, fontSize: FS.sm }}>
+                    Domain is live at https://{cd.customDomain}
+                  </Text>
+                </View>
+              </BrandthreadCard>
+            )}
+
             <View style={dm.actionRow}>
-              <SecondaryButton label="Remove" small accent={MUTED} onPress={() => Alert.alert('Remove', 'Remove domain coming soon.')} style={{ flex: 1 }} />
-              {!cd.isPrimary && (
-                <SecondaryButton label="Set Primary" small onPress={() => handleSetPrimary(cd.id)} style={{ flex: 1 }} />
-              )}
+              <SecondaryButton
+                label="Remove"
+                small
+                accent={MUTED}
+                onPress={() => handleRemoveDomain(cd.id, cd.customDomain ?? '')}
+                style={{ flex: 1 }}
+              />
             </View>
           </BrandthreadCard>
         ))}
@@ -194,31 +241,16 @@ export default function StoreDomainScreen() {
               placeholderTextColor={SUBTLE}
               autoCapitalize="none"
               keyboardType="url"
+              autoFocus
             />
-            <Text style={dm.noteText}>Point your domain's A record to 76.76.21.21 before connecting.</Text>
+            <Text style={dm.noteText}>
+              You'll receive DNS instructions after adding. No domain purchase required — just configure your existing domain registrar.
+            </Text>
             <View style={dm.actionRow}>
               <SecondaryButton label="Cancel" small accent={MUTED} onPress={() => { setAdding(false); setNewDomain(''); }} style={{ flex: 1 }} />
-              <PrimaryButton label="Connect Domain" small onPress={handleConnectDomain} style={{ flex: 1 }} />
+              <PrimaryButton label="Add Domain" small onPress={handleConnectDomain} disabled={!newDomain.trim()} style={{ flex: 1 }} />
             </View>
           </BrandthreadCard>
-        )}
-
-        {/* All domains — set primary */}
-        {domains.length > 1 && (
-          <>
-            <SectionHeader title="PRIMARY DOMAIN" style={dm.sh} />
-            {domains.map(d => (
-              <BrandthreadCard key={d.id} style={[dm.card, { flexDirection: 'row', alignItems: 'center', gap: SP.md }]}>
-                <Text style={[dm.domainName, { flex: 1 }]}>
-                  {d.type === 'brandthread' ? `${d.subdomain}.brandthread.co` : d.customDomain}
-                </Text>
-                {d.isPrimary
-                  ? <StatusBadge label="★ Primary" variant="purple" small />
-                  : <SecondaryButton label="Set Primary" small onPress={() => handleSetPrimary(d.id)} />
-                }
-              </BrandthreadCard>
-            ))}
-          </>
         )}
       </ScrollView>
     </View>
@@ -241,8 +273,6 @@ const dm = StyleSheet.create({
   scroll: { paddingBottom: 60, paddingTop: SP.md },
   sh: { marginTop: SP.lg, marginBottom: SP.sm },
   card: { marginHorizontal: SP.md, marginBottom: SP.sm, gap: SP.md },
-  bannerRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start' },
-  bannerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
   urlInputRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   input: {
     fontSize: FS.base, fontFamily: FONT.regular, color: FG,
@@ -257,8 +287,9 @@ const dm = StyleSheet.create({
   domainName: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   dnsCard: { backgroundColor: SURFACE, gap: SP.sm },
   dnsTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
-  dnsRow: { flexDirection: 'row', gap: SP.md },
-  dnsCell: { fontSize: FS.xs, fontFamily: FONT.regular, color: FG, minWidth: 60 },
+  dnsRow: { flexDirection: 'row', gap: SP.md, alignItems: 'flex-start' },
+  dnsType: { fontSize: FS.xs, fontFamily: FONT.bold, color: FG, minWidth: 50, textTransform: 'uppercase' },
+  dnsHost: { fontSize: FS.xs, fontFamily: FONT.regular, color: FG },
   dnsNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   actionRow: { flexDirection: 'row', gap: SP.sm },
   addDomainBtn: {

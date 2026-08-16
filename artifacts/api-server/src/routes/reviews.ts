@@ -5,9 +5,19 @@
  * GET  /api/reviews/seller/:sellerId    (public)
  */
 import { Router } from "express";
-import { db, reviews, orders } from "@workspace/db";
+import { db, reviews, orders, products, users } from "@workspace/db";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+
+// ─── Startup migration — add seller reply columns ─────────────────────────────
+(async () => {
+  try {
+    await db.execute(sql`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS seller_reply TEXT`);
+    await db.execute(sql`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS seller_replied_at TIMESTAMPTZ`);
+  } catch (err) {
+    console.error("[reviews] migration error:", err);
+  }
+})();
 
 const router = Router();
 
@@ -120,6 +130,57 @@ router.post("/", requireAuth, async (req, res) => {
     }
     throw err;
   }
+});
+
+// ─── GET /api/reviews/mine  (seller — received reviews with buyer + product info)
+router.get("/mine", requireAuth, async (req, res) => {
+  const sellerId = (req as any).clerkUserId as string;
+  const rows = (await db.execute(sql`
+    SELECT r.*,
+           p.name           AS product_name,
+           u.name           AS buyer_name,
+           u.display_name   AS buyer_display_name,
+           u.profile_image_url AS buyer_avatar
+    FROM   reviews r
+    LEFT JOIN products p ON p.id = r.product_id
+    LEFT JOIN users    u ON u.clerk_id = r.buyer_id
+    WHERE  r.seller_id = ${sellerId}
+    ORDER  BY r.created_at DESC
+    LIMIT  100
+  `)).rows;
+  return res.json(rows);
+});
+
+// ─── POST /api/reviews/:reviewId/reply  (seller only)
+router.post("/:reviewId/reply", requireAuth, async (req, res) => {
+  const sellerId  = (req as any).clerkUserId as string;
+  const reviewId = req.params.reviewId as string;
+  const { replyText } = req.body as { replyText?: string };
+
+  if (!replyText?.trim()) {
+    return res.status(400).json({ error: "replyText is required" });
+  }
+
+  const [existing] = await db
+    .select({ id: reviews.id, sellerId: reviews.sellerId })
+    .from(reviews)
+    .where(eq(reviews.id, reviewId))
+    .limit(1);
+
+  if (!existing)                    return res.status(404).json({ error: "Review not found" });
+  if (existing.sellerId !== sellerId) return res.status(403).json({ error: "Forbidden" });
+
+  const updated = (await db.execute(sql`
+    UPDATE reviews
+    SET    seller_reply      = ${replyText.trim()},
+           seller_replied_at = now(),
+           updated_at        = now()
+    WHERE  id        = ${reviewId}
+    AND    seller_id = ${sellerId}
+    RETURNING *
+  `)).rows[0];
+
+  return res.json(updated ?? {});
 });
 
 export default router;

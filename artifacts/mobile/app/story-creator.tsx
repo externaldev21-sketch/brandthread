@@ -11,6 +11,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
+import { createStory, MY_USER_ID, MY_COLOR, MY_INITIALS, MY_HANDLE } from '@/services/socialService';
+import { useApi } from '@/lib/api';
+import type { StoryMedia, StoryPrivacySettings, StoryOverlay } from '@/services/socialTypes';
 
 const { width: W, height: H } = Dimensions.get('window');
 const PANEL_H = H * 0.52;
@@ -46,10 +49,11 @@ const TEXT_SIZES  = [18, 24, 32, 44];
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Song   = typeof SONGS[0];
-type TxtItem = { id: string; text: string; color: string; size: number; x: number; y: number };
-type GifItem = { id: string; url: string; w: number; h: number };
-type Panel   = 'none' | 'text' | 'music' | 'gif';
+type Song     = typeof SONGS[0];
+type TxtItem  = { id: string; text: string; color: string; size: number; x: number; y: number };
+type GifItem  = { id: string; url: string; w: number; h: number };
+type LinkItem = { id: string; url: string; text: string; x: number; y: number };
+type Panel    = 'none' | 'text' | 'music' | 'gif' | 'link';
 
 // ─── Draggable item ───────────────────────────────────────────────────────────
 
@@ -116,7 +120,8 @@ export default function StoryCreatorScreen() {
   const insets  = useSafeAreaInsets();
   const scheme  = useColorScheme();
   const isDark  = scheme !== 'light';
-  const params  = useLocalSearchParams<{ uri?: string }>();
+  const params  = useLocalSearchParams<{ uri?: string; accountType?: string }>();
+  const api     = useApi();
 
   // Canvas state
   const [imageUri,      setImageUri]      = useState<string | null>(params.uri ?? null);
@@ -135,6 +140,11 @@ export default function StoryCreatorScreen() {
   const [gifResults,    setGifResults]    = useState<GifItem[]>([]);
   const [gifLoading,    setGifLoading]    = useState(false);
   const [posted,        setPosted]        = useState(false);
+
+  // Link overlay state
+  const [linkItems,     setLinkItems]     = useState<LinkItem[]>([]);
+  const [linkUrl,       setLinkUrl]       = useState('');
+  const [linkText,      setLinkText]      = useState('');
 
   // Panel slide animation
   const panelY = useRef(new Animated.Value(PANEL_H)).current;
@@ -206,8 +216,57 @@ export default function StoryCreatorScreen() {
     setTextItems(prev => prev.map(t => t.id === id ? { ...t, x, y } : t));
   }
 
-  function handlePost() {
+  async function handlePost() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    try {
+      // Build overlay array: positioned text, GIF, and link stickers
+      const overlays: StoryOverlay[] = [
+        ...textItems.map(t => ({
+          id: t.id, type: 'text' as const,
+          x: t.x, y: t.y,
+          text: t.text, color: t.color, size: t.size,
+        })),
+        ...(selectedGif ? [{
+          id: selectedGif.id, type: 'gif' as const,
+          x: gifPos.x, y: gifPos.y,
+          gifUrl: selectedGif.url, gifW: selectedGif.w, gifH: selectedGif.h,
+        }] : []),
+        ...linkItems.map(l => ({
+          id: l.id, type: 'link' as const,
+          x: l.x, y: l.y,
+          linkUrl: l.url, linkText: l.text,
+        })),
+      ];
+
+      const media: StoryMedia[] = [{
+        id:              'sm_' + Date.now(),
+        type:            imageUri ? 'photo' : 'text',
+        backgroundColor: '#000',
+        imageUri:        imageUri ?? undefined,
+        duration:        7,
+        overlays,
+      }];
+
+      const privacy: StoryPrivacySettings = {
+        visibility:        'public',
+        replyPermission:   'everyone',
+        hiddenFromUserIds: [],
+        closeFriendsOnly:  false,
+      };
+
+      await createStory({ media, privacy, repliesDisabled: false });
+      api.social.createStory({
+        authorName:        MY_USER_ID,
+        authorHandle:      MY_HANDLE,
+        authorInitials:    MY_INITIALS,
+        authorColor:       MY_COLOR,
+        authorAccountType: (params.accountType as any) ?? 'buyer',
+        media,
+        repliesDisabled:   false,
+        privacy:           { visibility: 'public', replyPermission: 'everyone' },
+      }).catch(() => {});
+    } catch { /* non-critical — best effort */ }
+
     setPosted(true);
     setTimeout(() => router.back(), 1800);
   }
@@ -289,6 +348,31 @@ export default function StoryCreatorScreen() {
             </DraggableItem>
           )}
 
+          {/* Draggable link stickers */}
+          {linkItems.map(link => (
+            <DraggableItem
+              key={link.id}
+              x={link.x}
+              y={link.y}
+              onRelease={(x, y) => setLinkItems(prev => prev.map(l => l.id === link.id ? { ...l, x, y } : l))}
+            >
+              <TouchableOpacity
+                onLongPress={() => {
+                  setLinkItems(prev => prev.filter(l => l.id !== link.id));
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                }}
+                activeOpacity={0.9}
+              >
+                <View style={s.linkSticker}>
+                  <Feather name="link-2" size={12} color="#FFF" />
+                  <Text style={s.linkStickerLabel} numberOfLines={1}>
+                    {link.text || link.url}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </DraggableItem>
+          ))}
+
           {/* Music sticker */}
           {selectedMusic && (
             <View style={[s.musicSticker, { bottom: 100 }]}>
@@ -315,9 +399,10 @@ export default function StoryCreatorScreen() {
 
             <View style={s.topRight}>
               {[
-                { icon: 'type' as const,    panel: 'text'  as Panel },
-                { icon: 'music' as const,   panel: 'music' as Panel },
-                { icon: 'smile' as const,   panel: 'gif'   as Panel },
+                { icon: 'type'  as const, panel: 'text'  as Panel },
+                { icon: 'music' as const, panel: 'music' as Panel },
+                { icon: 'smile' as const, panel: 'gif'   as Panel },
+                { icon: 'link'  as const, panel: 'link'  as Panel },
               ].map(({ icon, panel }) => (
                 <TouchableOpacity
                   key={panel}
@@ -505,6 +590,72 @@ export default function StoryCreatorScreen() {
                 <Text style={[s.poweredBy, { color: isDark ? '#4A453B' : '#B8AE99' }]}>Powered by GIPHY · Long-press GIF on canvas to remove</Text>
               </View>
             )}
+
+            {/* ── Link Panel ── */}
+            {activePanel === 'link' && (
+              <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+                <Text style={[s.panelTitle, { color: isDark ? '#F4F4FF' : '#07070F' }]}>Add Link</Text>
+                <Text style={[s.subLabel, { color: isDark ? '#8C8577' : '#8080A0' }]}>URL</Text>
+                <View style={[s.searchRow, { backgroundColor: isDark ? '#1D1A15' : '#E8E1CF', borderColor: isDark ? '#2A261E' : '#DBD3C0' }]}>
+                  <Feather name="link" size={16} color={isDark ? '#8C8577' : '#8080A0'} />
+                  <TextInput
+                    style={[s.searchInput, { color: isDark ? '#F4F4FF' : '#07070F' }]}
+                    value={linkUrl}
+                    onChangeText={setLinkUrl}
+                    placeholder="https://..."
+                    placeholderTextColor={isDark ? '#4A453B' : '#A69C87'}
+                    autoCapitalize="none"
+                    keyboardType="url"
+                    autoFocus
+                  />
+                  {linkUrl.length > 0 && (
+                    <TouchableOpacity onPress={() => setLinkUrl('')}>
+                      <Feather name="x-circle" size={15} color={isDark ? '#8C8577' : '#8080A0'} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <Text style={[s.subLabel, { color: isDark ? '#8C8577' : '#8080A0' }]}>Button label (optional)</Text>
+                <View style={[s.searchRow, { backgroundColor: isDark ? '#1D1A15' : '#E8E1CF', borderColor: isDark ? '#2A261E' : '#DBD3C0' }]}>
+                  <Feather name="type" size={16} color={isDark ? '#8C8577' : '#8080A0'} />
+                  <TextInput
+                    style={[s.searchInput, { color: isDark ? '#F4F4FF' : '#07070F' }]}
+                    value={linkText}
+                    onChangeText={setLinkText}
+                    placeholder="Shop now, Learn more..."
+                    placeholderTextColor={isDark ? '#4A453B' : '#A69C87'}
+                    returnKeyType="done"
+                  />
+                </View>
+                <Text style={[s.poweredBy, { color: isDark ? '#4A453B' : '#B8AE99', marginBottom: 10 }]}>
+                  Viewers tap the sticker to open your link · Long-press sticker to remove
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (!linkUrl.trim()) return;
+                    const url = linkUrl.trim().startsWith('http') ? linkUrl.trim() : 'https://' + linkUrl.trim();
+                    const newLink: LinkItem = {
+                      id:   Date.now().toString(),
+                      url,
+                      text: linkText.trim(),
+                      x:    W / 2 - 80,
+                      y:    H * 0.42,
+                    };
+                    setLinkItems(prev => [...prev, newLink]);
+                    setLinkUrl('');
+                    setLinkText('');
+                    closePanel();
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  }}
+                  disabled={!linkUrl.trim()}
+                  style={[s.doneBtn, { opacity: linkUrl.trim() ? 1 : 0.4 }]}
+                  activeOpacity={0.85}
+                >
+                  <LinearGradient colors={['#1A0A2E', '#8B5CF6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.doneBtnGrad}>
+                    <Text style={s.doneBtnText}>Add Link Sticker</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </KeyboardAvoidingView>
+            )}
           </View>
         </Animated.View>
       )}
@@ -574,4 +725,8 @@ const s = StyleSheet.create({
   postedCircle: { width: 90, height: 90, borderRadius: 45, alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
   postedTitle:  { fontSize: 24, fontFamily: 'Inter_700Bold', color: '#FFF', marginBottom: 8 },
   postedSub:    { fontSize: 14, fontFamily: 'Inter_400Regular', color: '#8C8577' },
+
+  // Link sticker overlay on canvas
+  linkSticker:      { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(139,92,246,0.85)', borderRadius: 22, paddingHorizontal: 12, paddingVertical: 7, maxWidth: 220 },
+  linkStickerLabel: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: '#FFF', flexShrink: 1 },
 });

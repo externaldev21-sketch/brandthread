@@ -5,6 +5,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
+import SellerTutorialOverlay from '@/components/SellerTutorialOverlay';
+import { useApi } from '@/lib/api';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   useWindowDimensions, Alert, ActivityIndicator,
@@ -183,10 +185,12 @@ export default function StudioScreen() {
   const cols    = getColumns(windowWidth);
   const toolCardWidth = cardWidth(windowWidth, cols);
 
+  const api = useApi();
   const [dismissedTips,  setDismissedTips]  = useState<string[]>([]);
   const [openedFeatures, setOpenedFeatures] = useState<string[]>([]);
   const [projects,       setProjects]       = useState<DesignProject[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
+  const [showTutorial,   setShowTutorial]   = useState(false);
 
   // load design projects
   useEffect(() => {
@@ -194,6 +198,24 @@ export default function StudioScreen() {
       .then(p => { setProjects(p.filter(x => x.status !== 'archived')); setLoadingProjects(false); })
       .catch(() => setLoadingProjects(false));
   }, []);
+
+  // Check if first-time seller — show tutorial overlay once
+  useEffect(() => {
+    (async () => {
+      try {
+        const seen = await AsyncStorage.getItem('bt:seller:tutorial_seen:v1');
+        if (!seen) setShowTutorial(true);
+      } catch { /* non-fatal */ }
+    })();
+  }, []);
+
+  const handleDismissTutorial = useCallback(async () => {
+    setShowTutorial(false);
+    try {
+      await AsyncStorage.setItem('bt:seller:tutorial_seen:v1', 'true');
+      api.seller.markTutorialSeen().catch(() => {});
+    } catch { /* non-fatal */ }
+  }, [api]);
 
   // load dismissed tips
   useEffect(() => {
@@ -417,6 +439,7 @@ export default function StudioScreen() {
 
       </ScrollView>
       <AIBrainFAB context={{ screen: 'design_studio' as const }} bottomOffset={72} />
+      <SellerTutorialOverlay visible={showTutorial} onDismiss={handleDismissTutorial} />
     </View>
   );
 }

@@ -1,16 +1,17 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Dimensions, Alert, Modal, Switch,
+  StyleSheet, Dimensions, Alert, Switch, Image, FlatList,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, ON_DARK, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
+  BG, SURFACE, CARD, BORDER, BORDER_ACTIVE,
+  FG, MUTED, ON_DARK, PURPLE, PURPLE_DIM,
   CYAN, FONT, FS, SP, RADIUS, ICON, GRAD_PRIMARY,
 } from '@/lib/theme';
 import { createStory, MY_USER_ID, MY_COLOR, MY_INITIALS, MY_HANDLE } from '@/services/socialService';
@@ -29,13 +30,14 @@ type Visibility = 'public' | 'friends';
 const TYPE_TABS: { label: string; value: MediaType; icon: string }[] = [
   { label: 'Photo', value: 'photo', icon: 'image' },
   { label: 'Video', value: 'video', icon: 'video' },
-  { label: 'Text', value: 'text', icon: 'type' },
+  { label: 'Text',  value: 'text',  icon: 'type'  },
 ];
 
 export default function BuyerStoryCreate() {
   const insets = useSafeAreaInsets();
   const router  = useRouter();
   const api     = useApi();
+  const params  = useLocalSearchParams<{ accountType?: string }>();
 
   const [type, setType] = useState<MediaType>('text');
   const [bgColor, setBgColor] = useState('#1a1a2e');
@@ -45,49 +47,124 @@ export default function BuyerStoryCreate() {
   const [allowReplies, setAllowReplies] = useState(true);
   const [isPosting, setIsPosting] = useState(false);
 
-  const isShareDisabled =
-    isPosting || (type === 'text' && textContent.trim().length === 0);
+  // Photo — supports multi-select for multi-slide story reel
+  const [photoUris, setPhotoUris] = useState<string[]>([]);
+  // Video — single clip, capped at 15s
+  const [videoUri, setVideoUri] = useState<string | null>(null);
+  const [videoDuration, setVideoDuration] = useState(0);
+
+  const hasMedia =
+    type === 'photo' ? photoUris.length > 0 :
+    type === 'video' ? !!videoUri :
+    textContent.trim().length > 0;
+
+  const isShareDisabled = isPosting || !hasMedia;
+
+  // ── Pickers ───────────────────────────────────────────────────────────────
+
+  async function pickPhotos() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Allow photo access to add photos to your story.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      selectionLimit: 10,
+      quality: 0.9,
+    });
+    if (!result.canceled && result.assets.length) {
+      setPhotoUris(result.assets.map(a => a.uri));
+    }
+  }
+
+  async function pickVideo() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Allow photo access to add video to your story.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      videoMaxDuration: 15,
+      quality: 0.9,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      setVideoUri(asset.uri);
+      setVideoDuration(Math.min((asset as any).duration ?? 15, 15));
+    }
+  }
+
+  // ── Post ──────────────────────────────────────────────────────────────────
 
   const doShare = useCallback(async () => {
     if (isShareDisabled) return;
     setIsPosting(true);
     try {
-      const mediaId = 'sm_' + Date.now();
-      const media: StoryMedia[] = [
-        {
-          id: mediaId,
-          type,
+      let media: StoryMedia[];
+
+      if (type === 'photo') {
+        // Each selected photo becomes one slide in a story reel
+        media = photoUris.map((uri, i) => ({
+          id:              `sm_${Date.now()}_${i}`,
+          type:            'photo' as const,
+          backgroundColor: '#000',
+          imageUri:        uri,
+          duration:        5,
+        }));
+      } else if (type === 'video') {
+        media = [{
+          id:              `sm_${Date.now()}`,
+          type:            'video' as const,
+          backgroundColor: '#000',
+          imageUri:        videoUri!,
+          duration:        Math.max(videoDuration, 3),
+        }];
+      } else {
+        media = [{
+          id:              `sm_${Date.now()}`,
+          type:            'text' as const,
           backgroundColor: bgColor,
-          textContent: type === 'text' ? textContent : undefined,
-          textColor: type === 'text' ? textColor : undefined,
-          duration: 5,
-        },
-      ];
+          textContent,
+          textColor,
+          duration:        5,
+        }];
+      }
+
       const privacy: StoryPrivacySettings = {
-        visibility: privacyVis,
-        replyPermission: allowReplies ? 'everyone' : 'off',
+        visibility:        privacyVis,
+        replyPermission:   allowReplies ? 'everyone' : 'off',
         hiddenFromUserIds: [],
-        closeFriendsOnly: false,
+        closeFriendsOnly:  false,
       };
+
+      // Save locally (source of truth for this device)
       await createStory({ media, privacy, repliesDisabled: !allowReplies });
-      // Also persist to server (fire-and-forget — local store is source of truth for now)
+
+      // Persist to server (fire-and-forget)
       api.social.createStory({
-        authorName:        MY_USER_ID,   // socialService exposes MY_USER_ID as display name fallback
+        authorName:        MY_USER_ID,
         authorHandle:      MY_HANDLE,
         authorInitials:    MY_INITIALS,
         authorColor:       MY_COLOR,
-        authorAccountType: 'buyer',
+        authorAccountType: (params.accountType as any) ?? 'buyer',
         media,
         repliesDisabled:   !allowReplies,
-        privacy: { visibility: privacyVis, replyPermission: allowReplies ? 'everyone' : 'off' },
-      }).catch(() => {/* non-critical — local store already saved */});
+        privacy:           { visibility: privacyVis, replyPermission: allowReplies ? 'everyone' : 'off' },
+      }).catch(() => {});
+
       router.back();
-    } catch (err) {
+    } catch {
       Alert.alert('Error', 'Failed to post story. Please try again.');
     } finally {
       setIsPosting(false);
     }
-  }, [isShareDisabled, type, bgColor, textContent, textColor, privacyVis, allowReplies]);
+  }, [isShareDisabled, type, bgColor, textContent, textColor, privacyVis, allowReplies,
+      photoUris, videoUri, videoDuration, params.accountType]);
+
+  // ── UI ────────────────────────────────────────────────────────────────────
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -110,7 +187,7 @@ export default function BuyerStoryCreate() {
             end={{ x: 1, y: 0 }}
             style={styles.shareBtn}
           >
-            <Text style={styles.shareBtnText}>Share</Text>
+            <Text style={styles.shareBtnText}>{isPosting ? 'Posting…' : 'Share'}</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -130,17 +207,8 @@ export default function BuyerStoryCreate() {
               ]}
               onPress={() => setType(tab.value)}
             >
-              <Feather
-                name={tab.icon as any}
-                size={ICON.sm}
-                color={active ? PURPLE : 'rgba(255,255,255,0.6)'}
-              />
-              <Text
-                style={[
-                  styles.typeTabLabel,
-                  { color: active ? PURPLE : 'rgba(255,255,255,0.6)' },
-                ]}
-              >
+              <Feather name={tab.icon as any} size={ICON.sm} color={active ? PURPLE : 'rgba(255,255,255,0.6)'} />
+              <Text style={[styles.typeTabLabel, { color: active ? PURPLE : 'rgba(255,255,255,0.6)' }]}>
                 {tab.label}
               </Text>
             </TouchableOpacity>
@@ -155,7 +223,9 @@ export default function BuyerStoryCreate() {
         {/* CANVAS */}
         <View style={styles.canvasWrapper}>
           <View style={[styles.canvas, { height: CANVAS_H }]}>
-            {type === 'text' ? (
+
+            {/* ── TEXT ── */}
+            {type === 'text' && (
               <View style={[styles.canvasFill, { backgroundColor: bgColor }]}>
                 <TextInput
                   style={[styles.textInput, { color: textColor }]}
@@ -167,33 +237,102 @@ export default function BuyerStoryCreate() {
                   textAlign="center"
                 />
               </View>
-            ) : (
-              <TouchableOpacity
-                style={styles.canvasFill}
-                activeOpacity={0.8}
-                onPress={() =>
-                  Alert.alert(
-                    'Coming soon',
-                    'Photo library integration coming in next update.',
-                  )
-                }
-              >
-                <View style={styles.mediaPlaceholder}>
-                  <Feather
-                    name={type === 'photo' ? 'image' : 'video'}
-                    size={48}
-                    color="rgba(255,255,255,0.4)"
-                  />
-                  <Text style={styles.mediaPlaceholderText}>
-                    Tap to choose from library
-                  </Text>
+            )}
+
+            {/* ── PHOTO ── */}
+            {type === 'photo' && (
+              photoUris.length > 0 ? (
+                <View style={styles.canvasFill}>
+                  <Image source={{ uri: photoUris[0] }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                  {photoUris.length > 1 && (
+                    <View style={styles.multiSlideChip}>
+                      <Feather name="layers" size={11} color="#FFF" />
+                      <Text style={styles.multiSlideText}>{photoUris.length} slides</Text>
+                    </View>
+                  )}
+                  <TouchableOpacity style={styles.changeBtn} onPress={pickPhotos}>
+                    <Text style={styles.changeBtnText}>Change</Text>
+                  </TouchableOpacity>
                 </View>
-              </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.canvasFill} activeOpacity={0.8} onPress={pickPhotos}>
+                  <View style={styles.placeholder}>
+                    <Feather name="image" size={48} color="rgba(255,255,255,0.35)" />
+                    <Text style={styles.placeholderTitle}>Tap to choose photos</Text>
+                    <Text style={styles.placeholderSub}>Select up to 10 — each becomes a slide</Text>
+                  </View>
+                </TouchableOpacity>
+              )
+            )}
+
+            {/* ── VIDEO ── */}
+            {type === 'video' && (
+              videoUri ? (
+                <View style={styles.canvasFill}>
+                  <View style={styles.videoReadyBg}>
+                    <Feather name="play-circle" size={56} color="rgba(255,255,255,0.8)" />
+                    <Text style={styles.videoDurText}>
+                      {videoDuration > 0 ? `${Math.round(videoDuration)}s` : 'Video'} · ready to post
+                    </Text>
+                  </View>
+                  <TouchableOpacity style={styles.changeBtn} onPress={pickVideo}>
+                    <Text style={styles.changeBtnText}>Change</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.canvasFill} activeOpacity={0.8} onPress={pickVideo}>
+                  <View style={styles.placeholder}>
+                    <Feather name="video" size={48} color="rgba(255,255,255,0.35)" />
+                    <Text style={styles.placeholderTitle}>Tap to choose a video</Text>
+                    <Text style={styles.placeholderSub}>Clips are capped at 15 seconds</Text>
+                  </View>
+                </TouchableOpacity>
+              )
             )}
           </View>
         </View>
 
-        {/* CONTROLS — text type only */}
+        {/* PHOTO STRIP — thumbnail row when multi-photo selected */}
+        {type === 'photo' && photoUris.length > 1 && (
+          <View style={styles.photoStrip}>
+            <FlatList
+              horizontal
+              data={photoUris}
+              keyExtractor={(_, i) => String(i)}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ gap: SP.xs, paddingHorizontal: SP.md }}
+              renderItem={({ item, index }) => (
+                <View style={styles.photoThumb}>
+                  <Image source={{ uri: item }} style={styles.photoThumbImg} resizeMode="cover" />
+                  <View style={styles.thumbNumBadge}>
+                    <Text style={styles.thumbNumText}>{index + 1}</Text>
+                  </View>
+                </View>
+              )}
+            />
+          </View>
+        )}
+
+        {/* ADVANCED EDITOR LINK — when photo/video is ready */}
+        {type !== 'text' && hasMedia && (
+          <TouchableOpacity
+            style={styles.advancedBtn}
+            onPress={() =>
+              router.push({
+                pathname: '/story-creator',
+                params: {
+                  uri:         type === 'photo' ? photoUris[0] : videoUri!,
+                  accountType: params.accountType ?? 'buyer',
+                },
+              } as any)
+            }
+          >
+            <Feather name="sliders" size={ICON.sm} color={PURPLE} />
+            <Text style={styles.advancedBtnText}>Open advanced editor — add text, links, GIFs</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* TEXT CONTROLS */}
         {type === 'text' && (
           <View style={styles.controlsPanel}>
             <Text style={styles.controlLabel}>Background</Text>
@@ -201,11 +340,7 @@ export default function BuyerStoryCreate() {
               {BG_COLORS.map(c => (
                 <TouchableOpacity
                   key={c}
-                  style={[
-                    styles.colorCircle,
-                    { backgroundColor: c },
-                    bgColor === c && styles.colorCircleActive,
-                  ]}
+                  style={[styles.colorCircle, { backgroundColor: c }, bgColor === c && styles.colorCircleActive]}
                   onPress={() => setBgColor(c)}
                 />
               ))}
@@ -231,32 +366,24 @@ export default function BuyerStoryCreate() {
         {/* PRIVACY */}
         <View style={styles.privacySection}>
           <View style={styles.privacyCard}>
-            {/* Audience Row */}
             <TouchableOpacity
               style={styles.privacyRow}
               onPress={() =>
                 Alert.alert('Audience', '', [
-                  { text: 'Everyone', onPress: () => setPrivacyVis('public') },
-                  { text: 'Friends only', onPress: () => setPrivacyVis('friends') },
+                  { text: 'Everyone',      onPress: () => setPrivacyVis('public')  },
+                  { text: 'Friends only',  onPress: () => setPrivacyVis('friends') },
                   { text: 'Cancel', style: 'cancel' },
                 ])
               }
             >
-              <Feather
-                name={privacyVis === 'public' ? 'globe' : 'users'}
-                size={ICON.md}
-                color={PURPLE}
-              />
+              <Feather name={privacyVis === 'public' ? 'globe' : 'users'} size={ICON.md} color={PURPLE} />
               <Text style={styles.privacyLabel}>Who can see</Text>
-              <Text style={styles.privacyValue}>
-                {privacyVis === 'public' ? 'Everyone' : 'Friends only'}
-              </Text>
+              <Text style={styles.privacyValue}>{privacyVis === 'public' ? 'Everyone' : 'Friends only'}</Text>
               <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
             </TouchableOpacity>
 
             <View style={styles.privacyDivider} />
 
-            {/* Replies Row */}
             <View style={styles.privacyRow}>
               <Feather name="message-circle" size={ICON.md} color={PURPLE} />
               <Text style={[styles.privacyLabel, { flex: 1 }]}>Replies</Text>
@@ -274,6 +401,8 @@ export default function BuyerStoryCreate() {
   );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -287,10 +416,8 @@ const styles = StyleSheet.create({
     paddingBottom: SP.sm,
   },
   closeBtn: {
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 36, height: 36,
+    justifyContent: 'center', alignItems: 'center',
   },
   closeText: {
     color: ON_DARK,
@@ -354,20 +481,120 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     padding: SP.xl,
   },
-  mediaPlaceholder: {
+  placeholder: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: SP.sm,
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: 'rgba(255,255,255,0.18)',
     borderRadius: RADIUS.lg,
   },
-  mediaPlaceholderText: {
-    color: 'rgba(255,255,255,0.4)',
-    fontSize: FS.sm,
+  placeholderTitle: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: FS.base,
+    fontFamily: FONT.medium,
+  },
+  placeholderSub: {
+    color: 'rgba(255,255,255,0.35)',
+    fontSize: FS.xs,
     fontFamily: FONT.regular,
-    marginTop: SP.md,
+    textAlign: 'center',
+    paddingHorizontal: SP.lg,
+  },
+  multiSlideChip: {
+    position: 'absolute',
+    top: SP.sm,
+    right: SP.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.62)',
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.sm,
+    paddingVertical: 4,
+  },
+  multiSlideText: {
+    color: '#FFF',
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+  },
+  changeBtn: {
+    position: 'absolute',
+    bottom: SP.sm,
+    right: SP.sm,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  changeBtnText: {
+    color: '#FFF',
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+  },
+  videoReadyBg: {
+    flex: 1,
+    backgroundColor: '#0a0a0a',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: SP.sm,
+  },
+  videoDurText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: FS.sm,
+    fontFamily: FONT.medium,
+  },
+  photoStrip: {
+    marginTop: SP.sm,
+    paddingVertical: SP.xs,
+  },
+  photoThumb: {
+    width: 60,
+    height: 80,
+    borderRadius: RADIUS.sm,
+    overflow: 'hidden',
+  },
+  photoThumbImg: {
+    width: '100%',
+    height: '100%',
+  },
+  thumbNumBadge: {
+    position: 'absolute',
+    bottom: 3,
+    right: 3,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  thumbNumText: {
+    color: '#FFF',
+    fontSize: 9,
+    fontFamily: FONT.bold,
+  },
+  advancedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    marginHorizontal: SP.md,
+    marginTop: SP.sm,
+    paddingVertical: SP.sm,
+    paddingHorizontal: SP.md,
+    backgroundColor: 'rgba(139,92,246,0.12)',
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: 'rgba(139,92,246,0.35)',
+  },
+  advancedBtnText: {
+    color: PURPLE,
+    fontSize: FS.sm,
+    fontFamily: FONT.medium,
   },
   controlsPanel: {
     paddingHorizontal: SP.md,
