@@ -1,35 +1,72 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, TextInput } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, TextInput, ActivityIndicator } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
+import { serviceRequest } from '@/lib/serviceConfig';
 
 const SEGMENTS = ['All', 'VIP', 'Returning', 'At-Risk'] as const;
 type Segment = typeof SEGMENTS[number];
 
-const CUSTOMERS = [
-  { name: 'Jordan Lee', email: 'j.lee@email.com', orders: 14, ltv: '$1,840', segment: 'VIP', initials: 'JL', color: '#39FF88' },
-  { name: 'Maya Chen', email: 'm.chen@email.com', orders: 8, ltv: '$960', segment: 'VIP', initials: 'MC', color: '#4A6FA5' },
-  { name: 'Amir Patel', email: 'a.patel@email.com', orders: 3, ltv: '$340', segment: 'Returning', initials: 'AP', color: '#4C9A5E' },
-  { name: 'Sofia Reyes', email: 's.reyes@email.com', orders: 1, ltv: '$89', segment: 'New', initials: 'SR', color: '#B98A2E' },
-  { name: 'Elijah Brooks', email: 'e.brooks@email.com', orders: 0, ltv: '$0', segment: 'At-Risk', initials: 'EB', color: '#EF4444' },
-];
-
-const segVariant: Record<string, 'gold' | 'info' | 'success' | 'warning' | 'error' | 'default'> = {
-  VIP: 'gold',
-  Returning: 'success',
-  New: 'info',
-  'At-Risk': 'error',
+type ApiCustomer = {
+  id: string;
+  ownerId: string;
+  name: string;
+  email: string;
+  phone?: string;
+  address?: string;
+  createdAt: string;
 };
+
+const AVATAR_COLORS = ['#8B5CF6', '#4A6FA5', '#22D3EE', '#B98A2E', '#EF4444', '#A78BFA', '#F59E0B', '#6D28D9'];
+
+function getInitials(name: string): string {
+  return name.split(' ').map((p) => p[0] ?? '').join('').slice(0, 2).toUpperCase();
+}
+
+function getAvatarColor(id: string): string {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
+
 
 export default function CustomersScreen() {
   const colors = useColors();
   const router = useRouter();
   const [segment, setSegment] = useState<Segment>('All');
   const [search, setSearch] = useState('');
+  const [customers, setCustomers] = useState<ApiCustomer[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchCustomers = useCallback(async (searchText: string) => {
+    try {
+      const url = searchText.trim()
+        ? `/api/customers?search=${encodeURIComponent(searchText.trim())}`
+        : '/api/customers';
+      const res = await serviceRequest<ApiCustomer[]>(url);
+      if (Array.isArray(res)) setCustomers(res);
+    } catch {
+      // silently keep existing data on error
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCustomers('');
+  }, [fetchCustomers]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (search.trim()) fetchCustomers(search);
+      else fetchCustomers('');
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search, fetchCustomers]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -70,7 +107,7 @@ export default function CustomersScreen() {
       </View>
 
       {/* Loyalty Card */}
-      <View style={[styles.loyaltyCard, { backgroundColor: '#17140F', borderColor: '#00C85344' }]}>
+      <View style={[styles.loyaltyCard, { backgroundColor: '#12121F', borderColor: 'rgba(139,92,246,0.26)' }]}>
         <View style={styles.loyaltyLeft}>
           <Feather name="star" size={20} color={colors.primary} />
           <View>
@@ -111,25 +148,42 @@ export default function CustomersScreen() {
 
       {/* Customer List */}
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {CUSTOMERS.filter((c) => segment === 'All' || c.segment === segment).map((c, i) => (
-          <TouchableOpacity
-            key={c.email}
-            activeOpacity={0.8}
-            style={[styles.custRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
-          >
-            <View style={[styles.avatar, { backgroundColor: c.color + '33' }]}>
-              <Text style={[styles.avatarText, { color: c.color }]}>{c.initials}</Text>
-            </View>
-            <View style={styles.custInfo}>
-              <Text style={[styles.custName, { color: colors.foreground }]}>{c.name}</Text>
-              <Text style={[styles.custEmail, { color: colors.mutedForeground }]}>{c.email}</Text>
-              <Text style={[styles.custOrders, { color: colors.mutedForeground }]}>{c.orders} orders · LTV {c.ltv}</Text>
-            </View>
-            <View style={styles.custRight}>
-              <Badge label={c.segment} variant={segVariant[c.segment] ?? 'default'} />
-            </View>
-          </TouchableOpacity>
-        ))}
+        {loading ? (
+          <View style={styles.custRow}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            <Text style={[styles.custEmail, { color: colors.mutedForeground, marginLeft: 10 }]}>Loading customers...</Text>
+          </View>
+        ) : customers.length === 0 ? (
+          <View style={styles.custRow}>
+            <Text style={[styles.custEmail, { color: colors.mutedForeground }]}>No customers found.</Text>
+          </View>
+        ) : (
+          customers.map((c, i) => {
+            const color = getAvatarColor(c.id);
+            const initials = getInitials(c.name);
+            return (
+              <TouchableOpacity
+                key={c.id}
+                activeOpacity={0.8}
+                style={[styles.custRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
+              >
+                <View style={[styles.avatar, { backgroundColor: color + '33' }]}>
+                  <Text style={[styles.avatarText, { color }]}>{initials}</Text>
+                </View>
+                <View style={styles.custInfo}>
+                  <Text style={[styles.custName, { color: colors.foreground }]}>{c.name}</Text>
+                  <Text style={[styles.custEmail, { color: colors.mutedForeground }]}>{c.email}</Text>
+                  {c.phone ? (
+                    <Text style={[styles.custOrders, { color: colors.mutedForeground }]}>{c.phone}</Text>
+                  ) : null}
+                </View>
+                <View style={styles.custRight}>
+                  <Badge label="Customer" variant="default" />
+                </View>
+              </TouchableOpacity>
+            );
+          })
+        )}
       </View>
 
       {/* Wishlists & Gift Cards */}

@@ -20,7 +20,7 @@ import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
   PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  SUCCESS,
+  SUCCESS, ON_DARK,
   ORANGE, ORANGE_DIM,
   RED, RED_DIM,
   GRAD_PRIMARY,
@@ -78,7 +78,7 @@ export default function BuyerProblemReportScreen() {
   if (submitted) {
     return (
       <View style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
-        <View style={s.successIcon}><Feather name="check" size={32} color="#fff" /></View>
+        <View style={s.successIcon}><Feather name="check" size={32} color={ON_DARK} /></View>
         <Text style={s.successTitle}>Report Submitted</Text>
         <Text style={s.successSub}>Your problem report has been received. Our team will review it and reach out if needed.</Text>
         <TouchableOpacity style={s.doneBtn} onPress={() => router.back()} activeOpacity={0.85}>
@@ -184,7 +184,7 @@ export default function BuyerProblemReportScreen() {
       <View style={[s.bottomBar, { paddingBottom: insets.bottom + SP.sm }]}>
         <TouchableOpacity style={s.submitBtn} onPress={handleSubmit} activeOpacity={0.88} disabled={submitting}>
           <LinearGradient colors={[...GRAD_PRIMARY]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.submitGrad}>
-            {submitting ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.submitText}>Submit Problem Report</Text>}
+            {submitting ? <ActivityIndicator color={ON_DARK} size="small" /> : <Text style={s.submitText}>Submit Problem Report</Text>}
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -221,11 +221,11 @@ const s = StyleSheet.create({
   bottomBar: { paddingHorizontal: SP.md, paddingTop: SP.md, backgroundColor: BG, borderTopWidth: 1, borderTopColor: BORDER },
   submitBtn: { borderRadius: RADIUS.lg, overflow: 'hidden' },
   submitGrad: { height: COMP.buttonH, alignItems: 'center', justifyContent: 'center' },
-  submitText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#fff' },
+  submitText: { fontSize: FS.base, fontFamily: FONT.bold, color: ON_DARK },
   successIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: SUCCESS, alignItems: 'center', justifyContent: 'center', marginBottom: SP.md },
   successTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, marginBottom: SP.sm },
   successSub: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 22, marginBottom: SP.lg },
   doneBtn: { width: '100%', borderRadius: RADIUS.lg, overflow: 'hidden' },
   doneBtnGrad: { height: COMP.buttonH, alignItems: 'center', justifyContent: 'center' },
-  doneBtnText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#fff' },
+  doneBtnText: { fontSize: FS.base, fontFamily: FONT.bold, color: ON_DARK },
 });

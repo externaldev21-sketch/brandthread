@@ -3,8 +3,9 @@
  * Mounted at /api/webhooks (before express.json() middleware).
  */
 import { Router, type Request, type Response } from "express";
+import crypto from "crypto";
 import {
-  db, checkoutSessions, orders, orderItems, productVariants, users,
+  db, checkoutSessions, orders, orderItems, productVariants, products, users, notificationsFeed, disputes,
 } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe";
@@ -58,6 +59,44 @@ router.post("/stripe", async (req: Request, res: Response) => {
 
       case "account.updated":
         await handleAccountUpdated(event.data.object);
+        break;
+
+      // ── Seller platform subscription (billed to seller's own payment method) ──
+      // These events are completely separate from buyer checkout and Connect.
+      case "customer.subscription.created":
+      case "customer.subscription.updated":
+        await handleSubscriptionUpdated(event.data.object);
+        break;
+
+      case "customer.subscription.deleted":
+        await handleSubscriptionDeleted(event.data.object);
+        break;
+
+      // ── Stripe Identity — seller ID verification ───────────────────────────
+      case "identity.verification_session.verified":
+        await handleIdentityVerified(event.data.object);
+        break;
+
+      case "identity.verification_session.requires_input":
+        await handleIdentityFailed(event.data.object);
+        break;
+
+      case "identity.verification_session.processing":
+        // Status already set to 'pending' when the session was created.
+        // No DB update needed — the verified/requires_input event follows.
+        break;
+
+      // ── Stripe Disputes / Chargebacks ─────────────────────────────────────
+      case "charge.dispute.created":
+        await handleDisputeCreated(event.data.object);
+        break;
+
+      case "charge.dispute.updated":
+        await handleDisputeUpdated(event.data.object);
+        break;
+
+      case "charge.dispute.closed":
+        await handleDisputeClosed(event.data.object);
         break;
 
       default:
@@ -270,6 +309,52 @@ async function handleCheckoutPaid(session: any) {
     }
     // If oversold: zero decrements committed — inventory stays intact.
     // Stripe refund is issued outside this transaction.
+
+    // ── Low-stock notifications ───────────────────────────────────────────────────
+    // For each decremented variant, check if stock fell below threshold
+    if (oversoldItems.length === 0) {
+      for (const item of cartItems) {
+        if (!item.variantId) continue;
+        try {
+          const [variant] = await tx
+            .select({
+              stock: productVariants.stock,
+              lowStockThreshold: productVariants.lowStockThreshold,
+              productName: products.name,
+              ownerId: products.ownerId,
+            })
+            .from(productVariants)
+            .innerJoin(products, eq(products.id, productVariants.productId))
+            .where(eq(productVariants.id, item.variantId as any))
+            .limit(1);
+
+          if (
+            variant &&
+            variant.lowStockThreshold !== null &&
+            variant.lowStockThreshold > 0 &&
+            variant.stock >= 0 &&
+            variant.stock <= variant.lowStockThreshold
+          ) {
+            const isZero = variant.stock === 0;
+            await tx.insert(notificationsFeed).values({
+              id: crypto.randomUUID(),
+              userId: variant.ownerId,
+              type: isZero ? 'out_of_stock' : 'low_stock',
+              title: isZero ? 'Out of stock' : 'Low stock alert',
+              body: isZero
+                ? `${variant.productName} is now out of stock.`
+                : `${variant.productName} has only ${variant.stock} units left.`,
+              targetId: item.variantId,
+              targetType: 'variant',
+              isRead: false,
+              createdAt: new Date(),
+            });
+          }
+        } catch {
+          // Non-critical — don't fail the order over a notification error
+        }
+      }
+    }
   });
 
   // ── Issue Stripe refund for oversold orders ───────────────────────────────
@@ -296,6 +381,239 @@ async function handleCheckoutPaid(session: any) {
   } else {
     console.log(`Order created for buyer ${buyerId}, session ${sessionId}`);
   }
+}
+
+// ── Seller subscription handlers ────────────────────────────────────────────
+
+/**
+ * Handles customer.subscription.created and customer.subscription.updated.
+ * Looks up the seller by stripeCustomerId and syncs their subscription status.
+ */
+async function handleSubscriptionUpdated(sub: any) {
+  const customerId: string =
+    typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
+  if (!customerId) {
+    console.warn("subscription.updated: missing customer id");
+    return;
+  }
+
+  // Determine plan from the price lookup_key on the first subscription item
+  const lookupKey: string | undefined = sub.items?.data?.[0]?.price?.lookup_key;
+  const planId =
+    lookupKey === "brandthread_pro_monthly"    ? "pro"
+    : lookupKey === "brandthread_growth_monthly" ? "growth"
+    : undefined; // don't overwrite plan if lookup_key absent (e.g. expand not requested)
+
+  const periodEnd: Date | null = sub.current_period_end
+    ? new Date(sub.current_period_end * 1000)
+    : null;
+
+  await db.update(users).set({
+    subscriptionId:     sub.id,
+    subscriptionStatus: sub.status,
+    ...(planId    ? { subscriptionPlanId:     planId    } : {}),
+    ...(periodEnd ? { subscriptionPeriodEnd:  periodEnd } : {}),
+    updatedAt: new Date(),
+  }).where(eq(users.stripeCustomerId, customerId));
+
+  console.log(
+    `Subscription ${sub.id} updated — customer: ${customerId}, status: ${sub.status}`,
+  );
+}
+
+/**
+ * Handles customer.subscription.deleted.
+ * Marks the seller as canceled and resets them to the free Starter plan.
+ */
+async function handleSubscriptionDeleted(sub: any) {
+  const customerId: string =
+    typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
+  if (!customerId) return;
+
+  await db.update(users).set({
+    subscriptionStatus: "canceled",
+    subscriptionPlanId: "starter",
+    updatedAt: new Date(),
+  }).where(eq(users.stripeCustomerId, customerId));
+
+  console.log(`Subscription ${sub.id} deleted — customer: ${customerId}`);
+}
+
+// ─── Stripe Identity handlers ─────────────────────────────────────────────────
+
+async function handleIdentityVerified(session: any) {
+  const clerkId: string | undefined = session.metadata?.seller_clerk_id;
+  if (!clerkId) {
+    console.warn("identity.verification_session.verified: missing seller_clerk_id in metadata", session.id);
+    return;
+  }
+
+  await db
+    .update(users)
+    .set({
+      verified: true,
+      verificationStatus: "verified",
+      updatedAt: new Date(),
+    })
+    .where(eq(users.clerkId, clerkId));
+
+  // Push notification to seller
+  try {
+    await db.insert(notificationsFeed).values({
+      userId: clerkId,
+      category: "system",
+      type: "verification_verified",
+      title: "You're a verified seller! ✓",
+      body: "Your identity has been confirmed. Your verified badge is now live on your storefront.",
+    });
+  } catch {
+    // Non-critical
+  }
+
+  console.log(`Seller ${clerkId} verified via Stripe Identity (session ${session.id})`);
+}
+
+async function handleIdentityFailed(session: any) {
+  const clerkId: string | undefined = session.metadata?.seller_clerk_id;
+  if (!clerkId) {
+    console.warn("identity.verification_session.requires_input: missing seller_clerk_id in metadata", session.id);
+    return;
+  }
+
+  const lastError = session.last_error;
+  const reason = lastError?.reason ?? "unknown";
+
+  await db
+    .update(users)
+    .set({
+      verificationStatus: "failed",
+      updatedAt: new Date(),
+    })
+    .where(eq(users.clerkId, clerkId));
+
+  // Notify seller so they know to retry
+  try {
+    await db.insert(notificationsFeed).values({
+      userId: clerkId,
+      category: "system",
+      type: "verification_failed",
+      title: "Verification needs attention",
+      body: "We couldn't verify your identity. Open the app to try again.",
+    });
+  } catch {
+    // Non-critical
+  }
+
+  console.log(`Seller ${clerkId} identity verification failed (session ${session.id}, reason: ${reason})`);
+}
+
+// ─── Dispute handlers ─────────────────────────────────────────────────────────
+
+function mapDisputeStatus(s: string): string {
+  switch (s) {
+    case "needs_response":           return "needs_response";
+    case "under_review":             return "under_review";
+    case "warning_needs_response":   return "needs_response";
+    case "warning_under_review":     return "under_review";
+    case "warning_closed":           return "closed";
+    case "charge_refunded":          return "closed";
+    case "won":                      return "won";
+    case "lost":                     return "lost";
+    default:                         return s;
+  }
+}
+
+/** Resolve the seller's clerkId from a Stripe paymentIntentId or chargeId. */
+async function resolveSellerAndOrder(
+  paymentIntentId: string | null,
+  chargeId: string | null,
+): Promise<{ sellerId: string; orderId: string | null }> {
+  // Try to find matching order by payment intent ID
+  if (paymentIntentId) {
+    const [ord] = await db
+      .select({ id: orders.id, ownerId: orders.ownerId })
+      .from(orders)
+      .where(eq(orders.stripePaymentIntentId, paymentIntentId))
+      .limit(1);
+    if (ord) return { sellerId: ord.ownerId, orderId: ord.id };
+  }
+  return { sellerId: "unknown", orderId: null };
+}
+
+async function handleDisputeCreated(dispute: any) {
+  const dueBy = dispute.evidence_details?.due_by
+    ? new Date(dispute.evidence_details.due_by * 1000)
+    : null;
+
+  const { sellerId, orderId } = await resolveSellerAndOrder(
+    dispute.payment_intent ?? null,
+    dispute.charge ?? null,
+  );
+
+  // Build human-readable claim from reason
+  const reasonLabels: Record<string, string> = {
+    credit_not_processed:    "Customer claims they did not receive a refund.",
+    duplicate:               "Customer claims this is a duplicate charge.",
+    fraudulent:              "Customer reports this as an unauthorized charge.",
+    general:                 "Customer filed a general dispute.",
+    product_not_received:    "Customer claims the product was not received.",
+    product_unacceptable:    "Customer claims the product was defective or not as described.",
+    subscription_canceled:   "Customer claims they canceled their subscription.",
+    unrecognized:            "Customer does not recognize this charge.",
+  };
+  const customerClaim = reasonLabels[dispute.reason] ?? `Dispute filed: ${dispute.reason}`;
+
+  await db
+    .insert(disputes)
+    .values({
+      stripeDisputeId:       dispute.id,
+      stripeChargeId:        dispute.charge ?? null,
+      stripePaymentIntentId: dispute.payment_intent ?? null,
+      orderId,
+      sellerId,
+      amountCents:           dispute.amount,
+      currency:              dispute.currency,
+      reason:                dispute.reason,
+      status:                mapDisputeStatus(dispute.status),
+      evidenceDueBy:         dueBy,
+      stripeEvidenceDetails: dispute.evidence_details ?? {},
+      isChargeRefundable:    dispute.is_charge_refundable ?? true,
+      networkReasonCode:     dispute.network_reason_code ?? null,
+      customerClaim,
+    })
+    .onConflictDoNothing();
+
+  console.log(`Dispute created: ${dispute.id} — seller ${sellerId} — reason ${dispute.reason}`);
+}
+
+async function handleDisputeUpdated(stripeDispute: any) {
+  const dueBy = stripeDispute.evidence_details?.due_by
+    ? new Date(stripeDispute.evidence_details.due_by * 1000)
+    : null;
+
+  await db
+    .update(disputes)
+    .set({
+      status:                mapDisputeStatus(stripeDispute.status),
+      evidenceDueBy:         dueBy,
+      stripeEvidenceDetails: stripeDispute.evidence_details ?? {},
+      updatedAt:             new Date(),
+    })
+    .where(eq(disputes.stripeDisputeId, stripeDispute.id));
+
+  console.log(`Dispute updated: ${stripeDispute.id} — status ${stripeDispute.status}`);
+}
+
+async function handleDisputeClosed(stripeDispute: any) {
+  await db
+    .update(disputes)
+    .set({
+      status:    mapDisputeStatus(stripeDispute.status),
+      updatedAt: new Date(),
+    })
+    .where(eq(disputes.stripeDisputeId, stripeDispute.id));
+
+  console.log(`Dispute closed: ${stripeDispute.id} — outcome ${stripeDispute.status}`);
 }
 
 async function handleAccountUpdated(account: any) {

@@ -28,7 +28,7 @@ import {
 } from '@/services/cartTypes';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, BORDER_FOCUS,
-  FG, MUTED, SUBTLE,
+  FG, MUTED, SUBTLE, ON_DARK,
   PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   CYAN, CYAN_DIM,
   SUCCESS, SUCCESS_DIM,
@@ -572,7 +572,7 @@ function ReviewStep({ session, onEdit, onAcknowledge, placing }: {
       {session.acknowledgments.map(ack => (
         <TouchableOpacity key={ack.key} style={rv.ackRow} onPress={() => onAcknowledge(ack.key, !ack.acknowledged)} activeOpacity={0.7}>
           <View style={[rv.checkbox, ack.acknowledged && rv.checkboxChecked]}>
-            {ack.acknowledged && <Feather name="check" size={12} color="#fff" />}
+            {ack.acknowledged && <Feather name="check" size={12} color={ON_DARK} />}
           </View>
           <Text style={rv.ackText}>{ack.label}</Text>
         </TouchableOpacity>
@@ -629,7 +629,7 @@ function ConfirmationStep({ orderNumbers, total, sellerNames, address, hasPreOrd
     <View style={conf.root}>
       {/* Success icon */}
       <View style={conf.iconCircle}>
-        <Feather name="check" size={36} color="#fff" />
+        <Feather name="check" size={36} color={ON_DARK} />
       </View>
       <Text style={conf.headline}>Order Confirmed!</Text>
       <Text style={conf.sub}>Thank you for your purchase.</Text>
@@ -702,7 +702,7 @@ function ConfirmationStep({ orderNumbers, total, sellerNames, address, hasPreOrd
       {/* Actions */}
       <TouchableOpacity style={conf.btn} onPress={() => router.replace('/(buyer)/orders' as never)} activeOpacity={0.85}>
         <LinearGradient colors={[...GRAD_PRIMARY]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={conf.btnGrad}>
-          <Feather name="package" size={16} color="#fff" />
+          <Feather name="package" size={16} color={ON_DARK} />
           <Text style={conf.btnText}>View My Orders</Text>
         </LinearGradient>
       </TouchableOpacity>
@@ -729,7 +729,7 @@ const conf = StyleSheet.create({
   milestoneText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
   btn: { width: '100%', borderRadius: RADIUS.lg, overflow: 'hidden', marginTop: SP.md },
   btnGrad: { height: COMP.buttonH, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm },
-  btnText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#fff' },
+  btnText: { fontSize: FS.base, fontFamily: FONT.bold, color: ON_DARK },
   btnSecondary: { marginTop: SP.sm, paddingVertical: 12 },
   btnSecondaryText: { fontSize: FS.base, fontFamily: FONT.medium, color: MUTED, textAlign: 'center' },
 });
@@ -1170,10 +1170,10 @@ export default function BuyerCheckoutScreen() {
           >
             <LinearGradient colors={[...GRAD_PRIMARY]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={co.continueGrad}>
               {placing ? (
-                <ActivityIndicator color="#fff" size="small" />
+                <ActivityIndicator color={ON_DARK} size="small" />
               ) : (
                 <>
-                  {step === 'review' && <Feather name="lock" size={15} color="#fff" />}
+                  {step === 'review' && <Feather name="lock" size={15} color={ON_DARK} />}
                   <Text style={co.continueText}>{continueLabel}</Text>
                 </>
               )}
@@ -1198,7 +1198,7 @@ const co = StyleSheet.create({
   },
   continueBtn: { borderRadius: RADIUS.lg, overflow: 'hidden', ...SHADOW_PURPLE },
   continueGrad: { height: COMP.buttonH, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm },
-  continueText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#fff' },
+  continueText: { fontSize: FS.base, fontFamily: FONT.bold, color: ON_DARK },
   errorBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, backgroundColor: RED_DIM, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md, borderWidth: 1, borderColor: 'rgba(248,113,113,0.3)' },
   errorText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: RED, lineHeight: 20 },
 });

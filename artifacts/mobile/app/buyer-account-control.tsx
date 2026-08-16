@@ -10,6 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, RED, OVERLAY,
+  BORDER_SUBTLE, ON_DARK,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { requestDeactivation } from '@/lib/accountService';
@@ -171,7 +172,7 @@ const s = StyleSheet.create({
   groupLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SP.sm },
   card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden', marginBottom: SP.sm },
   optionRow: { flexDirection: 'row', gap: 14, padding: SP.md },
-  optionIconWrap: { width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.05)', alignItems: 'center', justifyContent: 'center' },
+  optionIconWrap: { width: 44, height: 44, borderRadius: 12, backgroundColor: BORDER_SUBTLE, alignItems: 'center', justifyContent: 'center' },
   optionTitle: { fontFamily: FONT.semibold, fontSize: FS.base, color: FG, marginBottom: 4 },
   optionDesc: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, lineHeight: 17 },
   bulletList: { marginTop: 10, gap: 6 },
@@ -201,5 +202,5 @@ const m = StyleSheet.create({
   cancelText: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
   confirmBtn: { flex: 1, height: 44, borderRadius: RADIUS.md, backgroundColor: RED, alignItems: 'center', justifyContent: 'center' },
   confirmBtnDisabled: { opacity: 0.35 },
-  confirmText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: '#FFF' },
+  confirmText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: ON_DARK },
 });

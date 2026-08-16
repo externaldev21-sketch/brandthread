@@ -1,25 +1,26 @@
-import React, { useMemo, useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useApi } from '@/lib/api';
 
-type TaxKind = 'Shopify Tax' | 'Manual Tax' | 'Basic Tax';
+type TaxKind = 'Stripe Tax' | 'Manual Tax' | 'Basic Tax';
 
 const REGIONS: { name: string; flag: string; kind: TaxKind }[] = [
-  { name: 'United States', flag: '🇺🇸', kind: 'Shopify Tax' },
+  { name: 'United States', flag: '🇺🇸', kind: 'Stripe Tax' },
   { name: 'Algeria', flag: '🇩🇿', kind: 'Manual Tax' },
   { name: 'Argentina', flag: '🇦🇷', kind: 'Manual Tax' },
   { name: 'Australia', flag: '🇦🇺', kind: 'Basic Tax' },
   { name: 'Bahrain', flag: '🇧🇭', kind: 'Manual Tax' },
   { name: 'Bermuda', flag: '🇧🇲', kind: 'Manual Tax' },
-  { name: 'Canada', flag: '🇨🇦', kind: 'Shopify Tax' },
+  { name: 'Canada', flag: '🇨🇦', kind: 'Stripe Tax' },
   { name: 'Chile', flag: '🇨🇱', kind: 'Manual Tax' },
   { name: 'China', flag: '🇨🇳', kind: 'Manual Tax' },
   { name: 'Colombia', flag: '🇨🇴', kind: 'Manual Tax' },
   { name: 'Egypt', flag: '🇪🇬', kind: 'Manual Tax' },
-  { name: 'European Union', flag: '🇪🇺', kind: 'Shopify Tax' },
+  { name: 'European Union', flag: '🇪🇺', kind: 'Stripe Tax' },
   { name: 'Hong Kong SAR', flag: '🇭🇰', kind: 'Manual Tax' },
   { name: 'Indonesia', flag: '🇮🇩', kind: 'Manual Tax' },
   { name: 'Isle of Man', flag: '🇮🇲', kind: 'Manual Tax' },
@@ -27,10 +28,45 @@ const REGIONS: { name: string; flag: string; kind: TaxKind }[] = [
 
 export default function TaxesDutiesScreen() {
   const colors = useColors();
-  const [search, setSearch] = useState('');
-  const [includeSalesTax, setIncludeSalesTax] = useState(false);
+  const api    = useApi();
+  const [search,           setSearch]           = useState('');
+  const [includeSalesTax,  setIncludeSalesTax]   = useState(false);
   const [chargeShippingTax, setChargeShippingTax] = useState(false);
-  const [chargeVat, setChargeVat] = useState(false);
+  const [chargeVat,        setChargeVat]         = useState(false);
+  const [stripeTaxEnabled, setStripeTaxEnabled]  = useState(false);
+  const [saving,           setSaving]            = useState(false);
+
+  // Load config on mount
+  const loadConfig = useCallback(async () => {
+    try {
+      const cfg = await api.taxes.status();
+      setStripeTaxEnabled(cfg.stripeTaxEnabled ?? false);
+      setIncludeSalesTax(cfg.stripeTaxEnabled ?? false); // sales tax = enabled
+      setChargeShippingTax(cfg.chargeShippingTax ?? false);
+      setChargeVat(cfg.chargeVat ?? false);
+    } catch { /* no-op if not connected */ }
+  }, []);
+
+  useEffect(() => { loadConfig(); }, [loadConfig]);
+
+  const handleSetup = async () => {
+    haptic();
+    setSaving(true);
+    try {
+      await api.taxes.enable();
+      setStripeTaxEnabled(true);
+      setIncludeSalesTax(true);
+      Alert.alert('Stripe Tax enabled', 'Sales tax will now be automatically calculated at checkout based on buyer location.');
+    } catch (err: any) {
+      Alert.alert('Error', err.message ?? 'Failed to enable Stripe Tax');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveConfig = async (patch: { collectDuties?: boolean; chargeShippingTax?: boolean; chargeVat?: boolean }) => {
+    try { await api.taxes.config(patch); } catch { /* best-effort */ }
+  };
 
   function haptic() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -58,8 +94,10 @@ export default function TaxesDutiesScreen() {
                 Prevent surprise fees for international customers at delivery · 0.5% transaction fee
               </Text>
             </View>
-            <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.manageBtn, { borderColor: colors.border }]}>
-              <Text style={[styles.manageBtnText, { color: colors.foreground }]}>Set up</Text>
+            <TouchableOpacity onPress={handleSetup} disabled={saving || stripeTaxEnabled} activeOpacity={0.7} style={[styles.manageBtn, { borderColor: colors.border }]}>
+              <Text style={[styles.manageBtnText, { color: stripeTaxEnabled ? colors.success : colors.foreground }]}>
+                {stripeTaxEnabled ? '✓ Active' : (saving ? 'Enabling…' : 'Set up')}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -101,14 +139,24 @@ export default function TaxesDutiesScreen() {
               </>
             }
             checked={includeSalesTax}
-            onPress={() => { haptic(); setIncludeSalesTax((v) => !v); }}
+            onPress={async () => {
+              haptic();
+              if (!stripeTaxEnabled) { handleSetup(); return; }
+              const next = !includeSalesTax;
+              setIncludeSalesTax(next);
+            }}
             colors={colors}
           />
           <Checkbox
             label="Charge sales tax on shipping"
             description="Automatically calculated for Canada, European Union, and United States."
             checked={chargeShippingTax}
-            onPress={() => { haptic(); setChargeShippingTax((v) => !v); }}
+            onPress={async () => {
+              haptic();
+              const next = !chargeShippingTax;
+              setChargeShippingTax(next);
+              await saveConfig({ chargeShippingTax: next });
+            }}
             colors={colors}
           />
           <Checkbox

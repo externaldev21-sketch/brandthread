@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, RED, RED_DIM, SUCCESS,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ON_DARK,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { getSessions, removeSession, removeAllOtherSessions } from '@/lib/accountService';
@@ -88,7 +88,7 @@ export default function BuyerLoginActivity() {
             <React.Fragment key={session.id}>
               <View style={s.row}>
                 <View style={[s.iconBg, session.current && s.iconBgCurrent]}>
-                  <Feather name={session.icon} size={18} color={session.current ? '#FFF' : FG} />
+                  <Feather name={session.icon} size={18} color={session.current ? ON_DARK : FG} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -140,7 +140,7 @@ const s = StyleSheet.create({
   deviceName: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
   deviceOs: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
   deviceMeta: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, marginTop: 1 },
-  currentBadge: { backgroundColor: 'rgba(16,185,129,0.15)', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  currentBadge: { backgroundColor: SUCCESS_DIM, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   currentBadgeText: { fontFamily: FONT.medium, fontSize: 10, color: SUCCESS },
   removeBtn: { padding: 8 },
   signOutAll: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: SP.md, padding: SP.md, backgroundColor: RED_DIM, borderRadius: RADIUS.md, borderWidth: 1, borderColor: RED + '40' },

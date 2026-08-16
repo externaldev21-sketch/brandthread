@@ -5,6 +5,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { serviceRequest } from '@/lib/serviceConfig';
 import type {
   BuyerSocialProfile, BuyerPost, RepostRecord,
   Friendship, FriendshipStatus, FriendRequest, FriendSuggestion,
@@ -452,6 +453,20 @@ export async function repostPost(id: string, friendMeta?: FriendPostMeta): Promi
   }
   await save(K.reposts, reposts);
   notify();
+
+  // Fire-and-forget: log repost interaction to DB for real posts
+  try {
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+    if (isUUID) {
+      serviceRequest('/api/posts/' + id + '/interact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'repost' }),
+      }).catch(() => {});
+    }
+  } catch {
+    // ignore errors so local state is always preserved
+  }
 }
 
 /** Returns a Set of post IDs that the current user has reposted (persisted). */
@@ -656,6 +671,8 @@ export async function createSellerPost(params: {
   contentType: string;
   caption: string;
   hashtags: string[];
+  /** Curated style-taxonomy tags (from StyleTagsPicker). Stored separately from freeform hashtags. */
+  styleTags?: string[];
   mediaUris?: string[];
   thumbnailUri?: string;
   aspectRatio?: '9:16' | '3:4' | '1:1';
@@ -705,6 +722,18 @@ export async function createSellerPost(params: {
   };
   await save(SELLER_POSTS_KEY, [post, ...existing]);
   notify();
+  // Fire-and-forget to real API
+  serviceRequest('/api/posts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      mediaUrl: params.mediaUris?.[0],
+      mediaType: params.contentType,
+      caption: params.caption,
+      styleTags: params.styleTags ?? [],
+      taggedProductIds: (params.productTags ?? []).map(t => t.productId).filter(id => /^[0-9a-f-]{36}$/i.test(id)),
+    }),
+  }).catch(() => {});
   return post;
 }
 
@@ -874,7 +903,8 @@ export async function removeFriend(userId: string): Promise<void> {
 // ─── Conversations ────────────────────────────────────────────────────────────
 
 export async function getConversations(): Promise<Conversation[]> {
-  return load<Conversation[]>(K.conversations, DEMO_CONVS);
+  try { return await serviceRequest<Conversation[]>('/api/conversations'); }
+  catch { return load<Conversation[]>(K.conversations, DEMO_CONVS); }
 }
 export async function getConversation(id: string): Promise<Conversation | null> {
   const convs = await getConversations();
@@ -886,6 +916,25 @@ export async function createOrGetConversation(params: {
   contextOrderId?: string; contextOrderNumber?: string; contextOrderStatus?: string;
   contextProductId?: string; contextProductName?: string; contextSellerName?: string;
 }): Promise<Conversation> {
+  try {
+    const conv = await serviceRequest<Conversation>('/api/conversations', {
+      method: 'POST',
+      body: JSON.stringify({
+        type: params.type ?? 'buyer_to_seller',
+        participant: {
+          userId: params.participant.userId, name: params.participant.name,
+          handle: params.participant.handle ?? '', initials: params.participant.initials ?? '',
+          color: params.participant.color ?? '#8B5CF6', accountType: params.participant.accountType ?? 'seller',
+        },
+        myInfo: { name: MY_NAME, handle: MY_HANDLE, initials: MY_INITIALS, color: MY_COLOR, accountType: 'buyer' },
+        contextOrderId: params.contextOrderId, contextOrderNumber: params.contextOrderNumber,
+        contextOrderStatus: params.contextOrderStatus, contextProductId: params.contextProductId,
+        contextProductName: params.contextProductName, contextSellerName: params.contextSellerName,
+      }),
+    });
+    notify();
+    return conv;
+  } catch { /* fall through to existing local logic */ }
   const convs = await getConversations();
   // For order threads, match by orderId
   if (params.contextOrderId) {
@@ -908,7 +957,8 @@ export async function createOrGetConversation(params: {
   return conv;
 }
 export async function getMessages(conversationId: string): Promise<Message[]> {
-  return load<Message[]>(K.messages(conversationId), DEMO_MESSAGES[conversationId] ?? []);
+  try { return await serviceRequest<Message[]>(`/api/conversations/${conversationId}/messages`); }
+  catch { return load<Message[]>(K.messages(conversationId), DEMO_MESSAGES[conversationId] ?? []); }
 }
 export async function sendMessage(conversationId: string, text: string, attachment?: MessageAttachment): Promise<Message> {
   const msg: Message = {
@@ -923,12 +973,18 @@ export async function sendMessage(conversationId: string, text: string, attachme
   const idx = convs.findIndex(c => c.id === conversationId);
   if (idx >= 0) { convs[idx] = { ...convs[idx], lastMessage: text, lastMessageTs: msg.ts, updatedAt: iso() }; await save(K.conversations, convs); }
   notify();
-  // Simulate sent after 400ms
-  setTimeout(async () => {
-    const m2 = await getMessages(conversationId);
-    const mi = m2.findIndex(m => m.id === msg.id);
-    if (mi >= 0) { m2[mi] = { ...m2[mi], status: 'sent' }; await save(K.messages(conversationId), m2); notify(); }
-  }, 400);
+  // Send to API in background; update status on success or failure
+  serviceRequest(`/api/conversations/${conversationId}/messages`, { method: 'POST', body: JSON.stringify({ text, attachment }) })
+    .then(async (apiMsg: any) => {
+      const m2 = await load<Message[]>(K.messages(conversationId), []);
+      const mi = m2.findIndex(m => m.id === msg.id);
+      if (mi >= 0) { m2[mi] = { ...m2[mi], id: apiMsg?.id ?? m2[mi].id, status: 'delivered' }; await save(K.messages(conversationId), m2); notify(); }
+    })
+    .catch(async () => {
+      const m2 = await load<Message[]>(K.messages(conversationId), []);
+      const mi = m2.findIndex(m => m.id === msg.id);
+      if (mi >= 0) { m2[mi] = { ...m2[mi], status: 'failed' }; await save(K.messages(conversationId), m2); notify(); }
+    });
   return msg;
 }
 export async function retryMessage(conversationId: string, messageId: string): Promise<void> {
@@ -956,6 +1012,7 @@ export async function deleteMessageForMe(conversationId: string, messageId: stri
   if (idx >= 0) { msgs[idx] = { ...msgs[idx], deletedForMe: true }; await save(K.messages(conversationId), msgs); notify(); }
 }
 export async function markConversationRead(conversationId: string): Promise<void> {
+  serviceRequest(`/api/conversations/${conversationId}/read`, { method: 'PATCH', body: JSON.stringify({}) }).catch(() => {});
   const convs = await getConversations();
   const updated = convs.map(c => c.id === conversationId ? { ...c, unreadCount: 0 } : c);
   await save(K.conversations, updated); notify();
@@ -1009,9 +1066,11 @@ export async function deleteStory(storyId: string): Promise<void> {
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 export async function getNotifications(): Promise<Notification[]> {
-  return load<Notification[]>(K.notifications, DEMO_NOTIFS);
+  try { return await serviceRequest<Notification[]>('/api/buyer/notifications'); }
+  catch { return load<Notification[]>(K.notifications, DEMO_NOTIFS); }
 }
 export async function markNotificationRead(id: string): Promise<void> {
+  serviceRequest('/api/buyer/notifications/' + encodeURIComponent(id) + '/read', { method: 'PATCH', body: JSON.stringify({}) }).catch(() => {});
   const notifs = await getNotifications();
   await save(K.notifications, notifs.map(n => n.id === id ? { ...n, isRead: true } : n)); notify();
 }
@@ -1020,6 +1079,12 @@ export async function markNotificationUnread(id: string): Promise<void> {
   await save(K.notifications, notifs.map(n => n.id === id ? { ...n, isRead: false } : n)); notify();
 }
 export async function deleteNotification(id: string): Promise<void> {
+  try {
+    await serviceRequest('/api/buyer/notifications/' + encodeURIComponent(id), { method: 'DELETE' });
+    const notifs = await getNotifications();
+    await save(K.notifications, notifs.filter(n => n.id !== id));
+    notify(); return;
+  } catch { /* fall through to existing local logic */ }
   const notifs = await getNotifications();
   await save(K.notifications, notifs.filter(n => n.id !== id)); notify();
 }
@@ -1028,6 +1093,12 @@ export async function muteNotificationCategory(category: NotificationCategory): 
   await save(K.notifications, notifs.map(n => n.category === category ? { ...n, isMuted: true } : n)); notify();
 }
 export async function clearAllReadNotifications(): Promise<void> {
+  try {
+    await serviceRequest('/api/buyer/notifications/read-all', { method: 'PATCH', body: JSON.stringify({}) });
+    const notifs = await getNotifications();
+    await save(K.notifications, notifs.filter(n => !n.isRead));
+    notify(); return;
+  } catch { /* fall through to existing local logic */ }
   const notifs = await getNotifications();
   await save(K.notifications, notifs.filter(n => !n.isRead)); notify();
 }
@@ -1105,9 +1176,15 @@ export async function submitReport(params: { targetType: ReportTargetType; targe
 // ─── Saved Content ────────────────────────────────────────────────────────────
 
 export async function getSavedItems(): Promise<SavedItem[]> {
-  return load<SavedItem[]>(K.saved, DEMO_SAVED);
+  try { return await serviceRequest<SavedItem[]>('/api/buyer/saved'); }
+  catch { return load<SavedItem[]>(K.saved, DEMO_SAVED); }
 }
 export async function saveItem(params: { type: SavedItemType; targetId: string; title: string; subtitle?: string; accentColor?: string; }): Promise<SavedItem> {
+  try {
+    const saved = await serviceRequest<SavedItem>('/api/buyer/saved', { method: 'POST', body: JSON.stringify(params) });
+    notify();
+    return saved;
+  } catch { /* fall through to existing local logic */ }
   const items = await getSavedItems();
   const existing = items.find(i => i.targetId === params.targetId);
   if (existing) return existing;
@@ -1119,6 +1196,11 @@ export async function saveItem(params: { type: SavedItemType; targetId: string; 
   return item;
 }
 export async function removeSavedItem(targetId: string): Promise<void> {
+  try {
+    await serviceRequest('/api/buyer/saved/' + encodeURIComponent(targetId), { method: 'DELETE' });
+    notify();
+    return;
+  } catch { /* fall through to existing local logic */ }
   const items = await getSavedItems();
   await save(K.saved, items.filter(i => i.targetId !== targetId));
   const p = await getMyProfile();

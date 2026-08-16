@@ -27,8 +27,7 @@ import {
   FormInput,
 } from '@/components/BrandthreadUI';
 
-import { saveDraft } from '@/services/productService';
-import { ProductDraft } from '@/services/productTypes';
+import { useApi } from '@/lib/api';
 
 // ─── Import History Demo Data ─────────────────────────────────────────────────
 
@@ -49,6 +48,7 @@ function methodIcon(method: string): keyof typeof Feather.glyphMap {
 export default function ProductImportScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const api = useApi();
 
   const [selectedMethod, setSelectedMethod] = useState<'csv' | 'shopify' | 'manual' | null>(null);
 
@@ -66,30 +66,34 @@ export default function ProductImportScreen() {
 
   async function handleBulkCreate() {
     if (!bulkNames.trim()) return;
-    const names = bulkNames.split('\n').map(s => s.trim()).filter(Boolean);
-    if (names.length === 0) return;
+    const lines = bulkNames.split('\n').map(s => s.trim()).filter(Boolean);
+    if (lines.length === 0) return;
     setImporting(true);
     try {
-      for (const name of names) {
-        const draft: ProductDraft = {
-          id: 'draft_' + Math.random().toString(36).slice(2, 11),
-          name,
-          isDraft: true,
-          currentStep: 1,
-          lastSavedAt: new Date().toISOString(),
-          status: 'draft',
-          media: [],
-          tags: [],
-          pricing: { price: 0, currency: 'USD' },
-          options: [],
-          variants: [],
+      const rows = lines.map(line => {
+        const parts = line.split(/\t|\s*\|\s*/);
+        return {
+          name: parts[0]?.trim() ?? line,
+          price: parts[1]?.trim() ?? (bulkPrice || '0'),
+          category: parts[2]?.trim() ?? bulkCategory,
         };
-        await saveDraft(draft);
-      }
+      });
+      const result = await api.products.import(rows);
       setBulkNames('');
-      Alert.alert('Drafts created', names.length + ' product drafts were created. Find them in Products → Draft.');
-    } catch (e) {
-      Alert.alert('Error', 'Some drafts could not be saved. Please try again.');
+      Alert.alert(
+        'Import Complete',
+        `Imported ${result.successCount} products.${result.failCount > 0 ? ` ${result.failCount} failed.` : ''}`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              if (result.successCount > 0) router.back();
+            },
+          },
+        ],
+      );
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Import failed. Please try again.');
     } finally {
       setImporting(false);
     }
@@ -239,9 +243,9 @@ export default function ProductImportScreen() {
                 style={s.formInput}
               />
               <PrimaryButton
-                label={importing ? 'Creating...' : 'Create ' + bulkCount + ' Drafts'}
+                label={importing ? 'Importing...' : `Import ${bulkCount} Product${bulkCount !== 1 ? 's' : ''}`}
                 onPress={handleBulkCreate}
-                icon="plus"
+                icon="upload"
                 style={s.expandedBtn}
                 disabled={importing}
               />

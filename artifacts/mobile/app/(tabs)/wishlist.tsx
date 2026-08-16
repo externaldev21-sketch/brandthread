@@ -11,7 +11,7 @@ import * as Haptics from 'expo-haptics';
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
 const WISHLIST_ITEMS = [
-  { id: 'w1', brand: 'Vault Studio', name: 'Canvas Cargo Jacket', price: '$189', color: '#00C853', initials: 'VS', available: true,  tag: 'Limited — 14 left' },
+  { id: 'w1', brand: 'Vault Studio', name: 'Canvas Cargo Jacket', price: '$189', color: '#8B5CF6', initials: 'VS', available: true,  tag: 'Limited — 14 left' },
   { id: 'w2', brand: 'Meridian Co.', name: 'Essential Relaxed Tee', price: '$48', color: '#0F766E', initials: 'MC', available: true,  tag: 'Pre-order open' },
   { id: 'w3', brand: 'Atlas Goods', name: 'Utility Vest — Slate', price: '$220', color: '#1D4ED8', initials: 'AG', available: false, tag: 'Sold out' },
   { id: 'w4', brand: 'Softwear__', name: 'Micro-Fleece Jogger', price: '$92', color: '#BE185D', initials: 'SW', available: true,  tag: 'In stock' },
@@ -30,10 +30,10 @@ function WishlistCard({
 }) {
   const bg     = isDark ? '#1B1917' : '#FFFFFF';
   const border = isDark ? '#33302A' : '#DBD3C0';
-  const fg     = isDark ? '#EDE7D9' : '#17140F';
+  const fg     = isDark ? '#F4F4FF' : '#07070F';
   const muted  = isDark ? '#8C8577' : '#6E6759';
 
-  const tagColor = item.available ? '#3F7A4F' : '#DC2626';
+  const tagColor = item.available ? '#10B981' : '#F87171';
 
   return (
     <View style={[c.card, { backgroundColor: bg, borderColor: border }]}>
@@ -110,10 +110,10 @@ export default function WishlistScreen() {
   const [items, setItems] = useState(WISHLIST_ITEMS);
 
   const bg     = isDark ? '#121110' : '#F2EEE3';
-  const fg     = isDark ? '#EDE7D9' : '#17140F';
+  const fg     = isDark ? '#F4F4FF' : '#07070F';
   const muted  = isDark ? '#8C8577' : '#6E6759';
   const border = isDark ? '#33302A' : '#DBD3C0';
-  const primary = isDark ? '#39FF88' : '#00C853';
+  const primary = '#8B5CF6';
 
   function removeItem(id: string) {
     setItems(prev => prev.filter(i => i.id !== id));

@@ -380,17 +380,29 @@ function getApiBase(): string {
 }
 
 async function callGenerateAPI(endpoint: string, body: object): Promise<string> {
-  const url = `${getApiBase()}${endpoint}`;
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!resp.ok) {
-    const msg = await resp.text().catch(() => String(resp.status));
-    throw new Error(`API error ${resp.status}: ${msg}`);
+  // Use serviceRequest so the Clerk Bearer token is always included.
+  // Falls back to a raw fetch (no auth) only if services aren't configured yet.
+  let data: { b64_json: string };
+  try {
+    const { serviceRequest } = await import('@/lib/serviceConfig');
+    data = await serviceRequest<{ b64_json: string }>(endpoint, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  } catch (configErr: any) {
+    // If services aren't configured (e.g. during onboarding), try unauthenticated.
+    const url = `${getApiBase()}${endpoint}`;
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) {
+      const msg = await resp.text().catch(() => String(resp.status));
+      throw new Error(`API error ${resp.status}: ${msg}`);
+    }
+    data = await resp.json();
   }
-  const data: { b64_json: string } = await resp.json();
   return `data:image/png;base64,${data.b64_json}`;
 }
 

@@ -39,7 +39,7 @@ function Bubble({ msg, prevMsg, isDark, friendColor }: {
   isDark: boolean;
   friendColor: string;
 }) {
-  const fg       = isDark ? '#EDE7D9' : '#17140F';
+  const fg       = isDark ? '#F4F4FF' : '#07070F';
   const cardBg   = isDark ? '#1D1A15' : '#EDE7D9';
   const mutedFg  = isDark ? '#8C8577' : '#8080A0';
 
@@ -64,7 +64,7 @@ function Bubble({ msg, prevMsg, isDark, friendColor }: {
       <View style={[bub.row, isMe ? bub.rowMe : bub.rowThem]}>
         {isMe ? (
           <LinearGradient
-            colors={['#0F3822', '#00C853']}
+            colors={['#1A0A2E', '#8B5CF6']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[bub.bubble, bub.bubbleMe]}
@@ -116,7 +116,7 @@ function TypingIndicator({ isDark }: { isDark: boolean }) {
   }, []);
   return (
     <View style={[ty.wrap, { backgroundColor: isDark ? '#1D1A15' : '#EDE7D9' }]}>
-      <Text style={[ty.dots, { color: isDark ? '#39FF88' : '#00C853' }]}>{dots}</Text>
+      <Text style={[ty.dots, { color: isDark ? '#A78BFA' : '#8B5CF6' }]}>{dots}</Text>
     </View>
   );
 }
@@ -145,7 +145,7 @@ export default function ChatScreen() {
   const bg      = isDark ? '#121110' : '#F4F3FA';
   const headerBg = isDark ? '#1B1917' : '#FFFFFF';
   const border  = isDark ? '#1A1A28' : '#E3DCC9';
-  const fg      = isDark ? '#EDE7D9' : '#17140F';
+  const fg      = isDark ? '#F4F4FF' : '#07070F';
   const muted   = isDark ? '#8C8577' : '#8080A0';
   const inputBg = isDark ? '#1D1A15' : '#FFFFFF';
 
@@ -190,7 +190,7 @@ export default function ChatScreen() {
       {/* Header */}
       <View style={[s.header, { backgroundColor: headerBg, borderBottomColor: border, paddingTop: insets.top + 8 }]}>
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
-          <Feather name="chevron-left" size={26} color={isDark ? '#39FF88' : '#00C853'} />
+          <Feather name="chevron-left" size={26} color={isDark ? '#A78BFA' : '#8B5CF6'} />
         </TouchableOpacity>
 
         <TouchableOpacity style={s.headerCenter} activeOpacity={0.85}>
@@ -263,7 +263,7 @@ export default function ChatScreen() {
           disabled={!text.trim()}
         >
           <LinearGradient
-            colors={text.trim() ? ['#0F3822', '#00C853'] : [isDark ? '#2A261E' : '#E8E1CF', isDark ? '#2A261E' : '#E8E1CF']}
+            colors={text.trim() ? ['#1A0A2E', '#8B5CF6'] : [isDark ? '#2A261E' : '#E8E1CF', isDark ? '#2A261E' : '#E8E1CF']}
             style={s.sendBtn}
           >
             <Feather name="send" size={17} color={text.trim() ? '#FFFFFF' : muted} />
@@ -285,7 +285,7 @@ const s = StyleSheet.create({
   headerCenter: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerAvatar: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   headerInitials: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#FFF' },
-  onlineDot: { position: 'absolute', bottom: 1, right: 1, width: 11, height: 11, borderRadius: 6, backgroundColor: '#4C9A5E', borderWidth: 2 },
+  onlineDot: { position: 'absolute', bottom: 1, right: 1, width: 11, height: 11, borderRadius: 6, backgroundColor: '#10B981', borderWidth: 2 },
   headerName:   { fontSize: 15, fontFamily: 'Inter_700Bold' },
   headerStatus: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 1 },
   headerBtn:    { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },

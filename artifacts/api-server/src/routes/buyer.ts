@@ -8,7 +8,7 @@ import {
 } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { requireStripe } from "../lib/stripe";
+import { requireStripe, computeApplicationFeeCents } from "../lib/stripe";
 
 const router = Router();
 router.use(requireAuth);
@@ -261,6 +261,16 @@ router.post("/checkout/session", async (req, res) => {
       }
     }
 
+    // ── Compute platform application fee (5% of order subtotal) ──────────
+    // application_fee_amount is withheld from the transfer to the seller's
+    // Connect account and retained by the platform.  The rate lives in
+    // lib/stripe.ts as PLATFORM_COMMISSION_RATE — change it there to adjust.
+    const subtotalCents = cartItems.reduce(
+      (sum, item) => sum + item.priceCents * item.quantity,
+      0,
+    );
+    const applicationFeeCents = computeApplicationFeeCents(subtotalCents);
+
     // ── Call Stripe FIRST (idempotent via key) — no DB record yet ─────────
     // A Stripe failure at this point leaves no poisoned DB row.
     // Two concurrent requests with the same key get the same Stripe session back.
@@ -276,6 +286,10 @@ router.post("/checkout/session", async (req, res) => {
         payment_intent_data: {
           metadata: { buyerId },
           transfer_data: { destination: seller.stripeAccountId },
+          // Platform commission: withheld from the seller's payout automatically.
+          // Stripe deducts this from the transfer_data amount before sending
+          // the remainder to the seller's connected account.
+          application_fee_amount: applicationFeeCents,
         },
         ...(contactEmail ? { customer_email: contactEmail } : {}),
       },

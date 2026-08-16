@@ -236,19 +236,24 @@ export default function BuyerOrdersScreen() {
 
   const [orders, setOrders] = useState<BuyerOrderView[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [filter, setFilter] = useState<BuyerFilterKey>('all');
 
   const load = useCallback(async () => {
+    setLoadError(false);
     try {
       const rows = await api.buyer.orders.list();
       setOrders(rows.map(adaptOrder));
-    } catch {}
+    } catch { setLoadError(true); }
     setLoading(false);
   }, [api]);
 
+  // Refresh immediately on focus, then poll every 30 s while on this screen.
   useFocusEffect(useCallback(() => {
     setLoading(true);
     load();
+    const timer = setInterval(load, 30_000);
+    return () => clearInterval(timer);
   }, [load]));
 
   const filtered = applyFilter(orders, filter);
@@ -276,6 +281,20 @@ export default function BuyerOrdersScreen() {
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator color={PURPLE} size="large" />
+        </View>
+      ) : loadError ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
+          <Feather name="wifi-off" size={ICON.xxl} color={MUTED} />
+          <Text style={{ marginTop: SP.md, fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' }}>
+            Couldn't load your orders
+          </Text>
+          <TouchableOpacity
+            style={{ marginTop: SP.md, paddingHorizontal: SP.lg, paddingVertical: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER }}
+            onPress={() => { setLoading(true); load(); }}
+            activeOpacity={0.8}
+          >
+            <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED }}>Try again</Text>
+          </TouchableOpacity>
         </View>
       ) : filtered.length === 0 ? (
         <EmptyState
@@ -382,7 +401,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   preOrderText: {
-    fontSize: 9,
+    fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: CYAN,
     letterSpacing: 0.4,

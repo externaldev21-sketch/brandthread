@@ -19,6 +19,25 @@ import { tokenCache } from '@/lib/tokenCache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RoleProvider } from '@/contexts/RoleContext';
 import BootScreen from '@/components/BootScreen';
+import * as Notifications from 'expo-notifications';
+import { configureServices } from '@/lib/serviceConfig';
+import { configureApi, useApi } from '@/lib/api';
+
+// ─── Push notification handler (show alerts while app is foregrounded) ────────
+Notifications.setNotificationHandler({
+  handleNotification: async () =>
+    ({ shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: true }) as any,
+});
+
+// ─── Android notification channel ─────────────────────────────────────────────
+if (Platform.OS === 'android') {
+  Notifications.setNotificationChannelAsync('default', {
+    name:       'Brandthread',
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#8B5CF6',
+  });
+}
 
 SplashScreen.preventAutoHideAsync();
 
@@ -187,9 +206,44 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// ─── Wire background services + module-level API singleton to Clerk token ─────
+function ServiceConfigurer() {
+  const { getToken } = useAuth();
+  useEffect(() => {
+    configureServices(() => getToken());
+    configureApi(() => getToken());
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
+}
+
+// ─── Register Expo push token once per session ────────────────────────────────
+function PushRegistrar() {
+  const api = useApi();
+  const registered = useRef(false);
+  useEffect(() => {
+    if (registered.current) return;
+    registered.current = true;
+    (async () => {
+      try {
+        const { status: existing } = await Notifications.getPermissionsAsync();
+        const { status } = existing === 'granted'
+          ? { status: existing }
+          : await Notifications.requestPermissionsAsync();
+        if (status !== 'granted') return;
+        const tokenData = await Notifications.getExpoPushTokenAsync();
+        await api.push.register({ token: tokenData.data, platform: 'expo' });
+      } catch { /* non-fatal — push is best-effort */ }
+    })();
+  }, []);
+  return null;
+}
+
 function RootLayoutNav() {
   return (
     <AuthGate>
+      <ServiceConfigurer />
+      <PushRegistrar />
       <Stack screenOptions={{ headerShown: false }}>
         {/* Boot: "/" renders BootScreen until AuthGate redirects */}
         <Stack.Screen name="index"          options={{ headerShown: false, animation: 'fade' }} />
@@ -205,6 +259,7 @@ function RootLayoutNav() {
         <Stack.Screen name="(buyer)"        options={{ headerShown: false }} />
         {/* Feature screens */}
         <Stack.Screen name="chat/[id]"        options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="camera-capture"    options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
         <Stack.Screen name="story-creator"    options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
         <Stack.Screen name="brand"            options={{ headerShown: false }} />
         <Stack.Screen name="seller-profile"   options={{ headerShown: false, animation: 'slide_from_right' }} />
@@ -310,6 +365,11 @@ function RootLayoutNav() {
         <Stack.Screen name="buyer-privacy-settings"  options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-saved"             options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-blocked"              options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-payment-methods"     options={{ headerShown: false, animation: 'slide_from_right' }} />
+        {/* Live Shopping */}
+        <Stack.Screen name="seller-go-live"  options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
+        <Stack.Screen name="seller-live"     options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', gestureEnabled: false }} />
+        <Stack.Screen name="buyer-live"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
         <Stack.Screen name="buyer-muted"               options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-restricted"          options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-settings"        options={{ headerShown: false, animation: 'slide_from_right' }} />
@@ -325,6 +385,7 @@ function RootLayoutNav() {
         <Stack.Screen name="buyer-archive"         options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-qr-code"              options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-post-viewer"         options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-drop-detail"        options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-highlights-manager"  options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-report"            options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
         <Stack.Screen name="buyer-post-comments"     options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
@@ -361,6 +422,9 @@ function RootLayoutNav() {
         <Stack.Screen name="payouts"            options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="subscription"       options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="share-store"        options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
+        <Stack.Screen name="product-size-chart" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="product-bundles"    options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="product-bundle-edit" options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
         <Stack.Screen name="story-picker"       options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
         <Stack.Screen name="community-chat"     options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="manufacturer-onboard" options={{ headerShown: false, animation: 'slide_from_right' }} />

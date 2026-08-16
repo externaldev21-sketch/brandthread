@@ -5,6 +5,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { serviceRequest } from '@/lib/serviceConfig';
 import {
   Cart, CartItem, SavedCartItem, CartSellerGroup,
   CheckoutSession, CheckoutContact, CheckoutAddress,
@@ -253,19 +254,50 @@ export function getAllDemoProducts(): BuyerProduct[] {
   return DEMO_PRODUCTS;
 }
 
+// ─── DB sync ──────────────────────────────────────────────────────────────────
+
+async function syncToDb(items: any[], savedItems: any[]): Promise<void> {
+  try {
+    await serviceRequest('/api/buyer/cart/sync', {
+      method: 'POST',
+      body: JSON.stringify({ items, savedItems }),
+    });
+  } catch { /* ignore — local is source of truth */ }
+}
+
 // ─── Cart storage ─────────────────────────────────────────────────────────────
 
 async function loadCart(): Promise<Cart> {
+  let cart: Cart;
   try {
     const raw = await AsyncStorage.getItem(KEYS.cart);
-    if (raw) return JSON.parse(raw) as Cart;
-  } catch {}
-  return { id: uid(), items: [], savedItems: [], updatedAt: now() };
+    if (raw) {
+      cart = JSON.parse(raw) as Cart;
+    } else {
+      cart = { id: uid(), items: [], savedItems: [], updatedAt: now() };
+    }
+  } catch {
+    cart = { id: uid(), items: [], savedItems: [], updatedAt: now() };
+  }
+
+  // Background: attempt to load from DB and merge if DB has data
+  try {
+    const { items, savedItems } = await serviceRequest<{ items: any[]; savedItems: any[] }>('/api/buyer/cart', {});
+    if (items.length > 0 || savedItems.length > 0) {
+      // DB has data — use it and update local cache
+      cart.items = items;
+      cart.savedItems = savedItems;
+      await AsyncStorage.setItem(KEYS.cart, JSON.stringify(cart));
+    }
+  } catch { /* ignore */ }
+
+  return cart;
 }
 
 async function saveCart(cart: Cart): Promise<void> {
   cart.updatedAt = now();
   await AsyncStorage.setItem(KEYS.cart, JSON.stringify(cart));
+  void syncToDb(cart.items, cart.savedItems);
 }
 
 // ─── Cart operations ──────────────────────────────────────────────────────────
@@ -674,33 +706,62 @@ const DEMO_DISCOUNT_CODES: Record<string, CheckoutDiscount> = {
 
 export async function applyDiscount(
   code: string,
-  subtotal: number,
+  subtotalDollars: number,
   existingDiscounts: CheckoutDiscount[],
 ): Promise<CheckoutDiscount> {
-  const upper = code.toUpperCase().trim();
-
-  // Prevent duplicates
-  if (existingDiscounts.some(d => d.code === upper)) {
-    return {
-      code: upper, type: 'percentage', value: 0, appliedAmount: 0,
-      description: '', isValid: false, errorMessage: 'This code has already been applied.',
-    };
+  const trimmedCode = code.trim().toUpperCase();
+  if (!trimmedCode) {
+    return { code: '', type: 'percentage' as any, value: 0, description: '', isValid: false, appliedAmount: 0, errorMessage: 'Please enter a code.' };
   }
-
-  const found = DEMO_DISCOUNT_CODES[upper];
-  if (!found) {
-    return {
-      code: upper, type: 'percentage', value: 0, appliedAmount: 0,
-      description: '', isValid: false, errorMessage: 'Invalid discount code.',
-    };
+  // Get current checkout session to find the seller
+  const sess = await getCheckoutSession();
+  const sellerId = (sess as any)?.items?.[0]?.sellerId ?? (sess as any)?.deliveryGroups?.[0]?.sellerId ?? '';
+  if (!sellerId) {
+    // Fall back to demo codes if no seller context
+    const upper = trimmedCode;
+    if (existingDiscounts.some(d => d.code === upper)) {
+      return { code: upper, type: 'percentage' as any, value: 0, appliedAmount: 0, description: '', isValid: false, errorMessage: 'This code has already been applied.' };
+    }
+    const found = DEMO_DISCOUNT_CODES[upper];
+    if (!found) {
+      return { code: upper, type: 'percentage' as any, value: 0, appliedAmount: 0, description: '', isValid: false, errorMessage: 'Invalid discount code.' };
+    }
+    let appliedAmount = 0;
+    if (found.type === 'percentage') appliedAmount = +(subtotalDollars * found.value / 100).toFixed(2) as unknown as number;
+    else if (found.type === 'fixed') appliedAmount = Math.min(found.value, subtotalDollars);
+    else if (found.type === 'free_shipping') appliedAmount = 12.40;
+    return { ...found, appliedAmount };
   }
-
-  let appliedAmount = 0;
-  if (found.type === 'percentage') appliedAmount = +(subtotal * found.value / 100).toFixed(2);
-  else if (found.type === 'fixed') appliedAmount = Math.min(found.value, subtotal);
-  else if (found.type === 'free_shipping') appliedAmount = 12.40; // estimated shipping
-
-  return { ...found, appliedAmount };
+  const subtotalCents = Math.round(subtotalDollars * 100);
+  try {
+    const { api } = await import('@/lib/api');
+    const result = await api.discountCodes.validate(trimmedCode, sellerId, subtotalCents);
+    return {
+      code: result.code,
+      type: result.type,
+      value: result.value,
+      description: result.description ?? `${result.type === 'percentage' ? result.value + '% off' : '$' + (result.value / 100).toFixed(2) + ' off'}`,
+      isValid: true,
+      appliedAmount: result.appliedAmountCents / 100,
+      errorMessage: undefined,
+    } as CheckoutDiscount;
+  } catch (err: any) {
+    // Parse error code from API response body
+    let errCode = 'UNKNOWN';
+    try {
+      const body = err?.message ?? '';
+      const match = body.match(/\{.*\}/);
+      if (match) {
+        const parsed = JSON.parse(match[0]);
+        errCode = parsed?.error ?? errCode;
+      }
+    } catch {}
+    const msg = errCode === 'EXPIRED' ? 'This code has expired.' :
+                errCode === 'MAX_USES_REACHED' ? 'This code has reached its usage limit.' :
+                errCode === 'MIN_ORDER_NOT_MET' ? 'Minimum order not met for this code.' :
+                'Invalid or expired discount code.';
+    return { code: trimmedCode, type: 'percentage' as any, value: 0, description: '', isValid: false, appliedAmount: 0, errorMessage: msg };
+  }
 }
 
 export async function removeDiscount(code: string, discounts: CheckoutDiscount[]): Promise<CheckoutDiscount[]> {
@@ -933,20 +994,55 @@ export async function createReturnRequest(params: {
   imageUris: string[];
   preferredResolution: BuyerReturnResolution;
 }): Promise<BuyerReturnRequest> {
-  const returns = await loadReturns();
-  const req: BuyerReturnRequest = {
-    id: uid(),
-    ...params,
-    status: 'requested',
-    refundEstimate: params.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0),
-    returnDeadline: daysFromNow(30),
-    returnPolicy: '30-day returns on unworn items. Return shipping may be covered by the seller.',
-    submittedAt: now(),
-    updatedAt: now(),
-  };
-  returns.push(req);
-  await AsyncStorage.setItem(KEYS.returns, JSON.stringify(returns));
-  return req;
+  // Try real API first
+  try {
+    const { api } = await import('@/lib/api');
+    const result = await api.returns.create({
+      orderId: params.orderId,
+      reason: params.reason,
+      notes: params.description,
+      resolutionRequested: params.preferredResolution,
+    });
+    // Map API response back to local BuyerReturnRequest shape
+    const req: BuyerReturnRequest = {
+      id: result.id ?? uid(),
+      orderId: params.orderId,
+      orderNumber: params.orderNumber,
+      sellerName: params.sellerName,
+      items: params.items,
+      reason: params.reason,
+      description: params.description,
+      imageUris: params.imageUris,
+      preferredResolution: params.preferredResolution,
+      status: result.status ?? 'requested',
+      refundEstimate: params.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0),
+      returnDeadline: daysFromNow(30),
+      returnPolicy: '30-day returns on unworn items. Return shipping may be covered by the seller.',
+      submittedAt: result.createdAt ?? now(),
+      updatedAt: result.updatedAt ?? now(),
+    };
+    // Cache locally for offline viewing
+    const returns = await loadReturns();
+    returns.push(req);
+    await AsyncStorage.setItem(KEYS.returns, JSON.stringify(returns));
+    return req;
+  } catch {
+    // AsyncStorage fallback for demo/offline
+    const returns = await loadReturns();
+    const req: BuyerReturnRequest = {
+      id: uid(),
+      ...params,
+      status: 'requested',
+      refundEstimate: params.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0),
+      returnDeadline: daysFromNow(30),
+      returnPolicy: '30-day returns on unworn items. Return shipping may be covered by the seller.',
+      submittedAt: now(),
+      updatedAt: now(),
+    };
+    returns.push(req);
+    await AsyncStorage.setItem(KEYS.returns, JSON.stringify(returns));
+    return req;
+  }
 }
 
 async function loadReturns(): Promise<BuyerReturnRequest[]> {

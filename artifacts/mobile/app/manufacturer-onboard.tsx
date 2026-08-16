@@ -9,17 +9,18 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import { useApi } from '@/lib/api';
 
-const BG     = '#0A0B0A';
-const CARD   = '#111311';
-const BORDER = '#1E221E';
-const FG     = '#EAF2ED';
-const MUTED  = '#5A6B5C';
-const GREEN  = '#39FF88';
-const GREEN_D = '#0D2B1A';
+const BG     = '#07070F';
+const CARD   = '#12121F';
+const BORDER = 'rgba(255,255,255,0.07)';
+const FG     = '#F4F4FF';
+const MUTED  = 'rgba(244,244,255,0.50)';
+const GREEN  = '#8B5CF6';
+const GREEN_D = 'rgba(139,92,246,0.18)';
 const ERR    = '#EF4444';
 
 const STEPS = ['Account', 'Company', 'Specialties', 'Photos & Pricing', 'Review'];
@@ -73,6 +74,8 @@ const INITIAL: FormData = {
 export default function ManufacturerOnboardScreen() {
   const insets = useSafeAreaInsets();
   const router  = useRouter();
+  const { token: inviteToken } = useLocalSearchParams<{ token?: string }>();
+  const api     = useApi();
   const [step, setStep]   = useState(0);
   const [form, setForm]   = useState<FormData>(INITIAL);
   const [submitting, setSubmitting] = useState(false);
@@ -136,15 +139,42 @@ export default function ManufacturerOnboardScreen() {
 
   async function submit() {
     setSubmitting(true);
-    // Simulate API call
-    await new Promise((r) => setTimeout(r, 1800));
-    setSubmitting(false);
     haptic();
-    Alert.alert(
-      '🎉 Application Submitted!',
-      `Thank you, ${form.companyName}! Your profile is under review. We'll email ${form.email} within 2–3 business days once approved. You'll then appear in the Brandthread Manufacturer Hub.`,
-      [{ text: 'Done', onPress: () => router.back() }],
-    );
+    try {
+      const payload = {
+        businessName:     form.companyName,
+        country:          form.country,
+        city:             form.city || undefined,
+        specialty:        form.specialties[0] ?? 'Apparel',
+        description:      form.specialties.join(', '),
+        moq:              parseInt(form.moq) || 100,
+        contactEmail:     form.email,
+        website:          form.website || undefined,
+        priceRange:       form.pricePerUnit ? `$${form.pricePerUnit}/${form.currency}` : '',
+        sampleTurnaround: '2–4 weeks',
+        bulkTurnaround:   `${form.leadTimeDays || '30'} days`,
+      };
+
+      if (inviteToken) {
+        // Private invite path — user must be signed in to their Clerk account
+        await api.manufacturers.registerViaInvite(inviteToken, payload);
+      } else {
+        // Public apply path — no Clerk account required
+        await api.manufacturers.public.apply(payload);
+      }
+
+      Alert.alert(
+        '🎉 Application Submitted!',
+        inviteToken
+          ? `Welcome, ${form.companyName}! Your manufacturer profile is now live.`
+          : `Thank you, ${form.companyName}! Your profile is now live on the Brandthread Manufacturer Hub. Sellers can find and contact you immediately.`,
+        [{ text: 'Done', onPress: () => router.back() }],
+      );
+    } catch (e: any) {
+      Alert.alert('Submission Failed', e?.message ?? 'Please check your details and try again.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const pct = ((step + 1) / STEPS.length) * 100;

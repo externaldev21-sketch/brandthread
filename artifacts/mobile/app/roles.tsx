@@ -1,29 +1,27 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useApi } from '@/lib/api';
 
-const ROLES = [
-  { name: 'App developer', group: 'Organization' },
-  { name: 'Cashier', group: 'Point of Sale' },
-  { name: 'Customer support', group: 'Store' },
-  { name: 'Marketer', group: 'Store' },
-  { name: 'Merchandiser', group: 'Store' },
-  { name: 'Online store editor', group: 'Store' },
-  { name: 'Administrator', group: 'Organization' },
-  { name: 'POS administrator', group: 'Organization' },
-  { name: 'POS full permissions', group: 'Point of Sale' },
-  { name: 'POS device setup', group: 'Point of Sale' },
-  { name: 'POS user administrator', group: 'Point of Sale' },
-  { name: 'Sales associate', group: 'Point of Sale' },
-  { name: 'Store manager', group: 'Point of Sale' },
+// Fallback role data if API not connected
+const DEFAULT_ROLES = [
+  { name: 'Owner', group: 'Organization', description: 'Full access to all features', staffCount: 1 },
+  { name: 'Manager', group: 'Store', description: 'Products, orders, inventory', staffCount: 0 },
+  { name: 'Staff', group: 'Store', description: 'Fulfillment and shipping only', staffCount: 0 },
 ];
 
 export default function RolesScreen() {
   const colors = useColors();
+  const api = useApi();
   const [bannerVisible, setBannerVisible] = useState(true);
+  const [roles, setRoles] = useState(DEFAULT_ROLES);
+
+  useEffect(() => {
+    api.team.roles().then(r => { if (r?.length) setRoles(r); }).catch(() => {});
+  }, []);
 
   function haptic() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -75,15 +73,15 @@ export default function RolesScreen() {
         </View>
 
         <View style={styles.listWrap}>
-          {ROLES.map((role, i) => (
+          {roles.map((role, i) => (
             <TouchableOpacity
               key={role.name}
               onPress={haptic}
               activeOpacity={0.7}
-              style={[styles.roleRow, i !== ROLES.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
+              style={[styles.roleRow, i !== roles.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
             >
               <Text style={[styles.roleName, { color: colors.foreground }]}>{role.name}</Text>
-              <Text style={[styles.roleSub, { color: colors.mutedForeground }]}>{role.group} · 0 staff</Text>
+              <Text style={[styles.roleSub, { color: colors.mutedForeground }]}>{role.group} · {role.staffCount ?? 0} staff</Text>
             </TouchableOpacity>
           ))}
         </View>

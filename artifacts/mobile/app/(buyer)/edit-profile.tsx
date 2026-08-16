@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Platform, TextInput, Switch, Modal, Image, Alert,
+  Platform, TextInput, Switch, Modal, Image, Alert, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -12,8 +12,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { loadStyleBadge, saveStyleBadge, DEFAULT_STYLE_BADGE, type StyleBadgeState } from '@/lib/styleBadge';
 import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields } from '@/lib/buyerProfile';
 import { updateMyProfile, getMyProfile } from '@/services/socialService';
+import { api } from '@/lib/api';
 import {
   BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN, GRAD_PRIMARY,
+  RED, ORANGE, SUCCESS,
   FONT, FS, SP, RADIUS, OVERLAY,
 } from '@/lib/theme';
 
@@ -90,6 +92,38 @@ export default function BuyerEditProfileScreen() {
   const [loaded, setLoaded] = useState(false);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [genderPickerOpen, setGenderPickerOpen] = useState(false);
+  // Username availability state
+  const [usernameStatus, setUsernameStatus] = useState<'idle' | 'checking' | 'ok' | 'taken' | 'invalid'>('idle');
+  const [usernameError, setUsernameError]   = useState('');
+
+  // Only letters, numbers, underscores — 3 to 30 characters
+  const USERNAME_RE = /^[a-zA-Z0-9_]{3,30}$/;
+
+  /** Check username availability via API. Call on blur or before save. */
+  async function checkUsernameAvailability(raw: string) {
+    const u = raw.trim().toLowerCase();
+    if (!u) { setUsernameStatus('idle'); setUsernameError(''); return; }
+    if (!USERNAME_RE.test(u)) {
+      setUsernameStatus('invalid');
+      setUsernameError('Letters, numbers and underscores only (3–30 chars)');
+      return;
+    }
+    setUsernameStatus('checking');
+    try {
+      const result = await api.auth.checkUsername(u);
+      if (result.available) {
+        setUsernameStatus('ok');
+        setUsernameError('');
+      } else {
+        setUsernameStatus('taken');
+        setUsernameError(result.error ?? 'Username already taken');
+      }
+    } catch {
+      // Network issue — don't block save; server will re-validate
+      setUsernameStatus('idle');
+      setUsernameError('');
+    }
+  }
 
   function set(key: keyof Omit<BuyerProfileFields, 'aiCreator'>, val: string) {
     setFields(prev => ({ ...prev, [key]: val }));
@@ -140,6 +174,33 @@ export default function BuyerEditProfileScreen() {
   const topPad = Platform.OS === 'web' ? 24 : insets.top;
 
   async function handleSave() {
+    // ── Username validation (client + server) ──────────────────────────────
+    const rawUsername = fields.username.trim().toLowerCase();
+    if (rawUsername) {
+      if (!USERNAME_RE.test(rawUsername)) {
+        Alert.alert('Invalid username', 'Username may only contain letters, numbers, and underscores (3–30 characters).');
+        return;
+      }
+      if (usernameStatus === 'taken') {
+        Alert.alert('Username taken', usernameError || 'Please choose a different username.');
+        return;
+      }
+      if (usernameStatus === 'checking') {
+        Alert.alert('Please wait', 'Still checking username availability…');
+        return;
+      }
+      // If status is idle (user never blurred), check now before saving
+      if (usernameStatus === 'idle' || usernameStatus === 'invalid') {
+        await checkUsernameAvailability(rawUsername);
+        // Re-read status after check (usernameStatus closure won't update inside the same call)
+        const rechecked = await api.auth.checkUsername(rawUsername).catch(() => null);
+        if (rechecked && !rechecked.available) {
+          Alert.alert('Username taken', rechecked.error || 'Please choose a different username.');
+          return;
+        }
+      }
+    }
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const cleanedBadge: StyleBadgeState = {
       label: badge.label.trim() || DEFAULT_STYLE_BADGE.label,
@@ -162,7 +223,7 @@ export default function BuyerEditProfileScreen() {
     await Promise.all([
       saveStyleBadge(cleanedBadge),
       saveBuyerProfile(cleanedFields),
-      // Sync key fields to the social profile so profile.tsx sees updates
+      // Sync key identity fields to the local social profile
       updateMyProfile({
         name: cleanedFields.name,
         username: cleanedFields.username,
@@ -173,6 +234,16 @@ export default function BuyerEditProfileScreen() {
         avatarInitials: initials,
       }),
     ]);
+
+    // Persist username + profile fields to the DB (fire-and-forget; server validates again)
+    api.auth.updateProfile({
+      username:    rawUsername || undefined,
+      displayName: cleanedFields.name,
+      name:        cleanedFields.name,
+      bio:         cleanedFields.bio,
+      website:     cleanedFields.links,
+    }).catch(() => {});
+
     router.back();
   }
 
@@ -222,7 +293,69 @@ export default function BuyerEditProfileScreen() {
         <View style={styles.card}>
           <EditRow label="Name" value={fields.name} placeholder="Name" onChange={v => set('name', v)} />
           <Divider />
-          <EditRow label="Username" value={fields.username} placeholder="Username" onChange={v => set('username', v)} />
+          {/* Username — format validated in real time; availability checked on blur */}
+          <View>
+            <View style={[styles.row]}>
+              <Text style={styles.rowLabel}>Username</Text>
+              <TextInput
+                style={[
+                  styles.rowInput,
+                  usernameStatus === 'taken'   && { color: RED },
+                  usernameStatus === 'invalid' && { color: ORANGE },
+                ]}
+                value={fields.username}
+                onChangeText={v => {
+                  // Strip invalid chars immediately — no spaces or special chars allowed
+                  const cleaned = v.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 30);
+                  set('username', cleaned);
+                  if (cleaned.length === 0) {
+                    setUsernameStatus('idle');
+                    setUsernameError('');
+                  } else if (cleaned.length < 3) {
+                    setUsernameStatus('invalid');
+                    setUsernameError('At least 3 characters');
+                  } else {
+                    // Clear any stale "taken" error while user is typing
+                    if (usernameStatus === 'taken' || usernameStatus === 'ok') {
+                      setUsernameStatus('idle');
+                      setUsernameError('');
+                    }
+                  }
+                }}
+                onBlur={() => checkUsernameAvailability(fields.username)}
+                placeholder="e.g. alex_style"
+                placeholderTextColor={MUTED}
+                autoCorrect={false}
+                autoCapitalize="none"
+                returnKeyType="done"
+              />
+              {usernameStatus === 'checking' && (
+                <ActivityIndicator size="small" color={PURPLE} style={{ marginLeft: 6 }} />
+              )}
+              {usernameStatus === 'ok' && (
+                <Feather name="check-circle" size={17} color={SUCCESS} style={{ marginLeft: 6 }} />
+              )}
+              {usernameStatus === 'taken' && (
+                <Feather name="x-circle" size={17} color={RED} style={{ marginLeft: 6 }} />
+              )}
+              {usernameStatus === 'invalid' && (
+                <Feather name="alert-circle" size={17} color={ORANGE} style={{ marginLeft: 6 }} />
+              )}
+              {!['checking', 'ok', 'taken', 'invalid'].includes(usernameStatus) && (
+                <Feather name="chevron-right" size={17} color={MUTED} />
+              )}
+            </View>
+            {(usernameError || fields.username.length > 0) && (
+              <Text style={[
+                styles.usernameHint,
+                usernameStatus === 'ok'      && { color: SUCCESS },
+                usernameStatus === 'taken'   && { color: RED },
+                usernameStatus === 'invalid' && { color: ORANGE },
+              ]}>
+                {usernameError || `@${fields.username.toLowerCase()}`}
+              </Text>
+            )}
+          </View>
           <Divider />
           <EditRow label="Pronouns" value={fields.pronouns} placeholder="e.g. they/them" onChange={v => set('pronouns', v)} />
           <Divider />
@@ -351,6 +484,16 @@ const styles = StyleSheet.create({
   previewEmoji: { fontSize: 14 },
   previewText: { fontSize: 12, fontFamily: FONT.semibold, color: PURPLE },
 
+  // Username availability hint
+  usernameHint: {
+    fontSize: 11.5,
+    fontFamily: FONT.regular,
+    color: MUTED,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    paddingTop: 0,
+    marginTop: -6,
+  },
   // Gender picker
   pickerBackdrop: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },
   pickerSheet: { backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, paddingTop: SP.sm, paddingHorizontal: SP.md },

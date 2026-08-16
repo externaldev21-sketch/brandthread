@@ -14,13 +14,13 @@ import { getSellerPosts, subscribeSocial, type SellerThreadPost } from '@/servic
 
 // ─── Design tokens ─────────────────────────────────────────────────────────
 
-const BG     = '#0D0E0D';
-const CARD   = '#131713';
-const BORDER = '#232523';
-const FG     = '#EAF2ED';
-const MUTED  = '#6B7A6D';
-const GREEN  = '#39FF88';
-const GREEN_DIM = '#0D2B1A';
+const BG     = '#07070F';
+const CARD   = '#12121F';
+const BORDER = 'rgba(255,255,255,0.07)';
+const FG     = '#F4F4FF';
+const MUTED  = 'rgba(244,244,255,0.50)';
+const GREEN  = '#8B5CF6';
+const GREEN_DIM = 'rgba(139,92,246,0.18)';
 
 // ─── Mock data ──────────────────────────────────────────────────────────────
 
@@ -312,7 +312,7 @@ const s = StyleSheet.create({
   avatarSection:  { position: 'relative' },
   avatarGlow:     { width: 88, height: 88, borderRadius: 44, padding: 3, backgroundColor: GREEN, shadowColor: GREEN, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 14, elevation: 12 },
   avatarRing:     { flex: 1, borderRadius: 42, overflow: 'hidden', backgroundColor: BG, padding: 3 },
-  avatar:         { flex: 1, borderRadius: 39, backgroundColor: '#1A2A1E', alignItems: 'center', justifyContent: 'center' },
+  avatar:         { flex: 1, borderRadius: 39, backgroundColor: '#18182E', alignItems: 'center', justifyContent: 'center' },
   avatarText:     { fontSize: 30, fontFamily: 'Inter_700Bold', color: GREEN },
   cameraBtn:      { position: 'absolute', bottom: 0, right: -2, width: 26, height: 26, borderRadius: 13, backgroundColor: '#333', borderWidth: 2, borderColor: BG, alignItems: 'center', justifyContent: 'center' },
 
@@ -354,7 +354,7 @@ const s = StyleSheet.create({
   perfChange:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: GREEN },
 
   // Brand Health
-  healthCard:     { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#1A3D28' },
+  healthCard:     { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(139,92,246,0.45)' },
   healthGradient: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16 },
   healthCircle:   { width: 52, height: 52, position: 'relative', alignItems: 'center', justifyContent: 'center' },
   healthScore:    { position: 'absolute', fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },

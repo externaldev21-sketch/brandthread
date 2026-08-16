@@ -458,7 +458,34 @@ export async function undoAction(session: AISession, messageId: string): Promise
 
 const SUGGESTIONS_KEY = 'bt:ai:suggestions:v1';
 
-export async function getAISuggestions(): Promise<AISuggestion[]> {
+export async function getAISuggestions(authToken?: string | null): Promise<AISuggestion[]> {
+  // Try real API suggestions first
+  if (API_BASE && authToken) {
+    try {
+      const res = await fetch(`${API_BASE}/ai/suggestions`, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (res.ok) {
+        const { suggestions } = await res.json() as { suggestions: AISuggestion[] };
+        if (suggestions.length > 0) {
+          // Merge with any stored dismissals
+          try {
+            const raw = await AsyncStorage.getItem(SUGGESTIONS_KEY);
+            const stored: AISuggestion[] = raw ? JSON.parse(raw) : [];
+            const dismissedIds = new Set(stored.filter(s => s.dismissedAt).map(s => s.id));
+            const filtered = suggestions.filter(s => !dismissedIds.has(s.id));
+            // Store merged set for offline use
+            await AsyncStorage.setItem(SUGGESTIONS_KEY, JSON.stringify([
+              ...stored.filter(s => s.dismissedAt), // keep dismissed history
+              ...filtered,
+            ]));
+            return filtered;
+          } catch { return suggestions; }
+        }
+      }
+    } catch { /* fall through to demo */ }
+  }
+
   const DEMO: AISuggestion[] = [
     {
       id: 'sug_restock',
@@ -565,8 +592,47 @@ export async function completeSuggestion(id: string): Promise<void> {
 
 // ─── Next Best Actions ────────────────────────────────────────────────────────
 
-export async function getNextBestActions(): Promise<NextBestAction[]> {
-  // In production this would analyse real data. For now, demo data.
+export async function getNextBestActions(authToken?: string | null): Promise<NextBestAction[]> {
+  // Map real suggestions to NextBestAction format when available
+  if (authToken) {
+    try {
+      const suggestions = await getAISuggestions(authToken);
+      if (suggestions.length > 0) {
+        const iconMap: Record<string, string> = {
+          inventory: 'layers',
+          orders:    'package',
+          content:   'video',
+          marketing: 'zap',
+          analytics: 'trending-up',
+          customers: 'users',
+          store:     'layout',
+          production:'clock',
+        };
+        const colorMap: Record<string, string> = {
+          inventory: '#F87171',
+          orders:    '#F97316',
+          content:   '#8B5CF6',
+          marketing: '#22D3EE',
+          analytics: '#34D399',
+          customers: '#60A5FA',
+          store:     '#A78BFA',
+          production:'#F59E0B',
+        };
+        return suggestions.slice(0, 5).map((s, i) => ({
+          id:          s.id,
+          title:       s.title,
+          subtitle:    s.reason,
+          icon:        iconMap[s.category] ?? 'star',
+          accentColor: colorMap[s.category] ?? '#8B5CF6',
+          route:       s.actionRoute,
+          priority:    i + 1,
+          category:    s.category as NextBestAction['category'],
+        }));
+      }
+    } catch { /* fall through to demo */ }
+  }
+
+  // Demo fallback
   return [
     { id: 'nba_ship',  title: 'Ship 3 orders before 5 PM',                       subtitle: 'Orders ready to ship',              icon: 'package', accentColor: '#F97316', route: '/(tabs)/orders',  priority: 1, category: 'orders'    },
     { id: 'nba_stock', title: 'Black medium hoodies: ~8-day supply',              subtitle: 'Consider placing reorder today',     icon: 'layers',  accentColor: '#F87171', route: '/inventory',     priority: 2, category: 'inventory' },

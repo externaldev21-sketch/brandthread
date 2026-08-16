@@ -16,6 +16,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, CYAN, RED,
@@ -34,8 +35,10 @@ const BORDER_COLOR = 'rgba(255,255,255,0.07)';
 
 export default function AiBrandMemoryScreen() {
   const router = useRouter();
+  const { getToken } = useAuth();
   const [localMemory, setLocalMemory] = useState<BrandMemory | null>(null);
   const [saving, setSaving] = useState(false);
+  const [rebuilding, setRebuilding] = useState(false);
 
   useEffect(() => {
     getBrandMemory().then(setLocalMemory);
@@ -51,11 +54,18 @@ export default function AiBrandMemoryScreen() {
     );
   };
 
-  const handleRebuild = () => {
-    rebuildBrandMemory().then(m => {
+  const handleRebuild = async () => {
+    setRebuilding(true);
+    try {
+      const token = await getToken().catch(() => null);
+      const m = await rebuildBrandMemory(token);
       setLocalMemory(m);
-      Alert.alert('Brand memory rebuilt from your store data.');
-    });
+      Alert.alert('Brand memory rebuilt', 'Your brand profile has been derived from your products, posts, and store data.');
+    } catch {
+      Alert.alert('Could not rebuild', 'There was a problem rebuilding brand memory. Try again.');
+    } finally {
+      setRebuilding(false);
+    }
   };
 
   const handleSave = async () => {

@@ -9,11 +9,12 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
+  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
+  FG, MUTED, SUBTLE, ON_DARK, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   CYAN, FONT, FS, SP, RADIUS, ICON, GRAD_PRIMARY,
 } from '@/lib/theme';
-import { createStory, MY_USER_ID, MY_COLOR, MY_INITIALS } from '@/services/socialService';
+import { createStory, MY_USER_ID, MY_COLOR, MY_INITIALS, MY_HANDLE } from '@/services/socialService';
+import { useApi } from '@/lib/api';
 import type { StoryMedia, StoryPrivacySettings } from '@/services/socialTypes';
 
 const { width: W } = Dimensions.get('window');
@@ -33,7 +34,8 @@ const TYPE_TABS: { label: string; value: MediaType; icon: string }[] = [
 
 export default function BuyerStoryCreate() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
+  const router  = useRouter();
+  const api     = useApi();
 
   const [type, setType] = useState<MediaType>('text');
   const [bgColor, setBgColor] = useState('#1a1a2e');
@@ -68,6 +70,17 @@ export default function BuyerStoryCreate() {
         closeFriendsOnly: false,
       };
       await createStory({ media, privacy, repliesDisabled: !allowReplies });
+      // Also persist to server (fire-and-forget — local store is source of truth for now)
+      api.social.createStory({
+        authorName:        MY_USER_ID,   // socialService exposes MY_USER_ID as display name fallback
+        authorHandle:      MY_HANDLE,
+        authorInitials:    MY_INITIALS,
+        authorColor:       MY_COLOR,
+        authorAccountType: 'buyer',
+        media,
+        repliesDisabled:   !allowReplies,
+        privacy: { visibility: privacyVis, replyPermission: allowReplies ? 'everyone' : 'off' },
+      }).catch(() => {/* non-critical — local store already saved */});
       router.back();
     } catch (err) {
       Alert.alert('Error', 'Failed to post story. Please try again.');
@@ -251,7 +264,7 @@ export default function BuyerStoryCreate() {
                 value={allowReplies}
                 onValueChange={setAllowReplies}
                 trackColor={{ false: BORDER, true: PURPLE }}
-                thumbColor="#fff"
+                thumbColor={ON_DARK}
               />
             </View>
           </View>
@@ -280,14 +293,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   closeText: {
-    color: '#fff',
+    color: ON_DARK,
     fontSize: FS.xxl,
     fontFamily: FONT.bold,
     lineHeight: FS.xxl + 4,
   },
   headerTitle: {
     flex: 1,
-    color: '#fff',
+    color: ON_DARK,
     fontFamily: FONT.semibold,
     fontSize: FS.md,
     textAlign: 'center',
@@ -298,7 +311,7 @@ const styles = StyleSheet.create({
     paddingVertical: SP.sm,
   },
   shareBtnText: {
-    color: '#fff',
+    color: ON_DARK,
     fontFamily: FONT.semibold,
     fontSize: FS.base,
   },
@@ -332,7 +345,7 @@ const styles = StyleSheet.create({
   },
   canvasFill: {
     flex: 1,
-    backgroundColor: '#111',
+    backgroundColor: SURFACE,
   },
   textInput: {
     flex: 1,
@@ -361,7 +374,7 @@ const styles = StyleSheet.create({
     marginTop: SP.md,
   },
   controlLabel: {
-    color: '#fff',
+    color: ON_DARK,
     fontSize: FS.xs,
     fontFamily: FONT.regular,
     marginBottom: SP.sm,

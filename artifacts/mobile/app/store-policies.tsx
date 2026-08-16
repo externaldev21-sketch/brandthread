@@ -1,3 +1,8 @@
+/**
+ * Brandthread — Store Policies
+ * Wired to real backend: GET/PUT /api/seller/settings/policies
+ * Falls back to storeService (AsyncStorage) if API unavailable.
+ */
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
@@ -12,8 +17,12 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, StatusBadge } from '@/components/BrandthreadUI';
-import { getPolicies, upsertPolicy, generatePolicyDraft } from '@/services/storeService';
-import { StorePolicy, PolicyType } from '@/services/storeTypes';
+import { generatePolicyDraft } from '@/services/storeService';
+import { useApi } from '@/lib/api';
+
+export type PolicyType = 'shipping' | 'return' | 'refund' | 'privacy' | 'terms' | 'pre_order';
+
+interface StorePolicy { type: PolicyType; content: string; updatedAt?: string; aiGenerated?: boolean; }
 
 const POLICY_TYPES: { type: PolicyType; label: string; icon: keyof typeof Feather.glyphMap }[] = [
   { type: 'shipping',   label: 'Shipping Policy',   icon: 'truck' },
@@ -26,16 +35,33 @@ const POLICY_TYPES: { type: PolicyType; label: string; icon: keyof typeof Feathe
 
 export default function StorePoliciesScreen() {
   const router = useRouter();
+  const api = useApi();
   const [policies, setPolicies] = useState<StorePolicy[]>([]);
   const [selectedType, setSelectedType] = useState<PolicyType | null>(null);
   const [content, setContent] = useState('');
   const [aiGenerated, setAiGenerated] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const load = async () => {
-    const p = await getPolicies();
-    setPolicies(p);
+    setLoading(true);
+    try {
+      // Try real API first
+      const data = await (api.seller as any).getPolicies() as any;
+      setPolicies(Array.isArray(data.policies) ? data.policies : []);
+    } catch {
+      // Fallback to storeService (AsyncStorage)
+      try {
+        const { getPolicies } = await import('@/services/storeService');
+        const p = await getPolicies();
+        setPolicies(p);
+      } catch {
+        setPolicies([]);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   useFocusEffect(useCallback(() => { load(); }, []));
@@ -56,6 +82,27 @@ export default function StorePoliciesScreen() {
   const handleGenerate = async (type: PolicyType) => {
     setGenerating(true);
     try {
+      // Try AI via backend
+      try {
+        const resp = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: `Write a concise, professional ${type.replace('_', '-')} policy for a fashion brand. Return only the policy text, no extra commentary.`,
+          }),
+        });
+        if (resp.ok) {
+          const j = await resp.json();
+          const aiText = j.response ?? j.message ?? j.content ?? '';
+          if (aiText.trim()) {
+            setSelectedType(type);
+            setContent(aiText.trim());
+            setAiGenerated(true);
+            return;
+          }
+        }
+      } catch {}
+      // Local fallback template
       const draft = generatePolicyDraft(type, 'Your Store');
       setSelectedType(type);
       setContent(draft);
@@ -69,8 +116,21 @@ export default function StorePoliciesScreen() {
     if (!selectedType) return;
     setSaving(true);
     try {
-      await upsertPolicy(selectedType, content, aiGenerated);
-      await load();
+      const now = new Date().toISOString();
+      const updated: StorePolicy[] = [
+        ...policies.filter(p => p.type !== selectedType),
+        { type: selectedType, content, aiGenerated, updatedAt: now },
+      ];
+      // Try real API
+      try {
+        await (api.seller as any).savePolicies(updated);
+        setPolicies(updated);
+      } catch {
+        // Fallback to storeService
+        const { upsertPolicy } = await import('@/services/storeService');
+        await upsertPolicy(selectedType, content, aiGenerated);
+        setPolicies(updated);
+      }
       closeEdit();
       Alert.alert('Saved', 'Policy saved successfully.');
     } catch {
@@ -80,174 +140,137 @@ export default function StorePoliciesScreen() {
     }
   };
 
-  const policyStatus = (type: PolicyType): { label: string; variant: 'success' | 'warning' | 'neutral' } => {
-    const p = policies.find(x => x.type === type);
-    if (!p) return { label: 'Not created', variant: 'neutral' };
-    if (p.aiGenerated && !p.reviewedBySeller) return { label: 'AI draft — needs review', variant: 'warning' };
-    return { label: 'Published', variant: 'success' };
-  };
+  if (selectedType) {
+    const policyMeta = POLICY_TYPES.find(p => p.type === selectedType)!;
+    return (
+      <View style={[s.root, { backgroundColor: BG }]}>
+        <View style={[s.header, { borderBottomColor: BORDER }]}>
+          <TouchableOpacity onPress={closeEdit} style={s.backBtn}><Feather name="x" size={21} color={FG} /></TouchableOpacity>
+          <Text style={[s.headerTitle, { color: FG }]}>{policyMeta.label}</Text>
+          <TouchableOpacity onPress={handleSave} disabled={saving} style={[s.saveBtn, { backgroundColor: PURPLE, opacity: saving ? 0.6 : 1 }]}>
+            {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.saveBtnText}>Save</Text>}
+          </TouchableOpacity>
+        </View>
 
-  const selectedLabel = POLICY_TYPES.find(pt => pt.type === selectedType)?.label ?? '';
+        <View style={[s.aiBar, { backgroundColor: `${PURPLE}12`, borderBottomColor: BORDER }]}>
+          <TouchableOpacity
+            onPress={() => handleGenerate(selectedType)}
+            disabled={generating}
+            activeOpacity={0.7}
+            style={[s.aiBtn, { backgroundColor: `${PURPLE}20`, borderColor: `${PURPLE}40` }]}
+          >
+            {generating ? (
+              <><ActivityIndicator size="small" color={PURPLE} /><Text style={[s.aiBtnText, { color: PURPLE }]}>Generating…</Text></>
+            ) : (
+              <><Feather name="zap" size={14} color={PURPLE} /><Text style={[s.aiBtnText, { color: PURPLE }]}>Generate with AI</Text></>
+            )}
+          </TouchableOpacity>
+          {aiGenerated && (
+            <View style={[s.aiBadge, { backgroundColor: `${CYAN}20`, borderColor: `${CYAN}40` }]}>
+              <Feather name="zap" size={12} color={CYAN} />
+              <Text style={[s.aiBadgeText, { color: CYAN }]}>AI generated</Text>
+            </View>
+          )}
+        </View>
+
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: SP.md }}>
+          <TextInput
+            value={content}
+            onChangeText={setContent}
+            placeholder={`Write your ${policyMeta.label.toLowerCase()} here…`}
+            placeholderTextColor={SUBTLE}
+            multiline
+            style={[s.editor, { backgroundColor: CARD, borderColor: BORDER, color: FG }]}
+            autoFocus
+          />
+        </ScrollView>
+      </View>
+    );
+  }
 
   return (
-    <View style={ps.root}>
-      {/* Header */}
-      <View style={ps.header}>
-        <TouchableOpacity onPress={() => router.back()} style={ps.backBtn}>
-          <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
-        <Text style={ps.headerTitle}>Policies</Text>
+    <View style={[s.root, { backgroundColor: BG }]}>
+      <View style={[s.header, { borderBottomColor: BORDER }]}>
+        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}><Feather name="arrow-left" size={21} color={FG} /></TouchableOpacity>
+        <Text style={[s.headerTitle, { color: FG }]}>Store policies</Text>
+        <View style={{ width: 70 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={ps.scroll}>
-        <Text style={ps.subtitle}>Required policies build buyer trust and protect your business.</Text>
+      {loading ? (
+        <View style={s.center}><ActivityIndicator color={PURPLE} /></View>
+      ) : (
+        <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+          <Text style={[s.intro, { color: MUTED }]}>
+            Add policies that explain how you handle shipping, returns, privacy, and more. Buyers can view these before and after purchase.
+          </Text>
 
-        {/* Policy List */}
-        {POLICY_TYPES.map(pt => {
-          const status = policyStatus(pt.type);
-          const existing = policies.find(p => p.type === pt.type);
-          return (
-            <BrandthreadCard key={pt.type} style={ps.policyCard}>
-              <View style={ps.policyRow}>
-                <View style={[ps.iconBox, { backgroundColor: PURPLE_DIM }]}>
-                  <Feather name={pt.icon} size={ICON.md} color={PURPLE_LIGHT} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={ps.policyLabel}>{pt.label}</Text>
-                  {existing && (
-                    <Text style={ps.policyDate}>Updated {new Date(existing.updatedAt).toLocaleDateString()}</Text>
-                  )}
-                  <View style={ps.badgeRow}>
-                    <StatusBadge
-                      label={status.label}
-                      variant={status.variant}
-                      small
-                    />
-                    {existing?.reviewedBySeller && (
-                      <StatusBadge label="Reviewed" variant="success" small />
+          <View style={[s.listCard, { backgroundColor: CARD, borderColor: BORDER }]}>
+            {POLICY_TYPES.map((pt, i) => {
+              const existing = policies.find(p => p.type === pt.type);
+              const hasContent = !!existing?.content?.trim();
+              return (
+                <TouchableOpacity
+                  key={pt.type}
+                  onPress={() => openEdit(pt.type)}
+                  activeOpacity={0.7}
+                  style={[s.policyRow, i !== POLICY_TYPES.length - 1 && { borderBottomWidth: 1, borderBottomColor: BORDER }]}
+                >
+                  <View style={[s.policyIcon, { backgroundColor: `${PURPLE}15` }]}>
+                    <Feather name={pt.icon} size={17} color={PURPLE} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.policyLabel, { color: FG }]}>{pt.label}</Text>
+                    {hasContent ? (
+                      <Text style={[s.policySub, { color: MUTED }]} numberOfLines={1}>{existing!.content.slice(0, 60)}…</Text>
+                    ) : (
+                      <Text style={[s.policySub, { color: SUBTLE }]}>Not added yet</Text>
                     )}
                   </View>
-                </View>
-              </View>
-              <View style={ps.policyActions}>
-                <SecondaryButton
-                  label="Edit"
-                  small
-                  onPress={() => openEdit(pt.type)}
-                  icon="edit-2"
-                  style={{ flex: 1 }}
-                />
-                <SecondaryButton
-                  label={generating && selectedType === pt.type ? 'Generating...' : 'Generate with AI'}
-                  small
-                  onPress={() => handleGenerate(pt.type)}
-                  icon="zap"
-                  accent={CYAN}
-                  style={{ flex: 1 }}
-                />
-              </View>
-            </BrandthreadCard>
-          );
-        })}
+                  <View style={s.policyRight}>
+                    {hasContent && (
+                      <View style={[s.statusDot, { backgroundColor: SUCCESS }]} />
+                    )}
+                    <Feather name="chevron-right" size={17} color={SUBTLE} />
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
 
-        {/* Edit Panel */}
-        {selectedType && (
-          <BrandthreadCard style={ps.editPanel}>
-            <View style={ps.editHeader}>
-              <Text style={ps.editTitle}>{selectedLabel}</Text>
-              <TouchableOpacity onPress={closeEdit} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Feather name="x" size={ICON.md} color={MUTED} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Warning banner */}
-            <View style={[ps.banner, { borderColor: ORANGE, backgroundColor: ORANGE_DIM }]}>
-              <Feather name="alert-triangle" size={ICON.sm} color={ORANGE} />
-              <Text style={[ps.bannerText, { color: ORANGE }]}>
-                This draft is not legal advice. Please review with a qualified professional before publishing.
-              </Text>
-            </View>
-
-            {/* AI banner */}
-            {aiGenerated && (
-              <View style={[ps.banner, { borderColor: PURPLE, backgroundColor: PURPLE_DIM }]}>
-                <Feather name="zap" size={ICON.sm} color={PURPLE_LIGHT} />
-                <Text style={[ps.bannerText, { color: PURPLE_LIGHT }]}>
-                  AI-generated draft. Review carefully before saving.
-                </Text>
-              </View>
-            )}
-
-            <TextInput
-              style={ps.contentInput}
-              value={content}
-              onChangeText={setContent}
-              multiline
-              numberOfLines={12}
-              placeholder="Policy content..."
-              placeholderTextColor={SUBTLE}
-              textAlignVertical="top"
-            />
-
-            <View style={ps.editActions}>
-              {!aiGenerated && (
-                <SecondaryButton
-                  label={generating ? 'Generating...' : 'Generate with AI'}
-                  onPress={() => handleGenerate(selectedType)}
-                  icon="zap"
-                  accent={CYAN}
-                  style={{ flex: 1 }}
-                />
-              )}
-              <PrimaryButton
-                label={saving ? 'Saving...' : 'Save Policy'}
-                onPress={handleSave}
-                loading={saving}
-                style={{ flex: 1 }}
-              />
-            </View>
-          </BrandthreadCard>
-        )}
-      </ScrollView>
+          <View style={[s.tipCard, { backgroundColor: `${PURPLE}10`, borderColor: `${PURPLE}25` }]}>
+            <Feather name="zap" size={15} color={PURPLE} style={{ marginTop: 1 }} />
+            <Text style={[s.tipText, { color: MUTED }]}>
+              Tap any policy and use <Text style={{ color: PURPLE, fontFamily: FONT.semibold }}>Generate with AI</Text> to create a first draft in seconds.
+            </Text>
+          </View>
+        </ScrollView>
+      )}
     </View>
   );
 }
 
-const ps = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    paddingHorizontal: SP.md, paddingVertical: SP.sm,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.07)',
-  },
-  backBtn: {
-    width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  headerTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
-  scroll: { paddingBottom: 60, paddingTop: SP.md },
-  subtitle: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginHorizontal: SP.md, marginBottom: SP.md },
-  policyCard: { marginHorizontal: SP.md, marginBottom: SP.sm, gap: SP.md },
-  policyRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.md },
-  iconBox: { width: 40, height: 40, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
-  policyLabel: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  policyDate: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
-  badgeRow: { flexDirection: 'row', gap: SP.sm, marginTop: SP.sm, flexWrap: 'wrap' },
-  policyActions: { flexDirection: 'row', gap: SP.sm },
-  editPanel: { marginHorizontal: SP.md, marginTop: SP.sm, gap: SP.md },
-  editHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  editTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
-  banner: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm,
-    borderWidth: 1, borderRadius: RADIUS.sm, padding: SP.sm,
-  },
-  bannerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
-  contentInput: {
-    fontSize: FS.sm, fontFamily: FONT.regular, color: FG,
-    backgroundColor: SURFACE, borderRadius: RADIUS.sm,
-    borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)',
-    padding: SP.md, minHeight: 200,
-  },
-  editActions: { flexDirection: 'row', gap: SP.sm },
+const s = StyleSheet.create({
+  root:  { flex: 1 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  header: { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1 },
+  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: FS.base, fontFamily: FONT.bold },
+  saveBtn: { borderRadius: RADIUS.sm, paddingHorizontal: 16, paddingVertical: 8 },
+  saveBtnText: { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.sm },
+  aiBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: SP.md, paddingVertical: 10, borderBottomWidth: 1 },
+  aiBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: RADIUS.sm, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 8 },
+  aiBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold },
+  aiBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 20, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 5 },
+  aiBadgeText: { fontSize: 11, fontFamily: FONT.semibold },
+  editor: { borderRadius: RADIUS.lg, borderWidth: 1, padding: SP.md, minHeight: 320, fontSize: FS.base, fontFamily: FONT.regular, lineHeight: 24, textAlignVertical: 'top' },
+  intro: { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20, marginBottom: 18 },
+  listCard: { borderRadius: RADIUS.lg, borderWidth: 1, overflow: 'hidden', marginBottom: SP.lg },
+  policyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 14 },
+  policyIcon: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  policyLabel: { fontSize: 14, fontFamily: FONT.semibold },
+  policySub: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
+  policyRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  statusDot: { width: 7, height: 7, borderRadius: 4 },
+  tipCard: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', borderRadius: RADIUS.lg, borderWidth: 1, padding: 14 },
+  tipText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
 });

@@ -10,11 +10,13 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather, Ionicons } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Feather } from '@expo/vector-icons';
+import { FONT, FS } from '@/lib/theme';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { DEMO_SOUNDS, SUGGESTED_HASHTAGS } from '@/services/sellerContent';
 import { getTaggableProducts } from '@/services/productService';
 import { createSellerPost } from '@/services/socialService';
+import StyleTagsPicker from '@/components/StyleTagsPicker';
 import type { Product } from '@/services/productTypes';
 import type {
   Sound, PostProductTag, PostHashtag, PostVisibility,
@@ -22,15 +24,15 @@ import type {
 } from '@/services/types';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
-const BG     = '#0D0E0D';
-const CARD   = '#131713';
-const BORDER = '#232523';
-const FG     = '#EAF2ED';
-const MUTED  = '#6B7A6D';
-const PURPLE = '#7C3AED';
+const BG     = '#07070F';
+const CARD   = '#12121F';
+const BORDER = 'rgba(255,255,255,0.07)';
+const FG     = '#F4F4FF';
+const MUTED  = 'rgba(244,244,255,0.50)';
+const PURPLE = '#8B5CF6';
 const BLUE   = '#3B82F6';
 const ORANGE = '#F97316';
-const CYAN   = '#06B6D4';
+const CYAN   = '#22D3EE';
 const ERR    = '#F87171';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -131,6 +133,7 @@ export default function CreatePostScreen() {
   // ── Post details ──
   const [caption, setCaption] = useState('');
   const [hashtags, setHashtags] = useState<PostHashtag[]>([]);
+  const [styleTags, setStyleTags] = useState<string[]>([]);
   const [location, setLocation] = useState('');
   const [visibility, setVisibility] = useState<PostVisibility>(DEFAULT_VISIBILITY);
   const [scheduledAt, setScheduledAt] = useState<string | null>(null);
@@ -173,6 +176,36 @@ export default function CreatePostScreen() {
   useEffect(() => {
     getTaggableProducts().then(setTaggableProducts).catch(() => {});
   }, []);
+
+  // ─── Pick up camera-capture result when screen comes back into focus ──────
+  useFocusEffect(
+    React.useCallback(() => {
+      const result = (global as any).__cameraCaptureResult as
+        | { type: 'video'; uri: string; duration: number }
+        | { type: 'photo'; uri: string }
+        | null
+        | undefined;
+      if (!result) return;
+      (global as any).__cameraCaptureResult = null;
+      if (result.type === 'video') {
+        const clip: VideoClipLocal = {
+          uri:      result.uri,
+          duration: result.duration,
+          id:       `cam_${Date.now()}`,
+        };
+        setVideoClips(prev => [...prev, clip]);
+        setTrimEnd(result.duration);
+        setStep('video-edit');
+      } else if (result.type === 'photo') {
+        const photo: SlidePhotoLocal = {
+          uri: result.uri,
+          id:  `cam_${Date.now()}`,
+        };
+        setSlidePhotos(prev => [...prev, photo]);
+        setStep('slide-edit');
+      }
+    }, [])
+  );
 
   // ─── Publishing animation (animation only — actual save happens in handlePublishNow) ──
   useEffect(() => {
@@ -384,7 +417,7 @@ export default function CreatePostScreen() {
           <TouchableOpacity
             style={s.pickCard}
             activeOpacity={0.8}
-            onPress={() => Alert.alert('Camera', 'Camera recording is not supported in the simulator. Please upload a video from your library.')}
+            onPress={() => router.push((`/camera-capture?maxDuration=${maxDuration}`) as never)}
           >
             <View style={[s.pickIconCircle, { backgroundColor: PURPLE + '22' }]}>
               <Feather name="video" size={28} color={PURPLE} />
@@ -554,7 +587,7 @@ export default function CreatePostScreen() {
             ) : (
               <LinearGradient colors={['#1A0A30', '#0A0820']} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
                 <Feather name="video" size={40} color={MUTED} />
-                <Text style={{ color: MUTED, marginTop: 8, fontFamily: 'Inter_400Regular', fontSize: 13 }}>No video selected</Text>
+                <Text style={{ color: MUTED, marginTop: 8, fontFamily: FONT.regular, fontSize: 13 }}>No video selected</Text>
               </LinearGradient>
             )}
             {!isPlaying && (
@@ -784,7 +817,7 @@ export default function CreatePostScreen() {
         </View>
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
           <View style={[s.infoCard, { marginBottom: 20 }]}>
-            <Ionicons name="trending-up" size={14} color={PURPLE} style={{ marginRight: 8 }} />
+            <Feather name="trending-up" size={14} color={PURPLE} style={{ marginRight: 8 }} />
             <Text style={[s.infoCardText, { flex: 1 }]}>9:16 gets the most reach on Thread.</Text>
           </View>
           {ratios.map((r) => {
@@ -874,7 +907,7 @@ export default function CreatePostScreen() {
           <View style={[s.slidePreviewArea, { height: previewHClamped }]}>
             <LinearGradient colors={['#0E2830', '#061420']} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
               <Feather name="layers" size={36} color={MUTED} />
-              <Text style={{ color: MUTED, marginTop: 8, fontFamily: 'Inter_400Regular', fontSize: 12 }}>{aspectRatio} Preview</Text>
+              <Text style={{ color: MUTED, marginTop: 8, fontFamily: FONT.regular, fontSize: 12 }}>{aspectRatio} Preview</Text>
             </LinearGradient>
           </View>
 
@@ -1033,7 +1066,7 @@ export default function CreatePostScreen() {
               {productTags.length > 0 && (
                 <View style={{ position: 'absolute', bottom: 12, left: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 8, padding: 6, gap: 4 }}>
                   <Feather name="shopping-bag" size={12} color="#fff" />
-                  <Text style={{ color: '#fff', fontSize: 11, fontFamily: 'System' }}>{productTags[0].productName}</Text>
+                  <Text style={{ color: '#fff', fontSize: 11, fontFamily: FONT.regular }}>{productTags[0].productName}</Text>
                 </View>
               )}
             </View>
@@ -1089,6 +1122,10 @@ export default function CreatePostScreen() {
                 ))}
               </View>
             )}
+
+            {/* Style Tags */}
+            <Text style={[s.sectionLabel, { marginTop: 16 }]}>Style Tags</Text>
+            <StyleTagsPicker selected={styleTags} onChange={setStyleTags} max={5} />
 
             {/* Tagged products */}
             <Text style={[s.sectionLabel, { marginTop: 16 }]}>Tagged Products</Text>
@@ -1179,6 +1216,7 @@ export default function CreatePostScreen() {
                     contentType: contentType ?? 'video',
                     caption,
                     hashtags: hashtags.map(h => h.tag),
+                    styleTags,
                     mediaUris: contentType === 'video'
                       ? videoClips.map(c => c.uri)
                       : slidePhotos.map(p => p.uri),
@@ -1211,6 +1249,7 @@ export default function CreatePostScreen() {
                     contentType: contentType ?? 'video',
                     caption,
                     hashtags: hashtags.map(h => h.tag),
+                    styleTags,
                     mediaUris: contentType === 'video'
                       ? videoClips.map(c => c.uri)
                       : slidePhotos.map(p => p.uri),
@@ -1365,7 +1404,7 @@ function SoundModal({ visible, onClose, soundTab, setSoundTab, soundSearch, setS
           {filtered.length === 0 ? (
             <View style={{ alignItems: 'center', paddingTop: 40 }}>
               <Feather name="music" size={28} color={MUTED} />
-              <Text style={{ color: MUTED, marginTop: 10, fontFamily: 'Inter_400Regular' }}>No sounds found</Text>
+              <Text style={{ color: MUTED, marginTop: 10, fontFamily: FONT.regular }}>No sounds found</Text>
             </View>
           ) : (
             filtered.map((sound) => (
@@ -1412,7 +1451,7 @@ interface TextModalProps {
   insets: { top: number; bottom: number };
 }
 function TextModal({ visible, onClose, newTextInput, setNewTextInput, newTextColor, setNewTextColor, newTextSize, setNewTextSize, onAdd, overlayTexts, onRemoveText, insets }: TextModalProps) {
-  const COLOR_SWATCHES = ['#FFFFFF', '#000000', '#F87171', '#39FF88', '#3B82F6', '#FBBF24', '#8B5CF6'];
+  const COLOR_SWATCHES = ['#FFFFFF', '#000000', '#F87171', '#8B5CF6', '#3B82F6', '#FBBF24', '#22D3EE'];
 
   return (
     <Modal
@@ -1587,10 +1626,10 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 14,
     borderBottomWidth: 1, borderBottomColor: BORDER,
   },
-  headerTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', color: FG },
+  headerTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
   backBtn:  { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   doneBtn:  { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: PURPLE + '22', borderRadius: 8, borderWidth: 1, borderColor: PURPLE + '44' },
-  doneBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: PURPLE },
+  doneBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE },
 
   // type-select
   typeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
@@ -1600,7 +1639,7 @@ const s = StyleSheet.create({
     alignItems: 'center', paddingVertical: 24, paddingHorizontal: 8, gap: 12,
   },
   typeIconCircle: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
-  typeLabel: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG, textAlign: 'center' },
+  typeLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, textAlign: 'center' },
 
   // video/slide pick
   pickCard: {
@@ -1609,12 +1648,12 @@ const s = StyleSheet.create({
     padding: 18,
   },
   pickIconCircle: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-  pickCardTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
-  pickCardSub:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 2 },
+  pickCardTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
+  pickCardSub:   { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
 
   clipThumb: { width: 80, height: 80, borderRadius: 10, overflow: 'hidden', position: 'relative' },
   clipGrad:  { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 4 },
-  clipDur:   { fontSize: 10, fontFamily: 'Inter_500Medium', color: MUTED },
+  clipDur:   { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   clipRemove:{
     position: 'absolute', top: 4, right: 4,
     backgroundColor: '#00000088', borderRadius: 10,
@@ -1628,20 +1667,20 @@ const s = StyleSheet.create({
   nextBtn:   { borderRadius: 14, overflow: 'hidden' },
   nextBtnDisabled: { opacity: 0.5 },
   nextBtnGrad: { paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
-  nextBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  nextBtnText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
 
   // video-duration
-  stepSubtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 12 },
+  stepSubtitle: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginBottom: 12 },
   infoCard: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: CYAN + '11', borderRadius: 10, borderWidth: 1, borderColor: CYAN + '33', padding: 12 },
-  infoCardText: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
+  infoCardText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   durationGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   durationCard: {
     width: '46%', backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER,
     alignItems: 'center', paddingVertical: 28, gap: 6,
   },
   durationCardSel: { backgroundColor: PURPLE + '11', borderColor: PURPLE },
-  durationNum:   { fontSize: 28, fontFamily: 'Inter_700Bold', color: FG },
-  durationLabel: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
+  durationNum:   { fontSize: FS.xxl, fontFamily: FONT.bold, color: FG },
+  durationLabel: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
 
   // video-edit
   pauseOverlay: {
@@ -1649,7 +1688,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', backgroundColor: '#00000055',
   },
   durChip: { backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 4 },
-  durChipText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: MUTED },
+  durChipText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   trimHandle: {
     position: 'absolute', top: -8, width: 16, height: 20,
     backgroundColor: PURPLE, borderRadius: 3,
@@ -1658,13 +1697,13 @@ const s = StyleSheet.create({
   controlBtn: { width: 38, height: 38, backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   speedPill: { backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 6 },
   speedPillActive: { backgroundColor: PURPLE + '22', borderColor: PURPLE },
-  speedPillText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: MUTED },
+  speedPillText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   toolCard: { backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, alignItems: 'center', paddingVertical: 10, paddingHorizontal: 12, gap: 6 },
-  toolLabel: { fontSize: 10, fontFamily: 'Inter_400Regular', color: MUTED },
+  toolLabel: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   soundStrip: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 12, backgroundColor: PURPLE + '11', borderRadius: 10, borderWidth: 1, borderColor: PURPLE + '33', paddingHorizontal: 12, paddingVertical: 8 },
-  soundStripText: { flex: 1, fontSize: 12, fontFamily: 'Inter_500Medium', color: PURPLE },
+  soundStripText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.medium, color: PURPLE },
   beatSyncRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: 16, marginTop: 10, paddingVertical: 8 },
-  beatSyncLabel: { flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium', color: MUTED },
+  beatSyncLabel: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
 
   // slide-ratio
   ratioCard: {
@@ -1673,67 +1712,67 @@ const s = StyleSheet.create({
   },
   ratioCardSel: { backgroundColor: PURPLE + '11', borderColor: PURPLE },
   ratioPreview: { backgroundColor: BORDER, borderRadius: 6 },
-  ratioLabel: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
+  ratioLabel: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   recommendedBadge: { backgroundColor: PURPLE + '22', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3, alignSelf: 'flex-start', marginTop: 4 },
-  recommendedText: { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: PURPLE },
+  recommendedText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: PURPLE },
 
   // slide-edit
   slidePreviewArea: { marginHorizontal: 16, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: BORDER },
   transitionPill: { backgroundColor: CARD, borderRadius: 20, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 16, paddingVertical: 8 },
   transitionPillActive: { backgroundColor: PURPLE, borderColor: PURPLE },
-  transitionPillText: { fontSize: 13, fontFamily: 'Inter_500Medium', color: MUTED },
+  transitionPillText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   stepperBtn: { width: 38, height: 38, backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  stepperValue: { fontSize: 18, fontFamily: 'Inter_700Bold', color: FG, minWidth: 40, textAlign: 'center' },
+  stepperValue: { fontSize: FS.md, fontFamily: FONT.bold, color: FG, minWidth: 40, textAlign: 'center' },
 
   // post-details
   miniPreviewCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, padding: 14 },
   miniPreviewGrad: { width: 52, height: 52, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  miniPreviewType: { fontSize: 14, fontFamily: 'Inter_700Bold', color: FG },
-  miniPreviewSub:  { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 2 },
+  miniPreviewType: { fontSize: FS.sm, fontFamily: FONT.bold, color: FG },
+  miniPreviewSub:  { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
   typeBadge: { borderRadius: 8, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4 },
-  typeBadgeText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  typeBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold },
 
   captionInput: {
     backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER,
-    color: FG, fontFamily: 'Inter_400Regular', fontSize: 14,
+    color: FG, fontFamily: FONT.regular, fontSize: FS.sm,
     padding: 12, minHeight: 100, textAlignVertical: 'top',
   },
-  charCount: { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'right', marginTop: 4 },
+  charCount: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, textAlign: 'right', marginTop: 4 },
 
   hashtagInput: {
     backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER,
-    color: FG, fontFamily: 'Inter_400Regular', fontSize: 14,
+    color: FG, fontFamily: FONT.regular, fontSize: FS.sm,
     paddingHorizontal: 12, paddingVertical: 10,
   },
   suggestedChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 10, paddingVertical: 5 },
-  suggestedChipText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: MUTED },
+  suggestedChipText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   hashtagWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
   hashtagChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: PURPLE + '11', borderRadius: 14, borderWidth: 1, borderColor: PURPLE + '33', paddingHorizontal: 10, paddingVertical: 5 },
-  hashtagChipText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: PURPLE },
+  hashtagChipText: { fontSize: FS.xs, fontFamily: FONT.medium, color: PURPLE },
 
   locationRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 10 },
-  locationInput: { flex: 1, color: FG, fontFamily: 'Inter_400Regular', fontSize: 14 },
+  locationInput: { flex: 1, color: FG, fontFamily: FONT.regular, fontSize: FS.sm },
 
   toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: BORDER },
-  toggleLabel: { fontSize: 14, fontFamily: 'Inter_400Regular', color: FG },
+  toggleLabel: { fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
 
   scheduleRow: { flexDirection: 'row', gap: 10 },
   schedulePill: { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 20, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 16, paddingVertical: 8 },
   schedulePillActive: { backgroundColor: PURPLE + '11', borderColor: PURPLE + '44' },
-  schedulePillText: { fontSize: 13, fontFamily: 'Inter_500Medium', color: MUTED },
+  schedulePillText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
 
   outlineBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     borderRadius: 12, borderWidth: 1, borderColor: BORDER,
     paddingVertical: 12, paddingHorizontal: 16,
   },
-  outlineBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: FG },
+  outlineBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
 
   publishBtn: { borderRadius: 14, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  publishBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  publishBtnText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
 
-  sectionLabel: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: MUTED, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
 
   // publishing
   publishCircle: { width: 120, height: 120, borderRadius: 60, overflow: 'hidden' },
@@ -1741,61 +1780,61 @@ const s = StyleSheet.create({
 
   // done
   doneCircle: { width: 120, height: 120, borderRadius: 60, alignItems: 'center', justifyContent: 'center', marginBottom: 24 },
-  doneTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 8 },
-  doneSub: { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center', marginBottom: 4, paddingHorizontal: 32 },
+  doneTitle: { fontSize: FS.xxl, fontFamily: FONT.bold, color: FG, marginBottom: 8 },
+  doneSub: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', marginBottom: 4, paddingHorizontal: 32 },
   doneBtn2: { marginTop: 32, borderRadius: 14, overflow: 'hidden', width: 200 },
   doneBtnGrad: { paddingVertical: 14, alignItems: 'center' },
-  doneBtnText2: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  doneBtnText2: { fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
 });
 
 // ─── Modal Styles ─────────────────────────────────────────────────────────────
 const sm = StyleSheet.create({
   root:   { flex: 1, backgroundColor: BG },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: BORDER },
-  title:  { fontSize: 17, fontFamily: 'Inter_700Bold', color: FG },
+  title:  { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
   closeBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER },
 
   searchWrap: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginTop: 12, marginBottom: 8, backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 10 },
-  searchInput: { flex: 1, color: FG, fontFamily: 'Inter_400Regular', fontSize: 14 },
+  searchInput: { flex: 1, color: FG, fontFamily: FONT.regular, fontSize: FS.sm },
 
   tabPill: { backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 14, paddingVertical: 6 },
   tabPillActive: { backgroundColor: PURPLE + '22', borderColor: PURPLE + '44' },
-  tabText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: MUTED },
+  tabText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
 
   soundRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: BORDER },
   soundIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: PURPLE + '22', alignItems: 'center', justifyContent: 'center' },
-  soundTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: FG },
-  soundArtist: { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
-  soundDur: { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
+  soundTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
+  soundArtist: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  soundDur: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   useBtn: { backgroundColor: CARD, borderRadius: 8, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 6 },
-  useBtnText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: FG },
+  useBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: FG },
 
   disclaimer: { marginTop: 20, padding: 12, backgroundColor: ORANGE + '11', borderRadius: 10, borderWidth: 1, borderColor: ORANGE + '33' },
-  disclaimerText: { fontSize: 11, fontFamily: 'Inter_400Regular', color: ORANGE },
+  disclaimerText: { fontSize: FS.xs, fontFamily: FONT.regular, color: ORANGE },
 
   // text modal
-  textInput: { backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: 'Inter_400Regular', fontSize: 16, padding: 12, marginBottom: 16 },
-  modalLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+  textInput: { backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, fontSize: FS.md, padding: 12, marginBottom: 16 },
+  modalLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
   stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 20 },
   stepperBtn: { width: 36, height: 36, backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  stepperVal: { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG, minWidth: 50, textAlign: 'center' },
+  stepperVal: { fontSize: FS.md, fontFamily: FONT.bold, color: FG, minWidth: 50, textAlign: 'center' },
   swatch: { width: 32, height: 32, borderRadius: 16 },
   swatchActive: { borderWidth: 3, borderColor: PURPLE },
   addTextBtn: { borderRadius: 12, paddingVertical: 13, alignItems: 'center' },
-  addTextBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  addTextBtnText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
   overlayChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
-  overlayChipText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  overlayChipText: { fontSize: FS.xs, fontFamily: FONT.medium },
 
   // product modal
   productRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: BORDER },
   productSwatch: { width: 24, height: 24, borderRadius: 6 },
-  productName: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
-  productPrice: { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
+  productName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
+  productPrice: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   statusBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  statusBadgeText: { fontSize: 10, fontFamily: 'Inter_600SemiBold' },
+  statusBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   tagBtn: { backgroundColor: CARD, borderRadius: 8, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 6 },
   tagBtnActive: { backgroundColor: PURPLE, borderColor: PURPLE },
-  tagBtnText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: FG },
+  tagBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: FG },
   taggedChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: PURPLE + '22', borderRadius: 14, borderWidth: 1, borderColor: PURPLE + '44', paddingHorizontal: 10, paddingVertical: 5 },
-  taggedChipText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: PURPLE },
+  taggedChipText: { fontSize: FS.xs, fontFamily: FONT.medium, color: PURPLE },
 });

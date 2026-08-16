@@ -24,6 +24,12 @@ import {
   likeFriendPost, getFriendPostEngagements, getComments,
 } from '@/services/socialService';
 import type { Friendship, Story, BuyerPost } from '@/services/socialTypes';
+import { useApi } from '@/lib/api';
+
+type ApiFollowing = {
+  userId: string; name: string; username: string | null;
+  handle: string; initials: string; color: string; followedAt: string;
+};
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -53,7 +59,7 @@ const DEMO_FRIEND_POSTS: BuyerPost[] = [
   },
   {
     id: 'fp2', authorId: 'u_kai', authorName: 'Kai Nakamura', authorHandle: '@kainakamura',
-    authorInitials: 'KN', authorColor: '#00C853', authorAccountType: 'buyer',
+    authorInitials: 'KN', authorColor: '#8B5CF6', authorAccountType: 'buyer',
     feedEligibility: 'profile_only', profileVisibility: 'public', type: 'video',
     caption: 'Review of the archive hoodie — take it from me, worth every penny.',
     hashtags: ['#nxgendrops', '#review'],
@@ -205,13 +211,15 @@ function PostCard({
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function FriendsScreen() {
-  const insets = useSafeAreaInsets();
-  const router = useRouter();
+  const insets  = useSafeAreaInsets();
+  const router  = useRouter();
+  const api     = useApi();
 
-  const [friends, setFriends] = useState<Friendship[]>([]);
-  const [stories, setStories] = useState<Story[]>([]);
+  const [friends,      setFriends]      = useState<Friendship[]>([]);
+  const [apiFollowing, setApiFollowing] = useState<ApiFollowing[]>([]);
+  const [stories,      setStories]      = useState<Story[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
-  const [feedPosts, setFeedPosts] = useState<BuyerPost[]>(DEMO_FRIEND_POSTS);
+  const [feedPosts,    setFeedPosts]    = useState<BuyerPost[]>(DEMO_FRIEND_POSTS);
 
   async function loadData() {
     const postIds = DEMO_FRIEND_POSTS.map(p => p.id);
@@ -229,6 +237,12 @@ export default function FriendsScreen() {
     setPendingCount(incoming.length);
     const now = Date.now();
     setStories(sts.filter(s => s.expiresAt > now));
+
+    // Real API: load people I actually follow (backed by DB)
+    try {
+      const following = await api.social.following();
+      setApiFollowing(following);
+    } catch { /* graceful degrade */ }
 
     // Merge persisted like + repost state and real comment counts into feed posts
     const repostedIds = await getRepostedPostIds();
@@ -431,6 +445,50 @@ export default function FriendsScreen() {
               })}
             </ScrollView>
 
+            {/* ── People You Follow (real DB data) ──────────────────── */}
+            {apiFollowing.length > 0 && (
+              <View style={{ marginBottom: SP.sm }}>
+                <View style={s.sectionHeader}>
+                  <Text style={s.sectionTitle}>Following</Text>
+                  <TouchableOpacity onPress={() => router.push('/buyer-friend-requests' as never)}>
+                    <Text style={s.seeAll}>See all</Text>
+                  </TouchableOpacity>
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingHorizontal: SP.md, gap: SP.md, paddingBottom: SP.sm }}
+                >
+                  {apiFollowing.map(f => (
+                    <TouchableOpacity
+                      key={f.userId}
+                      style={s.followingItem}
+                      activeOpacity={0.8}
+                      onPress={() =>
+                        router.push({
+                          pathname: '/buyer-other-profile' as any,
+                          params: { userId: f.userId, name: f.name, handle: f.handle, initials: f.initials, color: f.color },
+                        })
+                      }
+                    >
+                      <View style={[s.storyCircle, { backgroundColor: f.color }]}>
+                        <Text style={s.storyInitials}>{f.initials}</Text>
+                      </View>
+                      <Text style={s.storyLabel} numberOfLines={1}>
+                        {f.name.split(' ')[0]}
+                      </Text>
+                      <TouchableOpacity
+                        style={s.msgBubble}
+                        onPress={() => handleMessageFriend({ userId: f.userId, name: f.name, handle: f.handle, initials: f.initials, color: f.color } as any)}
+                      >
+                        <Feather name="message-circle" size={14} color={PURPLE} />
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
             {/* Section header */}
             <View style={s.sectionHeader}>
               <Text style={s.sectionTitle}>Friend Activity</Text>
@@ -442,7 +500,7 @@ export default function FriendsScreen() {
             </View>
 
             {/* Empty state */}
-            {!hasFriends && feedPosts.length === 0 && (
+            {!hasFriends && feedPosts.length === 0 && apiFollowing.length === 0 && (
               <View style={s.emptyState}>
                 <Feather name="users" size={48} color={MUTED} />
                 <Text style={s.emptyTitle}>Connect with friends</Text>
@@ -546,6 +604,11 @@ const s = StyleSheet.create({
     paddingVertical: SP.md,
     gap: SP.md,
     alignItems: 'flex-start',
+  },
+  followingItem: { alignItems: 'center', gap: SP.xs, width: 68 },
+  msgBubble: {
+    width: 24, height: 24, borderRadius: 12,
+    backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center',
   },
   storyItem: { alignItems: 'center', gap: SP.xs },
   storyCircle: {

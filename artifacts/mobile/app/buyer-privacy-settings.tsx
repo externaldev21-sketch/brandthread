@@ -2,28 +2,34 @@ import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Switch, Alert, StyleSheet,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import { PrimaryButton } from '@/components/BrandthreadUI';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
 import {
   BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_DIM, GRAD_PRIMARY,
+  PURPLE, ON_DARK,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
 import { getPrivacySettings, updatePrivacySettings } from '@/services/socialService';
-import { PrivacySettings, AudienceOption } from '@/services/socialTypes';
+import { PrivacySettings, AudienceOption, DmPrivacy } from '@/services/socialTypes';
+import { useApi } from '@/lib/api';
 
 export default function BuyerPrivacySettings() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const api    = useApi();
   const [settings, setSettings] = useState<PrivacySettings | null>(null);
   const [hasChanges, setHasChanges] = useState(false);
+  // dmPrivacy is server-backed — loaded from and saved to /api/auth/privacy
+  const [dmPrivacy, setDmPrivacy] = useState<DmPrivacy>('requests');
 
   useFocusEffect(
     useCallback(() => {
       getPrivacySettings().then(setSettings);
+      // Load server-side DM privacy setting
+      api.privacy.get().then(({ dmPrivacy: p }) => setDmPrivacy(p)).catch(() => {});
     }, [])
   );
 
@@ -60,7 +66,10 @@ export default function BuyerPrivacySettings() {
 
   async function saveSettings() {
     if (!settings) return;
+    // Save local settings (stored in AsyncStorage)
     await updatePrivacySettings(settings);
+    // Save server-side DM privacy setting
+    await api.privacy.update({ dmPrivacy }).catch(() => {});
     setHasChanges(false);
     Alert.alert('Saved', 'Privacy settings updated.');
   }
@@ -102,7 +111,7 @@ export default function BuyerPrivacySettings() {
           value={value}
           onValueChange={onToggle}
           trackColor={{ false: BORDER, true: PURPLE }}
-          thumbColor="#FFF"
+          thumbColor={ON_DARK}
         />
       </View>
     );
@@ -129,16 +138,7 @@ export default function BuyerPrivacySettings() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Privacy</Text>
         {hasChanges ? (
-          <TouchableOpacity onPress={saveSettings}>
-            <LinearGradient
-              colors={GRAD_PRIMARY}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.saveBtn}
-            >
-              <Text style={styles.saveBtnText}>Save</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+          <PrimaryButton label="Save" onPress={saveSettings} small />
         ) : (
           <View style={styles.headerBtn} />
         )}
@@ -270,6 +270,38 @@ export default function BuyerPrivacySettings() {
           />
         </View>
 
+        {/* MESSAGES */}
+        <SectionHeader title="Messages" />
+        <View style={[styles.card, styles.cardOverflow]}>
+          <PickerRow
+            icon="message-circle"
+            label="Who can message you"
+            subtitle={
+              dmPrivacy === 'followers_only'
+                ? 'Only people you follow can send you DMs'
+                : 'Others go to your Requests inbox until you accept'
+            }
+            value={dmPrivacy === 'followers_only' ? 'Followers only' : 'Everyone (with requests)'}
+            onPress={() =>
+              Alert.alert(
+                'Who can message you',
+                'Others can always see your profile, but direct messages from non-followers are handled based on this setting.',
+                [
+                  {
+                    text: 'Everyone (non-followers go to Requests)',
+                    onPress: () => { setDmPrivacy('requests'); setHasChanges(true); },
+                  },
+                  {
+                    text: 'Followers only (block others entirely)',
+                    onPress: () => { setDmPrivacy('followers_only'); setHasChanges(true); },
+                  },
+                  { text: 'Cancel', style: 'cancel' },
+                ]
+              )
+            }
+          />
+        </View>
+
         {/* BLOCKED & MUTED & RESTRICTED */}
         <SectionHeader title="Blocked & Muted" />
         <View style={[styles.card, styles.cardOverflow]}>
@@ -319,16 +351,6 @@ const styles = StyleSheet.create({
     fontSize: FS.md,
     fontFamily: FONT.semibold,
     color: FG,
-  },
-  saveBtn: {
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SP.md,
-    paddingVertical: SP.xs,
-  },
-  saveBtnText: {
-    color: '#FFF',
-    fontFamily: FONT.semibold,
-    fontSize: FS.sm,
   },
   sectionHeader: {
     paddingHorizontal: SP.md,

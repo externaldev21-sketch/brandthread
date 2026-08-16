@@ -30,6 +30,7 @@ const STATIC_GROUPS: SettingsGroup[] = [
       { label: 'Shopping preferences', icon: 'shopping-bag', route: '/shopping-preferences' },
       { label: 'Account type',         icon: 'layers',      route: '/account-type-settings' },
       { label: 'Connected login methods', icon: 'link',     route: '/login-methods' },
+      { label: 'Identity verification', icon: 'shield',     route: '/seller-verification' },
     ],
   },
   {
@@ -56,6 +57,7 @@ const STATIC_GROUPS: SettingsGroup[] = [
       { label: 'Shipping and delivery',      icon: 'truck',         route: '/shipping-delivery' },
       { label: 'Taxes and duties',           icon: 'percent',       route: '/taxes-duties' },
       { label: 'Locations',                  icon: 'map-pin',       route: '/locations' },
+      { label: 'Bundles',                    icon: 'package',       route: '/product-bundles' },
       { label: 'Domains',                    icon: 'globe' },
       { label: 'Integrations',              icon: 'link',          route: '/integrations' },
       { label: 'Customer events',            icon: 'activity',      route: '/customer-events' },

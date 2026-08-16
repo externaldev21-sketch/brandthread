@@ -16,13 +16,13 @@ import { getPostById, getPostAnalytics } from '@/services/sellerContent';
 import type { SellerPost, PostAnalytics } from '@/services/types';
 
 // ─── Design Tokens ─────────────────────────────────────────────────────────────
-const BG        = '#0A0B0A';
-const CARD      = '#111311';
-const BORDER    = '#1E221E';
-const FG        = '#EAF2ED';
-const MUTED     = '#5A6B5C';
-const GREEN     = '#39FF88';
-const GREEN_DIM = '#0A2B18';
+const BG        = '#07070F';
+const CARD      = '#12121F';
+const BORDER    = 'rgba(255,255,255,0.07)';
+const FG        = '#F4F4FF';
+const MUTED     = 'rgba(244,244,255,0.50)';
+const GREEN     = '#8B5CF6';
+const GREEN_DIM = 'rgba(139,92,246,0.18)';
 const PURPLE    = '#8B5CF6';
 const BLUE      = '#3B82F6';
 const ORANGE    = '#F97316';
@@ -54,7 +54,7 @@ function formatPeakHour(hour: number): string {
 function postTypeGradient(type: string): [string, string] {
   if (type === 'video' || type === 'behind_scenes') return [PURPLE, '#1E1540'];
   if (type === 'slideshow') return [BLUE, '#0A1828'];
-  if (type === 'announcement') return [GREEN, '#0A2B18'];
+  if (type === 'announcement') return [GREEN, 'rgba(139,92,246,0.18)'];
   return ['#3D1F0F', '#1A0A05'];
 }
 

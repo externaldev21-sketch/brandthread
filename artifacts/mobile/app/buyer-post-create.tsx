@@ -8,8 +8,8 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
-  BG, CARD, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM,
+  BG, SURFACE, CARD, BORDER, BORDER_ACTIVE,
+  FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, ON_DARK,
   GRAD_PRIMARY, FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
 import { createPost } from '@/services/socialService';
@@ -25,7 +25,7 @@ const TYPE_OPTIONS: { key: PostType; label: string; icon: string }[] = [
 ];
 
 const MEDIA_COLORS: Record<PostType, [string, string]> = {
-  photo: ['#1a1a2e', '#0d0d1a'],
+  photo: [SURFACE, BG],
   slideshow: ['#0d1a0d', '#0a140a'],
   video: ['#1a0d00', '#140a00'],
 };
@@ -249,7 +249,7 @@ export default function BuyerPostCreateScreen() {
               style={styles.publishBtn}
             >
               {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={ON_DARK} />
               ) : (
                 <Text style={styles.publishBtnText}>Publish Post</Text>
               )}
@@ -494,6 +494,6 @@ const styles = StyleSheet.create({
   publishBtnText: {
     fontFamily: FONT.semibold,
     fontSize: FS.base,
-    color: '#FFFFFF',
+    color: ON_DARK,
   },
 });

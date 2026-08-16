@@ -11,14 +11,14 @@ import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 
 // ─── Tokens ───────────────────────────────────────────────────────────────────
-const BG      = '#0A0B0A';
-const CARD    = '#131713';
-const CARD2   = '#111211';
-const BORDER  = '#1E221E';
-const FG      = '#EAF2ED';
-const MUTED   = '#5C6B5E';
-const GREEN   = '#39FF88';
-const GREEN_D = '#0C2418';
+const BG      = '#07070F';
+const CARD    = '#12121F';
+const CARD2   = '#18182E';
+const BORDER  = 'rgba(255,255,255,0.07)';
+const FG      = '#F4F4FF';
+const MUTED   = 'rgba(244,244,255,0.50)';
+const GREEN   = '#8B5CF6';
+const GREEN_D = 'rgba(139,92,246,0.18)';
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 const PROD_STATS = [
@@ -58,8 +58,8 @@ const MANUFACTURERS = [
   {
     id: 'm4', name: 'Apex Garment Co.', location: 'Guangzhou, CN', initials: 'AG',
     rating: 4.9, verified: true, moq: 50, price: '$4.20', lead: '18 Days',
-    gradient: ['#1E2A1E', '#121A12'] as [string,string],
-    factorColor: '#253025',
+    gradient: ['#1A0A2E', '#12121F'] as [string,string],
+    factorColor: '#1A0A2E',
   },
 ];
 
@@ -440,7 +440,7 @@ const s = StyleSheet.create({
   productSpec:  { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
   productQty:   { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   productPct:   { fontSize: 12, fontFamily: 'Inter_700Bold' },
-  progressTrack:{ height: 5, backgroundColor: '#1A2A1A', borderRadius: 3, overflow: 'hidden', marginTop: 4 },
+  progressTrack:{ height: 5, backgroundColor: '#18182E', borderRadius: 3, overflow: 'hidden', marginTop: 4 },
   progressFill: { height: 5, backgroundColor: GREEN, borderRadius: 3 },
 
   // Pipeline
@@ -464,7 +464,7 @@ const s = StyleSheet.create({
 
   // Messages
   msgRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingTop: 12 },
-  msgAvatar:  { width: 42, height: 42, borderRadius: 12, backgroundColor: '#1A2A1A', alignItems: 'center', justifyContent: 'center' },
+  msgAvatar:  { width: 42, height: 42, borderRadius: 12, backgroundColor: '#18182E', alignItems: 'center', justifyContent: 'center' },
   msgAvatarText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: GREEN },
   onlineDot:  { position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: 5, backgroundColor: GREEN, borderWidth: 1.5, borderColor: CARD },
   msgName:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: FG },
@@ -490,5 +490,5 @@ const mc = StyleSheet.create({
   spec:     { fontSize: 10, fontFamily: 'Inter_500Medium', color: MUTED },
   lead:     { fontSize: 10, fontFamily: 'Inter_400Regular', color: MUTED },
   iconRow:  { flexDirection: 'row', gap: 8, marginTop: 6 },
-  iconBtn:  { width: 28, height: 28, borderRadius: 8, backgroundColor: '#1A2A1A', alignItems: 'center', justifyContent: 'center' },
+  iconBtn:  { width: 28, height: 28, borderRadius: 8, backgroundColor: '#18182E', alignItems: 'center', justifyContent: 'center' },
 });

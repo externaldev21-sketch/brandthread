@@ -212,7 +212,7 @@ const s = StyleSheet.create({
 
   deniedWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 40 },
   deniedText: { color: '#8C8577', fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' },
-  cameraOnlyBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#39FF88', paddingHorizontal: 18, paddingVertical: 11, borderRadius: 24, marginTop: 4 },
+  cameraOnlyBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#8B5CF6', paddingHorizontal: 18, paddingVertical: 11, borderRadius: 24, marginTop: 4 },
   cameraOnlyText: { color: '#03150B', fontSize: 14, fontFamily: 'Inter_600SemiBold' },
 
   modeBar: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8, paddingTop: 4, backgroundColor: '#000000E0' },

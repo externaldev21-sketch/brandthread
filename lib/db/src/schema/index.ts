@@ -1,5 +1,6 @@
-import { pgTable, uuid, text, integer, timestamp, json, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, timestamp, json, boolean, primaryKey, index, numeric, unique } from 'drizzle-orm/pg-core';
 export * from './manufacturers';
+import { manufacturers } from './manufacturers';
 import { relations } from 'drizzle-orm';
 
 // ─── Users (brand team members + buyers, linked to Clerk) ─────────────────────
@@ -17,15 +18,39 @@ export const users = pgTable('users', {
   bio: text('bio'),
   profileImageUrl: text('profile_image_url'),
   accountType: text('account_type'), // 'buyer' | 'seller' | 'both'
+  // Referral / invite system
+  inviteCode:     text('invite_code').unique(),   // lazily generated on first /referrals/code call
+  referredByCode: text('referred_by_code'),       // code used when this user signed up
+  // DM privacy: 'requests' (default) | 'followers_only'
+  dmPrivacy:      text('dm_privacy').notNull().default('requests'),
   // Brand onboarding fields (seller side)
   brandName: text('brand_name'),
   brandType: text('brand_type'),
   brandStage: text('brand_stage'),
   sellModel: text('sell_model'),
   onboardingComplete: boolean('onboarding_complete').notNull().default(false),
-  // Stripe Connect (seller payouts)
-  stripeAccountId: text('stripe_account_id'),
+  // Stripe Connect (seller payouts — separate from subscription billing)
+  stripeAccountId:     text('stripe_account_id'),
   stripeAccountStatus: text('stripe_account_status'), // 'pending' | 'active' | 'restricted'
+  // Stripe Customer + Subscription (seller's own recurring platform fee)
+  // Completely distinct from stripeAccountId / Connect.
+  stripeCustomerId:        text('stripe_customer_id'),
+  subscriptionId:          text('subscription_id'),
+  subscriptionStatus:      text('subscription_status').default('none'),
+  subscriptionPeriodEnd:   timestamp('subscription_period_end'),
+  subscriptionPlanId:      text('subscription_plan_id').default('starter'),
+  // Trust signals & Stripe Identity verification
+  verified:                     boolean('verified').notNull().default(false),
+  /** 'unverified' | 'pending' | 'verified' | 'failed' */
+  verificationStatus:           text('verification_status').notNull().default('unverified'),
+  stripeVerificationSessionId:  text('stripe_verification_session_id'),
+  returnPolicy:       text('return_policy'),
+  cancellationPolicy: text('cancellation_policy'),
+  // Public profile link (bio website)
+  website: text('website'),
+  // Unique @handle (letters, numbers, underscores; 3–30 chars). Nullable so
+  // existing rows are unaffected; the DB-level unique index enforces platform-wide uniqueness.
+  username: text('username').unique(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -41,7 +66,16 @@ export const products = pgTable('products', {
   status: text('status').notNull().default('draft'), // 'draft' | 'active' | 'archived'
   images: json('images').$type<string[]>().notNull().default([]),
   tags: json('tags').$type<string[]>().notNull().default([]),
-  styleTags: json('style_tags').$type<string[]>().notNull().default([]),
+  styleTags:             json('style_tags').$type<string[]>().notNull().default([]),
+  // ── Pre-order / demand gauging ───────────────────────────────────────────
+  isPreOrder:            boolean('is_pre_order').notNull().default(false),
+  preOrderClosingDate:   timestamp('pre_order_closing_date'),
+  preOrderEstShipDate:   timestamp('pre_order_est_ship_date'),
+  dropId:                uuid('drop_id'),  // FK → drops.id (set null on delete; handled by migration)
+  demandCount:           integer('demand_count').notNull().default(0),
+  // ── Size chart ────────────────────────────────────────────────────────────
+  // { columns: string[], rows: [{size:string, values:string[]}], unit?:string, notes?:string }
+  sizeChart:             json('size_chart').$type<Record<string, unknown> | null>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -90,6 +124,7 @@ export const drops = pgTable('drops', {
   name: text('name').notNull(),
   type: text('type').notNull(), // 'pre-order' | 'pre-made'
   status: text('status').notNull().default('draft'), // 'draft' | 'active' | 'closed' | 'fulfilled'
+  releaseAt: timestamp('release_at'),             // when the drop goes live to buyers (countdown)
   estimatedShipDate: timestamp('estimated_ship_date'),
   totalCollectedCents: integer('total_collected_cents').notNull().default(0),
   orderCount: integer('order_count').notNull().default(0),
@@ -125,6 +160,14 @@ export const orders = pgTable('orders', {
   }>(),
   trackingNumber: text('tracking_number'),
   carrier: text('carrier'),
+  // Fulfillment timestamps
+  packedAt:  timestamp('packed_at'),
+  shippedAt: timestamp('shipped_at'),
+  // Discount code applied at checkout
+  discountCode:        text('discount_code'),
+  discountAmountCents: integer('discount_amount_cents').notNull().default(0),
+  // Post/video that drove the Shop button click (attribution)
+  sourcePostId: text('source_post_id'),
   // Stripe payment fields
   stripePaymentIntentId: text('stripe_payment_intent_id'),
   stripeCheckoutSessionId: text('stripe_checkout_session_id'),
@@ -215,6 +258,39 @@ export const klaviyoIntegrations = pgTable('klaviyo_integrations', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+// ─── Push Tokens (Expo push notification device registration) ─────────────────
+
+export const pushTokens = pgTable('push_tokens', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  userId:    text('user_id').notNull(),
+  token:     text('token').notNull().unique(),
+  platform:  text('platform').notNull().default('unknown'), // 'ios' | 'android' | 'web'
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// ─── Seller Quote Requests (seller → manufacturer quote/sample requests) ───────
+
+export const sellerQuoteRequests = pgTable('seller_quote_requests', {
+  id:               uuid('id').primaryKey().defaultRandom(),
+  sellerId:         text('seller_id').notNull(),
+  manufacturerId:   uuid('manufacturer_id').notNull().references(() => manufacturers.id, { onDelete: 'cascade' }),
+  // 'quote' | 'sample'
+  type:             text('type').notNull().default('quote'),
+  productName:      text('product_name').notNull(),
+  productType:      text('product_type').notNull().default('apparel'),
+  quantity:         integer('quantity'),
+  colorways:        text('colorways'),
+  details:          text('details'),
+  // 'submitted' | 'quoted' | 'accepted' | 'declined' | 'cancelled'
+  status:           text('status').notNull().default('submitted'),
+  quotedPriceCents: integer('quoted_price_cents'),
+  quotedTurnaround: text('quoted_turnaround'),
+  notes:            text('notes'),
+  createdAt:        timestamp('created_at').defaultNow().notNull(),
+  updatedAt:        timestamp('updated_at').defaultNow().notNull(),
+});
+
 // ─── Relations ────────────────────────────────────────────────────────────────
 
 export const productsRelations = relations(products, ({ many }) => ({
@@ -252,3 +328,418 @@ export const postsRelations = relations(posts, ({ many }) => ({
 export const interactionsRelations = relations(interactions, ({ one }) => ({
   post: one(posts, { fields: [interactions.postId], references: [posts.id] }),
 }));
+
+// ─── Referrals (invite attribution; one inviter per invitee) ─────────────────
+
+export const referrals = pgTable('referrals', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  inviterId:  text('inviter_id').notNull(),         // Clerk userId who shared the code
+  inviteeId:  text('invitee_id').notNull().unique(), // Clerk userId of the new user
+  inviteCode: text('invite_code').notNull(),         // the code that was used
+  joinedAt:   timestamp('joined_at').defaultNow().notNull(),
+  // Reward/status columns can be added here later without breaking existing rows
+});
+
+// ─── Blocks (server-side enforcement; replaces local AsyncStorage blocks) ─────
+
+export const blocks = pgTable('blocks', {
+  blockerId:  text('blocker_id').notNull(),
+  blockedId:  text('blocked_id').notNull(),
+  createdAt:  timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.blockerId, t.blockedId] }),
+}));
+
+// ─── Conversations & Messages (buyer ↔ seller DM) ────────────────────────────
+
+export const conversations = pgTable('conversations', {
+  id:                 uuid('id').primaryKey().defaultRandom(),
+  type:               text('type').notNull().default('buyer_to_seller'),
+  lastMessage:        text('last_message'),
+  lastMessageAt:      timestamp('last_message_at'),
+  // Follow-based message requests (buyer_to_buyer only)
+  isRequest:          boolean('is_request').notNull().default(false),
+  requestedBy:        text('requested_by'),  // Clerk userId of the sender awaiting acceptance
+  contextOrderId:     text('context_order_id'),
+  contextOrderNumber: text('context_order_number'),
+  contextOrderStatus: text('context_order_status'),
+  contextProductId:   text('context_product_id'),
+  contextProductName: text('context_product_name'),
+  contextSellerName:  text('context_seller_name'),
+  createdAt:          timestamp('created_at').defaultNow().notNull(),
+  updatedAt:          timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const conversationParticipants = pgTable('conversation_participants', {
+  conversationId: uuid('conversation_id').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
+  userId:         text('user_id').notNull(),
+  name:           text('name').notNull().default(''),
+  handle:         text('handle').notNull().default(''),
+  initials:       text('initials').notNull().default(''),
+  color:          text('color').notNull().default('#8B5CF6'),
+  accountType:    text('account_type').notNull().default('buyer'),
+  unreadCount:    integer('unread_count').notNull().default(0),
+  lastReadAt:     timestamp('last_read_at'),
+  joinedAt:       timestamp('joined_at').defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ columns: [table.conversationId, table.userId] }),
+}));
+
+export const messages = pgTable('messages', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  conversationId: uuid('conversation_id').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
+  senderId:       text('sender_id').notNull(),
+  senderName:     text('sender_name').notNull().default(''),
+  senderInitials: text('sender_initials').notNull().default(''),
+  senderColor:    text('sender_color').notNull().default('#8B5CF6'),
+  body:           text('body').notNull(),
+  attachment:     json('attachment'),
+  replyToId:      uuid('reply_to_id'),
+  status:         text('status').notNull().default('sent'),
+  createdAt:      timestamp('created_at').defaultNow().notNull(),
+});
+
+// ─── Saved / wishlisted items ─────────────────────────────────────────────────
+
+export const savedItems = pgTable('saved_items', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  userId:      text('user_id').notNull(),
+  itemType:    text('item_type').notNull().default('product'),
+  targetId:    text('target_id').notNull(),
+  title:       text('title').notNull().default(''),
+  subtitle:    text('subtitle'),
+  accentColor: text('accent_color'),
+  createdAt:   timestamp('created_at').defaultNow().notNull(),
+});
+
+// ─── Server-side cart (full-replace sync model) ───────────────────────────────
+
+export const cartItems = pgTable('cart_items', {
+  id:                    uuid('id').primaryKey().defaultRandom(),
+  userId:                text('user_id').notNull(),
+  variantId:             text('variant_id').notNull(),
+  savedForLater:         boolean('saved_for_later').notNull().default(false),
+  itemData:              json('item_data').notNull().default({}),
+  updatedAt:             timestamp('updated_at').defaultNow().notNull(),
+  notifiedAbandonedAt:   timestamp('notified_abandoned_at'),
+});
+
+// ─── In-app notification feed ─────────────────────────────────────────────────
+
+export const notificationsFeed = pgTable('notifications_feed', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  userId:        text('user_id').notNull(),
+  category:      text('category').notNull().default('system'),
+  type:          text('type').notNull(),
+  title:         text('title').notNull(),
+  body:          text('body').notNull().default(''),
+  isRead:        boolean('is_read').notNull().default(false),
+  isMuted:       boolean('is_muted').notNull().default(false),
+  actorName:     text('actor_name'),
+  actorHandle:   text('actor_handle'),
+  actorInitials: text('actor_initials'),
+  actorColor:    text('actor_color'),
+  targetId:      text('target_id'),
+  targetType:    text('target_type'),
+  cta:           text('cta'),
+  createdAt:     timestamp('created_at').defaultNow().notNull(),
+});
+
+// ─── Reviews (buyer → seller/product rating after delivered order) ──────────────
+
+export const reviews = pgTable('reviews', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  buyerId:   text('buyer_id').notNull(),
+  sellerId:  text('seller_id').notNull(),
+  orderId:   uuid('order_id').references(() => orders.id, { onDelete: 'set null' }),
+  productId: uuid('product_id').references(() => products.id, { onDelete: 'set null' }),
+  rating:    integer('rating').notNull(),
+  body:      text('body'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// ─── Shoppable post tagging ────────────────────────────────────────────────────
+
+export const postTaggedProducts = pgTable('post_tagged_products', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  postId:    uuid('post_id').notNull().references(() => posts.id, { onDelete: 'cascade' }),
+  productId: uuid('product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
+  position:  integer('position').notNull().default(0),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// ─── Server-side stories (buyers + sellers, 24 h TTL) ────────────────────────
+
+export const stories = pgTable('stories', {
+  id:                uuid('id').primaryKey().defaultRandom(),
+  authorId:          text('author_id').notNull(),
+  authorName:        text('author_name').notNull(),
+  authorHandle:      text('author_handle'),
+  authorInitials:    text('author_initials'),
+  authorColor:       text('author_color'),
+  authorAccountType: text('author_account_type').notNull().default('buyer'),
+  media:             json('media').notNull().default([]),  // StoryMedia[]
+  repliesDisabled:   boolean('replies_disabled').notNull().default(false),
+  privacyVisibility: text('privacy_visibility').notNull().default('public'),
+  privacyReplyPerm:  text('privacy_reply_perm').notNull().default('everyone'),
+  likesCount:        integer('likes_count').notNull().default(0),
+  viewsCount:        integer('views_count').notNull().default(0),
+  createdAt:         timestamp('created_at').defaultNow().notNull(),
+  expiresAt:         timestamp('expires_at').notNull(),
+});
+
+export const storyLikes = pgTable('story_likes', {
+  storyId:   uuid('story_id').notNull().references(() => stories.id, { onDelete: 'cascade' }),
+  userId:    text('user_id').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.storyId, t.userId] }),
+}));
+
+export const storyViews = pgTable('story_views', {
+  storyId:  uuid('story_id').notNull().references(() => stories.id, { onDelete: 'cascade' }),
+  userId:   text('user_id').notNull(),
+  viewedAt: timestamp('viewed_at').defaultNow().notNull(),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.storyId, t.userId] }),
+}));
+
+// ─── Buyer-to-buyer follows (social graph) ────────────────────────────────────
+
+export const follows = pgTable('follows', {
+  followerId:  text('follower_id').notNull(),   // Clerk user ID of the follower
+  followingId: text('following_id').notNull(),  // Clerk user ID of the person being followed
+  createdAt:   timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  pk:           primaryKey({ columns: [t.followerId, t.followingId] }),
+  followingIdx: index('follows_following_idx').on(t.followingId),
+}));
+
+// ─── Discount codes ───────────────────────────────────────────────────────────
+
+export const discountCodes = pgTable('discount_codes', {
+  id:             text('id').primaryKey().default(''),
+  sellerId:       text('seller_id').notNull(),
+  code:           text('code').notNull(),
+  /** 'percentage' | 'fixed' | 'free_shipping' */
+  type:           text('type').notNull().default('percentage'),
+  /** Percentage 0-100, or fixed amount in cents */
+  value:          numeric('value', { precision: 10, scale: 2 }).notNull().default('0'),
+  minOrderCents:  integer('min_order_cents').notNull().default(0),
+  maxUses:        integer('max_uses'),
+  usesCount:      integer('uses_count').notNull().default(0),
+  expiresAt:      timestamp('expires_at'),
+  active:         boolean('active').notNull().default(true),
+  createdAt:      timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  sellerIdx: index('discount_codes_seller_idx').on(t.sellerId),
+  codeIdx:   index('discount_codes_code_idx').on(t.code),
+}));
+
+// ─── Returns ──────────────────────────────────────────────────────────────────
+
+export const returns = pgTable('returns', {
+  id:                  text('id').primaryKey().default(''),
+  orderId:             uuid('order_id').notNull(),
+  buyerId:             text('buyer_id').notNull(),
+  sellerId:            text('seller_id').notNull(),
+  reason:              text('reason').notNull(),
+  notes:               text('notes'),
+  /** 'refund' | 'exchange' | 'store_credit' | 'replacement' */
+  resolutionRequested: text('resolution_requested').notNull().default('refund'),
+  /** 'pending' | 'approved' | 'denied' | 'refunded' */
+  status:              text('status').notNull().default('pending'),
+  stripeRefundId:      text('stripe_refund_id'),
+  refundAmountCents:   integer('refund_amount_cents'),
+  sellerResponse:      text('seller_response'),
+  createdAt:           timestamp('created_at').defaultNow().notNull(),
+  updatedAt:           timestamp('updated_at').defaultNow().notNull(),
+}, (t) => ({
+  orderIdx:  index('returns_order_idx').on(t.orderId),
+  sellerIdx: index('returns_seller_idx').on(t.sellerId),
+  buyerIdx:  index('returns_buyer_idx').on(t.buyerId),
+}));
+
+// ─── Shipping rates ────────────────────────────────────────────────────────────
+
+export const shippingRates = pgTable('shipping_rates', {
+  id:             text('id').primaryKey().default(''),
+  sellerId:       text('seller_id').notNull(),
+  name:           text('name').notNull().default('Standard Shipping'),
+  /** Base shipping cost in cents; 0 = free */
+  flatRateCents:  integer('flat_rate_cents').notNull().default(0),
+  /** When order subtotal >= this value, shipping is free; NULL = never auto-free */
+  freeAboveCents: integer('free_above_cents'),
+  active:         boolean('active').notNull().default(true),
+  createdAt:      timestamp('created_at').defaultNow().notNull(),
+  updatedAt:      timestamp('updated_at').defaultNow().notNull(),
+}, (t) => ({
+  sellerIdx: index('shipping_rates_seller_idx').on(t.sellerId),
+}));
+
+// ─── Content reports ──────────────────────────────────────────────────────────
+
+export const reports = pgTable('reports', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  reporterId:  text('reporter_id').notNull(),
+  targetType:  text('target_type').notNull(),  // 'post'|'product'|'profile'|'story'|'message'|'seller'
+  targetId:    text('target_id').notNull(),
+  targetLabel: text('target_label'),
+  reason:      text('reason').notNull(),
+  description: text('description'),
+  // 'pending' | 'reviewed' | 'actioned' | 'dismissed'
+  status:      text('status').notNull().default('pending'),
+  createdAt:   timestamp('created_at').defaultNow().notNull(),
+});
+
+// ─── Pre-order reserves (demand signal, no charge) ────────────────────────────
+
+export const productReserves = pgTable('product_reserves', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  productId:  uuid('product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
+  userId:     text('user_id').notNull(),
+  createdAt:  timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  uniq: unique().on(t.productId, t.userId),
+}));
+
+// ─── Waitlist entries (out-of-stock variant interest) ─────────────────────────
+
+export const waitlistEntries = pgTable('waitlist_entries', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  productId:    uuid('product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
+  variantId:    uuid('variant_id'),
+  userId:       text('user_id').notNull(),
+  sellerId:     text('seller_id').notNull(),
+  productName:  text('product_name').notNull().default(''),
+  variantLabel: text('variant_label').notNull().default(''),
+  notifiedAt:   timestamp('notified_at'),
+  createdAt:    timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  uniq: unique().on(t.productId, t.variantId, t.userId),
+}));
+
+// ─── Product bundles ──────────────────────────────────────────────────────────
+
+export const productBundles = pgTable('product_bundles', {
+  id:                uuid('id').primaryKey().defaultRandom(),
+  ownerId:           text('owner_id').notNull(),
+  name:              text('name').notNull(),
+  description:       text('description'),
+  bundlePriceCents:  integer('bundle_price_cents').notNull().default(0),
+  compareAtCents:    integer('compare_at_cents').notNull().default(0),
+  status:            text('status').notNull().default('draft'), // 'draft' | 'active' | 'archived'
+  images:            json('images').$type<string[]>().notNull().default([]),
+  createdAt:         timestamp('created_at').defaultNow().notNull(),
+  updatedAt:         timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const bundleItems = pgTable('bundle_items', {
+  id:         uuid('id').primaryKey().defaultRandom(),
+  bundleId:   uuid('bundle_id').notNull().references(() => productBundles.id, { onDelete: 'cascade' }),
+  productId:  uuid('product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
+  variantId:  uuid('variant_id'),
+  quantity:   integer('quantity').notNull().default(1),
+});
+
+// ─── Storefronts ─────────────────────────────────────────────────────────────
+export const storefronts = pgTable('storefronts', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  ownerId:       text('owner_id').notNull().unique(),
+  slug:          text('slug').notNull().unique(),
+  title:         text('title').notNull().default(''),
+  subtitle:      text('subtitle'),
+  description:   text('description'),
+  status:        text('status').notNull().default('draft'),
+  theme:         json('theme').$type<Record<string, unknown>>().notNull().default({}),
+  branding:      json('branding').$type<Record<string, unknown>>().notNull().default({}),
+  sections:      json('sections').$type<unknown[]>().notNull().default([]),
+  seo:           json('seo').$type<Record<string, unknown>>().notNull().default({}),
+  socialLinks:   json('social_links').$type<Record<string, unknown>>().notNull().default({}),
+  analyticsCode: text('analytics_code'),
+  publishedAt:   timestamp('published_at'),
+  createdAt:     timestamp('created_at').defaultNow().notNull(),
+  updatedAt:     timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const storefrontVersions = pgTable('storefront_versions', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  storefrontId: uuid('storefront_id').notNull().references(() => storefronts.id, { onDelete: 'cascade' }),
+  label:        text('label').notNull().default(''),
+  snapshot:     json('snapshot').$type<Record<string, unknown>>().notNull().default({}),
+  createdBy:    text('created_by').notNull(),
+  createdAt:    timestamp('created_at').defaultNow().notNull(),
+});
+
+export const storefrontCustomDomains = pgTable('storefront_custom_domains', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  storefrontId: uuid('storefront_id').notNull().references(() => storefronts.id, { onDelete: 'cascade' }),
+  domain:       text('domain').notNull().unique(),
+  verified:     boolean('verified').notNull().default(false),
+  verifyToken:  text('verify_token'),
+  createdAt:    timestamp('created_at').defaultNow().notNull(),
+});
+
+// ─── Team Members ─────────────────────────────────────────────────────────────
+export const teamMembers = pgTable('team_members', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  ownerId:      text('owner_id').notNull(),
+  email:        text('email').notNull(),
+  name:         text('name'),
+  role:         text('role').notNull().default('staff'),
+  status:       text('status').notNull().default('pending'),
+  inviteToken:  text('invite_token').unique(),
+  invitedAt:    timestamp('invited_at').defaultNow().notNull(),
+  acceptedAt:   timestamp('accepted_at'),
+  lastActiveAt: timestamp('last_active_at'),
+  createdAt:    timestamp('created_at').defaultNow().notNull(),
+  updatedAt:    timestamp('updated_at').defaultNow().notNull(),
+});
+
+export const teamActivityLogs = pgTable('team_activity_logs', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  ownerId:   text('owner_id').notNull(),
+  memberId:  uuid('member_id').references(() => teamMembers.id, { onDelete: 'set null' }),
+  actorName: text('actor_name'),
+  action:    text('action').notNull(),
+  target:    text('target'),
+  metadata:  json('metadata').$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// ─── Disputes / Chargebacks ───────────────────────────────────────────────────
+export const disputes = pgTable('disputes', {
+  id:                     uuid('id').primaryKey().defaultRandom(),
+  stripeDisputeId:        text('stripe_dispute_id').notNull().unique(),
+  stripeChargeId:         text('stripe_charge_id'),
+  stripePaymentIntentId:  text('stripe_payment_intent_id'),
+  orderId:                uuid('order_id').references(() => orders.id, { onDelete: 'set null' }),
+  sellerId:               text('seller_id').notNull(),
+  amountCents:            integer('amount_cents').notNull().default(0),
+  currency:               text('currency').notNull().default('usd'),
+  reason:                 text('reason'),
+  status:                 text('status').notNull().default('needs_response'),
+  evidenceDueBy:          timestamp('evidence_due_by'),
+  evidenceJson:           json('evidence_json').$type<Record<string, unknown>[]>().notNull().default([]),
+  stripeEvidenceDetails:  json('stripe_evidence_details').$type<Record<string, unknown>>().notNull().default({}),
+  isChargeRefundable:     boolean('is_charge_refundable').notNull().default(true),
+  networkReasonCode:      text('network_reason_code'),
+  customerClaim:          text('customer_claim').notNull().default(''),
+  createdAt:              timestamp('created_at').defaultNow().notNull(),
+  updatedAt:              timestamp('updated_at').defaultNow().notNull(),
+});
+
+// ─── Seller Tax Configuration ─────────────────────────────────────────────────
+export const sellerTaxConfig = pgTable('seller_tax_config', {
+  id:                  uuid('id').primaryKey().defaultRandom(),
+  sellerId:            text('seller_id').notNull().unique(),
+  stripeTaxEnabled:    boolean('stripe_tax_enabled').notNull().default(false),
+  collectDuties:       boolean('collect_duties').notNull().default(false),
+  chargeShippingTax:   boolean('charge_shipping_tax').notNull().default(false),
+  chargeVat:           boolean('charge_vat').notNull().default(false),
+  taxCalculationMode:  text('tax_calculation_mode').notNull().default('automatic'),
+  stripeTaxSettings:   json('stripe_tax_settings').$type<Record<string, unknown>>().notNull().default({}),
+  createdAt:           timestamp('created_at').defaultNow().notNull(),
+  updatedAt:           timestamp('updated_at').defaultNow().notNull(),
+});

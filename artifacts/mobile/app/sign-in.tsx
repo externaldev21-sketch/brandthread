@@ -2,7 +2,7 @@
  * Sign-in screen — Brandthread premium dark design
  * Pure sign-in: email/password, Google OAuth, Apple OAuth
  */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, ActivityIndicator,
@@ -10,8 +10,9 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
-import { useSignIn, useOAuth, useAuth, useUser } from '@clerk/expo';
+import { useSignIn, useSSO, useAuth, useUser } from '@clerk/expo';
 import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
 import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -36,11 +37,17 @@ export default function SignInScreen() {
   const { signIn, fetchStatus } = useSignIn();
   const { isSignedIn, signOut } = useAuth();
   const { user }                = useUser();
-  const { startOAuthFlow: googleOAuth } = useOAuth({ strategy: 'oauth_google' });
-  const { startOAuthFlow: appleOAuth }  = useOAuth({ strategy: 'oauth_apple' });
+  const { startSSOFlow } = useSSO();
 
   const router = useRouter();
   const insets = useSafeAreaInsets();
+
+  // Warm up the browser on Android for faster OAuth sheet presentation
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    void WebBrowser.warmUpAsync();
+    return () => { void WebBrowser.coolDownAsync(); };
+  }, []);
 
   const [email, setEmail]           = useState('');
   const [password, setPassword]     = useState('');
@@ -93,13 +100,16 @@ export default function SignInScreen() {
   }
 
   // ─── OAuth ────────────────────────────────────────────────────────────────────
-  async function handleOAuth(start: () => Promise<any>, provider: string) {
+  async function handleOAuth(strategy: 'oauth_google' | 'oauth_apple', provider: string) {
     setOAuth(provider);
     setError('');
     try {
-      const result = await start();
-      if (result?.createdSessionId && result?.setActive) {
-        await result.setActive({ session: result.createdSessionId });
+      const { createdSessionId, setActive } = await startSSOFlow({
+        strategy,
+        redirectUrl: AuthSession.makeRedirectUri(),
+      });
+      if (createdSessionId && setActive) {
+        await setActive({ session: createdSessionId });
       }
     } catch (e: any) {
       if (e?.message?.includes('cancel') || e?.message?.includes('dismiss')) {
@@ -226,9 +236,10 @@ export default function SignInScreen() {
           <Text style={s.subtitle}>Sign in to continue where you left off.</Text>
 
           {/* ── OAuth ─────────────────────────────────────────────────────────── */}
+          {/* Google — dark surface with Google logo, per Google brand guidelines */}
           <TouchableOpacity
             style={s.oauthBtn}
-            onPress={() => handleOAuth(googleOAuth, 'Google')}
+            onPress={() => handleOAuth('oauth_google', 'Google')}
             activeOpacity={0.85}
             disabled={!!oauthLoading || isFetching}
           >
@@ -236,25 +247,26 @@ export default function SignInScreen() {
               <ActivityIndicator color={FG} size="small" />
             ) : (
               <>
-                <Text style={s.oauthIcon}>G</Text>
+                <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: 'Inter_700Bold', fontSize: 11, color: '#FFFFFF', lineHeight: 13 }}>G</Text></View>
                 <Text style={s.oauthText}>Continue with Google</Text>
               </>
             )}
           </TouchableOpacity>
 
+          {/* Apple — solid black button per Apple HIG, iOS only */}
           {Platform.OS === 'ios' && (
             <TouchableOpacity
               style={[s.oauthBtn, s.appleBtn]}
-              onPress={() => handleOAuth(appleOAuth, 'Apple')}
+              onPress={() => handleOAuth('oauth_apple', 'Apple')}
               activeOpacity={0.85}
               disabled={!!oauthLoading || isFetching}
             >
               {oauthLoading === 'Apple' ? (
-                <ActivityIndicator color={BG} size="small" />
+                <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <>
-                  <Text style={s.oauthIcon}>🍎</Text>
-                  <Text style={[s.oauthText, { color: BG }]}>Continue with Apple</Text>
+                  <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 18, color: '#FFFFFF', lineHeight: 20 }}></Text>
+                  <Text style={[s.oauthText, { color: '#FFFFFF' }]}>Continue with Apple</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -413,8 +425,8 @@ const s = StyleSheet.create({
     backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER,
     paddingVertical: 15, marginBottom: 10,
   },
-  appleBtn: { backgroundColor: FG, borderColor: FG },
-  oauthIcon: { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
+  // Apple button: solid black per Apple Human Interface Guidelines
+  appleBtn: { backgroundColor: '#000000', borderColor: 'rgba(255,255,255,0.15)' },
   oauthText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
 
   divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 20 },

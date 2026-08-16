@@ -8,11 +8,12 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
-  BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_DIM, GRAD_PRIMARY, SUCCESS,
+  BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, ON_DARK,
+  PURPLE, PURPLE_DIM, GRAD_PRIMARY, SUCCESS, SUCCESS_DIM,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
 import { submitReport } from '@/services/socialService';
+import { serviceRequest } from '@/lib/serviceConfig';
 import { ReportReason, ReportTargetType, REPORT_REASON_LABELS } from '@/services/socialTypes';
 
 const { width: W } = Dimensions.get('window');
@@ -68,6 +69,24 @@ export default function BuyerReport() {
             }
           : undefined,
       });
+
+      // Also persist to API
+      try {
+        await serviceRequest('/api/reports', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            targetType: params.targetType,
+            targetId: params.targetId,
+            targetLabel: params.targetLabel,
+            reason,
+            description,
+          }),
+        });
+      } catch {
+        // API persistence failure is non-blocking — local report still succeeded
+      }
+
       setIsSuccess(true);
     } catch {
       Alert.alert('Error', 'Failed to submit report. Please try again.');
@@ -185,7 +204,7 @@ export default function BuyerReport() {
               value={blockAfter}
               onValueChange={setBlockAfter}
               trackColor={{ false: BORDER, true: PURPLE }}
-              thumbColor="#FFF"
+              thumbColor={ON_DARK}
             />
           </View>
         ) : null}
@@ -353,7 +372,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   submitBtnText: {
-    color: '#FFF',
+    color: ON_DARK,
     fontFamily: FONT.semibold,
     fontSize: FS.base,
   },
@@ -368,7 +387,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(16,185,129,0.15)',
+    backgroundColor: SUCCESS_DIM,
     borderWidth: 1,
     borderColor: 'rgba(16,185,129,0.3)',
     alignItems: 'center',
@@ -399,7 +418,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   doneBtnText: {
-    color: '#FFF',
+    color: ON_DARK,
     fontFamily: FONT.semibold,
     fontSize: FS.base,
   },

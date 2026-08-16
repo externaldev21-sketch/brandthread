@@ -114,15 +114,15 @@ export default function BrandScreen() {
       >
 
       {/* Brand Profile */}
-      <LinearGradient colors={['#180D2E', '#17140F']} style={[styles.profileCard, { borderColor: '#00C85344' }]}>
+      <LinearGradient colors={['#180D2E', '#0C0C17']} style={[styles.profileCard, { borderColor: 'rgba(139,92,246,0.26)' }]}>
         <View style={[styles.logoCircle, { borderColor: colors.primary }]}>
           <Text style={[styles.logoText, { color: colors.primary }]}>BT</Text>
         </View>
         <View>
           <Text style={[styles.brandName, { color: colors.primary }]}>Brandthread</Text>
-          <Text style={[styles.brandStyle, { color: '#39FF8877' }]}>Minimalist · Est. 2025</Text>
+          <Text style={[styles.brandStyle, { color: 'rgba(139,92,246,0.47)' }]}>Minimalist · Est. 2025</Text>
         </View>
-        <View style={[styles.completeBadge, { backgroundColor: '#00C85322' }]}>
+        <View style={[styles.completeBadge, { backgroundColor: 'rgba(139,92,246,0.13)' }]}>
           <Text style={[styles.completeText, { color: colors.primary }]}>{completionPct}%</Text>
         </View>
       </LinearGradient>
@@ -132,7 +132,7 @@ export default function BrandScreen() {
         <View style={styles.cardHeader}>
           <Feather name="cpu" size={16} color={colors.primary} />
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>AI Brand Name Generator</Text>
-          <View style={[styles.aiBadge, { backgroundColor: '#00C85322' }]}>
+          <View style={[styles.aiBadge, { backgroundColor: 'rgba(139,92,246,0.13)' }]}>
             <Text style={[styles.aiText, { color: colors.primary }]}>AI</Text>
           </View>
         </View>
@@ -176,7 +176,7 @@ export default function BrandScreen() {
         <View style={styles.cardHeader}>
           <Feather name="aperture" size={16} color={colors.primary} />
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>AI Logo Generator</Text>
-          <View style={[styles.aiBadge, { backgroundColor: '#00C85322' }]}>
+          <View style={[styles.aiBadge, { backgroundColor: 'rgba(139,92,246,0.13)' }]}>
             <Text style={[styles.aiText, { color: colors.primary }]}>AI</Text>
           </View>
         </View>
@@ -242,7 +242,7 @@ export default function BrandScreen() {
             </View>
             {selectedLogo !== null && (
               <TouchableOpacity
-                style={[styles.generateBtn, { backgroundColor: '#4C9A5E22', marginTop: 8 }]}
+                style={[styles.generateBtn, { backgroundColor: 'rgba(139,92,246,0.13)', marginTop: 8 }]}
                 activeOpacity={0.8}
                 onPress={() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)}
               >
@@ -270,7 +270,7 @@ export default function BrandScreen() {
               onPress={() => toggleCheck(i)}
               style={[styles.checkRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
             >
-              <View style={[styles.checkBox, { backgroundColor: done ? '#4C9A5E22' : colors.secondary, borderColor: done ? colors.success : colors.border }]}>
+              <View style={[styles.checkBox, { backgroundColor: done ? 'rgba(139,92,246,0.13)' : colors.secondary, borderColor: done ? colors.success : colors.border }]}>
                 {done && <Feather name="check" size={12} color={colors.success} />}
               </View>
               <Text style={[styles.checkLabel, { color: done ? colors.mutedForeground : colors.foreground }]}>{label}</Text>
@@ -287,7 +287,7 @@ export default function BrandScreen() {
         </View>
         <View style={[styles.domainRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
           <Text style={[styles.domainText, { color: colors.mutedForeground }]}>brandthread.com</Text>
-          <View style={[styles.availBadge, { backgroundColor: '#4C9A5E22' }]}>
+          <View style={[styles.availBadge, { backgroundColor: 'rgba(139,92,246,0.13)' }]}>
             <Text style={[styles.availText, { color: colors.success }]}>Available</Text>
           </View>
         </View>

@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import { useApi } from '@/hooks/useApi';
 
 const bg     = '#000000';
 const card   = '#161616';
@@ -35,6 +36,7 @@ const DRAG_ROWS: DragRow[] = [
 export default function EditProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const api = useApi();
 
   const [fields, setFields] = useState<Record<string, string>>({
     name:     'Brandthread',
@@ -47,6 +49,7 @@ export default function EditProfileScreen() {
 
   const [order, setOrder] = useState(DRAG_ROWS.map((r) => r.label));
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   async function pickAvatar() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -59,9 +62,23 @@ export default function EditProfileScreen() {
     setFields((prev) => ({ ...prev, [key]: val }));
   }
 
-  function handleSave() {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.back();
+  async function handleSave() {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await api.seller.updateProfile({
+        name:        fields.name,
+        displayName: fields.username,
+        bio:         fields.bio,
+        website:     fields.website,
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.back();
+    } catch {
+      Alert.alert('Error', 'Could not save profile. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   }
 
   function handleCopyLink() {
@@ -82,8 +99,8 @@ export default function EditProfileScreen() {
           <Feather name="chevron-left" size={24} color={fg} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit profile</Text>
-        <TouchableOpacity onPress={handleSave} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Text style={styles.saveText}>Save</Text>
+        <TouchableOpacity onPress={handleSave} disabled={saving} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Text style={styles.saveText}>{saving ? 'Saving…' : 'Save'}</Text>
         </TouchableOpacity>
       </View>
 

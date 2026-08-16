@@ -15,8 +15,8 @@ import {
   BrandthreadCard, BrandthreadHeader, GradientCard, PrimaryButton,
   SecondaryButton, StatusBadge, FormInput,
 } from '@/components/BrandthreadUI';
-import { getOrder, addDisputeEvidence } from '@/services/orderService';
-import { Order, Dispute, DisputeEvidence, DISPUTE_TYPES } from '@/services/orderTypes';
+import { useApi } from '@/lib/api';
+import { Dispute, DisputeEvidence, DISPUTE_TYPES } from '@/services/orderTypes';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -62,12 +62,27 @@ function daysUntil(iso: string): number {
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
+// ─── Map API dispute status → UI DisputeStatus ───────────────────────────────
+function mapStatus(s: string): string {
+  switch (s) {
+    case 'needs_response': return 'evidence_needed';
+    case 'evidence_submitted': return 'evidence_submitted';
+    case 'under_review': return 'under_review';
+    case 'won':   return 'won';
+    case 'lost':  return 'lost';
+    case 'closed': return 'closed';
+    default:       return 'open';
+  }
+}
+
 export default function DisputeDetailScreen() {
   const { orderId, disputeId } = useLocalSearchParams<{ orderId: string; disputeId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const api = useApi();
 
-  const [order, setOrder] = useState<Order | null>(null);
+  // order shape compatible with render code
+  const [order, setOrder] = useState<any | null>(null);
   const [dispute, setDispute] = useState<Dispute | null>(null);
   const [loading, setLoading] = useState(true);
   const [evidenceType, setEvidenceType] = useState<EvidenceType>('tracking');
@@ -78,12 +93,61 @@ export default function DisputeDetailScreen() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const o = await getOrder(orderId);
-    if (o) {
-      setOrder(o);
-      const d = o.disputes.find(x => x.id === disputeId);
-      setDispute(d ?? null);
-    }
+    try {
+      // Try real API first (requires disputeId to be the DB UUID)
+      if (disputeId) {
+        const data = await api.disputes.get(disputeId);
+        // Map API response → Dispute shape used by render code
+        const mapped: Dispute = {
+          id:               data.id,
+          orderId:          data.orderId ?? orderId,
+          type:             (data.reason ?? 'general') as any,
+          status:           mapStatus(data.status) as any,
+          customerClaim:    data.customerClaim ?? '',
+          amount:           data.amount,
+          evidenceDeadline: data.evidenceDeadline ?? undefined,
+          evidence:         (data.evidence ?? []).filter((e: any) => !e.description?.startsWith('[INTERNAL NOTE]')),
+          internalNotes:    (data.evidence ?? [])
+            .filter((e: any) => e.description?.startsWith('[INTERNAL NOTE]'))
+            .map((e: any) => e.description.replace('[INTERNAL NOTE] ', '')),
+          potentialHold:    data.amount,
+          createdAt:        data.createdAt,
+          updatedAt:        data.updatedAt,
+        };
+        setDispute(mapped);
+
+        // Build order-compatible shape from the order context the API includes
+        const o = data.order;
+        if (o) {
+          setOrder({
+            orderNumber: o.orderNumber,
+            createdAt:   o.createdAt,
+            payment:     { total: o.totalCents / 100 },
+            lineItems:   [],
+            shipments:   o.trackingNumber ? [{ trackingNumber: o.trackingNumber, carrier: o.carrier }] : [],
+          });
+        }
+        setLoading(false);
+        return;
+      }
+    } catch (_) { /* fall through to legacy path */ }
+
+    // Legacy path: load from orderService (demo data)
+    try {
+      const { getOrder } = await import('@/services/orderService');
+      const o = await getOrder(orderId);
+      if (o) {
+        setOrder({
+          orderNumber: o.orderNumber,
+          createdAt:   o.createdAt,
+          payment:     { total: o.payment.total },
+          lineItems:   o.lineItems,
+          shipments:   o.shipments,
+        });
+        const d = o.disputes.find(x => x.id === disputeId);
+        setDispute(d ?? null);
+      }
+    } catch (_) {}
     setLoading(false);
   }, [orderId, disputeId]);
 
@@ -120,38 +184,37 @@ export default function DisputeDetailScreen() {
       return;
     }
     setSubmittingEvidence(true);
-    await addDisputeEvidence(order.id, dispute.id, {
-      type: evidenceType,
-      description: evidenceDesc.trim(),
-    });
-    setEvidenceDesc('');
-    await load();
-    setSubmittingEvidence(false);
+    try {
+      const tracking = evidenceType === 'tracking' ? evidenceDesc.trim() : undefined;
+      await api.disputes.submitEvidence(dispute!.id, {
+        type: evidenceType,
+        description: evidenceDesc.trim(),
+        trackingNumber: tracking,
+      });
+      setEvidenceDesc('');
+      await load();
+    } catch (err: any) {
+      Alert.alert('Error', err.message ?? 'Failed to submit evidence');
+    } finally {
+      setSubmittingEvidence(false);
+    }
   };
 
   const handleAddNote = async () => {
     if (addingNote || !internalNote.trim()) return;
     setAddingNote(true);
-    // Optimistically add to local dispute and persist via addDisputeEvidence side-effect
-    // We store internal notes directly on dispute object and persist
-    const o = await (async () => {
-      const fresh = await import('@/services/orderService').then(m => m.getOrder(order.id));
-      return fresh;
-    })();
-    if (o) {
-      const d = o.disputes.find(x => x.id === dispute.id);
-      if (d) {
-        d.internalNotes.push(internalNote.trim());
-        // Persist by calling addDisputeEvidence as a side-effect trigger
-        await addDisputeEvidence(order.id, dispute.id, {
-          type: 'other',
-          description: `[INTERNAL NOTE] ${internalNote.trim()}`,
-        });
-      }
+    try {
+      await api.disputes.submitEvidence(dispute!.id, {
+        type: 'other',
+        description: `[INTERNAL NOTE] ${internalNote.trim()}`,
+      });
+      setInternalNote('');
+      await load();
+    } catch (err: any) {
+      Alert.alert('Error', err.message ?? 'Failed to add note');
+    } finally {
+      setAddingNote(false);
     }
-    setInternalNote('');
-    await load();
-    setAddingNote(false);
   };
 
   return (

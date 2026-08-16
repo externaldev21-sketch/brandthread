@@ -73,6 +73,16 @@ const STUDIO_TOOLS: StudioTool[] = [
     badge: true,
   },
   {
+    id: 'go-live',
+    title: 'Go Live',
+    desc: 'Start a live shopping stream. Tag products and chat with viewers.',
+    icon: 'radio',
+    accent: '#FF3B30',
+    accentDim: '#FF3B3020',
+    route: '/seller-go-live',
+    badge: true,
+  },
+  {
     id: 'create-content',
     title: 'Create Content',
     desc: 'Film and edit Seller posts and videos.',

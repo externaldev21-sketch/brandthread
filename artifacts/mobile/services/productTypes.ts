@@ -263,6 +263,8 @@ export interface Product {
   productType?: string;
   vendor?: string;
   tags: string[];
+  /** Curated style-taxonomy tags chosen from the StyleTagsPicker vocabulary. */
+  styleTags?: string[];
 
   // Media
   media: ProductMedia[];

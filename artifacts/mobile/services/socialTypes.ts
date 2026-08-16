@@ -374,6 +374,13 @@ export interface SavedItem {
 
 export type AudienceOption = 'everyone' | 'friends' | 'nobody' | 'only_me' | 'friends_of_friends';
 
+/** Controls who can send DMs to this user.
+ *  Enforced server-side at POST /api/conversations.
+ *  'requests'      — non-followers go to Requests inbox (default)
+ *  'followers_only'— only people the user follows can message them at all
+ */
+export type DmPrivacy = 'requests' | 'followers_only';
+
 export interface PrivacySettings {
   profileVisibility: ProfileVisibility;
   whoCanSendFriendRequests: AudienceOption;
@@ -385,6 +392,8 @@ export interface PrivacySettings {
   readReceiptsEnabled: boolean;
   searchable: boolean;
   contactDiscovery: boolean;
+  /** Server-side DM privacy — loaded from and saved to /api/auth/privacy */
+  whoCanMessageMe: DmPrivacy;
 }
 
 export const DEFAULT_PRIVACY_SETTINGS: PrivacySettings = {
@@ -398,6 +407,7 @@ export const DEFAULT_PRIVACY_SETTINGS: PrivacySettings = {
   readReceiptsEnabled: true,
   searchable: true,
   contactDiscovery: false,
+  whoCanMessageMe: 'requests',
 };
 
 export const DEFAULT_NOTIFICATION_PREFS: NotificationPreference[] = [

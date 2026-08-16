@@ -11,6 +11,7 @@ import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM,
+  CYAN, ORANGE,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { getMyPosts, getSavedItems, getMyReposts } from '@/services/socialService';
@@ -66,8 +67,8 @@ export default function BuyerYourActivity() {
 
   const activityItems = [
     { icon: 'image' as const, label: 'Posts', value: String(postCount), sub: 'Your profile', color: PURPLE },
-    { icon: 'bookmark' as const, label: 'Saved items', value: String(savedCount), sub: 'Across all types', color: '#22D3EE' },
-    { icon: 'repeat' as const, label: 'Reposts', value: String(repostCount), sub: 'To your profile', color: '#FB923C' },
+    { icon: 'bookmark' as const, label: 'Saved items', value: String(savedCount), sub: 'Across all types', color: CYAN },
+    { icon: 'repeat' as const, label: 'Reposts', value: String(repostCount), sub: 'To your profile', color: ORANGE },
   ];
 
   return (

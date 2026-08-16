@@ -31,18 +31,18 @@ const LAYOUTS: StoreLayout[] = [
     id: 'minimal',
     name: 'Minimal',
     desc: 'Clean grid, lots of whitespace',
-    heroBg: '#2A2A1A',
-    heroTextColor: '#00C853',
+    heroBg: '#12121F',
+    heroTextColor: '#8B5CF6',
     layout: 'centered',
-    swatches: ['#39FF88', '#1A1A4A', '#2A3A1A', '#4A2A2A'],
+    swatches: ['#8B5CF6', '#1A1A4A', '#22D3EE', '#4A2A2A'],
     gridCols: 4,
   },
   {
     id: 'bold',
     name: 'Bold',
     desc: 'Big type, high contrast blocks',
-    heroBg: '#00C853',
-    heroTextColor: '#0E0E0E',
+    heroBg: '#8B5CF6',
+    heroTextColor: '#FFFFFF',
     layout: 'banner',
     swatches: ['#0E0E0E', '#F5EFE6', '#0E0E0E'],
     gridCols: 3,
@@ -94,7 +94,7 @@ function LayoutPreview({ layout, colors }: { layout: StoreLayout; colors: Return
     <View style={styles.layoutPreviewOuter}>
       <View style={styles.previewBar}>
         {[...Array(3)].map((_, i) => (
-          <View key={i} style={[styles.previewDot, { backgroundColor: i === 0 ? '#EF4444' : i === 1 ? '#B98A2E' : '#4C9A5E' }]} />
+          <View key={i} style={[styles.previewDot, { backgroundColor: i === 0 ? '#EF4444' : i === 1 ? '#B98A2E' : '#22D3EE' }]} />
         ))}
       </View>
       <View style={styles.previewContent}>
@@ -155,8 +155,8 @@ export default function WebsiteScreen() {
               style={[
                 styles.layoutCard,
                 {
-                  backgroundColor: '#17140F',
-                  borderColor: isSelected ? colors.primary : '#00C85333',
+                  backgroundColor: '#12121F',
+                  borderColor: isSelected ? colors.primary : 'rgba(139,92,246,0.20)',
                   borderWidth: isSelected ? 2 : 1,
                 },
               ]}

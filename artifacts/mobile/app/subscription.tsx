@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -9,16 +9,9 @@ import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, PURPLE_LIGHT,
   CYAN, SUCCESS, ORANGE, RED, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useApi } from '@/hooks/useApi';
 
-// ─── Demo plan data (mock — billing API not yet connected) ───────────────────
-const CURRENT_PLAN = {
-  name: 'Growth',
-  price: '$29',
-  period: 'month',
-  renewsOn: 'Aug 14, 2026',
-  trialEndsOn: null as string | null,
-  status: 'active' as 'active' | 'trial' | 'paused' | 'cancelled',
-};
+// ─── Static plan catalogue ────────────────────────────────────────────────────
 
 interface PlanFeature { text: string; included: boolean }
 interface Plan {
@@ -88,25 +81,103 @@ const USAGE: UsageStat[] = [
   { label: 'Staff accounts', used: 2, limit: 5 },
 ];
 
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
 export default function SubscriptionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [selectedPlan, setSelectedPlan] = useState(CURRENT_PLAN.name.toLowerCase());
+  const api = useApi();
+
   const [activeTab, setActiveTab] = useState<'plan' | 'usage' | 'billing'>('plan');
+  const [statusLoading, setStatusLoading] = useState(true);
+  const [currentPlan, setCurrentPlan] = useState({
+    name:               'Starter',
+    price:              '$0',
+    period:             'month',
+    renewsOn:           '—',
+    status:             'none',
+    amountCents:        0,
+    paymentMethodLabel: null as string | null,
+  });
+
+  // Derive the active plan id from loaded data
+  const selectedPlan = currentPlan.name.toLowerCase();
+
+  useEffect(() => {
+    api.seller.subscription.status()
+      .then(data => {
+        const planName =
+          data.plan === 'growth' ? 'Growth'
+          : data.plan === 'pro'  ? 'Pro'
+          : 'Starter';
+        setCurrentPlan({
+          name:               planName,
+          price:              data.amountCents > 0 ? `$${data.amountCents / 100}` : '$0',
+          period:             'month',
+          renewsOn:           data.renewsOn ?? '—',
+          status:             data.status,
+          amountCents:        data.amountCents,
+          paymentMethodLabel: data.paymentMethodLabel,
+        });
+      })
+      .catch(() => { /* keep defaults (Starter / free) */ })
+      .finally(() => setStatusLoading(false));
+  }, []);
 
   function haptic() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
 
-  function handleChangePlan(planId: string) {
+  async function handleChangePlan(planId: string) {
     haptic();
-    if (planId === 'growth') return; // already on growth
-    Alert.alert(
-      'Change plan',
-      'Billing changes are not yet live. Contact support to change your plan.',
-      [{ text: 'OK' }],
-    );
+    if (planId === selectedPlan) return;
+
+    if (planId === 'starter') {
+      Alert.alert(
+        'Downgrade to Starter',
+        'To cancel your subscription, use the billing portal.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open portal', onPress: handleOpenPortal },
+        ],
+      );
+      return;
+    }
+
+    try {
+      const { url } = await api.seller.subscription.checkout(planId as 'growth' | 'pro');
+      Linking.openURL(url);
+    } catch (e: any) {
+      Alert.alert('Checkout error', e?.message ?? 'Could not start checkout. Please try again.');
+    }
   }
+
+  async function handleOpenPortal() {
+    haptic();
+    try {
+      const { url } = await api.seller.subscription.portal();
+      Linking.openURL(url);
+    } catch (e: any) {
+      Alert.alert('Portal error', e?.message ?? 'Could not open billing portal. Please try again.');
+    }
+  }
+
+  // Status pill appearance
+  const statusColor =
+    currentPlan.status === 'active'    ? SUCCESS
+    : currentPlan.status === 'trialing' ? CYAN
+    : currentPlan.status === 'past_due' ? ORANGE
+    : currentPlan.status === 'canceled' ? RED
+    : currentPlan.name !== 'Starter'    ? SUCCESS
+    : MUTED;
+
+  const statusLabel =
+    currentPlan.status === 'active'    ? 'Active'
+    : currentPlan.status === 'trialing' ? 'Trial'
+    : currentPlan.status === 'past_due' ? 'Past Due'
+    : currentPlan.status === 'canceled' ? 'Cancelled'
+    : currentPlan.name !== 'Starter'    ? 'Active'
+    : 'Free';
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -117,12 +188,6 @@ export default function SubscriptionScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Subscription</Text>
         <View style={styles.backBtn} />
-      </View>
-
-      {/* Dev notice */}
-      <View style={styles.devBanner}>
-        <Feather name="info" size={13} color={ORANGE} />
-        <Text style={styles.devBannerText}>Development mode — billing not yet connected</Text>
       </View>
 
       {/* Tabs */}
@@ -145,25 +210,35 @@ export default function SubscriptionScreen() {
           <>
             {/* Current plan summary */}
             <LinearGradient colors={['#3B1FA3', '#6D28D9']} style={styles.currentPlanCard}>
-              <View style={styles.currentPlanRow}>
-                <View>
-                  <Text style={styles.currentPlanLabel}>Current plan</Text>
-                  <Text style={styles.currentPlanName}>{CURRENT_PLAN.name}</Text>
-                </View>
-                <View style={[styles.statusPill, { backgroundColor: `${SUCCESS}30` }]}>
-                  <Text style={[styles.statusText, { color: SUCCESS }]}>Active</Text>
-                </View>
-              </View>
-              <Text style={styles.currentPlanRenews}>Renews {CURRENT_PLAN.renewsOn} · {CURRENT_PLAN.price}/{CURRENT_PLAN.period}</Text>
+              {statusLoading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <>
+                  <View style={styles.currentPlanRow}>
+                    <View>
+                      <Text style={styles.currentPlanLabel}>Current plan</Text>
+                      <Text style={styles.currentPlanName}>{currentPlan.name}</Text>
+                    </View>
+                    <View style={[styles.statusPill, { backgroundColor: `${statusColor}30` }]}>
+                      <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.currentPlanRenews}>
+                    {currentPlan.name !== 'Starter'
+                      ? `Renews ${currentPlan.renewsOn} · ${currentPlan.price}/${currentPlan.period}`
+                      : 'Free plan — upgrade to unlock more features'}
+                  </Text>
+                </>
+              )}
             </LinearGradient>
 
             {/* Plan options */}
             <Text style={styles.sectionTitle}>Plans</Text>
             {PLANS.map((plan) => {
-              const isCurrent = plan.name.toLowerCase() === CURRENT_PLAN.name.toLowerCase();
+              const isCurrent = plan.id === selectedPlan;
               return (
-                <View key={plan.id} style={[styles.planCard, plan.highlight && styles.planCardHighlight]}>
-                  {plan.highlight && (
+                <View key={plan.id} style={[styles.planCard, isCurrent && styles.planCardHighlight]}>
+                  {isCurrent && (
                     <View style={styles.popularBadge}>
                       <Text style={styles.popularText}>CURRENT PLAN</Text>
                     </View>
@@ -206,8 +281,8 @@ export default function SubscriptionScreen() {
               );
             })}
 
-            <TouchableOpacity style={styles.cancelBtn} onPress={() => Alert.alert('Cancel subscription', 'Contact support to cancel your subscription.', [{ text: 'OK' }])}>
-              <Text style={styles.cancelText}>Cancel subscription</Text>
+            <TouchableOpacity style={styles.cancelBtn} onPress={handleOpenPortal}>
+              <Text style={styles.cancelText}>Manage or cancel subscription</Text>
             </TouchableOpacity>
           </>
         )}
@@ -239,26 +314,36 @@ export default function SubscriptionScreen() {
         {activeTab === 'billing' && (
           <>
             <Text style={styles.sectionTitle}>Billing details</Text>
-            <View style={styles.billingCard}>
-              <View style={styles.billingRow}>
-                <Text style={styles.billingLabel}>Next invoice</Text>
-                <Text style={styles.billingValue}>{CURRENT_PLAN.renewsOn}</Text>
-              </View>
-              <View style={styles.billingRow}>
-                <Text style={styles.billingLabel}>Amount</Text>
-                <Text style={styles.billingValue}>{CURRENT_PLAN.price}/mo</Text>
-              </View>
-              <View style={styles.billingRow}>
-                <Text style={styles.billingLabel}>Payment method</Text>
-                <Text style={styles.billingValue}>Visa ···4242</Text>
-              </View>
-            </View>
+            {statusLoading ? (
+              <ActivityIndicator color={PURPLE} style={{ marginTop: SP.lg }} />
+            ) : (
+              <>
+                <View style={styles.billingCard}>
+                  <View style={styles.billingRow}>
+                    <Text style={styles.billingLabel}>Next invoice</Text>
+                    <Text style={styles.billingValue}>{currentPlan.renewsOn}</Text>
+                  </View>
+                  <View style={styles.billingRow}>
+                    <Text style={styles.billingLabel}>Amount</Text>
+                    <Text style={styles.billingValue}>
+                      {currentPlan.amountCents > 0 ? `${currentPlan.price}/mo` : 'Free'}
+                    </Text>
+                  </View>
+                  <View style={styles.billingRow}>
+                    <Text style={styles.billingLabel}>Payment method</Text>
+                    <Text style={styles.billingValue}>
+                      {currentPlan.paymentMethodLabel ?? '—'}
+                    </Text>
+                  </View>
+                </View>
 
-            <TouchableOpacity style={styles.manageBillingBtn} onPress={() => router.push('/billing')}>
-              <Feather name="file-text" size={16} color={PURPLE} />
-              <Text style={styles.manageBillingText}>View billing history</Text>
-              <Feather name="chevron-right" size={16} color={MUTED} />
-            </TouchableOpacity>
+                <TouchableOpacity style={styles.manageBillingBtn} onPress={handleOpenPortal}>
+                  <Feather name="external-link" size={16} color={PURPLE} />
+                  <Text style={styles.manageBillingText}>Manage billing &amp; invoices</Text>
+                  <Feather name="chevron-right" size={16} color={MUTED} />
+                </TouchableOpacity>
+              </>
+            )}
           </>
         )}
       </ScrollView>
@@ -271,8 +356,6 @@ const styles = StyleSheet.create({
   header:             { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
   backBtn:            { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle:        { flex: 1, textAlign: 'center', color: FG, fontSize: FS.lg, fontFamily: FONT.semibold },
-  devBanner:          { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: `${ORANGE}15`, paddingHorizontal: SP.md, paddingVertical: 8 },
-  devBannerText:      { color: ORANGE, fontSize: FS.xs, fontFamily: FONT.medium },
   tabRow:             { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, marginHorizontal: SP.md },
   tab:                { flex: 1, paddingVertical: SP.sm, alignItems: 'center' },
   tabActive:          { borderBottomWidth: 2, borderBottomColor: PURPLE },

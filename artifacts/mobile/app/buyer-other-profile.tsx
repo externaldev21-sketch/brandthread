@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Alert,
-  StyleSheet, Dimensions, Modal,
+  StyleSheet, Dimensions, Modal, ActivityIndicator,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,168 +10,194 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import {
   BG, CARD, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, RED, OVERLAY,
+  FG, MUTED, SUBTLE, ON_DARK, PURPLE, PURPLE_DIM, RED, OVERLAY,
   GRAD_PRIMARY, FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
+import { PrimaryButton, SecondaryButton } from '@/components/BrandthreadUI';
 import {
-  getFriendships, getFriendRequests, sendFriendRequest,
-  acceptFriendRequest, declineFriendRequest, createOrGetConversation,
-  blockUser, muteUser, restrictUser, subscribeSocial,
+  muteUser, restrictUser, createOrGetConversation,
 } from '@/services/socialService';
-import type { Friendship, FriendRequest, FriendshipStatus } from '@/services/socialTypes';
+import { useApi } from '@/lib/api';
 
 const { width } = Dimensions.get('window');
-const GRID_GAP = 2;
+const GRID_GAP  = 2;
 const CELL_SIZE = (width - GRID_GAP * 2) / 3;
 
-// Demo posts for other profiles
+// Demo post grid shown until real post API is wired
 const DEMO_OTHER_POSTS = [
-  { id: 'op1', mediaColors: ['#1a1a2e', '#0d0d1a'], type: 'photo', caption: 'Style check' },
-  { id: 'op2', mediaColors: ['#0d1a0d', '#0a140a'], type: 'slideshow', caption: 'New fits' },
-  { id: 'op3', mediaColors: ['#1a0d00', '#140a00'], type: 'video', caption: 'Unboxing' },
-  { id: 'op4', mediaColors: ['#1a1a2e', '#161630'], type: 'photo', caption: 'OOTD' },
-  { id: 'op5', mediaColors: ['#0d1a1a', '#0a1414'], type: 'photo', caption: 'Vintage' },
-  { id: 'op6', mediaColors: ['#1a0d1a', '#140a14'], type: 'slideshow', caption: 'Haul' },
+  { id: 'op1', mediaColors: ['#1a1a2e', '#0d0d1a'], type: 'photo'    },
+  { id: 'op2', mediaColors: ['#0d1a0d', '#0a140a'], type: 'slideshow' },
+  { id: 'op3', mediaColors: ['#1a0d00', '#140a00'], type: 'video'     },
+  { id: 'op4', mediaColors: ['#1a1a2e', '#161630'], type: 'photo'     },
+  { id: 'op5', mediaColors: ['#0d1a1a', '#0a1414'], type: 'photo'     },
+  { id: 'op6', mediaColors: ['#1a0d1a', '#140a14'], type: 'slideshow' },
 ];
+
+type RemoteProfile = {
+  name: string; username: string | null; displayName: string | null;
+  bio: string | null; followersCount: number; followingCount: number;
+  isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean;
+  iBlockedThem: boolean;
+};
 
 export default function BuyerOtherProfileScreen() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
-  const params = useLocalSearchParams<{ userId: string; name: string; handle: string; initials: string; color: string }>();
+  const router  = useRouter();
+  const api     = useApi();
+  const params  = useLocalSearchParams<{
+    userId: string; name: string; handle: string; initials: string; color: string;
+  }>();
 
-  const userId = params.userId || 'u_unknown';
-  const name = params.name || 'Unknown';
-  const handle = params.handle || '@unknown';
+  const userId   = params.userId  || 'u_unknown';
+  const name     = params.name    || 'Unknown';
+  const handle   = params.handle  || '@unknown';
   const initials = params.initials || '?';
-  const color = params.color || '#8B5CF6';
+  const color    = params.color   || PURPLE;
 
-  const [friendship, setFriendship] = useState<Friendship | null>(null);
-  const [friendshipStatus, setFriendshipStatus] = useState<FriendshipStatus | null>(null);
-  const [friendRequests, setFriendRequests] = useState<FriendRequest[]>([]);
-  const [loading, setLoading] = useState(false);
+  // ── Remote profile state (from API) ────────────────────────────────────────
+  const [profile, setProfile]           = useState<RemoteProfile | null>(null);
+  const [apiLoaded, setApiLoaded]       = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [msgLoading, setMsgLoading]     = useState(false);
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
+  // Story ring — active stories for this user, visible to any viewer
+  const [storyIds, setStoryIds]         = useState<string[]>([]);
 
-  const loadData = useCallback(async () => {
-    const [friendships, requests] = await Promise.all([
-      getFriendships(),
-      getFriendRequests(),
-    ]);
-    const found = friendships.find(f => f.userId === userId) || null;
-    setFriendship(found);
-    setFriendshipStatus(found?.status || null);
-    setFriendRequests(requests);
+  // Derived display values — prefer API data, fall back to route params
+  const displayName = profile ? (profile.displayName || profile.name || name) : name;
+  const displayBio  = profile?.bio ?? null;
+  const isFollowing   = profile?.isFollowing  ?? false;
+  const isFollowedBy  = profile?.isFollowedBy ?? false;
+  const isMutual      = profile?.isMutual     ?? false;
+  const followersCount = profile?.followersCount ?? 0;
+  const followingCount = profile?.followingCount ?? 0;
+
+  // ── Load profile + stories from API ───────────────────────────────────────
+  const loadProfile = useCallback(async () => {
+    // Only try real API if userId looks like a Clerk ID
+    if (!userId || userId.startsWith('u_')) { setApiLoaded(true); return; }
+    try {
+      const [profileData, storiesData] = await Promise.allSettled([
+        api.social.profile(userId),
+        api.social.storiesForUser(userId),
+      ]);
+      if (profileData.status === 'fulfilled') setProfile(profileData.value as RemoteProfile);
+      if (storiesData.status === 'fulfilled') {
+        setStoryIds((storiesData.value as any[]).map((s: any) => s.id));
+      }
+    } catch {
+      // Non-existent user or network error — degrade gracefully
+    } finally {
+      setApiLoaded(true);
+    }
   }, [userId]);
 
-  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
-
-  useEffect(() => {
-    const unsub = subscribeSocial(() => { loadData(); });
-    return unsub;
-  }, [loadData]);
-
-  const postTypeIcon = (type: string): string => {
-    if (type === 'photo') return 'image';
-    if (type === 'slideshow') return 'layers';
-    return 'video';
+  const openStories = () => {
+    if (storyIds.length === 0) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push({
+      pathname: '/buyer-story-viewer' as any,
+      params: { storyId: storyIds[0], allStoryIds: storyIds.join(',') },
+    });
   };
 
-  const handleAddFriend = async () => {
-    setLoading(true);
+  useFocusEffect(useCallback(() => { loadProfile(); }, [loadProfile]));
+
+  // ── Follow / unfollow ──────────────────────────────────────────────────────
+  const handleFollow = async () => {
+    if (!apiLoaded || userId.startsWith('u_')) return;
+    setFollowLoading(true);
     try {
-      await sendFriendRequest({ userId, name, handle, initials, color });
-      await loadData();
+      if (isFollowing) {
+        await api.social.unfollow(userId);
+        setProfile(prev => prev ? { ...prev, isFollowing: false, isMutual: false, followersCount: Math.max(0, prev.followersCount - 1) } : prev);
+      } else {
+        await api.social.follow(userId);
+        setProfile(prev => prev ? { ...prev, isFollowing: true, isMutual: prev.isFollowedBy, followersCount: prev.followersCount + 1 } : prev);
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {
-      Alert.alert('Error', 'Could not send friend request.');
+      Alert.alert('Error', 'Could not update follow status.');
     } finally {
-      setLoading(false);
+      setFollowLoading(false);
     }
   };
 
+  // ── Message ────────────────────────────────────────────────────────────────
   const handleMessage = async () => {
-    setLoading(true);
+    setMsgLoading(true);
     try {
       const conv = await createOrGetConversation({
         type: 'buyer_to_buyer',
-        participant: { userId, name, handle, initials, color, accountType: 'buyer' },
+        participant: { userId, name: displayName, handle, initials, color, accountType: 'buyer' },
       });
-      router.push((`/buyer-conversation?id=${conv.id}`) as any);
+      router.push(`/buyer-conversation?id=${conv.id}` as any);
     } catch {
       Alert.alert('Error', 'Could not open conversation.');
     } finally {
-      setLoading(false);
+      setMsgLoading(false);
     }
   };
 
-  const handleAccept = async () => {
-    const req = friendRequests.find(r => r.fromId === userId);
-    if (!req) return;
-    setLoading(true);
-    try {
-      await acceptFriendRequest(req.id);
-      await loadData();
-    } catch {
-      Alert.alert('Error', 'Could not accept request.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const iBlockedThem = profile?.iBlockedThem ?? false;
 
-  const handleDecline = async () => {
-    const req = friendRequests.find(r => r.fromId === userId);
-    if (!req) return;
-    setLoading(true);
-    try {
-      await declineFriendRequest(req.id);
-      await loadData();
-    } catch {
-      Alert.alert('Error', 'Could not decline request.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleMore = () => {
-    Haptics.selectionAsync();
-    setMoreSheetOpen(true);
-  };
-
-  const handleMute = async () => {
-    setMoreSheetOpen(false);
-    await muteUser({ userId, name, handle, initials, color });
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  };
-
-  const handleRestrict = async () => {
-    setMoreSheetOpen(false);
-    await restrictUser({ userId, name, handle, initials, color });
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  };
-
+  const handleMute     = async () => { setMoreSheetOpen(false); await muteUser({ userId, name: displayName, handle, initials, color }); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); };
+  const handleRestrict = async () => { setMoreSheetOpen(false); await restrictUser({ userId, name: displayName, handle, initials, color }); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success); };
   const handleBlock = async () => {
     setMoreSheetOpen(false);
-    await blockUser({ userId, name, handle, initials, color });
-    router.back();
+    try {
+      if (iBlockedThem) {
+        await api.social.unblock(userId);
+        setProfile(prev => prev ? { ...prev, iBlockedThem: false } : prev);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
+        await api.social.block(userId);
+        router.back();
+      }
+    } catch {
+      Alert.alert('Error', 'Could not update block status.');
+    }
   };
+  const handleReport   = () => { setMoreSheetOpen(false); router.push(`/buyer-report?targetType=profile&targetId=${userId}&targetLabel=${encodeURIComponent(displayName)}&targetUserId=${userId}` as any); };
 
-  const handleReport = () => {
-    setMoreSheetOpen(false);
-    router.push(
-      `/buyer-report?targetType=profile&targetId=${userId}&targetLabel=${encodeURIComponent(name)}&targetUserId=${userId}` as any,
+  const postTypeIcon = (type: string) => type === 'photo' ? 'image' : type === 'slideshow' ? 'layers' : 'video';
+
+  // ── Button label helpers ───────────────────────────────────────────────────
+  function renderFollowButton() {
+    if (!apiLoaded || userId.startsWith('u_')) {
+      // Demo user — no real follow
+      return (
+        <SecondaryButton label="Follow" onPress={() => {}} disabled style={{ flex: 1 }} />
+      );
+    }
+    if (followLoading) {
+      return (
+        <View style={[styles.outlineBtn, { flex: 1 }]}>
+          <ActivityIndicator size="small" color={PURPLE} />
+        </View>
+      );
+    }
+    if (isFollowing) {
+      // Show "Following" — tap to unfollow
+      return (
+        <SecondaryButton label={isMutual ? 'Friends' : 'Following'} icon="check" onPress={handleFollow} style={{ flex: 1 }} />
+      );
+    }
+    if (isFollowedBy) {
+      // They follow me — show "Follow Back"
+      return (
+        <PrimaryButton label="Follow Back" onPress={handleFollow} style={{ flex: 1 }} />
+      );
+    }
+    // Stranger — show "Follow"
+    return (
+      <PrimaryButton label="Follow" onPress={handleFollow} style={{ flex: 1 }} />
     );
-  };
-
-  const isAccepted = friendshipStatus === 'accepted';
-  const isPendingSent = friendshipStatus === 'pending_sent';
-  const isPendingReceived = friendshipStatus === 'pending_received';
-  const noFriendship = !friendshipStatus;
-
-  // For demo: treat all profiles as public
-  const isPrivate = false;
-  const canSeePosts = !isPrivate || isAccepted;
+  }
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Back Button */}
+      {/* Back */}
       <TouchableOpacity
         style={[styles.backBtn, { top: insets.top + SP.md }]}
         onPress={() => router.back()}
@@ -180,113 +206,68 @@ export default function BuyerOtherProfileScreen() {
       </TouchableOpacity>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
-        {/* Cover */}
-        <LinearGradient
-          colors={[color, BG] as [string, string]}
-          style={styles.cover}
-        />
+        {/* Cover gradient */}
+        <LinearGradient colors={[color, BG] as [string, string]} style={styles.cover} />
 
-        {/* Profile Row */}
+        {/* Profile row */}
         <View style={styles.profileRow}>
-          <View style={[styles.avatar, { backgroundColor: color }]}>
-            <Text style={styles.avatarText}>{initials}</Text>
-          </View>
-
-          <View style={styles.actionButtons}>
-            {isAccepted && (
-              <>
-                <TouchableOpacity
-                  onPress={handleMessage}
-                  disabled={loading}
-                  style={styles.primaryBtnWrap}
-                >
-                  <LinearGradient
-                    colors={GRAD_PRIMARY as unknown as [string, string]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.primaryBtn}
-                  >
-                    <Text style={styles.primaryBtnText}>Message</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.moreBtn} onPress={handleMore}>
-                  <Feather name="more-horizontal" size={ICON.md} color={FG} />
-                </TouchableOpacity>
-              </>
-            )}
-
-            {isPendingSent && (
-              <>
-                <View style={[styles.outlineBtn, styles.disabledBtn]}>
-                  <Text style={styles.outlineBtnText}>Requested</Text>
+          {/* Avatar — with story ring if active stories exist */}
+          {storyIds.length > 0 ? (
+            <TouchableOpacity onPress={openStories} activeOpacity={0.85}>
+              <LinearGradient
+                colors={GRAD_PRIMARY as unknown as [string, string, ...string[]]}
+                start={{ x: 0, y: 1 }} end={{ x: 1, y: 0 }}
+                style={styles.storyRing}
+              >
+                <View style={[styles.avatar, { backgroundColor: color, margin: 3 }]}>
+                  <Text style={styles.avatarText}>{initials}</Text>
                 </View>
-                <TouchableOpacity style={styles.moreBtn} onPress={handleMore}>
-                  <Feather name="more-horizontal" size={ICON.md} color={FG} />
-                </TouchableOpacity>
-              </>
-            )}
+              </LinearGradient>
+            </TouchableOpacity>
+          ) : (
+            <View style={[styles.avatar, { backgroundColor: color }]}>
+              <Text style={styles.avatarText}>{initials}</Text>
+            </View>
+          )}
 
-            {isPendingReceived && (
-              <>
-                <TouchableOpacity
-                  onPress={handleAccept}
-                  disabled={loading}
-                  style={styles.primaryBtnWrap}
-                >
-                  <LinearGradient
-                    colors={GRAD_PRIMARY as unknown as [string, string]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.primaryBtn}
-                  >
-                    <Text style={styles.primaryBtnText}>Accept</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.outlineBtn}
-                  onPress={handleDecline}
-                  disabled={loading}
-                >
-                  <Text style={styles.outlineBtnText}>Decline</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.moreBtn} onPress={handleMore}>
-                  <Feather name="more-horizontal" size={ICON.md} color={FG} />
-                </TouchableOpacity>
-              </>
-            )}
+          {/* Action buttons */}
+          <View style={styles.actionButtons}>
+            {renderFollowButton()}
 
-            {noFriendship && (
-              <>
-                <TouchableOpacity
-                  onPress={handleAddFriend}
-                  disabled={loading}
-                  style={styles.primaryBtnWrap}
-                >
-                  <LinearGradient
-                    colors={GRAD_PRIMARY as unknown as [string, string]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.primaryBtn}
-                  >
-                    <Text style={styles.primaryBtnText}>Add Friend</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.moreBtn} onPress={handleMore}>
-                  <Feather name="more-horizontal" size={ICON.md} color={FG} />
-                </TouchableOpacity>
-              </>
-            )}
+            {/* Message — always visible */}
+            <TouchableOpacity
+              onPress={handleMessage}
+              disabled={msgLoading}
+              style={[styles.outlineBtn, { flex: 1 }]}
+            >
+              {msgLoading
+                ? <ActivityIndicator size="small" color={FG} />
+                : <Text style={styles.outlineBtnText}>Message</Text>
+              }
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.moreBtn} onPress={() => { Haptics.selectionAsync(); setMoreSheetOpen(true); }}>
+              <Feather name="more-horizontal" size={ICON.md} color={FG} />
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Profile Info */}
+        {/* Profile info */}
         <View style={styles.infoSection}>
-          <Text style={styles.nameText}>{name}</Text>
+          <Text style={styles.nameText}>{displayName}</Text>
           <Text style={styles.handleText}>{handle}</Text>
-          <Text style={styles.bioText}>No bio yet.</Text>
+          {displayBio
+            ? <Text style={styles.bioText}>{displayBio}</Text>
+            : <Text style={styles.bioText}>No bio yet.</Text>
+          }
+          {isFollowedBy && !isMutual && (
+            <View style={styles.followsYouPill}>
+              <Text style={styles.followsYouText}>Follows you</Text>
+            </View>
+          )}
         </View>
 
-        {/* Stats Row */}
+        {/* Stats row */}
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
             <Text style={styles.statNum}>{DEMO_OTHER_POSTS.length}</Text>
@@ -294,90 +275,50 @@ export default function BuyerOtherProfileScreen() {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statNum}>{friendship?.mutualFriendsCount ?? 0}</Text>
-            <Text style={styles.statLabel}>Mutual</Text>
+            <Text style={styles.statNum}>{followersCount}</Text>
+            <Text style={styles.statLabel}>Followers</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statNum}>2023</Text>
-            <Text style={styles.statLabel}>Joined</Text>
+            <Text style={styles.statNum}>{followingCount}</Text>
+            <Text style={styles.statLabel}>Following</Text>
           </View>
         </View>
 
-        {/* Content */}
-        {!canSeePosts ? (
-          <View style={styles.privateBox}>
-            <Feather name="lock" size={ICON.lg} color={MUTED} />
-            <Text style={styles.privateTitle}>Private Account</Text>
-            <Text style={styles.privateDesc}>Add as a friend to see their posts.</Text>
-            {noFriendship && (
-              <TouchableOpacity
-                style={styles.privateAction}
-                onPress={handleAddFriend}
-                disabled={loading}
-              >
-                <LinearGradient
-                  colors={GRAD_PRIMARY as unknown as [string, string]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.privateActionGrad}
-                >
-                  <Text style={styles.primaryBtnText}>Add Friend</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            )}
-          </View>
-        ) : (
-          <View style={styles.postsSection}>
-            {DEMO_OTHER_POSTS.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Feather name="image" size={32} color={MUTED} />
-                <Text style={styles.emptyTitle}>No posts yet.</Text>
-              </View>
-            ) : (
-              <View style={styles.grid}>
-                {DEMO_OTHER_POSTS.map(post => (
-                  <View key={post.id} style={styles.gridCell}>
-                    <LinearGradient
-                      colors={post.mediaColors as [string, string]}
-                      style={styles.gridCellInner}
-                    >
-                      <Feather name={postTypeIcon(post.type) as any} size={ICON.md} color={MUTED} />
-                    </LinearGradient>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
+        {/* Content grid */}
+        <View style={styles.postsSection}>
+          {DEMO_OTHER_POSTS.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Feather name="image" size={32} color={MUTED} />
+              <Text style={styles.emptyTitle}>No posts yet.</Text>
+            </View>
+          ) : (
+            <View style={styles.grid}>
+              {DEMO_OTHER_POSTS.map(post => (
+                <View key={post.id} style={styles.gridCell}>
+                  <LinearGradient colors={post.mediaColors as [string, string]} style={styles.gridCellInner}>
+                    <Feather name={postTypeIcon(post.type) as any} size={ICON.md} color={MUTED} />
+                  </LinearGradient>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
       </ScrollView>
 
-      {/* More options bottom sheet */}
+      {/* More options sheet */}
       <Modal visible={moreSheetOpen} transparent animationType="slide" onRequestClose={() => setMoreSheetOpen(false)}>
         <TouchableOpacity style={styles.moreBackdrop} activeOpacity={1} onPress={() => setMoreSheetOpen(false)}>
           <TouchableOpacity activeOpacity={1} style={[styles.moreSheet, { paddingBottom: insets.bottom + SP.md }]}>
             <View style={styles.moreHandle} />
-            <Text style={styles.moreTitle}>{name}</Text>
-
-            <TouchableOpacity style={styles.moreRow} onPress={handleMute} activeOpacity={0.7}>
-              <Feather name="volume-x" size={20} color={FG} />
-              <Text style={styles.moreRowText}>Mute</Text>
-            </TouchableOpacity>
+            <Text style={styles.moreTitle}>{displayName}</Text>
+            <TouchableOpacity style={styles.moreRow} onPress={handleMute}     activeOpacity={0.7}><Feather name="volume-x"   size={20} color={FG}  /><Text style={styles.moreRowText}>Mute</Text></TouchableOpacity>
             <View style={styles.moreDivider} />
-            <TouchableOpacity style={styles.moreRow} onPress={handleRestrict} activeOpacity={0.7}>
-              <Feather name="user-x" size={20} color={FG} />
-              <Text style={styles.moreRowText}>Restrict</Text>
-            </TouchableOpacity>
+            <TouchableOpacity style={styles.moreRow} onPress={handleRestrict} activeOpacity={0.7}><Feather name="user-x"     size={20} color={FG}  /><Text style={styles.moreRowText}>Restrict</Text></TouchableOpacity>
             <View style={styles.moreDivider} />
-            <TouchableOpacity style={styles.moreRow} onPress={handleReport} activeOpacity={0.7}>
-              <Feather name="flag" size={20} color={FG} />
-              <Text style={styles.moreRowText}>Report</Text>
-            </TouchableOpacity>
+            <TouchableOpacity style={styles.moreRow} onPress={handleReport}   activeOpacity={0.7}><Feather name="flag"       size={20} color={FG}  /><Text style={styles.moreRowText}>Report</Text></TouchableOpacity>
             <View style={styles.moreDivider} />
-            <TouchableOpacity style={styles.moreRow} onPress={handleBlock} activeOpacity={0.7}>
-              <Feather name="slash" size={20} color={RED} />
-              <Text style={[styles.moreRowText, { color: RED }]}>Block</Text>
-            </TouchableOpacity>
+            <TouchableOpacity style={styles.moreRow} onPress={handleBlock}    activeOpacity={0.7}><Feather name="slash"      size={20} color={RED} /><Text style={[styles.moreRowText, { color: RED }]}>{iBlockedThem ? 'Unblock' : 'Block'}</Text></TouchableOpacity>
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
@@ -386,220 +327,78 @@ export default function BuyerOtherProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: BG,
-  },
+  container: { flex: 1, backgroundColor: BG },
   backBtn: {
-    position: 'absolute',
-    left: SP.md,
-    zIndex: 10,
-    width: 40,
-    height: 40,
-    backgroundColor: 'rgba(7,7,15,0.7)',
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: 'absolute', left: SP.md, zIndex: 10,
+    width: 40, height: 40, backgroundColor: 'rgba(7,7,15,0.7)',
+    borderRadius: 20, alignItems: 'center', justifyContent: 'center',
   },
-  cover: {
-    height: 180,
-    width: '100%',
-  },
+  cover: { height: 180, width: '100%' },
   profileRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingHorizontal: SP.md,
-    marginTop: -40,
-    gap: SP.md,
+    flexDirection: 'row', alignItems: 'flex-end',
+    paddingHorizontal: SP.md, marginTop: -40, gap: SP.md,
+  },
+  storyRing: {
+    borderRadius: 46,
+    padding: 3,
   },
   avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: BG,
+    width: 72, height: 72, borderRadius: 36,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 3, borderColor: BG,
   },
-  avatarText: {
-    fontFamily: FONT.bold,
-    fontSize: FS.xl,
-    color: '#FFFFFF',
-  },
+  avatarText: { fontFamily: FONT.bold, fontSize: FS.xl, color: ON_DARK },
   actionButtons: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.xs,
-    flexWrap: 'wrap',
-    marginBottom: SP.xs,
-  },
-  primaryBtnWrap: {
-    flex: 1,
-    minWidth: 80,
-    height: 40,
-    borderRadius: RADIUS.pill,
-    overflow: 'hidden',
-  },
-  primaryBtn: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryBtnText: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.sm,
-    color: '#FFFFFF',
+    flex: 1, flexDirection: 'row', alignItems: 'center',
+    gap: SP.xs, flexWrap: 'wrap', marginBottom: SP.xs,
   },
   outlineBtn: {
-    flex: 1,
-    minWidth: 70,
-    height: 40,
+    flex: 1, minWidth: 70, height: 40,
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER_ACTIVE,
+    borderRadius: RADIUS.pill, flexDirection: 'row',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  outlineBtnText: { fontFamily: FONT.medium, fontSize: FS.sm, color: FG },
+  moreBtn: {
+    width: 40, height: 40, backgroundColor: CARD,
+    borderWidth: 1, borderColor: BORDER, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  infoSection: { paddingHorizontal: SP.md, marginTop: SP.sm, gap: 4 },
+  nameText:    { fontFamily: FONT.bold,    fontSize: FS.lg,   color: FG },
+  handleText:  { fontFamily: FONT.regular, fontSize: FS.sm,   color: MUTED },
+  bioText:     { fontFamily: FONT.regular, fontSize: FS.base, color: SUBTLE, marginTop: SP.xs },
+  followsYouPill: {
+    alignSelf: 'flex-start', marginTop: SP.xs,
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 3,
+  },
+  followsYouText: { fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED },
+  statsRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: SP.md, marginTop: SP.md,
     backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER_ACTIVE,
-    borderRadius: RADIUS.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderTopWidth: 1, borderBottomWidth: 1, borderColor: BORDER,
+    paddingVertical: SP.md,
   },
-  disabledBtn: {
-    opacity: 0.5,
-    borderColor: BORDER,
-  },
-  outlineBtnText: {
-    fontFamily: FONT.medium,
-    fontSize: FS.sm,
-    color: FG,
-  },
+  statItem:    { flex: 1, alignItems: 'center' },
+  statNum:     { fontFamily: FONT.bold, fontSize: FS.md, color: FG },
+  statLabel:   { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
+  statDivider: { width: 1, height: 24, backgroundColor: BORDER },
+  postsSection: { marginTop: SP.md },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
+  gridCell: { width: CELL_SIZE, height: CELL_SIZE, overflow: 'hidden' },
+  gridCellInner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  emptyState: { alignItems: 'center', paddingVertical: SP.xl, gap: SP.md },
+  emptyTitle: { fontFamily: FONT.medium, fontSize: FS.base, color: MUTED },
   moreBackdrop: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },
-  moreSheet: { backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, paddingHorizontal: SP.md, paddingTop: SP.md },
+  moreSheet: {
+    backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
+    paddingHorizontal: SP.md, paddingTop: SP.md,
+  },
   moreHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: SP.md },
-  moreTitle: { fontFamily: FONT.bold, fontSize: FS.md, color: FG, paddingBottom: SP.sm },
+  moreTitle:  { fontFamily: FONT.bold, fontSize: FS.md, color: FG, paddingBottom: SP.sm },
   moreRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 },
   moreRowText: { fontFamily: FONT.medium, fontSize: FS.base, color: FG },
   moreDivider: { height: 1, backgroundColor: BORDER },
-  moreBtn: {
-    width: 40,
-    height: 40,
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  infoSection: {
-    paddingHorizontal: SP.md,
-    marginTop: SP.sm,
-    gap: 4,
-  },
-  nameText: {
-    fontFamily: FONT.bold,
-    fontSize: FS.lg,
-    color: FG,
-  },
-  handleText: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: MUTED,
-  },
-  bioText: {
-    fontFamily: FONT.regular,
-    fontSize: FS.base,
-    color: SUBTLE,
-    marginTop: SP.xs,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SP.md,
-    marginTop: SP.md,
-    backgroundColor: CARD,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: BORDER,
-    paddingVertical: SP.md,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  statNum: {
-    fontFamily: FONT.bold,
-    fontSize: FS.md,
-    color: FG,
-  },
-  statLabel: {
-    fontFamily: FONT.regular,
-    fontSize: FS.xs,
-    color: MUTED,
-    marginTop: 2,
-  },
-  statDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: BORDER,
-  },
-  postsSection: {
-    marginTop: SP.md,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: GRID_GAP,
-  },
-  gridCell: {
-    width: CELL_SIZE,
-    height: CELL_SIZE,
-    overflow: 'hidden',
-  },
-  gridCellInner: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  privateBox: {
-    margin: SP.md,
-    padding: SP.xl,
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: RADIUS.lg,
-    alignItems: 'center',
-    gap: SP.sm,
-  },
-  privateTitle: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.md,
-    color: FG,
-    marginTop: SP.sm,
-  },
-  privateDesc: {
-    fontFamily: FONT.regular,
-    fontSize: FS.sm,
-    color: MUTED,
-    textAlign: 'center',
-  },
-  privateAction: {
-    width: '100%',
-    height: COMP.buttonH,
-    borderRadius: RADIUS.pill,
-    overflow: 'hidden',
-    marginTop: SP.sm,
-  },
-  privateActionGrad: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: SP.xl,
-    gap: SP.md,
-  },
-  emptyTitle: {
-    fontFamily: FONT.semibold,
-    fontSize: FS.md,
-    color: FG,
-  },
 });

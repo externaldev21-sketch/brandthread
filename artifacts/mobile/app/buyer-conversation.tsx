@@ -11,7 +11,7 @@ import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, ORANGE, RED, FONT, FS, SP, RADIUS, COMP, ICON,
+  CYAN, CYAN_DIM, ORANGE, RED, ON_DARK, FONT, FS, SP, RADIUS, COMP, ICON,
   GRAD_PRIMARY,
 } from '@/lib/theme';
 import {
@@ -666,7 +666,7 @@ const s = StyleSheet.create({
   headerAvatarInitials: {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: '#FFFFFF',
+    color: ON_DARK,
   },
   headerCenter: {
     flex: 1,
@@ -786,7 +786,7 @@ const s = StyleSheet.create({
   msgAvatarInitials: {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: '#FFFFFF',
+    color: ON_DARK,
   },
 
   // Bubble

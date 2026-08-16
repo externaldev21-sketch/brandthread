@@ -1,32 +1,48 @@
 /**
  * Manufacturer Messages Screen
- * Params: conversationId (string)
+ * Params:
+ *   threadId      — real DB thread UUID (takes priority)
+ *   conversationId — legacy demo AsyncStorage ID (fallback)
+ *   mfrName       — manufacturer display name (pre-fill header)
+ *   mfrId         — manufacturer UUID (for creating threads)
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet,
-  KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
+  KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Image,
+  ScrollView,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import * as ImagePicker from 'expo-image-picker';
 import {
-  getConversations, sendMessage, markConversationRead,
+  getConversations, sendMessage as demoSendMessage, markConversationRead,
 } from '@/services/manufacturerService';
 import { ManufacturerConversation, ManufacturerMessage } from '@/services/manufacturerTypes';
-import { BrandthreadHeader, GuidedTip, StatusBadge } from '@/components/BrandthreadUI';
+import { BrandthreadHeader, StatusBadge } from '@/components/BrandthreadUI';
+import { useApi } from '@/lib/api';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_FOCUS,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, ORANGE, ORANGE_DIM,
+  CYAN, CYAN_DIM, ORANGE, ORANGE_DIM, SUCCESS, SUCCESS_DIM,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type AttachType = null | 'quote' | 'sample' | 'production';
+interface ApiMessage {
+  id: string;
+  threadId: string;
+  senderRole: 'seller' | 'manufacturer' | 'system';
+  content: string;
+  messageType: string;   // 'text' | 'image' | 'sample_card' | 'bulk_card' | 'system'
+  mediaUrls: string[];
+  cardData: Record<string, unknown> | null;
+  sentAt: string;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -34,23 +50,100 @@ function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
-function attachIcon(type: ManufacturerMessage['attachmentType']): string {
-  switch (type) {
-    case 'quote': return '📋';
-    case 'sample': return '🧵';
-    case 'production': return '🏭';
-    case 'product': return '📦';
-    default: return '📎';
-  }
-}
+function fmtCents(c: number) { return `$${(c / 100).toFixed(2)}`; }
 
 // ─── Message Bubble ───────────────────────────────────────────────────────────
 
-function MessageBubble({ msg }: { msg: ManufacturerMessage }) {
+function ApiMessageBubble({ msg }: { msg: ApiMessage }) {
+  const isSeller = msg.senderRole === 'seller';
+  const isSystem = msg.senderRole === 'system' || msg.messageType === 'system';
+
+  if (isSystem) {
+    return (
+      <View style={bubS.systemWrap}>
+        <Text style={bubS.systemText}>{msg.content}</Text>
+        <Text style={bubS.timestamp}>{fmtTime(msg.sentAt)}</Text>
+      </View>
+    );
+  }
+
+  if (msg.messageType === 'image' && msg.mediaUrls.length > 0) {
+    return (
+      <View style={[bubS.row, isSeller ? bubS.rowRight : bubS.rowLeft]}>
+        <View style={{ maxWidth: '75%' }}>
+          <Image
+            source={{ uri: msg.mediaUrls[0] }}
+            style={bubS.imageMsg}
+            resizeMode="cover"
+          />
+          <Text style={[bubS.timestamp, isSeller ? { textAlign: 'right' } : {}]}>
+            {fmtTime(msg.sentAt)}
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (msg.messageType === 'sample_card' || msg.messageType === 'bulk_card') {
+    const card = msg.cardData as any;
+    const icon = msg.messageType === 'sample_card' ? '🧵' : '📦';
+    const label = msg.messageType === 'sample_card' ? 'Sample Order' : 'Bulk Order';
+    return (
+      <View style={[bubS.row, isSeller ? bubS.rowRight : bubS.rowLeft]}>
+        <View style={bubS.cardMsg}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <Text style={{ fontSize: 20 }}>{icon}</Text>
+            <Text style={bubS.cardLabel}>{label}</Text>
+          </View>
+          {card?.title && <Text style={bubS.cardTitle}>{card.title}</Text>}
+          <View style={{ flexDirection: 'row', gap: 16, marginTop: 6 }}>
+            {card?.quantity && (
+              <View>
+                <Text style={bubS.cardKey}>Qty</Text>
+                <Text style={bubS.cardVal}>{card.quantity}</Text>
+              </View>
+            )}
+            {card?.priceCents && (
+              <View>
+                <Text style={bubS.cardKey}>Price</Text>
+                <Text style={bubS.cardVal}>{fmtCents(card.priceCents)}</Text>
+              </View>
+            )}
+            {card?.walletBalance !== undefined && (
+              <View>
+                <Text style={bubS.cardKey}>Wallet</Text>
+                <Text style={[bubS.cardVal, { color: SUCCESS }]}>{fmtCents(card.walletBalance)}</Text>
+              </View>
+            )}
+          </View>
+          {card?.description && (
+            <Text style={[bubS.cardDesc]}>{card.description}</Text>
+          )}
+          <Text style={bubS.timestamp}>{fmtTime(msg.sentAt)}</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Default text bubble
+  return (
+    <View style={[bubS.row, isSeller ? bubS.rowRight : bubS.rowLeft]}>
+      <View style={{ maxWidth: '78%' }}>
+        <View style={[bubS.bubble, isSeller ? bubS.sellerBubble : bubS.mfgBubble]}>
+          <Text style={[bubS.msgText, isSeller && { color: '#fff' }]}>{msg.content}</Text>
+        </View>
+        <Text style={[bubS.timestamp, isSeller ? { textAlign: 'right' } : {}]}>
+          {fmtTime(msg.sentAt)}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+// Legacy demo bubble (for AsyncStorage path)
+function DemoBubble({ msg }: { msg: ManufacturerMessage }) {
   const isSeller = msg.senderType === 'seller';
   const isSystem = msg.senderType === 'system';
-  const isInternal = msg.isInternalNote;
-
   if (isSystem) {
     return (
       <View style={bubS.systemWrap}>
@@ -59,31 +152,12 @@ function MessageBubble({ msg }: { msg: ManufacturerMessage }) {
       </View>
     );
   }
-
-  const bubbleStyle = isInternal
-    ? bubS.internalBubble
-    : isSeller
-    ? bubS.sellerBubble
-    : bubS.mfgBubble;
-
   return (
     <View style={[bubS.row, isSeller ? bubS.rowRight : bubS.rowLeft]}>
       <View style={{ maxWidth: '78%' }}>
-        {isInternal && (
-          <Text style={bubS.internalLabel}>🔒 Internal note</Text>
-        )}
-        <View style={[bubS.bubble, bubbleStyle]}>
+        <View style={[bubS.bubble, isSeller ? bubS.sellerBubble : bubS.mfgBubble]}>
           <Text style={[bubS.msgText, isSeller && { color: '#fff' }]}>{msg.text}</Text>
         </View>
-        {msg.attachmentType && (
-          <View style={bubS.attachCard}>
-            <Text style={bubS.attachIcon}>{attachIcon(msg.attachmentType)}</Text>
-            <View>
-              <Text style={bubS.attachLabel}>{msg.attachmentLabel ?? msg.attachmentType}</Text>
-              <Text style={bubS.attachSub}>{msg.attachmentType}</Text>
-            </View>
-          </View>
-        )}
         <Text style={[bubS.timestamp, isSeller ? { textAlign: 'right' } : {}]}>
           {fmtTime(msg.createdAt)}
         </Text>
@@ -112,12 +186,6 @@ const bubS = StyleSheet.create({
     borderColor: BORDER,
     borderBottomLeftRadius: 4,
   },
-  internalBubble: {
-    backgroundColor: ORANGE_DIM,
-    borderWidth: 1,
-    borderColor: ORANGE + '50',
-    borderBottomRightRadius: 4,
-  },
   msgText: {
     fontSize: FS.base,
     fontFamily: FONT.regular,
@@ -136,141 +204,342 @@ const bubS = StyleSheet.create({
     fontStyle: 'italic',
     textAlign: 'center',
   },
-  internalLabel: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
-    color: ORANGE,
-    marginBottom: 3,
-    textAlign: 'right',
-  },
   timestamp: {
     fontSize: 10,
     fontFamily: FONT.regular,
     color: SUBTLE,
     marginTop: 3,
   },
-  attachCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
-    backgroundColor: CARD,
-    borderRadius: RADIUS.sm,
+  imageMsg: {
+    width: 200,
+    height: 200,
+    borderRadius: RADIUS.md,
+  },
+  cardMsg: {
+    backgroundColor: CARD_ELEVATED,
     borderWidth: 1,
     borderColor: BORDER,
-    padding: SP.sm,
-    marginTop: 4,
+    borderRadius: RADIUS.lg,
+    padding: SP.md,
+    maxWidth: 280,
   },
-  attachIcon: { fontSize: 20 },
-  attachLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  attachSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  cardLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
+  cardTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
+  cardKey:   { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  cardVal:   { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
+  cardDesc:  { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 6 },
 });
 
-// ─── Attachment Chip ──────────────────────────────────────────────────────────
+// ─── Sample Card Dialog ────────────────────────────────────────────────────────
 
-function AttachChip({ type, onRemove }: { type: AttachType; onRemove: () => void }) {
-  if (!type) return null;
-  const labels: Record<string, string> = { quote: 'Quote', sample: 'Sample', production: 'Production' };
+function SampleCardDialog({
+  type,
+  onSend,
+  onClose,
+}: {
+  type: 'sample_card' | 'bulk_card';
+  onSend: (cardData: any) => void;
+  onClose: () => void;
+}) {
+  const [title, setTitle]       = useState('');
+  const [qty, setQty]           = useState('1');
+  const [price, setPrice]       = useState('');
+  const [desc, setDesc]         = useState('');
+
+  const isBulk = type === 'bulk_card';
+  const label  = isBulk ? 'Bulk Order' : 'Sample Order';
+
+  function handleSend() {
+    if (!title.trim() || !price.trim()) {
+      Alert.alert('Required', 'Title and price are required.'); return;
+    }
+    onSend({
+      title:      title.trim(),
+      quantity:   parseInt(qty) || 1,
+      priceCents: Math.round(parseFloat(price) * 100),
+      orderType:  isBulk ? 'bulk' : 'sample',
+      description: desc.trim() || undefined,
+    });
+    onClose();
+  }
+
   return (
-    <View style={chipS.root}>
-      <Text style={chipS.text}>{attachIcon(type as any)} {labels[type]}</Text>
-      <TouchableOpacity onPress={onRemove} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-        <Feather name="x" size={12} color={MUTED} />
-      </TouchableOpacity>
+    <View style={dlgS.overlay}>
+      <View style={dlgS.sheet}>
+        <View style={dlgS.header}>
+          <Text style={dlgS.title}>{isBulk ? '📦' : '🧵'} Send {label}</Text>
+          <TouchableOpacity onPress={onClose}>
+            <Feather name="x" size={20} color={MUTED} />
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView style={{ flex: 1 }} keyboardShouldPersistTaps="handled">
+          <DlgField label="Title" value={title} onChange={setTitle} placeholder={isBulk ? 'e.g. 500 Hoodies — White' : 'e.g. Sample Hoodie — Black'} />
+          <DlgField label="Quantity" value={qty} onChange={setQty} keyboard="numeric" />
+          <DlgField label="Price (USD)" value={price} onChange={setPrice} keyboard="decimal-pad" placeholder="0.00" />
+          <DlgField label="Notes (optional)" value={desc} onChange={setDesc} multiline />
+        </ScrollView>
+
+        <TouchableOpacity style={dlgS.sendBtn} onPress={handleSend}>
+          <Text style={dlgS.sendBtnText}>Send {label} Card</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
-const chipS = StyleSheet.create({
-  root: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.pill,
-    borderWidth: 1, borderColor: BORDER,
-    paddingHorizontal: 10, paddingVertical: 4, alignSelf: 'flex-start',
+function DlgField({ label, value, onChange, placeholder, keyboard, multiline }: any) {
+  return (
+    <View style={{ marginBottom: 14 }}>
+      <Text style={{ fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, marginBottom: 6 }}>{label}</Text>
+      <TextInput
+        style={[dlgS.input, multiline && { height: 72, textAlignVertical: 'top' }]}
+        value={value}
+        onChangeText={onChange}
+        placeholder={placeholder}
+        placeholderTextColor={SUBTLE}
+        keyboardType={keyboard}
+        multiline={multiline}
+        returnKeyType="done"
+      />
+    </View>
+  );
+}
+
+const dlgS = StyleSheet.create({
+  overlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end', zIndex: 999,
   },
-  text: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
+  sheet: {
+    backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
+    padding: SP.lg, paddingBottom: 40, maxHeight: '80%',
+  },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.md },
+  title:  { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
+  input: {
+    backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER,
+    borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: 12,
+    fontSize: FS.base, fontFamily: FONT.regular, color: FG,
+  },
+  sendBtn: {
+    backgroundColor: PURPLE, borderRadius: RADIUS.md, paddingVertical: 14,
+    alignItems: 'center', marginTop: SP.md,
+  },
+  sendBtnText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#fff' },
 });
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function ManufacturerMessagesScreen() {
-  const { conversationId } = useLocalSearchParams<{ conversationId: string }>();
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{
+    conversationId?: string;
+    threadId?: string;
+    mfrName?: string;
+    mfrId?: string;
+  }>();
+  const router  = useRouter();
+  const insets  = useSafeAreaInsets();
+  const api     = useApi();
 
-  const [conversation, setConversation] = useState<ManufacturerConversation | null>(null);
-  const [messages, setMessages] = useState<ManufacturerMessage[]>([]);
-  const [inputText, setInputText] = useState('');
-  const [sending, setSending] = useState(false);
-  const [attachType, setAttachType] = useState<AttachType>(null);
-  const [tipDismissed, setTipDismissed] = useState(false);
-  const [loading, setLoading] = useState(true);
+  // Which mode: 'api' if we have a threadId or can create one; 'demo' otherwise
+  const [resolvedThreadId, setResolvedThreadId] = useState<string | null>(params.threadId ?? null);
+  const [mfrDisplayName, setMfrDisplayName] = useState(params.mfrName ?? 'Manufacturer');
+
+  // API mode state
+  const [apiMessages,    setApiMessages]    = useState<ApiMessage[]>([]);
+  // Demo mode state
+  const [demoConversation, setDemoConv] = useState<ManufacturerConversation | null>(null);
+  const [demoMessages,     setDemoMsgs] = useState<ManufacturerMessage[]>([]);
+
+  const [inputText,  setInputText]  = useState('');
+  const [sending,    setSending]    = useState(false);
+  const [loading,    setLoading]    = useState(true);
+  const [cardDialog, setCardDialog] = useState<'sample_card' | 'bulk_card' | null>(null);
 
   const inputRef = useRef<TextInput>(null);
+  const listRef  = useRef<FlatList>(null);
 
-  const load = useCallback(async () => {
-    if (!conversationId) return;
-    const convs = await getConversations();
-    const conv = convs.find(c => c.id === conversationId);
-    if (conv) {
-      setConversation(conv);
-      setMessages([...conv.messages].reverse());
-      await markConversationRead(conversationId);
+  const mode = resolvedThreadId ? 'api' : 'demo';
+
+  // ── Load ──────────────────────────────────────────────────────────────────────
+
+  const loadApiMessages = useCallback(async (threadId: string) => {
+    try {
+      const msgs = await api.manufacturers.threads.messages.list(threadId);
+      setApiMessages(msgs.reverse()); // newest first for inverted list
+    } catch (e) {
+      console.error('Failed to load messages:', e);
     }
-    setLoading(false);
-  }, [conversationId]);
+  }, [api]);
 
-  useEffect(() => { load(); }, [load]);
+  const loadDemoConv = useCallback(async () => {
+    const convs = await getConversations();
+    const conv  = convs.find(c => c.id === params.conversationId);
+    if (conv) {
+      setDemoConv(conv);
+      setMfrDisplayName(conv.manufacturerName);
+      setDemoMsgs([...conv.messages].reverse());
+      await markConversationRead(params.conversationId!);
+    }
+  }, [params.conversationId]);
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      if (resolvedThreadId) {
+        await loadApiMessages(resolvedThreadId);
+      } else if (params.mfrId && !params.conversationId) {
+        // Create or get thread for this manufacturer
+        try {
+          const thread = await api.manufacturers.threads.create({
+            manufacturerId: params.mfrId,
+            subject: 'General',
+          });
+          setResolvedThreadId(thread.id);
+          // Messages will load via the effect below
+        } catch { /* fall through to demo */ }
+      } else if (params.conversationId) {
+        await loadDemoConv();
+      }
+      setLoading(false);
+    })();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When threadId resolves, load messages
+  useEffect(() => {
+    if (resolvedThreadId) {
+      loadApiMessages(resolvedThreadId).catch(() => {});
+    }
+  }, [resolvedThreadId, loadApiMessages]);
+
+  // ── Send text ─────────────────────────────────────────────────────────────────
 
   async function handleSend() {
     const text = inputText.trim();
-    if (!text || !conversationId) return;
+    if (!text) return;
     setSending(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    try {
-      const msg = await sendMessage(conversationId, {
-        text,
-        attachmentType: attachType ?? undefined,
-        attachmentLabel: attachType ? attachType.charAt(0).toUpperCase() + attachType.slice(1) : undefined,
-        isInternalNote: false,
-      });
-      setMessages(prev => [msg, ...prev]);
-      setInputText('');
-      setAttachType(null);
-    } catch (e) {
-      Alert.alert('Error', 'Could not send message.');
+
+    if (mode === 'api' && resolvedThreadId) {
+      try {
+        const msg = await api.manufacturers.threads.messages.send(resolvedThreadId, {
+          content:     text,
+          messageType: 'text',
+          senderRole:  'seller',
+        });
+        setApiMessages(prev => [{ ...msg }, ...prev]);
+        setInputText('');
+      } catch {
+        Alert.alert('Error', 'Could not send message.');
+      }
+    } else {
+      // Demo path
+      try {
+        const msg = await demoSendMessage(params.conversationId!, {
+          text,
+          isInternalNote: false,
+        });
+        setDemoMsgs(prev => [msg, ...prev]);
+        setInputText('');
+      } catch {
+        Alert.alert('Error', 'Could not send message.');
+      }
     }
     setSending(false);
   }
 
-  async function handleSendInternal() {
-    const text = inputText.trim();
-    if (!text || !conversationId) return;
+  // ── Send photo ────────────────────────────────────────────────────────────────
+
+  async function handlePhotoSend() {
+    if (mode !== 'api' || !resolvedThreadId) {
+      Alert.alert('Photo sharing', 'Photo sharing requires a real manufacturer connection.'); return;
+    }
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Permission needed', 'Allow photo access to share images.'); return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+      base64: false,
+    });
+    if (result.canceled) return;
+
     setSending(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
-      const msg = await sendMessage(conversationId, {
-        text,
-        isInternalNote: true,
+      const uri = result.assets[0].uri;
+      // Upload image via object storage
+      const formData = new FormData();
+      const filename = uri.split('/').pop() ?? 'image.jpg';
+      formData.append('file', { uri, name: filename, type: 'image/jpeg' } as any);
+
+      const uploadRes = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL ?? ''}/api-server/api/upload`, {
+        method: 'POST',
+        body:   formData,
       });
-      setMessages(prev => [msg, ...prev]);
-      setInputText('');
-      setAttachType(null);
-    } catch {}
+
+      let imageUrl = uri; // fallback to local URI
+      if (uploadRes.ok) {
+        const uploadData = await uploadRes.json();
+        imageUrl = uploadData.url ?? uri;
+      }
+
+      const msg = await api.manufacturers.threads.messages.send(resolvedThreadId, {
+        content:     '📷 Photo',
+        messageType: 'image',
+        mediaUrls:   [imageUrl],
+        senderRole:  'seller',
+      });
+      setApiMessages(prev => [{ ...msg }, ...prev]);
+    } catch (e) {
+      Alert.alert('Error', 'Could not send photo.');
+    }
     setSending(false);
   }
 
-  function handleAttachPress() {
-    Alert.alert('Attach', 'Choose attachment type', [
-      { text: 'Attach Quote', onPress: () => setAttachType('quote') },
-      { text: 'Attach Sample', onPress: () => setAttachType('sample') },
-      { text: 'Attach Production', onPress: () => setAttachType('production') },
-      { text: 'Internal Note', onPress: () => {
-        Alert.alert('Internal Note', 'Type your note and it will be marked as internal.', [
-          { text: 'OK', onPress: () => inputRef.current?.focus() },
-        ]);
-      }},
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+  // ── Send card ─────────────────────────────────────────────────────────────────
+
+  async function handleSendCard(cardType: 'sample_card' | 'bulk_card', cardData: any) {
+    if (mode !== 'api' || !resolvedThreadId) return;
+    setSending(true);
+    try {
+      const label = cardType === 'sample_card' ? 'Sample Order Card' : 'Bulk Order Card';
+      const msg = await api.manufacturers.threads.messages.send(resolvedThreadId, {
+        content:     label,
+        messageType: cardType,
+        cardData,
+        senderRole:  'seller',
+      });
+      setApiMessages(prev => [{ ...msg }, ...prev]);
+    } catch {
+      Alert.alert('Error', 'Could not send card.');
+    }
+    setSending(false);
   }
+
+  // ── Attach menu ───────────────────────────────────────────────────────────────
+
+  function handleAttachPress() {
+    const actions: any[] = [
+      { text: '🖼️  Send Photo',       onPress: handlePhotoSend },
+    ];
+    if (mode === 'api') {
+      actions.push({ text: '🧵 Send Sample Order Card', onPress: () => setCardDialog('sample_card') });
+      actions.push({ text: '📦 Send Bulk Order Card',   onPress: () => setCardDialog('bulk_card')   });
+    }
+    actions.push({
+      text: '📹 Start Video Call',
+      onPress: () => Alert.alert('Video Calling', 'Video and voice calling requires the EAS native build. Ask your account manager to enable it for your workspace.'),
+    });
+    actions.push({ text: 'Cancel', style: 'cancel' });
+
+    Alert.alert('Attach', 'Choose an action', actions);
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────────
 
   if (loading) {
     return (
@@ -280,16 +549,7 @@ export default function ManufacturerMessagesScreen() {
     );
   }
 
-  if (!conversation) {
-    return (
-      <View style={{ flex: 1, backgroundColor: BG, paddingTop: insets.top }}>
-        <BrandthreadHeader title="Messages" onBack={() => router.back()} />
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ color: MUTED, fontFamily: FONT.regular }}>Conversation not found.</Text>
-        </View>
-      </View>
-    );
-  }
+  const isEmpty = mode === 'api' ? apiMessages.length === 0 : demoMessages.length === 0;
 
   return (
     <KeyboardAvoidingView
@@ -297,58 +557,78 @@ export default function ManufacturerMessagesScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={0}
     >
+      {/* Card dialogs (above everything) */}
+      {cardDialog && (
+        <SampleCardDialog
+          type={cardDialog}
+          onSend={(cd) => handleSendCard(cardDialog, cd)}
+          onClose={() => setCardDialog(null)}
+        />
+      )}
+
       {/* Header */}
       <View style={{ paddingTop: insets.top, backgroundColor: BG, borderBottomWidth: 1, borderBottomColor: BORDER }}>
         <BrandthreadHeader
-          title={conversation.manufacturerName}
-          subtitle={conversation.contextLabel ?? undefined}
+          title={mfrDisplayName}
+          subtitle={mode === 'api' ? 'Connected' : 'Demo Mode'}
           onBack={() => router.back()}
           rightElement={
-            conversation.contextLabel ? (
-              <StatusBadge label={conversation.contextLabel} variant="purple" small />
-            ) : undefined
+            <TouchableOpacity
+              onPress={() => Alert.alert('Video Calling', 'Video and voice calling requires the EAS native build.')}
+              style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Feather name="video" size={16} color={PURPLE_LIGHT} />
+            </TouchableOpacity>
           }
         />
       </View>
 
-      {/* Demo tip */}
-      {!tipDismissed && (
-        <GuidedTip
-          id="msg-demo"
-          text="Messages are stored locally. Real-time sync available with backend."
-          dismissedIds={[]}
-          onDismiss={() => setTipDismissed(true)}
-          style={{ marginTop: SP.sm }}
+      {/* Messages */}
+      {mode === 'api' ? (
+        <FlatList
+          ref={listRef}
+          data={apiMessages}
+          keyExtractor={m => m.id}
+          inverted
+          renderItem={({ item }) => <ApiMessageBubble msg={item} />}
+          contentContainerStyle={{ paddingVertical: SP.md }}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', marginTop: 40 }}>
+              <Text style={{ color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.sm }}>
+                No messages yet. Say hello!
+              </Text>
+            </View>
+          }
+        />
+      ) : (
+        <FlatList
+          ref={listRef}
+          data={demoMessages}
+          keyExtractor={m => m.id}
+          inverted
+          renderItem={({ item }) => <DemoBubble msg={item} />}
+          contentContainerStyle={{ paddingVertical: SP.md }}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={{ alignItems: 'center', marginTop: 40 }}>
+              <Text style={{ color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.sm }}>
+                No messages yet.
+              </Text>
+            </View>
+          }
         />
       )}
 
-      {/* Messages */}
-      <FlatList
-        data={messages}
-        keyExtractor={m => m.id}
-        inverted
-        renderItem={({ item }) => <MessageBubble msg={item} />}
-        contentContainerStyle={{ paddingVertical: SP.md }}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={{ alignItems: 'center', marginTop: 40 }}>
-            <Text style={{ color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.sm }}>
-              No messages yet. Say hello!
-            </Text>
-          </View>
-        }
-      />
-
       {/* Input Bar */}
       <View style={[s.inputArea, { paddingBottom: Math.max(insets.bottom, SP.md) }]}>
-        {attachType && (
-          <View style={{ paddingHorizontal: SP.md, paddingBottom: SP.sm }}>
-            <AttachChip type={attachType} onRemove={() => setAttachType(null)} />
-          </View>
-        )}
         <View style={s.inputRow}>
-          <TouchableOpacity onPress={handleAttachPress} style={s.iconBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={{ fontSize: 20 }}>📎</Text>
+          <TouchableOpacity
+            onPress={handleAttachPress}
+            style={s.iconBtn}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Feather name="paperclip" size={ICON.sm} color={MUTED} />
           </TouchableOpacity>
           <TextInput
             ref={inputRef}
@@ -377,7 +657,6 @@ export default function ManufacturerMessagesScreen() {
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-
 
 const s = StyleSheet.create({
   inputArea: {

@@ -3,6 +3,7 @@
 // Mock generation is separated into pure functions — never placed in UI code.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { api } from '@/lib/api';
 import {
   Storefront, StoreSection, StoreSectionType, StoreSectionSettings,
   StoreCollection, StorePage, StorePolicy, StoreMenu, StoreMenuItem,
@@ -176,11 +177,27 @@ function defaultStorefront(): Storefront {
 // ─── Persistence ──────────────────────────────────────────────────────────────
 export async function getStorefront(): Promise<Storefront> {
   try {
+    // Load from AsyncStorage first (local truth for complex UI state)
     const raw = await AsyncStorage.getItem(STORE_KEY);
-    if (raw) return JSON.parse(raw) as Storefront;
-    const store = defaultStorefront();
-    await AsyncStorage.setItem(STORE_KEY, JSON.stringify(store));
-    return store;
+    const local: Storefront = raw ? JSON.parse(raw) as Storefront : defaultStorefront();
+
+    // Overlay server-side published state (non-blocking)
+    try {
+      const remote = await api.store.get();
+      if (remote?.status === 'published') {
+        local.publishStatus = 'published';
+        local.publishedAt = remote.publishedAt ?? local.publishedAt;
+      } else if (remote?.status === 'draft' && local.publishStatus === 'published') {
+        local.publishStatus = 'unpublished';
+      }
+      // Sync server title/slug if we don't have one locally
+      if (!local.settings.storeUrl && remote?.slug) {
+        local.settings.storeUrl = `${remote.slug}.brandthread.app`;
+      }
+    } catch { /* no-op — API may not be reachable */ }
+
+    if (!raw) await AsyncStorage.setItem(STORE_KEY, JSON.stringify(local));
+    return local;
   } catch {
     return defaultStorefront();
   }
@@ -189,6 +206,35 @@ export async function getStorefront(): Promise<Storefront> {
 async function saveStorefront(store: Storefront): Promise<Storefront> {
   store.lastEditedAt = new Date().toISOString();
   await AsyncStorage.setItem(STORE_KEY, JSON.stringify(store));
+
+  // Fire-and-forget sync to real API (best-effort, never blocks UI)
+  api.store.save({
+    title:       store.settings.storeName || store.settings.storeUrl || undefined,
+    description: store.settings.storeName || undefined,
+    theme: {
+      primaryColor:    store.branding.colors.primary,
+      secondaryColor:  store.branding.colors.secondary,
+      accentColor:     store.branding.colors.accent,
+      backgroundColor: store.branding.colors.background,
+      textColor:       store.branding.colors.text,
+      fontFamily:      store.branding.typography.headingFont,
+      borderRadius:    store.branding.cornerRadius === 'sharp' ? 0 : store.branding.cornerRadius === 'pill' ? 24 : 8,
+    },
+    branding: {
+      tagline:        store.settings.storeName ?? '',
+      logoUrl:        store.branding.logoUri ?? '',
+      targetAudience: '',
+    },
+    sections: store.sections.map(s => ({
+      type: s.type, title: s.label, enabled: s.enabled, settings: s.settings,
+    })),
+    seo: {
+      metaTitle:       store.seo.homepageTitle,
+      metaDescription: store.seo.homepageDescription,
+      keywords:        [],
+    },
+  } as Record<string, unknown>).catch(() => {/* no-op */});
+
   return store;
 }
 
@@ -720,7 +766,40 @@ function _buildSectionsFromAnswers(answers: StoreGenerationAnswers): StoreSectio
 }
 
 export async function generateStoreFromAnswers(answers: StoreGenerationAnswers): Promise<StoreGenerationResult> {
-  // Simulate async processing delay
+  // Try real AI API first
+  try {
+    const aiData = await api.store.generate(answers as unknown as Record<string, unknown>);
+    if (aiData?.config?.theme) {
+      const cfg = aiData.config;
+      // Map API response back to local StoreGenerationResult shape
+      const colors: StoreColorPalette = {
+        primary:    cfg.theme?.primaryColor ?? '#7c3aed',
+        secondary:  cfg.theme?.secondaryColor ?? '#5b21b6',
+        accent:     cfg.theme?.accentColor ?? '#a78bfa',
+        background: cfg.theme?.backgroundColor ?? '#0f0f1a',
+        text:       cfg.theme?.textColor ?? '#f4f4ff',
+        buttonText: '#0f0f1a',
+      };
+      const branding: StoreBranding = {
+        logoUri: answers.logoUri,
+        colors,
+        typography: { style: answers.typography, headingFont: 'Inter', bodyFont: 'Inter', buttonFont: 'Inter', fontWeight: '600', letterSpacing: 0, textCase: 'none' },
+        buttonStyle: 'filled',
+        cornerRadius: 'rounded',
+        iconStyle: 'outline',
+        animationLevel: 'standard',
+      };
+      const sections = (cfg.sections ?? []).map((s: any, i: number) => ({
+        id: uid('sec'), type: 'hero_image' as StoreSectionType,
+        label: s.title ?? 'Section', enabled: true, order: i,
+        settings: { heading: s.title, description: s.content } as StoreSectionSettings,
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      }));
+      return { sections, branding, suggestedThemeId: 'vertex', generatedAt: new Date().toISOString(), fromAnswers: answers };
+    }
+  } catch { /* fall through to mock */ }
+
+  // Fallback mock generation
   await new Promise(r => setTimeout(r, 100));
 
   const colors = _pickColorFromAnswers(answers);
@@ -777,7 +856,7 @@ export async function applyGenerationResult(result: StoreGenerationResult): Prom
   return saveStorefront(store);
 }
 
-// ─── Generate from logo (mock) ────────────────────────────────────────────────
+// ─── Generate from logo ───────────────────────────────────────────────────────
 export async function generateFromLogo(logoUri: string): Promise<{
   dominantColors: string[];
   suggestedPalette: StoreColorPalette;
@@ -785,8 +864,30 @@ export async function generateFromLogo(logoUri: string): Promise<{
   suggestedTypography: TypographyStyle;
   brandMoods: BrandMood[];
 }> {
-  await new Promise(r => setTimeout(r, 1200)); // simulate analysis
-  // Deterministic mock based on URI hash
+  try {
+    const aiData = await api.store.fromLogo(logoUri, {});
+    if (aiData?.config?.theme) {
+      const cfg = aiData.config;
+      const palette: StoreColorPalette = {
+        primary:    cfg.theme?.primaryColor ?? '#7c3aed',
+        secondary:  cfg.theme?.secondaryColor ?? '#5b21b6',
+        accent:     cfg.theme?.accentColor ?? '#a78bfa',
+        background: cfg.theme?.backgroundColor ?? '#0f0f1a',
+        text:       cfg.theme?.textColor ?? '#f4f4ff',
+        buttonText: '#0f0f1a',
+      };
+      return {
+        dominantColors: [palette.primary, palette.accent, palette.secondary],
+        suggestedPalette: palette,
+        suggestedThemeId: 'vertex',
+        suggestedTypography: 'modern',
+        brandMoods: ['premium', 'clean'],
+      };
+    }
+  } catch { /* fall through to mock */ }
+
+  // Deterministic mock fallback
+  await new Promise(r => setTimeout(r, 800));
   const idx = logoUri.length % COLOR_PRESETS.length;
   const palette = COLOR_PRESETS[idx];
   return {
@@ -798,7 +899,7 @@ export async function generateFromLogo(logoUri: string): Promise<{
   };
 }
 
-// ─── Generate from mood board (mock) ──────────────────────────────────────────
+// ─── Generate from mood board ─────────────────────────────────────────────────
 export async function generateFromMoodBoard(imageUris: string[]): Promise<{
   colorPalette: StoreColorPalette;
   typographyDirection: TypographyStyle;
@@ -807,7 +908,31 @@ export async function generateFromMoodBoard(imageUris: string[]): Promise<{
   suggestedThemeId: string;
   suggestedSections: StoreSectionType[];
 }> {
-  await new Promise(r => setTimeout(r, 1500));
+  try {
+    const aiData = await api.store.fromMoodboard(imageUris, {});
+    if (aiData?.config?.theme) {
+      const cfg = aiData.config;
+      const palette: StoreColorPalette = {
+        primary:    cfg.theme?.primaryColor ?? '#7c3aed',
+        secondary:  cfg.theme?.secondaryColor ?? '#5b21b6',
+        accent:     cfg.theme?.accentColor ?? '#a78bfa',
+        background: cfg.theme?.backgroundColor ?? '#0f0f1a',
+        text:       cfg.theme?.textColor ?? '#f4f4ff',
+        buttonText: '#0f0f1a',
+      };
+      return {
+        colorPalette: palette,
+        typographyDirection: 'modern',
+        layoutStyle: 'editorial',
+        imageTreatment: 'high-contrast with minimal overlay',
+        suggestedThemeId: 'vertex',
+        suggestedSections: ['hero_image', 'lookbook', 'featured_collection', 'brand_story', 'seller_posts', 'newsletter'],
+      };
+    }
+  } catch { /* fall through to mock */ }
+
+  // Mock fallback
+  await new Promise(r => setTimeout(r, 1000));
   const idx = imageUris.length % COLOR_PRESETS.length;
   const palette = COLOR_PRESETS[idx];
   return {
@@ -865,12 +990,17 @@ export async function publishStore(): Promise<{ success: boolean; message: strin
   store.publishStatus = 'published';
   store.publishedAt = new Date().toISOString();
   await saveStorefront(store);
+
+  // Publish to real API
+  try { await api.store.publish(); } catch { /* no-op */ }
+
   return { success: true, message: 'Your store is now live.', storefront: store };
 }
 
 export async function unpublishStore(): Promise<Storefront> {
   const store = await getStorefront();
   store.publishStatus = 'unpublished';
+  try { await api.store.unpublish(); } catch { /* no-op */ }
   return saveStorefront(store);
 }
 

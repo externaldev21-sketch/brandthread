@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import Svg, { Line as SvgLine } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import {
@@ -267,6 +268,36 @@ const sbS = StyleSheet.create({
            borderRadius: RADIUS.md, borderWidth: 1, backgroundColor: 'rgba(139,92,246,0.08)' },
   label: { fontFamily: FONT.semibold },
 });
+
+// ─── TertiaryButton ───────────────────────────────────────────────────────────
+
+interface TertiaryButtonProps {
+  label: string;
+  onPress: () => void;
+  icon?: keyof typeof Feather.glyphMap;
+  disabled?: boolean;
+  small?: boolean;
+  style?: StyleProp<ViewStyle>;
+  accent?: string;
+}
+
+export function TertiaryButton({ label, onPress, icon, disabled, small, style, accent = PURPLE_LIGHT }: TertiaryButtonProps) {
+  const h = small ? COMP.buttonHSm : COMP.buttonH;
+  return (
+    <TouchableOpacity
+      activeOpacity={disabled ? 1 : 0.65}
+      onPress={() => {
+        if (disabled) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        onPress();
+      }}
+      style={[{ height: h, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, opacity: disabled ? 0.4 : 1 }, style]}
+    >
+      {icon && <Feather name={icon} size={ICON.sm} color={accent} />}
+      <Text style={{ fontFamily: FONT.semibold, fontSize: small ? FS.sm : FS.base, color: accent }}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
 
 // ─── IconButton ───────────────────────────────────────────────────────────────
 
@@ -701,11 +732,7 @@ export function ProgressCard({ percent, label, nextLabel, onContinue, style }: P
           {label && <Text style={pcS.label}>{label}</Text>}
         </View>
         {onContinue && (
-          <TouchableOpacity onPress={onContinue} style={pcS.btn}>
-            <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={pcS.btnGrad}>
-              <Text style={pcS.btnText}>Continue</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+          <PrimaryButton label="Continue" onPress={onContinue} small style={{ alignSelf: 'flex-end', minWidth: 108 }} />
         )}
       </View>
       <View style={pcS.track}>
@@ -717,16 +744,13 @@ export function ProgressCard({ percent, label, nextLabel, onContinue, style }: P
 }
 
 const pcS = StyleSheet.create({
-  root:    { gap: SP.sm },
-  top:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  pct:     { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
-  label:   { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
-  track:   { height: 4, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: RADIUS.pill, overflow: 'hidden' },
-  fill:    { height: '100%', borderRadius: RADIUS.pill, backgroundColor: PURPLE },
-  next:    { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
-  btn:     { borderRadius: RADIUS.sm, overflow: 'hidden' },
-  btnGrad: { paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  btnText: { fontSize: FS.sm, fontFamily: FONT.bold, color: ON_DARK },
+  root:  { gap: SP.sm },
+  top:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  pct:   { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
+  label: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  track: { height: 4, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: RADIUS.pill, overflow: 'hidden' },
+  fill:  { height: '100%', borderRadius: RADIUS.pill, backgroundColor: PURPLE },
+  next:  { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
 });
 
 // ─── NavigationCard ───────────────────────────────────────────────────────────
@@ -803,6 +827,46 @@ export function LoadingSkeleton({ height = 80, style }: { height?: number; style
   );
 }
 
+// ─── BrandedLoadingState ──────────────────────────────────────────────────────
+/**
+ * Replaces bare <ActivityIndicator /> on key screens. Shows the brand gradient
+ * icon with a slow pulse so loading never looks like an unstyled placeholder.
+ */
+export function BrandedLoadingState({ message, style }: { message?: string; style?: StyleProp<ViewStyle> }) {
+  const pulse = useRef(new Animated.Value(0.45)).current;
+  useEffect(() => {
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 950, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.45, duration: 950, useNativeDriver: true }),
+      ])
+    );
+    anim.start();
+    return () => anim.stop();
+  }, []);
+  return (
+    <View style={[blS.root, style]}>
+      <Animated.View style={{ opacity: pulse }}>
+        <LinearGradient
+          colors={GRAD_PRIMARY}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={blS.iconWrap}
+        >
+          <Feather name="loader" size={ICON.md} color={ON_DARK} />
+        </LinearGradient>
+      </Animated.View>
+      {message && <Text style={blS.msg}>{message}</Text>}
+    </View>
+  );
+}
+
+const blS = StyleSheet.create({
+  root:    { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.md, backgroundColor: BG },
+  iconWrap:{ width: 56, height: 56, borderRadius: RADIUS.lg, alignItems: 'center', justifyContent: 'center' },
+  msg:     { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, textAlign: 'center', maxWidth: 200 },
+});
+
 // ─── Toast (simple inline variant) ───────────────────────────────────────────
 
 interface ToastProps {
@@ -842,3 +906,60 @@ export function SheetHandle() {
     </View>
   );
 }
+
+// ─── ThreadDivider ─────────────────────────────────────────────────────────────
+/**
+ * The signature Brandthread visual motif: a stitched-line divider that replaces
+ * plain 1px hairlines throughout the app. Uses SVG strokeDasharray to render a
+ * thread-stitch pattern that works identically on iOS and Android.
+ *
+ * Usage:
+ *   <ThreadDivider />                        — full-width stitch line
+ *   <ThreadDivider label="or" />             — stitch line with centred label
+ *   <ThreadDivider accent={CYAN_DIM} />      — coloured variant
+ */
+interface ThreadDividerProps {
+  label?: string;
+  accent?: string;
+  style?: StyleProp<ViewStyle>;
+}
+
+export function ThreadDivider({ label, accent = BORDER_ACTIVE, style }: ThreadDividerProps) {
+  const StitchLine = () => (
+    <View style={{ flex: 1, height: 8 }}>
+      <Svg height="8" width="100%" style={{ overflow: 'visible' }}>
+        <SvgLine
+          x1="0" y1="4" x2="100%" y2="4"
+          stroke={accent}
+          strokeWidth="1"
+          strokeDasharray="8,4"
+          strokeLinecap="round"
+          strokeOpacity="0.5"
+        />
+      </Svg>
+    </View>
+  );
+
+  if (label) {
+    return (
+      <View style={[tdS.row, style]}>
+        <StitchLine />
+        <Text style={[tdS.label, { color: accent }]}>{label}</Text>
+        <StitchLine />
+      </View>
+    );
+  }
+  return (
+    <View style={[tdS.solo, style]}>
+      <StitchLine />
+    </View>
+  );
+}
+
+const tdS = StyleSheet.create({
+  row:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm,
+           marginVertical: SP.xs, paddingHorizontal: SP.md },
+  solo:  { marginVertical: SP.xs, paddingHorizontal: SP.md },
+  label: { fontSize: FS.xs, fontFamily: FONT.medium, letterSpacing: 0.8,
+           textTransform: 'uppercase', opacity: 0.7 },
+});

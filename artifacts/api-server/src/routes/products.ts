@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, products, productVariants } from "@workspace/db";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import crypto from "crypto";
 
 const router = Router();
 router.use(requireAuth);
@@ -34,7 +35,7 @@ router.get("/", async (req, res) => {
 // POST /api/products
 router.post("/", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const { name, description, category = "apparel", status = "draft", images = [], tags = [], variant, variants } = req.body;
+  const { name, description, category = "apparel", status = "draft", images = [], tags = [], styleTags = [], variant, variants } = req.body;
   if (!name || typeof name !== "string" || name.trim() === "") {
     res.status(400).json({ error: "name required" }); return;
   }
@@ -83,7 +84,7 @@ router.post("/", async (req, res) => {
   const product = await db.transaction(async (tx) => {
     const [prod] = await tx
       .insert(products)
-      .values({ ownerId, name: name.trim(), description, category, status, images, tags })
+      .values({ ownerId, name: name.trim(), description, category, status, images, tags, styleTags })
       .returning();
 
     if (validatedVariants.length > 0) {
@@ -112,7 +113,14 @@ router.get("/:id", async (req, res) => {
 // PUT /api/products/:id
 router.put("/:id", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const { name, description, category, status, images, tags } = req.body;
+  const {
+    name, description, category, status, images, tags, styleTags,
+    // Pre-order fields
+    isPreOrder, preOrderClosingDate, preOrderEstShipDate, dropId,
+    // Size chart
+    sizeChart,
+  } = req.body;
+
   const [updated] = await db.update(products)
     .set({
       ...(name         && { name }),
@@ -121,6 +129,14 @@ router.put("/:id", async (req, res) => {
       ...(status       && { status }),
       ...(images       && { images }),
       ...(tags         && { tags }),
+      ...(styleTags    !== undefined && { styleTags }),
+      // Pre-order
+      ...(isPreOrder             !== undefined && { isPreOrder }),
+      ...(preOrderClosingDate    !== undefined && { preOrderClosingDate: preOrderClosingDate ? new Date(preOrderClosingDate) : null }),
+      ...(preOrderEstShipDate    !== undefined && { preOrderEstShipDate: preOrderEstShipDate ? new Date(preOrderEstShipDate) : null }),
+      ...(dropId                 !== undefined && { dropId: dropId ?? null }),
+      // Size chart (pass null to clear)
+      ...(sizeChart              !== undefined && { sizeChart: sizeChart ?? null }),
       updatedAt: new Date(),
     })
     .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId)))
@@ -183,6 +199,69 @@ router.patch("/:id/variants/:variantId", async (req, res) => {
     .returning();
   if (!updated) { res.status(404).json({ error: "Variant not found" }); return; }
   res.json(updated);
+});
+
+// POST /api/products/import — CSV bulk product import
+// Body: { rows: Array<{ name: string, description?: string, category?: string, price: string, sku?: string, images?: string, tags?: string }> }
+// Limits: max 100 rows per call
+router.post("/import", async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  const { rows } = req.body;
+
+  if (!Array.isArray(rows) || rows.length === 0) {
+    res.status(400).json({ error: "rows array required" }); return;
+  }
+  if (rows.length > 100) {
+    res.status(400).json({ error: "Maximum 100 rows per import" }); return;
+  }
+
+  const results: { success: boolean; name: string; productId?: string; error?: string }[] = [];
+
+  for (const row of rows) {
+    const name = String(row.name ?? '').trim();
+    if (!name) { results.push({ success: false, name: '(empty)', error: 'name is required' }); continue; }
+
+    const priceCents = Math.round(parseFloat(String(row.price ?? '0')) * 100);
+    if (isNaN(priceCents) || priceCents < 0) { results.push({ success: false, name, error: 'invalid price' }); continue; }
+
+    const category = String(row.category ?? 'apparel').toLowerCase().trim() || 'apparel';
+    const description = String(row.description ?? '').trim() || null;
+    const sku = String(row.sku ?? '').trim() || null;
+    const images = String(row.images ?? '').split('|').map((s: string) => s.trim()).filter(Boolean);
+    const tags = String(row.tags ?? '').split(',').map((s: string) => s.trim()).filter(Boolean);
+
+    try {
+      const [product] = await db.insert(products).values({
+        id: crypto.randomUUID(),
+        ownerId,
+        name,
+        description: description ?? '',
+        category,
+        status: 'draft',
+        images,
+        tags,
+      }).returning({ id: products.id });
+
+      // Insert a default variant if price > 0
+      if (priceCents > 0) {
+        await db.insert(productVariants).values({
+          id: crypto.randomUUID(),
+          productId: product.id,
+          sku: sku ?? (name.replace(/\s+/g, '-').toUpperCase() + '-DEFAULT'),
+          priceCents,
+          stock: 0,
+          lowStockThreshold: 5,
+        });
+      }
+
+      results.push({ success: true, name, productId: product.id });
+    } catch (err: any) {
+      results.push({ success: false, name, error: err.message ?? 'Insert failed' });
+    }
+  }
+
+  const successCount = results.filter(r => r.success).length;
+  res.status(201).json({ successCount, failCount: results.length - successCount, results });
 });
 
 export default router;

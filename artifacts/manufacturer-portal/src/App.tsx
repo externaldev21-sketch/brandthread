@@ -14,6 +14,7 @@ import Messages from '@/pages/messages';
 import MessageThread from '@/pages/message-thread';
 import Payment from '@/pages/payment';
 import Profile from '@/pages/profile';
+import Reports from '@/pages/reports';
 import NotFound from '@/pages/not-found';
 import { Layout } from '@/components/layout';
 
@@ -231,6 +232,9 @@ function AppRouter() {
             </Route>
             <Route path="/profile">
               <Protected><Layout><Profile /></Layout></Protected>
+            </Route>
+            <Route path="/reports">
+              <Protected><Layout><Reports /></Layout></Protected>
             </Route>
 
             <Route component={NotFound} />

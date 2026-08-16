@@ -11,7 +11,7 @@ import { useRouter } from 'expo-router';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, PURPLE_LIGHT,
-  CYAN, SUCCESS, ORANGE, BLUE, RED,
+  CYAN, SUCCESS, ORANGE, BLUE, RED, ON_DARK,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
@@ -20,6 +20,7 @@ import {
   subscribeSocial,
 } from '@/services/socialService';
 import type { Notification, NotificationCategory } from '@/services/socialTypes';
+import { BrandedLoadingState, ThreadDivider } from '@/components/BrandthreadUI';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -175,12 +176,17 @@ export default function BuyerNotifications() {
 
   const [notifs, setNotifs] = useState<Notification[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<NotificationCategory | undefined>(undefined);
+  const [notifLoading, setNotifLoading] = useState(true);
 
   const loadNotifs = useCallback(async () => {
+    setNotifLoading(true);
     try {
       const data = await getNotifications();
       setNotifs(data);
-    } catch (_) {}
+    } catch (_) {
+    } finally {
+      setNotifLoading(false);
+    }
   }, []);
 
   useFocusEffect(useCallback(() => { loadNotifs(); }, [loadNotifs]));
@@ -260,12 +266,15 @@ export default function BuyerNotifications() {
     ]);
   };
 
-  const renderItem = ({ item }: { item: ListItem }) => {
+  const renderItem = ({ item, index }: { item: ListItem; index: number }) => {
     if (item.type === 'header') {
       return (
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionHeaderText}>{item.title.toUpperCase()}</Text>
-        </View>
+        <>
+          {index > 0 && <ThreadDivider style={{ marginHorizontal: SP.md, marginBottom: SP.sm }} />}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionHeaderText}>{item.title.toUpperCase()}</Text>
+          </View>
+        </>
       );
     }
 
@@ -380,12 +389,18 @@ export default function BuyerNotifications() {
       )}
 
       {/* LIST */}
-      {listData.length === 0 ? (
+      {notifLoading && (
+        <BrandedLoadingState
+          message="Loading notifications…"
+          style={{ position: 'absolute', top: 80, left: 0, right: 0, bottom: 0, zIndex: 5 }}
+        />
+      )}
+      {!notifLoading && listData.length === 0 ? (
         <View style={styles.emptyState}>
           <Feather name="bell" size={48} color={MUTED} />
           <Text style={styles.emptyTitle}>You're all caught up.</Text>
           <Text style={styles.emptyBody}>
-            Notifications will appear here when there's activity.
+            When someone likes your post, follows you, or sends a message — it shows up here.
           </Text>
         </View>
       ) : (
@@ -487,7 +502,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarText: {
-    color: '#fff',
+    color: ON_DARK,
     fontFamily: FONT.bold,
     fontSize: FS.sm,
   },

@@ -1,12 +1,13 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ScrollView, View, Text, TouchableOpacity,
-  StyleSheet,
+  StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
+import { useApi } from '@/lib/api';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,13 +23,28 @@ interface Drop {
   totalRaw: number;
   payoutDate: string;
   status: DropStatus;
-  releaseDate?: string;   // Pre Order only — when items ship
-  mfgProgress?: number;   // Pre Order only — 0–1
+  releaseDate?: string;
+  mfgProgress?: number;
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
-const DROPS: Drop[] = [
+function fmtCents(cents: number) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
+}
+
+function dropStatusFromApiStatus(status: string): DropStatus {
+  if (status === 'active')    return 'processing';
+  if (status === 'scheduled') return 'scheduled';
+  if (status === 'ended')     return 'paid';
+  return 'held';
+}
+
+// ─── Fallback mock data (used when API has no drops yet) ─────────────────────
+
+const DROPS_FALLBACK: Drop[] = [
   {
     id: 'DROP-001',
     name: 'Summer Collection Vol. 3',
@@ -106,13 +122,13 @@ interface DropCardProps {
 }
 
 function DropCard({ drop, colors, isDark, isLast }: DropCardProps) {
-  const primary = isDark ? '#39FF88' : '#00C853';
+  const primary = '#8B5CF6';
   const isPreOrder = drop.type === 'pre-order';
   const s = statusConfig[drop.status];
 
-  const typeColor   = isPreOrder ? (isDark ? '#E2DDD0' : '#00C853') : (isDark ? '#4C9A5E' : '#3F7A4F');
-  const typeBg      = isPreOrder ? (isDark ? '#39FF8818' : '#E8E1CF') : (isDark ? '#4C9A5E18' : '#DCFCE7');
-  const typeBorder  = isPreOrder ? (isDark ? '#00C85333' : '#DBD3C0') : (isDark ? '#4C9A5E33' : '#BBF7D0');
+  const typeColor   = isPreOrder ? (isDark ? '#E2DDD0' : '#8B5CF6') : '#10B981';
+  const typeBg      = isPreOrder ? (isDark ? 'rgba(139,92,246,0.09)' : '#E8E1CF') : 'rgba(16,185,129,0.09)';
+  const typeBorder  = isPreOrder ? (isDark ? 'rgba(139,92,246,0.20)' : '#DBD3C0') : 'rgba(16,185,129,0.20)';
   const progressBg  = isDark ? '#33302A' : '#E8E1CF';
 
   return (
@@ -222,14 +238,43 @@ const CONFIG_ROWS = [
 
 export default function PaymentsScreen() {
   const colors = useColors();
+  const api    = useApi();
+  const [drops,   setDrops]   = useState<Drop[]>(DROPS_FALLBACK);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Load drops from the drops API and map to our Drop shape
+      const raw: any[] = await api.drops.list();
+      if (raw.length > 0) {
+        const mapped: Drop[] = raw.map((d: any) => ({
+          id:             d.id,
+          name:           d.name ?? d.title ?? 'Drop',
+          type:           d.releaseAt ? 'pre-order' : 'pre-made',
+          totalOrders:    d.orderCount ?? 0,
+          totalCollected: fmtCents((d.totalCents ?? 0)),
+          totalRaw:       (d.totalCents ?? 0) / 100,
+          payoutDate:     d.releaseAt ? fmtDate(d.releaseAt) : '—',
+          status:         dropStatusFromApiStatus(d.status ?? 'active'),
+          releaseDate:    d.releaseAt ? fmtDate(d.releaseAt) : undefined,
+          mfgProgress:    d.mfgProgress ?? undefined,
+        }));
+        setDrops(mapped);
+      }
+    } catch { /* stay with fallback mock data */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   const isDark = colors.background === '#121110' || colors.background.startsWith('#0');
-  const primary = isDark ? '#39FF88' : '#00C853';
+  const primary = '#8B5CF6';
 
-  const preOrderDrops = DROPS.filter((d) => d.type === 'pre-order');
-  const preMadeDrops  = DROPS.filter((d) => d.type === 'pre-made');
+  const preOrderDrops = drops.filter((d) => d.type === 'pre-order');
+  const preMadeDrops  = drops.filter((d) => d.type === 'pre-made');
 
-  const nextPayout = [...DROPS]
+  const nextPayout = [...drops]
     .filter((d) => d.status !== 'paid')
     .sort((a, b) => new Date(a.payoutDate).getTime() - new Date(b.payoutDate).getTime())[0];
 
@@ -244,7 +289,7 @@ export default function PaymentsScreen() {
 
         {/* ── Next payout banner ── */}
         {nextPayout && (
-          <View style={[styles.banner, { backgroundColor: isDark ? '#00C85322' : '#E8F0FE', borderColor: isDark ? '#00C85344' : '#C7DBFB' }]}>
+          <View style={[styles.banner, { backgroundColor: isDark ? 'rgba(139,92,246,0.13)' : '#E8F0FE', borderColor: isDark ? 'rgba(139,92,246,0.26)' : '#C7DBFB' }]}>
             <Feather name="info" size={14} color={isDark ? '#E2DDD0' : '#1A56C4'} />
             <Text style={[styles.bannerText, { color: isDark ? '#E2DDD0' : '#1A3E7A' }]}>
               Next payout on {nextPayout.payoutDate} · ${nextPayout.totalRaw.toLocaleString()} from {nextPayout.name}
@@ -345,11 +390,11 @@ export default function PaymentsScreen() {
 
         {/* ── Pre Order Drops ── */}
         <View style={styles.sectionHeader}>
-          <View style={[styles.sectionDot, { backgroundColor: isDark ? '#E2DDD0' : '#00C853' }]} />
+          <View style={[styles.sectionDot, { backgroundColor: isDark ? '#E2DDD0' : '#8B5CF6' }]} />
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Pre Order Drops</Text>
           <Text style={[styles.sectionCount, { color: colors.mutedForeground }]}>{preOrderDrops.length}</Text>
         </View>
-        <View style={[styles.preOrderNote, { backgroundColor: isDark ? '#39FF8810' : '#E8E1CF', borderColor: isDark ? '#00C85333' : '#DBD3C0' }]}>
+        <View style={[styles.preOrderNote, { backgroundColor: isDark ? 'rgba(139,92,246,0.09)' : '#E8E1CF', borderColor: isDark ? 'rgba(139,92,246,0.20)' : '#DBD3C0' }]}>
           <Feather name="clock" size={13} color={isDark ? '#E2DDD0' : primary} />
           <Text style={[styles.preOrderNoteText, { color: isDark ? '#E2DDD0' : primary }]}>
             Funds collected upfront and held until each drop ships
@@ -365,7 +410,7 @@ export default function PaymentsScreen() {
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Pre Made Drops</Text>
           <Text style={[styles.sectionCount, { color: colors.mutedForeground }]}>{preMadeDrops.length}</Text>
         </View>
-        <View style={[styles.preOrderNote, { backgroundColor: isDark ? '#4C9A5E10' : '#DCFCE7', borderColor: isDark ? '#4C9A5E33' : '#BBF7D0' }]}>
+        <View style={[styles.preOrderNote, { backgroundColor: isDark ? 'rgba(16,185,129,0.09)' : '#DCFCE7', borderColor: isDark ? 'rgba(16,185,129,0.20)' : '#BBF7D0' }]}>
           <Feather name="package" size={13} color={colors.success} />
           <Text style={[styles.preOrderNoteText, { color: colors.success }]}>
             Standard payout 2–3 business days after order fulfillment

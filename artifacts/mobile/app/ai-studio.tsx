@@ -214,10 +214,10 @@ export default function AIStudioScreen() {
           activeOpacity={0.75}
           style={[
             styles.toolRow,
-            { backgroundColor: selected === tool.label ? '#17140F' : colors.card, borderColor: selected === tool.label ? colors.primary : colors.border },
+            { backgroundColor: selected === tool.label ? '#18182E' : colors.card, borderColor: selected === tool.label ? colors.primary : colors.border },
           ]}
         >
-          <View style={[styles.toolIcon, { backgroundColor: selected === tool.label ? '#00C85322' : colors.secondary }]}>
+          <View style={[styles.toolIcon, { backgroundColor: selected === tool.label ? 'rgba(139,92,246,0.13)' : colors.secondary }]}>
             <Feather name={tool.icon} size={18} color={selected === tool.label ? colors.primary : colors.mutedForeground} />
           </View>
           <View style={styles.toolInfo}>
@@ -225,7 +225,7 @@ export default function AIStudioScreen() {
             <Text style={[styles.toolDesc, { color: colors.mutedForeground }]}>{tool.desc}</Text>
           </View>
           {tool.badge != null && (
-            <View style={[styles.toolBadge, { backgroundColor: tool.badge === 'Popular' ? '#00C85322' : '#4C9A5E22' }]}>
+            <View style={[styles.toolBadge, { backgroundColor: 'rgba(139,92,246,0.13)' }]}>
               <Text style={[styles.toolBadgeText, { color: tool.badge === 'Popular' ? colors.primary : colors.success }]}>{tool.badge}</Text>
             </View>
           )}

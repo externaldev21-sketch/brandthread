@@ -15,8 +15,8 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, RED,
+  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
+  FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, RED, ON_DARK,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
@@ -138,8 +138,8 @@ export default function BuyerPostCommentsScreen() {
   const authorInitials = params.postAuthorInitials ?? '?';
   const authorColor = params.postAuthorColor ?? PURPLE;
   const caption = params.postCaption ?? '';
-  const mediaColor1 = params.postMediaColor1 ?? '#1a1a2e';
-  const mediaColor2 = params.postMediaColor2 ?? '#0d0d1a';
+  const mediaColor1 = params.postMediaColor1 ?? SURFACE;
+  const mediaColor2 = params.postMediaColor2 ?? BG;
   const postType = params.postType ?? 'photo';
 
   const [comments, setComments] = useState<Comment[]>([]);
@@ -401,7 +401,7 @@ const s = StyleSheet.create({
   postAvatarText: {
     fontFamily: FONT.bold,
     fontSize: 9,
-    color: '#fff',
+    color: ON_DARK,
   },
   postAuthorName: {
     fontFamily: FONT.semibold,
@@ -450,7 +450,7 @@ const s = StyleSheet.create({
   avatarText: {
     fontFamily: FONT.bold,
     fontSize: FS.xs,
-    color: '#fff',
+    color: ON_DARK,
   },
   commentBody: { flex: 1 },
 
@@ -556,7 +556,7 @@ const s = StyleSheet.create({
   inputAvatarText: {
     fontFamily: FONT.bold,
     fontSize: FS.xs,
-    color: '#fff',
+    color: ON_DARK,
   },
   input: {
     flex: 1,

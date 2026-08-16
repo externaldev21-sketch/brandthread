@@ -1,39 +1,74 @@
-import React from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Switch } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Switch, Alert, TextInput, ActivityIndicator } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
 import * as Haptics from 'expo-haptics';
+import { useApi } from '@/lib/api';
 
-const MEMBERS = [
-  { name: 'Alex Torres', role: 'Owner', access: 'Full Access', initials: 'AT', color: '#39FF88', online: true },
-  { name: 'Jamie Kim', role: 'Manager', access: 'Orders, Products', initials: 'JK', color: '#4A6FA5', online: true },
-  { name: 'Sam Rivera', role: 'Marketing', access: 'Marketing only', initials: 'SR', color: '#4C9A5E', online: false },
-  { name: 'Casey Brown', role: 'Fulfillment', access: 'Shipping only', initials: 'CB', color: '#B98A2E', online: true },
-];
+function relTime(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1)  return 'Just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
 
-const TASKS = [
-  { title: 'Review new product photos', assignee: 'Jamie Kim', due: 'Today', priority: 'High' },
-  { title: 'Update summer collection desc.', assignee: 'Sam Rivera', due: 'Jul 11', priority: 'Medium' },
-  { title: 'Process pending returns (6)', assignee: 'Casey Brown', due: 'Jul 10', priority: 'High' },
-  { title: 'Approve manufacturer quote', assignee: 'Alex Torres', due: 'Jul 12', priority: 'Low' },
-];
+function initials(name: string) {
+  return name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('');
+}
 
-const AUDIT_LOGS = [
-  { action: 'Product published', user: 'Jamie Kim', time: '2 min ago' },
-  { action: 'Order #5041 fulfilled', user: 'Casey Brown', time: '18 min ago' },
-  { action: 'Discount code created', user: 'Sam Rivera', time: '1h ago' },
-  { action: 'Settings updated', user: 'Alex Torres', time: '3h ago' },
-];
+const AVATAR_COLORS = ['#8B5CF6', '#4A6FA5', '#22D3EE', '#B98A2E', '#EC4899', '#10B981'];
+
+function avatarColor(idx: number) { return AVATAR_COLORS[idx % AVATAR_COLORS.length]; }
 
 export default function TeamScreen() {
-  const colors = useColors();
-  const router = useRouter();
+  const colors  = useColors();
+  const router  = useRouter();
+  const api     = useApi();
   const [twoFactor, setTwoFactor] = useState(true);
-  const [fraud, setFraud] = useState(true);
+  const [fraud, setFraud]         = useState(true);
+  const [members,  setMembers]    = useState<any[]>([]);
+  const [activity, setActivity]   = useState<any[]>([]);
+  const [loading,  setLoading]    = useState(true);
+  const [inviting, setInviting]   = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [showInviteForm, setShowInviteForm] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [m, a] = await Promise.all([
+        api.team.members(),
+        api.team.activity(10),
+      ]);
+      setMembers(m);
+      setActivity(a.logs ?? []);
+    } catch { /* no-op if not connected */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleInvite = async () => {
+    if (!inviteEmail.trim()) return;
+    setInviting(true);
+    try {
+      await api.team.invite({ email: inviteEmail.trim() });
+      setInviteEmail('');
+      setShowInviteForm(false);
+      await load();
+      Alert.alert('Invite sent', `An invite was sent to ${inviteEmail.trim()}`);
+    } catch (err: any) {
+      Alert.alert('Error', err.message ?? 'Failed to send invite');
+    } finally {
+      setInviting(false);
+    }
+  };
 
   const priorityColor = (p: string) => {
     if (p === 'High') return colors.destructive;
@@ -53,43 +88,70 @@ export default function TeamScreen() {
       {/* Members */}
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Staff Accounts</Text>
-        <TouchableOpacity style={[styles.addBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8}>
+        <TouchableOpacity onPress={() => setShowInviteForm(v => !v)} style={[styles.addBtn, { backgroundColor: colors.primary }]} activeOpacity={0.8}>
           <Feather name="user-plus" size={14} color={colors.primaryForeground} />
           <Text style={[styles.addBtnText, { color: colors.primaryForeground }]}>Invite</Text>
         </TouchableOpacity>
       </View>
+
+      {showInviteForm && (
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, marginBottom: 12 }]}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Invite a team member</Text>
+          <TextInput
+            value={inviteEmail}
+            onChangeText={setInviteEmail}
+            placeholder="Email address"
+            placeholderTextColor={colors.mutedForeground}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            style={[styles.inviteInput, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+          />
+          <TouchableOpacity
+            onPress={handleInvite}
+            disabled={inviting || !inviteEmail.trim()}
+            activeOpacity={0.8}
+            style={[styles.addBtn, { backgroundColor: colors.primary, alignSelf: 'flex-start', marginTop: 8 }]}
+          >
+            <Text style={[styles.addBtnText, { color: colors.primaryForeground }]}>
+              {inviting ? 'Sending…' : 'Send Invite'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {MEMBERS.map((m, i) => (
-          <View key={m.name} style={[styles.memberRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-            <View style={styles.memberLeft}>
-              <View style={[styles.avatar, { backgroundColor: m.color + '33' }]}>
-                <Text style={[styles.avatarText, { color: m.color }]}>{m.initials}</Text>
-              </View>
-              {m.online && <View style={[styles.onlineDot, { backgroundColor: colors.success }]} />}
-            </View>
-            <View style={styles.memberInfo}>
-              <Text style={[styles.memberName, { color: colors.foreground }]}>{m.name}</Text>
-              <Text style={[styles.memberAccess, { color: colors.mutedForeground }]}>{m.access}</Text>
-            </View>
-            <Badge label={m.role} variant={m.role === 'Owner' ? 'gold' : 'default'} />
+        {loading ? (
+          <ActivityIndicator color={colors.primary} style={{ margin: 16 }} />
+        ) : members.length === 0 ? (
+          <View style={{ padding: 20, alignItems: 'center' }}>
+            <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>No team members yet. Invite someone to get started.</Text>
           </View>
-        ))}
+        ) : (
+          members.map((m, i) => {
+            const color = avatarColor(i);
+            const ini   = initials(m.name ?? m.email ?? '?');
+            const roleLabel = m.role === 'owner' ? 'Owner' : m.role === 'manager' ? 'Manager' : 'Staff';
+            const accessLabel = m.role === 'owner' ? 'Full Access' : m.role === 'manager' ? 'Orders, Products, Inventory' : 'Fulfillment only';
+            return (
+              <View key={m.id} style={[styles.memberRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+                <View style={styles.memberLeft}>
+                  <View style={[styles.avatar, { backgroundColor: color + '33' }]}>
+                    <Text style={[styles.avatarText, { color }]}>{ini}</Text>
+                  </View>
+                  {m.status === 'active' && <View style={[styles.onlineDot, { backgroundColor: colors.success }]} />}
+                </View>
+                <View style={styles.memberInfo}>
+                  <Text style={[styles.memberName, { color: colors.foreground }]}>{m.name ?? m.email}</Text>
+                  <Text style={[styles.memberAccess, { color: colors.mutedForeground }]}>{accessLabel}</Text>
+                </View>
+                <Badge label={roleLabel} variant={m.role === 'owner' ? 'gold' : 'default'} />
+              </View>
+            );
+          })
+        )}
       </View>
 
-      {/* Tasks */}
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Team Tasks</Text>
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {TASKS.map((t, i) => (
-          <View key={t.title} style={[styles.taskRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-            <TouchableOpacity style={[styles.taskCheck, { borderColor: colors.border }]} activeOpacity={0.7} />
-            <View style={styles.taskInfo}>
-              <Text style={[styles.taskTitle, { color: colors.foreground }]}>{t.title}</Text>
-              <Text style={[styles.taskMeta, { color: colors.mutedForeground }]}>{t.assignee} · Due {t.due}</Text>
-            </View>
-            <View style={[styles.priorityDot, { backgroundColor: priorityColor(t.priority) }]} />
-          </View>
-        ))}
-      </View>
+      {/* Approval Workflows header */}
 
       {/* Approval Workflows */}
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Approval Workflows</Text>
@@ -110,15 +172,23 @@ export default function TeamScreen() {
       {/* Audit Log */}
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Audit Log</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {AUDIT_LOGS.map((log, i) => (
-          <View key={log.action + i} style={[styles.logRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-            <View style={[styles.logDot, { backgroundColor: colors.primary }]} />
-            <View style={styles.logInfo}>
-              <Text style={[styles.logAction, { color: colors.foreground }]}>{log.action}</Text>
-              <Text style={[styles.logMeta, { color: colors.mutedForeground }]}>{log.user} · {log.time}</Text>
-            </View>
+        {activity.length === 0 ? (
+          <View style={{ padding: 16, alignItems: 'center' }}>
+            <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>No activity yet</Text>
           </View>
-        ))}
+        ) : (
+          activity.map((log: any, i: number) => (
+            <View key={log.id ?? i} style={[styles.logRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+              <View style={[styles.logDot, { backgroundColor: colors.primary }]} />
+              <View style={styles.logInfo}>
+                <Text style={[styles.logAction, { color: colors.foreground }]}>{log.action}</Text>
+                <Text style={[styles.logMeta, { color: colors.mutedForeground }]}>
+                  {log.actorName ?? 'System'} · {relTime(log.createdAt)}
+                </Text>
+              </View>
+            </View>
+          ))
+        )}
       </View>
 
       {/* Security Toggles */}

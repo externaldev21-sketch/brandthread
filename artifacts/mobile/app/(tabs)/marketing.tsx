@@ -141,7 +141,7 @@ export default function MarketingScreen() {
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {CAMPAIGNS.map((c, i) => (
           <View key={c.id} style={[styles.campaignRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-            <View style={[styles.campaignIcon, { backgroundColor: c.type === 'Email' ? '#4A6FA522' : c.type === 'SMS' ? '#4C9A5E22' : '#00C85322' }]}>
+            <View style={[styles.campaignIcon, { backgroundColor: c.type === 'Email' ? 'rgba(59,130,246,0.13)' : c.type === 'SMS' ? 'rgba(34,211,238,0.13)' : 'rgba(139,92,246,0.13)' }]}>
               <Feather
                 name={c.type === 'Email' ? 'mail' : c.type === 'SMS' ? 'message-square' : 'bell'}
                 size={16}
@@ -169,7 +169,7 @@ export default function MarketingScreen() {
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {DISCOUNTS.map((d, i) => (
           <View key={d.code} style={[styles.discountRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-            <View style={[styles.codeWrap, { backgroundColor: '#00C85322' }]}>
+            <View style={[styles.codeWrap, { backgroundColor: 'rgba(139,92,246,0.13)' }]}>
               <Text style={[styles.code, { color: colors.primary }]}>{d.code}</Text>
             </View>
             <View style={styles.discountInfo}>
@@ -225,7 +225,7 @@ export default function MarketingScreen() {
 
       {/* Referral */}
       <SectionHeader title="Referral Program" />
-      <View style={[styles.referralCard, { backgroundColor: '#17140F', borderColor: '#00C85344' }]}>
+      <View style={[styles.referralCard, { backgroundColor: '#12121F', borderColor: 'rgba(139,92,246,0.26)' }]}>
         <Feather name="share-2" size={24} color={colors.primary} />
         <View style={{ flex: 1 }}>
           <Text style={[styles.referralTitle, { color: colors.foreground }]}>Earn $10 per referral</Text>

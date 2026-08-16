@@ -1,32 +1,84 @@
-import React, { useState } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform, Linking, ActivityIndicator } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
+import { useApi } from '@/lib/api';
 
-const EXPENSES = [
-  { name: 'Manufacturer – Apex', amount: '-$8,400', date: 'Jul 1', category: 'Production' },
-  { name: 'Stripe Fees', amount: '-$284', date: 'Jul 3', category: 'Payments' },
-  { name: 'Influencer Collab', amount: '-$1,200', date: 'Jul 5', category: 'Marketing' },
-  { name: 'Packaging Supplies', amount: '-$620', date: 'Jul 6', category: 'Operations' },
-  { name: 'Store Revenue', amount: '+$28,450', date: 'Jul 1–7', category: 'Revenue' },
-];
+function fmtCents(cents: number) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
+}
 
-const PL_DATA = [
-  { label: 'Gross Revenue', value: '$94,200', positive: true },
-  { label: 'COGS (Mfr. Costs)', value: '-$38,200', positive: false },
-  { label: 'Gross Profit', value: '$56,000', positive: true, highlight: true },
-  { label: 'Marketing', value: '-$8,400', positive: false },
-  { label: 'Operations', value: '-$4,200', positive: false },
-  { label: 'Payment Fees', value: '-$1,884', positive: false },
-  { label: 'Net Profit', value: '$41,516', positive: true, highlight: true },
-];
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function txCategory(type: string): string {
+  if (type === 'charge' || type === 'payment') return 'Revenue';
+  if (type === 'refund' || type === 'payment_refund') return 'Refund';
+  if (type === 'payout') return 'Payout';
+  if (type === 'stripe_fee' || type === 'application_fee') return 'Payments';
+  if (type === 'adjustment') return 'Adjustment';
+  return 'Other';
+}
 
 export default function FinanceScreen() {
   const colors = useColors();
   const router = useRouter();
+  const api = useApi();
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [balance,      setBalance]      = useState<any>(null);
+  const [loading,      setLoading]      = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [bal, txs] = await Promise.all([
+        api.finance.balance(),
+        api.finance.transactions(20),
+      ]);
+      setBalance(bal);
+      setTransactions(txs.transactions ?? []);
+    } catch { /* stay with empty if not connected */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleDownloadStatement = async () => {
+    const BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
+    const url  = `${BASE}/api/finance/statement.csv`;
+    try { await Linking.openURL(url); } catch { /* ignore */ }
+  };
+
+  // Build overview cards from real data
+  const availAmt = balance?.available?.amount ?? 0;
+  const pendAmt  = balance?.pending?.amount   ?? 0;
+  const totalNet = transactions.reduce((acc, t) => acc + (t.net ?? 0), 0);
+
+  const overviewCards = [
+    { label: 'Available', value: balance?.available?.formatted ?? fmtCents(availAmt), color: colors.success, icon: 'trending-up' as const },
+    { label: 'Pending',   value: balance?.pending?.formatted   ?? fmtCents(pendAmt),  color: colors.primary, icon: 'activity' as const },
+    { label: 'Net (30d)', value: fmtCents(Math.abs(totalNet)),                         color: colors.info,    icon: 'percent' as const },
+  ];
+
+  // Build expenses list from real transactions
+  const expenseRows = transactions.slice(0, 10).map(t => ({
+    name:     t.description ?? t.type,
+    amount:   (t.net >= 0 ? '+' : '') + fmtCents(t.net),
+    date:     fmtDate(t.created),
+    category: txCategory(t.type),
+    positive: t.net >= 0,
+  }));
+
+  // Fallback P&L data when not connected
+  const PL_DATA_FALLBACK = [
+    { label: 'Gross Revenue', value: fmtCents(transactions.filter(t => t.net > 0).reduce((a, t) => a + t.amount, 0)), positive: true },
+    { label: 'Fees',          value: '-' + fmtCents(transactions.reduce((a, t) => a + Math.abs(t.fee ?? 0), 0)),        positive: false },
+    { label: 'Net Total',     value: fmtCents(Math.abs(totalNet)), positive: totalNet >= 0, highlight: true },
+  ];
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -39,11 +91,7 @@ export default function FinanceScreen() {
 
       {/* Overview */}
       <View style={styles.overviewRow}>
-        {[
-          { label: 'Net Profit', value: '$41,516', color: colors.success, icon: 'trending-up' as const },
-          { label: 'Cash Flow', value: '+$18.2k', color: colors.primary, icon: 'activity' as const },
-          { label: 'Margin', value: '44.1%', color: colors.info, icon: 'percent' as const },
-        ].map((card) => (
+        {overviewCards.map((card) => (
           <View key={card.label} style={[styles.overviewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name={card.icon} size={16} color={card.color} />
             <Text style={[styles.overviewVal, { color: card.color }]}>{card.value}</Text>
@@ -53,15 +101,15 @@ export default function FinanceScreen() {
       </View>
 
       {/* P&L */}
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Profit & Loss</Text>
+      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Summary</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {PL_DATA.map((item, i) => (
+        {PL_DATA_FALLBACK.map((item, i) => (
           <View
             key={item.label}
             style={[
               styles.plRow,
               i > 0 && { borderTopWidth: 1, borderTopColor: colors.border },
-              item.highlight && { backgroundColor: '#39FF8811' },
+              item.highlight && { backgroundColor: 'rgba(139,92,246,0.07)' },
             ]}
           >
             <Text style={[styles.plLabel, { color: item.highlight ? colors.foreground : colors.mutedForeground, fontFamily: item.highlight ? 'Inter_600SemiBold' : 'Inter_400Regular' }]}>
@@ -74,50 +122,43 @@ export default function FinanceScreen() {
         ))}
       </View>
 
-      {/* Cash Flow */}
-      <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Cash Flow (Jul)</Text>
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={styles.cashRow}>
-          <View style={[styles.cashBar, { backgroundColor: colors.secondary }]}>
-            <View style={[styles.cashFill, { width: '78%', backgroundColor: colors.success }]} />
-          </View>
-          <Text style={[styles.cashLabel, { color: colors.foreground }]}>Inflows $28,450</Text>
-        </View>
-        <View style={[styles.cashRow, { borderTopWidth: 1, borderTopColor: colors.border }]}>
-          <View style={[styles.cashBar, { backgroundColor: colors.secondary }]}>
-            <View style={[styles.cashFill, { width: '45%', backgroundColor: colors.destructive }]} />
-          </View>
-          <Text style={[styles.cashLabel, { color: colors.foreground }]}>Outflows $10,504</Text>
-        </View>
-      </View>
-
-      {/* Expenses */}
+      {/* Recent Transactions */}
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent Transactions</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {EXPENSES.map((e, i) => (
-          <View key={e.name} style={[styles.expRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-            <View style={styles.expLeft}>
-              <Text style={[styles.expName, { color: colors.foreground }]}>{e.name}</Text>
-              <View style={styles.expMeta}>
-                <Badge label={e.category} variant="default" />
-                <Text style={[styles.expDate, { color: colors.mutedForeground }]}>{e.date}</Text>
-              </View>
-            </View>
-            <Text style={[styles.expAmount, { color: e.amount.startsWith('+') ? colors.success : colors.foreground }]}>{e.amount}</Text>
+        {loading ? (
+          <ActivityIndicator color={colors.primary} style={{ margin: 20 }} />
+        ) : expenseRows.length === 0 ? (
+          <View style={{ padding: 20, alignItems: 'center' }}>
+            <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
+              {balance?.connected === false ? 'Connect Stripe to see transactions' : 'No transactions yet'}
+            </Text>
           </View>
-        ))}
+        ) : (
+          expenseRows.map((e, i) => (
+            <View key={i} style={[styles.expRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+              <View style={styles.expLeft}>
+                <Text style={[styles.expName, { color: colors.foreground }]}>{e.name}</Text>
+                <View style={styles.expMeta}>
+                  <Badge label={e.category} variant="default" />
+                  <Text style={[styles.expDate, { color: colors.mutedForeground }]}>{e.date}</Text>
+                </View>
+              </View>
+              <Text style={[styles.expAmount, { color: e.positive ? colors.success : colors.foreground }]}>{e.amount}</Text>
+            </View>
+          ))
+        )}
       </View>
 
-      {/* Quick Actions */}
+      {/* Documents */}
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Documents</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {[
-          { label: 'Download Invoice', icon: 'file-text' as const },
-          { label: 'Tax Report Q2', icon: 'percent' as const },
-          { label: 'Manufacturer PO', icon: 'shopping-cart' as const },
-          { label: 'Inventory Valuation', icon: 'package' as const },
+          { label: 'Download Statement (CSV)', icon: 'file-text' as const, onPress: handleDownloadStatement },
+          { label: 'Tax Report / 1099-K', icon: 'percent' as const, onPress: () => router.push('/taxes-duties' as any) },
+          { label: 'Manufacturer PO', icon: 'shopping-cart' as const, onPress: undefined },
+          { label: 'Inventory Valuation', icon: 'package' as const, onPress: undefined },
         ].map((item, i) => (
-          <TouchableOpacity key={item.label} activeOpacity={0.75} style={[styles.docRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+          <TouchableOpacity key={item.label} onPress={item.onPress} activeOpacity={0.75} style={[styles.docRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
             <View style={[styles.docIcon, { backgroundColor: colors.secondary }]}>
               <Feather name={item.icon} size={15} color={colors.mutedForeground} />
             </View>

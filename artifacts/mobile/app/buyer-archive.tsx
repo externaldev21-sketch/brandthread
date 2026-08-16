@@ -13,7 +13,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM,
+  BG, SURFACE, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM,
   FONT, FS, SP, RADIUS, ICON, OVERLAY, RED,
 } from '@/lib/theme';
 import { getMyPosts, unarchivePost, deletePost } from '@/services/socialService';
@@ -75,8 +75,8 @@ export default function BuyerArchive() {
       postAuthorInitials: item.authorInitials,
       postAuthorColor: item.authorColor,
       postCaption: item.caption,
-      postMediaColor1: item.mediaColors?.[0] ?? '#1a1a2e',
-      postMediaColor2: item.mediaColors?.[1] ?? '#0d0d1a',
+      postMediaColor1: item.mediaColors?.[0] ?? SURFACE,
+      postMediaColor2: item.mediaColors?.[1] ?? BG,
       postType: item.type,
     }).toString();
     return (
@@ -87,7 +87,7 @@ export default function BuyerArchive() {
         activeOpacity={0.8}
       >
         <LinearGradient
-          colors={(item.mediaColors?.length >= 2 ? item.mediaColors : ['#1a1a2e', '#0d0d1a']) as [string, string]}
+          colors={(item.mediaColors?.length >= 2 ? item.mediaColors : [SURFACE, BG]) as [string, string]}
           style={styles.cellInner}
         >
           <Feather name={postTypeIcon(item.type)} size={ICON.md} color={MUTED} />

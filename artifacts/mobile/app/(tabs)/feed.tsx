@@ -5,13 +5,14 @@ import {
   KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Feather, Ionicons } from '@expo/vector-icons';
+import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { getThreadPosts, subscribeSocial } from '@/services/socialService';
 import type { SellerThreadPost } from '@/services/socialService';
 import * as Haptics from 'expo-haptics';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import type { ViewToken } from 'react-native';
+import { useApi } from '@/lib/api';
 import {
   BG, SURFACE, CARD, OVERLAY,
   BORDER, BORDER_SUBTLE,
@@ -19,6 +20,7 @@ import {
   PURPLE, PURPLE_LIGHT, CYAN, SUCCESS, RED,
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM
 } from '@/lib/theme';
+import { BrandedLoadingState } from '@/components/BrandthreadUI';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -30,7 +32,7 @@ const SPOTLIGHT_ITEMS = [
     id: '1',
     creator: 'Vault Studio',
     handle: '@vaultstudio',
-    avatarColor: '#00C853',
+    avatarColor: '#8B5CF6',
     initials: 'VS',
     verified: true,
     videoUri: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4',
@@ -39,7 +41,7 @@ const SPOTLIGHT_ITEMS = [
     productName: 'Canvas Cargo Jacket',
     productPrice: '$189',
     productOriginalPrice: null as string | null,
-    accentColor: '#39FF88',
+    accentColor: '#8B5CF6',
     likes: 1240,
     comments: [
       { id: 'c1', user: '@dropzone', text: 'need this in black 😍' },
@@ -136,6 +138,101 @@ const SPOTLIGHT_ITEMS = [
 ];
 
 type SpotlightItem = typeof SPOTLIGHT_ITEMS[number];
+
+// ─── Live Stream feed item ────────────────────────────────────────────────────
+interface LiveStreamFeedItem {
+  _isLive: true;
+  id: string;
+  streamId: string;
+  sellerName: string;
+  brandName: string | null;
+  thumbnailUrl: string | null;
+  title: string;
+  viewerCount: number;
+  productTags: { productName: string; price: number }[];
+}
+
+function LiveStreamPage({ stream, onJoin }: { stream: LiveStreamFeedItem; onJoin: () => void }) {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 0.3, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,   duration: 700, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+
+  return (
+    <View style={{ width: SCREEN_W, height: SCREEN_H, backgroundColor: '#0a0209' }}>
+      {/* Gradient background */}
+      <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(80,20,100,0.18)' }} />
+      {/* Centre glow */}
+      <View style={{ position: 'absolute', top: SCREEN_H * 0.25, alignSelf: 'center', width: 280, height: 280, borderRadius: 140, backgroundColor: 'rgba(139,92,246,0.08)' }} />
+
+      {/* Top bar */}
+      <View style={{ position: 'absolute', top: 52, left: 16, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FF3B30', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 }}>
+          <Animated.View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#fff', opacity: pulseAnim }} />
+          <Text style={{ color: '#fff', fontFamily: FONT.bold, fontSize: 11, letterSpacing: 1.4 }}>LIVE</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 }}>
+          <Feather name="eye" size={12} color="#fff" />
+          <Text style={{ color: '#fff', fontFamily: FONT.semibold, fontSize: 12 }}>
+            {stream.viewerCount > 0 ? stream.viewerCount.toLocaleString() : 'Live now'}
+          </Text>
+        </View>
+      </View>
+
+      {/* Centre content */}
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
+        {/* Avatar circle */}
+        <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center', marginBottom: 20, borderWidth: 3, borderColor: '#fff' }}>
+          <Text style={{ color: '#fff', fontFamily: FONT.bold, fontSize: 32 }}>
+            {(stream.brandName ?? stream.sellerName).slice(0, 1).toUpperCase()}
+          </Text>
+        </View>
+        <Text style={{ color: '#fff', fontFamily: FONT.bold, fontSize: FS.xl, textAlign: 'center', marginBottom: 8 }}>
+          {stream.brandName ?? stream.sellerName}
+        </Text>
+        <Text style={{ color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 20, marginBottom: 32 }}>
+          {stream.title}
+        </Text>
+
+        {/* Product tags preview */}
+        {stream.productTags.length > 0 && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginBottom: 28 }}>
+            {stream.productTags.slice(0, 3).map((tag, i) => (
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 }}>
+                <Feather name="shopping-bag" size={11} color="#FF3B30" />
+                <Text style={{ color: '#fff', fontFamily: FONT.semibold, fontSize: 12 }} numberOfLines={1}>{tag.productName}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Join button */}
+        <TouchableOpacity
+          onPress={onJoin}
+          activeOpacity={0.85}
+          style={{ backgroundColor: '#FF3B30', borderRadius: 28, paddingHorizontal: 40, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 8 }}
+        >
+          <Feather name="video" size={18} color="#fff" />
+          <Text style={{ color: '#fff', fontFamily: FONT.bold, fontSize: FS.base }}>Join live stream</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Bottom label */}
+      <View style={{ position: 'absolute', bottom: 90, left: 16, right: 16 }}>
+        <Text style={{ color: 'rgba(255,255,255,0.45)', fontFamily: FONT.regular, fontSize: FS.xs, textAlign: 'center' }}>
+          Tap to join — live shopping is on
+        </Text>
+      </View>
+    </View>
+  );
+}
 type EngagementState = {
   liked: boolean; likes: number;
   saved: boolean;
@@ -287,7 +384,7 @@ function SpotlightPage({
           onPress={() => { onLike(item.id); bumpHeart(); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
         >
           <Animated.View style={{ transform: [{ scale: heartScale }] }}>
-            <Ionicons name="heart" size={30} color={engagement?.liked ? '#EF4444' : '#FFFFFF'} />
+            <Feather name="heart" size={30} color={engagement?.liked ? '#EF4444' : '#FFFFFF'} />
           </Animated.View>
           <Text style={styles.railCount}>{formatCount(engagement?.likes ?? 0)}</Text>
         </TouchableOpacity>
@@ -298,7 +395,7 @@ function SpotlightPage({
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
           onPress={() => onOpenComments(item.id)}
         >
-          <Ionicons name="chatbubble" size={26} color="#FFFFFF" />
+          <Feather name="message-circle" size={26} color="#FFFFFF" />
           <Text style={styles.railCount}>{formatCount((engagement?.comments ?? []).length)}</Text>
         </TouchableOpacity>
 
@@ -311,7 +408,7 @@ function SpotlightPage({
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           }}
         >
-          <Ionicons name="repeat" size={28} color={engagement?.reposted ? PURPLE : '#FFFFFF'} />
+          <Feather name="repeat" size={28} color={engagement?.reposted ? PURPLE : '#FFFFFF'} />
           <Text style={styles.railCount}>{formatCount(engagement?.reposts ?? 0)}</Text>
         </TouchableOpacity>
 
@@ -321,7 +418,7 @@ function SpotlightPage({
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
           onPress={() => { onSave(item.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
         >
-          <Ionicons name="bookmark" size={27} color={engagement?.saved ? PURPLE : '#FFFFFF'} />
+          <Feather name="bookmark" size={27} color={engagement?.saved ? PURPLE : '#FFFFFF'} />
           <Text style={styles.railCount}>Save</Text>
         </TouchableOpacity>
 
@@ -334,9 +431,29 @@ function SpotlightPage({
             Share.share({ message: `Check out ${item.productName} by ${item.creator} — ${item.productPrice} 🔥 on Brandthread` });
           }}
         >
-          <Ionicons name="arrow-redo" size={27} color="#FFFFFF" />
+          <Feather name="share-2" size={27} color="#FFFFFF" />
           <Text style={styles.railCount}>{formatCount(item.shares)}</Text>
         </TouchableOpacity>
+
+        {(item as any).productTags && (item as any).productTags.length > 0 && (
+          <TouchableOpacity
+            style={styles.railBtn}
+            activeOpacity={0.7}
+            hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              const tags = (item as any).productTags as Array<{ productId: string; productName: string; price: number }>;
+              if (tags.length === 1) {
+                router.push(('/buyer-product-detail?productId=' + tags[0].productId) as never);
+              } else {
+                Alert.alert('Shop this post', tags.map(t => t.productName).join('\n'));
+              }
+            }}
+          >
+            <Feather name="shopping-bag" size={27} color="#FFFFFF" />
+            <Text style={styles.railCount}>Shop</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* ─ Bottom-left overlay: shop CTA, creator, caption, sound ─ */}
@@ -347,7 +464,7 @@ function SpotlightPage({
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
           onPress={() => onShop(item)}
         >
-          <Ionicons name="bag" size={18} color="#FFFFFF" />
+          <Feather name="shopping-bag" size={18} color="#FFFFFF" />
           <Text style={styles.shopBtnText}>SHOP</Text>
         </TouchableOpacity>
 
@@ -404,6 +521,7 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem {
     // Extra fields used by handleShop via `(item as any).productId`
     productId: tag?.productId,
     sellerId: post.authorId,
+    productTags: post.productTags,
   } as unknown as SpotlightItem;
 }
 
@@ -424,18 +542,47 @@ export default function FeedScreen() {
   const [showNotifs, setShowNotifs] = useState(false);
   const [hasUnread, setHasUnread] = useState(true);
   const [sellerFeedPosts, setSellerFeedPosts] = useState<SpotlightItem[]>([]);
+  const [feedLoading, setFeedLoading] = useState(true);
+  const [activeLiveStreams, setActiveLiveStreams] = useState<LiveStreamFeedItem[]>([]);
+  const api = useApi();
 
   // Load published seller posts and subscribe to real-time changes
   useEffect(() => {
     async function loadFeed() {
+      setFeedLoading(true);
       try {
         const posts = await getThreadPosts();
         setSellerFeedPosts(posts.map(mapSellerPost));
-      } catch {}
+      } catch {} finally {
+        setFeedLoading(false);
+      }
     }
     loadFeed();
     const unsub = subscribeSocial(loadFeed);
     return unsub;
+  }, []);
+
+  // Poll active live streams every 30 seconds
+  useEffect(() => {
+    async function fetchLive() {
+      try {
+        const data = await (api as any).live.active() as { streams: any[] };
+        setActiveLiveStreams((data.streams ?? []).map((s: any) => ({
+          _isLive: true as const,
+          id:          `live_${s.id}`,
+          streamId:    s.id,
+          sellerName:  s.seller_name ?? 'Seller',
+          brandName:   s.brand_name ?? null,
+          thumbnailUrl: s.thumbnail_url ?? null,
+          title:       s.title,
+          viewerCount: s.viewer_count ?? 0,
+          productTags: Array.isArray(s.product_tags) ? s.product_tags : [],
+        })));
+      } catch {}
+    }
+    fetchLive();
+    const id = setInterval(fetchLive, 30_000);
+    return () => clearInterval(id);
   }, []);
 
   // Add engagement entries for newly loaded seller posts
@@ -448,11 +595,22 @@ export default function FeedScreen() {
     });
   }, [sellerFeedPosts]);
 
-  // Real published seller posts first; demo items fill the rest
-  const allItems = useMemo(
-    () => [...sellerFeedPosts, ...SPOTLIGHT_ITEMS.filter(s => !sellerFeedPosts.some(sp => sp.id === s.id))],
-    [sellerFeedPosts],
-  );
+  // Real published seller posts first; demo items fill the rest.
+  // Live streams are woven in at roughly 1 per 10 regular posts (occasional, not dominant).
+  const allItems = useMemo(() => {
+    const regular: (SpotlightItem | LiveStreamFeedItem)[] = [
+      ...sellerFeedPosts,
+      ...SPOTLIGHT_ITEMS.filter(s => !sellerFeedPosts.some(sp => sp.id === s.id)),
+    ];
+    if (!activeLiveStreams.length) return regular;
+    // Weave live streams in: first at index 4, then every 10 after
+    const result: (SpotlightItem | LiveStreamFeedItem)[] = [...regular];
+    activeLiveStreams.slice(0, 3).forEach((liveItem, i) => {
+      const insertAt = Math.min(4 + i * 10, result.length);
+      result.splice(insertAt, 0, liveItem);
+    });
+    return result;
+  }, [sellerFeedPosts, activeLiveStreams]);
 
   const displayItems = searchQuery.trim()
     ? allItems.filter(item => {
@@ -473,20 +631,40 @@ export default function FeedScreen() {
 
   const handleLike = useCallback((id: string) => {
     update(id, e => ({ liked: !e.liked, likes: e.liked ? e.likes - 1 : e.likes + 1 }));
+    // Fire-and-forget — real posts get persisted; demo IDs are silently ignored server-side
+    try { const { api } = require('@/lib/api'); api.posts.interact(id, { type: 'like' }).catch(() => {}); } catch {}
   }, []);
 
   const handleDoubleTapLike = useCallback((id: string) => {
     setEngagements(prev => {
       const e = prev[id] ?? DEFAULT_ENGAGEMENT;
       if (e.liked) return prev;
+      try { const { api } = require('@/lib/api'); api.posts.interact(id, { type: 'like' }).catch(() => {}); } catch {}
       return { ...prev, [id]: { ...e, liked: true, likes: e.likes + 1 } };
     });
   }, []);
 
-  const handleSave = useCallback((id: string) => update(id, e => ({ saved: !e.saved })), []);
-  const handleRepost = useCallback((id: string) => update(id, e => ({
-    reposted: !e.reposted, reposts: e.reposted ? e.reposts - 1 : e.reposts + 1,
-  })), []);
+  const handleSave = useCallback((id: string) => {
+    // Read current saved state before toggling so we know which API to call
+    setEngagements(prev => {
+      const cur = prev[id] ?? DEFAULT_ENGAGEMENT;
+      try {
+        const { api } = require('@/lib/api');
+        if (cur.saved) {
+          api.saved.remove(id).catch(() => {});
+        } else {
+          api.saved.add({ targetId: id, targetType: 'post' }).catch(() => {});
+        }
+      } catch {}
+      return { ...prev, [id]: { ...cur, saved: !cur.saved } };
+    });
+  }, []);
+
+  const handleRepost = useCallback((id: string) => {
+    update(id, e => ({ reposted: !e.reposted, reposts: e.reposted ? e.reposts - 1 : e.reposts + 1 }));
+    try { const { api } = require('@/lib/api'); api.posts.interact(id, { type: 'repost' }).catch(() => {}); } catch {}
+  }, []);
+
   const handleFollow = useCallback((id: string) => update(id, e => ({ following: !e.following })), []);
 
   function handleOpenComments(id: string) {
@@ -507,6 +685,11 @@ export default function FeedScreen() {
 
   function handleShop(item: SpotlightItem) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Track shop click for post analytics (fire-and-forget)
+    try {
+      const { api } = require('@/lib/api');
+      api.posts.interact(item.id, { type: 'shop_click' }).catch(() => {/* non-critical */});
+    } catch { /* non-critical */ }
     const productId = (item as any).productId ?? item.id;
     const productName = (item as any).productName ?? '';
     router.push(('/buyer-product-detail?productId=' + productId + '&productName=' + encodeURIComponent(productName ?? '') + '&sourcePostId=' + item.id) as never);
@@ -522,6 +705,11 @@ export default function FeedScreen() {
 
   return (
     <View style={styles.container}>
+      {feedLoading && (
+        <BrandedLoadingState
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 5 }}
+        />
+      )}
       <FlatList
         data={displayItems}
         keyExtractor={item => item.id}
@@ -535,25 +723,40 @@ export default function FeedScreen() {
         ListEmptyComponent={
           <View style={{ width: SCREEN_W, height: SCREEN_H, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
             <Feather name="search" size={32} color="#8C8577" />
-            <Text style={{ fontSize: 15, fontFamily: 'Inter_500Medium', color: '#8C8577' }}>
+            <Text style={{ fontSize: FS.base, fontFamily: FONT.medium, color: '#8C8577' }}>
               No results for "{searchQuery}"
             </Text>
           </View>
         }
-        renderItem={({ item, index }) => (
-          <SpotlightPage
-            item={item}
-            isActive={index === activeIndex && !showNotifs}
-            engagement={engagements[item.id] ?? initialEngagement(item)}
-            onLike={handleLike}
-            onDoubleTapLike={handleDoubleTapLike}
-            onSave={handleSave}
-            onRepost={handleRepost}
-            onFollow={handleFollow}
-            onOpenComments={handleOpenComments}
-            onShop={handleShop}
-          />
-        )}
+        renderItem={({ item, index }) => {
+          if ((item as any)._isLive) {
+            const live = item as unknown as LiveStreamFeedItem;
+            return (
+              <LiveStreamPage
+                stream={live}
+                onJoin={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  router.push(`/buyer-live?streamId=${encodeURIComponent(live.streamId)}` as never);
+                }}
+              />
+            );
+          }
+          const spotlight = item as SpotlightItem;
+          return (
+            <SpotlightPage
+              item={spotlight}
+              isActive={index === activeIndex && !showNotifs}
+              engagement={engagements[spotlight.id] ?? initialEngagement(spotlight)}
+              onLike={handleLike}
+              onDoubleTapLike={handleDoubleTapLike}
+              onSave={handleSave}
+              onRepost={handleRepost}
+              onFollow={handleFollow}
+              onOpenComments={handleOpenComments}
+              onShop={handleShop}
+            />
+          );
+        }}
       />
 
       {/* ─ Top bar overlay ─ */}
@@ -662,29 +865,29 @@ const styles = StyleSheet.create({
   },
   railAvatarWrap: { alignItems: 'center', marginBottom: 4 },
   railAvatar: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#FFFFFF' },
-  railAvatarText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  railAvatarText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
   railFollowBadge: {
     position: 'absolute', bottom: -8, width: 19, height: 19, borderRadius: 10,
     alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#000',
   },
   railBtn: { alignItems: 'center', gap: 3 },
-  railCount: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
+  railCount: { fontSize: FS.xs, fontFamily: FONT.semibold, color: '#FFFFFF' },
 
   shopBtn: {
     alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingVertical: 10, paddingHorizontal: 18, borderRadius: 24, marginBottom: 2,
     shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.35, shadowRadius: 6, elevation: 8,
   },
-  shopBtnText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#FFFFFF', letterSpacing: 0.4 },
+  shopBtnText: { fontSize: FS.sm, fontFamily: FONT.bold, color: '#FFFFFF', letterSpacing: 0.4 },
 
   bottomInfo: { position: 'absolute', left: 16, right: 84, bottom: 26, gap: 8 },
 
 
-  caption: { fontSize: 14, fontFamily: 'Inter_400Regular', color: '#FFFFFF', lineHeight: 19 },
+  caption: { fontSize: 14, fontFamily: FONT.regular, color: '#FFFFFF', lineHeight: 19 },
   creatorRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
-  creatorName: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  creatorName: { fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
   soundRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  soundText: { fontSize: 12, fontFamily: 'Inter_400Regular', color: '#FFFFFFCC', flexShrink: 1 },
+  soundText: { fontSize: FS.xs, fontFamily: FONT.regular, color: '#FFFFFFCC', flexShrink: 1 },
 
   topBar: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: 14, paddingBottom: 8 },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -692,7 +895,7 @@ const styles = StyleSheet.create({
   topAvatar: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   unreadDot: { position: 'absolute', top: 4, right: 4, width: 9, height: 9, borderRadius: 4.5, backgroundColor: RED, borderWidth: 1.5, borderColor: BG },
   topIconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  topTitle: { flex: 1, textAlign: 'center', fontSize: 16, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  topTitle: { flex: 1, textAlign: 'center', fontSize: FS.md, fontFamily: FONT.bold, color: '#FFFFFF' },
 
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   searchInput: {
@@ -706,11 +909,11 @@ const styles = StyleSheet.create({
     paddingTop: 10, paddingHorizontal: 18,
   },
   commentsHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: 14 },
-  commentsTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 6 },
-  commentsEmpty: { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, paddingVertical: 20, textAlign: 'center' },
+  commentsTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG, marginBottom: 6 },
+  commentsEmpty: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, paddingVertical: 20, textAlign: 'center' },
   commentRow: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: BORDER },
-  commentUser: { fontSize: 13, fontFamily: 'Inter_700Bold', color: PURPLE_LIGHT, marginBottom: 3 },
-  commentText: { fontSize: 14, fontFamily: 'Inter_400Regular', color: FG },
+  commentUser: { fontSize: FS.sm, fontFamily: FONT.bold, color: PURPLE_LIGHT, marginBottom: 3 },
+  commentText: { fontSize: 14, fontFamily: FONT.regular, color: FG },
   commentInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 14, paddingBottom: 4 },
   commentInput: {
     flex: 1, height: 44, borderRadius: 22, backgroundColor: SURFACE,

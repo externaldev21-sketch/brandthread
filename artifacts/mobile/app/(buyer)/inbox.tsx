@@ -20,6 +20,7 @@ import {
   getNotifications,
 } from '@/services/socialService';
 import type { Conversation, Story } from '@/services/socialTypes';
+import { useApi } from '@/lib/api';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -56,12 +57,14 @@ const EMPTY_MESSAGES: Record<Tab, { icon: keyof typeof Feather.glyphMap; title: 
 export default function InboxScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const api = useApi();
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
   const [activeTab, setActiveTab] = useState<Tab>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [requestActionLoading, setRequestActionLoading] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     const [convs, strs, notifs] = await Promise.all([
@@ -113,9 +116,55 @@ export default function InboxScreen() {
   // ── Handlers ────────────────────────────────────────────────────────────────
 
   function openConversation(conv: Conversation) {
+    // Don't open request conversations inline — user must accept first
+    if (conv.isRequest) return;
     Haptics.selectionAsync();
     markConversationRead(conv.id);
     router.push(`/buyer-conversation?id=${conv.id}` as never);
+  }
+
+  async function acceptRequest(conv: Conversation) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setRequestActionLoading(conv.id);
+    try {
+      await api.conversations.accept(conv.id);
+      // Refresh conversation list
+      const convs = await getConversations();
+      setConversations(convs);
+      // Open the accepted conversation
+      markConversationRead(conv.id);
+      router.push(`/buyer-conversation?id=${conv.id}` as never);
+    } catch {
+      Alert.alert('Error', 'Could not accept request. Try again.');
+    } finally {
+      setRequestActionLoading(null);
+    }
+  }
+
+  async function declineRequest(conv: Conversation) {
+    const participant = getParticipant(conv);
+    Alert.alert(
+      'Decline request',
+      `Remove message request from ${participant?.name ?? 'this user'}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Decline',
+          style: 'destructive',
+          onPress: async () => {
+            setRequestActionLoading(conv.id);
+            try {
+              await api.conversations.decline(conv.id);
+              setConversations(prev => prev.filter(c => c.id !== conv.id));
+            } catch {
+              Alert.alert('Error', 'Could not decline request. Try again.');
+            } finally {
+              setRequestActionLoading(null);
+            }
+          },
+        },
+      ]
+    );
   }
 
   function longPressConversation(conv: Conversation) {
@@ -141,6 +190,50 @@ export default function InboxScreen() {
     const participant = getParticipant(conv);
     if (!participant) return null;
     const isUnread = conv.unreadCount > 0;
+    const isRequest = conv.isRequest === true;
+    const isLoadingAction = requestActionLoading === conv.id;
+
+    // Requests get a distinct card with Accept/Decline instead of the usual row
+    if (isRequest) {
+      return (
+        <View style={s.requestCard}>
+          {/* Avatar */}
+          <View style={[s.avatar48, { backgroundColor: participant.color }]}>
+            <Text style={s.avatarInitials}>{participant.initials}</Text>
+          </View>
+
+          {/* Info */}
+          <View style={s.convCenter}>
+            <Text style={[s.convName, { fontFamily: FONT.semibold }]} numberOfLines={1}>
+              {participant.name}
+            </Text>
+            <Text style={[s.convPreview]} numberOfLines={1}>
+              {conv.lastMessage ?? 'Sent you a message'}
+            </Text>
+
+            {/* Accept / Decline buttons */}
+            <View style={s.requestActions}>
+              <TouchableOpacity
+                style={[s.requestAcceptBtn, isLoadingAction && s.requestBtnDisabled]}
+                onPress={() => acceptRequest(conv)}
+                disabled={isLoadingAction}
+                activeOpacity={0.8}
+              >
+                <Text style={s.requestAcceptText}>Accept</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.requestDeclineBtn, isLoadingAction && s.requestBtnDisabled]}
+                onPress={() => declineRequest(conv)}
+                disabled={isLoadingAction}
+                activeOpacity={0.8}
+              >
+                <Text style={s.requestDeclineText}>Decline</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      );
+    }
 
     return (
       <TouchableOpacity
@@ -391,7 +484,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 3,
   },
   notifBadgeText: {
-    fontSize: 9,
+    fontSize: FS.xs,
     fontFamily: FONT.bold,
     color: FG,
   },
@@ -493,6 +586,53 @@ const s = StyleSheet.create({
   tabText: {
     fontSize: FS.sm,
     fontFamily: FONT.medium,
+  },
+
+  // Request card (replaces convRow for Requests tab)
+  requestCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.md,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+    gap: SP.md,
+  },
+  requestActions: {
+    flexDirection: 'row',
+    gap: SP.sm,
+    marginTop: SP.sm,
+  },
+  requestAcceptBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SP.xs,
+    backgroundColor: PURPLE,
+    borderRadius: RADIUS.md,
+  },
+  requestAcceptText: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    color: '#FFFFFF',
+  },
+  requestDeclineBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SP.xs,
+    backgroundColor: CARD,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  requestDeclineText: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    color: MUTED,
+  },
+  requestBtnDisabled: {
+    opacity: 0.5,
   },
 
   // Conversation row

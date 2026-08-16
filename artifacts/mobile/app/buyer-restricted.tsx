@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, FONT, FS, SP, RADIUS, OVERLAY } from '@/lib/theme';
+import { BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, CYAN, ON_DARK, FONT, FS, SP, RADIUS, OVERLAY } from '@/lib/theme';
 import { getRestrictedUsers, unrestrictUser } from '@/services/socialService';
 import type { RestrictRecord } from '@/services/socialTypes';
 
@@ -84,7 +84,7 @@ export default function RestrictedAccountsScreen() {
         renderItem={({ item }) => (
           <View style={styles.row}>
             <LinearGradient
-              colors={[item.restrictedUserColor || PURPLE, '#22D3EE']}
+              colors={[item.restrictedUserColor || PURPLE, CYAN]}
               style={styles.avatar}
             >
               <Text style={styles.avatarText}>{item.restrictedUserInitials}</Text>
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: BORDER,
   },
   avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.base },
+  avatarText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.base },
   name: { color: FG, fontFamily: FONT.medium, fontSize: FS.base },
   handle: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm },
   unrestrictBtn: {
@@ -179,5 +179,5 @@ const styles = StyleSheet.create({
   cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
   cancelText: { fontFamily: FONT.medium, fontSize: FS.base, color: MUTED },
   confirmBtn: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, backgroundColor: PURPLE, alignItems: 'center' },
-  confirmText: { fontFamily: FONT.bold, fontSize: FS.base, color: '#FFF' },
+  confirmText: { fontFamily: FONT.bold, fontSize: FS.base, color: ON_DARK },
 });

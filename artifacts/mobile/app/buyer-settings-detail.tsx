@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, PURPLE, ON_DARK, FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { BuyerSettingsState, loadBuyerSettings, patchBuyerSettings } from '@/lib/buyerSettings';
 
 type ToggleKey = keyof { [K in keyof BuyerSettingsState as BuyerSettingsState[K] extends boolean ? K : never]: true };
@@ -56,7 +56,7 @@ export default function BuyerSettingsDetail() {
       <View style={styles.card}>{items.map((item, i) => <TouchableOpacity key={`${item.label}-${i}`} activeOpacity={item.toggle ? 1 : 0.7} style={[styles.row, i < items.length - 1 && styles.divider]} onPress={() => { if (!item.toggle) { Haptics.selectionAsync(); item.action?.(); if (!item.action && !item.value?.toLowerCase().includes('off')) Alert.alert(item.label, 'This control is ready for backend wiring.'); } }}>
         {item.icon ? <View style={styles.itemIcon}><Feather name={item.icon} size={19} color={FG}/></View> : null}
         <View style={{ flex: 1 }}><Text style={styles.label}>{item.label}</Text>{item.sub ? <Text style={styles.sub}>{item.sub}</Text> : null}</View>
-        {item.toggle && settings ? <Switch value={Boolean(settings[item.toggle])} onValueChange={(v) => toggle(item.toggle!, v)} trackColor={{ false: '#333344', true: PURPLE }} thumbColor="#fff" /> : <><Text style={styles.value}>{item.value}</Text><Feather name="chevron-right" size={18} color={SUBTLE}/></>}
+        {item.toggle && settings ? <Switch value={Boolean(settings[item.toggle])} onValueChange={(v) => toggle(item.toggle!, v)} trackColor={{ false: CARD_ELEVATED, true: PURPLE }} thumbColor={ON_DARK} /> : <><Text style={styles.value}>{item.value}</Text><Feather name="chevron-right" size={18} color={SUBTLE}/></>}
       </TouchableOpacity>)}</View>
     </ScrollView>
   </View>;

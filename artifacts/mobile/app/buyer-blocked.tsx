@@ -8,28 +8,35 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import {
   BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE,
-  PURPLE, GRAD_PRIMARY,
+  PURPLE, PURPLE_DIM, ON_DARK, GRAD_PRIMARY,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
 import {
-  getBlockedUsers, unblockUser, getMutedUsers, unmuteUser, subscribeSocial,
+  getMutedUsers, unmuteUser, subscribeSocial,
 } from '@/services/socialService';
-import { BlockRecord, MuteRecord } from '@/services/socialTypes';
+import { MuteRecord } from '@/services/socialTypes';
+import { useApi } from '@/lib/api';
+
+type ApiBlockRecord = {
+  userId: string; name: string; handle: string;
+  initials: string; color: string; blockedAt: string;
+};
 
 export default function BuyerBlocked() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const api = useApi();
   const params = useLocalSearchParams<{ tab?: string }>();
-  const [blocked, setBlocked] = useState<BlockRecord[]>([]);
+  const [blocked, setBlocked] = useState<ApiBlockRecord[]>([]);
   const [muted, setMuted] = useState<MuteRecord[]>([]);
   const [activeTab, setActiveTab] = useState<'blocked' | 'muted'>(
     params.tab === 'muted' ? 'muted' : 'blocked'
   );
 
   async function loadData() {
-    const [b, m] = await Promise.all([getBlockedUsers(), getMutedUsers()]);
-    setBlocked(b);
-    setMuted(m);
+    const [b, m] = await Promise.allSettled([api.social.blocks(), getMutedUsers()]);
+    if (b.status === 'fulfilled') setBlocked(b.value);
+    if (m.status === 'fulfilled') setMuted(m.value);
   }
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
@@ -49,7 +56,7 @@ export default function BuyerBlocked() {
           text: 'Unblock',
           style: 'destructive',
           onPress: async () => {
-            await unblockUser(userId);
+            await api.social.unblock(userId);
             loadData();
           },
         },
@@ -74,19 +81,19 @@ export default function BuyerBlocked() {
     );
   }
 
-  function renderBlockedItem({ item }: { item: BlockRecord }) {
+  function renderBlockedItem({ item }: { item: ApiBlockRecord }) {
     return (
       <View style={styles.row}>
-        <View style={[styles.avatar, { backgroundColor: item.blockedUserColor }]}>
-          <Text style={styles.avatarText}>{item.blockedUserInitials}</Text>
+        <View style={[styles.avatar, { backgroundColor: item.color }]}>
+          <Text style={styles.avatarText}>{item.initials}</Text>
         </View>
         <View style={styles.rowContent}>
-          <Text style={styles.rowName}>{item.blockedUserName}</Text>
-          <Text style={styles.rowHandle}>{item.blockedUserHandle}</Text>
+          <Text style={styles.rowName}>{item.name}</Text>
+          <Text style={styles.rowHandle}>{item.handle}</Text>
         </View>
         <TouchableOpacity
           style={styles.actionBtn}
-          onPress={() => handleUnblock(item.blockedUserId, item.blockedUserName)}
+          onPress={() => handleUnblock(item.userId, item.name)}
           activeOpacity={0.7}
         >
           <Text style={styles.actionBtnText}>Unblock</Text>
@@ -167,7 +174,7 @@ export default function BuyerBlocked() {
       {activeTab === 'blocked' ? (
         <FlatList
           data={blocked}
-          keyExtractor={item => item.id}
+          keyExtractor={item => item.userId}
           renderItem={renderBlockedItem}
           ListEmptyComponent={<BlockedEmpty />}
           contentContainerStyle={blocked.length === 0 ? styles.emptyList : undefined}
@@ -225,8 +232,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tabActive: {
-    backgroundColor: 'rgba(139,92,246,0.18)',
-    borderColor: 'rgba(139,92,246,0.45)',
+    backgroundColor: PURPLE_DIM,
+    borderColor: BORDER_ACTIVE,
   },
   tabText: {
     color: MUTED,
@@ -253,7 +260,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: {
-    color: '#FFF',
+    color: ON_DARK,
     fontFamily: FONT.bold,
     fontSize: FS.base,
   },
@@ -274,7 +281,7 @@ const styles = StyleSheet.create({
   actionBtn: {
     backgroundColor: CARD,
     borderWidth: 1,
-    borderColor: 'rgba(139,92,246,0.45)',
+    borderColor: BORDER_ACTIVE,
     borderRadius: RADIUS.md,
     paddingHorizontal: SP.md,
     height: 36,

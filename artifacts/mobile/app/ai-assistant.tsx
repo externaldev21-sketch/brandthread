@@ -14,7 +14,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
+import {
+  sendMessage as aiSendMessage,
+  loadSession,
+} from '@/services/aiService';
+import type { AISession } from '@/services/aiTypes';
 
 interface Message {
   id: string;
@@ -37,27 +43,20 @@ const INITIAL_MSG: Message = {
   content: "Hi! I'm your AI Business Assistant for Brandthread. I have full access to your store data — revenue, products, orders, customers, and more. Ask me anything about your business.",
 };
 
-const CANNED: Record<string, string> = {
-  'Why are my sales down?': "Looking at your data over the last 7 days, I see sales dropped 12% compared to last week. The biggest contributing factor appears to be a decrease in returning customer purchases — down 28%. Your 'Oversized Hoodie' and 'Cargo Shorts' have also gone out of stock, representing $4,200 in missed revenue. I'd recommend:\n1. Restocking those items immediately\n2. Launching a win-back email to inactive customers\n3. Running a flash sale this weekend to boost conversion",
-  'Which products should I restock?': "Based on your sales velocity and current stock levels, here's your urgent restock priority:\n\n🔴 Critical (< 5 units):\n• Cargo Shorts – Khaki M (1 unit)\n• Classic Tee – White XL (3 units)\n\n🟡 Low (< 10 units):\n• Hoodie – Black S (7 units)\n\nI recommend placing a reorder for at least 200 units each with Apex Garment Co. based on your typical 6-week lead time.",
-  'Write a product description': "Here's a product description for the Classic Thread Tee:\n\n**Classic Thread Tee**\n\nSimplicity, perfected. The Classic Thread Tee is crafted from 180gsm premium combed cotton — structured enough to keep its shape, soft enough to wear every day. A clean silhouette, a barely-there logo, and a fit that works whether you're building the brand or living in it.\n\n• 180gsm 100% combed cotton\n• True-to-size fit\n• Reinforced shoulder seams\n• Pre-shrunk & colorfast",
-  'Predict next month\'s revenue': "Based on your historical trend, current inventory, and planned marketing campaigns, here's my revenue forecast for August:\n\n**Projected Revenue: $98,400 – $112,000**\n\nKey assumptions:\n• Summer Drop campaign launches Aug 1 (est. +$18k)\n• Hoodie restock arrives Aug 5\n• 15% MoM growth trend continues\n\nRisk factors: Potential shipping delays from Apex (QC review in progress). If their delivery slips past Aug 15, I'd revise the forecast down by ~$8k.",
-  'Which ads are underperforming?': "Analyzing your ad attribution data from the last 30 days:\n\n🔴 Underperforming (ROAS < 1.5x):\n• Instagram Story – 'Summer Vibes' (ROAS: 0.9x, spend: $400)\n• TikTok Carousel – Product showcase (ROAS: 1.1x, spend: $280)\n\n✅ Strong performers:\n• Instagram Reel – Hoodie launch (ROAS: 4.2x)\n• Email campaign 'Summer Drop' (ROAS: 8.1x)\n\nRecommendation: Pause the two underperformers and reallocate that $680 to the hoodie reel.",
-  'Create an email campaign': "Here's a ready-to-send email campaign:\n\n**Subject:** Something new just dropped. 👀\n\n**Preview:** Your next go-to piece is here.\n\n---\n\nHey [First Name],\n\nWe don't drop things often — but when we do, we make it count.\n\nIntroducing the **Wide-Leg Trousers**. Clean lines, premium cotton twill, and a silhouette that works from desk to dinner.\n\n[SHOP NOW →]\n\nLimited quantities. First come, first served.\n\n— The Brandthread Team\n\n---\n\nShall I send this to all subscribers or a specific segment?",
-};
-
 export default function AIAssistantScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { getToken } = useAuth();
   const [messages, setMessages] = useState<Message[]>([INITIAL_MSG]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const flatRef = useRef<FlatList>(null);
+  const sessionRef = useRef<AISession | null>(null);
 
   const bottomPad = Platform.OS === 'web' ? 34 : insets.bottom;
 
-  function sendMessage(text: string) {
+  async function sendMessage(text: string) {
     if (!text.trim() || loading) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
@@ -70,18 +69,37 @@ export default function AIAssistantScreen() {
     setInput('');
     setLoading(true);
 
-    const responseText = CANNED[text.trim()] ??
-      "Great question! Based on your current store data, I'm analyzing the trends across your orders, products, and customer segments. In summary: your store is performing well with a 24% revenue growth this month. If you'd like a deeper dive into any specific area, just let me know — inventory, marketing, customers, or financial projections.";
+    try {
+      // Load or reuse session
+      if (!sessionRef.current) {
+        sessionRef.current = await loadSession({ screen: 'home' });
+      }
 
-    setTimeout(() => {
+      const token = await getToken().catch(() => null);
+      const result = await aiSendMessage({
+        userText: text.trim(),
+        session: sessionRef.current,
+        authToken: token,
+      });
+
+      sessionRef.current = result.session;
+
       const aiMsg: Message = {
-        id: (Date.now() + 1).toString(),
+        id: result.response.id,
         role: 'assistant',
-        content: responseText,
+        content: result.response.content || "I'm here to help with your Brandthread business. Ask me about your products, orders, inventory, content, analytics, or store.",
       };
       setMessages((prev) => [aiMsg, ...prev]);
+    } catch {
+      const errMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: "I'm having trouble connecting right now. Please try again in a moment.",
+      };
+      setMessages((prev) => [errMsg, ...prev]);
+    } finally {
       setLoading(false);
-    }, 1200);
+    }
   }
 
   return (
@@ -94,7 +112,7 @@ export default function AIAssistantScreen() {
         title="AI Assistant"
         subtitle="Your AI-powered business advisor"
         rightElement={
-          <View style={[styles.statusBadge, { backgroundColor: '#4C9A5E22' }]}>
+          <View style={[styles.statusBadge, { backgroundColor: 'rgba(139,92,246,0.13)' }]}>
             <Text style={[styles.statusText, { color: colors.success }]}>Online</Text>
           </View>
         }

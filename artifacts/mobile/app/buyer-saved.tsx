@@ -7,7 +7,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
-  BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE,
+  BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, ON_DARK,
   PURPLE, PURPLE_DIM, GRAD_PRIMARY,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   discoverBtnText: {
-    color: '#FFF',
+    color: ON_DARK,
     fontFamily: FONT.semibold,
     fontSize: FS.base,
   },
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   tileTitle: {
-    color: '#FFF',
+    color: ON_DARK,
     fontFamily: FONT.semibold,
     fontSize: FS.sm,
   },

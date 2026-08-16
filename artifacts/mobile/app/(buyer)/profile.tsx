@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Dimensions, Modal, Animated, Share,
-  RefreshControl, Image,
+  RefreshControl, Image, Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -21,6 +21,7 @@ import {
   getPrivacySettings, archivePost, deletePost,
   subscribeSocial, MY_USER_ID, MY_COLOR, MY_INITIALS, MY_HANDLE,
 } from '@/services/socialService';
+import { useApi } from '@/lib/api';
 import { loadBuyerProfile } from '@/lib/buyerProfile';
 import { loadHighlights, type Highlight } from '@/lib/highlightsService';
 import type {
@@ -96,10 +97,12 @@ function SheetRow({
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
+  const router  = useRouter();
   const { signOut } = useAuth();
+  const api     = useApi();
 
   const [profile, setProfile] = useState<BuyerSocialProfile | null>(null);
+  const [hasActiveStory, setHasActiveStory] = useState(false);
   const [posts, setPosts] = useState<BuyerPost[]>([]);
   const [reposts, setReposts] = useState<RepostRecord[]>([]);
   const [savedItems, setSavedItems] = useState<SavedItem[]>([]);
@@ -114,7 +117,7 @@ export default function ProfileScreen() {
   const [postSheet, setPostSheet] = useState<BuyerPost | null>(null);
 
   const loadData = useCallback(async () => {
-    const [p, po, rp, sv, pr, bp, hl] = await Promise.all([
+    const [p, po, rp, sv, pr, bp, hl, myStories] = await Promise.all([
       getMyProfile(),
       getMyPosts(),
       getMyReposts(),
@@ -122,6 +125,7 @@ export default function ProfileScreen() {
       getPrivacySettings(),
       loadBuyerProfile(),
       loadHighlights(),
+      api.social.myStories().catch(() => []),
     ]);
     setProfile(p);
     setPosts(po.filter(x => !x.isArchived && !x.isDraft));
@@ -130,7 +134,8 @@ export default function ProfileScreen() {
     setPrivacySettings(pr);
     setAvatarUri(bp.avatarUri || null);
     setHighlights(hl);
-  }, []);
+    setHasActiveStory(Array.isArray(myStories) && myStories.length > 0);
+  }, [api]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -256,7 +261,22 @@ export default function ProfileScreen() {
         {/* Hero Row */}
         <View style={styles.heroRow}>
           <TouchableOpacity onPress={() => router.push('/buyer-story-create' as any)} style={styles.avatarWrap}>
-            {avatarUri ? (
+            {/* Purple ring when user has an active story */}
+            {hasActiveStory ? (
+              <LinearGradient
+                colors={GRAD_PRIMARY as unknown as [string, string, ...string[]]}
+                start={{ x: 0, y: 1 }} end={{ x: 1, y: 0 }}
+                style={styles.storyRing}
+              >
+                {avatarUri ? (
+                  <Image source={{ uri: avatarUri }} style={[styles.avatar, { resizeMode: 'cover', margin: 3 }]} />
+                ) : (
+                  <LinearGradient colors={GRAD_PRIMARY} style={[styles.avatar, { margin: 3 }]}>
+                    <Text style={styles.avatarText}>{profile?.avatarInitials || MY_INITIALS}</Text>
+                  </LinearGradient>
+                )}
+              </LinearGradient>
+            ) : avatarUri ? (
               <Image source={{ uri: avatarUri }} style={[styles.avatar, { resizeMode: 'cover' }]} />
             ) : (
               <LinearGradient colors={GRAD_PRIMARY} style={styles.avatar}>
@@ -294,7 +314,11 @@ export default function ProfileScreen() {
             {profile?.username ? `@${profile.username}` : MY_HANDLE}{joinedYear ? ` · Joined ${joinedYear}` : ''}
           </Text>
           {profile?.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
-          {profile?.website ? <Text style={styles.website}>{profile.website}</Text> : null}
+          {profile?.website ? (
+            <TouchableOpacity onPress={() => { const url = profile.website.startsWith('http') ? profile.website : 'https://' + profile.website; Linking.openURL(url); }}>
+              <Text style={styles.website}>{profile.website}</Text>
+            </TouchableOpacity>
+          ) : null}
           {profile?.location ? (
             <View style={styles.locationRow}>
               <Feather name="map-pin" size={12} color={MUTED} />
@@ -502,6 +526,7 @@ const styles = StyleSheet.create({
 
   heroRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, marginTop: SP.md, gap: SP.lg },
   avatarWrap: { position: 'relative' },
+  storyRing: { borderRadius: 43, padding: 3 },
   avatar: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontFamily: FONT.bold, fontSize: FS.lg, color: '#FFFFFF' },
   avatarBadge: { position: 'absolute', bottom: -2, right: -2, backgroundColor: BG, borderRadius: 12, padding: 1 },

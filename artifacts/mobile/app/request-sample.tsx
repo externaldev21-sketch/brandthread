@@ -8,12 +8,12 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
-const BG    = '#0A0B0A';
-const CARD  = '#111311';
-const BORD  = '#1E221E';
-const FG    = '#EAF2ED';
-const MUTED = '#5A6B5C';
-const GREEN = '#39FF88';
+const BG    = '#07070F';
+const CARD  = '#12121F';
+const BORD  = 'rgba(255,255,255,0.07)';
+const FG    = '#F4F4FF';
+const MUTED = 'rgba(244,244,255,0.50)';
+const GREEN = '#8B5CF6';
 
 const PRODUCT_TYPES = ['T-Shirt', 'Hoodie', 'Sweatpants', 'Shorts', 'Jacket', 'Hat', 'Custom'];
 const QUANTITIES    = ['1 sample', '2–3 samples', '5 samples', '10 samples'];
@@ -151,11 +151,11 @@ const s = StyleSheet.create({
   fieldHint:  { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 16 },
   chipRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip:       { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: CARD, borderWidth: 1, borderColor: BORD },
-  chipActive: { backgroundColor: '#0D2B1A', borderColor: GREEN },
+  chipActive: { backgroundColor: 'rgba(139,92,246,0.18)', borderColor: GREEN },
   chipText:   { fontSize: 13, fontFamily: 'Inter_500Medium', color: MUTED },
   chipTextActive: { color: GREEN },
   input:      { backgroundColor: CARD, borderWidth: 1, borderColor: BORD, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, fontFamily: 'Inter_400Regular', color: FG },
-  escrowNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#0D2B1A', borderRadius: 12, borderWidth: 1, borderColor: GREEN + '33', padding: 14 },
+  escrowNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: 'rgba(139,92,246,0.18)', borderRadius: 12, borderWidth: 1, borderColor: GREEN + '33', padding: 14 },
   escrowText: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, flex: 1, lineHeight: 18 },
   bottom:     { paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: BORD, backgroundColor: BG },
   submitBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: GREEN, borderRadius: 16, paddingVertical: 16 },

@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, GRAD_PRIMARY,
+  ON_DARK,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields } from '@/lib/buyerProfile';
@@ -167,5 +168,5 @@ const s = StyleSheet.create({
   noteText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, lineHeight: 17 },
   saveBar: { paddingHorizontal: SP.md, paddingTop: SP.sm, backgroundColor: BG, borderTopWidth: 1, borderTopColor: BORDER },
   saveBtn: { height: 50, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
-  saveBtnText: { color: '#FFF', fontFamily: FONT.bold, fontSize: FS.base },
+  saveBtnText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.base },
 });

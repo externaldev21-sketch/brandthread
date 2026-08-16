@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE,
+  BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, PURPLE, ON_DARK,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { loadBuyerSettings, patchBuyerSettings } from '@/lib/buyerSettings';
@@ -76,8 +76,8 @@ export default function BuyerSecurity() {
             <Switch
               value={loginAlerts}
               onValueChange={onToggleLoginAlerts}
-              trackColor={{ false: '#333344', true: PURPLE }}
-              thumbColor="#fff"
+              trackColor={{ false: CARD_ELEVATED, true: PURPLE }}
+              thumbColor={ON_DARK}
             />
           </View>
           <View style={s.divider} />
@@ -92,8 +92,8 @@ export default function BuyerSecurity() {
             <Switch
               value={saveLogin}
               onValueChange={onToggleSaveLogin}
-              trackColor={{ false: '#333344', true: PURPLE }}
-              thumbColor="#fff"
+              trackColor={{ false: CARD_ELEVATED, true: PURPLE }}
+              thumbColor={ON_DARK}
             />
           </View>
         </View>

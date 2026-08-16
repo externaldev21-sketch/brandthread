@@ -6,8 +6,8 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, SUCCESS, SUCCESS_DIM,
-  GRAD_PRIMARY, FONT, FS, SP, RADIUS,
+  BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, PURPLE, SUCCESS, SUCCESS_DIM,
+  ON_DARK, GRAD_PRIMARY, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { requestDataExport, getDataExportStatus } from '@/lib/accountService';
 
@@ -102,8 +102,8 @@ export default function BuyerDownloadData() {
                     <Switch
                       value={cat.selected}
                       onValueChange={() => toggleCat(cat.key)}
-                      trackColor={{ false: '#333344', true: PURPLE }}
-                      thumbColor="#fff"
+                      trackColor={{ false: CARD_ELEVATED, true: PURPLE }}
+                      thumbColor={ON_DARK}
                     />
                   </TouchableOpacity>
                   {i < categories.length - 1 && <View style={s.divider} />}
@@ -130,7 +130,7 @@ export default function BuyerDownloadData() {
             style={{ opacity: selectedCount > 0 ? 1 : 0.4 }}
           >
             <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.requestBtn}>
-              <Feather name="download" size={18} color="#FFF" />
+              <Feather name="download" size={18} color={ON_DARK} />
               <Text style={s.requestBtnText}>Request Export</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -157,7 +157,7 @@ const s = StyleSheet.create({
   footer: { paddingHorizontal: SP.md, paddingTop: SP.sm, borderTopWidth: 1, borderTopColor: BORDER, gap: SP.sm },
   footerCount: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, textAlign: 'center' },
   requestBtn: { height: 50, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: SP.sm },
-  requestBtnText: { fontFamily: FONT.bold, fontSize: FS.base, color: '#FFF' },
+  requestBtnText: { fontFamily: FONT.bold, fontSize: FS.base, color: ON_DARK },
   successCard: { alignItems: 'center', paddingVertical: SP.xxl, gap: SP.md },
   successTitle: { fontFamily: FONT.bold, fontSize: FS.lg, color: FG },
   successDate: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },

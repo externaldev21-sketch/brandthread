@@ -12,7 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, ON_DARK,
   FONT, FS, SP, RADIUS, GRAD_PRIMARY,
 } from '@/lib/theme';
 import { getAcceptedFriends } from '@/services/socialService';
@@ -80,7 +80,7 @@ export default function BuyerCloseFriends() {
           <Text style={s.handle}>{item.handle}</Text>
         </View>
         <View style={[s.radio, isCF && s.radioActive]}>
-          {isCF && <Feather name="star" size={14} color="#FFF" />}
+          {isCF && <Feather name="star" size={14} color={ON_DARK} />}
         </View>
       </TouchableOpacity>
     );
@@ -165,7 +165,7 @@ const s = StyleSheet.create({
   countBadge: { fontFamily: FONT.medium, fontSize: FS.xs, color: PURPLE, paddingHorizontal: SP.md, marginBottom: SP.xs },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: 12, gap: 12 },
   avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: '#FFF' },
+  avatarText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: ON_DARK },
   name: { fontFamily: FONT.semibold, fontSize: FS.base, color: FG },
   handle: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, marginTop: 2 },
   radio: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
@@ -176,5 +176,5 @@ const s = StyleSheet.create({
   emptyDesc: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', maxWidth: 240 },
   saveBar: { paddingHorizontal: SP.md, paddingTop: SP.sm, borderTopWidth: 1, borderTopColor: BORDER, backgroundColor: BG },
   saveBtn: { height: 50, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
-  saveBtnText: { color: '#FFF', fontFamily: FONT.bold, fontSize: FS.base },
+  saveBtnText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.base },
 });

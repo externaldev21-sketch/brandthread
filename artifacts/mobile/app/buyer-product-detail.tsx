@@ -19,13 +19,14 @@ import { BuyerProduct, BuyerProductOption, BuyerProductVariant, CheckoutAttribut
 import { useApi } from '@/hooks/useApi';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, BORDER_FOCUS,
-  FG, MUTED, SUBTLE,
+  FG, MUTED, SUBTLE, ON_DARK,
   PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   CYAN, CYAN_DIM,
   SUCCESS, SUCCESS_DIM,
   ORANGE, ORANGE_DIM,
   RED, RED_DIM,
-  GRAD_PRIMARY,
+  GOLD,
+  GRAD_PRIMARY, GRAD_SUCCESS_G,
   FONT, FS, SP, RADIUS, COMP, ICON,
   SHADOW_PURPLE,
 } from '@/lib/theme';
@@ -75,8 +76,10 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
     price:              lowestPrice,
     imageUris:          row.images ?? [],
     category:           row.category ?? 'apparel',
-    isPreOrder:         false,
-    cancellationPolicy: 'All sales final unless the item arrives damaged.',
+    isPreOrder:           row.isPreOrder           ?? false,
+    preOrderClosingDate:  row.preOrderClosingDate ? new Date(row.preOrderClosingDate) : undefined,
+    preOrderEstShipDate:  row.preOrderEstShipDate ? new Date(row.preOrderEstShipDate) : undefined,
+    cancellationPolicy:   'All sales final unless the item arrives damaged.',
     refundPolicy:       'Contact seller within 7 days of delivery for returns.',
     options,
     variants,
@@ -88,6 +91,11 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtPrice(n: number) { return '$' + n.toFixed(2); }
+
+function renderStars(rating: number): string {
+  const full = Math.round(Math.max(0, Math.min(5, rating)));
+  return '★'.repeat(full) + '☆'.repeat(5 - full);
+}
 
 function findVariant(product: BuyerProduct, selections: Record<string, string>): BuyerProductVariant | null {
   const optionIds = product.options.map(o => o.id);
@@ -259,6 +267,16 @@ export default function BuyerProductDetailScreen() {
   const [addingToCart, setAddingToCart] = useState(false);
   const [buyingNow, setBuyingNow] = useState(false);
   const [addedToCart, setAddedToCart] = useState(false);
+  const [productReviews, setProductReviews] = useState<any[]>([]);
+  const [avgRating, setAvgRating] = useState(0);
+  const [reviewCount, setReviewCount] = useState(0);
+
+  // Waitlist & pre-order reservation state
+  const [waitlistJoined,  setWaitlistJoined]  = useState(false);
+  const [waitlistLoading, setWaitlistLoading] = useState(false);
+  const [reserved,        setReserved]        = useState(false);
+  const [reserveLoading,  setReserveLoading]  = useState(false);
+  const [sizeChartOpen,   setSizeChartOpen]   = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -286,6 +304,36 @@ export default function BuyerProductDetailScreen() {
       setLoading(false);
     })();
   }, [productId, productName]);
+
+  useEffect(() => {
+    if (!product?.id) return;
+    api.reviews.forProduct(product.id)
+      .then((data: any) => {
+        setProductReviews(data.reviews ?? []);
+        setAvgRating(data.avgRating ?? 0);
+        setReviewCount(data.totalCount ?? 0);
+      })
+      .catch(() => {});
+  }, [product?.id]);
+
+  // Check waitlist status when selected variant changes
+  useEffect(() => {
+    if (!product) return;
+    const v = findVariant(product, selections);
+    if (!v?.id || v.isAvailable) { setWaitlistJoined(false); return; }
+    (api as any).waitlist?.check?.(v.id)
+      ?.then((d: any) => setWaitlistJoined(d?.joined ?? false))
+      ?.catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?.id, JSON.stringify(selections)]);
+
+  // Check reservation status for pre-order products
+  useEffect(() => {
+    if (!product?.id || !product.isPreOrder) { setReserved(false); return; }
+    (api as any).buyer?.checkReservation?.(product.id)
+      ?.then((d: any) => setReserved(d?.reserved ?? false))
+      ?.catch(() => {});
+  }, [product?.id, product?.isPreOrder]);
 
   if (loading) {
     return (
@@ -334,6 +382,30 @@ export default function BuyerProductDetailScreen() {
     sourceTagId: sourceTagId,
     channel: sourcePostId ? 'thread' : 'discover',
   };
+
+  async function handleJoinWaitlist() {
+    if (!product || !variant) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setWaitlistLoading(true);
+    try {
+      await (api as any).waitlist.join(product.id, variant.id);
+      setWaitlistJoined(true);
+      Alert.alert("You're on the list", "We'll send a push notification when this item is restocked.");
+    } catch { Alert.alert('Error', 'Could not join waitlist. Please try again.'); }
+    finally { setWaitlistLoading(false); }
+  }
+
+  async function handleReserve() {
+    if (!product) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setReserveLoading(true);
+    try {
+      await (api as any).buyer.reserve(product.id);
+      setReserved(true);
+      Alert.alert('Reserved!', "You're on the list. We'll notify you when production is confirmed.");
+    } catch { Alert.alert('Error', 'Could not reserve. Please try again.'); }
+    finally { setReserveLoading(false); }
+  }
 
   async function handleAddToCart() {
     if (!allSelected) {
@@ -481,6 +553,27 @@ export default function BuyerProductDetailScreen() {
             </View>
           )}
 
+          {/* Waitlist — shown when selected variant is OOS and not pre-order */}
+          {allSelected && variant && !variant.isAvailable && !product.isPreOrder && (
+            <TouchableOpacity
+              style={[wl.btn, waitlistJoined && wl.joined]}
+              onPress={waitlistJoined ? undefined : handleJoinWaitlist}
+              disabled={waitlistLoading || waitlistJoined}
+              activeOpacity={0.8}
+            >
+              {waitlistLoading ? (
+                <ActivityIndicator size="small" color={PURPLE_LIGHT} />
+              ) : (
+                <>
+                  <Feather name={waitlistJoined ? 'check' : 'bell'} size={14} color={waitlistJoined ? SUCCESS : PURPLE_LIGHT} />
+                  <Text style={[wl.text, waitlistJoined && { color: SUCCESS }]}>
+                    {waitlistJoined ? "You're on the waitlist" : 'Notify me when back in stock'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+
           {/* Quantity */}
           {allSelected && inStock && (
             <View style={{ marginVertical: SP.md }}>
@@ -502,6 +595,50 @@ export default function BuyerProductDetailScreen() {
           <View style={s.divider} />
           <PolicyRow icon="refresh-ccw" label="Returns" value={product.refundPolicy} />
           <PolicyRow icon="x-circle" label="Cancellation" value={product.cancellationPolicy} />
+
+          {/* Size Chart — expandable table */}
+          {!!(product as any).sizeChart && (
+            <>
+              <View style={s.divider} />
+              <TouchableOpacity
+                style={sz.toggle}
+                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSizeChartOpen(o => !o); }}
+                activeOpacity={0.7}
+              >
+                <Text style={sz.label}>Size Chart</Text>
+                <Feather name={sizeChartOpen ? 'chevron-up' : 'chevron-down'} size={16} color={MUTED} />
+              </TouchableOpacity>
+              {sizeChartOpen && <SizeChartViewer chart={(product as any).sizeChart} />}
+            </>
+          )}
+
+          {/* Reviews */}
+          <View style={s.divider} />
+          <Text style={s.reviewsHeader}>Customer Reviews</Text>
+          {reviewCount === 0 ? (
+            <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: SUBTLE, marginBottom: SP.md }}>
+              No reviews yet
+            </Text>
+          ) : (
+            <>
+              <View style={s.ratingRow}>
+                <Text style={s.ratingAvg}>{avgRating.toFixed(1)}</Text>
+                <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: GOLD }}>
+                  {renderStars(avgRating)}
+                </Text>
+                <Text style={s.ratingCount}>({reviewCount} review{reviewCount !== 1 ? 's' : ''})</Text>
+              </View>
+              {productReviews.slice(0, 5).map((r: any) => (
+                <View key={r.id} style={s.reviewRow}>
+                  <Text style={s.reviewStars}>{renderStars(r.rating)}</Text>
+                  {r.body ? <Text style={s.reviewBody}>{r.body}</Text> : null}
+                  <Text style={s.reviewDate}>
+                    {new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </Text>
+                </View>
+              ))}
+            </>
+          )}
         </View>
       </ScrollView>
 
@@ -513,8 +650,8 @@ export default function BuyerProductDetailScreen() {
             onPress={() => router.push('/(buyer)/cart' as never)}
             activeOpacity={0.85}
           >
-            <LinearGradient colors={['#10B981', '#34D399']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.actionGrad}>
-              <Feather name="shopping-bag" size={18} color="#fff" />
+            <LinearGradient colors={[...GRAD_SUCCESS_G]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.actionGrad}>
+              <Feather name="shopping-bag" size={18} color={ON_DARK} />
               <Text style={s.actionBtnText}>View Cart</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -538,30 +675,103 @@ export default function BuyerProductDetailScreen() {
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity
-          style={[s.buyNowBtn, (!allSelected || !inStock) && s.btnDisabled]}
-          onPress={handleBuyNow}
-          activeOpacity={0.85}
-          disabled={buyingNow || !inStock || !allSelected}
-        >
-          <LinearGradient
-            colors={allSelected && inStock ? [...GRAD_PRIMARY] : ['#2a2a3a', '#2a2a3a']}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-            style={s.actionGrad}
+        {product.isPreOrder ? (
+          <TouchableOpacity
+            style={s.buyNowBtn}
+            onPress={handleReserve}
+            disabled={reserveLoading || reserved}
+            activeOpacity={0.85}
           >
-            {buyingNow ? (
-              <ActivityIndicator color="#fff" size="small" />
-            ) : (
-              <Text style={[s.actionBtnText, (!allSelected || !inStock) && { color: SUBTLE }]}>
-                {!allSelected ? 'Select Options' : 'Buy Now'}
-              </Text>
-            )}
-          </LinearGradient>
-        </TouchableOpacity>
+            <LinearGradient
+              colors={reserved ? [CARD_ELEVATED, CARD_ELEVATED] : [PURPLE_DIM, PURPLE_DIM]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={[s.actionGrad, { borderWidth: 1, borderColor: reserved ? SUCCESS + '44' : PURPLE + '44' }]}
+            >
+              {reserveLoading ? (
+                <ActivityIndicator color={PURPLE_LIGHT} size="small" />
+              ) : (
+                <Text style={[s.actionBtnText, { color: reserved ? SUCCESS : PURPLE_LIGHT }]}>
+                  {reserved ? 'Reserved ✓' : 'Reserve (No Charge)'}
+                </Text>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[s.buyNowBtn, (!allSelected || !inStock) && s.btnDisabled]}
+            onPress={handleBuyNow}
+            activeOpacity={0.85}
+            disabled={buyingNow || !inStock || !allSelected}
+          >
+            <LinearGradient
+              colors={allSelected && inStock ? [...GRAD_PRIMARY] : [CARD_ELEVATED, CARD_ELEVATED]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={s.actionGrad}
+            >
+              {buyingNow ? (
+                <ActivityIndicator color={ON_DARK} size="small" />
+              ) : (
+                <Text style={[s.actionBtnText, (!allSelected || !inStock) && { color: SUBTLE }]}>
+                  {!allSelected ? 'Select Options' : 'Buy Now'}
+                </Text>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
 }
+
+// ─── Size Chart Viewer ────────────────────────────────────────────────────────
+
+interface SizeChart { columns: string[]; rows: { size: string; values: string[] }[]; unit?: string; notes?: string }
+
+function SizeChartViewer({ chart }: { chart: SizeChart }) {
+  if (!chart?.columns?.length) return null;
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: SP.sm }}>
+      <View>
+        <View style={sch.row}>
+          <View style={[sch.cell, sch.sizeCell, sch.headerCell]}>
+            <Text style={sch.headerText}>Size</Text>
+          </View>
+          {chart.columns.map((col, i) => (
+            <View key={i} style={[sch.cell, sch.headerCell]}>
+              <Text style={sch.headerText}>{col}{chart.unit ? ` (${chart.unit})` : ''}</Text>
+            </View>
+          ))}
+        </View>
+        {(chart.rows ?? []).map((row, ri) => (
+          <View key={ri} style={[sch.row, ri % 2 === 0 && sch.altRow]}>
+            <View style={[sch.cell, sch.sizeCell]}>
+              <Text style={sch.sizeText}>{row.size}</Text>
+            </View>
+            {row.values.map((v, ci) => (
+              <View key={ci} style={sch.cell}>
+                <Text style={sch.valueText}>{v || '—'}</Text>
+              </View>
+            ))}
+          </View>
+        ))}
+        {chart.notes ? <Text style={sch.notes}>{chart.notes}</Text> : null}
+      </View>
+    </ScrollView>
+  );
+}
+const sch = StyleSheet.create({
+  row:        { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER },
+  altRow:     { backgroundColor: CARD_ELEVATED },
+  cell:       { width: 72, paddingVertical: 8, paddingHorizontal: 4, justifyContent: 'center' },
+  sizeCell:   { width: 52 },
+  headerCell: { backgroundColor: PURPLE_DIM },
+  headerText: { fontFamily: FONT.semibold, fontSize: 10, color: PURPLE_LIGHT, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.4 },
+  sizeText:   { fontFamily: FONT.semibold, fontSize: FS.xs, color: FG, textAlign: 'center' },
+  valueText:  { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, textAlign: 'center' },
+  notes:      { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, marginTop: SP.sm, lineHeight: 17 },
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function PolicyRow({ icon, label, value }: { icon: keyof typeof Feather.glyphMap; label: string; value: string }) {
   return (
@@ -636,6 +846,27 @@ const s = StyleSheet.create({
   buyNowBtn: { flex: 1, borderRadius: RADIUS.md, overflow: 'hidden' },
   viewCartBtn: { flex: 2, borderRadius: RADIUS.md, overflow: 'hidden' },
   actionGrad: { height: COMP.buttonH, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm },
-  actionBtnText: { fontSize: FS.sm, fontFamily: FONT.bold, color: '#fff' },
+  actionBtnText: { fontSize: FS.sm, fontFamily: FONT.bold, color: ON_DARK },
   btnDisabled: { opacity: 0.5 },
+  reviewsHeader: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
+  reviewRow: { marginBottom: SP.md, paddingBottom: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
+  reviewStars: { fontSize: FS.sm, fontFamily: FONT.regular, color: GOLD, marginBottom: 2 },
+  reviewBody: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 20 },
+  reviewDate: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginTop: 2 },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
+  ratingAvg: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
+  ratingCount: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+});
+
+// Waitlist button styles
+const wl = StyleSheet.create({
+  btn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, marginTop: SP.sm, paddingVertical: SP.sm, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM },
+  joined: { borderColor: SUCCESS + '44', backgroundColor: 'transparent' },
+  text:   { fontFamily: FONT.medium, fontSize: FS.sm, color: PURPLE_LIGHT },
+});
+
+// Size chart toggle styles
+const sz = StyleSheet.create({
+  toggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: SP.sm },
+  label:  { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
 });

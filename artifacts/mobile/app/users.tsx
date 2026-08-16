@@ -1,12 +1,23 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useApi } from '@/lib/api';
 
 export default function UsersScreen() {
   const colors = useColors();
+  const api    = useApi();
+  const [members, setMembers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.team.members()
+      .then(m => setMembers(m))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   function haptic() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -36,21 +47,43 @@ export default function UsersScreen() {
         }
       />
 
-      <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.userRow, { borderBottomColor: colors.border }]}>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.userName, { color: colors.foreground }]}>galleria desires</Text>
-          <Text style={[styles.userEmail, { color: colors.mutedForeground }]}>galleriadesires@gmail.com</Text>
-        </View>
-        <View style={[styles.statusPill, { backgroundColor: colors.success + '26' }]}>
-          <Text style={[styles.statusText, { color: colors.success }]}>Active</Text>
-        </View>
-      </TouchableOpacity>
-
-      <View style={[styles.body, { backgroundColor: colors.secondary }]}>
-        <TouchableOpacity onPress={haptic} activeOpacity={0.7}>
-          <Text style={[styles.learnMore, { color: colors.mutedForeground }]}>Learn more about users</Text>
-        </TouchableOpacity>
-      </View>
+      {loading ? (
+        <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
+      ) : (
+        <ScrollView>
+          {members.length === 0 ? (
+            <View style={[styles.body, { backgroundColor: colors.secondary }]}>
+              <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>No team members yet.</Text>
+            </View>
+          ) : (
+            members.map((m, i) => (
+              <TouchableOpacity
+                key={m.id}
+                onPress={haptic}
+                activeOpacity={0.7}
+                style={[styles.userRow, { borderBottomColor: colors.border }]}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.userName, { color: colors.foreground }]}>{m.name ?? m.email}</Text>
+                  <Text style={[styles.userEmail, { color: colors.mutedForeground }]}>{m.email}</Text>
+                </View>
+                <View style={[styles.statusPill, {
+                  backgroundColor: m.status === 'active' ? colors.success + '26' : colors.mutedForeground + '26',
+                }]}>
+                  <Text style={[styles.statusText, {
+                    color: m.status === 'active' ? colors.success : colors.mutedForeground,
+                  }]}>{m.status === 'active' ? 'Active' : m.status === 'pending' ? 'Invited' : m.status}</Text>
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
+          <View style={[styles.body, { backgroundColor: colors.secondary }]}>
+            <TouchableOpacity onPress={haptic} activeOpacity={0.7}>
+              <Text style={[styles.learnMore, { color: colors.mutedForeground }]}>Learn more about users</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      )}
     </View>
   );
 }

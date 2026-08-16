@@ -8,12 +8,12 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
-const BG     = '#0A0B0A';
-const CARD   = '#111311';
-const BORDER = '#1E221E';
-const FG     = '#EAF2ED';
-const MUTED  = '#5A6B5C';
-const GREEN  = '#39FF88';
+const BG     = '#07070F';
+const CARD   = '#12121F';
+const BORDER = 'rgba(255,255,255,0.07)';
+const FG     = '#F4F4FF';
+const MUTED  = 'rgba(244,244,255,0.50)';
+const GREEN  = '#8B5CF6';
 
 const FAQS = [
   { q: 'How do drops work?', a: 'Drops are limited-time releases from brands you follow. When a drop goes live you get a notification. Tap the drop to view it and place your order before it sells out. Pre-orders are charged immediately and shipped when production is complete.' },
@@ -131,7 +131,7 @@ const s = StyleSheet.create({
   faqTop:     { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
   faqQ:       { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: FG, flex: 1 },
   faqA:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 20 },
-  stillStuck: { backgroundColor: '#0D2B1A', borderRadius: 18, borderWidth: 1, borderColor: GREEN + '33', padding: 20, alignItems: 'center', gap: 8 },
+  stillStuck: { backgroundColor: 'rgba(139,92,246,0.18)', borderRadius: 18, borderWidth: 1, borderColor: GREEN + '33', padding: 20, alignItems: 'center', gap: 8 },
   stillStuckTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
   stillStuckSub:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center', lineHeight: 19 },
   contactFullBtn:  { backgroundColor: GREEN, borderRadius: 14, paddingHorizontal: 24, paddingVertical: 13, marginTop: 4 },

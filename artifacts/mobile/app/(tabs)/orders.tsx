@@ -22,11 +22,13 @@ import {
   IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState,
   StatCard, SearchBar,
 } from '@/components/BrandthreadUI';
+import { filterOrders, sortOrders } from '@/services/orderService';
 import {
-  getOrders, searchOrders, filterOrders, sortOrders, markProcessing,
-  markReadyToShip, getOrderStats,
-} from '@/services/orderService';
-import { Order, OrderFilterKey, OrderSortKey } from '@/services/orderTypes';
+  Order, OrderFilterKey, OrderSortKey,
+  OrderAddress, OrderCustomer, FulfillmentStatus, FulfillmentType,
+  OrderStatus, PaymentStatus,
+} from '@/services/orderTypes';
+import { useApi } from '@/hooks/useApi';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -102,6 +104,77 @@ function computeStats(orders: Order[]): OrderStats {
     returnRequests: orders.filter(o => o.returns.length > 0).length,
     disputes: orders.filter(o => o.disputes.length > 0).length,
     total: orders.length,
+  };
+}
+
+// ─── API → Order adapter ──────────────────────────────────────────────────────
+// Maps the seller orders API response to the full Order type used by this screen.
+// Only fills the fields that filterOrders / sortOrders / the UI actually read.
+
+const DB_STATUS_MAP: Record<string, OrderStatus> = {
+  pending:        'new',
+  processing:     'processing',
+  fulfilled:      'ready_to_ship',
+  shipped:        'shipped',
+  cancelled:      'cancelled',
+  refund_pending: 'refunded',
+};
+
+const FULFILLMENT_MAP: Partial<Record<OrderStatus, FulfillmentStatus>> = {
+  new:           'unfulfilled',
+  processing:    'unfulfilled',
+  ready_to_ship: 'fulfilled',
+  shipped:       'fulfilled',
+  delivered:     'fulfilled',
+  cancelled:     'cancelled',
+  refunded:      'cancelled',
+  disputed:      'unfulfilled',
+};
+
+function apiRowToOrder(row: any): Order {
+  const ordStatus: OrderStatus = DB_STATUS_MAP[row.status as string] ?? 'new';
+  const fStatus: FulfillmentStatus = FULFILLMENT_MAP[ordStatus] ?? 'unfulfilled';
+  const initials = ((row.customerName as string | undefined) ?? 'C')
+    .split(/\s+/).map((w: string) => w[0] ?? '').slice(0, 2).join('').toUpperCase();
+
+  const emptyAddr: OrderAddress = { name: '', line1: '', city: '', state: '', zip: '', country: 'US' };
+  const customer: OrderCustomer = {
+    id: '', name: row.customerName ?? 'Customer', email: row.customerEmail ?? '',
+    initials, totalOrders: 1, lifetimeValue: (row.totalCents ?? 0) / 100,
+    tags: [], shippingAddress: emptyAddr, billingAddress: emptyAddr,
+  };
+  const totalDollars = (row.totalCents ?? 0) / 100;
+
+  return {
+    id: row.id, orderNumber: row.orderNumber ?? '',
+    sellerId: '', sellerName: '', sellerHandle: '',
+    source: 'online', salesChannel: 'online',
+    status: ordStatus, paymentStatus: 'paid' as PaymentStatus,
+    fulfillmentStatus: fStatus, fulfillmentType: 'seller' as FulfillmentType,
+    riskLevel: 'low', riskFlags: [], customer,
+    lineItems: [],
+    fulfillment: {
+      id: '', orderId: row.id, groups: [], type: 'seller', status: fStatus,
+      isPicked: ['ready_to_ship', 'shipped', 'delivered'].includes(ordStatus),
+      isPacked: ['ready_to_ship', 'shipped', 'delivered'].includes(ordStatus),
+    },
+    payment: {
+      subtotal: totalDollars, discountTotal: 0, shippingTotal: 0, taxTotal: 0,
+      total: totalDollars, amountPaid: totalDollars, amountRefunded: 0,
+      amountHeld: 0, amountPending: 0, sellerAllocation: totalDollars,
+      manufacturerAllocation: 0, shippingLabelAllocation: 0, platformFee: 0,
+      payoutStatus: 'available',
+    },
+    shipments: row.trackingNumber ? [{
+      id: `ship_${row.id}`, orderId: row.id, fulfillmentGroupId: '',
+      carrier: row.carrier ?? undefined, trackingNumber: row.trackingNumber,
+      trackingEvents: [], isDemo: false,
+    }] : [],
+    labels: [], returns: [], refunds: [], disputes: [], timeline: [], notes: [],
+    hasUnreadMessage: false, isPreOrder: false, isManufacturerFulfilled: false,
+    currency: 'USD', tags: [],
+    createdAt: typeof row.createdAt === 'string' ? row.createdAt : new Date(row.createdAt).toISOString(),
+    updatedAt: typeof row.updatedAt === 'string' ? row.updatedAt : new Date(row.updatedAt).toISOString(),
   };
 }
 
@@ -372,6 +445,8 @@ export default function OrdersScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
+  const api = useApi();
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -385,21 +460,25 @@ export default function OrdersScreen() {
 
   const loadData = useCallback(async () => {
     try {
-      const all = await getOrders();
+      const rows = await api.orders.list();
+      const all = (rows as any[]).map(apiRowToOrder);
       setOrders(all);
       setStats(computeStats(all));
     } catch (e) {
-      console.error('Failed to load orders', e);
+      console.error('Failed to load seller orders', e);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [api]);
 
+  // Load on focus and poll every 30 s so status updates appear live.
   useFocusEffect(
     useCallback(() => {
       setLoading(true);
       loadData();
+      const timer = setInterval(loadData, 30_000);
+      return () => clearInterval(timer);
     }, [loadData])
   );
 
@@ -440,22 +519,22 @@ export default function OrdersScreen() {
   const handleMarkProcessing = useCallback(async (orderId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      await markProcessing(orderId);
+      await api.orders.updateStatus(orderId, 'processing');
       await loadData();
     } catch {
       Alert.alert('Error', 'Could not update order.');
     }
-  }, [loadData]);
+  }, [api, loadData]);
 
   const handleMarkReady = useCallback(async (orderId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      await markReadyToShip(orderId);
+      await api.orders.updateStatus(orderId, 'fulfilled');
       await loadData();
     } catch {
       Alert.alert('Error', 'Could not update order.');
     }
-  }, [loadData]);
+  }, [api, loadData]);
 
   const handleShip = useCallback((orderId: string) => {
     router.push(('/order-detail?id=' + orderId + '&tab=shipping') as never);
@@ -482,24 +561,24 @@ export default function OrdersScreen() {
   const handleBulkMarkProcessing = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      await Promise.all(selectedIds.map(id => markProcessing(id)));
+      await Promise.all(selectedIds.map(id => api.orders.updateStatus(id, 'processing')));
       setSelectedIds([]);
       await loadData();
     } catch {
       Alert.alert('Error', 'Could not bulk update orders.');
     }
-  }, [selectedIds, loadData]);
+  }, [api, selectedIds, loadData]);
 
   const handleBulkMarkReady = useCallback(async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      await Promise.all(selectedIds.map(id => markReadyToShip(id)));
+      await Promise.all(selectedIds.map(id => api.orders.updateStatus(id, 'fulfilled')));
       setSelectedIds([]);
       await loadData();
     } catch {
       Alert.alert('Error', 'Could not bulk update orders.');
     }
-  }, [selectedIds, loadData]);
+  }, [api, selectedIds, loadData]);
 
   const handleMoreMenu = useCallback(() => {
     Alert.alert('Orders', 'Choose an action', [

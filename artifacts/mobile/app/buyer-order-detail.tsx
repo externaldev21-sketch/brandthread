@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, ActivityIndicator,
+  View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, ActivityIndicator, Modal, TextInput,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
@@ -18,6 +18,7 @@ import {
   BLUE, BLUE_DIM,
   ORANGE, ORANGE_DIM,
   RED, RED_DIM,
+  GOLD,
   GRAD_PRIMARY, GRAD_CARD_GLOW,
   FONT, FS, SP, RADIUS, COMP, ICON,
   SHADOW_PURPLE,
@@ -192,14 +193,31 @@ export default function BuyerOrderDetailScreen() {
 
   const [order, setOrder] = useState<BuyerOrderView | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewBody, setReviewBody] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
 
-  useEffect(() => {
+  // Poll every 15 s while this screen is focused so status updates
+  // (paid → processing → shipped → delivered) appear without manual refresh.
+  useFocusEffect(useCallback(() => {
     if (!id) return;
-    api.buyer.orders.get(id).then(row => {
-      setOrder(adaptOrderDetail(row));
-      setLoading(false);
-    }).catch(() => setLoading(false));
-  }, [id]);
+    let cancelled = false;
+
+    function fetchOrder() {
+      api.buyer.orders.get(id!).then(row => {
+        if (!cancelled) {
+          setOrder(adaptOrderDetail(row));
+          setLoading(false);
+        }
+      }).catch(() => { if (!cancelled) setLoading(false); });
+    }
+
+    fetchOrder();
+    const timer = setInterval(fetchOrder, 15_000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [id]));
 
   function handleCopyTracking() {
     if (!order?.trackingNumber) return;
@@ -237,6 +255,25 @@ export default function BuyerOrderDetailScreen() {
       '/buyer-report?targetType=seller&targetId=' + encodeURIComponent(order.sellerId) +
       '&targetLabel=' + encodeURIComponent(order.sellerName)
     ) as never);
+  }
+
+  async function handleSubmitReview() {
+    if (!order) return;
+    setSubmittingReview(true);
+    try {
+      await api.reviews.create({
+        orderId:  order.id,
+        sellerId: order.sellerId,
+        rating:   reviewRating,
+        body:     reviewBody.trim() || undefined,
+      });
+      setReviewSubmitted(true);
+      setShowReviewModal(false);
+    } catch (err: any) {
+      Alert.alert('Error', err?.message ?? 'Could not submit review');
+    } finally {
+      setSubmittingReview(false);
+    }
   }
 
   function handleRequestReturn() {
@@ -499,6 +536,77 @@ export default function BuyerOrderDetailScreen() {
         </View>
 
       </ScrollView>
+
+      {/* ── Review CTA ──────────────────────────────────────────────────── */}
+      {order.status === 'delivered' && !reviewSubmitted && (
+        <View style={{ paddingHorizontal: SP.md, paddingVertical: SP.sm }}>
+          <TouchableOpacity
+            style={{ backgroundColor: CARD, borderRadius: RADIUS.md, padding: SP.md, borderWidth: 1, borderColor: BORDER, flexDirection: 'row', alignItems: 'center', gap: SP.sm }}
+            onPress={() => setShowReviewModal(true)}
+            activeOpacity={0.8}
+          >
+            <Feather name="star" size={ICON.sm} color={GOLD} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: FG }}>Leave a Review</Text>
+              <Text style={{ fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 }}>Share your experience with {order.sellerName}</Text>
+            </View>
+            <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
+          </TouchableOpacity>
+        </View>
+      )}
+      {reviewSubmitted && (
+        <View style={{ paddingHorizontal: SP.md, paddingVertical: SP.sm }}>
+          <View style={{ backgroundColor: CARD, borderRadius: RADIUS.md, padding: SP.md, borderWidth: 1, borderColor: BORDER, flexDirection: 'row', alignItems: 'center', gap: SP.sm }}>
+            <Feather name="check-circle" size={ICON.sm} color={SUCCESS} />
+            <Text style={{ fontSize: FS.sm, fontFamily: FONT.medium, color: SUCCESS }}>Review submitted — thank you!</Text>
+          </View>
+        </View>
+      )}
+
+      {/* ── Review Modal ─────────────────────────────────────────────────── */}
+      <Modal visible={showReviewModal} transparent animationType="slide" onRequestClose={() => setShowReviewModal(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: CARD, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: SP.lg, paddingBottom: SP.xl + 20 }}>
+            <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, marginBottom: SP.md }}>Rate your order</Text>
+            <View style={{ flexDirection: 'row', gap: SP.sm, marginBottom: SP.md }}>
+              {[1, 2, 3, 4, 5].map(n => (
+                <TouchableOpacity key={n} onPress={() => setReviewRating(n)} activeOpacity={0.7}>
+                  <Text style={{ fontSize: 32, color: n <= reviewRating ? GOLD : MUTED }}>★</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TextInput
+              style={{ backgroundColor: BG, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: SP.md, color: FG, fontSize: FS.sm, fontFamily: FONT.regular, minHeight: 80, textAlignVertical: 'top', marginBottom: SP.md }}
+              placeholder="Share your experience (optional)"
+              placeholderTextColor={MUTED}
+              value={reviewBody}
+              onChangeText={setReviewBody}
+              multiline
+              maxLength={500}
+            />
+            <View style={{ flexDirection: 'row', gap: SP.sm }}>
+              <TouchableOpacity
+                style={{ flex: 1, height: COMP.buttonH, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' }}
+                onPress={() => setShowReviewModal(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{ flex: 2, height: COMP.buttonH, borderRadius: RADIUS.md, backgroundColor: PURPLE_DIM, borderWidth: 1, borderColor: BORDER_ACTIVE, alignItems: 'center', justifyContent: 'center' }}
+                onPress={handleSubmitReview}
+                disabled={submittingReview}
+                activeOpacity={0.8}
+              >
+                {submittingReview
+                  ? <ActivityIndicator color={PURPLE_LIGHT} size="small" />
+                  : <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: PURPLE_LIGHT }}>Submit Review</Text>
+                }
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </BrandthreadScreen>
   );
 }

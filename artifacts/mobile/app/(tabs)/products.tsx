@@ -7,7 +7,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
-  StyleSheet, Alert, Share, Modal, Pressable, Image,
+  StyleSheet, Alert, Share, Modal, Pressable, Image, ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -631,6 +631,11 @@ export default function ProductsScreen() {
         onClose={() => setFilterModalVisible(false)}
       />
       <AIBrainFAB context={{ screen: 'products' as const }} bottomOffset={72} />
+      {loading && (
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(7,7,15,0.6)', zIndex: 10 }}>
+          <ActivityIndicator color={PURPLE} size="large" />
+        </View>
+      )}
     </View>
   );
 }

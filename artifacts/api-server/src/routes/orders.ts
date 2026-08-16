@@ -1,5 +1,6 @@
 import { Router } from "express";
-import { db, orders, orderItems, customers, drops, productVariants, products } from "@workspace/db";
+import crypto from "crypto";
+import { db, orders, orderItems, customers, drops, productVariants, products, notificationsFeed } from "@workspace/db";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 
@@ -229,10 +230,31 @@ router.patch("/:id/tracking", async (req, res) => {
   const { trackingNumber, carrier } = req.body;
   if (!trackingNumber) { res.status(400).json({ error: "trackingNumber required" }); return; }
   const [updated] = await db.update(orders)
-    .set({ trackingNumber, carrier, status: "shipped", updatedAt: new Date() })
+    .set({ trackingNumber, carrier, status: "shipped", shippedAt: new Date(), updatedAt: new Date() })
     .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId)))
     .returning();
   if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+
+  // Notify buyer that their order has shipped (non-critical)
+  if (updated.buyerId) {
+    try {
+      const carrierLabel = carrier ? carrier : "carrier";
+      await db.insert(notificationsFeed).values({
+        id: crypto.randomUUID(),
+        userId: updated.buyerId,
+        type: 'order_update',
+        title: 'Your order has shipped! 🚚',
+        body: `Your order #${updated.orderNumber} is on its way. Tracking: ${carrierLabel} ${trackingNumber}`,
+        targetId: updated.id,
+        targetType: 'order',
+        isRead: false,
+        createdAt: new Date(),
+      });
+    } catch {
+      // Non-critical — don't fail the response over a notification error
+    }
+  }
+
   res.json(updated);
 });
 

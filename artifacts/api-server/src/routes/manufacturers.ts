@@ -7,8 +7,10 @@ import {
   manufacturerThreads,
   manufacturerMessages,
   manufacturerOrders,
+  manufacturerInviteTokens,
 } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
+import crypto from "crypto";
 import {
   RegisterManufacturerBody,
   UpdateMyManufacturerProfileBody,
@@ -16,10 +18,11 @@ import {
   UpdateManufacturerOrderStatusBody,
   SetupManufacturerPaymentBody,
 } from "@workspace/api-zod";
+import { requireAuth } from "../middlewares/requireAuth";
 
 const router = Router();
 
-// ── Helper: resolve authenticated manufacturer ─────────────────────────────────
+// ── Helper ─────────────────────────────────────────────────────────────────────
 
 async function resolveManufacturer(clerkId: string) {
   const [mfr] = await db
@@ -30,7 +33,120 @@ async function resolveManufacturer(clerkId: string) {
   return mfr ?? null;
 }
 
-// ── GET /manufacturers/me ──────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// INVITE TOKENS — seller creates private invite links for manufacturers
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// POST /api/manufacturers/invite-tokens — seller creates a private invite token
+router.post("/invite-tokens", requireAuth, async (req, res) => {
+  const sellerId   = (req as any).clerkUserId as string;
+  const { companyName, contactName, contactEmail, notes } = req.body;
+
+  const token = crypto.randomBytes(24).toString("hex");
+
+  const [inv] = await db
+    .insert(manufacturerInviteTokens)
+    .values({ sellerId, token, companyName, contactName, contactEmail, notes })
+    .returning();
+
+  const inviteUrl = `${process.env.REPLIT_DEV_DOMAIN
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : "https://brandthread.app"}/manufacturer-onboard?token=${inv.token}`;
+
+  res.status(201).json({ ...inv, inviteUrl, createdAt: inv.createdAt.toISOString() });
+});
+
+// GET /api/manufacturers/invite-tokens — seller lists their tokens
+router.get("/invite-tokens", requireAuth, async (req, res) => {
+  const sellerId = (req as any).clerkUserId as string;
+  const rows = await db
+    .select()
+    .from(manufacturerInviteTokens)
+    .where(eq(manufacturerInviteTokens.sellerId, sellerId))
+    .orderBy(desc(manufacturerInviteTokens.createdAt));
+
+  const domain = process.env.REPLIT_DEV_DOMAIN
+    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+    : "https://brandthread.app";
+
+  res.json(rows.map(inv => ({
+    ...inv,
+    inviteUrl: `${domain}/manufacturer-onboard?token=${inv.token}`,
+    usedAt:    inv.usedAt?.toISOString() ?? null,
+    createdAt: inv.createdAt.toISOString(),
+  })));
+});
+
+// GET /api/manufacturers/invite-tokens/resolve/:token — look up an invite token (no auth — for onboard form)
+router.get("/invite-tokens/resolve/:token", async (req, res) => {
+  const [inv] = await db
+    .select()
+    .from(manufacturerInviteTokens)
+    .where(eq(manufacturerInviteTokens.token, req.params.token))
+    .limit(1);
+
+  if (!inv) { res.status(404).json({ error: "Invalid or expired invite token" }); return; }
+  if (inv.usedAt) { res.status(410).json({ error: "This invite has already been used" }); return; }
+
+  res.json({
+    valid:        true,
+    companyName:  inv.companyName,
+    contactName:  inv.contactName,
+    contactEmail: inv.contactEmail,
+    sellerId:     inv.sellerId,
+  });
+});
+
+// POST /api/manufacturers/register-via-invite/:token — manufacturer registers through a private invite
+router.post("/register-via-invite/:token", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const [inv] = await db
+    .select()
+    .from(manufacturerInviteTokens)
+    .where(eq(manufacturerInviteTokens.token, req.params.token))
+    .limit(1);
+
+  if (!inv) { res.status(404).json({ error: "Invalid invite token" }); return; }
+  if (inv.usedAt) { res.status(410).json({ error: "This invite has already been used" }); return; }
+
+  // Check if manufacturer already registered
+  const existing = await resolveManufacturer(userId);
+  if (existing) {
+    res.status(409).json({ error: "Already registered as a manufacturer" }); return;
+  }
+
+  const parsed = RegisterManufacturerBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
+
+  const [mfr] = await db
+    .insert(manufacturers)
+    .values({
+      clerkId:           userId,
+      isPublicDirectory: false,   // private invite — not in public directory
+      status:            "active",
+      ...parsed.data,
+    })
+    .returning();
+
+  // Mark invite as used
+  await db
+    .update(manufacturerInviteTokens)
+    .set({ usedAt: new Date(), manufacturerId: mfr.id })
+    .where(eq(manufacturerInviteTokens.id, inv.id));
+
+  res.status(201).json({
+    ...mfr,
+    invitedBySellerId: inv.sellerId,
+    verifiedAt: null,
+    createdAt:  mfr.createdAt.toISOString(),
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MANUFACTURER PROFILE (manufacturer-facing)
+// ═══════════════════════════════════════════════════════════════════════════════
 
 router.get("/me", async (req, res) => {
   const { userId } = getAuth(req);
@@ -45,8 +161,6 @@ router.get("/me", async (req, res) => {
     createdAt:  mfr.createdAt.toISOString(),
   });
 });
-
-// ── PATCH /manufacturers/me ────────────────────────────────────────────────────
 
 router.patch("/me", async (req, res) => {
   const { userId } = getAuth(req);
@@ -71,8 +185,6 @@ router.patch("/me", async (req, res) => {
   });
 });
 
-// ── POST /manufacturers/register ───────────────────────────────────────────────
-
 router.post("/register", async (req, res) => {
   const { userId } = getAuth(req);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
@@ -80,13 +192,12 @@ router.post("/register", async (req, res) => {
   const parsed = RegisterManufacturerBody.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
-  // Check already registered
   const existing = await resolveManufacturer(userId);
   if (existing) return res.status(409).json({ error: "Already registered" });
 
   const [mfr] = await db
     .insert(manufacturers)
-    .values({ clerkId: userId, ...parsed.data })
+    .values({ clerkId: userId, isPublicDirectory: true, status: "active", ...parsed.data })
     .returning();
 
   return res.status(201).json({
@@ -96,7 +207,9 @@ router.post("/register", async (req, res) => {
   });
 });
 
-// ── GET /manufacturers/me/dashboard ───────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════════
+// MANUFACTURER DASHBOARD, THREADS, MESSAGES, ORDERS
+// ═══════════════════════════════════════════════════════════════════════════════
 
 router.get("/me/dashboard", async (req, res) => {
   const { userId } = getAuth(req);
@@ -105,7 +218,7 @@ router.get("/me/dashboard", async (req, res) => {
   const mfr = await resolveManufacturer(userId);
   if (!mfr) return res.status(404).json({ error: "Not registered" });
 
-  const orders = await db
+  const orderList = await db
     .select()
     .from(manufacturerOrders)
     .where(eq(manufacturerOrders.manufacturerId, mfr.id))
@@ -116,30 +229,142 @@ router.get("/me/dashboard", async (req, res) => {
     .from(manufacturerThreads)
     .where(eq(manufacturerThreads.manufacturerId, mfr.id));
 
-  const activeOrders    = orders.filter(o => o.status !== "complete").length;
-  const completedOrders = orders.filter(o => o.status === "complete").length;
+  const activeOrders    = orderList.filter(o => o.status !== "complete").length;
+  const completedOrders = orderList.filter(o => o.status === "complete").length;
   const pendingMessages = threads.reduce((sum, t) => sum + t.unreadCount, 0);
-  const totalRevenue    = orders.filter(o => o.status === "complete").reduce((s, o) => s + o.totalCents, 0);
-  const pendingPayout   = orders.filter(o => o.status !== "complete").reduce((s, o) => s + o.totalCents, 0);
+  const totalRevenue    = orderList.filter(o => o.status === "complete").reduce((s, o) => s + o.totalCents, 0);
 
-  const recentOrders = orders.slice(0, 5).map(o => ({
+  const recentOrders = orderList.slice(0, 5).map(o => ({
     ...o,
     createdAt: o.createdAt.toISOString(),
     updatedAt: o.updatedAt.toISOString(),
   }));
 
   return res.json({
-    activeOrders,
-    pendingMessages,
-    completedOrders,
-    totalRevenueCents:  totalRevenue,
-    pendingPayoutCents: pendingPayout,
-    recentOrders,
+    activeOrders, pendingMessages, completedOrders,
+    totalRevenueCents: totalRevenue, recentOrders,
   });
 });
 
-// ── GET /manufacturers/me/threads ─────────────────────────────────────────────
+// Seller-side: get or create a thread with a manufacturer
+router.post("/threads", requireAuth, async (req, res) => {
+  const sellerId = (req as any).clerkUserId as string;
+  const { manufacturerId, subject = "General" } = req.body;
 
+  if (!manufacturerId) { res.status(400).json({ error: "manufacturerId required" }); return; }
+
+  // Get seller name from auth
+  const sellerName = (req as any).clerkUserName ?? "Seller";
+
+  // Check for existing thread
+  const [existing] = await db
+    .select()
+    .from(manufacturerThreads)
+    .where(and(
+      eq(manufacturerThreads.manufacturerId, manufacturerId),
+      eq(manufacturerThreads.buyerClerkId, sellerId),
+    ))
+    .limit(1);
+
+  if (existing) {
+    res.json({ ...existing, lastMessageAt: existing.lastMessageAt.toISOString(), createdAt: existing.createdAt.toISOString() });
+    return;
+  }
+
+  const [thread] = await db
+    .insert(manufacturerThreads)
+    .values({ manufacturerId, buyerClerkId: sellerId, buyerName: sellerName, subject })
+    .returning();
+
+  res.status(201).json({ ...thread, lastMessageAt: thread.lastMessageAt.toISOString(), createdAt: thread.createdAt.toISOString() });
+});
+
+// Seller-side: list threads I'm in
+router.get("/threads", requireAuth, async (req, res) => {
+  const sellerId = (req as any).clerkUserId as string;
+
+  const rows = await db
+    .select({
+      thread:      manufacturerThreads,
+      mfrName:     manufacturers.businessName,
+      mfrCountry:  manufacturers.country,
+      mfrPhotos:   manufacturers.photos,
+    })
+    .from(manufacturerThreads)
+    .leftJoin(manufacturers, eq(manufacturerThreads.manufacturerId, manufacturers.id))
+    .where(eq(manufacturerThreads.buyerClerkId, sellerId))
+    .orderBy(desc(manufacturerThreads.lastMessageAt));
+
+  res.json(rows.map(r => ({
+    ...r.thread,
+    manufacturerName:    r.mfrName,
+    manufacturerCountry: r.mfrCountry,
+    manufacturerPhoto:   r.mfrPhotos?.[0] ?? null,
+    lastMessageAt: r.thread.lastMessageAt.toISOString(),
+    createdAt:     r.thread.createdAt.toISOString(),
+  })));
+});
+
+// GET/POST messages for a thread
+router.get("/threads/:threadId/messages", async (req, res) => {
+  const messages = await db
+    .select()
+    .from(manufacturerMessages)
+    .where(eq(manufacturerMessages.threadId, req.params.threadId))
+    .orderBy(manufacturerMessages.sentAt);
+
+  res.json(messages.map(m => ({
+    ...m,
+    sentAt: m.sentAt.toISOString(),
+  })));
+});
+
+router.post("/threads/:threadId/messages", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  const parsed = SendThreadMessageBody.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
+
+  const { threadId } = req.params;
+  const { content, messageType = "text", mediaUrls, cardData, senderRole } = req.body;
+
+  // Determine sender role: check if this user is the manufacturer for this thread
+  const [thread] = await db
+    .select({ manufacturerId: manufacturerThreads.manufacturerId, buyerClerkId: manufacturerThreads.buyerClerkId })
+    .from(manufacturerThreads)
+    .where(eq(manufacturerThreads.id, threadId))
+    .limit(1);
+
+  let resolvedRole = senderRole ?? "seller";
+  if (thread) {
+    const mfr = await resolveManufacturer(userId);
+    if (mfr && mfr.id === thread.manufacturerId) {
+      resolvedRole = "manufacturer";
+    }
+  }
+
+  const [msg] = await db
+    .insert(manufacturerMessages)
+    .values({
+      threadId,
+      senderRole:  resolvedRole,
+      content:     content ?? "",
+      messageType: messageType ?? "text",
+      mediaUrls:   Array.isArray(mediaUrls) ? mediaUrls : [],
+      cardData:    cardData ?? null,
+    })
+    .returning();
+
+  await db
+    .update(manufacturerThreads)
+    .set({ lastMessage: content ?? "", lastMessageAt: new Date() })
+    .where(eq(manufacturerThreads.id, threadId));
+
+  res.status(201).json({ ...msg, sentAt: msg.sentAt.toISOString() });
+});
+
+// Manufacturer dashboard: their own threads
 router.get("/me/threads", async (req, res) => {
   const { userId } = getAuth(req);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
@@ -160,18 +385,14 @@ router.get("/me/threads", async (req, res) => {
   })));
 });
 
-// ── GET /manufacturers/me/threads/:threadId/messages ──────────────────────────
-
 router.get("/me/threads/:threadId/messages", async (req, res) => {
   const { userId } = getAuth(req);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-  const { threadId } = req.params;
-
   const messages = await db
     .select()
     .from(manufacturerMessages)
-    .where(eq(manufacturerMessages.threadId, threadId))
+    .where(eq(manufacturerMessages.threadId, req.params.threadId))
     .orderBy(manufacturerMessages.sentAt);
 
   return res.json(messages.map(m => ({
@@ -179,8 +400,6 @@ router.get("/me/threads/:threadId/messages", async (req, res) => {
     sentAt: m.sentAt.toISOString(),
   })));
 });
-
-// ── POST /manufacturers/me/threads/:threadId/messages ─────────────────────────
 
 router.post("/me/threads/:threadId/messages", async (req, res) => {
   const { userId } = getAuth(req);
@@ -190,23 +409,29 @@ router.post("/me/threads/:threadId/messages", async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const { threadId } = req.params;
+  const { content, messageType, mediaUrls, cardData } = req.body;
 
   const [msg] = await db
     .insert(manufacturerMessages)
-    .values({ threadId, senderRole: "manufacturer", content: parsed.data.content })
+    .values({
+      threadId,
+      senderRole:  "manufacturer",
+      content:     content ?? "",
+      messageType: messageType ?? "text",
+      mediaUrls:   Array.isArray(mediaUrls) ? mediaUrls : [],
+      cardData:    cardData ?? null,
+    })
     .returning();
 
-  // Update thread last message
   await db
     .update(manufacturerThreads)
-    .set({ lastMessage: parsed.data.content, lastMessageAt: new Date() })
+    .set({ lastMessage: content ?? "", lastMessageAt: new Date() })
     .where(eq(manufacturerThreads.id, threadId));
 
   return res.status(201).json({ ...msg, sentAt: msg.sentAt.toISOString() });
 });
 
-// ── GET /manufacturers/me/orders ──────────────────────────────────────────────
-
+// Manufacturer orders
 router.get("/me/orders", async (req, res) => {
   const { userId } = getAuth(req);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
@@ -214,20 +439,18 @@ router.get("/me/orders", async (req, res) => {
   const mfr = await resolveManufacturer(userId);
   if (!mfr) return res.status(404).json({ error: "Not registered" });
 
-  const orders = await db
+  const orderList = await db
     .select()
     .from(manufacturerOrders)
     .where(eq(manufacturerOrders.manufacturerId, mfr.id))
     .orderBy(desc(manufacturerOrders.createdAt));
 
-  return res.json(orders.map(o => ({
+  return res.json(orderList.map(o => ({
     ...o,
     createdAt: o.createdAt.toISOString(),
     updatedAt: o.updatedAt.toISOString(),
   })));
 });
-
-// ── PATCH /manufacturers/me/orders/:orderId/status ────────────────────────────
 
 router.patch("/me/orders/:orderId/status", async (req, res) => {
   const { userId } = getAuth(req);
@@ -235,8 +458,6 @@ router.patch("/me/orders/:orderId/status", async (req, res) => {
 
   const parsed = UpdateManufacturerOrderStatusBody.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-
-  const { orderId } = req.params;
 
   const [updated] = await db
     .update(manufacturerOrders)
@@ -246,20 +467,15 @@ router.patch("/me/orders/:orderId/status", async (req, res) => {
       notes:          parsed.data.notes ?? undefined,
       updatedAt:      new Date(),
     })
-    .where(eq(manufacturerOrders.id, orderId))
+    .where(eq(manufacturerOrders.id, req.params.orderId))
     .returning();
 
   if (!updated) return res.status(404).json({ error: "Order not found" });
 
-  return res.json({
-    ...updated,
-    createdAt: updated.createdAt.toISOString(),
-    updatedAt: updated.updatedAt.toISOString(),
-  });
+  return res.json({ ...updated, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() });
 });
 
-// ── GET /manufacturers/me/payment ─────────────────────────────────────────────
-
+// Payment setup (legacy bank/PayPal/Wise)
 router.get("/me/payment", async (req, res) => {
   const { userId } = getAuth(req);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
@@ -287,8 +503,6 @@ router.get("/me/payment", async (req, res) => {
   });
 });
 
-// ── POST /manufacturers/me/payment ────────────────────────────────────────────
-
 router.post("/me/payment", async (req, res) => {
   const { userId } = getAuth(req);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
@@ -300,11 +514,8 @@ router.post("/me/payment", async (req, res) => {
   if (!mfr) return res.status(404).json({ error: "Not registered" });
 
   const accountNumber = parsed.data.accountNumber ?? "";
-  const last4 = accountNumber.length >= 4
-    ? accountNumber.slice(-4)
-    : accountNumber;
+  const last4 = accountNumber.length >= 4 ? accountNumber.slice(-4) : accountNumber;
 
-  // Upsert: delete old, insert new
   await db.delete(manufacturerPayments).where(eq(manufacturerPayments.manufacturerId, mfr.id));
 
   const [payment] = await db
@@ -321,7 +532,6 @@ router.post("/me/payment", async (req, res) => {
     })
     .returning();
 
-  // Mark manufacturer as having payment setup
   await db
     .update(manufacturers)
     .set({ paymentSetup: true, updatedAt: new Date() })

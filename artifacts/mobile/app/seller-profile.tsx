@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -28,15 +29,16 @@ import {
 import type { SellerPost } from '@/services/types';
 import { getProducts } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
+import { useApi } from '@/hooks/useApi';
 
 // ─── Design Tokens ─────────────────────────────────────────────────────────────
-const BG        = '#0A0B0A';
-const CARD      = '#111311';
-const BORDER    = '#1E221E';
-const FG        = '#EAF2ED';
-const MUTED     = '#5A6B5C';
-const GREEN     = '#39FF88';
-const GREEN_DIM = '#0A2B18';
+const BG        = '#07070F';
+const CARD      = '#12121F';
+const BORDER    = 'rgba(255,255,255,0.07)';
+const FG        = '#F4F4FF';
+const MUTED     = 'rgba(244,244,255,0.50)';
+const GREEN     = '#8B5CF6';
+const GREEN_DIM = 'rgba(139,92,246,0.18)';
 const PURPLE    = '#8B5CF6';
 const BLUE      = '#3B82F6';
 const ORANGE    = '#F97316';
@@ -239,25 +241,79 @@ export default function SellerProfileScreen() {
   const params = useLocalSearchParams<{ id?: string; isOwner?: string }>();
   const isOwner = params.isOwner === 'true';
 
-  const profile = DEMO_SELLER_PROFILE;
+  const api = useApi();
 
+  const [profile, setProfile] = useState(DEMO_SELLER_PROFILE);
   const [activeTab, setActiveTab] = useState(0);
   const [isFollowing, setIsFollowing] = useState(false);
-  const [followers, setFollowers] = useState(profile.followers);
+  const [followers, setFollowers] = useState(DEMO_SELLER_PROFILE.followers);
   const [selectedPost, setSelectedPost] = useState<SellerPost | null>(null);
   const [showActionSheet, setShowActionSheet] = useState(false);
   const [bioExpanded, setBioExpanded] = useState(false);
   const [liveProducts, setLiveProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
+  const [apiRating, setApiRating] = useState<{ avgRating: number; totalCount: number } | null>(null);
+  const [posts, setPosts] = useState<SellerPost[]>(isOwner ? DEMO_SELLER_POSTS : getPublishedPosts());
 
+  // Load seller data from real API; fall back to demo data on failure
   useEffect(() => {
-    getProducts({ filter: 'active' })
-      .then(setLiveProducts)
-      .catch(() => {})
-      .finally(() => setProductsLoading(false));
-  }, []);
+    const sellerId = params.id as string | undefined;
+    if (!sellerId) {
+      // No sellerId — stay on demo/owner data, still load products locally
+      getProducts({ filter: 'active' })
+        .then(setLiveProducts)
+        .catch(() => {})
+        .finally(() => setProductsLoading(false));
+      return;
+    }
 
-  const posts = isOwner ? DEMO_SELLER_POSTS : getPublishedPosts();
+    (async () => {
+      try {
+        const data = await api.publicSellers.get(sellerId);
+        const p = data.profile ?? {};
+        // Map API profile fields onto SellerProfile shape
+        setProfile((prev) => ({
+          ...prev,
+          sellerId:     p.clerkId ?? sellerId,
+          brandName:    p.brandName ?? p.displayName ?? prev.brandName,
+          username:     p.displayName ?? prev.username,
+          bio:          p.bio ?? prev.bio,
+          website:      p.website ?? prev.website,
+          verified:     p.verified ?? prev.verified,
+          category:     p.brandType ?? prev.category,
+        }));
+        setFollowers((prev) => prev); // keep local follow state
+        // Wire products from API
+        if (Array.isArray(data.products) && data.products.length > 0) {
+          setLiveProducts(data.products as Product[]);
+        } else {
+          // fall back to local products
+          const localProducts = await getProducts({ filter: 'active' }).catch(() => []);
+          setLiveProducts(localProducts);
+        }
+        // Wire posts from API
+        if (Array.isArray(data.posts) && data.posts.length > 0) {
+          setPosts(data.posts as SellerPost[]);
+        }
+      } catch {
+        // Fall back: load local products, keep demo posts
+        getProducts({ filter: 'active' })
+          .then(setLiveProducts)
+          .catch(() => {});
+      } finally {
+        setProductsLoading(false);
+      }
+    })();
+  }, [params.id]);
+
+  // Load reviews separately (keep as-is)
+  useEffect(() => {
+    const sellerId = (params.id ?? (profile as any).sellerId) as string | undefined;
+    if (!sellerId) return;
+    api.reviews.forSeller(sellerId)
+      .then((data: any) => setApiRating({ avgRating: data.avgRating ?? 0, totalCount: data.totalCount ?? 0 }))
+      .catch(() => {});
+  }, [params.id]);
 
   const tabs = isOwner
     ? ['Posts', 'Products', 'Tagged', 'Reposts', 'Saved']
@@ -442,10 +498,19 @@ export default function SellerProfileScreen() {
 
           {/* Website */}
           {profile.website && (
-            <View style={styles.metaRow}>
+            <TouchableOpacity
+              style={styles.metaRow}
+              onPress={() => {
+                const url = profile.website!.startsWith('http')
+                  ? profile.website!
+                  : 'https://' + profile.website;
+                Linking.openURL(url);
+              }}
+              activeOpacity={0.7}
+            >
               <Feather name="link" size={12} color={GREEN} />
               <Text style={styles.websiteText}>{profile.website}</Text>
-            </View>
+            </TouchableOpacity>
           )}
 
           {/* Location */}
@@ -499,6 +564,12 @@ export default function SellerProfileScreen() {
                 <Text style={styles.statLabel}>Posts</Text>
               </View>
             </>
+          )}
+          {apiRating && apiRating.totalCount > 0 && (
+            <View style={styles.statItem}>
+              <Text style={styles.statNumber}>{'★ ' + apiRating.avgRating.toFixed(1)}</Text>
+              <Text style={styles.statLabel}>{apiRating.totalCount} review{apiRating.totalCount !== 1 ? 's' : ''}</Text>
+            </View>
           )}
         </View>
 

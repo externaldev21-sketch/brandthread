@@ -27,6 +27,7 @@ import {
   IconButton, FilterChip, StatusBadge, SectionHeader, FormInput,
   ProgressCard, EmptyState, GuidedTip,
 } from '@/components/BrandthreadUI';
+import StyleTagsPicker from '@/components/StyleTagsPicker';
 
 import {
   getProduct, saveDraft, loadDraft, deleteDraft,
@@ -93,6 +94,7 @@ export default function AddProductScreen() {
     name: '',
     description: '',
     tags: [],
+    styleTags: [],
     media: [],
     pricing: { price: 0, currency: 'USD' },
     options: [],
@@ -519,6 +521,7 @@ export default function AddProductScreen() {
       status:      'active',
       images:      (productPayload.media ?? []).map((m: any) => m.uri ?? m.url ?? '').filter(Boolean),
       tags:        productPayload.tags ?? [],
+      styleTags:   productPayload.styleTags ?? [],
       variants:    productVariantsForServer,
     };
 
@@ -530,6 +533,7 @@ export default function AddProductScreen() {
       status:      'active',
       images:      (productPayload.media ?? []).map((m: any) => m.uri ?? m.url ?? '').filter(Boolean),
       tags:        productPayload.tags ?? [],
+      styleTags:   productPayload.styleTags ?? [],
     };
 
     try {
@@ -609,6 +613,14 @@ export default function AddProductScreen() {
           }}
           placeholder="streetwear, hoodie, oversized"
         />
+        <View style={{ marginTop: SP.xs }}>
+          <SectionHeader title="Style Tags" style={s.sectionHdr} />
+          <StyleTagsPicker
+            selected={draftData.styleTags ?? []}
+            onChange={v => patchDraft({ styleTags: v })}
+            max={5}
+          />
+        </View>
         {collections.length > 0 && (
           <>
             <SectionHeader title="Collection" style={s.sectionHdr} />

@@ -3,10 +3,12 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
 export default function SecurityScreen() {
   const colors = useColors();
+  const router = useRouter();
   const [code, setCode] = useState('3711');
 
   function haptic() {
@@ -27,6 +29,11 @@ export default function SecurityScreen() {
     ]);
   }
 
+  function viewActivityLog() {
+    haptic();
+    router.push('/login-activity' as any);
+  }
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScreenHeader title="Security" />
@@ -37,7 +44,7 @@ export default function SecurityScreen() {
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>User activity logs</Text>
             <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>Monitor and review user activities</Text>
           </View>
-          <TouchableOpacity onPress={haptic} activeOpacity={0.7} style={[styles.viewBtn, { borderColor: colors.border }]}>
+          <TouchableOpacity onPress={viewActivityLog} activeOpacity={0.7} style={[styles.viewBtn, { borderColor: colors.border }]}>
             <Text style={[styles.viewBtnText, { color: colors.foreground }]}>View</Text>
           </TouchableOpacity>
         </View>
@@ -86,18 +93,18 @@ export default function SecurityScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   section: { paddingHorizontal: 20, paddingVertical: 18 },
-  rowBetween: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   sectionTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginBottom: 4 },
-  sectionSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17 },
-  viewBtn: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 8 },
-  viewBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  divider: { height: 10 },
-  collabRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
-  collabName: { fontSize: 14, fontFamily: 'Inter_500Medium', flexShrink: 1, minWidth: 90 },
-  codeBox: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
-  codeText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  actionBtn: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
-  actionBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  sectionSubtitle: { fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 18 },
+  rowBetween: { flexDirection: 'row', alignItems: 'center' },
+  viewBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
+  viewBtnText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  divider: { height: 8 },
+  collabRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  collabName: { fontSize: 14, fontFamily: 'Inter_500Medium', flexShrink: 1 },
+  codeBox: { flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
+  codeText: { fontSize: 13, fontFamily: 'Inter_500Medium', letterSpacing: 1 },
+  actionBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1 },
+  actionBtnText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   iconBtn: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   footerNote: { paddingHorizontal: 20, paddingVertical: 16 },
   footerText: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 18 },

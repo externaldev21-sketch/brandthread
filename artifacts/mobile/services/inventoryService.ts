@@ -4,6 +4,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { serviceRequest } from '../lib/serviceConfig';
 import {
   InventoryItem, InventoryLevel, InventoryLocation, InventoryAdjustment,
   InventoryEvent, InventoryTransfer, InventoryTransferItem,
@@ -309,9 +310,66 @@ function addEvent(
   });
 }
 
+// ─── API → local type adapter ─────────────────────────────────────────────────
+
+function apiRowToInventoryItem(row: any): InventoryItem {
+  return {
+    id:               row.variantId,
+    productId:        row.productId,
+    productName:      row.productName,
+    variantId:        row.variantId,
+    variantLabel:     row.variantLabel ?? row.sku,
+    sku:              row.sku,
+    barcode:          undefined,
+    onHand:           row.stock,
+    available:        row.stock,
+    reserved:         0,
+    committed:        0,
+    incoming:         0,
+    damaged:          0,
+    unavailable:      0,
+    lowStockThreshold: row.lowStockThreshold,
+    status:           row.status as InventoryStatus,
+    inventoryValue:   row.stock * ((row.priceCents ?? 0) / 100),
+    oversellPolicy:   'deny' as OversellPolicy,
+    isTracked:        true,
+    isContinuouslySynced: false,
+    fulfillmentType:  'seller' as any,
+    levels: [{
+      locationId:   'default',
+      locationName: 'Default Location',
+      onHand:       row.stock,
+      available:    row.stock,
+      reserved:     0,
+      incoming:     0,
+      damaged:      0,
+      unavailable:  0,
+    }],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  } as unknown as InventoryItem;
+}
+
 // ─── Public API — Overview ─────────────────────────────────────────────────────
 
 export async function getInventoryOverview(): Promise<InventoryOverview> {
+  try {
+    const rows = await serviceRequest<any[]>('/api/inventory');
+    return {
+      totalOnHand:           rows.reduce((s, r) => s + r.stock, 0),
+      totalAvailable:        rows.reduce((s, r) => s + r.stock, 0),
+      totalReserved:         0,
+      totalIncoming:         0,
+      totalCommitted:        0,
+      totalDamaged:          0,
+      lowStockCount:         rows.filter(r => r.status === 'low_stock').length,
+      outOfStockCount:       rows.filter(r => r.status === 'out_of_stock').length,
+      inventoryValue:        rows.reduce((s, r) => s + r.stock * ((r.priceCents ?? 0) / 100), 0),
+      locationCount:         1,
+      unitsInProduction:     0,
+      recentAdjustmentCount: 0,
+    } as InventoryOverview;
+  } catch { /* fall through to local */ }
   await ensureInitialized();
   const items = _items;
   return {
@@ -337,6 +395,11 @@ export async function getInventoryOverview(): Promise<InventoryOverview> {
 // ─── Public API — Items ───────────────────────────────────────────────────────
 
 export async function getInventoryItems(): Promise<InventoryItem[]> {
+  try {
+    const rows = await serviceRequest<any[]>('/api/inventory');
+    _items = rows.map(apiRowToInventoryItem);
+    return [..._items];
+  } catch { /* fall through to local */ }
   await ensureInitialized();
   return [..._items];
 }

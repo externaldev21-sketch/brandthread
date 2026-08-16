@@ -61,11 +61,48 @@ export async function clearBrandMemory(): Promise<BrandMemory> {
   return fresh;
 }
 
-// ─── Rebuild from demo data ───────────────────────────────────────────────────
+// ─── Rebuild from real DB data (via API) ─────────────────────────────────────
 
-export async function rebuildBrandMemory(): Promise<BrandMemory> {
+export async function rebuildBrandMemory(authToken?: string | null): Promise<BrandMemory> {
   const memory = await getBrandMemory();
-  // Pre-fill with sensible demo defaults if fields are empty
+
+  // Try real API first — derives brand voice from seller's actual products/posts/store
+  const API_BASE = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
+  if (API_BASE && authToken) {
+    try {
+      const res = await fetch(`${API_BASE}/ai/brand-memory/rebuild`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${authToken}`,
+        },
+        body: JSON.stringify({}),
+      });
+      if (res.ok) {
+        const { fields } = await res.json() as { fields: Record<string, string> };
+        const keyMap: Partial<Record<string, keyof BrandMemory>> = {
+          brandDescription:  'brandDescription',
+          brandVoice:        'brandVoice',
+          targetAudience:    'targetAudience',
+          pricePosition:     'pricePosition',
+          visualStyle:       'visualStyle',
+          marketingTone:     'marketingTone',
+          preferredWords:    'preferredWords',
+          productCategories: 'productCategories',
+        };
+        for (const [apiKey, value] of Object.entries(fields)) {
+          const memKey = keyMap[apiKey];
+          if (memKey && value?.trim()) {
+            memory[memKey] = { ...memory[memKey], value: value.trim(), enabled: true };
+          }
+        }
+        await saveBrandMemory(memory);
+        return memory;
+      }
+    } catch { /* fall through to demo defaults */ }
+  }
+
+  // Fallback: pre-fill with sensible demo defaults if fields are empty
   const demoValues: Partial<Record<keyof BrandMemory, string>> = {
     brandDescription:  'Premium streetwear brand focused on elevated basics and limited drops.',
     brandVoice:        'Confident, concise, luxury-adjacent. Never corporate.',

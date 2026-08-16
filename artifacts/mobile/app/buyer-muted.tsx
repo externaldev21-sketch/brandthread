@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, CYAN, ON_DARK, FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { getMutedUsers, unmuteUser } from '@/services/socialService';
 import type { MuteRecord } from '@/services/socialTypes';
 
@@ -90,7 +90,7 @@ export default function MutedAccountsScreen() {
         renderItem={({ item }) => (
           <View style={styles.row}>
             <LinearGradient
-              colors={[item.mutedUserColor || PURPLE, '#22D3EE']}
+              colors={[item.mutedUserColor || PURPLE, CYAN]}
               style={styles.avatar}
             >
               <Text style={styles.avatarText}>{item.mutedUserInitials || item.mutedUserName[0]}</Text>
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
     width: 44, height: 44, borderRadius: 22,
     alignItems: 'center', justifyContent: 'center',
   },
-  avatarText: { color: '#fff', fontFamily: FONT.bold, fontSize: FS.base },
+  avatarText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.base },
   name: { color: FG, fontFamily: FONT.medium, fontSize: FS.base },
   handle: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm },
   unmuteBtn: {

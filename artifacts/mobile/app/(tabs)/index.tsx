@@ -116,6 +116,7 @@ export default function SellerHomeScreen() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
+  const [statsError, setStatsError] = useState(false);
   const [setupState, setSetupState] = useState<SetupState>(DEFAULT_SETUP);
   const [searchModal, setSearchModal] = useState(false);
   const [commandModal, setCommandModal] = useState(false);
@@ -161,13 +162,14 @@ export default function SellerHomeScreen() {
     }, 0);
     // Show skeleton for at least 500ms
     const minLoad = setTimeout(() => {}, 500);
+    setStatsError(false);
     // Load hub stats
     getHubStats().then(stats => setHubStats({
       activeQuotes: stats.activeQuotes,
       samplesNeedingReview: stats.samplesNeedingReview,
       activeProduction: stats.activeProduction,
       unreadMessages: stats.unreadMessages,
-    })).catch(() => {});
+    })).catch(() => { setStatsError(true); });
     // Load order stats
     getOrderStats().then(s => setOrderStats({
       newOrders: s.newOrders,
@@ -175,14 +177,14 @@ export default function SellerHomeScreen() {
       readyToShip: s.readyToShip,
       returnRequests: s.returnRequests,
       disputes: s.disputes,
-    })).catch(() => {});
+    })).catch(() => { setStatsError(true); });
     // Load inventory stats
     getInventoryStats().then(s => setInvStats({
       lowStockCount: s.lowStockCount,
       outOfStockCount: s.outOfStockCount,
       incomingCount: s.incomingCount,
       delayedCount: s.delayedCount,
-    })).catch(() => {});
+    })).catch(() => { setStatsError(true); });
     return () => { clearTimeout(timer); clearTimeout(minLoad); };
   }, []);
 
@@ -295,6 +297,18 @@ export default function SellerHomeScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+
+        {/* ── Stats Error Banner ────────────────────────────────────────── */}
+        {statsError && (
+          <TouchableOpacity
+            style={{ marginHorizontal: SP.md, marginBottom: SP.sm, flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: 'rgba(249,115,22,0.1)', borderRadius: RADIUS.md, padding: SP.sm, borderWidth: 1, borderColor: 'rgba(249,115,22,0.25)' }}
+            onPress={() => { setStatsError(false); }}
+            activeOpacity={0.8}
+          >
+            <Feather name="alert-triangle" size={14} color={ORANGE} />
+            <Text style={{ flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: ORANGE }}>Couldn't load live stats — tap to dismiss</Text>
+          </TouchableOpacity>
+        )}
 
         {/* ── Welcome Card ──────────────────────────────────────────────── */}
         {showWelcome && (

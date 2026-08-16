@@ -1,94 +1,177 @@
-import React from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+/**
+ * Brandthread — Integrations
+ * Lists third-party integrations with real connected status from backend.
+ */
+import React, { useState, useCallback } from 'react';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
+import { PURPLE, SUCCESS, SUCCESS_DIM, RED, FONT, FS, RADIUS } from '@/lib/theme';
 
-interface IntegrationItem {
+interface IntegrationDef {
   key: string;
   label: string;
   icon: keyof typeof Feather.glyphMap;
   iconBg: string;
-  connected: boolean;
+  description: string;
   route?: string;
 }
 
-const INTEGRATIONS: IntegrationItem[] = [
-  { key: 'shopify', label: 'Shopify', icon: 'shopping-bag', iconBg: '#95BF47', connected: true },
-  { key: 'instagram', label: 'Instagram', icon: 'instagram', iconBg: '#D62976', connected: true },
-  { key: 'tiktok', label: 'TikTok', icon: 'music', iconBg: '#0B0B0B', connected: false },
-  { key: 'klaviyo', label: 'Klaviyo', icon: 'mail', iconBg: '#1A1A1A', connected: true, route: '/integrations/klaviyo' },
-  { key: 'stripe', label: 'Stripe', icon: 'credit-card', iconBg: '#635BFF', connected: true },
-  { key: 'paypal', label: 'PayPal', icon: 'dollar-sign', iconBg: '#003087', connected: false },
-  { key: 'shipstation', label: 'ShipStation', icon: 'truck', iconBg: '#4A5568', connected: false },
+const INTEGRATION_DEFS: IntegrationDef[] = [
+  { key: 'klaviyo',     label: 'Klaviyo',      icon: 'mail',         iconBg: '#1A1A1A', description: 'Email & SMS marketing automation', route: '/integrations/klaviyo' },
+  { key: 'instagram',   label: 'Instagram',    icon: 'instagram',    iconBg: '#D62976', description: 'Sync products to Instagram Shopping' },
+  { key: 'tiktok',      label: 'TikTok Shop',  icon: 'music',        iconBg: '#0B0B0B', description: 'Sell through TikTok\'s shopping channel' },
+  { key: 'shopify',     label: 'Shopify',      icon: 'shopping-bag', iconBg: '#95BF47', description: 'Import your Shopify catalog and orders' },
+  { key: 'stripe',      label: 'Stripe',       icon: 'credit-card',  iconBg: '#635BFF', description: 'Payments and payouts (auto-connected)' },
+  { key: 'shipstation', label: 'ShipStation',  icon: 'truck',        iconBg: '#4A5568', description: 'Multi-carrier shipping management' },
+  { key: 'mailchimp',   label: 'Mailchimp',    icon: 'mail',         iconBg: '#FFE01B', description: 'Email campaigns and audience management' },
+  { key: 'google',      label: 'Google Ads',   icon: 'search',       iconBg: '#4285F4', description: 'Track conversions and run shopping ads' },
+  { key: 'meta',        label: 'Meta Ads',     icon: 'target',       iconBg: '#1877F2', description: 'Facebook and Instagram ad integration' },
 ];
 
 export default function IntegrationsScreen() {
   const colors = useColors();
   const router = useRouter();
+  const api = useApi();
+  const [connectedKeys, setConnectedKeys] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [toggling, setToggling] = useState<string | null>(null);
 
-  function haptic() {
+  const load = async () => {
+    setLoading(true);
+    try {
+      const data = await api.seller.integrationStatus() as any;
+      const integrations: Array<{ key: string }> = data.integrations ?? [];
+      setConnectedKeys(new Set(integrations.map(i => i.key)));
+    } catch {
+      setConnectedKeys(new Set());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useFocusEffect(useCallback(() => { load(); }, []));
+
+  async function handleConnect(item: IntegrationDef) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }
+    if (item.route) { router.push(item.route as never); return; }
 
-  function handlePress(item: IntegrationItem) {
-    haptic();
-    if (item.route) router.push(item.route as never);
+    const isConnected = connectedKeys.has(item.key);
+    if (isConnected) {
+      Alert.alert(`Disconnect ${item.label}?`, 'This will remove the integration from your store.', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Disconnect', style: 'destructive',
+          onPress: async () => {
+            setToggling(item.key);
+            try {
+              await api.seller.disconnectIntegration(item.key) as any;
+              setConnectedKeys(prev => { const next = new Set(prev); next.delete(item.key); return next; });
+            } catch { Alert.alert('Error', 'Could not disconnect. Try again.'); }
+            finally { setToggling(null); }
+          },
+        },
+      ]);
+    } else {
+      Alert.alert(
+        `Connect ${item.label}`,
+        `Connect your ${item.label} account to sync data with Brandthread.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Connect',
+            onPress: async () => {
+              setToggling(item.key);
+              try {
+                await api.seller.connectIntegration(item.key, {}) as any;
+                setConnectedKeys(prev => new Set([...prev, item.key]));
+              } catch { Alert.alert('Error', 'Could not connect. Try again.'); }
+              finally { setToggling(null); }
+            },
+          },
+        ],
+      );
+    }
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[s.container, { backgroundColor: colors.background }]}>
       <ScreenHeader title="Integrations" />
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
-        <View style={styles.section}>
-          <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>
-            Connect the tools you already use to run your brand — sales channels, marketing, and payments in one place.
+      <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
+        <View style={s.section}>
+          <Text style={[s.sectionSubtitle, { color: colors.mutedForeground }]}>
+            Connect the tools you already use to run your brand — sales channels, marketing, and shipping in one place.
           </Text>
 
-          <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {INTEGRATIONS.map((item, i) => (
-              <TouchableOpacity
-                key={item.key}
-                onPress={() => handlePress(item)}
-                activeOpacity={0.7}
-                style={[styles.row, i !== INTEGRATIONS.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
-              >
-                <View style={[styles.iconWrap, { backgroundColor: item.iconBg }]}>
-                  <Feather name={item.icon} size={16} color="#FFFFFF" />
-                </View>
-                <Text style={[styles.rowLabel, { color: colors.foreground, flex: 1 }]}>{item.label}</Text>
-                {item.connected ? (
-                  <View style={[styles.connectedPill, { backgroundColor: colors.success + '26' }]}>
-                    <View style={[styles.dot, { backgroundColor: colors.success }]} />
-                    <Text style={[styles.connectedText, { color: colors.success }]}>Connected</Text>
-                  </View>
-                ) : (
-                  <TouchableOpacity onPress={() => handlePress(item)} activeOpacity={0.75} style={[styles.connectBtn, { borderColor: colors.border }]}>
-                    <Text style={[styles.connectBtnText, { color: colors.foreground }]}>Connect</Text>
+          {loading ? (
+            <View style={s.loadingRow}><ActivityIndicator color={PURPLE} /></View>
+          ) : (
+            <View style={[s.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {INTEGRATION_DEFS.map((item, i) => {
+                const connected = connectedKeys.has(item.key);
+                const isToggling = toggling === item.key;
+                return (
+                  <TouchableOpacity
+                    key={item.key}
+                    onPress={() => handleConnect(item)}
+                    activeOpacity={0.7}
+                    style={[s.row, i !== INTEGRATION_DEFS.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
+                  >
+                    <View style={[s.iconWrap, { backgroundColor: item.iconBg }]}>
+                      <Feather name={item.icon} size={15} color="#FFFFFF" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.rowLabel, { color: colors.foreground }]}>{item.label}</Text>
+                      <Text style={[s.rowDesc, { color: colors.mutedForeground }]} numberOfLines={1}>{item.description}</Text>
+                    </View>
+                    {isToggling ? (
+                      <ActivityIndicator size="small" color={PURPLE} />
+                    ) : connected ? (
+                      <View style={[s.connectedPill, { backgroundColor: SUCCESS_DIM }]}>
+                        <View style={[s.dot, { backgroundColor: SUCCESS }]} />
+                        <Text style={[s.connectedText, { color: SUCCESS }]}>Connected</Text>
+                      </View>
+                    ) : (
+                      <View style={[s.connectBtn, { borderColor: colors.border }]}>
+                        <Text style={[s.connectBtnText, { color: colors.foreground }]}>Connect</Text>
+                      </View>
+                    )}
                   </TouchableOpacity>
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Connected count summary */}
+          {!loading && (
+            <Text style={[s.footerNote, { color: colors.mutedForeground }]}>
+              {connectedKeys.size} of {INTEGRATION_DEFS.length} integrations connected
+            </Text>
+          )}
         </View>
       </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: { flex: 1 },
   section: { paddingHorizontal: 20, paddingVertical: 18 },
-  sectionSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17, marginBottom: 16 },
-  listCard: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
-  iconWrap: { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
-  rowLabel: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  sectionSubtitle: { fontSize: 12, fontFamily: FONT.regular, lineHeight: 17, marginBottom: 16 },
+  loadingRow: { alignItems: 'center', paddingVertical: 30 },
+  listCard: { borderRadius: RADIUS.lg, borderWidth: 1, overflow: 'hidden' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 14 },
+  iconWrap: { width: 34, height: 34, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  rowLabel: { fontSize: 14, fontFamily: FONT.semibold },
+  rowDesc: { fontSize: 11, fontFamily: FONT.regular, marginTop: 2 },
   connectedPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 20, paddingHorizontal: 9, paddingVertical: 4 },
   dot: { width: 6, height: 6, borderRadius: 3 },
-  connectedText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-  connectBtn: { borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 7 },
-  connectBtnText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  connectedText: { fontSize: 11, fontFamily: FONT.semibold },
+  connectBtn: { borderWidth: 1, borderRadius: RADIUS.sm, paddingHorizontal: 12, paddingVertical: 7 },
+  connectBtnText: { fontSize: 12, fontFamily: FONT.semibold },
+  footerNote: { fontSize: FS.xs, fontFamily: FONT.regular, textAlign: 'center', marginTop: 12 },
 });

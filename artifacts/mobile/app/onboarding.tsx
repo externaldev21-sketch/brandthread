@@ -23,13 +23,15 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useAuth, useOAuth, useSignIn, useSignUp, useUser } from '@clerk/expo';
+import { useAuth, useSSO, useSignIn, useSignUp, useUser } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
+import * as AuthSession from 'expo-auth-session';
 import { ONBOARDING_KEY } from './_layout';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { useApi } from '@/lib/api';
 
 // ─── Palette ────────────────────────────────────────────────────────────────
 const BG      = '#07070F';
@@ -735,9 +737,12 @@ interface AuthStepProps {
   startAppleOAuth: () => Promise<any>;
   onAuthComplete: () => void;
   onDevClear: () => Promise<void>;
+  /** The @username the user typed above the auth form. */
+  username: string;
+  onUsernameChange: (v: string) => void;
 }
 
-function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGoogleOAuth, startAppleOAuth, onAuthComplete, onDevClear }: AuthStepProps) {
+function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGoogleOAuth, startAppleOAuth, onAuthComplete, onDevClear, username, onUsernameChange }: AuthStepProps) {
   const router = useRouter();
   const { isSignedIn, signOut } = useAuth();
   const { user } = useUser();
@@ -751,8 +756,12 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
   const [oauthLoading, setOAuth]        = useState('');
   const [error, setError]               = useState('');
   const [clearingSession, setClearSession] = useState(false);
+  const [usernameError, setUsernameError] = useState('');
 
-  const canSubmit = email.includes('@') && password.length >= 8;
+  // username format: letters, numbers, underscores only, 3-30 chars
+  const USERNAME_REGEX_AUTH = /^[a-zA-Z0-9_]{3,30}$/;
+  const isUsernameValid = USERNAME_REGEX_AUTH.test(username.trim());
+  const canSubmit = email.includes('@') && password.length >= 8 && isUsernameValid;
   const canVerify = code.length === 6;
   const currentEmail = user?.primaryEmailAddress?.emailAddress ?? '';
 
@@ -995,29 +1004,59 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
         <Text style={sa.headline}>Create your account</Text>
         <Text style={sa.sub}>One account for everything you build.</Text>
 
-        {/* OAuth */}
+        {/* Username — collected here so both OAuth and email-password paths get a handle */}
+        <View style={sa.inputWrap}>
+          <Text style={sa.label}>Choose your @username</Text>
+          <TextInput
+            style={[sa.input, usernameError ? { borderColor: 'rgba(248,113,113,0.5)' } : undefined]}
+            placeholder="e.g. alex_style"
+            placeholderTextColor={MUTED2}
+            value={username}
+            onChangeText={v => {
+              // Strip disallowed chars on the fly — no spaces or special characters
+              const cleaned = v.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 30);
+              onUsernameChange(cleaned);
+              if (cleaned.length > 0 && cleaned.length < 3) {
+                setUsernameError('At least 3 characters');
+              } else {
+                setUsernameError('');
+              }
+            }}
+            autoCapitalize="none"
+            autoCorrect={false}
+            maxLength={30}
+          />
+          {usernameError
+            ? <Text style={sa.hint}>{usernameError}</Text>
+            : username.length > 0
+              ? <Text style={sa.hint}>@{username} · letters, numbers, underscores only</Text>
+              : <Text style={sa.hint}>Letters, numbers, and underscores only</Text>
+          }
+        </View>
+
+        {/* OAuth — disabled until a valid username is entered */}
         <TouchableOpacity
-          style={sa.oauthBtn}
+          style={[sa.oauthBtn, !isUsernameValid && { opacity: 0.45 }]}
           onPress={() => handleOAuth(startGoogleOAuth, 'Google')}
           activeOpacity={0.85}
-          disabled={!!oauthLoading || loading}
+          disabled={!!oauthLoading || loading || !isUsernameValid}
         >
           {oauthLoading === 'Google' ? <ActivityIndicator color={FG} size="small" /> : <>
-            <Text style={sa.oauthIcon}>G</Text>
+            <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: 'Inter_700Bold', fontSize: 11, color: '#FFFFFF', lineHeight: 13 }}>G</Text></View>
             <Text style={sa.oauthText}>Continue with Google</Text>
           </>}
         </TouchableOpacity>
 
         {Platform.OS === 'ios' && (
           <TouchableOpacity
-            style={[sa.oauthBtn, sa.appleBtn]}
+            style={[sa.oauthBtn, sa.appleBtn, !isUsernameValid && { opacity: 0.45 }]}
             onPress={() => handleOAuth(startAppleOAuth, 'Apple')}
             activeOpacity={0.85}
-            disabled={!!oauthLoading || loading}
+            disabled={!!oauthLoading || loading || !isUsernameValid}
           >
-            {oauthLoading === 'Apple' ? <ActivityIndicator color={BG} size="small" /> : <>
-              <Text style={[sa.oauthIcon, { color: BG }]}>🍎</Text>
-              <Text style={[sa.oauthText, { color: BG }]}>Continue with Apple</Text>
+            {oauthLoading === 'Apple' ? <ActivityIndicator color="#FFFFFF" size="small" /> : <>
+              <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 18, color: '#FFFFFF', lineHeight: 20 }}></Text>
+              <Text style={[sa.oauthText, { color: '#FFFFFF' }]}>Continue with Apple</Text>
             </>}
           </TouchableOpacity>
         )}
@@ -1102,8 +1141,8 @@ const sa = StyleSheet.create({
   headline:  { fontSize: 28, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.5, marginBottom: 6 },
   sub:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 24 },
   oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: BORDER, paddingVertical: 14, backgroundColor: CARD, marginBottom: 10 },
-  appleBtn:  { backgroundColor: FG },
-  oauthIcon: { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
+  // Apple button: solid black per Apple Human Interface Guidelines
+  appleBtn:  { backgroundColor: '#000000', borderColor: 'rgba(255,255,255,0.15)' },
   oauthText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
   divider:   { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 18 },
   divLine:   { flex: 1, height: 1, backgroundColor: BORDER },
@@ -1162,8 +1201,10 @@ export default function OnboardingScreen() {
   const { isSignedIn, signOut } = useAuth();
   const { signUp }              = useSignUp();
   const { signIn }              = useSignIn();
-  const { startOAuthFlow: startGoogleOAuth } = useOAuth({ strategy: 'oauth_google' });
-  const { startOAuthFlow: startAppleOAuth }  = useOAuth({ strategy: 'oauth_apple' });
+  const { startSSOFlow } = useSSO();
+  const startGoogleOAuth = useCallback(() => startSSOFlow({ strategy: 'oauth_google', redirectUrl: AuthSession.makeRedirectUri() }), [startSSOFlow]);
+  const startAppleOAuth  = useCallback(() => startSSOFlow({ strategy: 'oauth_apple',  redirectUrl: AuthSession.makeRedirectUri() }), [startSSOFlow]);
+  const api = useApi();
 
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
@@ -1174,6 +1215,7 @@ export default function OnboardingScreen() {
 
   // Buyer data
   const [firstName, setFirstName]         = useState('');
+  const [username, setUsername]           = useState('');
   const [styleInterests, setStyleArr]     = useState<string[]>([]);
 
   // Seller data
@@ -1198,6 +1240,7 @@ export default function OnboardingScreen() {
             setFlow(draft.flow);
             setStep(draft.step ?? 0);
             setFirstName(draft.firstName ?? '');
+            setUsername(draft.username ?? '');
             setStyleArr(draft.styleInterests ?? []);
             setBrandName(draft.brandName ?? '');
             setBrandStage(draft.brandStage ?? '');
@@ -1221,11 +1264,11 @@ export default function OnboardingScreen() {
   // ── Persist draft ───────────────────────────────────────────────────────────
   const saveDraft = useCallback(async (overrides?: Record<string, unknown>) => {
     const data = {
-      flow, step, firstName, styleInterests, brandName, brandStage, productModel, goals,
+      flow, step, firstName, username, styleInterests, brandName, brandStage, productModel, goals,
       ...overrides,
     };
     await AsyncStorage.setItem(DRAFT_KEY, JSON.stringify(data));
-  }, [flow, step, firstName, styleInterests, brandName, brandStage, productModel, goals]);
+  }, [flow, step, firstName, username, styleInterests, brandName, brandStage, productModel, goals]);
 
   // ── Auth completion handler (OAuth without remount) ─────────────────────────
   const handleAuthComplete = useCallback(() => {
@@ -1277,6 +1320,11 @@ export default function OnboardingScreen() {
       ['onboarding_style_interests', JSON.stringify(styleInterests)],
     ]);
     await AsyncStorage.removeItem(DRAFT_KEY);
+    // Persist username to DB — fire-and-forget; user can refine in edit-profile later
+    const uname = username.trim().toLowerCase();
+    if (/^[a-zA-Z0-9_]{3,30}$/.test(uname)) {
+      api.auth.updateProfile({ username: uname }).catch(() => {});
+    }
     router.replace('/(buyer)/' as never);
   }
 
@@ -1288,6 +1336,11 @@ export default function OnboardingScreen() {
       ['onboarding_brand_name', brandName],
     ]);
     await AsyncStorage.removeItem(DRAFT_KEY);
+    // Persist username to DB — fire-and-forget; user can refine in settings later
+    const uname = username.trim().toLowerCase();
+    if (/^[a-zA-Z0-9_]{3,30}$/.test(uname)) {
+      api.auth.updateProfile({ username: uname }).catch(() => {});
+    }
     router.replace('/(tabs)/' as never);
   }
 
@@ -1397,6 +1450,8 @@ export default function OnboardingScreen() {
           startAppleOAuth={startAppleOAuth}
           onAuthComplete={handleAuthComplete}
           onDevClear={devReset}
+          username={username}
+          onUsernameChange={setUsername}
         />
       );
 
@@ -1558,6 +1613,8 @@ export default function OnboardingScreen() {
           startAppleOAuth={startAppleOAuth}
           onAuthComplete={handleAuthComplete}
           onDevClear={devReset}
+          username={username}
+          onUsernameChange={setUsername}
         />
       );
 

@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM,
+  BG, SURFACE, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, ON_DARK,
   GRAD_PRIMARY, FONT, FS, SP, RADIUS, ICON, OVERLAY, RED,
 } from '@/lib/theme';
 import {
@@ -107,8 +107,8 @@ export default function BuyerPostViewer() {
   const authorName = post?.authorName ?? params.postAuthorName ?? MY_NAME;
   const authorInitials = post?.authorInitials ?? params.postAuthorInitials ?? MY_INITIALS;
   const authorColor = post?.authorColor ?? params.postAuthorColor ?? MY_COLOR;
-  const mediaColor1 = params.postMediaColor1 ?? '#1a1a2e';
-  const mediaColor2 = params.postMediaColor2 ?? '#0d0d1a';
+  const mediaColor1 = params.postMediaColor1 ?? SURFACE;
+  const mediaColor2 = params.postMediaColor2 ?? BG;
   const postType = (post?.type ?? params.postType ?? 'photo') as BuyerPost['type'];
 
   const typeIcon: keyof typeof Feather.glyphMap =
@@ -322,7 +322,7 @@ const s = StyleSheet.create({
   media: { width: '100%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
   authorRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingTop: SP.md, gap: 10 },
   avatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontFamily: FONT.bold, fontSize: FS.sm, color: '#FFF' },
+  avatarText: { fontFamily: FONT.bold, fontSize: FS.sm, color: ON_DARK },
   authorName: { fontFamily: FONT.semibold, fontSize: FS.base, color: FG },
   authorHandle: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
   editBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: SP.sm, paddingVertical: 6, borderRadius: RADIUS.sm, backgroundColor: PURPLE_DIM },
@@ -336,7 +336,7 @@ const s = StyleSheet.create({
   commentsLabel: { fontFamily: FONT.semibold, fontSize: FS.sm, color: MUTED, marginBottom: SP.sm },
   commentRow: { flexDirection: 'row', gap: 8, marginBottom: SP.sm },
   commentAvatar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  commentAvatarText: { fontFamily: FONT.bold, fontSize: 10, color: '#FFF' },
+  commentAvatarText: { fontFamily: FONT.bold, fontSize: 10, color: ON_DARK },
   commentName: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED },
   commentText: { fontFamily: FONT.regular, fontSize: FS.sm, color: FG },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.md, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: RED + '44', justifyContent: 'center' },
@@ -351,5 +351,5 @@ const s = StyleSheet.create({
   modalCancel: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
   modalCancelText: { fontFamily: FONT.medium, fontSize: FS.base, color: MUTED },
   modalSave: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, backgroundColor: PURPLE, alignItems: 'center' },
-  modalSaveText: { fontFamily: FONT.bold, fontSize: FS.base, color: '#FFF' },
+  modalSaveText: { fontFamily: FONT.bold, fontSize: FS.base, color: ON_DARK },
 });

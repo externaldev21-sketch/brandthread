@@ -1,10 +1,11 @@
-import React from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
+import { useApi } from '@/lib/api';
 
 const SHIPMENTS = [
   { id: 'SH-8821', customer: 'Jordan Lee', carrier: 'UPS', status: 'In Transit', eta: 'Jul 10', progress: 70 },
@@ -13,25 +14,76 @@ const SHIPMENTS = [
   { id: 'SH-8818', customer: 'Sofia Reyes', carrier: 'DHL', status: 'Delivered', eta: 'Jul 6', progress: 100 },
 ];
 
-const RETURNS = [
-  { id: 'RET-441', customer: 'T. Morrison', item: 'Hoodie – Black XL', reason: 'Wrong size', status: 'Pending' },
-  { id: 'RET-440', customer: 'K. Wang', item: 'Classic Tee – White M', reason: 'Defect', status: 'Approved' },
-];
-
 const WAREHOUSES = [
   { name: 'East Coast Hub', location: 'Newark, NJ', stock: 2840, capacity: 85 },
   { name: 'West Coast Hub', location: 'Los Angeles, CA', stock: 1420, capacity: 60 },
 ];
 
+function capitalize(s: string) {
+  if (!s) return '';
+  return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+}
+
 export default function ShippingScreen() {
   const colors = useColors();
   const router = useRouter();
+  const api = useApi();
+
+  const [sellerReturns, setSellerReturns] = useState<any[]>([]);
+  const [shippingRates, setShippingRates] = useState<any[]>([]);
+  const [ratesLoading, setRatesLoading] = useState(false);
+
+  useEffect(() => {
+    api.returns.listSeller().then(data => setSellerReturns(data ?? [])).catch(() => {});
+    api.shippingRates.list().then(data => setShippingRates(data ?? [])).catch(() => {});
+  }, []);
 
   function shipmentBadge(status: string) {
     if (status === 'Delivered') return 'success';
     if (status === 'Out for Delivery') return 'info';
     if (status === 'In Transit') return 'gold';
     return 'default';
+  }
+
+  function returnBadge(status: string) {
+    const s = status?.toLowerCase();
+    if (s === 'approved') return 'success';
+    if (s === 'rejected' || s === 'denied') return 'error';
+    return 'warning';
+  }
+
+  function handleAddRate() {
+    Alert.prompt(
+      'Add Shipping Rate',
+      'Enter a name for this rate (e.g. "Standard Shipping"):',
+      (name) => {
+        if (!name?.trim()) return;
+        Alert.prompt(
+          'Flat Rate (cents)',
+          'Enter the flat rate in cents (e.g. 499 for $4.99):',
+          async (centsStr) => {
+            const cents = parseInt(centsStr ?? '', 10);
+            if (isNaN(cents) || cents < 0) {
+              Alert.alert('Invalid amount', 'Please enter a valid number of cents.');
+              return;
+            }
+            try {
+              setRatesLoading(true);
+              const newRate = await api.shippingRates.create({ name: name.trim(), flatRateCents: cents });
+              setShippingRates(prev => [...prev, newRate]);
+            } catch (e: any) {
+              Alert.alert('Error', e?.message ?? 'Could not create shipping rate.');
+            } finally {
+              setRatesLoading(false);
+            }
+          },
+          'plain-text',
+          '499',
+        );
+      },
+      'plain-text',
+      'Standard Shipping',
+    );
   }
 
   return (
@@ -49,7 +101,7 @@ export default function ShippingScreen() {
           { label: 'Pending', value: '8', color: colors.warning },
           { label: 'In Transit', value: '24', color: colors.primary },
           { label: 'Delivered', value: '384', color: colors.success },
-          { label: 'Returns', value: '6', color: colors.destructive },
+          { label: 'Returns', value: String(sellerReturns.length || '6'), color: colors.destructive },
         ].map((s) => (
           <View key={s.label} style={[styles.stat, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Text style={[styles.statVal, { color: s.color }]}>{s.value}</Text>
@@ -109,16 +161,68 @@ export default function ShippingScreen() {
       {/* Returns */}
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Returns & Exchanges</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {RETURNS.map((r, i) => (
-          <View key={r.id} style={[styles.returnRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-            <View style={styles.returnInfo}>
-              <Text style={[styles.returnId, { color: colors.primary }]}>{r.id} · {r.customer}</Text>
-              <Text style={[styles.returnItem, { color: colors.foreground }]}>{r.item}</Text>
-              <Text style={[styles.returnReason, { color: colors.mutedForeground }]}>{r.reason}</Text>
-            </View>
-            <Badge label={r.status} variant={r.status === 'Approved' ? 'success' : 'warning'} />
+        {sellerReturns.length === 0 ? (
+          <View style={styles.emptySection}>
+            <Feather name="rotate-ccw" size={20} color={colors.mutedForeground} />
+            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No return requests</Text>
           </View>
-        ))}
+        ) : (
+          sellerReturns.map((r, i) => (
+            <View key={r.id} style={[styles.returnRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+              <View style={styles.returnInfo}>
+                <Text style={[styles.returnId, { color: colors.primary }]}>
+                  {r.id?.slice(0, 8).toUpperCase()} · Buyer {r.buyer_id?.slice(0, 8) ?? '—'}
+                </Text>
+                <Text style={[styles.returnItem, { color: colors.foreground }]}>{r.reason ?? '—'}</Text>
+                <Text style={[styles.returnReason, { color: colors.mutedForeground }]}>{r.notes ?? ''}</Text>
+              </View>
+              <Badge label={capitalize(r.status)} variant={returnBadge(r.status) as any} />
+            </View>
+          ))
+        )}
+      </View>
+
+      {/* Shipping Rates */}
+      <View style={styles.sectionTitleRow}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 0 }]}>Shipping Rates</Text>
+        <TouchableOpacity
+          onPress={handleAddRate}
+          activeOpacity={0.75}
+          style={[styles.addRateBtn, { backgroundColor: colors.primary + '18', borderColor: colors.primary }]}
+        >
+          <Feather name="plus" size={14} color={colors.primary} />
+          <Text style={[styles.addRateBtnText, { color: colors.primary }]}>Add Rate</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 12 }]}>
+        {shippingRates.length === 0 ? (
+          <View style={styles.emptySection}>
+            <Feather name="truck" size={20} color={colors.mutedForeground} />
+            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No shipping rates configured</Text>
+          </View>
+        ) : (
+          shippingRates.map((rate, i) => (
+            <View key={rate.id} style={[styles.rateRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+              <View style={styles.rateInfo}>
+                <Text style={[styles.rateName, { color: colors.foreground }]}>{rate.name ?? 'Shipping Rate'}</Text>
+                {rate.freeAboveCents != null && (
+                  <Text style={[styles.rateSub, { color: colors.mutedForeground }]}>
+                    Free above ${(rate.freeAboveCents / 100).toFixed(2)}
+                  </Text>
+                )}
+              </View>
+              <View style={styles.rateRight}>
+                <Text style={[styles.rateAmount, { color: colors.foreground }]}>
+                  ${(rate.flatRateCents / 100).toFixed(2)}
+                </Text>
+                <Badge
+                  label={rate.active !== false ? 'Active' : 'Inactive'}
+                  variant={(rate.active !== false ? 'success' : 'default') as any}
+                />
+              </View>
+            </View>
+          ))
+        )}
       </View>
 
       {/* Warehouses */}
@@ -158,7 +262,12 @@ const styles = StyleSheet.create({
   action: { flex: 1, borderRadius: 12, padding: 12, borderWidth: 1, alignItems: 'center', gap: 6 },
   actionLabel: { fontSize: 10, fontFamily: 'Inter_500Medium' },
   sectionTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold', marginBottom: 12 },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 0 },
+  addRateBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: 8, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 5 },
+  addRateBtnText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
+  emptySection: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16 },
+  emptyText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
   shipCard: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 10 },
   shipHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 12 },
   shipId: { fontSize: 12, fontFamily: 'Inter_700Bold' },
@@ -175,6 +284,12 @@ const styles = StyleSheet.create({
   returnId: { fontSize: 11, fontFamily: 'Inter_700Bold' },
   returnItem: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   returnReason: { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  rateRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
+  rateInfo: { flex: 1, gap: 2 },
+  rateName: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  rateSub: { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  rateRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  rateAmount: { fontSize: 14, fontFamily: 'Inter_700Bold' },
   warehouseCard: { borderRadius: 14, borderWidth: 1, padding: 16, marginBottom: 10 },
   warehouseHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   warehouseName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },

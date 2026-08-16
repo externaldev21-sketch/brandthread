@@ -158,7 +158,7 @@ export default function PlansScreen() {
             style={[
               styles.card,
               {
-                backgroundColor: plan.current ? '#17140F' : colors.card,
+                backgroundColor: plan.current ? '#12121F' : colors.card,
                 borderColor: plan.current ? colors.primary : colors.border,
               },
             ]}

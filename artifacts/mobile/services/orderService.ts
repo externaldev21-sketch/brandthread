@@ -485,22 +485,29 @@ export async function markReadyToShip(orderId: string): Promise<Order | undefine
   return o;
 }
 
-export async function addTracking(orderId: string, carrier: string, trackingNumber: string): Promise<Order | undefined> {
-  await ensureInitialized();
-  const o = _orders.find(x => x.id === orderId);
-  if (!o) return undefined;
-  const shipment: Shipment = {
-    id: 'shp_' + uid(), orderId,
-    fulfillmentGroupId: o.fulfillment.groups[0]?.id ?? '',
-    carrier, trackingNumber, trackingStatus: 'label_created',
-    trackingEvents: [{ id: 'te_' + uid(), status: 'label_created', description: 'Tracking added manually', timestamp: now() }],
-    isDemo: true,
-  };
-  o.shipments.push(shipment);
-  addTimeline(o, 'tracking_added', `Tracking added: ${carrier} ${trackingNumber}`, true);
-  o.updatedAt = now();
-  await persistOrders();
-  return o;
+export async function addTracking(orderId: string, carrier: string, trackingNumber: string): Promise<any> {
+  // Try real API first, fall back to local demo
+  try {
+    const { api } = await import('@/lib/api');
+    return await api.orders.addTracking(orderId, { trackingNumber, carrier });
+  } catch {
+    // Demo fallback (if no real order or API unavailable)
+    await ensureInitialized();
+    const o = _orders.find(x => x.id === orderId);
+    if (!o) return undefined;
+    const shipment: Shipment = {
+      id: 'shp_' + uid(), orderId,
+      fulfillmentGroupId: o.fulfillment.groups[0]?.id ?? '',
+      carrier, trackingNumber, trackingStatus: 'label_created',
+      trackingEvents: [{ id: 'te_' + uid(), status: 'label_created', description: 'Tracking added manually', timestamp: now() }],
+      isDemo: true,
+    };
+    o.shipments.push(shipment);
+    addTimeline(o, 'tracking_added', `Tracking added: ${carrier} ${trackingNumber}`, true);
+    o.updatedAt = now();
+    await persistOrders();
+    return o;
+  }
 }
 
 export async function markShipped(orderId: string): Promise<Order | undefined> {

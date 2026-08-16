@@ -5,7 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
-import { BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, RED, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { ThreadDivider } from '@/components/BrandthreadUI';
 
 type Row = { label: string; subtitle?: string; icon: keyof typeof Feather.glyphMap; route?: string; section?: string; destructive?: boolean; action?: 'signout' | 'delete' };
 type Group = { title: string; rows: Row[] };
@@ -18,6 +19,7 @@ const GROUPS: Group[] = [
     { label: 'Archive', subtitle: 'Archived posts and stories', icon: 'archive', route: '/buyer-archive' },
     { label: 'Saved', subtitle: 'Posts, products and collections', icon: 'bookmark', route: '/buyer-saved' },
     { label: 'QR code', subtitle: 'Share your Brandthread profile', icon: 'grid', route: '/buyer-qr-code' },
+    { label: 'Invite friends', subtitle: 'Share your invite code and earn rewards', icon: 'gift', route: '/buyer-invite' },
   ]},
   { title: 'Who can see your content', rows: [
     { label: 'Account privacy', icon: 'lock', route: '/buyer-privacy-settings' },
@@ -42,8 +44,13 @@ const GROUPS: Group[] = [
   { title: 'Shopping', rows: [
     { label: 'Shopping preferences', subtitle: 'Sizes, fit, favorite categories and recommendations', icon: 'shopping-bag', route: '/shopping-preferences' },
     { label: 'Orders and returns', icon: 'package', route: '/(buyer)/orders' },
-    { label: 'Addresses and payments', icon: 'credit-card', section: 'payments' },
+    { label: 'Payment methods', subtitle: 'Cards saved to your account', icon: 'credit-card', route: '/buyer-payment-methods' },
     { label: 'Following brands', icon: 'users', route: '/(buyer)/following' },
+  ]},
+  { title: 'Security', rows: [
+    { label: 'Login methods', subtitle: 'Password, two-factor authentication', icon: 'key', route: '/login-methods' },
+    { label: 'Login activity', subtitle: 'Review devices signed into your account', icon: 'monitor', route: '/login-activity' },
+    { label: 'Biometric unlock', subtitle: 'Face ID or fingerprint', icon: 'unlock', route: '/biometric-unlock' },
   ]},
   { title: 'Notifications and app', rows: [
     { label: 'Notifications', icon: 'bell', section: 'notifications' },
@@ -101,14 +108,17 @@ export default function BuyerSettingsScreen() {
     </View>
     <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
       <View style={styles.search}><Feather name="search" size={17} color={MUTED} /><TextInput value={query} onChangeText={setQuery} placeholder="Search" placeholderTextColor={SUBTLE} style={styles.searchInput} /></View>
-      {groups.map(group => <View key={group.title} style={styles.group}>
-        <Text style={styles.groupTitle}>{group.title}</Text>
-        <View style={styles.card}>{group.rows.map((row, i) => <TouchableOpacity key={row.label} onPress={() => press(row)} style={[styles.row, i < group.rows.length - 1 && styles.divider]} activeOpacity={0.7}>
-          <View style={styles.rowIcon}><Feather name={row.icon} size={19} color={row.destructive ? '#F87171' : FG} /></View>
-          <View style={{ flex: 1 }}><Text style={[styles.rowLabel, row.destructive && { color: '#F87171' }]}>{row.label}</Text>{row.subtitle ? <Text style={styles.rowSub}>{row.subtitle}</Text> : null}</View>
-          {!row.destructive && <Feather name="chevron-right" size={19} color={SUBTLE} />}
-        </TouchableOpacity>)}</View>
-      </View>)}
+      {groups.map((group, gi) => <React.Fragment key={group.title}>
+        {gi > 0 && <ThreadDivider style={{ marginVertical: SP.xs }} />}
+        <View style={styles.group}>
+          <Text style={styles.groupTitle}>{group.title}</Text>
+          <View style={styles.card}>{group.rows.map((row, i) => <TouchableOpacity key={row.label} onPress={() => press(row)} style={[styles.row, i < group.rows.length - 1 && styles.divider]} activeOpacity={0.7}>
+            <View style={styles.rowIcon}><Feather name={row.icon} size={19} color={row.destructive ? RED : FG} /></View>
+            <View style={{ flex: 1 }}><Text style={[styles.rowLabel, row.destructive && { color: RED }]}>{row.label}</Text>{row.subtitle ? <Text style={styles.rowSub}>{row.subtitle}</Text> : null}</View>
+            {!row.destructive && <Feather name="chevron-right" size={19} color={SUBTLE} />}
+          </TouchableOpacity>)}</View>
+        </View>
+      </React.Fragment>)}
       <Text style={styles.version}>Brandthread v1.0.0</Text>
     </ScrollView>
   </View>;
@@ -119,5 +129,5 @@ const styles = StyleSheet.create({
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }, title: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
   search: { height: 44, borderRadius: RADIUS.md, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, flexDirection: 'row', gap: 10, alignItems: 'center', paddingHorizontal: 14, marginBottom: SP.lg },
   searchInput: { flex: 1, color: FG, fontFamily: FONT.regular, fontSize: FS.base }, group: { marginBottom: SP.lg }, groupTitle: { color: MUTED, fontFamily: FONT.semibold, fontSize: FS.sm, marginBottom: SP.sm },
-  card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' }, row: { minHeight: 58, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 12 }, divider: { borderBottomWidth: 1, borderBottomColor: BORDER }, rowIcon: { width: 28, alignItems: 'center' }, rowLabel: { color: FG, fontFamily: FONT.medium, fontSize: 14 }, rowSub: { color: MUTED, fontFamily: FONT.regular, fontSize: 11.5, marginTop: 2, lineHeight: 16 }, version: { color: SUBTLE, textAlign: 'center', fontFamily: FONT.regular, fontSize: 11, marginVertical: 8 },
+  card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' }, row: { minHeight: 58, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 10, gap: 12 }, divider: { borderBottomWidth: 1, borderBottomColor: BORDER }, rowIcon: { width: 28, alignItems: 'center' }, rowLabel: { color: FG, fontFamily: FONT.medium, fontSize: FS.sm }, rowSub: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2, lineHeight: 16 }, version: { color: SUBTLE, textAlign: 'center', fontFamily: FONT.regular, fontSize: FS.xs, marginVertical: 8 },
 });

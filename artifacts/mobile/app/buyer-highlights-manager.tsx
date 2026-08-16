@@ -12,7 +12,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM,
+  BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, ON_DARK,
+  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
+  CYAN, SUCCESS, RED, ORANGE, GOLD,
   FONT, FS, SP, RADIUS, OVERLAY,
 } from '@/lib/theme';
 import {
@@ -20,7 +22,7 @@ import {
   reorderHighlights, type Highlight,
 } from '@/lib/highlightsService';
 
-const COVER_COLORS = ['#8B5CF6', '#22D3EE', '#F472B6', '#FB923C', '#34D399', '#F87171', '#A78BFA', '#FBBF24'];
+const COVER_COLORS = [PURPLE, CYAN, '#F472B6', ORANGE, SUCCESS, RED, PURPLE_LIGHT, GOLD];
 
 function EmojiPicker({ visible, onSelect, onClose }: {
   visible: boolean;
@@ -273,7 +275,7 @@ const s = StyleSheet.create({
   emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.lg, color: FG },
   emptySub: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', paddingHorizontal: SP.xl },
   createBtn: { paddingHorizontal: SP.xl, paddingVertical: SP.md, borderRadius: RADIUS.pill, backgroundColor: PURPLE },
-  createBtnText: { fontFamily: FONT.bold, fontSize: FS.base, color: '#FFF' },
+  createBtnText: { fontFamily: FONT.bold, fontSize: FS.base, color: ON_DARK },
   emojiTrigger: { alignItems: 'center', paddingVertical: SP.md, gap: 4 },
   emojiHint: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE },
   labelInput: { borderWidth: 1, borderColor: BORDER_ACTIVE, borderRadius: RADIUS.md, padding: SP.md, color: FG, fontFamily: FONT.regular, fontSize: FS.base, marginBottom: SP.md },
@@ -285,7 +287,7 @@ const s = StyleSheet.create({
   cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
   cancelBtnText: { fontFamily: FONT.medium, fontSize: FS.base, color: MUTED },
   saveBtn: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, backgroundColor: PURPLE, alignItems: 'center' },
-  saveBtnText: { fontFamily: FONT.bold, fontSize: FS.base, color: '#FFF' },
+  saveBtnText: { fontFamily: FONT.bold, fontSize: FS.base, color: ON_DARK },
 });
 
 const sheet = StyleSheet.create({

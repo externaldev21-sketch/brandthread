@@ -9,14 +9,15 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM,
+  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
+  FG, MUTED, SUBTLE, ON_DARK, PURPLE, PURPLE_DIM,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
   getStories, trackStoryView, subscribeSocial,
 } from '@/services/socialService';
 import type { Story, StoryMedia } from '@/services/socialTypes';
+import { useApi } from '@/lib/api';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -35,6 +36,8 @@ export default function BuyerStoryViewer() {
   const router = useRouter();
   const { storyId, allStoryIds } = useLocalSearchParams<{ storyId: string; allStoryIds: string }>();
 
+  const api = useApi();
+
   const [stories, setStories] = useState<Story[]>([]);
   const [storyIdx, setStoryIdx] = useState(0);
   const [slideIdx, setSlideIdx] = useState(0);
@@ -42,6 +45,9 @@ export default function BuyerStoryViewer() {
   const [isLongPressing, setIsLongPressing] = useState(false);
   const [inputText, setInputText] = useState('');
   const [viewerModalVisible, setViewerModalVisible] = useState(false);
+  // Like state keyed by storyId
+  const [likedSet, setLikedSet] = useState<Set<string>>(new Set());
+  const [likesCounts, setLikesCounts] = useState<Record<string, number>>({});
 
   const progress = useRef(new Animated.Value(0)).current;
   const ids = allStoryIds ? allStoryIds.split(',').filter(Boolean) : storyId ? [storyId] : [];
@@ -66,8 +72,43 @@ export default function BuyerStoryViewer() {
 
   useEffect(() => {
     loadStories();
-    if (storyId) trackStoryView(storyId).catch(() => {});
+    if (storyId) {
+      trackStoryView(storyId).catch(() => {});
+      // Also record view server-side (fire-and-forget)
+      api.social.viewStory(storyId).catch(() => {});
+    }
   }, []);
+
+  // Seed like state from server story data
+  useEffect(() => {
+    if (!stories.length) return;
+    const serverCounts: Record<string, number> = {};
+    const serverLiked  = new Set<string>();
+    stories.forEach(s => {
+      serverCounts[s.id] = (s as any).likesCount ?? 0;
+      if ((s as any).likedByMe) serverLiked.add(s.id);
+    });
+    setLikesCounts(prev => ({ ...serverCounts, ...prev }));
+    setLikedSet(prev => {
+      const next = new Set(prev);
+      serverLiked.forEach(id => next.add(id));
+      return next;
+    });
+  }, [stories]);
+
+  const handleLike = async () => {
+    if (!currentStory) return;
+    const sid = currentStory.id;
+    const wasLiked = likedSet.has(sid);
+    // Optimistic update
+    setLikedSet(prev => { const n = new Set(prev); wasLiked ? n.delete(sid) : n.add(sid); return n; });
+    setLikesCounts(prev => ({ ...prev, [sid]: Math.max(0, (prev[sid] ?? 0) + (wasLiked ? -1 : 1)) }));
+    try {
+      const res = await api.social.likeStory(sid);
+      setLikesCounts(prev => ({ ...prev, [sid]: res.likesCount }));
+      setLikedSet(prev => { const n = new Set(prev); res.liked ? n.add(sid) : n.delete(sid); return n; });
+    } catch { /* keep optimistic */ }
+  };
 
   useEffect(() => {
     const unsub = subscribeSocial(() => loadStories());
@@ -137,7 +178,7 @@ export default function BuyerStoryViewer() {
             </Text>
           </View>
         ) : (
-          <View style={[styles.slideContent, { backgroundColor: currentSlide.backgroundColor || '#111' }]}>
+          <View style={[styles.slideContent, { backgroundColor: currentSlide.backgroundColor || SURFACE }]}>
             <Feather
               name={currentSlide.type === 'video' ? 'video' : 'image'}
               size={80}
@@ -226,7 +267,7 @@ export default function BuyerStoryViewer() {
             ])
           }
         >
-          <Feather name="more-horizontal" size={ICON.md} color="#fff" />
+          <Feather name="more-horizontal" size={ICON.md} color={ON_DARK} />
         </TouchableOpacity>
       </View>
 
@@ -242,25 +283,28 @@ export default function BuyerStoryViewer() {
               placeholderTextColor="rgba(255,255,255,0.4)"
             />
             <TouchableOpacity
-              onPress={() =>
-                Alert.alert('React', '', [
-                  { text: '❤️' },
-                  { text: '🔥' },
-                  { text: '😍' },
-                  { text: '😂' },
-                  { text: '👏' },
-                  { text: 'Cancel', style: 'cancel' },
-                ])
-              }
+              onPress={handleLike}
+              style={styles.likeBtn}
+              activeOpacity={0.7}
             >
-              <Feather name="heart" size={ICON.lg} color="#fff" />
+              <Feather
+                name="heart"
+                size={ICON.lg}
+                color={likedSet.has(currentStory.id) ? '#EF4444' : ON_DARK}
+                style={likedSet.has(currentStory.id) ? styles.heartFilled : undefined}
+              />
+              {(likesCounts[currentStory.id] ?? 0) > 0 && (
+                <Text style={styles.likesCountText}>
+                  {likesCounts[currentStory.id]}
+                </Text>
+              )}
             </TouchableOpacity>
             {isMyStory && (
               <TouchableOpacity
                 style={styles.viewerBtn}
                 onPress={() => setViewerModalVisible(true)}
               >
-                <Feather name="eye" size={ICON.lg} color="#fff" />
+                <Feather name="eye" size={ICON.lg} color={ON_DARK} />
                 <Text style={styles.viewerCount}>{currentStory.viewers.length}</Text>
               </TouchableOpacity>
             )}
@@ -357,11 +401,11 @@ const styles = StyleSheet.create({
   },
   progressFull: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: ON_DARK,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#fff',
+    backgroundColor: ON_DARK,
   },
   authorRow: {
     position: 'absolute',
@@ -381,12 +425,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarText: {
-    color: '#fff',
+    color: ON_DARK,
     fontFamily: FONT.bold,
     fontSize: FS.sm,
   },
   authorName: {
-    color: '#fff',
+    color: ON_DARK,
     fontFamily: FONT.semibold,
     fontSize: FS.base,
   },
@@ -449,7 +493,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.15)',
     fontSize: FS.sm,
     fontFamily: FONT.regular,
-    color: '#fff',
+    color: ON_DARK,
   },
   viewerBtn: {
     flexDirection: 'row',
@@ -457,7 +501,7 @@ const styles = StyleSheet.create({
     gap: SP.xs,
   },
   viewerCount: {
-    color: '#fff',
+    color: ON_DARK,
     fontSize: FS.sm,
     fontFamily: FONT.medium,
   },
@@ -511,7 +555,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   viewerInitials: {
-    color: '#fff',
+    color: ON_DARK,
     fontFamily: FONT.bold,
     fontSize: FS.sm,
   },
@@ -536,5 +580,20 @@ const styles = StyleSheet.create({
     fontFamily: FONT.regular,
     textAlign: 'center',
     padding: SP.lg,
+  },
+  likeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 4,
+  },
+  heartFilled: {
+    // tintColor applied via color prop above
+  },
+  likesCountText: {
+    color: ON_DARK,
+    fontSize: FS.sm,
+    fontFamily: FONT.medium,
+    minWidth: 16,
   },
 });

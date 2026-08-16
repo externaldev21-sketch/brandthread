@@ -4,6 +4,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { serviceRequest } from '../lib/serviceConfig';
 import {
   Manufacturer, ManufacturerRelationship, ManufacturerInvitation,
   QuoteRequest, Quote, Counteroffer,
@@ -332,6 +333,68 @@ async function ensureInitialized() {
 
 // ─── Manufacturers ────────────────────────────────────────────────────────────
 
+function apiRowToManufacturer(row: any): Manufacturer {
+  return {
+    id:                 row.id,
+    name:               row.businessName,
+    country:            row.country,
+    city:               '',
+    specialty:          row.specialty ?? '',
+    description:        row.description ?? '',
+    moq:                row.moq ?? 100,
+    samplePriceMin:     50,
+    samplePriceMax:     150,
+    unitPriceMin:       8,
+    unitPriceMax:       30,
+    leadTimeDays:       30,
+    responseTimeHours:  24,
+    rating:             0,
+    reviewCount:        0,
+    isVerified:         !!row.verifiedAt,
+    profileImageUri:    row.photos?.[0] ?? undefined,
+    galleryUris:        row.photos ?? [],
+    yearsInBusiness:    0,
+    teamSize:           '',
+    productionCapacity: '',
+    specialties:        [row.specialty ?? ''].filter(Boolean),
+    categories:         [row.specialty ?? ''].filter(Boolean),
+    capabilities:       [],
+    certifications:     [],
+    materials:          [],
+    shippingRegions:    [row.country].filter(Boolean),
+    website:            row.website ?? undefined,
+    email:              undefined,
+    createdAt:          row.createdAt ?? now(),
+  } as unknown as Manufacturer;
+}
+
+function apiRowToQuoteRequest(row: any): QuoteRequest {
+  return {
+    id:              row.id,
+    sellerId:        row.sellerId,
+    manufacturerId:  row.manufacturerId,
+    productName:     row.productName,
+    status:          row.status,
+    quantity:        row.quantity ?? 100,
+    materials:       [],
+    colorways:       row.colorways ? [row.colorways] : [],
+    sizes:           [],
+    variantQuantities: {},
+    hasEmbroidery:   false,
+    hasWash:         false,
+    hasHardware:     false,
+    hasLabels:       false,
+    customPackaging: false,
+    fileIds:         [],
+    currentStep:     3,
+    isDraft:         false,
+    sampleRequired:  row.type === 'sample',
+    submittedAt:     row.createdAt,
+    createdAt:       row.createdAt,
+    updatedAt:       row.updatedAt,
+  } as unknown as QuoteRequest;
+}
+
 export async function searchManufacturers(opts: {
   query?: string;
   country?: string;
@@ -343,6 +406,24 @@ export async function searchManufacturers(opts: {
   ratingMin?: number;
   material?: string;
 }): Promise<Manufacturer[]> {
+  // Try real public directory API first
+  try {
+    const params: Record<string, string> = {};
+    if (opts.query)    params.q         = opts.query;
+    if (opts.country)  params.country   = opts.country;
+    if (opts.category) params.specialty = opts.category;
+
+    const qs = Object.keys(params).length
+      ? '?' + Object.entries(params).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&')
+      : '';
+    const apiRows = await serviceRequest<any[]>(`/api/manufacturers/public${qs}`);
+    if (apiRows.length > 0) {
+      const apiMfgs = apiRows.map(apiRowToManufacturer);
+      const apiIds  = new Set(apiMfgs.map(m => m.id));
+      const demoOnly = DEMO_MANUFACTURERS.filter(m => !apiIds.has(m.id));
+      _manufacturers = [...apiMfgs, ...demoOnly];
+    }
+  } catch { /* fall through to demo */ }
   await ensureInitialized();
   let results = [..._manufacturers];
   const q = opts.query?.toLowerCase().trim() ?? '';
@@ -432,6 +513,30 @@ export async function getInvitations(): Promise<ManufacturerInvitation[]> {
 }
 
 export async function createInvitation(data: Omit<ManufacturerInvitation, 'id' | 'sellerId' | 'status' | 'createdAt'>): Promise<ManufacturerInvitation> {
+  // Try real API first
+  try {
+    const result = await serviceRequest<any>('/api/manufacturers/invite-tokens', {
+      method: 'POST',
+      body: JSON.stringify({
+        companyName:  data.companyName,
+        contactName:  data.contactName,
+        contactEmail: data.email,
+        notes:        data.notes,
+      }),
+    });
+    // Normalise to ManufacturerInvitation shape
+    return {
+      id:          result.id,
+      sellerId:    result.sellerId,
+      status:      'pending',
+      companyName: result.companyName ?? data.companyName,
+      contactName: result.contactName ?? data.contactName,
+      email:       data.email,
+      inviteLink:  result.inviteUrl ?? `https://brandthread.app/manufacturer-onboard?token=${result.token}`,
+      createdAt:   result.createdAt ?? now(),
+    } as any;
+  } catch { /* fall through to demo */ }
+
   await ensureInitialized();
   const inv: ManufacturerInvitation = {
     id: 'inv_' + uid(),
@@ -449,6 +554,15 @@ export async function createInvitation(data: Omit<ManufacturerInvitation, 'id' |
 // ─── Quote Requests ───────────────────────────────────────────────────────────
 
 export async function getQuoteRequests(): Promise<QuoteRequest[]> {
+  try {
+    const rows = await serviceRequest<any[]>('/api/seller-hub/quote-requests');
+    const apiRequests = rows.map(apiRowToQuoteRequest);
+    // Merge API results with any local-only drafts
+    const apiIds = new Set(apiRequests.map(r => r.id));
+    await ensureInitialized();
+    const localDrafts = _quoteRequests.filter(r => r.isDraft && !apiIds.has(r.id));
+    return [...apiRequests, ...localDrafts];
+  } catch { /* fall through to local */ }
   await ensureInitialized();
   return [..._quoteRequests];
 }
@@ -505,6 +619,19 @@ export async function submitQuoteRequest(id: string): Promise<QuoteRequest | und
   qr.submittedAt = now();
   qr.expiresAt = futureDate(30);
   qr.updatedAt = now();
+  // Also persist to server (fire-and-forget)
+  serviceRequest('/api/seller-hub/quote-requests', {
+    method: 'POST',
+    body: JSON.stringify({
+      manufacturerId: qr.manufacturerId,
+      type:          qr.sampleRequired ? 'sample' : 'quote',
+      productName:   qr.productName,
+      productType:   'apparel',
+      quantity:      qr.quantity,
+      colorways:     qr.colorways?.join(', '),
+      details:       qr.notes,
+    }),
+  }).catch(() => { /* non-fatal */ });
   await persistAll();
 
   // Auto-generate a demo quote response after a brief delay

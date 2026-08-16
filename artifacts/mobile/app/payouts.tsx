@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -8,15 +8,7 @@ import {
   BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM,
   CYAN, CYAN_DIM, SUCCESS, RED, ORANGE, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
-
-// ─── Demo data (mock — real payout API not yet connected) ────────────────────
-const PAYOUT_SUMMARY = {
-  nextPayoutAmount: '$1,284.50',
-  nextPayoutDate:   'Jul 21, 2026',
-  availableBalance: '$1,284.50',
-  pendingBalance:   '$312.00',
-  totalEarned:      '$18,640.20',
-};
+import { useApi } from '@/lib/api';
 
 type PayoutStatus = 'paid' | 'pending' | 'in_transit' | 'failed';
 
@@ -29,14 +21,18 @@ interface PayoutRecord {
   ordersCount: number;
 }
 
-const PAYOUTS: PayoutRecord[] = [
-  { id: 'po_1', date: 'Jul 14, 2026', amount: '$840.00',   status: 'in_transit', bankLast4: '4242', ordersCount: 12 },
-  { id: 'po_2', date: 'Jul 7, 2026',  amount: '$1,120.40', status: 'paid',       bankLast4: '4242', ordersCount: 17 },
-  { id: 'po_3', date: 'Jun 30, 2026', amount: '$630.80',   status: 'paid',       bankLast4: '4242', ordersCount: 9  },
-  { id: 'po_4', date: 'Jun 23, 2026', amount: '$990.00',   status: 'paid',       bankLast4: '4242', ordersCount: 14 },
-  { id: 'po_5', date: 'Jun 16, 2026', amount: '$215.00',   status: 'paid',       bankLast4: '4242', ordersCount: 3  },
-  { id: 'po_6', date: 'Jun 9, 2026',  amount: '$0.00',     status: 'failed',     bankLast4: '4242', ordersCount: 0  },
-];
+// Status label fallback for Stripe statuses not in our union
+function stripeStatusToLocal(s: string): PayoutStatus {
+  if (s === 'paid') return 'paid';
+  if (s === 'in_transit') return 'in_transit';
+  if (s === 'pending') return 'pending';
+  if (s === 'failed' || s === 'canceled') return 'failed';
+  return 'pending';
+}
+
+function fmtDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 const STATUS_CONFIG: Record<PayoutStatus, { label: string; color: string; bg: string }> = {
   paid:       { label: 'Paid',       color: SUCCESS,  bg: `${SUCCESS}20`  },
@@ -48,11 +44,43 @@ const STATUS_CONFIG: Record<PayoutStatus, { label: string; color: string; bg: st
 export default function PayoutsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const api    = useApi();
   const [activeTab, setActiveTab] = useState<'payouts' | 'settings'>('payouts');
+  const [loading,   setLoading]   = useState(true);
+  const [balance,   setBalance]   = useState<any>(null);
+  const [payouts,   setPayouts]   = useState<PayoutRecord[]>([]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [bal, po] = await Promise.all([
+        api.finance.balance(),
+        api.finance.payouts(20),
+      ]);
+      setBalance(bal);
+      setPayouts((po.payouts ?? []).map((p: any): PayoutRecord => ({
+        id:         p.id,
+        date:       fmtDate(p.arrivalDate),
+        amount:     p.formatted,
+        status:     stripeStatusToLocal(p.status),
+        bankLast4:  p.destination?.last4 ?? '····',
+        ordersCount: 0,
+      })));
+    } catch { /* stay with empty state if not connected */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   function haptic() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
+
+  const availFmt   = balance?.available?.formatted ?? '$0.00';
+  const pendFmt    = balance?.pending?.formatted   ?? '$0.00';
+  const nextDate   = balance?.nextPayout
+    ? fmtDate(balance.nextPayout.arrivalDate)
+    : '—';
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -67,22 +95,16 @@ export default function PayoutsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Dev notice */}
-      <View style={styles.devBanner}>
-        <Feather name="info" size={13} color={ORANGE} />
-        <Text style={styles.devBannerText}>Development mode — payouts are simulated</Text>
-      </View>
-
       {/* Balance cards */}
       <View style={styles.balanceRow}>
         <View style={[styles.balanceCard, { flex: 1, marginRight: SP.sm }]}>
           <Text style={styles.balanceLabel}>Available</Text>
-          <Text style={styles.balanceAmount}>{PAYOUT_SUMMARY.availableBalance}</Text>
-          <Text style={styles.balanceSub}>Next: {PAYOUT_SUMMARY.nextPayoutDate}</Text>
+          <Text style={styles.balanceAmount}>{availFmt}</Text>
+          <Text style={styles.balanceSub}>Next: {nextDate}</Text>
         </View>
         <View style={[styles.balanceCard, { flex: 1 }]}>
           <Text style={styles.balanceLabel}>Pending</Text>
-          <Text style={[styles.balanceAmount, { color: MUTED }]}>{PAYOUT_SUMMARY.pendingBalance}</Text>
+          <Text style={[styles.balanceAmount, { color: MUTED }]}>{pendFmt}</Text>
           <Text style={styles.balanceSub}>Processing 2–3 days</Text>
         </View>
       </View>
@@ -104,27 +126,34 @@ export default function PayoutsScreen() {
 
       {activeTab === 'payouts' ? (
         <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + SP.xl }]}>
-          {PAYOUTS.map((p) => {
-            const cfg = STATUS_CONFIG[p.status];
-            return (
-              <View key={p.id} style={styles.payoutRow}>
-                <View style={styles.payoutLeft}>
-                  <Text style={styles.payoutDate}>{p.date}</Text>
-                  <Text style={styles.payoutSub}>{p.ordersCount} orders · ···{p.bankLast4}</Text>
-                </View>
-                <View style={styles.payoutRight}>
-                  <Text style={styles.payoutAmount}>{p.amount}</Text>
-                  <View style={[styles.statusPill, { backgroundColor: cfg.bg }]}>
-                    <Text style={[styles.statusText, { color: cfg.color }]}>{cfg.label}</Text>
+          {loading ? (
+            <ActivityIndicator color={PURPLE} style={{ marginTop: 40 }} />
+          ) : payouts.length === 0 ? (
+            <View style={{ alignItems: 'center', paddingVertical: 40 }}>
+              <Feather name="inbox" size={28} color={MUTED} />
+              <Text style={{ color: MUTED, fontSize: FS.sm, fontFamily: FONT.regular, marginTop: 10 }}>
+                {balance?.connected === false ? 'Connect Stripe to see payouts' : 'No payouts yet'}
+              </Text>
+            </View>
+          ) : (
+            payouts.map((p) => {
+              const cfg = STATUS_CONFIG[p.status];
+              return (
+                <View key={p.id} style={styles.payoutRow}>
+                  <View style={styles.payoutLeft}>
+                    <Text style={styles.payoutDate}>{p.date}</Text>
+                    <Text style={styles.payoutSub}>···{p.bankLast4}</Text>
+                  </View>
+                  <View style={styles.payoutRight}>
+                    <Text style={styles.payoutAmount}>{p.amount}</Text>
+                    <View style={[styles.statusPill, { backgroundColor: cfg.bg }]}>
+                      <Text style={[styles.statusText, { color: cfg.color }]}>{cfg.label}</Text>
+                    </View>
                   </View>
                 </View>
-              </View>
-            );
-          })}
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total earned</Text>
-            <Text style={styles.totalAmount}>{PAYOUT_SUMMARY.totalEarned}</Text>
-          </View>
+              );
+            })
+          )}
         </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + SP.xl }]}>

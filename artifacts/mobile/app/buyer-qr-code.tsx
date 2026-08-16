@@ -7,7 +7,7 @@ import * as Haptics from 'expo-haptics';
 import QRCode from 'react-native-qrcode-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE,
+  BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, ON_DARK,
   PURPLE, PURPLE_DIM, GRAD_PRIMARY,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
@@ -64,9 +64,9 @@ export default function BuyerQRCode() {
                 value={qrValue}
                 size={200}
                 backgroundColor="transparent"
-                color="#FFFFFF"
+                color={ON_DARK}
                 enableLinearGradient
-                linearGradient={['#8B5CF6', '#22D3EE']}
+                linearGradient={[...GRAD_PRIMARY]}
               />
             </View>
           </View>
@@ -85,7 +85,7 @@ export default function BuyerQRCode() {
         {/* Share button */}
         <TouchableOpacity onPress={handleShare} activeOpacity={0.85} style={s.shareBtnWrap}>
           <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.shareBtn}>
-            <Feather name="share-2" size={18} color="#FFF" />
+            <Feather name="share-2" size={18} color={ON_DARK} />
             <Text style={s.shareBtnText}>Share QR Code</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -119,20 +119,20 @@ const s = StyleSheet.create({
 
   card: { width: '100%', maxWidth: 320, backgroundColor: CARD, borderRadius: RADIUS.xl, borderWidth: 1, borderColor: BORDER, overflow: 'hidden', marginTop: SP.lg },
   cardTop: { paddingVertical: 12, alignItems: 'center' },
-  cardBrand: { fontFamily: FONT.bold, fontSize: FS.md, color: '#FFF', letterSpacing: 1.5 },
+  cardBrand: { fontFamily: FONT.bold, fontSize: FS.md, color: ON_DARK, letterSpacing: 1.5 },
 
   qrWrap: { alignItems: 'center', paddingVertical: SP.xl },
   qrBg: { padding: 20, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER_ACTIVE },
 
   handleRow: { alignItems: 'center', marginBottom: SP.md },
   handleBadge: { paddingHorizontal: SP.lg, paddingVertical: 8, borderRadius: RADIUS.pill },
-  handleText: { fontFamily: FONT.bold, fontSize: FS.base, color: '#FFF' },
+  handleText: { fontFamily: FONT.bold, fontSize: FS.base, color: ON_DARK },
 
   hint: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, textAlign: 'center', paddingHorizontal: SP.lg, paddingBottom: SP.lg },
 
   shareBtnWrap: { marginTop: SP.lg, width: '100%', maxWidth: 320 },
   shareBtn: { height: 50, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: SP.sm },
-  shareBtnText: { fontFamily: FONT.bold, fontSize: FS.base, color: '#FFF' },
+  shareBtnText: { fontFamily: FONT.bold, fontSize: FS.base, color: ON_DARK },
 
   infoCard: { width: '100%', maxWidth: 320, backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden', marginTop: SP.md },
   infoRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: 14, gap: SP.sm },

@@ -4,7 +4,7 @@
  */
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  Animated, Platform, RefreshControl, ScrollView, StyleSheet,
+  ActivityIndicator, Animated, Platform, RefreshControl, ScrollView, StyleSheet,
   Text, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -80,12 +80,12 @@ const DROPPING_SOON = [
   { id: 'd1', brand: 'Meridian Co.',  name: 'Essential Tee — Sage',   price: '$48',  color: '#0F766E', initials: 'MC', inHours: 0,  live: true  },
   { id: 'd2', brand: 'NxGen Drops',   name: 'Cargo Trouser S/S',      price: '$134', color: '#B45309', initials: 'NX', inHours: 4,  live: false },
   { id: 'd3', brand: 'Rawthread',     name: 'Boxy Flannel Shirt',     price: '$96',  color: '#92400E', initials: 'RT', inHours: 9,  live: false },
-  { id: 'd4', brand: 'Vault Studio',  name: 'Fleece Zip Jacket',      price: '$220', color: '#00C853', initials: 'VS', inHours: 23, live: false },
+  { id: 'd4', brand: 'Vault Studio',  name: 'Fleece Zip Jacket',      price: '$220', color: '#8B5CF6', initials: 'VS', inHours: 23, live: false },
 ];
 
 const TRENDING = [
   { id: 't1', rank: 1, brand: 'NxGen Drops',  name: 'Archive Hoodie Vol.3',   price: '$135', color: '#B45309', initials: 'NX', hype: '🔥 Hot'    },
-  { id: 't2', rank: 2, brand: 'Vault Studio',  name: 'Canvas Cargo Jacket',    price: '$189', color: '#00C853', initials: 'VS', hype: '⚡ Live'   },
+  { id: 't2', rank: 2, brand: 'Vault Studio',  name: 'Canvas Cargo Jacket',    price: '$189', color: '#8B5CF6', initials: 'VS', hype: '⚡ Live'   },
   { id: 't3', rank: 3, brand: 'Atlas Goods',   name: 'Utility Vest — Slate',   price: '$220', color: '#1D4ED8', initials: 'AG', hype: '⏳ Limited' },
   { id: 't4', rank: 4, brand: 'Coldform',      name: 'Raw Denim Jacket',       price: '$310', color: '#065F46', initials: 'CF', hype: '💎 Grail'  },
 ];
@@ -417,6 +417,7 @@ export default function DiscoverScreen() {
   const [refreshing, setRefreshing] = useState(false);
   // API-backed products replace the hardcoded FOR_YOU list when available
   const [liveForYou, setLiveForYou] = useState<ForYouItem[]>([]);
+  const [forYouLoading, setForYouLoading] = useState(true);
 
   useEffect(() => {
     api.publicProducts.list({ limit: 8 })
@@ -437,8 +438,9 @@ export default function DiscoverScreen() {
           };
         });
         if (items.length > 0) setLiveForYou(items);
+        setForYouLoading(false);
       })
-      .catch(() => { /* silent — fall back to static FOR_YOU */ });
+      .catch(() => { /* silent — fall back to static FOR_YOU */ setForYouLoading(false); });
   }, []);
 
   const forYouItems = liveForYou.length > 0 ? liveForYou : FOR_YOU;
@@ -500,14 +502,20 @@ export default function DiscoverScreen() {
           onAction={() => router.push('/(buyer)/' as never)}
         />
       </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 20, gap: 12, paddingBottom: 4 }}
-        style={{ marginBottom: 32 }}
-      >
-        {forYouItems.map(item => <ForYouCard key={item.id} item={item} />)}
-      </ScrollView>
+      {forYouLoading ? (
+        <View style={{ paddingHorizontal: 20, height: 180, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color={PURPLE} size="small" />
+        </View>
+      ) : (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 20, gap: 12, paddingBottom: 4 }}
+          style={{ marginBottom: 32 }}
+        >
+          {forYouItems.map(item => <ForYouCard key={item.id} item={item} />)}
+        </ScrollView>
+      )}
 
       {/* ─ Discover — brands you don't follow, reshuffled on pull-to-refresh ─ */}
       <View style={{ paddingHorizontal: 20, marginBottom: 4 }}>
