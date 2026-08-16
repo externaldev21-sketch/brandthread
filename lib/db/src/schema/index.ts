@@ -2,21 +2,30 @@ import { pgTable, uuid, text, integer, timestamp, json, boolean } from 'drizzle-
 export * from './manufacturers';
 import { relations } from 'drizzle-orm';
 
-// ─── Users (brand team members, linked to Clerk) ──────────────────────────────
+// ─── Users (brand team members + buyers, linked to Clerk) ─────────────────────
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   clerkId: text('clerk_id').notNull().unique(),
   email: text('email').notNull().unique(),
   name: text('name').notNull(),
-  role: text('role').notNull().default('owner'), // 'owner' | 'admin' | 'member'
+  // role: 'owner' | 'admin' | 'member' (seller side) | 'buyer' | 'seller'
+  role: text('role').notNull().default('owner'),
   avatarUrl: text('avatar_url'),
-  // Brand onboarding fields
+  // Buyer / unified profile fields
+  displayName: text('display_name'),
+  bio: text('bio'),
+  profileImageUrl: text('profile_image_url'),
+  accountType: text('account_type'), // 'buyer' | 'seller' | 'both'
+  // Brand onboarding fields (seller side)
   brandName: text('brand_name'),
   brandType: text('brand_type'),
   brandStage: text('brand_stage'),
   sellModel: text('sell_model'),
   onboardingComplete: boolean('onboarding_complete').notNull().default(false),
+  // Stripe Connect (seller payouts)
+  stripeAccountId: text('stripe_account_id'),
+  stripeAccountStatus: text('stripe_account_status'), // 'pending' | 'active' | 'restricted'
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -25,13 +34,14 @@ export const users = pgTable('users', {
 
 export const products = pgTable('products', {
   id: uuid('id').primaryKey().defaultRandom(),
-  ownerId: text('owner_id').notNull().default(''), // Clerk user ID of brand owner
+  ownerId: text('owner_id').notNull().default(''), // Clerk user ID of brand owner / seller
   name: text('name').notNull(),
   description: text('description'),
   category: text('category').notNull().default('apparel'),
   status: text('status').notNull().default('draft'), // 'draft' | 'active' | 'archived'
   images: json('images').$type<string[]>().notNull().default([]),
   tags: json('tags').$type<string[]>().notNull().default([]),
+  styleTags: json('style_tags').$type<string[]>().notNull().default([]),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -95,7 +105,8 @@ export const drops = pgTable('drops', {
 
 export const orders = pgTable('orders', {
   id: uuid('id').primaryKey().defaultRandom(),
-  ownerId: text('owner_id').notNull().default(''), // Clerk user ID of brand owner
+  ownerId: text('owner_id').notNull().default(''), // Clerk user ID of brand owner / seller
+  buyerId: text('buyer_id'),                        // Clerk user ID of buyer (null for seller-created)
   orderNumber: text('order_number').notNull(),
   customerId: uuid('customer_id').references(() => customers.id),
   dropId: uuid('drop_id').references(() => drops.id),
@@ -105,6 +116,7 @@ export const orders = pgTable('orders', {
   shippingCents: integer('shipping_cents').notNull().default(0),
   notes: text('notes'),
   shippingAddress: json('shipping_address').$type<{
+    name?: string;
     street: string;
     city: string;
     state: string;
@@ -113,6 +125,9 @@ export const orders = pgTable('orders', {
   }>(),
   trackingNumber: text('tracking_number'),
   carrier: text('carrier'),
+  // Stripe payment fields
+  stripePaymentIntentId: text('stripe_payment_intent_id'),
+  stripeCheckoutSessionId: text('stripe_checkout_session_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -127,6 +142,29 @@ export const orderItems = pgTable('order_items', {
   variantLabel: text('variant_label'),
   quantity: integer('quantity').notNull(),
   priceCents: integer('price_cents').notNull(), // server-resolved price at time of order
+});
+
+// ─── Posts ────────────────────────────────────────────────────────────────────
+
+export const posts = pgTable('posts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull(), // Clerk user ID of poster
+  mediaUrl: text('media_url').notNull(),
+  mediaType: text('media_type').notNull().default('photo'), // 'photo' | 'video' | 'slideshow'
+  caption: text('caption'),
+  styleTags: json('style_tags').$type<string[]>().notNull().default([]),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// ─── Interactions ─────────────────────────────────────────────────────────────
+
+export const interactions = pgTable('interactions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: text('user_id').notNull(),   // Clerk user ID of actor
+  postId: uuid('post_id').references(() => posts.id, { onDelete: 'cascade' }),
+  type: text('type').notNull(),        // 'like' | 'comment' | 'follow' | 'watch_time'
+  value: text('value'),               // e.g. comment text, seconds watched, followed user ID
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
 // ─── Klaviyo Integration ────────────────────────────────────────────────────────
@@ -173,4 +211,12 @@ export const ordersRelations = relations(orders, ({ one, many }) => ({
 export const orderItemsRelations = relations(orderItems, ({ one }) => ({
   order: one(orders, { fields: [orderItems.orderId], references: [orders.id] }),
   variant: one(productVariants, { fields: [orderItems.variantId], references: [productVariants.id] }),
+}));
+
+export const postsRelations = relations(posts, ({ many }) => ({
+  interactions: many(interactions),
+}));
+
+export const interactionsRelations = relations(interactions, ({ one }) => ({
+  post: one(posts, { fields: [interactions.postId], references: [posts.id] }),
 }));

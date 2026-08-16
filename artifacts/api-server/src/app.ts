@@ -31,6 +31,14 @@ app.use(
 app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
 
 app.use(cors({ credentials: true, origin: true }));
+
+// Stripe webhooks need the raw body for signature verification —
+// register a raw parser scoped to just that path BEFORE express.json().
+app.use(
+  "/api/webhooks/stripe",
+  express.raw({ type: "application/json" }),
+);
+
 // Raised from the default 100kb so requests carrying base64-encoded reference
 // photos (e.g. AI product photography uploads) don't get rejected.
 app.use(express.json({ limit: "45mb" }));
