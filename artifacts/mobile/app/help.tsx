@@ -8,7 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
-import { useUser } from '@clerk/clerk-expo';
+import { useUser } from '@clerk/expo';
 
 const BG     = '#07070F';
 const CARD   = '#12121F';
