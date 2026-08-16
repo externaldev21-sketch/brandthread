@@ -752,6 +752,8 @@ export default function BuyerCheckoutScreen() {
   const [placedOrderNumbers, setPlacedOrderNumbers] = useState<string[]>([]);
   const [placedTotal, setPlacedTotal] = useState(0);
   const [failureMessage, setFailureMessage] = useState('');
+  /** Set when the API confirms the seller's Stripe Connect account isn't ready. */
+  const [sellerPaymentError, setSellerPaymentError] = useState<{ sellerName: string; sellerId: string } | null>(null);
 
   /**
    * Tracks which seller groups have already been charged this checkout session.
@@ -885,11 +887,16 @@ export default function BuyerCheckoutScreen() {
       if (!validateAcknowledgments()) return;
       setPlacing(true);
       setFailureMessage('');
+      setSellerPaymentError(null);
+      // Tracks which group was active when an error occurred so the catch block
+      // can identify the seller and show a targeted error message.
+      let currentGroup: (typeof sess.deliveryGroups)[0] | null = null;
       try {
         // Split checkout by seller — the server enforces single-seller per session.
         // paidGroupsRef persists across retries so a failed-then-retried session
         // never creates a duplicate Stripe charge for a seller already paid.
         for (const group of sess.deliveryGroups) {
+          currentGroup = group;
           // Skip groups already successfully paid in a prior attempt this session
           if (paidGroupsRef.current.has(group.sellerId)) continue;
 
@@ -1009,7 +1016,29 @@ export default function BuyerCheckoutScreen() {
         await clearCheckoutSession();
         setSession({ ...sess, step: 'confirmation' } as CheckoutSession);
       } catch (err: any) {
-        setFailureMessage(err?.message ?? 'Something went wrong. Please try again.');
+        // Try to extract the JSON body embedded in "API 400: {\"error\":\"...\"}"
+        const rawMsg: string = err?.message ?? '';
+        let apiError = '';
+        try {
+          const jsonStart = rawMsg.indexOf('{');
+          if (jsonStart !== -1) {
+            const parsed = JSON.parse(rawMsg.slice(jsonStart));
+            apiError = parsed?.error ?? '';
+          }
+        } catch { /* ignore parse errors */ }
+
+        // Detect seller-payment-account errors by matching the server's exact phrases
+        const isSellerPaymentError =
+          apiError.includes('payment account') ||
+          apiError.includes('payment account not yet active') ||
+          apiError.includes('has not set up a payment account');
+
+        if (isSellerPaymentError && currentGroup) {
+          setSellerPaymentError({ sellerName: currentGroup.sellerName, sellerId: currentGroup.sellerId });
+          setFailureMessage('');
+        } else {
+          setFailureMessage(apiError || rawMsg || 'Something went wrong. Please try again.');
+        }
       }
       setPlacing(false);
     }
@@ -1151,6 +1180,31 @@ export default function BuyerCheckoutScreen() {
           />
         )}
 
+        {!!sellerPaymentError && (
+          <View style={co.sellerPaymentErrorCard}>
+            <View style={co.sellerPaymentErrorHeader}>
+              <Feather name="alert-triangle" size={16} color={ORANGE} />
+              <Text style={co.sellerPaymentErrorTitle}>Payment Not Available</Text>
+            </View>
+            <Text style={co.sellerPaymentErrorBody}>
+              <Text style={{ fontFamily: FONT.semibold }}>{sellerPaymentError.sellerName}</Text>
+              {' '}hasn't finished setting up their payment account yet, so we can't process your order right now.{'\n\n'}Try again later, or reach out to the seller directly.
+            </Text>
+            <TouchableOpacity
+              style={co.contactSellerBtn}
+              activeOpacity={0.8}
+              onPress={() =>
+                router.push(
+                  `/buyer-conversation?participantId=${encodeURIComponent(sellerPaymentError.sellerId)}&participantName=${encodeURIComponent(sellerPaymentError.sellerName)}&participantAccountType=seller` as never,
+                )
+              }
+            >
+              <Feather name="message-circle" size={14} color={ORANGE} />
+              <Text style={co.contactSellerBtnText}>Message {sellerPaymentError.sellerName}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {!!failureMessage && (
           <View style={co.errorBanner}>
             <Feather name="alert-circle" size={16} color={RED} />
@@ -1201,4 +1255,10 @@ const co = StyleSheet.create({
   continueText: { fontSize: FS.base, fontFamily: FONT.bold, color: ON_DARK },
   errorBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, backgroundColor: RED_DIM, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md, borderWidth: 1, borderColor: 'rgba(248,113,113,0.3)' },
   errorText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: RED, lineHeight: 20 },
+  sellerPaymentErrorCard: { backgroundColor: ORANGE_DIM, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md, borderWidth: 1, borderColor: 'rgba(251,146,60,0.35)' },
+  sellerPaymentErrorHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: 8 },
+  sellerPaymentErrorTitle: { fontSize: FS.sm, fontFamily: FONT.bold, color: ORANGE },
+  sellerPaymentErrorBody: { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20, marginBottom: SP.md },
+  contactSellerBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', paddingVertical: 8, paddingHorizontal: 14, backgroundColor: 'rgba(251,146,60,0.12)', borderRadius: RADIUS.pill, borderWidth: 1, borderColor: 'rgba(251,146,60,0.35)' },
+  contactSellerBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: ORANGE },
 });
