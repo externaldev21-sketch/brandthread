@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Dimensions, Animated, ActivityIndicator,
+  Dimensions, Animated, ActivityIndicator, Alert,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -58,11 +59,30 @@ export default function StorePreview() {
   const [webViewHtml, setWebViewHtml] = useState<string | null>(null);
   const [loadingWebView, setLoadingWebView] = useState(false);
 
+  // Share preview link
+  const [sharingPreview, setSharingPreview] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+
   useFocusEffect(
     useCallback(() => {
       getStorefront().then(setStore);
     }, [])
   );
+
+  const handleSharePreview = async () => {
+    if (sharingPreview) return;
+    setSharingPreview(true);
+    try {
+      const result = await (api as any).store.sharePreview() as { url: string; expiresAt: string };
+      await Clipboard.setStringAsync(result.url);
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 3000);
+    } catch {
+      Alert.alert('Could not generate link', 'Check your connection and try again.');
+    } finally {
+      setSharingPreview(false);
+    }
+  };
 
   const handleToggleWebView = async () => {
     if (webViewMode) {
@@ -426,11 +446,27 @@ export default function StorePreview() {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Store Preview</Text>
           <TouchableOpacity
+            onPress={handleSharePreview}
+            style={[styles.shareBtn, shareCopied && styles.shareBtnCopied]}
+            disabled={sharingPreview}
+          >
+            {sharingPreview
+              ? <ActivityIndicator size="small" color={PURPLE_LIGHT} />
+              : <Feather name={shareCopied ? 'check' : 'link'} size={ICON.sm} color={shareCopied ? '#4ade80' : PURPLE_LIGHT} />
+            }
+          </TouchableOpacity>
+          <TouchableOpacity
             onPress={() => router.push('/store-editor' as never)}
             style={styles.editBtn}
           >
             <Text style={styles.editBtnText}>Edit Store</Text>
           </TouchableOpacity>
+        </View>
+      )}
+      {shareCopied && !fullscreen && (
+        <View style={styles.shareToast}>
+          <Feather name="check-circle" size={13} color="#4ade80" />
+          <Text style={styles.shareToastText}>Preview link copied — valid for 24 hours</Text>
         </View>
       )}
 
@@ -790,6 +826,32 @@ const styles = StyleSheet.create({
     fontFamily: FONT.bold,
     color: FG,
     letterSpacing: -0.3,
+  },
+  shareBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.sm,
+    backgroundColor: PURPLE_DIM,
+    borderWidth: 1,
+    borderColor: PURPLE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shareBtnCopied: {
+    borderColor: '#4ade80',
+    backgroundColor: '#4ade8022',
+  },
+  shareToast: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.xs,
+  },
+  shareToastText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: '#4ade80',
   },
   editBtn: {
     paddingHorizontal: SP.md,

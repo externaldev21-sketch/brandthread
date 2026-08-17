@@ -769,6 +769,7 @@ export function createApi(getToken: GetToken) {
       fromSocial:  (socialUrl: string, context?: Record<string, unknown>) => post<any>('/api/store/ai/from-social', { socialUrl, ...(context ?? {}) }),
       previewToken: () => get<{ token: string; ttlSeconds: number }>('/api/store/preview-token'),
       previewHtml:  () => getText('/api/store/preview'),
+      sharePreview: () => post<{ token: string; url: string; expiresAt: string; ttlSeconds: number }>('/api/store/share-preview', {}),
     },
     /** Disputes / chargebacks — Stripe dispute data and evidence submission */
     disputes: {
