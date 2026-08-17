@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Linking } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
@@ -19,6 +20,7 @@ type FulfillmentOption = 'all' | 'giftCards' | 'none';
 
 export default function GeneralSettingsScreen() {
   const colors = useColors();
+  const router = useRouter();
   const [region, setRegion] = useState(0);
   const [unitSystem, setUnitSystem] = useState(0);
   const [weightUnit, setWeightUnit] = useState(0);
@@ -104,7 +106,7 @@ export default function GeneralSettingsScreen() {
                 <Text style={[styles.cardTitle, { color: colors.foreground }]}>Currency display</Text>
                 <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>
                   To manage the currencies customers see, go to{' '}
-                  <Text style={{ textDecorationLine: 'underline' }} onPress={() => {}}>Markets</Text>
+                  <Text style={{ textDecorationLine: 'underline' }} onPress={() => router.push('/store-domain' as never)}>Markets</Text>
                 </Text>
               </View>
               <Feather name="more-horizontal" size={18} color={colors.mutedForeground} />

@@ -4,8 +4,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
-  ActivityIndicator, Alert,
+  ActivityIndicator, Alert, Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -45,6 +46,20 @@ export default function BuyerRefundRequestScreen() {
   const [description, setDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [evidencePhotos, setEvidencePhotos] = useState<string[]>([]);
+
+  async function pickEvidence() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert('Permission required', 'Please allow access to your photo library.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      allowsMultipleSelection: true,
+      quality: 0.8,
+    });
+    if (!result.canceled) {
+      setEvidencePhotos(prev => [...prev, ...result.assets.map(a => a.uri)].slice(0, 5));
+    }
+  }
 
   useEffect(() => {
     if (!orderId) return;
@@ -165,10 +180,34 @@ export default function BuyerRefundRequestScreen() {
           />
         </View>
 
-        <View style={s.evidenceNote}>
-          <Feather name="camera" size={13} color={MUTED} />
-          <Text style={s.evidenceNoteText}>Photo and video evidence: upload functionality coming soon.</Text>
-        </View>
+        {/* Evidence photos */}
+        <TouchableOpacity
+          style={[s.evidenceNote, { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderStyle: 'dashed' }]}
+          onPress={pickEvidence}
+          activeOpacity={0.8}
+        >
+          <Feather name="camera" size={16} color={PURPLE_LIGHT} />
+          <Text style={[s.evidenceNoteText, { color: PURPLE_LIGHT }]}>
+            Add photo evidence ({evidencePhotos.length}/5)
+          </Text>
+        </TouchableOpacity>
+        {evidencePhotos.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              {evidencePhotos.map((uri, idx) => (
+                <View key={idx} style={{ width: 72, height: 72, borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
+                  <Image source={{ uri }} style={{ width: 72, height: 72 }} resizeMode="cover" />
+                  <TouchableOpacity
+                    style={{ position: 'absolute', top: 2, right: 2, backgroundColor: '#00000099', borderRadius: 10, width: 18, height: 18, alignItems: 'center', justifyContent: 'center' }}
+                    onPress={() => setEvidencePhotos(prev => prev.filter((_, i) => i !== idx))}
+                  >
+                    <Feather name="x" size={10} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+        )}
 
         <Text style={s.disclaimer}>
           Submitting a refund request does not guarantee approval. Do not claim a refund is approved until the seller or payment provider confirms it.

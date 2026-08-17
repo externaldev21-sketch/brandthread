@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Switch, TextInput, Alert, ActivityIndicator,
+  Switch, TextInput, Alert, ActivityIndicator, Modal,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -89,6 +89,9 @@ export default function ProductionDetailScreen() {
   const [issueSeverity, setIssueSeverity] = useState<IssueSeverity>('medium');
   const [issueTitle, setIssueTitle] = useState('');
   const [issueDesc, setIssueDesc] = useState('');
+  const [showNoteModal, setShowNoteModal] = useState(false);
+  const [noteText, setNoteText] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
   const [issueResolution, setIssueResolution] = useState('');
   const [submittingIssue, setSubmittingIssue] = useState(false);
 
@@ -529,21 +532,70 @@ export default function ProductionDetailScreen() {
           <SecondaryButton
             label="Message Manufacturer"
             icon="message-circle"
-            onPress={() => Alert.alert('Messages', 'Open manufacturer messages')}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/manufacturer-hub' as never); }}
           />
           <SecondaryButton
             label="Add Internal Note"
             icon="lock"
-            onPress={() => Alert.alert('Note', 'Add an internal note')}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowNoteModal(true); }}
           />
           <SecondaryButton
             label="View Files"
             icon="file"
-            onPress={() => Alert.alert('Files', 'File manager coming soon')}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/tech-pack-generator' as never); }}
           />
         </View>
 
       </ScrollView>
+
+      {/* ── Internal Note Modal ── */}
+      <Modal visible={showNoteModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowNoteModal(false)}>
+        <View style={{ flex: 1, backgroundColor: BG, padding: 20 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+            <Text style={{ fontSize: 18, fontFamily: FONT.bold, color: FG }}>Add Internal Note</Text>
+            <TouchableOpacity onPress={() => setShowNoteModal(false)} style={{ width: 36, height: 36, backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' }}>
+              <Feather name="x" size={18} color={FG} />
+            </TouchableOpacity>
+          </View>
+          <Text style={{ fontSize: 12, fontFamily: FONT.regular, color: MUTED, marginBottom: 8 }}>
+            Internal notes are only visible to your team — not the manufacturer.
+          </Text>
+          <TextInput
+            style={{ backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, fontSize: 14, padding: 12, minHeight: 140, textAlignVertical: 'top' }}
+            value={noteText}
+            onChangeText={setNoteText}
+            placeholder="Add a note about this production order…"
+            placeholderTextColor={MUTED}
+            multiline
+            autoFocus
+          />
+          <TouchableOpacity
+            style={{ marginTop: 16, backgroundColor: PURPLE, borderRadius: 12, paddingVertical: 14, alignItems: 'center', opacity: savingNote || !noteText.trim() ? 0.5 : 1 }}
+            disabled={savingNote || !noteText.trim()}
+            activeOpacity={0.85}
+            onPress={async () => {
+              setSavingNote(true);
+              try {
+                await fetch(`/api/manufacturer/productions/${id}/notes`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ content: noteText.trim() }),
+                });
+                setNoteText('');
+                setShowNoteModal(false);
+              } catch {
+                Alert.alert('Error', 'Could not save note. Please try again.');
+              } finally {
+                setSavingNote(false);
+              }
+            }}
+          >
+            <Text style={{ fontSize: 15, fontFamily: FONT.bold, color: '#fff' }}>
+              {savingNote ? 'Saving…' : 'Save Note'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </View>
   );
 }

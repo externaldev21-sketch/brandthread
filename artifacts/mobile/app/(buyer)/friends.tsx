@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
-  Alert, StyleSheet, Dimensions,
+  Alert, StyleSheet, Dimensions, Share,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -182,7 +182,7 @@ function PostCard({
         </TouchableOpacity>
         <TouchableOpacity
           style={s.actionIcon}
-          onPress={() => Alert.alert('Share coming soon')}
+          onPress={() => Share.share({ message: 'Check this post out on Brandthread!' })}
         >
           <Feather name="send" size={ICON.lg} color={MUTED} />
         </TouchableOpacity>
@@ -493,7 +493,7 @@ export default function FriendsScreen() {
             <View style={s.sectionHeader}>
               <Text style={s.sectionTitle}>Friend Activity</Text>
               <TouchableOpacity
-                onPress={() => Alert.alert('View all friend posts coming soon')}
+                onPress={() => router.push('/(tabs)/discover' as never)}
               >
                 <Text style={s.seeAll}>See all</Text>
               </TouchableOpacity>

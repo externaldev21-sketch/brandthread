@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
 import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
@@ -497,7 +498,23 @@ export default function StoreGenerateScreen() {
           <TouchableOpacity
             key={tool}
             style={st.aiToolChip}
-            onPress={() => Alert.alert('Coming Soon', `AI will help you ${tool.toLowerCase()} your brand story from your style and mood selections.`)}
+            onPress={async () => {
+              if (!answers.brandStory?.trim()) { Alert.alert('Add your brand story first', 'Write some text below, then use AI to refine it.'); return; }
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              try {
+                const res = await fetch('/api/ai/chat', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ messages: [
+                    { role: 'system', content: 'You are a brand copywriter. Apply the requested transformation and return ONLY the rewritten brand story text.' },
+                    { role: 'user', content: `${tool} this brand story:\n\n${answers.brandStory}` },
+                  ] }),
+                });
+                const data = await res.json();
+                const result = data?.message?.content ?? data?.content;
+                if (result) setAnswers(prev => ({ ...prev, brandStory: result }));
+              } catch { Alert.alert('Error', 'AI processing failed. Please try again.'); }
+            }}
             activeOpacity={0.8}
           >
             <Text style={st.aiToolChipText}>{tool}</Text>
@@ -617,7 +634,14 @@ export default function StoreGenerateScreen() {
                 {(value === 'logo' || value === 'product_photos' || value === 'campaign_images') && isSelected && (
                   <TouchableOpacity
                     style={st.uploadBtn}
-                    onPress={() => Alert.alert('Upload', 'Photo library upload coming in production build.')}
+                    onPress={async () => {
+                      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                      if (!perm.granted) { Alert.alert('Permission required', 'Allow access to your photo library.'); return; }
+                      const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.8 });
+                      if (!result.canceled && result.assets[0]) {
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                      }
+                    }}
                     activeOpacity={0.8}
                   >
                     <Text style={st.uploadBtnText}>Upload</Text>

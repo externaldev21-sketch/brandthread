@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Modal, TextInput } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -58,6 +58,24 @@ export default function ProductImportScreen() {
   const [bulkPrice, setBulkPrice] = useState('');
   const [importing, setImporting] = useState(false);
   const [csvUploading, setCsvUploading] = useState(false);
+  const [showCsvModal, setShowCsvModal] = useState(false);
+  const [csvText, setCsvText] = useState('');
+
+  async function importCsv() {
+    if (!csvText.trim()) return;
+    setCsvUploading(true);
+    setShowCsvModal(false);
+    try {
+      const res = await api.products.import({ csvContent: csvText.trim() });
+      const count = res?.imported ?? csvText.split('\n').length - 1;
+      Alert.alert('Import complete', `${count} product${count !== 1 ? 's' : ''} imported successfully.`);
+      setCsvText('');
+    } catch {
+      Alert.alert('Import failed', 'Could not import products. Check your CSV format and try again.');
+    } finally {
+      setCsvUploading(false);
+    }
+  }
 
   function selectMethod(method: 'csv' | 'shopify' | 'manual') {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -162,7 +180,7 @@ export default function ProductImportScreen() {
               />
               <SecondaryButton
                 label={csvUploading ? 'Importing...' : 'Upload CSV'}
-                onPress={() => Alert.alert('Upload', 'File upload coming soon in production build')}
+                onPress={() => setShowCsvModal(true)}
                 icon="upload"
                 style={s.expandedBtn}
                 disabled={csvUploading}
@@ -279,6 +297,44 @@ export default function ProductImportScreen() {
           </BrandthreadCard>
         ))}
       </ScrollView>
+
+      {/* ── CSV Paste Modal ── */}
+      <Modal visible={showCsvModal} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setShowCsvModal(false)}>
+        <View style={{ flex: 1, backgroundColor: BG, padding: 20 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <Text style={{ fontSize: 18, fontFamily: FONT.bold, color: FG }}>Paste CSV Data</Text>
+            <TouchableOpacity onPress={() => setShowCsvModal(false)} style={{ width: 36, height: 36, backgroundColor: SURFACE, borderRadius: 10, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' }}>
+              <Feather name="x" size={18} color={FG} />
+            </TouchableOpacity>
+          </View>
+          <Text style={{ fontSize: 12, fontFamily: FONT.regular, color: MUTED, marginBottom: 4 }}>
+            Expected format: <Text style={{ color: FG }}>name, description, price, cost, category</Text>
+          </Text>
+          <Text style={{ fontSize: 11, fontFamily: FONT.regular, color: MUTED, marginBottom: 12 }}>
+            Paste your CSV content below (including the header row).
+          </Text>
+          <TextInput
+            style={{ backgroundColor: SURFACE, borderRadius: 12, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, fontSize: 12, padding: 12, flex: 1, textAlignVertical: 'top' }}
+            value={csvText}
+            onChangeText={setCsvText}
+            placeholder={'name,description,price,cost,category\n"My Product","A great product",29.99,12.00,"Tops"'}
+            placeholderTextColor={MUTED}
+            multiline
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <TouchableOpacity
+            style={{ marginTop: 16, backgroundColor: PURPLE_LIGHT, borderRadius: 12, paddingVertical: 14, alignItems: 'center', opacity: !csvText.trim() ? 0.5 : 1 }}
+            disabled={!csvText.trim() || csvUploading}
+            activeOpacity={0.85}
+            onPress={importCsv}
+          >
+            <Text style={{ fontSize: 15, fontFamily: FONT.bold, color: '#fff' }}>
+              {csvUploading ? 'Importing…' : 'Import Products'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </View>
   );
 }

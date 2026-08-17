@@ -1108,7 +1108,7 @@ function ProductionTab({ router }: { router: ReturnType<typeof useRouter> }) {
         icon="layers"
         title="Approved products move into production here."
         description="Accept a quote to start a production order."
-        action={{ label: 'View quotes', onPress: () => {}, icon: 'file-text' }}
+        action={{ label: 'View quotes', onPress: () => router.push('/manufacturer-hub' as never), icon: 'file-text' }}
         style={s.emptyState}
       />
     );

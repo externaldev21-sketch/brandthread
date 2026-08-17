@@ -540,7 +540,7 @@ export default function SellerProfileScreen() {
         <View style={styles.statsRow}>
           <TouchableOpacity
             style={styles.statItem}
-            onPress={() => Alert.alert('Followers', 'Followers list coming soon')}
+            onPress={() => router.push('/connections?type=followers' as never)}
           >
             <Text style={styles.statNumber}>{formatCount(followers)}</Text>
             <Text style={styles.statLabel}>Followers</Text>
@@ -548,7 +548,7 @@ export default function SellerProfileScreen() {
           <View style={styles.statDivider} />
           <TouchableOpacity
             style={styles.statItem}
-            onPress={() => Alert.alert('Following', 'Following list coming soon')}
+            onPress={() => router.push('/connections?type=following' as never)}
           >
             <Text style={styles.statNumber}>{formatCount(profile?.following ?? 0)}</Text>
             <Text style={styles.statLabel}>Following</Text>

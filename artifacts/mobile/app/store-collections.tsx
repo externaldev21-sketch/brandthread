@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import * as ImagePicker from 'expo-image-picker';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Alert, Switch, Modal,
@@ -383,7 +384,14 @@ export default function StoreCollectionsScreen() {
           </View>
           <TouchableOpacity
             style={styles.uploadBtn}
-            onPress={() => Alert.alert('Upload Cover', 'Image upload coming soon.')}
+            onPress={async () => {
+              const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+              if (!perm.granted) { Alert.alert('Permission required', 'Allow access to your photo library.'); return; }
+              const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.85, aspect: [16, 9], allowsEditing: true });
+              if (!result.canceled && result.assets[0]) {
+                setForm(prev => ({ ...prev, coverImage: result.assets[0].uri }));
+              }
+            }}
           >
             <Feather name="upload" size={ICON.sm} color={PURPLE} />
             <Text style={styles.uploadBtnText}>Upload Cover</Text>
