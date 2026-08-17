@@ -669,7 +669,8 @@ export const storefronts = pgTable('storefronts', {
   seo:           json('seo').$type<Record<string, unknown>>().notNull().default({}),
   socialLinks:   json('social_links').$type<Record<string, unknown>>().notNull().default({}),
   analyticsCode: text('analytics_code'),
-  publishedAt:   timestamp('published_at'),
+  publishedAt:          timestamp('published_at'),
+  sharePreviewRevokedAt: timestamp('share_preview_revoked_at', { withTimezone: true }),
   createdAt:     timestamp('created_at').defaultNow().notNull(),
   updatedAt:     timestamp('updated_at').defaultNow().notNull(),
 });

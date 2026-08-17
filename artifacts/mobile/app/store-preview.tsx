@@ -62,6 +62,8 @@ export default function StorePreview() {
   // Share preview link
   const [sharingPreview, setSharingPreview] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [revokingPreview, setRevokingPreview] = useState(false);
+  const [previewRevoked, setPreviewRevoked] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -72,6 +74,7 @@ export default function StorePreview() {
   const handleSharePreview = async () => {
     if (sharingPreview) return;
     setSharingPreview(true);
+    setPreviewRevoked(false);
     try {
       const result = await (api as any).store.sharePreview() as { url: string; expiresAt: string };
       await Clipboard.setStringAsync(result.url);
@@ -82,6 +85,32 @@ export default function StorePreview() {
     } finally {
       setSharingPreview(false);
     }
+  };
+
+  const handleRevokePreview = () => {
+    Alert.alert(
+      'Revoke preview link?',
+      'Anyone with the current link won\'t be able to view your store. You can share a fresh link any time.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Revoke',
+          style: 'destructive',
+          onPress: async () => {
+            setRevokingPreview(true);
+            try {
+              await (api as any).store.revokePreview();
+              setPreviewRevoked(true);
+              setShareCopied(false);
+            } catch {
+              Alert.alert('Could not revoke link', 'Check your connection and try again.');
+            } finally {
+              setRevokingPreview(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const handleToggleWebView = async () => {
@@ -447,14 +476,28 @@ export default function StorePreview() {
           <Text style={styles.headerTitle}>Store Preview</Text>
           <TouchableOpacity
             onPress={handleSharePreview}
-            style={[styles.shareBtn, shareCopied && styles.shareBtnCopied]}
-            disabled={sharingPreview}
+            style={[styles.shareBtn, shareCopied && styles.shareBtnCopied, previewRevoked && styles.shareBtnRevoked]}
+            disabled={sharingPreview || revokingPreview}
           >
             {sharingPreview
               ? <ActivityIndicator size="small" color={PURPLE_LIGHT} />
               : <Feather name={shareCopied ? 'check' : 'link'} size={ICON.sm} color={shareCopied ? '#4ade80' : PURPLE_LIGHT} />
             }
           </TouchableOpacity>
+          {/* Revoke button — only show when a link may be active */}
+          {!previewRevoked && (
+            <TouchableOpacity
+              onPress={handleRevokePreview}
+              style={styles.revokeBtn}
+              disabled={revokingPreview || sharingPreview}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              {revokingPreview
+                ? <ActivityIndicator size="small" color={RED} />
+                : <Feather name="slash" size={ICON.sm} color={RED} />
+              }
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             onPress={() => router.push('/store-editor' as never)}
             style={styles.editBtn}
@@ -467,6 +510,12 @@ export default function StorePreview() {
         <View style={styles.shareToast}>
           <Feather name="check-circle" size={13} color="#4ade80" />
           <Text style={styles.shareToastText}>Preview link copied — valid for 24 hours</Text>
+        </View>
+      )}
+      {previewRevoked && !fullscreen && (
+        <View style={[styles.shareToast, styles.revokeToast]}>
+          <Feather name="slash" size={13} color={RED} />
+          <Text style={[styles.shareToastText, { color: RED }]}>Link revoked — tap the link icon to share a fresh one</Text>
         </View>
       )}
 
@@ -840,6 +889,23 @@ const styles = StyleSheet.create({
   shareBtnCopied: {
     borderColor: '#4ade80',
     backgroundColor: '#4ade8022',
+  },
+  shareBtnRevoked: {
+    borderColor: RED,
+    backgroundColor: RED_DIM,
+  },
+  revokeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.sm,
+    backgroundColor: RED_DIM,
+    borderWidth: 1,
+    borderColor: RED,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  revokeToast: {
+    // colour overrides applied inline
   },
   shareToast: {
     flexDirection: 'row',

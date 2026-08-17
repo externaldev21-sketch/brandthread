@@ -832,6 +832,7 @@ export function createApi(getToken: GetToken) {
       previewToken: () => get<{ token: string; ttlSeconds: number }>('/api/store/preview-token'),
       previewHtml:  () => getText('/api/store/preview'),
       sharePreview: () => post<{ token: string; url: string; expiresAt: string; ttlSeconds: number }>('/api/store/share-preview', {}),
+      revokePreview: () => del<{ ok: boolean; revokedAt: string }>('/api/store/share-preview'),
     },
     /** Disputes / chargebacks — Stripe dispute data and evidence submission */
     disputes: {
