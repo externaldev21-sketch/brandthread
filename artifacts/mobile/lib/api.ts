@@ -12,6 +12,26 @@ const BASE =
 
 type GetToken = () => Promise<string | null>;
 
+// ─── Store context switcher ───────────────────────────────────────────────────
+// When a team member wants to act on their own store instead of the joined store,
+// the client sends X-Store-Context: own. The backend teamContext() middleware
+// skips the clerkUserId rewrite, so all queries run against the user's own data.
+// 'joined' (or null) restores the default behaviour (backend decides based on
+// active team membership).
+export type StoreContext = 'own' | 'joined';
+let _storeContext: StoreContext | null = null;
+
+/** Set the active store context. Call this from the switcher UI and persist
+ *  the value to AsyncStorage for the next app launch. */
+export function setStoreContext(ctx: StoreContext | null): void {
+  _storeContext = ctx;
+}
+
+/** Read the current store context. */
+export function getStoreContext(): StoreContext | null {
+  return _storeContext;
+}
+
 async function request<T = any>(
   path: string,
   options: RequestInit,
@@ -19,14 +39,21 @@ async function request<T = any>(
   asText = false,
 ): Promise<T> {
   const token = await getToken();
-  const res = await fetch(`${BASE}${path}`, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers ?? {}),
-    },
-  });
+  // Build a plain Record so TypeScript is happy with every HeadersInit variant.
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(_storeContext === 'own' ? { 'X-Store-Context': 'own' } : {}),
+    // Normalize any HeadersInit shape (Headers instance, string[][], or plain object).
+    ...(options.headers
+      ? options.headers instanceof Headers
+        ? Object.fromEntries((options.headers as Headers).entries())
+        : Array.isArray(options.headers)
+          ? Object.fromEntries(options.headers as string[][])
+          : (options.headers as Record<string, string>)
+      : {}),
+  };
+  const res = await fetch(`${BASE}${path}`, { ...options, headers });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`API ${res.status}: ${body}`);
@@ -747,6 +774,19 @@ export function createApi(getToken: GetToken) {
       remove:    (memberId: string) => del<any>(`/api/team/members/${encodeURIComponent(memberId)}`),
       roles:     () => get<any[]>('/api/team/roles'),
       roleMembers: (role: string) => get<any[]>(`/api/team/roles/${encodeURIComponent(role)}/members`),
+      /** Returns the caller's active membership in another seller's store (null if none).
+       *  Used by the store switcher: if non-null the user can toggle between their own
+       *  store and the store they joined. */
+      myMembership: () =>
+        get<{
+          membership: {
+            id: string;
+            ownerId: string;
+            role: string;
+            acceptedAt: string | null;
+            ownerName: string;
+          } | null;
+        }>('/api/team/my-membership'),
       activity:  (params?: number | { limit?: number; offset?: number; actorClerkId?: string; resourceType?: string }) => {
         const p = typeof params === 'number' ? { limit: params } : (params ?? {});
         const qs = new URLSearchParams();

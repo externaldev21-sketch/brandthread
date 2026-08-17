@@ -19,7 +19,7 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUser, useAuth } from '@clerk/expo';
 import { getSetupState, completionPercent, SetupState } from '@/lib/setupStore';
-import { useApi } from '@/lib/api';
+import { useApi, setStoreContext, getStoreContext, type StoreContext } from '@/lib/api';
 import {
   BG, SURFACE, CARD, BORDER,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -128,6 +128,14 @@ export default function MoreScreen() {
   );
   const [unreadMessages, setUnreadMessages] = useState(0);
 
+  // Store context switcher state
+  const [teamMembership, setTeamMembership] = useState<{
+    id: string; ownerId: string; role: string; ownerName: string;
+  } | null>(null);
+  const [activeContext, setActiveContext] = useState<StoreContext>('joined');
+
+  const STORE_CTX_KEY = '@brandthread/store_context';
+
   useEffect(() => {
     getSetupState().then(setSetupState);
   }, []);
@@ -135,6 +143,7 @@ export default function MoreScreen() {
   // Refresh unread count whenever this screen is focused
   useFocusEffect(useCallback(() => {
     let cancelled = false;
+
     async function fetchUnread() {
       try {
         const list = await api.conversations.list() as Array<{ unreadCount: number; type?: string }>;
@@ -147,7 +156,30 @@ export default function MoreScreen() {
         // silently ignore — badge simply won't show if offline
       }
     }
+
+    async function fetchMembership() {
+      try {
+        const { membership } = await api.team.myMembership();
+        if (cancelled) return;
+        setTeamMembership(membership ?? null);
+        if (membership) {
+          // Context is already hydrated by ServiceConfigurer at boot;
+          // just sync the visual state to what the module-level var says.
+          const current = getStoreContext();
+          const ctx: StoreContext = current === 'own' ? 'own' : 'joined';
+          setActiveContext(ctx);
+        } else {
+          // No membership — always own store, no rewrite.
+          setActiveContext('joined');
+          setStoreContext(null);
+        }
+      } catch {
+        // silently ignore — switcher won't show if offline
+      }
+    }
+
     fetchUnread();
+    fetchMembership();
     return () => { cancelled = true; };
   }, [api]));
 
@@ -159,6 +191,21 @@ export default function MoreScreen() {
   const avatarLetter = (user?.firstName?.[0] ?? 'S').toUpperCase();
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
+
+  const handleStoreSwitch = async (ctx: StoreContext) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setActiveContext(ctx);
+    setStoreContext(ctx);
+    await AsyncStorage.setItem(STORE_CTX_KEY, ctx);
+    // Brief confirmation
+    Alert.alert(
+      ctx === 'own' ? 'Switched to your store' : `Switched to ${teamMembership?.ownerName ?? 'joined store'}`,
+      ctx === 'own'
+        ? 'You are now managing your own store.'
+        : `You are now managing ${teamMembership?.ownerName ?? 'the joined store'} as ${teamMembership?.role ?? 'member'}.`,
+      [{ text: 'OK' }],
+    );
+  };
 
   const handleSignOut = async () => {
     try {
@@ -217,6 +264,69 @@ export default function MoreScreen() {
             style={styles.editProfileBtn}
           />
         </GradientCard>
+
+        {/* STORE CONTEXT SWITCHER — only shown when user is a team member */}
+        {!!teamMembership && (
+          <BrandthreadCard style={styles.switcherCard}>
+            <Text style={styles.switcherTitle}>ACTIVE STORE</Text>
+            <View style={styles.switcherRow}>
+              {/* Own store option */}
+              <TouchableOpacity
+                style={[
+                  styles.switcherOption,
+                  activeContext === 'own' && styles.switcherOptionActive,
+                ]}
+                onPress={() => activeContext !== 'own' && handleStoreSwitch('own')}
+                activeOpacity={0.75}
+              >
+                <Feather
+                  name="home"
+                  size={13}
+                  color={activeContext === 'own' ? PURPLE_LIGHT : MUTED}
+                />
+                <Text
+                  style={[
+                    styles.switcherLabel,
+                    activeContext === 'own' && styles.switcherLabelActive,
+                  ]}
+                  numberOfLines={1}
+                >
+                  My Store
+                </Text>
+              </TouchableOpacity>
+
+              {/* Joined store option */}
+              <TouchableOpacity
+                style={[
+                  styles.switcherOption,
+                  activeContext === 'joined' && styles.switcherOptionActive,
+                ]}
+                onPress={() => activeContext !== 'joined' && handleStoreSwitch('joined')}
+                activeOpacity={0.75}
+              >
+                <Feather
+                  name="users"
+                  size={13}
+                  color={activeContext === 'joined' ? PURPLE_LIGHT : MUTED}
+                />
+                <Text
+                  style={[
+                    styles.switcherLabel,
+                    activeContext === 'joined' && styles.switcherLabelActive,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {teamMembership.ownerName}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.switcherHint}>
+              {activeContext === 'own'
+                ? 'You are managing your own store'
+                : `You are managing ${teamMembership.ownerName} as ${teamMembership.role}`}
+            </Text>
+          </BrandthreadCard>
+        )}
 
         {/* STORE SETUP PROGRESS */}
         <BrandthreadCard style={styles.setupCard}>
@@ -355,6 +465,54 @@ const styles = StyleSheet.create({
   },
   editProfileBtn: {
     alignSelf: 'flex-start',
+  },
+
+  // Store context switcher
+  switcherCard: {
+    marginHorizontal: SP.md,
+    marginBottom: SP.md,
+  },
+  switcherTitle: {
+    fontSize: 9,
+    fontFamily: FONT.bold,
+    color: SUBTLE,
+    letterSpacing: 1.5,
+    marginBottom: SP.sm,
+  },
+  switcherRow: {
+    flexDirection: 'row',
+    gap: SP.sm,
+    marginBottom: 8,
+  },
+  switcherOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  switcherOptionActive: {
+    backgroundColor: PURPLE_DIM,
+    borderColor: PURPLE,
+  },
+  switcherLabel: {
+    flex: 1,
+    fontSize: FS.sm,
+    fontFamily: FONT.medium,
+    color: MUTED,
+  },
+  switcherLabelActive: {
+    color: PURPLE_LIGHT,
+  },
+  switcherHint: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: SUBTLE,
   },
 
   // Setup progress

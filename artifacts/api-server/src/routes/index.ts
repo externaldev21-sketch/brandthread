@@ -44,7 +44,13 @@ import disputesRouter from "./disputes";
 import financeRouter from "./finance";
 import taxesRouter from "./taxes";
 import teamRouter from "./team";
-import { requireRole } from "../middlewares/requireRole";
+import { requireRole, teamContext } from "../middlewares/requireRole";
+
+/** Lazily-resolved team context for routes that don't mount it themselves.
+ *  `resolveTeamContext` is idempotent (cached on req.teamContext), so applying
+ *  this at the index level alongside a route that already mounts it internally
+ *  is a safe no-op on the second call. */
+const tc = teamContext();
 import storeRouter from "./store";
 import storeAiRouter from "./store-ai";
 import discountCodesRouter from "./discount-codes";
@@ -75,78 +81,83 @@ router.use("/support-chat",    supportChatRouter);
 router.use("/seller/export",   sellerExportRouter);
 
 // ─── Authenticated seller + shared routes ─────────────────────────────────────
+// tc (teamContext) is applied to every seller-scoped route so X-Store-Context
+// is honoured consistently. resolveTeamContext is idempotent (cached on req),
+// so routes that already mount it internally get a free no-op on the second call.
 router.use("/healthz",         healthRouter);
 router.use("/auth",            authRouter);
-router.use("/products",        productsRouter);
-router.use("/orders",          ordersRouter);
-router.use("/customers",       customersRouter);
-router.use("/drops",           dropsRouter);
-router.use("/analytics",       analyticsRouter);
-router.use("/integrations",    integrationsRouter);
+router.use("/products",        tc, productsRouter);
+router.use("/orders",          tc, ordersRouter);
+router.use("/customers",       tc, customersRouter);
+router.use("/drops",           tc, dropsRouter);
+router.use("/analytics",       tc, analyticsRouter);
+router.use("/integrations",    tc, integrationsRouter);
 // ─── Growth-plan-gated AI design routes ───────────────────────────────────────
-router.use("/logo",            requirePlan("growth"), logoRouter);
-router.use("/mockup",          requirePlan("growth"), mockupRouter);
-router.use("/photography",     requirePlan("growth"), photographyRouter);
-router.use("/bg-removal",      requirePlan("growth"), bgRemovalRouter);
-router.use("/lifestyle",       requirePlan("growth"), lifestyleRouter);
-router.use("/techpack",        techpackRouter);
+router.use("/logo",            tc, requirePlan("growth"), logoRouter);
+router.use("/mockup",          tc, requirePlan("growth"), mockupRouter);
+router.use("/photography",     tc, requirePlan("growth"), photographyRouter);
+router.use("/bg-removal",      tc, requirePlan("growth"), bgRemovalRouter);
+router.use("/lifestyle",       tc, requirePlan("growth"), lifestyleRouter);
+router.use("/techpack",        tc, techpackRouter);
 // Specific manufacturer sub-paths BEFORE the catch-all manufacturersRouter
 router.use("/manufacturers/public",          manufacturerPublicRouter);
-router.use("/manufacturers/connect",         manufacturerConnectRouter);
+router.use("/manufacturers/connect",         tc, manufacturerConnectRouter);
 // Growth-plan-gated Manufacturer Hub
-router.use("/manufacturers",   requirePlan("growth"), manufacturersRouter);
-router.use("/inventory",       inventoryRouter);
-router.use("/seller-hub",      sellerHubRouter);
+router.use("/manufacturers",   tc, requirePlan("growth"), manufacturersRouter);
+router.use("/inventory",       tc, inventoryRouter);
+router.use("/seller-hub",      tc, sellerHubRouter);
 router.use("/push",            pushRouter);
-router.use("/ai",              aiRouter);
+router.use("/ai",              tc, aiRouter);
 
 // ─── Buyer & Seller Connect / Subscription routes ─────────────────────────────
 // Mount specific sub-paths before the catch-all /buyer router so they don't
 // get swallowed by buyerRouter's lack of those handlers.
-router.use("/waitlist",                  waitlistRouter);
-router.use("/bundles",                   bundlesRouter);
+// Buyer routes are intentionally NOT wrapped with tc — buyer context must stay
+// scoped to the actual buyer, not the team store owner.
+router.use("/waitlist",                  tc, waitlistRouter);
+router.use("/bundles",                   tc, bundlesRouter);
 router.use("/buyer/products",            buyerProductsRouter);
 router.use("/buyer/saved",               savedRouter);
 router.use("/buyer/cart",                cartDbRouter);
 router.use("/buyer/notifications",       notificationsFeedRouter);
 router.use("/buyer",                     buyerRouter);
 router.use("/conversations",             conversationsRouter);
-router.use("/seller/connect",            requireRole("owner"), connectRouter);      // payouts: owner only
-router.use("/seller/subscription",       requireRole("owner"), subscriptionRouter); // billing: owner only
-router.use("/seller/verification",       sellerVerificationRouter);
-router.use("/seller",                    sellerProfileRouter);
-router.use("/reviews",                   reviewsRouter);
-router.use("/posts",                     postsRouter);
+router.use("/seller/connect",            requireRole("owner"), connectRouter);      // payouts: owner only; requireRole resolves tc internally
+router.use("/seller/subscription",       requireRole("owner"), subscriptionRouter); // billing: owner only; requireRole resolves tc internally
+router.use("/seller/verification",       tc, sellerVerificationRouter);
+router.use("/seller",                    tc, sellerProfileRouter);
+router.use("/reviews",                   tc, reviewsRouter);
+router.use("/posts",                     tc, postsRouter);
 router.use("/reports",                   reportsRouter);
 router.use("/social",                    socialRouter);
 router.use("/referrals",                 referralsRouter);
-router.use("/shipping-rates",            shippingRatesRouter);
-router.use("/discount-codes",            discountCodesRouter);
-router.use("/returns",                   returnsRouter);
-router.use("/sample-orders",             sampleOrdersRouter);
-router.use("/drop-wallets",              dropWalletRouter);
-router.use("/disputes",                  disputesRouter);
-router.use("/finance",                   requireRole("owner"), financeRouter);      // payouts: owner only
-router.use("/taxes",                     taxesRouter);
+router.use("/shipping-rates",            tc, shippingRatesRouter);
+router.use("/discount-codes",            tc, discountCodesRouter);
+router.use("/returns",                   tc, returnsRouter);
+router.use("/sample-orders",             tc, sampleOrdersRouter);
+router.use("/drop-wallets",              tc, dropWalletRouter);
+router.use("/disputes",                  tc, disputesRouter);
+router.use("/finance",                   requireRole("owner"), financeRouter);      // payouts: owner only; requireRole resolves tc internally
+router.use("/taxes",                     tc, taxesRouter);
 router.use("/team",                      teamRouter);
-router.use("/store/ai",                  storeAiRouter);
-router.use("/store",                     storeRouter);
+router.use("/store/ai",                  tc, storeAiRouter);
+router.use("/store",                     tc, storeRouter);
 
 // ─── Freelancer marketplace (Community tab) ───────────────────────────────────
 // Connect sub-path BEFORE the generic /freelancers router so /connect/* isn't
 // swallowed by /freelancers/:id.
-router.use("/freelancers/connect",       freelancerConnectRouter);
-router.use("/freelancers",               freelancersRouter);
-router.use("/freelancer-jobs",           freelancerJobsRouter);
+router.use("/freelancers/connect",       tc, freelancerConnectRouter);
+router.use("/freelancers",               tc, freelancersRouter);
+router.use("/freelancer-jobs",           tc, freelancerJobsRouter);
 
 // ─── New seller settings + buyer payments routes ──────────────────────────────
-router.use("/seller/locations",          sellerLocationsRouter);
-router.use("/seller/metafields",         sellerMetafieldsRouter);
-router.use("/seller/settings",           sellerSettingsExtRouter);
+router.use("/seller/locations",          tc, sellerLocationsRouter);
+router.use("/seller/metafields",         tc, sellerMetafieldsRouter);
+router.use("/seller/settings",           tc, sellerSettingsExtRouter);
 router.use("/buyer/payment-methods",     buyerPaymentsRouter);
 
 // ─── Live shopping ─────────────────────────────────────────────────────────────
 import liveRouter from "./live";
-router.use("/live",                      liveRouter);
+router.use("/live",                      tc, liveRouter);
 
 export default router;

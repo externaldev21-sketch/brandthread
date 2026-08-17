@@ -53,31 +53,39 @@ async function resolveTeamContext(req: Request): Promise<TeamContext | null> {
     teamMembershipId: null,
   };
 
-  try {
-    const [membership] = await db
-      .select({
-        id: teamMembers.id,
-        ownerId: teamMembers.ownerId,
-        role: teamMembers.role,
-      })
-      .from(teamMembers)
-      .where(and(eq(teamMembers.memberClerkId, userId), eq(teamMembers.status, "active")))
-      .orderBy(desc(teamMembers.acceptedAt))
-      .limit(1);
+  // If the client explicitly requests their own store context, skip team rewrite.
+  const storeContextHeader = (req.headers as Record<string, string | string[] | undefined>)["x-store-context"];
+  const wantsOwnStore =
+    storeContextHeader === "own" ||
+    (Array.isArray(storeContextHeader) && storeContextHeader[0] === "own");
 
-    if (membership && membership.ownerId !== userId) {
-      ctx.actorRole = (membership.role as TeamRole) ?? "staff";
-      ctx.storeOwnerId = membership.ownerId;
-      ctx.teamMembershipId = membership.id;
-      // Touch lastActiveAt (fire & forget) — drives online/offline status.
-      db.update(teamMembers)
-        .set({ lastActiveAt: new Date() })
-        .where(eq(teamMembers.id, membership.id))
-        .then(() => {}, () => {});
+  if (!wantsOwnStore) {
+    try {
+      const [membership] = await db
+        .select({
+          id: teamMembers.id,
+          ownerId: teamMembers.ownerId,
+          role: teamMembers.role,
+        })
+        .from(teamMembers)
+        .where(and(eq(teamMembers.memberClerkId, userId), eq(teamMembers.status, "active")))
+        .orderBy(desc(teamMembers.acceptedAt))
+        .limit(1);
+
+      if (membership && membership.ownerId !== userId) {
+        ctx.actorRole = (membership.role as TeamRole) ?? "staff";
+        ctx.storeOwnerId = membership.ownerId;
+        ctx.teamMembershipId = membership.id;
+        // Touch lastActiveAt (fire & forget) — drives online/offline status.
+        db.update(teamMembers)
+          .set({ lastActiveAt: new Date() })
+          .where(eq(teamMembers.id, membership.id))
+          .then(() => {}, () => {});
+      }
+    } catch (err) {
+      console.error("[teamContext] membership lookup failed:", err);
+      // Fail open as owner-of-self — never lock a seller out of their own store.
     }
-  } catch (err) {
-    console.error("[teamContext] membership lookup failed:", err);
-    // Fail open as owner-of-self — never lock a seller out of their own store.
   }
 
   (req as any).teamContext = ctx;

@@ -190,6 +190,55 @@ router.get("/invite/accept/:token", async (req, res) => {
 
 // ─── Authenticated routes ─────────────────────────────────────────────────────
 router.use(requireAuth);
+
+// GET /api/team/my-membership — the caller's active membership in another store.
+// Must be placed BEFORE teamContext() so it always reads the real caller's id.
+// Returns null when the user is not a member of any other store.
+router.get("/my-membership", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  try {
+    const [membership] = await db
+      .select({
+        id: teamMembers.id,
+        ownerId: teamMembers.ownerId,
+        role: teamMembers.role,
+        status: teamMembers.status,
+        acceptedAt: teamMembers.acceptedAt,
+      })
+      .from(teamMembers)
+      .where(and(eq(teamMembers.memberClerkId, userId), eq(teamMembers.status, "active")))
+      .orderBy(desc(teamMembers.acceptedAt))
+      .limit(1);
+
+    if (!membership || membership.ownerId === userId) {
+      res.json({ membership: null });
+      return;
+    }
+
+    // Fetch the store owner's display info.
+    const [owner] = await db
+      .select({ name: users.name, displayName: users.displayName, brandName: users.brandName })
+      .from(users)
+      .where(eq(users.clerkId, membership.ownerId))
+      .limit(1);
+
+    res.json({
+      membership: {
+        id: membership.id,
+        ownerId: membership.ownerId,
+        role: membership.role,
+        acceptedAt: membership.acceptedAt,
+        ownerName: owner?.brandName ?? owner?.displayName ?? owner?.name ?? "Another store",
+      },
+    });
+  } catch (err) {
+    console.error("[team] my-membership lookup failed:", err);
+    res.json({ membership: null });
+  }
+});
+
 router.use(teamContext());
 
 // POST /api/team/invite/accept/:token — link the signed-in caller to the invite

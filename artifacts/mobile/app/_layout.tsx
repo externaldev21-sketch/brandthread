@@ -21,7 +21,7 @@ import { RoleProvider } from '@/contexts/RoleContext';
 import BootScreen from '@/components/BootScreen';
 import * as Notifications from 'expo-notifications';
 import { configureServices } from '@/lib/serviceConfig';
-import { configureApi, useApi } from '@/lib/api';
+import { configureApi, setStoreContext, useApi } from '@/lib/api';
 import { clearSocialCache } from '@/services/socialService';
 import { clearCartCache } from '@/services/cartService';
 
@@ -244,13 +244,37 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 }
 
 // ─── Wire background services + module-level API singleton to Clerk token ─────
+const STORE_CTX_KEY = '@brandthread/store_context';
+
 function ServiceConfigurer() {
-  const { getToken } = useAuth();
+  const { getToken, isSignedIn, isLoaded } = useAuth();
+  const prevSignedInRef2 = useRef<boolean | null>(null);
+
   useEffect(() => {
     configureServices(() => getToken());
     configureApi(() => getToken());
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Hydrate persisted store context once per sign-in session.
+  useEffect(() => {
+    if (!isLoaded) return;
+    const prev = prevSignedInRef2.current;
+    prevSignedInRef2.current = isSignedIn ?? false;
+
+    if (isSignedIn) {
+      // Restore the context that was active in the last session.
+      AsyncStorage.getItem(STORE_CTX_KEY).then((saved) => {
+        setStoreContext(saved === 'own' ? 'own' : null);
+      }).catch(() => {});
+    } else if (prev === true) {
+      // Just signed out — clear context so the next user starts fresh.
+      setStoreContext(null);
+      AsyncStorage.removeItem(STORE_CTX_KEY).catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSignedIn, isLoaded]);
+
   return null;
 }
 
