@@ -945,8 +945,15 @@ export async function removeFriend(userId: string): Promise<void> {
 // ─── Conversations ────────────────────────────────────────────────────────────
 
 export async function getConversations(): Promise<Conversation[]> {
-  try { return await serviceRequest<Conversation[]>('/api/conversations'); }
-  catch { return load<Conversation[]>(K.conversations, DEMO_CONVS); }
+  try {
+    const remote = await serviceRequest<Conversation[]>('/api/conversations');
+    // Only use API result if it has data — empty means first-login DB (fall back to local demo data)
+    if (Array.isArray(remote) && remote.length > 0) {
+      await save(K.conversations, remote); // cache for offline / next-launch use
+      return remote;
+    }
+  } catch { /* fall through to local */ }
+  return load<Conversation[]>(K.conversations, DEMO_CONVS);
 }
 export async function getConversation(id: string): Promise<Conversation | null> {
   const convs = await getConversations();
@@ -999,8 +1006,15 @@ export async function createOrGetConversation(params: {
   return conv;
 }
 export async function getMessages(conversationId: string): Promise<Message[]> {
-  try { return await serviceRequest<Message[]>(`/api/conversations/${conversationId}/messages`); }
-  catch { return load<Message[]>(K.messages(conversationId), DEMO_MESSAGES[conversationId] ?? []); }
+  try {
+    const remote = await serviceRequest<Message[]>(`/api/conversations/${conversationId}/messages`);
+    // Only use API result if it has data — empty means conversation not yet in DB (use local demo/cached)
+    if (Array.isArray(remote) && remote.length > 0) {
+      await save(K.messages(conversationId), remote); // cache for offline use
+      return remote;
+    }
+  } catch { /* fall through to local */ }
+  return load<Message[]>(K.messages(conversationId), DEMO_MESSAGES[conversationId] ?? []);
 }
 export async function sendMessage(conversationId: string, text: string, attachment?: MessageAttachment): Promise<Message> {
   const msg: Message = {
@@ -1108,8 +1122,15 @@ export async function deleteStory(storyId: string): Promise<void> {
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 export async function getNotifications(): Promise<Notification[]> {
-  try { return await serviceRequest<Notification[]>('/api/buyer/notifications'); }
-  catch { return load<Notification[]>(K.notifications, DEMO_NOTIFS); }
+  try {
+    const remote = await serviceRequest<Notification[]>('/api/buyer/notifications');
+    // Only use API result if it has data — empty means first-login DB (fall back to local demo data)
+    if (Array.isArray(remote) && remote.length > 0) {
+      await save(K.notifications, remote); // cache for offline / next-launch use
+      return remote;
+    }
+  } catch { /* fall through to local */ }
+  return load<Notification[]>(K.notifications, DEMO_NOTIFS);
 }
 export async function markNotificationRead(id: string): Promise<void> {
   serviceRequest('/api/buyer/notifications/' + encodeURIComponent(id) + '/read', { method: 'PATCH', body: JSON.stringify({}) }).catch(() => {});
@@ -1218,8 +1239,15 @@ export async function submitReport(params: { targetType: ReportTargetType; targe
 // ─── Saved Content ────────────────────────────────────────────────────────────
 
 export async function getSavedItems(): Promise<SavedItem[]> {
-  try { return await serviceRequest<SavedItem[]>('/api/buyer/saved'); }
-  catch { return load<SavedItem[]>(K.saved, DEMO_SAVED); }
+  try {
+    const remote = await serviceRequest<SavedItem[]>('/api/buyer/saved');
+    // Only use API result if it has data — empty means first-login DB (fall back to local demo data)
+    if (Array.isArray(remote) && remote.length > 0) {
+      await save(K.saved, remote); // cache for offline / next-launch use
+      return remote;
+    }
+  } catch { /* fall through to local */ }
+  return load<SavedItem[]>(K.saved, DEMO_SAVED);
 }
 export async function saveItem(params: { type: SavedItemType; targetId: string; title: string; subtitle?: string; accentColor?: string; }): Promise<SavedItem> {
   try {
