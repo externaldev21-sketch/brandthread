@@ -10,18 +10,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type SetupTaskId =
-  | 'brand_profile'
-  | 'brand_logo'
+  | 'verify_account'
+  | 'connect_payments'
   | 'first_product'
-  | 'product_images'
-  | 'product_price'
-  | 'sales_model'
-  | 'connect_payouts'
-  | 'shipping'
-  | 'manufacturer'
+  | 'shipping_rates'
   | 'customize_store'
+  | 'connect_domain'
+  | 'publish_store'
   | 'first_post'
-  | 'publish_store';
+  | 'connect_manufacturer';
 
 export interface SetupTask {
   id: SetupTaskId;
@@ -29,6 +26,7 @@ export interface SetupTask {
   description: string;
   icon: string;
   route: string;
+  optional?: boolean;
   completed: boolean;
   skipped: boolean;
 }
@@ -46,18 +44,70 @@ export interface SetupState {
 // ─── Default Task List ────────────────────────────────────────────────────────
 
 const DEFAULT_TASKS: Omit<SetupTask, 'completed' | 'skipped'>[] = [
-  { id: 'brand_profile',   label: 'Complete brand profile',  description: 'Add your brand name, bio and social links',       icon: 'user',       route: '/edit-profile' },
-  { id: 'brand_logo',      label: 'Upload brand logo',       description: 'Add a logo that represents your brand',           icon: 'image',      route: '/edit-profile' },
-  { id: 'first_product',   label: 'Create first product',    description: 'Add your first item to your catalog',             icon: 'package',    route: '/(tabs)/products' },
-  { id: 'product_images',  label: 'Add product images',      description: 'Upload photos that show your product well',       icon: 'camera',     route: '/(tabs)/products' },
-  { id: 'product_price',   label: 'Set product price',       description: 'Set a price and choose your currency',            icon: 'dollar-sign',route: '/(tabs)/products' },
-  { id: 'sales_model',     label: 'Choose sales model',      description: 'Pre-order, in-stock, or limited drop',           icon: 'layers',     route: '/(tabs)/products' },
-  { id: 'connect_payouts', label: 'Connect payouts',         description: 'Link a bank account to receive payments',         icon: 'credit-card', route: '/(tabs)/more' },
-  { id: 'shipping',        label: 'Configure shipping',      description: 'Set your shipping zones and rates',               icon: 'truck',      route: '/(tabs)/more' },
-  { id: 'manufacturer',    label: 'Add manufacturer',        description: 'Find or invite a manufacturer to produce your items', icon: 'tool',   route: '/(tabs)/more' },
-  { id: 'customize_store', label: 'Customize store',         description: 'Choose your store colors, fonts and layout',      icon: 'layout',     route: '/(tabs)/more' },
-  { id: 'first_post',      label: 'Create first post',       description: 'Share a Seller post to the Thread feed',          icon: 'video',      route: '/create-post' },
-  { id: 'publish_store',   label: 'Publish store',           description: 'Make your store visible to buyers',               icon: 'globe',      route: '/(tabs)/more' },
+  {
+    id: 'verify_account',
+    label: 'Verify your account',
+    description: 'Complete Stripe Identity verification to start selling',
+    icon: 'shield',
+    route: '/seller-verification',
+  },
+  {
+    id: 'connect_payments',
+    label: 'Set up payments',
+    description: 'Link Stripe Connect so you can receive payouts',
+    icon: 'credit-card',
+    route: '/payouts',
+  },
+  {
+    id: 'first_product',
+    label: 'Add your first product',
+    description: 'Create a product and add it to your catalog',
+    icon: 'package',
+    route: '/add-product',
+  },
+  {
+    id: 'shipping_rates',
+    label: 'Set up shipping rates',
+    description: 'Configure your shipping zones and rates for buyers',
+    icon: 'truck',
+    route: '/shipping',
+  },
+  {
+    id: 'customize_store',
+    label: 'Customize your storefront',
+    description: 'Choose your store colors, fonts and layout',
+    icon: 'layout',
+    route: '/store-builder',
+  },
+  {
+    id: 'connect_domain',
+    label: 'Connect a domain',
+    description: 'Verify a custom domain you already own from a registrar',
+    icon: 'globe',
+    route: '/store-domain',
+  },
+  {
+    id: 'publish_store',
+    label: 'Publish your storefront',
+    description: 'Make your store live and visible to buyers',
+    icon: 'upload-cloud',
+    route: '/store-publish',
+  },
+  {
+    id: 'first_post',
+    label: 'Post your first video',
+    description: 'Share content to the Thread feed to attract buyers',
+    icon: 'video',
+    route: '/create-post',
+  },
+  {
+    id: 'connect_manufacturer',
+    label: 'Connect a manufacturer',
+    description: 'Find or invite a manufacturer to produce your drops',
+    icon: 'tool',
+    route: '/manufacturer-hub',
+    optional: true,
+  },
 ];
 
 const DEFAULT_STATE: SetupState = {
@@ -81,12 +131,20 @@ export async function getSetupState(): Promise<SetupState> {
     const raw = await AsyncStorage.getItem(KEY_SETUP);
     if (!raw) return DEFAULT_STATE;
     const parsed: SetupState = JSON.parse(raw);
-    // Merge any new tasks added in future app versions
-    const existingIds = new Set(parsed.tasks.map(t => t.id));
+    // Only retain tasks whose IDs still exist in DEFAULT_TASKS. This lets us
+    // rename or remove task IDs across app versions without corrupt persisted state.
+    const validIds = new Set(DEFAULT_TASKS.map(t => t.id));
+    const validTasks = (parsed.tasks ?? []).filter(t => validIds.has(t.id as SetupTaskId));
+    const existingIds = new Set(validTasks.map(t => t.id));
     const newTasks = DEFAULT_TASKS
       .filter(t => !existingIds.has(t.id))
       .map(t => ({ ...t, completed: false, skipped: false }));
-    return { ...parsed, tasks: [...parsed.tasks, ...newTasks] };
+    // Preserve DEFAULT_TASKS display order
+    const taskMap = new Map([...validTasks, ...newTasks].map(t => [t.id, t]));
+    const mergedTasks = DEFAULT_TASKS.map(def =>
+      taskMap.get(def.id) ?? { ...def, completed: false, skipped: false }
+    );
+    return { ...parsed, tasks: mergedTasks };
   } catch {
     return DEFAULT_STATE;
   }
@@ -150,6 +208,7 @@ export async function markFeatureOpened(featureId: string): Promise<void> {
 // ─── Computed helpers ─────────────────────────────────────────────────────────
 
 export function completionPercent(state: SetupState): number {
+  if (!state.tasks.length) return 0;
   const done = state.tasks.filter(t => t.completed).length;
   return Math.round((done / state.tasks.length) * 100);
 }
@@ -163,18 +222,15 @@ export function nextBestAction(state: SetupState): { label: string; route: strin
   if (!next) return { label: 'View your brand dashboard', route: '/(tabs)/profile' };
 
   const actions: Partial<Record<SetupTaskId, string>> = {
-    brand_profile:   'Finish setting up your brand profile',
-    brand_logo:      'Upload your brand logo',
-    first_product:   'Create your first product',
-    product_images:  'Add photos to your product',
-    product_price:   'Set a price for your product',
-    sales_model:     'Choose your sales model',
-    connect_payouts: 'Connect payouts before publishing',
-    shipping:        'Configure your shipping rates',
-    manufacturer:    'Add a manufacturer to your network',
-    customize_store: 'Customize your store layout',
-    first_post:      'Create your first Seller post',
-    publish_store:   'Your store is ready — publish it',
+    verify_account:       'Verify your account to start selling',
+    connect_payments:     'Connect payouts before you can earn',
+    first_product:        'Create your first product',
+    shipping_rates:       'Configure your shipping rates',
+    customize_store:      'Customize your store layout',
+    connect_domain:       'Connect a custom domain',
+    publish_store:        'Your store is ready — publish it',
+    first_post:           'Create your first Seller post',
+    connect_manufacturer: 'Add a manufacturer to your network',
   };
 
   return {

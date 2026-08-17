@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useApi } from '@/hooks/useApi';
 import {
   getSetupState, markSetupStarted, dismissWelcome,
   completionPercent, nextTask, nextBestAction, dismissTip,
@@ -115,9 +116,18 @@ export default function SellerHomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
+  const api = useApi();
   const [loading, setLoading] = useState(true);
   const [statsError, setStatsError] = useState(false);
   const [setupState, setSetupState] = useState<SetupState>(DEFAULT_SETUP);
+  // Real per-seller dashboard stats — null while loading or on error.
+  // No fake/seed fallback: chips show '—' until real data arrives.
+  const [dashStats, setDashStats] = useState<{
+    revenueCents: number;
+    orders: number;
+    storefrontVisits: number;
+    completedOrders: number;
+  } | null>(null);
   const [searchModal, setSearchModal] = useState(false);
   const [commandModal, setCommandModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -163,6 +173,19 @@ export default function SellerHomeScreen() {
     // Show skeleton for at least 500ms
     const minLoad = setTimeout(() => {}, 500);
     setStatsError(false);
+    // ── Real per-seller dashboard stats (revenue, orders, conversion rate) ──
+    api.analytics.dashboard().then((data: any) => {
+      if (!data || typeof data !== 'object') return;
+      setDashStats({
+        revenueCents:     typeof data.revenue?.totalCents === 'number' ? data.revenue.totalCents : 0,
+        orders:           typeof data.orders?.total        === 'number' ? data.orders.total        : 0,
+        storefrontVisits: typeof data.storefrontVisits     === 'number' ? data.storefrontVisits     : 0,
+        completedOrders:  typeof data.completedOrders      === 'number' ? data.completedOrders      : 0,
+      });
+    }).catch(() => {
+      // Leave dashStats as null — chips show '—' rather than a fabricated number
+      setDashStats(null);
+    });
     // Load hub stats
     getHubStats().then(stats => setHubStats({
       activeQuotes: stats.activeQuotes,
@@ -340,61 +363,94 @@ export default function SellerHomeScreen() {
         )}
 
 
-        {/* ── Setup Progress Card ───────────────────────────────────────── */}
+        {/* ── Setup Checklist ──────────────────────────────────────────── */}
         {showProgress && (
           <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
             <BrandthreadCard>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <Text style={s.progressTitle}>Setup progress</Text>
-                <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE_LIGHT }}>{pct}%</Text>
+              {/* Header: title + "X of 9 complete" */}
+              <View style={s.checklistHeader}>
+                <Text style={s.checklistTitle}>Finish setting up your store</Text>
+                <Text style={s.checklistCount}>
+                  {setupState.tasks.filter(t => t.completed).length} of {setupState.tasks.length} complete
+                </Text>
               </View>
+              {/* Slim animated progress bar */}
               <View style={s.progressTrack}>
                 <Animated.View
-                  style={[
-                    s.progressFill,
-                    {
-                      width: progressAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['0%', '100%'],
-                      }),
-                    },
-                  ]}
+                  style={[s.progressFill, {
+                    width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+                  }]}
                 />
               </View>
-              {nextT && (
-                <Text style={[s.progressNext, { marginTop: 8 }]}>
-                  <Text style={{ color: MUTED }}>Next: </Text>
-                  <Text style={{ color: SUBTLE }}>{nextT.label}</Text>
-                </Text>
-              )}
-              <View style={{ marginTop: 12, alignSelf: 'flex-start' }}>
-                <SecondaryButton
-                  label="Continue setup"
-                  onPress={() => Alert.alert('Setup', 'Guided setup coming soon.')}
-                  small
-                />
+              {/* Checklist rows */}
+              <View style={{ marginTop: SP.sm }}>
+                {setupState.tasks.map((task, idx) => (
+                  <TouchableOpacity
+                    key={task.id}
+                    style={[s.checkRow, idx < setupState.tasks.length - 1 && s.checkRowBorder]}
+                    activeOpacity={task.completed ? 1 : 0.72}
+                    onPress={() => {
+                      if (!task.completed) {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        nav(task.route);
+                      }
+                    }}
+                  >
+                    {/* Circle: empty = incomplete, green-filled = done */}
+                    <View style={[s.checkCircle, task.completed && s.checkCircleDone]}>
+                      {task.completed && <Feather name="check" size={11} color="#fff" />}
+                    </View>
+                    {/* Label — struck through when complete */}
+                    <Text
+                      style={[s.checkLabel, task.completed && s.checkLabelDone]}
+                      numberOfLines={1}
+                    >
+                      {task.label}
+                    </Text>
+                    {/* Optional badge — only when not yet done */}
+                    {task.optional && !task.completed && (
+                      <View style={s.optionalBadge}>
+                        <Text style={s.optionalText}>Optional</Text>
+                      </View>
+                    )}
+                    {/* Chevron on incomplete rows */}
+                    {!task.completed && (
+                      <Feather name="chevron-right" size={15} color={MUTED} />
+                    )}
+                  </TouchableOpacity>
+                ))}
               </View>
             </BrandthreadCard>
           </View>
         )}
 
-        {/* ── Zone A: Key Stats (3 chips) ───────────────────────────────── */}
+        {/* ── Zone A: Key Stats (3 chips — real per-seller data) ───────── */}
         <View style={s.statsRow}>
-          <View style={s.statChip}>
-            <Text style={s.statChipVal}>$0</Text>
-            <Text style={s.statChipLbl}>Revenue</Text>
-          </View>
+          {/* Revenue: all-time non-cancelled order total from DB */}
           <View style={s.statChip}>
             <Text style={s.statChipVal}>
-              {(orderStats?.newOrders ?? 0) + (orderStats?.toProcess ?? 0)}
+              {dashStats === null
+                ? '—'
+                : '$' + (dashStats.revenueCents / 100).toLocaleString('en-US', { maximumFractionDigits: 0 })}
             </Text>
-            <Text style={s.statChipLbl}>Pending</Text>
+            <Text style={s.statChipLbl}>Revenue</Text>
           </View>
-          <View style={[s.statChip, invStats?.lowStockCount ? s.statChipWarn : undefined]}>
-            <Text style={[s.statChipVal, invStats?.lowStockCount ? { color: ORANGE } : undefined]}>
-              {invStats?.lowStockCount ?? 0}
+          {/* Orders: all-time order count from DB */}
+          <View style={s.statChip}>
+            <Text style={s.statChipVal}>
+              {dashStats === null ? '—' : String(dashStats.orders)}
             </Text>
-            <Text style={s.statChipLbl}>Low Stock</Text>
+            <Text style={s.statChipLbl}>Orders</Text>
+          </View>
+          {/* Conversion: completed orders / storefront visits — real tracked values.
+              Shows '—' when no visit data exists yet (honest, not fabricated). */}
+          <View style={s.statChip}>
+            <Text style={s.statChipVal}>
+              {dashStats === null || dashStats.storefrontVisits === 0
+                ? '—'
+                : (dashStats.completedOrders / dashStats.storefrontVisits * 100).toFixed(1) + '%'}
+            </Text>
+            <Text style={s.statChipLbl}>Conversion</Text>
           </View>
         </View>
 
@@ -733,14 +789,26 @@ const s = StyleSheet.create({
     letterSpacing: -0.2,
   },
 
-  // Progress
-  progressTitle: {
+  // ── Setup checklist ───────────────────────────────────────────────────────
+  checklistHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  checklistTitle: {
     fontSize: FS.base,
     fontFamily: FONT.bold,
     color: FG,
   },
+  checklistCount: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    color: PURPLE_LIGHT,
+  },
+  // Slim progress bar (still animated via progressAnim ref)
   progressTrack: {
-    height: 4,
+    height: 3,
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: 99,
     overflow: 'hidden',
@@ -750,7 +818,48 @@ const s = StyleSheet.create({
     backgroundColor: PURPLE,
     borderRadius: 99,
   },
-  progressNext: {
+  // Checklist rows
+  checkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 11,
+  },
+  checkRowBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: BORDER,
+  },
+  checkCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 1.5,
+    borderColor: BORDER,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  checkCircleDone: {
+    backgroundColor: SUCCESS,
+    borderColor: SUCCESS,
+  },
+  checkLabel: {
+    flex: 1,
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    color: FG,
+  },
+  checkLabelDone: {
+    color: MUTED,
+    textDecorationLine: 'line-through' as const,
+  },
+  optionalBadge: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  optionalText: {
     fontSize: FS.xs,
     fontFamily: FONT.regular,
     color: MUTED,

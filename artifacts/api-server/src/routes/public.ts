@@ -4,7 +4,7 @@
  */
 import { Router } from "express";
 import { db, products, productVariants, users, drops, posts, postTaggedProducts } from "@workspace/db";
-import { eq, and, desc, inArray, or, ilike } from "drizzle-orm";
+import { eq, and, desc, inArray, or, ilike, sql } from "drizzle-orm";
 
 const router = Router();
 
@@ -357,6 +357,25 @@ router.get("/drops/:id", async (req, res) => {
   ]);
 
   return res.json({ ...drop, seller: seller ?? null, products: dropProducts });
+});
+
+// POST /api/public/sellers/:sellerId/visit
+// Unauthenticated. Increments the seller's storefront visit counter by 1.
+// Called fire-and-forget from the buyer-facing seller profile screen.
+router.post("/sellers/:sellerId/visit", async (req, res) => {
+  const { sellerId } = req.params;
+  if (!sellerId || typeof sellerId !== "string") {
+    return res.status(400).json({ error: "sellerId required" });
+  }
+  try {
+    await db.execute(
+      sql`UPDATE users SET storefront_visit_count = storefront_visit_count + 1 WHERE clerk_id = ${sellerId}`
+    );
+    return res.status(204).end();
+  } catch (err) {
+    console.error("visit increment error:", err);
+    return res.status(500).json({ error: "failed" });
+  }
 });
 
 export default router;

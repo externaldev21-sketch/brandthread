@@ -51,6 +51,9 @@ export const users = pgTable('users', {
   // Unique @handle (letters, numbers, underscores; 3–30 chars). Nullable so
   // existing rows are unaffected; the DB-level unique index enforces platform-wide uniqueness.
   username: text('username').unique(),
+  // Storefront visit counter — incremented by a public endpoint each time a buyer
+  // views this seller's storefront. Drives the real conversion rate stat.
+  storefrontVisitCount: integer('storefront_visit_count').notNull().default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

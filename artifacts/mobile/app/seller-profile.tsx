@@ -267,6 +267,13 @@ export default function SellerProfileScreen() {
       return;
     }
 
+    // Fire-and-forget: increment the seller's storefront visit counter so the
+    // dashboard conversion rate stat reflects real buyer traffic.
+    const apiBase = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
+    fetch(`${apiBase}/api/public/sellers/${encodeURIComponent(sellerId)}/visit`, {
+      method: 'POST',
+    }).catch(() => { /* non-fatal */ });
+
     (async () => {
       try {
         const data = await api.publicSellers.get(sellerId);

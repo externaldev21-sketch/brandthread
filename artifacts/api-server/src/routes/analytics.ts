@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, orders, customers, productVariants, drops, products, orderItems } from "@workspace/db";
+import { db, orders, customers, productVariants, drops, products, orderItems, users } from "@workspace/db";
 import { sql, gte, and, eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 
@@ -26,22 +26,29 @@ router.get("/dashboard", async (req, res) => {
     revenueMonth,
     ordersToday,
     ordersTotal,
+    completedOrders,
     customerCount,
     customerToday,
     lowStock,
     preOrderHeld,
     preMadeAvailable,
+    sellerRow,
   ] = await Promise.all([
     db.select({ total: sql<number>`coalesce(sum(total_cents),0)::int` }).from(orders)
       .where(and(eq(orders.ownerId, ownerId), gte(orders.createdAt, todayStart), sql`status != 'cancelled'`)),
     db.select({ total: sql<number>`coalesce(sum(total_cents),0)::int` }).from(orders)
       .where(and(eq(orders.ownerId, ownerId), gte(orders.createdAt, weekStart), sql`status != 'cancelled'`)),
+    // All-time revenue (non-cancelled) — primary number shown on dashboard
     db.select({ total: sql<number>`coalesce(sum(total_cents),0)::int` }).from(orders)
-      .where(and(eq(orders.ownerId, ownerId), gte(orders.createdAt, monthStart), sql`status != 'cancelled'`)),
+      .where(and(eq(orders.ownerId, ownerId), sql`status != 'cancelled'`)),
     db.select({ count: sql<number>`count(*)::int` }).from(orders)
       .where(and(eq(orders.ownerId, ownerId), gte(orders.createdAt, todayStart))),
+    // All-time order count (all statuses)
     db.select({ count: sql<number>`count(*)::int` }).from(orders)
       .where(eq(orders.ownerId, ownerId)),
+    // Completed orders: delivered or shipped — numerator for conversion rate
+    db.select({ count: sql<number>`count(*)::int` }).from(orders)
+      .where(and(eq(orders.ownerId, ownerId), sql`status IN ('delivered','shipped')`)),
     db.select({ count: sql<number>`count(*)::int` }).from(customers)
       .where(eq(customers.ownerId, ownerId)),
     db.select({ count: sql<number>`count(*)::int` }).from(customers)
@@ -63,18 +70,29 @@ router.get("/dashboard", async (req, res) => {
       .where(and(eq(drops.ownerId, ownerId), eq(drops.type, "pre-order"), sql`payout_status = 'held'`)),
     db.select({ total: sql<number>`coalesce(sum(total_collected_cents),0)::int` }).from(drops)
       .where(and(eq(drops.ownerId, ownerId), eq(drops.type, "pre-made"), sql`payout_status = 'processing'`)),
+    // Storefront visit counter — denominator for real conversion rate
+    db.select({ visits: users.storefrontVisitCount }).from(users)
+      .where(eq(users.clerkId, ownerId))
+      .limit(1),
   ]);
+
+  const storefrontVisits   = sellerRow[0]?.visits ?? 0;
+  const completedOrdersCount = completedOrders[0]?.count ?? 0;
 
   res.json({
     revenue: {
       todayCents:  revenueToday[0]?.total  ?? 0,
       weekCents:   revenueWeek[0]?.total   ?? 0,
-      monthCents:  revenueMonth[0]?.total  ?? 0,
+      // All-time total (non-cancelled) — primary revenue figure
+      totalCents:  revenueMonth[0]?.total  ?? 0,
     },
     orders: {
       today: ordersToday[0]?.count ?? 0,
       total: ordersTotal[0]?.count ?? 0,
     },
+    // Real conversion rate inputs — no fabricated numbers
+    storefrontVisits,
+    completedOrders: completedOrdersCount,
     customers: {
       total:    customerCount[0]?.count  ?? 0,
       newToday: customerToday[0]?.count ?? 0,
