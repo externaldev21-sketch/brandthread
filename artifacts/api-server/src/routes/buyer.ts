@@ -512,4 +512,50 @@ router.get("/orders/:id", async (req, res) => {
   }
 });
 
+// ─── Seller Payment Status ────────────────────────────────────────────────────
+
+/**
+ * GET /api/buyer/seller-payment-status/:sellerId
+ * Check whether a seller's Stripe Connect account is ready to accept payments.
+ * Returns { ready: boolean, reason?: string }
+ */
+router.get("/seller-payment-status/:sellerId", async (req, res) => {
+  try {
+    const { sellerId } = req.params;
+
+    const [seller] = await db
+      .select({
+        stripeAccountId:     users.stripeAccountId,
+        stripeAccountStatus: users.stripeAccountStatus,
+      })
+      .from(users)
+      .where(eq(users.clerkId, sellerId))
+      .limit(1);
+
+    if (!seller) {
+      res.json({ ready: false, reason: "This seller's account could not be found." });
+      return;
+    }
+
+    if (!seller.stripeAccountId) {
+      res.json({ ready: false, reason: "This seller hasn't set up a payment account yet." });
+      return;
+    }
+
+    if (seller.stripeAccountStatus !== "active") {
+      const reason =
+        seller.stripeAccountStatus === "restricted"
+          ? "This seller's payment account is currently restricted."
+          : "This seller's payment account isn't active yet.";
+      res.json({ ready: false, reason });
+      return;
+    }
+
+    res.json({ ready: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ ready: false, reason: "Could not verify seller payment status." });
+  }
+});
+
 export default router;

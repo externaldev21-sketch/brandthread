@@ -434,6 +434,26 @@ export default function BuyerProductDetailScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setBuyingNow(true);
     try {
+      // Check seller payment readiness before entering checkout
+      const sellerId = product!.sellerId;
+      if (sellerId) {
+        try {
+          const status = await api.buyer.sellerPaymentStatus(sellerId);
+          if (!status.ready) {
+            Alert.alert(
+              'Payments Unavailable',
+              status.reason ?? 'This seller can\'t accept payments right now. Please try again later.',
+              [{ text: 'OK' }],
+            );
+            setBuyingNow(false);
+            return;
+          }
+        } catch {
+          // Non-fatal: if the status check fails (e.g. network error), proceed —
+          // the server will reject the checkout session if the account is truly unready.
+        }
+      }
+
       const cart = await getCart();
       await createBuyNowSession(product!, variant, qty, cart);
       router.push('/buyer-checkout?source=buynow' as never);

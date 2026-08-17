@@ -17,6 +17,7 @@ import {
   groupCartBySeller, calculateCartSummary, validateCart,
 } from '@/services/cartService';
 import { Cart, CartItem, SavedCartItem, CartSellerGroup } from '@/services/cartTypes';
+import { useApi } from '@/hooks/useApi';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
@@ -350,6 +351,7 @@ const sum = StyleSheet.create({
 export default function CartScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const api = useApi();
 
   const [cart, setCart] = useState<Cart>({ id: '', items: [], savedItems: [], updatedAt: '' });
   const [loading, setLoading] = useState(true);
@@ -420,6 +422,28 @@ export default function CartScreen() {
         setValidating(false);
         return;
       }
+
+      // Check each seller's payment account before entering checkout
+      const currentGroups = groupCartBySeller(cart.items);
+      for (const group of currentGroups) {
+        try {
+          const status = await api.buyer.sellerPaymentStatus(group.sellerId);
+          if (!status.ready) {
+            const sellerLabel = group.sellerName || 'One of the sellers';
+            Alert.alert(
+              'Payments Unavailable',
+              `${sellerLabel} can't accept payments right now.\n\n${status.reason ?? 'Please try again later or remove their items from your cart.'}`,
+              [{ text: 'OK' }],
+            );
+            setValidating(false);
+            return;
+          }
+        } catch {
+          // Non-fatal: if the status check fails (e.g. network issue), let the
+          // buyer proceed — the server will reject the checkout session if truly unready.
+        }
+      }
+
       router.push(('/buyer-checkout?source=cart') as never);
     } catch {
       Alert.alert('Error', 'Something went wrong. Please try again.');

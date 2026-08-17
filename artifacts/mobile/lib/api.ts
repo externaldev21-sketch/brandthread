@@ -346,6 +346,12 @@ export function createApi(getToken: GetToken) {
         markAllRead: () => patch<{ ok: boolean }>('/api/buyer/notifications/read-all', {}),
         delete:     (id: string) => del<{ ok: boolean }>(`/api/buyer/notifications/${encodeURIComponent(id)}`),
       },
+      /** Check whether a seller's Stripe Connect account can accept payments.
+       *  Returns { ready: boolean, reason?: string }. */
+      sellerPaymentStatus: (sellerId: string) =>
+        get<{ ready: boolean; reason?: string }>(
+          `/api/buyer/seller-payment-status/${encodeURIComponent(sellerId)}`
+        ),
     },
     /** DM conversations between buyers and sellers. */
     conversations: {
