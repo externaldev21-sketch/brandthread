@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, ActivityIndicator, Modal, TextInput,
 } from 'react-native';
@@ -198,25 +198,47 @@ export default function BuyerOrderDetailScreen() {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewBody, setReviewBody] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
+  // Backoff: stop polling after 3 consecutive failures; resume on next focus.
+  const consecutiveFailuresRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Poll every 15 s while this screen is focused so status updates
   // (paid → processing → shipped → delivered) appear without manual refresh.
+  // After 3 consecutive failures the interval is cleared to avoid hammering a
+  // down/offline server; it resets on the next focus event.
   useFocusEffect(useCallback(() => {
     if (!id) return;
     let cancelled = false;
+    consecutiveFailuresRef.current = 0;
 
     function fetchOrder() {
       api.buyer.orders.get(id!).then(row => {
         if (!cancelled) {
           setOrder(adaptOrderDetail(row));
           setLoading(false);
+          consecutiveFailuresRef.current = 0;
         }
-      }).catch(() => { if (!cancelled) setLoading(false); });
+      }).catch(() => {
+        if (!cancelled) {
+          setLoading(false);
+          consecutiveFailuresRef.current += 1;
+          if (consecutiveFailuresRef.current >= 3 && timerRef.current !== null) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
+        }
+      });
     }
 
     fetchOrder();
-    const timer = setInterval(fetchOrder, 15_000);
-    return () => { cancelled = true; clearInterval(timer); };
+    timerRef.current = setInterval(fetchOrder, 15_000);
+    return () => {
+      cancelled = true;
+      if (timerRef.current !== null) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
   }, [id]));
 
   function handleCopyTracking() {

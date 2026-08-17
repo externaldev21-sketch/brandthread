@@ -241,24 +241,50 @@ export default function BuyerOrdersScreen() {
   // Track whether the very first load has completed so re-focuses and
   // polling intervals don't flash the full-screen spinner.
   const hasLoadedRef = useRef(false);
+  // Backoff: stop polling after 3 consecutive failures; resume on next focus.
+  // A generation counter ensures requests from a previous focus cycle cannot
+  // increment the failure count or clear the timer of the current focus cycle.
+  const consecutiveFailuresRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const generationRef = useRef(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (generation: number) => {
     setLoadError(false);
     try {
       const rows = await api.buyer.orders.list();
+      if (generationRef.current !== generation) return; // stale focus cycle
       setOrders(rows.map(adaptOrder));
-    } catch { setLoadError(true); }
+      consecutiveFailuresRef.current = 0;
+    } catch {
+      if (generationRef.current !== generation) return; // stale focus cycle
+      setLoadError(true);
+      consecutiveFailuresRef.current += 1;
+      if (consecutiveFailuresRef.current >= 3 && timerRef.current !== null) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+    if (generationRef.current !== generation) return;
     setLoading(false);
     hasLoadedRef.current = true;
   }, [api]);
 
   // Refresh immediately on focus, then poll every 30 s while on this screen.
   // Spinner only shows on the very first load; subsequent refreshes are silent.
+  // After 3 consecutive failures the interval is cleared to avoid hammering a
+  // down/offline server; it resets on the next focus event.
   useFocusEffect(useCallback(() => {
+    const generation = ++generationRef.current;
+    consecutiveFailuresRef.current = 0;
     if (!hasLoadedRef.current) setLoading(true);
-    load();
-    const timer = setInterval(load, 30_000);
-    return () => clearInterval(timer);
+    load(generation);
+    timerRef.current = setInterval(() => load(generation), 30_000);
+    return () => {
+      if (timerRef.current !== null) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
   }, [load]));
 
   const filtered = applyFilter(orders, filter);
@@ -295,7 +321,7 @@ export default function BuyerOrdersScreen() {
           </Text>
           <TouchableOpacity
             style={{ marginTop: SP.md, paddingHorizontal: SP.lg, paddingVertical: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER }}
-            onPress={() => { setLoading(true); load(); }}
+            onPress={() => { setLoading(true); load(generationRef.current); }}
             activeOpacity={0.8}
           >
             <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED }}>Try again</Text>
