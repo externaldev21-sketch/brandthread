@@ -301,8 +301,10 @@ export async function applyTheme(themeId: string, presetId?: string): Promise<St
     ? theme.presets.find(p => p.paletteId === presetId) ?? theme.presets[0]
     : theme.presets[0];
 
-  // Create version before applying
-  await _createVersionSnapshot(store, 'theme_change', `Applied theme: ${theme.name}`);
+  // Capture pre-mutation snapshot and persist to DB (fire-and-forget — theme
+  // changes are auto-saves; the user can save a named version manually).
+  const preThemeSnapshot = await _createVersionSnapshot(store, 'theme_change', `Applied theme: ${theme.name}`);
+  api.store.saveVersion(`Applied theme: ${theme.name}`, preThemeSnapshot as Record<string, unknown>).catch(() => {});
 
   store.themeSettings.themeId = themeId;
   store.themeSettings.activePresetId = preset.paletteId;
@@ -600,53 +602,124 @@ export async function addCustomDomain(domain: string): Promise<Storefront> {
 }
 
 // ─── Versions ─────────────────────────────────────────────────────────────────
-async function _createVersionSnapshot(store: Storefront, trigger: StoreVersion['trigger'], label: string): Promise<void> {
+
+/**
+ * Fetch saved store versions.
+ *
+ * Strategy:
+ * 1. Try the real DB first — versions are durable across app uninstalls and
+ *    device switches because they live in the server database.
+ * 2. Treat the DB response as authoritative even when it is an empty list;
+ *    only fall back to AsyncStorage when the API call itself throws (network
+ *    unreachable, server error, etc.).
+ * 3. Back-fill the local AsyncStorage cache with the authoritative DB list so
+ *    offline reads work after a successful online fetch.
+ */
+export async function getVersions(): Promise<StoreVersion[]> {
+  try {
+    const dbVersions = await api.store.versions();
+    if (Array.isArray(dbVersions)) {
+      // DB is authoritative — map every returned version (including empty list)
+      const mapped: StoreVersion[] = dbVersions.map((v: any) => ({
+        id:          v.id,
+        label:       v.label       ?? 'Version',
+        trigger:     (v.trigger    ?? 'manual') as StoreVersion['trigger'],
+        snapshot:    (v.snapshot   ?? {})        as StoreVersion['snapshot'],
+        createdAt:   v.createdAt   ?? new Date().toISOString(),
+        createdBy:   v.createdBy,
+      }));
+
+      // Back-fill the local cache so the UI can read versions while offline
+      try {
+        const store = await getStorefront();
+        store.versions = mapped;
+        await AsyncStorage.setItem(STORE_KEY, JSON.stringify(store));
+      } catch { /* cache failure is non-fatal */ }
+
+      return mapped;
+    }
+  } catch { /* API unreachable — fall through to local */ }
+
+  // Local fallback — only reached on API failure (not on empty list)
+  const store = await getStorefront();
+  return store.versions;
+}
+
+/**
+ * Capture a snapshot of the current store state into the local version list.
+ *
+ * Returns the captured snapshot object so callers can pass it as an explicit
+ * payload to `api.store.saveVersion()`.  Passing the snapshot to the server
+ * avoids the race between a concurrent storefront PUT and the snapshot POST:
+ * the server stores exactly what the client observed at snapshot time, not
+ * whatever happens to be in the DB row at the moment of the INSERT.
+ *
+ * This function does NOT call the API — each call site decides whether to
+ * persist the snapshot to the DB (awaited for critical paths, fire-and-forget
+ * for best-effort auto-saves).
+ */
+async function _createVersionSnapshot(
+  store: Storefront,
+  trigger: StoreVersion['trigger'],
+  label: string,
+): Promise<StoreVersion['snapshot']> {
+  const snapshot: StoreVersion['snapshot'] = {
+    sections:      JSON.parse(JSON.stringify(store.sections)),
+    branding:      JSON.parse(JSON.stringify(store.branding)),
+    themeSettings: JSON.parse(JSON.stringify(store.themeSettings)),
+  };
   const version: StoreVersion = {
     id: uid('ver'),
     label,
     trigger,
-    snapshot: {
-      sections: JSON.parse(JSON.stringify(store.sections)),
-      branding: JSON.parse(JSON.stringify(store.branding)),
-      themeSettings: JSON.parse(JSON.stringify(store.themeSettings)),
-    },
+    snapshot,
     createdAt: new Date().toISOString(),
   };
   store.versions.unshift(version);
   if (store.versions.length > 20) store.versions.pop();
+  return snapshot;
 }
 
 export async function createVersion(label: string): Promise<Storefront> {
   const store = await getStorefront();
-  await _createVersionSnapshot(store, 'manual', label);
+  // Capture the pre-save snapshot so the server stores what the client sees
+  // right now, not what the DB holds after the concurrent storefront sync.
+  const snapshot = await _createVersionSnapshot(store, 'manual', label);
+
   // Sync current local state to the backend BEFORE saving the version snapshot.
-  // Not best-effort: if this sync fails we propagate the error so the version is
-  // not saved with stale server state. The caller (handleSaveVersion) already
-  // catches this and shows an Alert.
+  // Not best-effort: if either call fails we propagate the error so the caller
+  // (handleSaveVersion) can surface an Alert — we never silently lose a version.
   await api.store.save({
     sections: store.sections as any,
     branding: store.branding as any,
     theme: { themeId: store.themeSettings.themeId } as any,
   });
-  // Save the version snapshot server-side; throws on failure.
-  await api.store.saveVersion(label);
+  // Save the version snapshot server-side with the explicit client payload.
+  // Throws on failure so local state is only committed once the DB confirms.
+  await api.store.saveVersion(label, snapshot as Record<string, unknown>);
   return saveStorefront(store);
 }
 
 export async function restoreVersion(versionId: string): Promise<Storefront> {
   const store = await getStorefront();
 
-  // Try real API first — returns the restored DB storefront
+  // ── Save the pre-restore snapshot BEFORE touching the server ──────────────
+  // This must happen first so the snapshot captures the current state, not the
+  // already-restored one.  We await the DB write so the safety version is
+  // durable before any server mutation takes place.
+  const preSnapshot = await _createVersionSnapshot(store, 'manual', 'Auto-saved before restore');
+  try {
+    await api.store.saveVersion('Auto-saved before restore', preSnapshot as Record<string, unknown>);
+  } catch { /* non-fatal — local snapshot still recorded in AsyncStorage */ }
+
+  // ── Try server restore ─────────────────────────────────────────────────────
   try {
     const restored = await api.store.restoreVersion(versionId);
     if (restored) {
-      // Snapshot current state before overwriting
-      await _createVersionSnapshot(store, 'manual', 'Auto-saved before restore');
-      // Apply DB fields (sections / branding / theme) returned by the restore route
+      // Apply DB fields (sections / branding / theme) returned by the restore
       if (Array.isArray(restored.sections))   store.sections = restored.sections as any;
       if (restored.branding && typeof restored.branding === 'object') store.branding = restored.branding as any;
       if (restored.theme    && typeof restored.theme    === 'object') {
-        // Map DB theme shape → local themeSettings.themeId (best-effort)
         const t = restored.theme as any;
         if (t.themeId) store.themeSettings.themeId = t.themeId;
       }
@@ -654,12 +727,11 @@ export async function restoreVersion(versionId: string): Promise<Storefront> {
     }
   } catch { /* fall through to local */ }
 
-  // Local fallback — look up snapshot by versionId in AsyncStorage
+  // ── Local fallback ─────────────────────────────────────────────────────────
   const ver = store.versions.find(v => v.id === versionId);
   if (!ver?.snapshot) return store;
-  await _createVersionSnapshot(store, 'manual', 'Auto-saved before restore');
-  if (ver.snapshot.sections)     store.sections     = ver.snapshot.sections;
-  if (ver.snapshot.branding)     store.branding     = ver.snapshot.branding;
+  if (ver.snapshot.sections)      store.sections      = ver.snapshot.sections;
+  if (ver.snapshot.branding)      store.branding      = ver.snapshot.branding;
   if (ver.snapshot.themeSettings) store.themeSettings = ver.snapshot.themeSettings;
   return saveStorefront(store);
 }
@@ -921,7 +993,10 @@ function mapAiConfigToResult(
 
 export async function applyGenerationResult(result: StoreGenerationResult): Promise<Storefront> {
   const store = await getStorefront();
-  await _createVersionSnapshot(store, 'ai_change', 'Before AI generation');
+  // Capture pre-AI snapshot and persist to DB fire-and-forget (explicit payload
+  // avoids race with the awaited api.store.save() below).
+  const preAiSnapshot = await _createVersionSnapshot(store, 'ai_change', 'Before AI generation');
+  api.store.saveVersion('Before AI generation', preAiSnapshot as Record<string, unknown>).catch(() => {});
   store.sections = result.sections;
   store.branding  = result.branding;
   store.themeSettings.themeId = result.suggestedThemeId;
@@ -1219,7 +1294,12 @@ export async function publishStore(): Promise<{ success: boolean; message: strin
     return { success: false, message: `Cannot publish: ${validation.errors[0]}` };
   }
   const store = await getStorefront();
-  await _createVersionSnapshot(store, 'publish', `Published ${new Date().toLocaleString()}`);
+  // Capture pre-publish snapshot and persist to DB fire-and-forget so sellers
+  // can roll back to the last draft even after the server restarts.
+  const publishLabel = `Published ${new Date().toLocaleString()}`;
+  const prePublishSnapshot = await _createVersionSnapshot(store, 'publish', publishLabel);
+  api.store.saveVersion(publishLabel, prePublishSnapshot as Record<string, unknown>).catch(() => {});
+
   store.publishStatus = 'published';
   store.publishedAt = new Date().toISOString();
   await saveStorefront(store);

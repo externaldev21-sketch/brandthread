@@ -11,8 +11,7 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, StatusBadge, EmptyState } from '@/components/BrandthreadUI';
-import { getStorefront, createVersion, restoreVersion } from '@/services/storeService';
-import { useApi } from '@/lib/api';
+import { getVersions, createVersion, restoreVersion } from '@/services/storeService';
 import { StoreVersion } from '@/services/storeTypes';
 
 function triggerVariant(trigger: StoreVersion['trigger']): { label: string; variant: 'success' | 'purple' | 'info' | 'neutral' } {
@@ -33,32 +32,17 @@ function formatDate(iso: string): string {
 
 export default function StoreVersionsScreen() {
   const router = useRouter();
-  const api = useApi();
   const [versions, setVersions] = useState<StoreVersion[]>([]);
   const [creating, setCreating] = useState(false);
   const [newLabel, setNewLabel] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // getVersions() fetches from DB first (survives server restarts + app
+  // reinstalls) and back-fills the AsyncStorage cache for offline access.
   const load = useCallback(async () => {
-    // Try real API first
-    try {
-      const apiVersions = await (api as any).store.versions() as any[];
-      if (Array.isArray(apiVersions) && apiVersions.length > 0) {
-        setVersions(apiVersions.map((v: any) => ({
-          id:        v.id,
-          label:     v.label ?? 'Version',
-          trigger:   'manual' as const,
-          snapshot:  {},
-          createdAt: v.createdAt ?? new Date().toISOString(),
-        })));
-        return;
-      }
-    } catch { /* fall through to local */ }
-
-    // Fall back to AsyncStorage versions
-    const s = await getStorefront();
-    setVersions(s.versions);
-  }, [api]);
+    const v = await getVersions();
+    setVersions(v);
+  }, []);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 

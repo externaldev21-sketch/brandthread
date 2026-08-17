@@ -756,7 +756,8 @@ export function createApi(getToken: GetToken) {
       publish:    () => post<any>('/api/store/publish', {}),
       unpublish:  () => post<any>('/api/store/unpublish', {}),
       versions:   () => get<any[]>('/api/store/versions'),
-      saveVersion: (label: string) => post<any>('/api/store/versions', { label }),
+      saveVersion: (label: string, snapshot?: Record<string, unknown>) =>
+        post<any>('/api/store/versions', { label, ...(snapshot ? { snapshot } : {}) }),
       restoreVersion: (versionId: string) => post<any>(`/api/store/versions/${encodeURIComponent(versionId)}/restore`, {}),
       domains:    () => get<any[]>('/api/store/domains'),
       addDomain:  (domain: string) => post<any>('/api/store/domains', { domain }),

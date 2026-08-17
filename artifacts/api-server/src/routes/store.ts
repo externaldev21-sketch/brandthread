@@ -19,9 +19,17 @@ const _signingKey: Buffer | null = _sessionSecret
   ? crypto.createHmac("sha256", _sessionSecret).update("store-preview-v1").digest()
   : null; // null → feature unavailable; 503 returned at each endpoint
 
-function createShareToken(ownerId: string): string {
+/**
+ * Create an HMAC-signed, self-contained preview token.
+ * Because the payload + signature are encoded in the token itself (no server
+ * state), tokens survive server restarts and multi-instance deployments.
+ *
+ * @param ownerId  The seller's Clerk user ID.
+ * @param ttlMs    Token lifetime in milliseconds. Defaults to 24 hours.
+ */
+function createShareToken(ownerId: string, ttlMs = 24 * 60 * 60 * 1000): string {
   if (!_signingKey) throw new Error("SESSION_SECRET not configured");
-  const payload = Buffer.from(JSON.stringify({ ownerId, expiresAt: Date.now() + 24 * 60 * 60 * 1000 })).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({ ownerId, expiresAt: Date.now() + ttlMs })).toString("base64url");
   const sig = crypto.createHmac("sha256", _signingKey).update(payload).digest("base64url");
   return `${payload}.${sig}`;
 }
@@ -281,10 +289,16 @@ router.get("/versions", async (req, res) => {
   res.json(versions);
 });
 
-// POST /api/store/versions — save current state as a named version
+// POST /api/store/versions — save a named version
+// Body: { label?: string, snapshot?: Record<string,unknown> }
+// When the client supplies a `snapshot` it is stored verbatim (preferred: the
+// client captures the pre-mutation local state before the server storefront is
+// updated, so the explicit payload is always more accurate than re-reading the
+// server row).  When `snapshot` is absent the server falls back to the current
+// DB row so callers that don't need a specific pre-mutation snapshot still work.
 router.post("/versions", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const { label = "Version" } = req.body;
+  const { label = "Version", snapshot } = req.body;
   const sf = await getOrCreateStorefront(ownerId);
 
   const [version] = await db
@@ -292,7 +306,7 @@ router.post("/versions", async (req, res) => {
     .values({
       storefrontId: sf.id,
       label,
-      snapshot: sf as unknown as Record<string, unknown>,
+      snapshot: (snapshot ?? sf) as Record<string, unknown>,
       createdBy: ownerId,
     })
     .returning();
@@ -301,6 +315,19 @@ router.post("/versions", async (req, res) => {
 });
 
 // POST /api/store/versions/:id/restore — restore a saved version
+//
+// Supports two snapshot schemas written by different code paths:
+//
+//  1. Legacy full-storefront (old implicit saves — uses current DB row as the
+//     snapshot):  snap.theme present, snap.branding uses DB column shape
+//     ({ tagline, logoUrl, targetAudience }).
+//
+//  2. Mobile compact (new explicit-payload saves): snap.themeSettings carries
+//     { themeId, ... }, snap.branding carries StoreBranding
+//     ({ colors, typography, ... }).
+//
+// Only DB columns that are actually present in the snapshot are updated;
+// absent fields are left at their current values, not overwritten with null.
 router.post("/versions/:id/restore", async (req, res): Promise<void> => {
   const ownerId = (req as any).clerkUserId as string;
   const { id } = req.params;
@@ -315,20 +342,45 @@ router.post("/versions/:id/restore", async (req, res): Promise<void> => {
   if (!version) { res.status(404).json({ error: "Version not found" }); return; }
 
   const snap = version.snapshot as any;
+
+  // Build an update object from only the fields present in this snapshot so
+  // absent fields are not overwritten with undefined/null.
+  const update: Record<string, unknown> = { updatedAt: new Date() };
+
+  if ("sections"      in snap) update.sections     = snap.sections;
+  if ("title"         in snap) update.title        = snap.title;
+  if ("subtitle"      in snap) update.subtitle     = snap.subtitle;
+  if ("description"   in snap) update.description  = snap.description;
+  if ("seo"           in snap) update.seo          = snap.seo;
+  if ("socialLinks"   in snap) update.social_links  = snap.socialLinks;
+  if ("analyticsCode" in snap) update.analytics_code = snap.analyticsCode;
+
+  // branding: both schemas may carry it, but with different shapes.
+  // Store whatever the snapshot says — the mobile client reads it back verbatim.
+  if ("branding" in snap) update.branding = snap.branding;
+
+  // theme: legacy schema has snap.theme directly (DB column shape).
+  // Mobile compact schema has snap.themeSettings.themeId + snap.branding.colors.
+  // Merge both into the DB theme column, preserving any existing fields not
+  // captured in the snapshot.
+  if ("theme" in snap) {
+    update.theme = snap.theme;
+  } else if (snap.themeSettings || snap.branding?.colors) {
+    const existing = (sf.theme as Record<string, unknown> | null) ?? {};
+    const derived: Record<string, unknown> = { ...existing };
+    if (snap.themeSettings?.themeId)               derived.themeId         = snap.themeSettings.themeId;
+    if (snap.branding?.colors?.primary)            derived.primaryColor    = snap.branding.colors.primary;
+    if (snap.branding?.colors?.secondary)          derived.secondaryColor  = snap.branding.colors.secondary;
+    if (snap.branding?.colors?.accent)             derived.accentColor     = snap.branding.colors.accent;
+    if (snap.branding?.colors?.background)         derived.backgroundColor = snap.branding.colors.background;
+    if (snap.branding?.colors?.text)               derived.textColor       = snap.branding.colors.text;
+    if (snap.branding?.typography?.headingFont)    derived.fontFamily      = snap.branding.typography.headingFont;
+    update.theme = derived;
+  }
+
   const [restored] = await db
     .update(storefronts)
-    .set({
-      title:         snap.title,
-      subtitle:      snap.subtitle,
-      description:   snap.description,
-      theme:         snap.theme,
-      branding:      snap.branding,
-      sections:      snap.sections,
-      seo:           snap.seo,
-      socialLinks:   snap.socialLinks,
-      analyticsCode: snap.analyticsCode,
-      updatedAt:     new Date(),
-    })
+    .set(update as any)
     .where(eq(storefronts.id, sf.id))
     .returning();
 
@@ -421,16 +473,22 @@ router.delete("/domains/:id", async (req, res) => {
   res.json({ ok: true });
 });
 
-// ─── In-memory preview token store (short-lived, server-local) ───────────────
-const previewTokens = new Map<string, { ownerId: string; expiresAt: number }>();
-
-// GET /api/store/preview-token — generate a 5-min token for the preview endpoint
-router.get("/preview-token", async (req, res) => {
+// GET /api/store/preview-token — generate a 5-min HMAC-signed token for the
+// preview WebView. Using the same HMAC approach as share-preview means these
+// tokens are self-contained: they survive server restarts and multi-instance
+// deployments with zero shared state or database round-trips.
+//
+// The token is verified by the same verifyShareToken() function used for
+// 24-hour share links — TTL enforcement is purely the expiresAt field inside
+// the signed payload, so a 5-min token is simply one with a shorter TTL.
+router.get("/preview-token", (req, res): void => {
+  if (!_signingKey) {
+    res.status(503).json({ error: "Preview unavailable: SESSION_SECRET not configured" });
+    return;
+  }
   const ownerId = (req as any).clerkUserId as string;
-  const token = crypto.randomBytes(20).toString("hex");
-  previewTokens.set(token, { ownerId, expiresAt: Date.now() + 5 * 60 * 1000 });
-  // Prune expired tokens
-  for (const [k, v] of previewTokens) { if (v.expiresAt < Date.now()) previewTokens.delete(k); }
+  const TTL_MS  = 5 * 60 * 1000; // 5 minutes
+  const token   = createShareToken(ownerId, TTL_MS);
   res.json({ token, ttlSeconds: 300 });
 });
 
