@@ -32,7 +32,7 @@ import {
 } from '@/lib/theme';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  SectionHeader, EmptyState, GuidedTip, NewFeatureBadge, StatusBadge,
+  SectionHeader, EmptyState, GuidedTip, NewFeatureBadge, StatusBadge, LockBadge,
 } from '@/components/BrandthreadUI';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
@@ -329,31 +329,38 @@ export default function StudioScreen() {
 
         {/* Responsive grid — pixel widths, no percentages */}
         <View style={[s.toolGrid, { paddingHorizontal: H_PAD }]}>
-          {STUDIO_TOOLS.map((tool) => (
-            <TouchableOpacity
-              key={tool.id}
-              activeOpacity={0.85}
-              onPress={() => handleToolPress(tool)}
-              style={[s.toolCard, { width: toolCardWidth, borderColor: tool.accent + '33' }]}
-            >
-              {/* Icon row */}
-              <View style={s.toolCardTop}>
-                <View style={[s.toolIconBg, { backgroundColor: tool.accentDim }]}>
-                  <Feather name={tool.icon} size={ICON.sm} color={tool.accent} />
+          {STUDIO_TOOLS.map((tool) => {
+            const isLocked = GROWTH_REQUIRED_TOOLS.has(tool.id) && !hasPlan('growth');
+            return (
+              <TouchableOpacity
+                key={tool.id}
+                activeOpacity={0.85}
+                onPress={() => handleToolPress(tool)}
+                style={[s.toolCard, { width: toolCardWidth, borderColor: tool.accent + '33' }]}
+              >
+                {/* Icon row */}
+                <View style={s.toolCardTop}>
+                  <View style={[s.toolIconBg, { backgroundColor: tool.accentDim }]}>
+                    <Feather name={tool.icon} size={ICON.sm} color={tool.accent} />
+                  </View>
+                  {isLocked ? (
+                    <LockBadge locked />
+                  ) : tool.badge ? (
+                    <NewFeatureBadge
+                      featureId={tool.id}
+                      openedIds={openedFeatures}
+                    />
+                  ) : null}
                 </View>
-                {tool.badge && (
-                  <NewFeatureBadge
-                    featureId={tool.id}
-                    openedIds={openedFeatures}
-                  />
-                )}
-              </View>
-              {/* Labels */}
-              <Text style={s.toolTitle} numberOfLines={1}>{tool.title}</Text>
-              <Text style={s.toolDesc}>{tool.desc}</Text>
-              <Text style={[s.toolCta, { color: tool.accent }]}>Open →</Text>
-            </TouchableOpacity>
-          ))}
+                {/* Labels */}
+                <Text style={s.toolTitle} numberOfLines={1}>{tool.title}</Text>
+                <Text style={s.toolDesc}>{tool.desc}</Text>
+                <Text style={[s.toolCta, { color: isLocked ? MUTED : tool.accent }]}>
+                  {isLocked ? 'Growth plan →' : 'Open →'}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         {/* ── RECENT PROJECTS ── */}

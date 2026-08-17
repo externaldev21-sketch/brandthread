@@ -652,6 +652,38 @@ const nfS = StyleSheet.create({
   text: { fontSize: 8, fontFamily: FONT.bold, color: ON_DARK, letterSpacing: 0.5 },
 });
 
+// ─── LockBadge ────────────────────────────────────────────────────────────────
+// Shown on tool cards gated behind a paid plan so users can see what's locked
+// before tapping. Pass `locked={false}` (or omit) to render nothing.
+
+interface LockBadgeProps {
+  locked: boolean;
+  style?: StyleProp<ViewStyle>;
+}
+
+export function LockBadge({ locked, style }: LockBadgeProps) {
+  if (!locked) return null;
+  return (
+    <View style={[lbS.root, style]}>
+      <Feather name="lock" size={9} color={ON_DARK} />
+      <Text style={lbS.text}>PRO</Text>
+    </View>
+  );
+}
+
+const lbS = StyleSheet.create({
+  root: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: PURPLE,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+  },
+  text: { fontSize: 8, fontFamily: FONT.bold, color: ON_DARK, letterSpacing: 0.5 },
+});
+
 // ─── FormInput ────────────────────────────────────────────────────────────────
 
 interface FormInputProps {
