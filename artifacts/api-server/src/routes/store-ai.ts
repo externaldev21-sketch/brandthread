@@ -44,6 +44,18 @@ Always respond ONLY with valid JSON matching this schema:
   }
 }`;
 
+// Infer image mime type from base64 magic bytes so data URLs are valid for
+// PNG logos and WebP/GIF moodboard images, not just JPEG.
+function dataUrl(b64: string): string {
+  const s = b64.replace(/^data:[^,]+,/, "");
+  const mime =
+    s.startsWith("iVBOR") ? "image/png" :
+    s.startsWith("R0lGOD") ? "image/gif" :
+    s.startsWith("UklGR") ? "image/webp" :
+    "image/jpeg";
+  return `data:${mime};base64,${s}`;
+}
+
 function parseStoreJson(raw: string): Record<string, unknown> {
   const clean = raw.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "").trim();
   try { return JSON.parse(clean); } catch { return {}; }
@@ -92,7 +104,7 @@ router.post("/from-logo", async (req, res): Promise<void> => {
           content: [
             {
               type: "image_url",
-              image_url: { url: `data:image/jpeg;base64,${base64}`, detail: "low" },
+              image_url: { url: dataUrl(base64), detail: "low" },
             },
             {
               type: "text",
@@ -119,7 +131,7 @@ router.post("/from-moodboard", async (req, res): Promise<void> => {
     // Send up to 4 images to stay within token budget
     const imageContent = (base64List as string[]).slice(0, 4).map((b64: string) => ({
       type: "image_url" as const,
-      image_url: { url: `data:image/jpeg;base64,${b64}`, detail: "low" as const },
+      image_url: { url: dataUrl(b64), detail: "low" as const },
     }));
 
     const response = await openai.chat.completions.create({
@@ -156,7 +168,7 @@ router.post("/from-social", async (req, res): Promise<void> => {
     try {
       const imageContent = (base64List as string[]).slice(0, 4).map((b64: string) => ({
         type: "image_url" as const,
-        image_url: { url: `data:image/jpeg;base64,${b64}`, detail: "low" as const },
+        image_url: { url: dataUrl(b64), detail: "low" as const },
       }));
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
