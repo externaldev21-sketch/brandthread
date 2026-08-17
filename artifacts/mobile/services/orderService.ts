@@ -4,6 +4,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { serviceRequest } from '@/lib/serviceConfig';
 import {
   Order, OrderLineItem, OrderCustomer, OrderAddress, PaymentSummary,
   HeldFundsRecord, PayoutMilestone, Fulfillment, FulfillmentGroup,
@@ -774,12 +775,94 @@ export async function getOrderStats(): Promise<{
 
 // ─── Public API — Buyer ───────────────────────────────────────────────────────
 
+// Map DB order status → UI OrderStatus (UI uses a broader set of values)
+function mapBuyerOrderStatus(dbStatus: string): OrderStatus {
+  switch (dbStatus) {
+    case 'pending':       return 'new';
+    case 'processing':    return 'processing';
+    case 'ready_to_ship': return 'ready_to_ship';
+    case 'shipped':       return 'shipped';
+    case 'delivered':     return 'delivered';
+    case 'cancelled':     return 'cancelled';
+    case 'refund_pending':
+    case 'refunded':      return 'refunded';
+    case 'disputed':      return 'disputed';
+    default:              return 'new';
+  }
+}
+
+function mapBuyerFulfillmentStatus(dbStatus: string): FulfillmentStatus {
+  switch (dbStatus) {
+    case 'shipped':
+    case 'delivered': return 'fulfilled';
+    case 'cancelled': return 'cancelled';
+    default:          return 'unfulfilled';
+  }
+}
+
+function mapApiBuyerOrder(o: any): BuyerOrderView {
+  return {
+    id:                o.id,
+    orderNumber:       o.orderNumber,
+    sellerId:          o.ownerId          ?? '',
+    sellerName:        o.sellerDisplayName ?? o.sellerName ?? 'Seller',
+    sellerHandle:      o.sellerHandle     ?? `@seller`,
+    status:            mapBuyerOrderStatus(o.status ?? 'pending'),
+    paymentStatus:     'paid' as PaymentStatus,
+    fulfillmentStatus: mapBuyerFulfillmentStatus(o.status ?? 'pending'),
+    lineItems:         (o.items ?? []).map((item: any) => ({
+      productName: item.productName ?? item.name ?? '',
+      variant:     item.variantLabel ?? '',
+      quantity:    item.quantity     ?? 1,
+      unitPrice:   (item.priceCents  ?? 0) / 100,
+      imageUri:    item.imageUri     ?? undefined,
+    })),
+    shippingAddress: o.shippingAddress ?? { street: '', city: '', state: '', zip: '', country: 'US' },
+    payment: {
+      subtotal:      (o.subtotalCents  ?? 0) / 100,
+      shippingTotal: (o.shippingCents  ?? 0) / 100,
+      taxTotal:      0,
+      total:         (o.totalCents     ?? 0) / 100,
+    },
+    trackingNumber:  o.trackingNumber ?? undefined,
+    trackingCarrier: o.carrier        ?? undefined,
+    isPreOrder:      false,
+    hasReturnRequest: false,
+    createdAt:       o.createdAt      ?? now(),
+  };
+}
+
 export async function getBuyerOrders(): Promise<BuyerOrderView[]> {
+  // Try real API first so buyers see their actual orders
+  try {
+    const apiOrders = await serviceRequest('/api/buyer/orders') as any[];
+    if (Array.isArray(apiOrders) && apiOrders.length > 0) {
+      const mapped = apiOrders.map(mapApiBuyerOrder);
+      _buyerOrders = mapped;
+      await AsyncStorage.setItem(KEYS.buyer, JSON.stringify(mapped));
+      return [...mapped].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    }
+  } catch {
+    // Fall through to local cache
+  }
   await ensureInitialized();
   return [..._buyerOrders].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function getBuyerOrder(id: string): Promise<BuyerOrderView | undefined> {
+  // Try real API first for a single order fetch
+  try {
+    const apiOrder = await serviceRequest(`/api/buyer/orders/${encodeURIComponent(id)}`) as any;
+    if (apiOrder?.id) {
+      const mapped = mapApiBuyerOrder(apiOrder);
+      // Update in-memory cache
+      const idx = _buyerOrders.findIndex(o => o.id === id);
+      if (idx >= 0) _buyerOrders[idx] = mapped; else _buyerOrders.push(mapped);
+      return mapped;
+    }
+  } catch {
+    // Fall through to local cache
+  }
   await ensureInitialized();
   return _buyerOrders.find(o => o.id === id);
 }

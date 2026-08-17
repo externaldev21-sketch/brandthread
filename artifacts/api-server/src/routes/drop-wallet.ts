@@ -12,9 +12,9 @@
 import { Router } from "express";
 import { db, drops, orders, dropWallets, dropWalletTransactions } from "@workspace/db";
 import { users } from "@workspace/db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { requireStripe } from "../lib/stripe";
+import { requireStripe, PLATFORM_COMMISSION_RATE } from "../lib/stripe";
 
 const router = Router();
 router.use(requireAuth);
@@ -117,8 +117,8 @@ router.get("/:dropId", async (req, res) => {
 });
 
 // ── POST /api/drop-wallets/:dropId/deposit ────────────────────────────────────
-// Called internally (from webhooks) when a buyer order is paid for this drop.
-// This is also exposed as an API so the webhook handler can call it.
+// Called by sellers to manually credit a wallet, or via webhook auto-credit.
+// Uses SELECT FOR UPDATE to prevent concurrent duplicate deposits.
 
 router.post("/:dropId/deposit", async (req, res) => {
   try {
@@ -129,39 +129,49 @@ router.post("/:dropId/deposit", async (req, res) => {
       res.status(400).json({ error: "orderId and amountCents required" }); return;
     }
 
-    const [wallet] = await db
-      .select()
-      .from(dropWallets)
-      .where(and(eq(dropWallets.dropId, req.params.dropId), eq(dropWallets.sellerId, sellerId)))
-      .limit(1);
-    if (!wallet) { res.status(404).json({ error: "Wallet not found" }); return; }
-
     await db.transaction(async (tx) => {
-      await tx
-        .update(dropWallets)
-        .set({ balanceCents: wallet.balanceCents + amountCents, updatedAt: new Date() })
-        .where(eq(dropWallets.id, wallet.id));
+      // Lock wallet row — prevents concurrent deposits from double-crediting
+      const lockResult = await tx.execute(
+        sql`SELECT id FROM drop_wallets WHERE drop_id = ${req.params.dropId}::uuid AND seller_id = ${sellerId} FOR UPDATE LIMIT 1`,
+      );
+      const walletRow = (lockResult as any).rows?.[0];
+      if (!walletRow) { throw Object.assign(new Error("Wallet not found"), { status: 404 }); }
+
+      // Atomic balance increment (no read-modify-write race)
+      await tx.execute(
+        sql`UPDATE drop_wallets SET balance_cents = balance_cents + ${amountCents}, updated_at = NOW() WHERE id = ${walletRow.id}::uuid`,
+      );
 
       await tx.insert(dropWalletTransactions).values({
-        walletId:         wallet.id,
+        walletId:         walletRow.id as string,
         type:             "deposit",
         amountCents,
         orderId:          orderId ?? null,
-        description:      `Buyer order payment`,
+        description:      "Buyer order payment",
         stripeTransferId: stripeTransferId ?? null,
       });
     });
 
     res.json({ deposited: true, amountCents });
-  } catch (err) {
+  } catch (err: any) {
+    if (err.status && err.status < 500) { res.status(err.status).json({ error: err.message }); return; }
     console.error(err);
     res.status(500).json({ error: "Failed to deposit" });
   }
 });
 
 // ── POST /api/drop-wallets/:dropId/release-order/:orderId ─────────────────────
-// Release a specific order's share of the wallet to the seller's bank.
-// Triggered when that order gets a tracking number (marked shipped).
+// Release a specific order's share from the platform's escrow to the seller.
+//
+// Architecture (separate charges + transfers model):
+//   • Buyer checkout lands the full payment on the PLATFORM's Stripe account
+//     (no transfer_data.destination on drop checkouts).
+//   • This endpoint creates a Stripe Transfer from platform → seller Connect,
+//     net of the 5% platform commission.
+//   • Uses SELECT FOR UPDATE to prevent concurrent double-releases.
+//
+// Triggered automatically by PATCH /api/orders/:id/tracking (on ship).
+// Also callable manually by the seller if auto-release failed.
 
 router.post("/:dropId/release-order/:orderId", async (req, res) => {
   try {
@@ -181,84 +191,86 @@ router.post("/:dropId/release-order/:orderId", async (req, res) => {
       )
       .limit(1);
     if (!order) { res.status(404).json({ error: "Order not found for this drop" }); return; }
-    if (!order.trackingNumber) { res.status(400).json({ error: "Order has no tracking number — ship it first" }); return; }
-
-    const [wallet] = await db
-      .select()
-      .from(dropWallets)
-      .where(and(eq(dropWallets.dropId, req.params.dropId), eq(dropWallets.sellerId, sellerId)))
-      .limit(1);
-    if (!wallet) { res.status(404).json({ error: "Wallet not found" }); return; }
-
-    // Check if this order was already released
-    const alreadyReleased = await db
-      .select({ id: dropWalletTransactions.id })
-      .from(dropWalletTransactions)
-      .where(
-        and(
-          eq(dropWalletTransactions.walletId, wallet.id),
-          eq(dropWalletTransactions.type, "release"),
-          eq(dropWalletTransactions.orderId, order.id),
-        ),
-      )
-      .limit(1);
-    if (alreadyReleased.length > 0) {
-      res.status(409).json({ error: "This order's share has already been released" }); return;
+    if (!order.trackingNumber) {
+      res.status(400).json({ error: "Order has no tracking number — ship it first" }); return;
     }
 
-    // Release amount = order total (minus platform fee already captured by Stripe)
-    const releaseCents = order.subtotalCents;
-    const available    = wallet.balanceCents - wallet.releasedCents - wallet.reservedCents;
-    if (available < releaseCents) {
-      res.status(400).json({
-        error: `Insufficient wallet balance. Available: $${(available / 100).toFixed(2)}, need: $${(releaseCents / 100).toFixed(2)}`,
-      }); return;
-    }
-
-    // Get seller's Connect account for Stripe payout
+    // Get seller's Connect account before the locked transaction
     const [user] = await db
       .select({ stripeAccountId: users.stripeAccountId })
       .from(users)
       .where(eq(users.clerkId, sellerId))
       .limit(1);
-
-    let stripeTransferId: string | null = null;
-    if (user?.stripeAccountId) {
-      const payout = await stripe.payouts.create(
-        {
-          amount:   releaseCents,
-          currency: "usd",
-          metadata: { dropId: wallet.dropId, orderId: order.id, sellerId },
-        },
-        { stripeAccount: user.stripeAccountId },
-      );
-      stripeTransferId = payout.id;
+    if (!user?.stripeAccountId) {
+      res.status(400).json({ error: "Seller has no Connect account configured" }); return;
     }
 
+    const releaseCents  = order.subtotalCents;
+    const feeCents      = Math.round(releaseCents * PLATFORM_COMMISSION_RATE);
+    const transferCents = releaseCents - feeCents;
+
+    let stripeTransferId: string | null = null;
+    let resp: { releaseCents: number; orderNumber: string } | null = null;
+
     await db.transaction(async (tx) => {
-      await tx
-        .update(dropWallets)
-        .set({
-          releasedCents: wallet.releasedCents + releaseCents,
-          updatedAt:     new Date(),
-        })
-        .where(eq(dropWallets.id, wallet.id));
+      // Lock wallet row — prevents concurrent double-releases
+      const lockResult = await tx.execute(
+        sql`SELECT id, balance_cents, released_cents, reserved_cents, stripe_transfer_group FROM drop_wallets WHERE drop_id = ${req.params.dropId}::uuid AND seller_id = ${sellerId} FOR UPDATE LIMIT 1`,
+      );
+      const w = (lockResult as any).rows?.[0];
+      if (!w) { throw Object.assign(new Error("Wallet not found"), { status: 404 }); }
+
+      // Idempotency: abort if already released for this exact order
+      const already = await tx.execute(
+        sql`SELECT id FROM drop_wallet_transactions WHERE wallet_id = ${w.id}::uuid AND order_id = ${req.params.orderId}::uuid AND type = 'release' LIMIT 1`,
+      );
+      if ((already as any).rows?.length > 0) {
+        throw Object.assign(new Error("This order's share has already been released"), { status: 409 });
+      }
+
+      const available = w.balance_cents - w.released_cents - w.reserved_cents;
+      if (available < releaseCents) {
+        throw Object.assign(new Error(
+          `Insufficient wallet balance. Available: $${(available / 100).toFixed(2)}, need: $${(releaseCents / 100).toFixed(2)}`
+        ), { status: 400 });
+      }
+
+      // Platform → seller Connect transfer (correct escrow release mechanism)
+      if (transferCents > 0) {
+        const transfer = await stripe.transfers.create({
+          amount:         transferCents,
+          currency:       "usd",
+          destination:    user.stripeAccountId!,
+          transfer_group: w.stripe_transfer_group ?? `drop_${req.params.dropId}`,
+          metadata:       { dropId: req.params.dropId, orderId: req.params.orderId, sellerId },
+        });
+        stripeTransferId = transfer.id;
+      }
+
+      // Atomic balance update — no read-modify-write race
+      await tx.execute(
+        sql`UPDATE drop_wallets SET released_cents = released_cents + ${releaseCents}, updated_at = NOW() WHERE id = ${w.id}::uuid`,
+      );
 
       await tx.insert(dropWalletTransactions).values({
-        walletId:         wallet.id,
+        walletId:         w.id as string,
         type:             "release",
         amountCents:      releaseCents,
-        orderId:          order.id,
-        description:      `Per-order release for order #${order.orderNumber}`,
+        orderId:          req.params.orderId,
+        description:      `Per-order release for #${order.orderNumber} (transferred: $${(transferCents / 100).toFixed(2)}, fee: $${(feeCents / 100).toFixed(2)})`,
         stripeTransferId: stripeTransferId ?? undefined,
       });
+
+      resp = { releaseCents, orderNumber: order.orderNumber };
     });
 
     res.json({
       released:         true,
-      releaseCents,
-      stripePayoutId:   stripeTransferId,
-      orderNumber:      order.orderNumber,
+      releaseCents:     resp!.releaseCents,
+      transferCents,
+      feeCents,
+      stripeTransferId,
+      orderNumber:      resp!.orderNumber,
     });
   } catch (err: any) {
     if (err.status && err.status < 500) {

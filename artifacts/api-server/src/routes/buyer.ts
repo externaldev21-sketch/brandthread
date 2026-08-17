@@ -8,7 +8,7 @@ import {
 } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { requireStripe, computeApplicationFeeCents } from "../lib/stripe";
+import { requireStripe, computeApplicationFeeCents, PLATFORM_COMMISSION_RATE } from "../lib/stripe";
 
 const router = Router();
 router.use(requireAuth);
@@ -31,7 +31,7 @@ router.post("/checkout/session", async (req, res) => {
   try {
     const stripe = requireStripe();
     const buyerId = (req as any).clerkUserId as string;
-    const { items, successUrl, cancelUrl, contactEmail, shippingAddress, clientIdempotencyKey } = req.body;
+    const { items, successUrl, cancelUrl, contactEmail, shippingAddress, clientIdempotencyKey, dropId } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
       res.status(400).json({ error: "items required" });
@@ -262,18 +262,26 @@ router.post("/checkout/session", async (req, res) => {
     }
 
     // ── Compute platform application fee (5% of order subtotal) ──────────
-    // application_fee_amount is withheld from the transfer to the seller's
-    // Connect account and retained by the platform.  The rate lives in
-    // lib/stripe.ts as PLATFORM_COMMISSION_RATE — change it there to adjust.
+    // For destination charges (regular orders): fee withheld automatically.
+    // For escrow/drop orders: fee deducted at transfer time (release-order).
     const subtotalCents = cartItems.reduce(
       (sum, item) => sum + item.priceCents * item.quantity,
       0,
     );
     const applicationFeeCents = computeApplicationFeeCents(subtotalCents);
 
+    // Validate dropId if provided — must be a non-empty string
+    const validDropId: string | null =
+      dropId && typeof dropId === "string" && dropId.trim() ? dropId.trim() : null;
+
     // ── Call Stripe FIRST (idempotent via key) — no DB record yet ─────────
-    // A Stripe failure at this point leaves no poisoned DB row.
-    // Two concurrent requests with the same key get the same Stripe session back.
+    // Drop orders use the "separate charges + transfers" model:
+    //   • No transfer_data.destination — charge lands on platform account
+    //   • Funds are released to seller via stripe.transfers.create at ship time
+    //   • Platform fee is deducted from the transfer amount (not collected here)
+    // Regular orders use destination charges:
+    //   • transfer_data.destination sends funds directly to seller Connect account
+    //   • application_fee_amount keeps the platform commission
     const session = await stripe.checkout.sessions.create(
       {
         mode: "payment",
@@ -282,14 +290,20 @@ router.post("/checkout/session", async (req, res) => {
         cancel_url: cancelUrl,
         client_reference_id: buyerId,
         // metadata.csRef is back-filled after the DB upsert below
-        metadata: {},
+        metadata: {
+          ...(validDropId ? { dropId: validDropId } : {}),
+        },
         payment_intent_data: {
-          metadata: { buyerId },
-          transfer_data: { destination: seller.stripeAccountId },
-          // Platform commission: withheld from the seller's payout automatically.
-          // Stripe deducts this from the transfer_data amount before sending
-          // the remainder to the seller's connected account.
-          application_fee_amount: applicationFeeCents,
+          metadata: { buyerId, ...(validDropId ? { dropId: validDropId } : {}) },
+          ...(validDropId
+            ? {
+                // Escrow model: platform holds the charge until release-order is triggered
+              }
+            : {
+                // Destination charge: funds flow directly to seller Connect account
+                transfer_data: { destination: seller.stripeAccountId },
+                application_fee_amount: applicationFeeCents,
+              }),
         },
         ...(contactEmail ? { customer_email: contactEmail } : {}),
       },
@@ -332,7 +346,12 @@ router.post("/checkout/session", async (req, res) => {
     // Best-effort: failure here is non-fatal because the webhook also falls back
     // to looking up by stripe_session_id.
     try {
-      await stripe.checkout.sessions.update(session.id, { metadata: { csRef: csId } });
+      await stripe.checkout.sessions.update(session.id, {
+        metadata: {
+          csRef: csId,
+          ...(validDropId ? { dropId: validDropId } : {}),
+        },
+      });
     } catch (metaErr) {
       console.warn("Could not back-fill csRef metadata on Stripe session:", metaErr);
     }

@@ -475,9 +475,9 @@ export function groupCartBySeller(items: CartItem[]): CartSellerGroup[] {
 
 // ─── Cart summary ─────────────────────────────────────────────────────────────
 
-export function calculateCartSummary(items: CartItem[], discountTotal = 0, shippingTotal = 12.40): CheckoutSummary {
+export function calculateCartSummary(items: CartItem[], discountTotal = 0, shippingTotal = 0): CheckoutSummary {
   const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-  const taxTotal = +((subtotal - discountTotal) * 0.0875).toFixed(2); // 8.75% demo estimate
+  const taxTotal = 0; // Calculated accurately by Stripe at checkout; not estimated here
   const total = +(subtotal - discountTotal + shippingTotal + taxTotal).toFixed(2);
   return {
     subtotal: +subtotal.toFixed(2),
@@ -487,6 +487,22 @@ export function calculateCartSummary(items: CartItem[], discountTotal = 0, shipp
     total: Math.max(total, 0),
     currency: 'USD',
   };
+}
+
+// ─── Real shipping rate fetch ─────────────────────────────────────────────────
+
+/**
+ * Fetch the real shipping rate from the seller's configured rates.
+ * Returns rate in dollars (not cents). Falls back to 0 (free) on error.
+ */
+export async function fetchShippingRate(sellerId: string, subtotalCents: number): Promise<number> {
+  try {
+    const resp = await serviceRequest(
+      `/api/shipping-rates/calculate?sellerId=${encodeURIComponent(sellerId)}&subtotalCents=${subtotalCents}`,
+    ) as any;
+    if (typeof resp?.shippingCents === 'number') return resp.shippingCents / 100;
+  } catch {}
+  return 0;
 }
 
 // ─── Cart validation ──────────────────────────────────────────────────────────

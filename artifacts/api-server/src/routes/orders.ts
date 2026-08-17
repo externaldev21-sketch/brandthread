@@ -1,7 +1,8 @@
 import { Router } from "express";
 import crypto from "crypto";
-import { db, orders, orderItems, customers, drops, productVariants, products, notificationsFeed, users } from "@workspace/db";
+import { db, orders, orderItems, customers, drops, productVariants, products, notificationsFeed, users, dropWallets, dropWalletTransactions } from "@workspace/db";
 import { eq, desc, sql, and } from "drizzle-orm";
+import { stripe, PLATFORM_COMMISSION_RATE } from "../lib/stripe";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router = Router();
@@ -276,7 +277,91 @@ router.patch("/:id/tracking", async (req, res) => {
     }
   }
 
+  // Auto-release drop wallet share when order ships
+  // Drop order payments sit on the platform account (escrow); on ship, we
+  // create a Stripe Transfer to the seller's Connect account (net of fee).
+  if (updated.dropId) {
+    setImmediate(() => {
+      autoReleaseDropOrder(updated.id, updated.ownerId, updated.dropId!, updated.subtotalCents)
+        .catch(err => console.error(`Auto drop-wallet release failed for order ${updated.id}:`, err));
+    });
+  }
+
   res.json(updated);
 });
+
+// ─── Drop wallet auto-release helper ─────────────────────────────────────────
+// Called automatically when a drop order is marked shipped.
+async function autoReleaseDropOrder(
+  orderId: string,
+  sellerId: string,
+  dropId: string,
+  subtotalCents: number,
+): Promise<void> {
+  if (!stripe) { console.warn("autoReleaseDropOrder: Stripe not configured"); return; }
+
+  const [user] = await db
+    .select({ stripeAccountId: users.stripeAccountId })
+    .from(users)
+    .where(eq(users.clerkId, sellerId))
+    .limit(1);
+
+  if (!user?.stripeAccountId) {
+    console.warn(`autoReleaseDropOrder: seller ${sellerId} has no Connect account`); return;
+  }
+
+  const feeCents      = Math.round(subtotalCents * PLATFORM_COMMISSION_RATE);
+  const transferCents = subtotalCents - feeCents;
+
+  await db.transaction(async (tx) => {
+    // Lock wallet row to prevent concurrent double-releases
+    const lockResult = await tx.execute(
+      sql`SELECT id, balance_cents, released_cents, reserved_cents, stripe_transfer_group FROM drop_wallets WHERE drop_id = ${dropId}::uuid FOR UPDATE LIMIT 1`,
+    );
+    const w = (lockResult as any).rows?.[0];
+    if (!w) { console.warn(`autoReleaseDropOrder: no wallet for drop ${dropId}`); return; }
+
+    // Idempotency — skip if already released for this order
+    const already = await tx.execute(
+      sql`SELECT id FROM drop_wallet_transactions WHERE wallet_id = ${w.id}::uuid AND order_id = ${orderId}::uuid AND type = 'release' LIMIT 1`,
+    );
+    if ((already as any).rows?.length > 0) { return; }
+
+    const available = w.balance_cents - w.released_cents - w.reserved_cents;
+    if (available < subtotalCents) {
+      console.error(`autoReleaseDropOrder: insufficient balance. available=${available}, need=${subtotalCents}`); return;
+    }
+
+    let stripeTransferId: string | null = null;
+    if (transferCents > 0) {
+      try {
+        const transfer = await stripe!.transfers.create({
+          amount:         transferCents,
+          currency:       "usd",
+          destination:    user.stripeAccountId!,
+          transfer_group: w.stripe_transfer_group ?? `drop_${dropId}`,
+          metadata:       { dropId, orderId, sellerId, trigger: "auto_on_ship" },
+        });
+        stripeTransferId = transfer.id;
+      } catch (stripeErr) {
+        console.error("autoReleaseDropOrder: Stripe transfer failed:", stripeErr);
+        return; // Don't mark released if Stripe call failed
+      }
+    }
+
+    await tx.execute(
+      sql`UPDATE drop_wallets SET released_cents = released_cents + ${subtotalCents}, updated_at = NOW() WHERE id = ${w.id}::uuid`,
+    );
+
+    await tx.insert(dropWalletTransactions).values({
+      walletId:         w.id as string,
+      type:             "release",
+      amountCents:      subtotalCents,
+      orderId,
+      description:      `Auto-release on ship (net: $${(transferCents / 100).toFixed(2)}, fee: $${(feeCents / 100).toFixed(2)})`,
+      stripeTransferId: stripeTransferId ?? undefined,
+    });
+  });
+}
 
 export default router;

@@ -6,6 +6,7 @@ import { Router, type Request, type Response } from "express";
 import crypto from "crypto";
 import {
   db, checkoutSessions, orders, orderItems, productVariants, products, users, notificationsFeed, disputes,
+  dropWallets, dropWalletTransactions,
 } from "@workspace/db";
 import { eq, sql } from "drizzle-orm";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe";
@@ -240,6 +241,7 @@ async function handleCheckoutPaid(session: any) {
 
   // ── All-or-nothing stock reservation inside transaction ───────────────────
   let oversoldItems: string[] = [];
+  let createdOrderId: string | null = null;
 
   await db.transaction(async (tx) => {
     // Step 1: Lock all variant rows in deterministic order (prevents deadlocks)
@@ -271,6 +273,7 @@ async function handleCheckoutPaid(session: any) {
     const orderNumber   = `BT-${String(count + 1).padStart(5, "0")}`;
 
     // Step 4: Insert order — pending if stock OK, refund_pending if oversold
+    const dropId: string | undefined = metadata["dropId"];
     const [order] = await tx
       .insert(orders)
       .values({
@@ -284,8 +287,10 @@ async function handleCheckoutPaid(session: any) {
         stripePaymentIntentId:   piId,
         stripeCheckoutSessionId: sessionId,
         ...(shippingAddress && { shippingAddress }),
+        ...(dropId ? { dropId } : {}),
       })
       .returning();
+    createdOrderId = order.id;
 
     // Step 5: Insert order items (from original cart, not aggregated map, to preserve line detail)
     await tx.insert(orderItems).values(
@@ -380,7 +385,64 @@ async function handleCheckoutPaid(session: any) {
     }
   } else {
     console.log(`Order created for buyer ${buyerId}, session ${sessionId}`);
+
+    // ── Auto-credit drop wallet (Fix #1) ───────────────────────────────────
+    // If this order is part of a drop, credit the drop's escrow wallet so
+    // the per-order release-order endpoint has funds to transfer at ship time.
+    const dropId: string | undefined = metadata["dropId"];
+    if (dropId && createdOrderId) {
+      try {
+        await creditDropWallet(dropId, createdOrderId, subtotalCents, piId);
+      } catch (walletErr) {
+        // Non-fatal — log for manual recovery; order record is committed
+        console.error(`Auto-credit drop wallet failed for order ${createdOrderId}:`, walletErr);
+      }
+    }
   }
+}
+
+// ── Drop wallet auto-credit helper ──────────────────────────────────────────
+// Uses SELECT FOR UPDATE to prevent concurrent duplicate deposits.
+async function creditDropWallet(
+  dropId: string,
+  orderId: string,
+  amountCents: number,
+  stripePaymentIntentId: string | null,
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    // Lock wallet row — prevents concurrent deposits from double-crediting
+    const lockResult = await tx.execute(
+      sql`SELECT id, balance_cents FROM drop_wallets WHERE drop_id = ${dropId}::uuid FOR UPDATE LIMIT 1`,
+    );
+    const walletRow = (lockResult as any).rows?.[0];
+    if (!walletRow) {
+      console.warn(`creditDropWallet: no wallet found for drop ${dropId}`);
+      return;
+    }
+
+    // Idempotency guard — skip if this order was already deposited
+    const already = await tx.execute(
+      sql`SELECT id FROM drop_wallet_transactions WHERE wallet_id = ${walletRow.id}::uuid AND order_id = ${orderId}::uuid AND type = 'deposit' LIMIT 1`,
+    );
+    if ((already as any).rows?.length > 0) {
+      console.log(`creditDropWallet: order ${orderId} already deposited — skipping`);
+      return;
+    }
+
+    // Atomic balance increment (avoids read-modify-write race)
+    await tx.execute(
+      sql`UPDATE drop_wallets SET balance_cents = balance_cents + ${amountCents}, updated_at = NOW() WHERE id = ${walletRow.id}::uuid`,
+    );
+
+    await tx.insert(dropWalletTransactions).values({
+      walletId:         walletRow.id as string,
+      type:             "deposit",
+      amountCents,
+      orderId,
+      description:      "Buyer order payment (auto-credited on checkout.session.completed)",
+      stripeTransferId: stripePaymentIntentId ?? undefined,
+    });
+  });
 }
 
 // ── Seller subscription handlers ────────────────────────────────────────────

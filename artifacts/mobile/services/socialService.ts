@@ -783,6 +783,48 @@ export async function saveSellerPost(id: string): Promise<void> {
 }
 
 export async function getSellerPosts(): Promise<SellerThreadPost[]> {
+  // Try real API first so sellers see their actual published posts
+  try {
+    const apiPosts = await serviceRequest('/api/posts') as any[];
+    if (Array.isArray(apiPosts) && apiPosts.length > 0) {
+      const now = iso();
+      const mapped: SellerThreadPost[] = apiPosts.map(p => ({
+        id:              p.id,
+        sellerId:        p.ownerId        ?? MY_USER_ID,
+        brandId:         p.ownerId        ?? MY_USER_ID,
+        feedEligibility: 'thread_eligible' as const,
+        caption:         p.caption        ?? '',
+        hashtags:        p.hashtags       ?? [],
+        mediaUris:       p.mediaUrl       ? [p.mediaUrl] : (p.mediaUris ?? []),
+        thumbnailUri:    p.thumbnailUrl   ?? p.thumbnailUri ?? undefined,
+        aspectRatio:     (p.aspectRatio   ?? '9:16') as SellerThreadPost['aspectRatio'],
+        contentType:     (p.mediaType     ?? 'video') as SellerThreadPost['contentType'],
+        postStatus:      'published'      as const,
+        isDraft:         false,
+        isArchived:      false,
+        isDeleted:       false,
+        sound:           undefined,
+        productTags:     p.taggedProducts ?? [],
+        visibility:      { allowComments: true, allowReposts: true, showLikeCount: true },
+        scheduledAt:     null,
+        publishedAt:     p.createdAt      ?? now,
+        createdAt:       p.createdAt      ?? now,
+        updatedAt:       p.updatedAt      ?? now,
+        likesCount:      p.likesCount     ?? 0,
+        commentsCount:   p.commentsCount  ?? 0,
+        repostsCount:    p.repostsCount   ?? 0,
+        savedCount:      0,
+        likedByMe:       p.likedByMe      ?? false,
+        savedByMe:       false,
+        repostedByMe:    false,
+      }));
+      await save(SELLER_POSTS_KEY, mapped);
+      return mapped;
+    }
+  } catch {
+    // Fall through to local cache
+  }
+  // Fall back to AsyncStorage (cached real data or demo seeds on first run)
   await ensureSellerPostsSeed();
   return load<SellerThreadPost[]>(SELLER_POSTS_KEY, []);
 }
