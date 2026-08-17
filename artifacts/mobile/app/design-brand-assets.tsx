@@ -22,8 +22,9 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { SearchBar, EmptyState } from '@/components/BrandthreadUI';
+import { Share } from 'react-native';
 import {
-  getBrandAssets, addBrandAsset, renameBrandAsset, deleteBrandAsset,
+  getBrandAssets, addBrandAsset, renameBrandAsset, deleteBrandAsset, getProjects,
 } from '@/services/designService';
 import { BRAND_ASSET_TYPES } from '@/services/designTypes';
 import type { BrandAsset, BrandAssetType } from '@/services/designTypes';
@@ -129,8 +130,36 @@ export default function DesignBrandAssetsScreen() {
           }, 'plain-text', asset.name);
         },
       },
-      { text: 'Add to Project', onPress: () => Alert.alert('Coming Soon', 'Asset insertion coming soon.') },
-      { text: 'Download', onPress: () => Alert.alert('Coming Soon', 'Export coming soon.') },
+      {
+        text: 'Add to Project',
+        onPress: async () => {
+          const projects = await getProjects();
+          if (projects.length === 0) {
+            Alert.alert('No Projects', 'Create a design project first to add assets.', [
+              { text: 'Go to Design Studio', onPress: () => router.push('/design' as never) },
+              { text: 'Cancel', style: 'cancel' },
+            ]);
+            return;
+          }
+          const buttons: any[] = projects.slice(0, 7).map(p => ({
+            text: p.name,
+            onPress: () => router.push((`/design-canvas?id=${p.id}&addAssetId=${asset.id}`) as never),
+          }));
+          buttons.push({ text: 'Cancel', style: 'cancel' });
+          Alert.alert('Add to Project', 'Choose a design project:', buttons);
+        },
+      },
+      {
+        text: 'Download',
+        onPress: async () => {
+          const uri = (asset as any).uri ?? (asset as any).thumbnailUrl ?? '';
+          try {
+            await Share.share({ message: asset.name, url: uri });
+          } catch {
+            Alert.alert('Download', 'Could not share this asset.');
+          }
+        },
+      },
       {
         text: 'Delete',
         style: 'destructive',

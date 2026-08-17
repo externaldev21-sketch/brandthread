@@ -24,7 +24,7 @@ import {
   PrimaryButton, SecondaryButton, FilterChip, StatusBadge,
   SectionHeader, EmptyState,
 } from '@/components/BrandthreadUI';
-import { getProjects, deleteProject, duplicateProject, archiveProject } from '@/services/designService';
+import { getProjects, deleteProject, duplicateProject, archiveProject, updateProject, exportProject } from '@/services/designService';
 import {
   DesignProject, PROJECT_TYPE_LABELS, PROJECT_STATUS_LABELS,
   GARMENT_TEMPLATES, DesignProjectType, DesignProjectStatus,
@@ -201,7 +201,13 @@ export default function DesignScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert(project.name, undefined, [
       { text: 'Open', onPress: () => router.push(`/design-canvas?id=${project.id}`) },
-      { text: 'Rename', onPress: () => Alert.alert('Rename', 'Rename functionality coming soon.') },
+      {
+        text: 'Rename', onPress: () => Alert.prompt(
+          'Rename Project', 'New name:',
+          async (name) => { if (!name?.trim()) return; await updateProject(project.id, { name: name.trim() }); loadData(); },
+          'plain-text', project.name,
+        ),
+      },
       {
         text: 'Duplicate', onPress: async () => {
           await duplicateProject(project.id);
@@ -226,9 +232,14 @@ export default function DesignScreen() {
             },
           ]),
       },
-      { text: 'Export', onPress: () => Alert.alert('Export', 'Export panel coming soon.') },
-      { text: 'Create product', onPress: () => Alert.alert('Create product', 'Link to product flow coming soon.') },
-      { text: 'Send to manufacturer', onPress: () => Alert.alert('Manufacturer', 'Send to manufacturer flow coming soon.') },
+      {
+        text: 'Export',
+        onPress: () => exportProject(project.id, 'png')
+          .then(() => Alert.alert('Exported', 'Design saved to your device.'))
+          .catch(() => Alert.alert('Export failed', 'Could not export. Please try again.')),
+      },
+      { text: 'Create product', onPress: () => router.push(('/add-product?designId=' + project.id) as never) },
+      { text: 'Send to manufacturer', onPress: () => router.push(('/manufacturer-hub?designId=' + project.id) as never) },
       { text: 'Create Seller post', onPress: () => router.push('/create-post') },
       { text: 'Cancel', style: 'cancel' },
     ]);

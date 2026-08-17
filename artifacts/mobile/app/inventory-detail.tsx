@@ -477,7 +477,7 @@ export default function InventoryDetailScreen() {
       />
       <SecondaryButton
         label="Orders"
-        onPress={() => Alert.alert('Orders', 'Order history for this item coming soon.')}
+        onPress={() => router.push(('/(tabs)/orders?productId=' + (item?.productId ?? id)) as never)}
         icon="shopping-bag"
         small
         style={d.actionBtn}

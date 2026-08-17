@@ -44,7 +44,6 @@ interface NavItem {
   desc: string;
   accent: string;
   badge?: boolean;
-  /** undefined = coming soon; string = real route */
   route?: string;
 }
 
@@ -57,8 +56,7 @@ const STORE_ITEMS: NavItem[] = [
   { icon: 'layout', label: 'Store Builder', desc: 'Customize your storefront',  accent: PURPLE, route: '/store-builder' },
   { icon: 'grid',   label: 'Collections',   desc: 'Group products',              accent: CYAN,   route: '/store-collections' },
   { icon: 'globe',  label: 'Domains',       desc: 'Custom domain settings',      accent: BLUE,   route: '/store-domain' },
-  { icon: 'tag',    label: 'Discounts',     desc: 'Coupon codes and offers',      accent: GOLD },
-  // Discounts has no screen yet — shows "coming soon" until wired
+  { icon: 'tag',    label: 'Discounts',     desc: 'Coupon codes and offers',      accent: GOLD, route: '/discounts' },
 ];
 
 const STUDIO_ITEMS: NavItem[] = [
@@ -175,13 +173,7 @@ export default function MoreScreen() {
   const handleNavPress = (item: NavItem) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (item.route) {
-      try {
-        router.push(item.route as any);
-      } catch {
-        Alert.alert(item.label, 'Coming soon');
-      }
-    } else {
-      Alert.alert(item.label, 'Coming soon');
+      router.push(item.route as any);
     }
   };
 
@@ -238,7 +230,7 @@ export default function MoreScreen() {
             <View style={[styles.progressFill, { width: `${percent}%` }]} />
           </View>
           <TouchableOpacity
-            onPress={() => Alert.alert('Setup', 'Guided setup coming soon')}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/seller-settings' as any); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Text style={styles.continueSetup}>Continue setup →</Text>

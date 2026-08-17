@@ -256,7 +256,7 @@ function ActionSheet({ product, visible, onClose, onRefresh }: ActionSheetProps)
     { label: 'Share', icon: 'share', onPress: handleShare },
     {
       label: 'Send to manufacturer', icon: 'tool', accent: ORANGE,
-      onPress: () => { closeSheet(); Alert.alert('Manufacturer', 'Send to manufacturer coming soon.'); },
+      onPress: () => { closeSheet(); router.push(('/manufacturer-hub?productId=' + p.id) as never); },
     },
     { label: 'View analytics', icon: 'bar-chart-2', onPress: () => { closeSheet(); router.push(('/product-detail?id=' + p.id + '&tab=analytics') as never); } },
     isArchived

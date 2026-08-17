@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
-  StyleSheet, Alert, RefreshControl, Modal,
+  StyleSheet, Alert, RefreshControl, Modal, Share,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -587,9 +587,34 @@ export default function OrdersScreen() {
     }
   }, [api, selectedIds, loadData]);
 
+  const handleExportCsv = useCallback(async () => {
+    try {
+      const rows = orders.map(o => {
+        const customer = o.customer?.name ?? o.customer?.email ?? 'Unknown';
+        const date = new Date(o.createdAt).toLocaleDateString('en-US');
+        const total = (o.total / 100).toFixed(2);
+        const itemCount = o.items?.length ?? 0;
+        return [
+          o.orderNumber ?? o.id.slice(0, 8),
+          `"${customer.replace(/"/g, '""')}"`,
+          date,
+          o.status,
+          o.paymentStatus,
+          o.fulfillmentStatus ?? 'unfulfilled',
+          itemCount,
+          `$${total}`,
+        ].join(',');
+      });
+      const csv = ['Order #,Customer,Date,Status,Payment,Fulfillment,Items,Total', ...rows].join('\n');
+      await Share.share({ message: csv, title: 'Orders Export' });
+    } catch {
+      Alert.alert('Export failed', 'Could not export orders. Please try again.');
+    }
+  }, [orders]);
+
   const handleMoreMenu = useCallback(() => {
     Alert.alert('Orders', 'Choose an action', [
-      { text: 'Export CSV', onPress: () => Alert.alert('Export', 'CSV export coming soon.') },
+      { text: 'Export CSV', onPress: handleExportCsv },
       { text: 'Bulk Actions', onPress: () => Alert.alert('Bulk', 'Long-press orders to select.') },
       { text: 'Refresh', onPress: onRefresh },
       { text: 'Cancel', style: 'cancel' },
@@ -806,7 +831,7 @@ export default function OrdersScreen() {
                 <Feather name="package" size={ICON.xs} color={SUCCESS} />
                 <Text style={[s.bulkBtnText, { color: SUCCESS }]}>Ready</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={s.bulkBtn} onPress={() => Alert.alert('Export', 'Export coming soon.')}>
+              <TouchableOpacity style={s.bulkBtn} onPress={handleExportCsv}>
                 <Feather name="download" size={ICON.xs} color={MUTED} />
                 <Text style={[s.bulkBtnText, { color: MUTED }]}>Export</Text>
               </TouchableOpacity>

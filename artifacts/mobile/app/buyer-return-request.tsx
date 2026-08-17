@@ -5,8 +5,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
-  ActivityIndicator, Alert,
+  ActivityIndicator, Alert, Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -48,6 +49,22 @@ export default function BuyerReturnRequestScreen() {
   const [resolution, setResolution] = useState<BuyerReturnResolution>('refund');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [evidencePhotos, setEvidencePhotos] = useState<string[]>([]);
+
+  async function pickEvidence() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { Alert.alert('Permission required', 'Allow photo library access to add evidence.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaType.IMAGE,
+      allowsMultipleSelection: true,
+      quality: 0.7,
+      selectionLimit: 5,
+    });
+    if (!result.canceled) {
+      const uris = result.assets.map(a => a.uri);
+      setEvidencePhotos(prev => [...prev, ...uris].slice(0, 5));
+    }
+  }
 
   useEffect(() => {
     if (!orderId) return;
@@ -78,7 +95,7 @@ export default function BuyerReturnRequestScreen() {
         })),
         reason: reason as BuyerReturnReason,
         description: description.trim(),
-        imageUris: [],
+        imageUris: evidencePhotos,
         preferredResolution: resolution,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -180,10 +197,34 @@ export default function BuyerReturnRequestScreen() {
           />
         </View>
 
-        {/* Evidence note */}
-        <View style={s.evidenceNote}>
-          <Feather name="camera" size={13} color={MUTED} />
-          <Text style={s.evidenceNoteText}>Photo and video evidence: upload functionality coming soon. You can describe visual issues in the text above.</Text>
+        {/* Evidence photos */}
+        <View style={s.card}>
+          <Text style={s.sectionTitle}>Evidence Photos</Text>
+          <Text style={[s.sectionTitle, { fontFamily: FONT.regular, color: MUTED, fontSize: FS.xs, marginBottom: SP.sm }]}>
+            Add up to 5 photos showing the issue (optional).
+          </Text>
+          {evidencePhotos.length > 0 && (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SP.sm }}>
+              {evidencePhotos.map((uri, idx) => (
+                <TouchableOpacity key={idx} onPress={() => setEvidencePhotos(prev => prev.filter((_, i) => i !== idx))} activeOpacity={0.8}>
+                  <Image source={{ uri }} style={{ width: 72, height: 72, borderRadius: 8, borderWidth: 1, borderColor: BORDER }} />
+                  <View style={{ position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 8, width: 16, height: 16, alignItems: 'center', justifyContent: 'center' }}>
+                    <Feather name="x" size={10} color="#fff" />
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+          {evidencePhotos.length < 5 && (
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, paddingHorizontal: 14, backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, alignSelf: 'flex-start' }}
+              onPress={pickEvidence}
+              activeOpacity={0.8}
+            >
+              <Feather name="camera" size={15} color={PURPLE_LIGHT} />
+              <Text style={{ fontFamily: FONT.medium, fontSize: FS.sm, color: PURPLE_LIGHT }}>Add photos</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Preferred resolution */}

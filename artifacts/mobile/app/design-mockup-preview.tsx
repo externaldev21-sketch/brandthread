@@ -82,11 +82,17 @@ export default function DesignMockupPreviewScreen() {
 
   const handleAddToProduct = useCallback(() => {
     Alert.alert('Add to Product', 'Choose an option:', [
-      { text: 'Existing product', onPress: () => Alert.alert('Coming soon') },
-      { text: 'Create new product', onPress: () => Alert.alert('Coming soon') },
+      {
+        text: 'Existing product',
+        onPress: () => router.push(('/(tabs)/products?pickForMockup=1&projectId=' + (project?.id ?? '')) as never),
+      },
+      {
+        text: 'Create new product',
+        onPress: () => router.push(('/add-product?mockupProjectId=' + (project?.id ?? '')) as never),
+      },
       { text: 'Cancel', style: 'cancel' },
     ]);
-  }, []);
+  }, [project, router]);
 
   const handleCustomBg = useCallback(() => {
     Alert.alert('Custom Background', 'Enter a hex color in the next version. Using current color for now.');

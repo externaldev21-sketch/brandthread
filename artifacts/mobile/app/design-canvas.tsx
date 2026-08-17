@@ -5,7 +5,7 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, PanResponder,
-  Alert, ScrollView, TextInput, Modal, Dimensions, Image,
+  Alert, ScrollView, TextInput, Modal, Dimensions, Image, Share,
 } from 'react-native';
 import Svg, { Path, Rect, Circle, G, Line, Text as SvgText } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,7 +25,7 @@ import {
   GRAD_PRIMARY,
 } from '@/lib/theme';
 import {
-  getProject, autosaveProject, addLayer, updateLayer,
+  getProject, autosaveProject, updateProject, addLayer, updateLayer,
   deleteLayer as svcDeleteLayer, reorderLayers,
   toggleLayerVisibility, toggleLayerLock,
   duplicateLayer as svcDuplicateLayer,
@@ -411,10 +411,27 @@ export default function DesignCanvasScreen() {
   function handleMoreMenu() {
     Alert.alert('Options', '', [
       { text: 'Export', onPress: () => exportProject(project?.id ?? '', 'png').then(() => Alert.alert('Exported', 'Project exported successfully.')) },
-      { text: 'Preview Mockup', onPress: () => Alert.alert('Preview', 'Mockup preview coming soon.') },
+      { text: 'Preview Mockup', onPress: () => router.push((`/design-mockup-preview?projectId=${project?.id ?? ''}`) as never) },
       { text: 'Version History', onPress: () => Alert.alert('Versions', `${project?.versions?.length ?? 0} versions saved.`) },
-      { text: 'Project Settings', onPress: () => Alert.alert('Settings', 'Project settings coming soon.') },
-      { text: 'Share', onPress: () => Alert.alert('Share', 'Share coming soon.') },
+      {
+        text: 'Project Settings',
+        onPress: () => Alert.prompt(
+          'Project Name', 'Rename this project:',
+          async (name) => {
+            if (!name?.trim() || !project) return;
+            const updated = await updateProject(project.id, { name: name.trim() });
+            setProject(updated);
+          },
+          'plain-text', project?.name ?? '',
+        ),
+      },
+      {
+        text: 'Share',
+        onPress: async () => {
+          try { await Share.share({ message: `Check out my design: ${project?.name ?? 'Untitled'}` }); }
+          catch { /* cancelled */ }
+        },
+      },
       { text: 'Cancel', style: 'cancel' },
     ]);
   }
@@ -695,11 +712,11 @@ export default function DesignCanvasScreen() {
                 { label: 'Rectangle',     icon: 'square',       onPress: () => handleAddShape('rect') },
                 { label: 'Circle',        icon: 'circle',       onPress: () => handleAddShape('circle') },
                 { label: 'Triangle',      icon: 'triangle',     onPress: () => handleAddShape('triangle') },
-                { label: 'Logo',          icon: 'award',        onPress: () => Alert.alert('Coming Soon', 'Brand logo insert coming soon.') },
-                { label: 'Sticker',       icon: 'smile',        onPress: () => Alert.alert('Coming Soon', 'Stickers coming soon.') },
-                { label: 'Product Badge', icon: 'tag',          onPress: () => Alert.alert('Coming Soon', 'Product badge coming soon.') },
-                { label: 'Price Label',   icon: 'dollar-sign',  onPress: () => Alert.alert('Coming Soon', 'Price label coming soon.') },
-                { label: 'QR Code',       icon: 'maximize',     onPress: () => Alert.alert('Coming Soon', 'QR code coming soon.') },
+                { label: 'Logo',          icon: 'award',       onPress: () => { closeSheet(); handleAddImage(); } },
+                { label: 'Sticker',       icon: 'smile',       onPress: () => { closeSheet(); handleAddImage(); } },
+                { label: 'Product Badge', icon: 'tag',         onPress: () => { closeSheet(); router.push('/design-brand-assets' as never); } },
+                { label: 'Price Label',   icon: 'dollar-sign', onPress: () => { closeSheet(); setActiveTool('text'); setBottomSheet('text'); } },
+                { label: 'QR Code',       icon: 'maximize',    onPress: () => { closeSheet(); router.push('/store-domain' as never); } },
                 { label: 'Brand Asset',   icon: 'star',         onPress: () => { closeSheet(); router.push('/design-brand-assets'); } },
               ].map(item => (
                 <TouchableOpacity key={item.label} style={ss.addItem} onPress={item.onPress} activeOpacity={0.8}>
