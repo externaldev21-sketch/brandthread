@@ -689,9 +689,13 @@ export const storefrontCustomDomains = pgTable('storefront_custom_domains', {
 export const teamMembers = pgTable('team_members', {
   id:           uuid('id').primaryKey().defaultRandom(),
   ownerId:      text('owner_id').notNull(),
+  /** Clerk userId of the invitee — set when they accept the invite. Drives role enforcement. */
+  memberClerkId: text('member_clerk_id'),
   email:        text('email').notNull(),
   name:         text('name'),
+  /** 'owner' | 'manager' | 'staff' */
   role:         text('role').notNull().default('staff'),
+  /** 'pending' | 'active' | 'removed' */
   status:       text('status').notNull().default('pending'),
   inviteToken:  text('invite_token').unique(),
   invitedAt:    timestamp('invited_at').defaultNow().notNull(),
@@ -705,8 +709,15 @@ export const teamActivityLogs = pgTable('team_activity_logs', {
   id:        uuid('id').primaryKey().defaultRandom(),
   ownerId:   text('owner_id').notNull(),
   memberId:  uuid('member_id').references(() => teamMembers.id, { onDelete: 'set null' }),
+  /** Clerk userId of who performed the action (owner or team member). */
+  actorClerkId: text('actor_clerk_id'),
+  /** 'owner' | 'manager' | 'staff' at the time of the action. */
+  actorRole:    text('actor_role'),
   actorName: text('actor_name'),
   action:    text('action').notNull(),
+  /** 'product' | 'order' | 'inventory' | 'team' */
+  resourceType: text('resource_type'),
+  resourceId:   text('resource_id'),
   target:    text('target'),
   metadata:  json('metadata').$type<Record<string, unknown>>().notNull().default({}),
   createdAt: timestamp('created_at').defaultNow().notNull(),

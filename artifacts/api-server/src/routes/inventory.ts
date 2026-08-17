@@ -2,9 +2,14 @@ import { Router } from "express";
 import { db, products, productVariants } from "@workspace/db";
 import { eq, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { teamContext, requireRole } from "../middlewares/requireRole";
+import { logActivity, reqActor } from "../lib/activityLog";
 
 const router = Router();
 router.use(requireAuth);
+// Resolve team membership: managers act on the owner's store while the audit
+// log keeps track of who actually performed each action.
+router.use(teamContext());
 
 function stockStatus(stock: number, threshold: number): "out_of_stock" | "low_stock" | "in_stock" {
   if (stock === 0) return "out_of_stock";
@@ -49,7 +54,7 @@ router.get("/", async (req, res) => {
 // PATCH /api/inventory/:variantId/adjust
 // Body: { delta?: number, newStock?: number }
 // Adjusts stock by delta (positive=add, negative=remove), or sets to newStock directly.
-router.patch("/:variantId/adjust", async (req, res) => {
+router.patch("/:variantId/adjust", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { variantId } = req.params;
   const { delta, newStock } = req.body as { delta?: number; newStock?: number };
@@ -83,10 +88,21 @@ router.patch("/:variantId/adjust", async (req, res) => {
     .where(eq(productVariants.id, variantId))
     .returning();
 
+  const variantLabel = [updated.size, updated.color].filter(Boolean).join(" / ") || updated.sku;
+
+  {
+    const actor = reqActor(req);
+    void logActivity(
+      actor.ownerClerkId, actor.actorClerkId, actor.actorRole,
+      `Adjusted stock for ${variantLabel} to ${updatedStock}`,
+      "inventory", variantId, { delta: delta ?? null, newStock: updatedStock },
+    );
+  }
+
   return res.json({
     ...updated,
     status: stockStatus(updatedStock, updated.lowStockThreshold),
-    variantLabel: [updated.size, updated.color].filter(Boolean).join(" / ") || updated.sku,
+    variantLabel,
   });
 });
 

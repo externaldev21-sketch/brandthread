@@ -3,10 +3,15 @@ import { db, orders, orderItems, customers, drops, productVariants, products, no
 import { eq, desc, sql, and, ne } from "drizzle-orm";
 import { stripe, PLATFORM_COMMISSION_RATE } from "../lib/stripe";
 import { requireAuth } from "../middlewares/requireAuth";
+import { teamContext, requireRole } from "../middlewares/requireRole";
+import { logActivity, reqActor } from "../lib/activityLog";
 import { publishNotification } from "./notifications-feed";
 
 const router = Router();
 router.use(requireAuth);
+// Resolve team membership: managers/staff act on the owner's store while the
+// audit log keeps track of who actually performed each action.
+router.use(teamContext());
 
 // GET /api/orders
 router.get("/", async (req, res) => {
@@ -37,8 +42,8 @@ router.get("/", async (req, res) => {
   res.json(rows);
 });
 
-// POST /api/orders — transactional, server-side prices, stock validation
-router.post("/", async (req, res) => {
+// POST /api/orders — transactional, server-side prices, stock validation (manager+)
+router.post("/", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { customerId, dropId, items, shippingCents = 0, notes, shippingAddress } = req.body;
 
@@ -228,8 +233,8 @@ router.get("/:id", async (req, res) => {
   res.json({ ...order, items, customer });
 });
 
-// PATCH /api/orders/:id/status
-router.patch("/:id/status", async (req, res) => {
+// PATCH /api/orders/:id/status — fulfillment (staff+)
+router.patch("/:id/status", requireRole("staff"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { status } = req.body;
   const valid = ["pending", "processing", "fulfilled", "shipped", "delivered", "cancelled"];
@@ -256,6 +261,16 @@ router.patch("/:id/status", async (req, res) => {
     res.json(current); return;  // Already at target status — no notification needed
   }
 
+  // Audit log: which team member changed the status
+  {
+    const actor = reqActor(req);
+    void logActivity(
+      actor.ownerClerkId, actor.actorClerkId, actor.actorRole,
+      `Marked order #${transitioned.orderNumber} as ${status}`,
+      "order", transitioned.id, { status },
+    );
+  }
+
   // Genuine transition — notify buyer for meaningful statuses
   const notifMap: Record<string, { type: string; title: string; body: string } | undefined> = {
     shipped:   { type: "order_shipped",   title: "Your order has shipped! 🚚", body: `Order #${transitioned.orderNumber} is on its way.` },
@@ -278,8 +293,8 @@ router.patch("/:id/status", async (req, res) => {
   res.json(transitioned);
 });
 
-// PATCH /api/orders/:id/tracking
-router.patch("/:id/tracking", async (req, res) => {
+// PATCH /api/orders/:id/tracking — fulfillment (staff+)
+router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { trackingNumber, carrier } = req.body;
   if (!trackingNumber) { res.status(400).json({ error: "trackingNumber required" }); return; }
@@ -301,6 +316,16 @@ router.patch("/:id/tracking", async (req, res) => {
     .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId)))
     .returning();
   if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+
+  // Audit log: which team member added tracking
+  {
+    const actor = reqActor(req);
+    void logActivity(
+      actor.ownerClerkId, actor.actorClerkId, actor.actorRole,
+      `Added tracking ${trackingNumber} to order #${updated.orderNumber}`,
+      "order", updated.id, { trackingNumber, carrier: carrier ?? null },
+    );
+  }
 
   // Notify buyer only when status genuinely transitioned to shipped
   if (statusTransition?.buyerId) {

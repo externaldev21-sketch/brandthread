@@ -726,15 +726,28 @@ export function createApi(getToken: GetToken) {
         get<any[]>(`/api/bundles/public/${encodeURIComponent(sellerId)}`),
     },
     // (buyer key defined earlier in this object — no duplicate)
-    /** Team members — invite, roles, and activity log */
+    /** Team members — invite flow, roles, and activity log */
     team: {
       members:   () => get<any[]>('/api/team/members'),
+      member:    (id: string) => get<any>(`/api/team/members/${encodeURIComponent(id)}`),
       invite:    (data: { email: string; name?: string; role?: string }) => post<any>('/api/team/invite', data),
-      accept:    (token: string) => post<any>(`/api/team/accept/${encodeURIComponent(token)}`, {}),
+      /** Public: resolve invite details for the accept screen (works signed-out) */
+      resolveInvite: (token: string) => get<any>(`/api/team/invite/accept/${encodeURIComponent(token)}`),
+      accept:    (token: string) => post<any>(`/api/team/invite/accept/${encodeURIComponent(token)}`, {}),
       changeRole: (memberId: string, role: string) => patch<any>(`/api/team/members/${encodeURIComponent(memberId)}/role`, { role }),
       remove:    (memberId: string) => del<any>(`/api/team/members/${encodeURIComponent(memberId)}`),
       roles:     () => get<any[]>('/api/team/roles'),
-      activity:  (limit?: number) => get<any>(`/api/team/activity${limit ? `?limit=${limit}` : ''}`),
+      roleMembers: (role: string) => get<any[]>(`/api/team/roles/${encodeURIComponent(role)}/members`),
+      activity:  (params?: number | { limit?: number; offset?: number; actorClerkId?: string; resourceType?: string }) => {
+        const p = typeof params === 'number' ? { limit: params } : (params ?? {});
+        const qs = new URLSearchParams();
+        if (p.limit) qs.set('limit', String(p.limit));
+        if (p.offset) qs.set('offset', String(p.offset));
+        if (p.actorClerkId) qs.set('actorClerkId', p.actorClerkId);
+        if (p.resourceType) qs.set('resourceType', p.resourceType);
+        const s = qs.toString();
+        return get<any>(`/api/team/activity${s ? `?${s}` : ''}`);
+      },
     },
     /** Seller storefront — store builder CRUD */
     store: {

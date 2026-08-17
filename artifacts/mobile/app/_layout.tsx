@@ -105,6 +105,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [onboardingDone, setOnboardingDone]       = useState(false);
   const [storedRole, setStoredRole]               = useState<string | null>(null);
   const [splashSeen, setSplashSeen]               = useState<boolean | null>(null);
+  const [pendingInvite, setPendingInvite]         = useState<string | null>(null);
+
+  // Pending team invite (stashed by team-invite.tsx before sign-in) — re-check
+  // whenever auth state or the top segment changes.
+  useEffect(() => {
+    if (!isSignedIn) { setPendingInvite(null); return; }
+    AsyncStorage.getItem('bt:pendingTeamInvite').then(setPendingInvite).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSignedIn, topSegment]);
 
   // DEV: wipe all session/onboarding state and go to splash on hot-reload
   useEffect(() => {
@@ -150,7 +159,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     // The index route ("/") has no segment — it only shows BootScreen and
     // must always be redirected away from once auth state is known.
     const atRoot          = !segments[0] || (segments[0] as string) === 'index';
-    const inProtectedArea = !inAuthScreen && !inOnboarding && !inAccountType;
+    // Team invite links must be viewable signed-out (deep-link entry point)
+    const inInvite        = (segments[0] as string) === 'team-invite';
+    const inProtectedArea = !inAuthScreen && !inOnboarding && !inAccountType && !inInvite;
 
     // DEV bypass (all platforms): skip auth and go straight to dashboard.
     const devRole = PREVIEW_ROLE ?? DEV_BYPASS_ROLE;
@@ -188,6 +199,13 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // A team invite was pending when the user signed in/up — bring them back
+    // to the accept screen once onboarding is finished.
+    if (onboardingDone && pendingInvite && !inInvite) {
+      router.replace(`/team-invite?token=${pendingInvite}` as never);
+      return;
+    }
+
     // Onboarding done → route away from auth/onboarding screens and the
     // bare "/" boot route to the correct dashboard
     if (onboardingDone && (inAuthScreen || inOnboarding || inAccountType || atRoot)) {
@@ -202,7 +220,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     } else if (onboardingDone && storedRole === 'seller' && inBuyerGroup) {
       router.replace('/(tabs)/' as never);
     }
-  }, [isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole, splashSeen]);
+  }, [isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole, splashSeen, pendingInvite]);
 
   return <>{children}</>;
 }
@@ -276,6 +294,7 @@ function RootLayoutNav() {
         <Stack.Screen name="customers"        options={{ headerShown: false }} />
         <Stack.Screen name="shipping"         options={{ headerShown: false }} />
         <Stack.Screen name="team"             options={{ headerShown: false }} />
+        <Stack.Screen name="team-invite"      options={{ headerShown: false }} />
         <Stack.Screen name="ai-assistant"     options={{ headerShown: false }} />
         <Stack.Screen name="community"        options={{ headerShown: false }} />
         <Stack.Screen name="automation"       options={{ headerShown: false }} />

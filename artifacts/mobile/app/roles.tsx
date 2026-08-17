@@ -4,17 +4,19 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
 
 // Fallback role data if API not connected
 const DEFAULT_ROLES = [
-  { name: 'Owner', group: 'Organization', description: 'Full access to all features', staffCount: 1 },
-  { name: 'Manager', group: 'Store', description: 'Products, orders, inventory', staffCount: 0 },
-  { name: 'Staff', group: 'Store', description: 'Fulfillment and shipping only', staffCount: 0 },
+  { key: 'owner', name: 'Owner', group: 'Organization', description: 'Full access to all features', staffCount: 1 },
+  { key: 'manager', name: 'Manager', group: 'Store', description: 'Products, orders, inventory', staffCount: 0 },
+  { key: 'staff', name: 'Staff', group: 'Store', description: 'Fulfillment and shipping only', staffCount: 0 },
 ];
 
 export default function RolesScreen() {
   const colors = useColors();
+  const router = useRouter();
   const api = useApi();
   const [bannerVisible, setBannerVisible] = useState(true);
   const [roles, setRoles] = useState(DEFAULT_ROLES);
@@ -73,15 +75,23 @@ export default function RolesScreen() {
         </View>
 
         <View style={styles.listWrap}>
-          {roles.map((role, i) => (
+          {roles.map((role: any, i) => (
             <TouchableOpacity
               key={role.name}
-              onPress={haptic}
+              onPress={() => {
+                haptic();
+                router.push(`/users?role=${role.key ?? role.name.toLowerCase()}` as never);
+              }}
               activeOpacity={0.7}
               style={[styles.roleRow, i !== roles.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
             >
-              <Text style={[styles.roleName, { color: colors.foreground }]}>{role.name}</Text>
-              <Text style={[styles.roleSub, { color: colors.mutedForeground }]}>{role.group} · {role.staffCount ?? 0} staff</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.roleName, { color: colors.foreground }]}>{role.name}</Text>
+                <Text style={[styles.roleSub, { color: colors.mutedForeground }]}>
+                  {role.group} · {role.staffCount ?? 0} staff{role.pendingCount ? ` · ${role.pendingCount} invited` : ''}
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
           ))}
         </View>
@@ -108,7 +118,7 @@ const styles = StyleSheet.create({
   allPillText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   iconBtn: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   listWrap: { paddingHorizontal: 20 },
-  roleRow: { paddingVertical: 14 },
+  roleRow: { paddingVertical: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
   roleName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   roleSub: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
   footerNote: { paddingVertical: 18, alignItems: 'center', marginTop: 4 },

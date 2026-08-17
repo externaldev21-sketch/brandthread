@@ -2,10 +2,16 @@ import { Router } from "express";
 import { db, products, productVariants } from "@workspace/db";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { teamContext, requireRole } from "../middlewares/requireRole";
+import { logActivity, reqActor } from "../lib/activityLog";
 import crypto from "crypto";
 
 const router = Router();
 router.use(requireAuth);
+// Resolve team membership: managers act on the owner's store while the audit
+// log keeps track of who actually performed each action. Staff are read-only
+// here — product mutations below require the manager role.
+router.use(teamContext());
 
 // GET /api/products — scoped to the authenticated user's brand
 router.get("/", async (req, res) => {
@@ -32,8 +38,8 @@ router.get("/", async (req, res) => {
   res.json(rows);
 });
 
-// POST /api/products
-router.post("/", async (req, res) => {
+// POST /api/products (manager+)
+router.post("/", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { name, description, category = "apparel", status = "draft", images = [], tags = [], styleTags = [], variant, variants } = req.body;
   if (!name || typeof name !== "string" || name.trim() === "") {
@@ -96,6 +102,15 @@ router.post("/", async (req, res) => {
     return prod;
   });
 
+  {
+    const actor = reqActor(req);
+    void logActivity(
+      actor.ownerClerkId, actor.actorClerkId, actor.actorRole,
+      `Created product "${product.name}"`,
+      "product", product.id,
+    );
+  }
+
   res.status(201).json(product);
 });
 
@@ -110,8 +125,8 @@ router.get("/:id", async (req, res) => {
   res.json({ ...product, variants });
 });
 
-// PUT /api/products/:id
-router.put("/:id", async (req, res) => {
+// PUT /api/products/:id (manager+)
+router.put("/:id", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const {
     name, description, category, status, images, tags, styleTags,
@@ -142,22 +157,42 @@ router.put("/:id", async (req, res) => {
     .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId)))
     .returning();
   if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+
+  {
+    const actor = reqActor(req);
+    void logActivity(
+      actor.ownerClerkId, actor.actorClerkId, actor.actorRole,
+      `Updated product "${updated.name}"`,
+      "product", updated.id,
+    );
+  }
+
   res.json(updated);
 });
 
-// DELETE /api/products/:id — archive
-router.delete("/:id", async (req, res) => {
+// DELETE /api/products/:id — archive (manager+)
+router.delete("/:id", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const [updated] = await db.update(products)
     .set({ status: "archived", updatedAt: new Date() })
     .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId)))
     .returning();
   if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+
+  {
+    const actor = reqActor(req);
+    void logActivity(
+      actor.ownerClerkId, actor.actorClerkId, actor.actorRole,
+      `Archived product "${updated.name}"`,
+      "product", updated.id,
+    );
+  }
+
   res.json({ success: true });
 });
 
-// POST /api/products/:id/variants
-router.post("/:id/variants", async (req, res) => {
+// POST /api/products/:id/variants (manager+)
+router.post("/:id/variants", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   // Verify product ownership first
   const [product] = await db.select({ id: products.id }).from(products)
@@ -176,7 +211,7 @@ router.post("/:id/variants", async (req, res) => {
 });
 
 // PATCH /api/products/:id/variants/:variantId — update stock / price (ownership via product join)
-router.patch("/:id/variants/:variantId", async (req, res) => {
+router.patch("/:id/variants/:variantId", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   // Verify product ownership
   const [product] = await db.select({ id: products.id }).from(products)
@@ -198,13 +233,23 @@ router.patch("/:id/variants/:variantId", async (req, res) => {
     .where(and(eq(productVariants.id, req.params.variantId), eq(productVariants.productId, req.params.id)))
     .returning();
   if (!updated) { res.status(404).json({ error: "Variant not found" }); return; }
+
+  {
+    const actor = reqActor(req);
+    void logActivity(
+      actor.ownerClerkId, actor.actorClerkId, actor.actorRole,
+      `Updated variant ${updated.sku}`,
+      "product", req.params.id, { variantId: updated.id },
+    );
+  }
+
   res.json(updated);
 });
 
 // POST /api/products/import — CSV bulk product import
 // Body: { rows: Array<{ name: string, description?: string, category?: string, price: string, sku?: string, images?: string, tags?: string }> }
 // Limits: max 100 rows per call
-router.post("/import", async (req, res) => {
+router.post("/import", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { rows } = req.body;
 
@@ -261,6 +306,16 @@ router.post("/import", async (req, res) => {
   }
 
   const successCount = results.filter(r => r.success).length;
+
+  if (successCount > 0) {
+    const actor = reqActor(req);
+    void logActivity(
+      actor.ownerClerkId, actor.actorClerkId, actor.actorRole,
+      `Imported ${successCount} product${successCount === 1 ? "" : "s"} via CSV`,
+      "product", undefined, { successCount, failCount: results.length - successCount },
+    );
+  }
+
   res.status(201).json({ successCount, failCount: results.length - successCount, results });
 });
 

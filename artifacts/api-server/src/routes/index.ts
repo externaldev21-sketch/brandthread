@@ -44,6 +44,7 @@ import disputesRouter from "./disputes";
 import financeRouter from "./finance";
 import taxesRouter from "./taxes";
 import teamRouter from "./team";
+import { requireRole } from "../middlewares/requireRole";
 import storeRouter from "./store";
 import storeAiRouter from "./store-ai";
 import discountCodesRouter from "./discount-codes";
@@ -110,8 +111,8 @@ router.use("/buyer/cart",                cartDbRouter);
 router.use("/buyer/notifications",       notificationsFeedRouter);
 router.use("/buyer",                     buyerRouter);
 router.use("/conversations",             conversationsRouter);
-router.use("/seller/connect",            connectRouter);
-router.use("/seller/subscription",       subscriptionRouter);
+router.use("/seller/connect",            requireRole("owner"), connectRouter);      // payouts: owner only
+router.use("/seller/subscription",       requireRole("owner"), subscriptionRouter); // billing: owner only
 router.use("/seller/verification",       sellerVerificationRouter);
 router.use("/seller",                    sellerProfileRouter);
 router.use("/reviews",                   reviewsRouter);
@@ -125,7 +126,7 @@ router.use("/returns",                   returnsRouter);
 router.use("/sample-orders",             sampleOrdersRouter);
 router.use("/drop-wallets",              dropWalletRouter);
 router.use("/disputes",                  disputesRouter);
-router.use("/finance",                   financeRouter);
+router.use("/finance",                   requireRole("owner"), financeRouter);      // payouts: owner only
 router.use("/taxes",                     taxesRouter);
 router.use("/team",                      teamRouter);
 router.use("/store/ai",                  storeAiRouter);
