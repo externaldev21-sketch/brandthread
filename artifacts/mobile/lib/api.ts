@@ -945,8 +945,10 @@ export function createApi(getToken: GetToken) {
         get<{ trending: Array<{
           rank: number; id: string; brand: string; brandId: string;
           caption: string | null; mediaType: string | null;
-          verified: boolean; engagementScore: number;
-          likesCount: number; repostsCount: number; hype: string;
+          verified: boolean;
+          organicScore: number; finalScore: number;
+          likesCount: number; commentsCount: number; repostsCount: number; shopClicks: number;
+          boosted: boolean; category: string; hype: string;
         }> }>(`/api/public/trending?limit=${limit}`),
     },
     /** Stripe Connect Express onboarding for freelancer payouts. */

@@ -334,9 +334,25 @@ const dr = StyleSheet.create({
   eta:      { fontSize: 11, fontFamily: 'Inter_400Regular' },
 });
 
+// ─── Trending item type ───────────────────────────────────────────────────────
+// Shared by both the static TRENDING fallback and the live API data.
+// brandId is present for live items and used for seller-profile navigation.
+
+type TrendingItem = {
+  id: string;
+  rank: number;
+  brand: string;
+  name: string;
+  price: string;
+  color: string;
+  initials: string;
+  hype: string;
+  brandId?: string; // seller clerkId — present for live items, absent in static fallback
+};
+
 // ─── Trending row ─────────────────────────────────────────────────────────────
 
-function TrendingRow({ item }: { item: typeof TRENDING[0] }) {
+function TrendingRow({ item }: { item: TrendingItem }) {
   const router  = useRouter();
   const card    = CARD;
   const border  = BORDER;
@@ -344,11 +360,22 @@ function TrendingRow({ item }: { item: typeof TRENDING[0] }) {
   const muted   = MUTED;
   const primary = PURPLE;
 
+  function handlePress() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (item.brandId) {
+      // Live item: navigate to the seller's storefront/profile
+      router.push((`/seller-profile?sellerId=${encodeURIComponent(item.brandId)}`) as never);
+    } else {
+      // Static fallback: navigate by name (demo behaviour)
+      router.push((`/buyer-product-detail?productId=${encodeURIComponent(item.id)}&productName=${encodeURIComponent(item.name)}`) as never);
+    }
+  }
+
   return (
     <TouchableOpacity
       style={[tr.row, { backgroundColor: card, borderColor: border }]}
       activeOpacity={0.8}
-      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(('/buyer-product-detail?productId=prod_canvas_cargo&productName=' + encodeURIComponent(item.name)) as never); }}
+      onPress={handlePress}
     >
       <Text style={[tr.rank, { color: primary }]}>#{item.rank}</Text>
       <View style={[tr.avatar, { backgroundColor: item.color }]}>
@@ -419,16 +446,16 @@ export default function DiscoverScreen() {
   const [liveForYou, setLiveForYou] = useState<ForYouItem[]>([]);
   const [forYouLoading, setForYouLoading] = useState(true);
   // Real trending data from /api/public/trending
-  const [liveTrending, setLiveTrending] = useState<typeof TRENDING>([]);
+  const [liveTrending, setLiveTrending] = useState<TrendingItem[]>([]);
 
-  useEffect(() => {
-    // Fetch real trending data
-    (api as any).publicTrending?.get?.(20)
-      .then((data: any) => {
-        const items = (data?.trending ?? []).map((t: any) => ({
+  function fetchTrending() {
+    api.publicTrending.get(20)
+      .then((data) => {
+        const items: TrendingItem[] = (data?.trending ?? []).map((t) => ({
           id:       t.id,
           rank:     t.rank,
           brand:    t.brand,
+          brandId:  t.brandId,   // seller clerkId — used for correct navigation
           name:     t.caption ? t.caption.slice(0, 60) : 'Trending Post',
           price:    `${t.likesCount} ♥`,
           color:    PURPLE,
@@ -437,8 +464,10 @@ export default function DiscoverScreen() {
         }));
         if (items.length > 0) setLiveTrending(items);
       })
-      .catch(() => {/* fallback to hardcoded */});
-  }, []);
+      .catch(() => {/* fallback to hardcoded TRENDING */});
+  }
+
+  useEffect(() => { fetchTrending(); }, []);
 
   useEffect(() => {
     api.publicProducts.list({ limit: 8 })
@@ -469,10 +498,10 @@ export default function DiscoverScreen() {
   function handleRefresh() {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setTimeout(() => {
-      setDiscoverItems(shuffle(UNFOLLOWED_BRAND_POOL).slice(0, 4));
-      setRefreshing(false);
-    }, 500);
+    // Reshuffle discover pool immediately; re-fetch live trending in parallel.
+    setDiscoverItems(shuffle(UNFOLLOWED_BRAND_POOL).slice(0, 4));
+    fetchTrending();
+    setTimeout(() => setRefreshing(false), 500);
   }
 
   return (

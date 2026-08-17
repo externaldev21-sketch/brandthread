@@ -7,6 +7,13 @@ import { db, products, productVariants, users, drops, posts, postTaggedProducts,
 import { eq, and, desc, inArray, or, ilike, sql, count, gte } from "drizzle-orm";
 import { computeTrendingForToday, isCacheFresh } from "../jobs/computeTrending";
 
+// ─── In-flight guard for synchronous cache-miss computation ──────────────────
+// Prevents concurrent requests from each triggering an independent full
+// scoring pipeline when the cache is empty (e.g. right after midnight UTC or
+// a fresh deploy before the 2-min warm job fires).  All concurrent waiters
+// share the same Promise and get the result once it resolves.
+let trendingInflight: Promise<void> | null = null;
+
 const router = Router();
 
 // GET /api/public/products
@@ -521,8 +528,14 @@ router.get("/trending", async (req, res) => {
     }
 
     // ── Cache miss — compute synchronously (once per day maximum) ───────────
+    // Use a module-level Promise so all concurrent requests share one computation.
     console.log("[computeTrending] Cache miss for", today, "— computing synchronously");
-    await computeTrendingForToday();
+    if (!trendingInflight) {
+      trendingInflight = computeTrendingForToday().finally(() => {
+        trendingInflight = null;
+      });
+    }
+    await trendingInflight;
 
     const [fresh] = await db
       .select()
