@@ -22,6 +22,8 @@ import BootScreen from '@/components/BootScreen';
 import * as Notifications from 'expo-notifications';
 import { configureServices } from '@/lib/serviceConfig';
 import { configureApi, useApi } from '@/lib/api';
+import { clearSocialCache } from '@/services/socialService';
+import { clearCartCache } from '@/services/cartService';
 
 // ─── Push notification handler (show alerts while app is foregrounded) ────────
 Notifications.setNotificationHandler({
@@ -106,6 +108,22 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [storedRole, setStoredRole]               = useState<string | null>(null);
   const [splashSeen, setSplashSeen]               = useState<boolean | null>(null);
   const [pendingInvite, setPendingInvite]         = useState<string | null>(null);
+  const prevSignedInRef = useRef<boolean | null>(null);
+
+  // Clear per-account caches on sign-out so a different account gets fresh data.
+  // We detect the false→true transition separately and never clear on the very
+  // first render (prevSignedInRef starts null).
+  useEffect(() => {
+    if (!isLoaded) return;
+    const prev = prevSignedInRef.current;
+    prevSignedInRef.current = isSignedIn ?? false;
+    // Transition: was signed-in, now signed-out → wipe cached data
+    if (prev === true && !isSignedIn) {
+      clearSocialCache().catch(() => {});
+      clearCartCache().catch(() => {});
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSignedIn, isLoaded]);
 
   // Pending team invite (stashed by team-invite.tsx before sign-in) — re-check
   // whenever auth state or the top segment changes.

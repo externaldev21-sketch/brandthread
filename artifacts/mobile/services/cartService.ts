@@ -1135,6 +1135,18 @@ async function loadProblems(): Promise<BuyerProblemReport[]> {
   return [];
 }
 
+// ─── Cache invalidation ───────────────────────────────────────────────────────
+
+/**
+ * Clear all cart/checkout AsyncStorage keys for the current device.
+ * Call this on sign-out so the next account starts with an empty cart.
+ */
+export async function clearCartCache(): Promise<void> {
+  try {
+    await AsyncStorage.multiRemove(Object.values(KEYS));
+  } catch {}
+}
+
 // ─── Cancellation ─────────────────────────────────────────────────────────────
 
 export function isCancellationEligible(orderStatus: string): { eligible: boolean; reason?: string } {

@@ -308,6 +308,25 @@ async function seedIfNeeded(): Promise<void> {
 // Trigger seed immediately
 seedIfNeeded();
 
+// ─── Cache invalidation ───────────────────────────────────────────────────────
+
+/**
+ * Clear all social AsyncStorage keys for the current device.
+ * Call this on sign-out so the next account sees fresh data instead of stale cache.
+ */
+export async function clearSocialCache(): Promise<void> {
+  try {
+    // Collect all flat string keys from K (message/comment keys are functions, not stored here)
+    const flatKeys = Object.values(K).filter((v): v is string => typeof v === 'string');
+    await AsyncStorage.multiRemove(flatKeys);
+    // Also clear any in-flight message/comment keys by scanning AsyncStorage
+    const allKeys = await AsyncStorage.getAllKeys();
+    const socialKeys = allKeys.filter(k => k.startsWith('bt:social:'));
+    if (socialKeys.length > 0) await AsyncStorage.multiRemove(socialKeys as string[]);
+  } catch {}
+  notify();
+}
+
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
 const DEFAULT_PROFILE: BuyerSocialProfile = {
