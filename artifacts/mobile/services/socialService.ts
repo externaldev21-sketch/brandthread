@@ -829,17 +829,72 @@ export async function getSellerPosts(): Promise<SellerThreadPost[]> {
   return load<SellerThreadPost[]>(SELLER_POSTS_KEY, []);
 }
 
-/** Returns published, non-archived, non-deleted seller posts whose schedule date has passed. */
+/** Maps a raw API post object from /api/posts/feed to a SellerThreadPost. */
+function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
+  const ACCENT_POOL = ['#7C3AED','#0F766E','#BE185D','#B45309','#1D4ED8','#0891B2','#059669'];
+  const now = iso();
+  const authorName     = p.seller?.brandName ?? p.seller?.displayName ?? 'Seller';
+  const authorHandle   = '@' + authorName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const authorInitials = authorName.slice(0, 2).toUpperCase();
+  const authorColor    = ACCENT_POOL[idx % ACCENT_POOL.length];
+  return {
+    id:                p.id,
+    authorId:          p.userId,
+    authorAccountType: 'seller' as const,
+    authorName,
+    authorHandle,
+    authorInitials,
+    authorColor,
+    sellerId:          p.userId,
+    brandId:           p.userId,
+    feedEligibility:   'thread_eligible' as const,
+    caption:           p.caption   ?? '',
+    hashtags:          p.styleTags ?? [],
+    mediaUris:         p.mediaUrl  ? [p.mediaUrl] : [],
+    thumbnailUri:      undefined,
+    aspectRatio:       '9:16' as SellerThreadPost['aspectRatio'],
+    contentType:       (p.mediaType ?? 'video') as SellerThreadPost['contentType'],
+    postStatus:        'published' as const,
+    isDraft:           false,
+    isArchived:        false,
+    isDeleted:         false,
+    sound:             undefined,
+    productTags:       (p.taggedProducts ?? []).map((t: any) => ({
+      productId:   t.productId,
+      productName: t.name ?? '',
+      price:       0,
+    })),
+    visibility:    { allowComments: true, allowReposts: true, showLikeCount: true },
+    scheduledAt:   null,
+    publishedAt:   p.createdAt ?? now,
+    createdAt:     p.createdAt ?? now,
+    updatedAt:     p.createdAt ?? now,
+    likesCount:    p.likesCount    ?? 0,
+    commentsCount: p.commentsCount ?? 0,
+    repostsCount:  p.repostsCount  ?? 0,
+    savedCount:    0,
+    likedByMe:     false,
+    savedByMe:     false,
+    repostedByMe:  false,
+  };
+}
+
+/** Returns published posts from sellers the buyer follows, for the buyer Thread feed.
+ *  Primary source: GET /api/posts/feed (requires auth — buyer Clerk token).
+ *  Returns an empty array when the buyer follows no sellers with posts, or when
+ *  the API is unavailable. Never falls back to demo data.
+ */
 export async function getThreadPosts(): Promise<SellerThreadPost[]> {
-  const posts = await getSellerPosts();
-  const now = new Date().toISOString();
-  return posts.filter(p =>
-    p.postStatus === 'published' &&
-    !p.isDraft &&
-    !p.isArchived &&
-    !p.isDeleted &&
-    (!p.scheduledAt || p.scheduledAt <= now),
-  );
+  try {
+    const apiPosts = await serviceRequest('/api/posts/feed') as any[];
+    if (Array.isArray(apiPosts)) {
+      // Map all results (empty array = buyer follows no sellers that have posted)
+      return apiPosts.map((p, idx) => mapApiPostToSellerThreadPost(p, idx));
+    }
+  } catch {
+    // API unreachable — return empty rather than surfacing demo content
+  }
+  return [];
 }
 
 // ─── Friendships ──────────────────────────────────────────────────────────────

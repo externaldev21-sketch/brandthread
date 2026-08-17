@@ -3,8 +3,8 @@
  * Mounted at /api/public — no requireAuth middleware.
  */
 import { Router } from "express";
-import { db, products, productVariants, users, drops, posts, postTaggedProducts } from "@workspace/db";
-import { eq, and, desc, inArray, or, ilike, sql } from "drizzle-orm";
+import { db, products, productVariants, users, drops, posts, postTaggedProducts, interactions } from "@workspace/db";
+import { eq, and, desc, inArray, or, ilike, sql, count } from "drizzle-orm";
 
 const router = Router();
 
@@ -375,6 +375,118 @@ router.post("/sellers/:sellerId/visit", async (req, res) => {
   } catch (err) {
     console.error("visit increment error:", err);
     return res.status(500).json({ error: "failed" });
+  }
+});
+
+// ─── GET /api/public/posts ────────────────────────────────────────────────────
+// Paginated public feed of all seller posts, newest-first. No auth required.
+// Query params: ?limit=30&offset=0
+router.get("/posts", async (req, res) => {
+  try {
+    const lim = Math.min(parseInt((req.query.limit as string) || "30", 10) || 30, 50);
+    const off = Math.max(parseInt((req.query.offset as string) || "0", 10) || 0, 0);
+
+    // Fetch posts newest-first, joined with seller display info
+    const rows = await db
+      .select({
+        id:          posts.id,
+        userId:      posts.userId,
+        mediaUrl:    posts.mediaUrl,
+        mediaType:   posts.mediaType,
+        caption:     posts.caption,
+        styleTags:   posts.styleTags,
+        createdAt:   posts.createdAt,
+        displayName: users.displayName,
+        brandName:   users.brandName,
+        verified:    users.verified,
+      })
+      .from(posts)
+      .leftJoin(users, eq(users.clerkId, posts.userId))
+      .orderBy(desc(posts.createdAt))
+      .limit(lim)
+      .offset(off);
+
+    if (rows.length === 0) {
+      return res.json([]);
+    }
+
+    const postIds = rows.map((r) => r.id);
+
+    // Fetch tagged products and interaction counts in parallel
+    const [tagRows, likeRows, repostRows, commentRows] = await Promise.all([
+      db
+        .select({
+          postId:    postTaggedProducts.postId,
+          productId: postTaggedProducts.productId,
+          position:  postTaggedProducts.position,
+          name:      products.name,
+          images:    products.images,
+        })
+        .from(postTaggedProducts)
+        .leftJoin(products, eq(products.id, postTaggedProducts.productId))
+        .where(inArray(postTaggedProducts.postId, postIds))
+        .orderBy(postTaggedProducts.position),
+
+      db
+        .select({ postId: interactions.postId, cnt: count() })
+        .from(interactions)
+        .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "like")))
+        .groupBy(interactions.postId),
+
+      db
+        .select({ postId: interactions.postId, cnt: count() })
+        .from(interactions)
+        .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "repost")))
+        .groupBy(interactions.postId),
+
+      db
+        .select({ postId: interactions.postId, cnt: count() })
+        .from(interactions)
+        .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "comment")))
+        .groupBy(interactions.postId),
+    ]);
+
+    // Index by postId for O(1) lookup
+    const tagsByPost: Record<string, typeof tagRows> = {};
+    for (const t of tagRows) {
+      if (!tagsByPost[t.postId]) tagsByPost[t.postId] = [];
+      tagsByPost[t.postId].push(t);
+    }
+    const likesByPost: Record<string, number> = {};
+    for (const r of likeRows) if (r.postId) likesByPost[r.postId] = Number(r.cnt);
+    const repostsByPost: Record<string, number> = {};
+    for (const r of repostRows) if (r.postId) repostsByPost[r.postId] = Number(r.cnt);
+    const commentsByPost: Record<string, number> = {};
+    for (const r of commentRows) if (r.postId) commentsByPost[r.postId] = Number(r.cnt);
+
+    const result = rows.map((p) => ({
+      id:             p.id,
+      userId:         p.userId,
+      mediaUrl:       p.mediaUrl,
+      mediaType:      p.mediaType,
+      caption:        p.caption,
+      styleTags:      p.styleTags,
+      createdAt:      p.createdAt,
+      seller: {
+        displayName: p.displayName,
+        brandName:   p.brandName,
+        verified:    p.verified,
+      },
+      taggedProducts: (tagsByPost[p.id] ?? []).map((t) => ({
+        productId: t.productId,
+        position:  t.position,
+        name:      t.name,
+        images:    t.images,
+      })),
+      likesCount:    likesByPost[p.id]    ?? 0,
+      repostsCount:  repostsByPost[p.id]  ?? 0,
+      commentsCount: commentsByPost[p.id] ?? 0,
+    }));
+
+    return res.json(result);
+  } catch (err) {
+    console.error("GET /api/public/posts error:", err);
+    return res.status(500).json({ error: "Failed to fetch posts" });
   }
 });
 

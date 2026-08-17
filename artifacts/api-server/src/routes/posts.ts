@@ -1,19 +1,154 @@
 /**
  * Seller-authored Thread posts.
+ * GET  /api/posts/feed          — buyer's personalised Thread feed (requireAuth)
+ *                                 Posts from sellers the buyer follows, newest-first.
+ * GET  /api/public/posts        — paginated public feed of all published posts (no auth)
  * POST /api/posts              — create post + tag products (requireAuth)
  * GET  /api/posts/:id          — get single post + tags + counts (public)
  * POST /api/posts/:id/interact — toggle like / repost; record watch_time (requireAuth)
  */
 import { Router } from "express";
 import {
-  db, posts, postTaggedProducts, products, users, interactions,
+  db, posts, postTaggedProducts, products, users, interactions, follows,
 } from "@workspace/db";
-import { eq, and, inArray, count, sql } from "drizzle-orm";
+import { eq, and, inArray, count, sql, desc, lt } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router = Router();
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// ─── GET /api/posts/feed ──────────────────────────────────────────────────────
+// Buyer's personalised Thread feed: posts from sellers the buyer follows,
+// newest-first. Requires auth so we can resolve the buyer's follows.
+// Query params: ?limit=30&offset=0
+router.get("/feed", requireAuth, async (req, res) => {
+  const clerkId = (req as any).clerkUserId as string;
+  const lim = Math.min(parseInt((req.query.limit as string) || "30", 10) || 30, 50);
+  const off = Math.max(parseInt((req.query.offset as string) || "0", 10) || 0, 0);
+
+  try {
+    // 1. Which seller accounts does this buyer follow?
+    const followRows = await db
+      .select({ followingId: follows.followingId })
+      .from(follows)
+      .where(eq(follows.followerId, clerkId));
+
+    const followedIds = followRows.map((r) => r.followingId);
+
+    // No followed sellers → return empty feed (real empty, not demo)
+    if (followedIds.length === 0) {
+      return res.json([]);
+    }
+
+    // 2. Fetch posts from those followed accounts (seller-only gate via users join)
+    const rows = await db
+      .select({
+        id:          posts.id,
+        userId:      posts.userId,
+        mediaUrl:    posts.mediaUrl,
+        mediaType:   posts.mediaType,
+        caption:     posts.caption,
+        styleTags:   posts.styleTags,
+        createdAt:   posts.createdAt,
+        displayName: users.displayName,
+        brandName:   users.brandName,
+        verified:    users.verified,
+        accountType: users.accountType,
+      })
+      .from(posts)
+      .innerJoin(users, and(
+        eq(users.clerkId, posts.userId),
+        eq(users.accountType, "seller"),        // seller-only gate
+        inArray(posts.userId, followedIds),     // followed-only gate
+      ))
+      .orderBy(desc(posts.createdAt))
+      .limit(lim)
+      .offset(off);
+
+    if (rows.length === 0) {
+      return res.json([]);
+    }
+
+    const postIds = rows.map((r) => r.id);
+
+    // 3. Fetch tagged products and interaction counts in parallel
+    const [tagRows, likeRows, repostRows, commentRows] = await Promise.all([
+      db
+        .select({
+          postId:    postTaggedProducts.postId,
+          productId: postTaggedProducts.productId,
+          position:  postTaggedProducts.position,
+          name:      products.name,
+          images:    products.images,
+        })
+        .from(postTaggedProducts)
+        .leftJoin(products, eq(products.id, postTaggedProducts.productId))
+        .where(inArray(postTaggedProducts.postId, postIds))
+        .orderBy(postTaggedProducts.position),
+
+      db
+        .select({ postId: interactions.postId, cnt: count() })
+        .from(interactions)
+        .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "like")))
+        .groupBy(interactions.postId),
+
+      db
+        .select({ postId: interactions.postId, cnt: count() })
+        .from(interactions)
+        .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "repost")))
+        .groupBy(interactions.postId),
+
+      db
+        .select({ postId: interactions.postId, cnt: count() })
+        .from(interactions)
+        .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "comment")))
+        .groupBy(interactions.postId),
+    ]);
+
+    // Index by postId for O(1) lookup
+    const tagsByPost: Record<string, typeof tagRows> = {};
+    for (const t of tagRows) {
+      if (!tagsByPost[t.postId]) tagsByPost[t.postId] = [];
+      tagsByPost[t.postId].push(t);
+    }
+    const likesByPost: Record<string, number> = {};
+    for (const r of likeRows) if (r.postId) likesByPost[r.postId] = Number(r.cnt);
+    const repostsByPost: Record<string, number> = {};
+    for (const r of repostRows) if (r.postId) repostsByPost[r.postId] = Number(r.cnt);
+    const commentsByPost: Record<string, number> = {};
+    for (const r of commentRows) if (r.postId) commentsByPost[r.postId] = Number(r.cnt);
+
+    const result = rows.map((p) => ({
+      id:        p.id,
+      userId:    p.userId,
+      mediaUrl:  p.mediaUrl,
+      mediaType: p.mediaType,
+      caption:   p.caption,
+      styleTags: p.styleTags,
+      createdAt: p.createdAt,
+      seller: {
+        displayName: p.displayName,
+        brandName:   p.brandName,
+        verified:    p.verified,
+      },
+      taggedProducts: (tagsByPost[p.id] ?? []).map((t) => ({
+        productId: t.productId,
+        position:  t.position,
+        name:      t.name,
+        images:    t.images,
+      })),
+      likesCount:    likesByPost[p.id]    ?? 0,
+      repostsCount:  repostsByPost[p.id]  ?? 0,
+      commentsCount: commentsByPost[p.id] ?? 0,
+    }));
+
+    return res.json(result);
+  } catch (err) {
+    console.error("GET /api/posts/feed error:", err);
+    return res.status(500).json({ error: "Failed to fetch feed" });
+  }
+});
 
 // ─── POST /api/posts ─────────────────────────────────────────────────────────
 router.post("/", requireAuth, async (req, res) => {
