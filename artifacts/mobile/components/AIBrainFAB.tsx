@@ -1,15 +1,13 @@
 /**
- * Brandthread AI Brain — Floating Action Button
+ * Brandthread AI Brain — Floating Action Button (Nub Edition)
  *
- * A subtle floating entry point placed on all key Seller screens.
- * - Uses the official Brandthread logo
- * - Hides when keyboard is open
- * - Respects safe area insets
- * - Never covers important controls (bottom-right, above tab bar if present)
- * - Passes typed screen context to the AI Brain screen
+ * Default state: a small purple nub sitting on the right edge of the screen.
+ * Tapping the nub slides the full circular button into view (tap 1).
+ * Tapping the expanded button opens the AI Brain screen (tap 2).
+ * Auto-collapses back to nub after 3 s if the user doesn't proceed.
  */
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated, Keyboard, Platform, Pressable, StyleSheet, View,
 } from 'react-native';
@@ -29,73 +27,150 @@ interface AIBrainFABProps {
    * Default: 0 (the component already respects safeArea.bottom).
    */
   bottomOffset?: number;
-  /** Hides the FAB completely — useful when local overlay is open */
+  /** Hides the FAB completely — useful when a local overlay is open */
   hidden?: boolean;
 }
 
+// ─── Geometry ─────────────────────────────────────────────────────────────────
+
+const SIZE    = 52;  // diameter of the full circular button
+const MARGIN  = 16;  // right margin when fully expanded
+const NUB_PX  = 18;  // visible pixels of the circle in collapsed state
+
+// translateX needed so only NUB_PX of the circle peeks from the right edge.
+// container sits at `right: MARGIN`. Its right edge = MARGIN from screen right.
+// Left edge of button = MARGIN + SIZE from screen right.
+// With translateX = T, left edge → MARGIN + SIZE - T from screen right.
+// Visible width = MARGIN + SIZE - T → set equal to NUB_PX:
+//   T = MARGIN + SIZE - NUB_PX = 16 + 52 - 18 = 50
+const COLLAPSED_TX = MARGIN + SIZE - NUB_PX; // 50
+
+const AUTO_COLLAPSE_MS = 3000;
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function AIBrainFAB({ context, bottomOffset = 0, hidden = false }: AIBrainFABProps) {
-  const router  = useRouter();
-  const insets  = useSafeAreaInsets();
-  const opacity = useRef(new Animated.Value(hidden ? 0 : 1)).current;
-  const scale   = useRef(new Animated.Value(hidden ? 0 : 1)).current;
+export default function AIBrainFAB({
+  context,
+  bottomOffset = 0,
+  hidden = false,
+}: AIBrainFABProps) {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
 
-  // Hide with keyboard
+  const [expanded, setExpanded] = useState(false);
+  const slideX  = useRef(new Animated.Value(COLLAPSED_TX)).current; // starts collapsed
+  const opacity = useRef(new Animated.Value(1)).current;
+  const collapseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Keyboard hide/show ──────────────────────────────────────────────────────
   useEffect(() => {
-    const show = Keyboard.addListener('keyboardWillShow', _hide);
-    const hide  = Keyboard.addListener('keyboardWillHide', _show);
-    const showA = Keyboard.addListener('keyboardDidShow', _hide);
-    const hideA = Keyboard.addListener('keyboardDidHide', _show);
-    return () => { show.remove(); hide.remove(); showA.remove(); hideA.remove(); };
+    const listeners = [
+      Keyboard.addListener(
+        Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+        _hideForKeyboard,
+      ),
+      Keyboard.addListener(
+        Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+        _showAfterKeyboard,
+      ),
+    ];
+    return () => listeners.forEach(l => l.remove());
   }, []);
 
+  function _hideForKeyboard() {
+    Animated.timing(opacity, { toValue: 0, duration: 150, useNativeDriver: true }).start();
+  }
+  function _showAfterKeyboard() {
+    if (hidden) return;
+    Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }).start();
+  }
+
+  // ── React to `hidden` prop ─────────────────────────────────────────────────
   useEffect(() => {
-    Animated.parallel([
-      Animated.spring(opacity, { toValue: hidden ? 0 : 1, useNativeDriver: true, speed: 20 }),
-      Animated.spring(scale,   { toValue: hidden ? 0 : 1, useNativeDriver: true, speed: 20 }),
-    ]).start();
+    Animated.timing(opacity, {
+      toValue: hidden ? 0 : 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
   }, [hidden]);
 
-  function _hide() {
-    Animated.parallel([
-      Animated.timing(opacity, { toValue: 0, duration: 150, useNativeDriver: true }),
-      Animated.timing(scale,   { toValue: 0.8, duration: 150, useNativeDriver: true }),
-    ]).start();
+  // ── Cleanup timer on unmount ───────────────────────────────────────────────
+  useEffect(() => () => {
+    if (collapseTimer.current) clearTimeout(collapseTimer.current);
+  }, []);
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  function collapseToNub() {
+    setExpanded(false);
+    Animated.spring(slideX, {
+      toValue: COLLAPSED_TX,
+      useNativeDriver: true,
+      damping: 18,
+      stiffness: 180,
+    }).start();
   }
 
-  function _show() {
-    if (hidden) return;
-    Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
-      Animated.spring(scale,   { toValue: 1, useNativeDriver: true, speed: 20 }),
-    ]).start();
+  function scheduleAutoCollapse() {
+    if (collapseTimer.current) clearTimeout(collapseTimer.current);
+    collapseTimer.current = setTimeout(collapseToNub, AUTO_COLLAPSE_MS);
   }
+
+  // ── Press handler ──────────────────────────────────────────────────────────
 
   function handlePress() {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    router.push({
-      pathname: '/ai-brain',
-      params: { context: JSON.stringify(context) },
-    });
+    if (collapseTimer.current) clearTimeout(collapseTimer.current);
+
+    if (!expanded) {
+      // Tap 1: slide the full button into view
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+      setExpanded(true);
+      Animated.spring(slideX, {
+        toValue: 0,
+        useNativeDriver: true,
+        damping: 16,
+        stiffness: 200,
+      }).start();
+      scheduleAutoCollapse();
+    } else {
+      // Tap 2: open AI Brain, then collapse
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      collapseToNub();
+      router.push({
+        pathname: '/ai-brain',
+        params: { context: JSON.stringify(context) },
+      });
+    }
   }
 
-  const bottom = 16 + insets.bottom + bottomOffset;
+  // ── Don't render on web ────────────────────────────────────────────────────
+  if (Platform.OS === 'web') return null;
+
+  // Slightly lower than the old 16px base — now 8px above safe area / offset.
+  const bottom = 8 + insets.bottom + bottomOffset;
 
   return (
     <Animated.View
-      style={[styles.container, { bottom, opacity, transform: [{ scale }] }]}
+      style={[
+        styles.container,
+        {
+          bottom,
+          opacity,
+          transform: [{ translateX: slideX }],
+        },
+      ]}
       pointerEvents={hidden ? 'none' : 'box-none'}
     >
       <Pressable
         onPress={handlePress}
         style={({ pressed }) => [styles.pressable, pressed && styles.pressed]}
-        accessibilityLabel="Open Brandthread AI"
+        accessibilityLabel={expanded ? 'Open Brandthread AI' : 'Reveal Brandthread AI button'}
         accessibilityRole="button"
       >
-        {/* Glow ring */}
+        {/* Purple glow ring — bleeds left of the circle; visible even when collapsed */}
         <View style={styles.glow} />
-        {/* Gradient pill */}
+
+        {/* Main gradient circle */}
         <LinearGradient
           colors={['#8B5CF6', '#6D28D9']}
           start={{ x: 0, y: 0 }}
@@ -111,12 +186,10 @@ export default function AIBrainFAB({ context, bottomOffset = 0, hidden = false }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const SIZE = 52;
-
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    right: 16,
+    right: MARGIN,
     zIndex: 9999,
     elevation: 10,
   },
@@ -136,7 +209,7 @@ const styles = StyleSheet.create({
     width: SIZE + 16,
     height: SIZE + 16,
     borderRadius: (SIZE + 16) / 2,
-    backgroundColor: 'rgba(139,92,246,0.20)',
+    backgroundColor: 'rgba(139,92,246,0.22)',
     top: -8,
     left: -8,
   },
@@ -148,8 +221,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     shadowColor: '#8B5CF6',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
+    shadowOpacity: 0.55,
+    shadowRadius: 14,
     elevation: 8,
   },
 });

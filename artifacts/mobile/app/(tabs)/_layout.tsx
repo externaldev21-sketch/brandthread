@@ -20,7 +20,6 @@ import {
   FS,
   SP,
 } from '@/lib/theme';
-import SupportChatBubble from '@/components/SupportChatBubble';
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
@@ -130,8 +129,6 @@ export default function TabLayout() {
         <Tabs.Screen name="marketing" options={{ href: null }} />
         <Tabs.Screen name="wishlist"  options={{ href: null }} />
       </Tabs>
-      {/* Support chatbot bubble — bottom-left, above tab bar */}
-      <SupportChatBubble bottomOffset={58} side="left" />
     </>
   );
 }
