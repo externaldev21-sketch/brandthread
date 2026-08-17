@@ -6,7 +6,7 @@
  * Payouts de-duplicated (single entry in Money).
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, LayoutAnimation,
   Platform, UIManager,
@@ -14,10 +14,12 @@ import {
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUser, useAuth } from '@clerk/expo';
 import { getSetupState, completionPercent, SetupState } from '@/lib/setupStore';
+import { useApi } from '@/lib/api';
 import {
   BG, SURFACE, CARD, BORDER,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -119,16 +121,37 @@ export default function MoreScreen() {
   const insets   = useSafeAreaInsets();
   const { user } = useUser();
   const { signOut } = useAuth();
+  const api = useApi();
 
   const [setupState, setSetupState]   = useState<SetupState | null>(null);
   const [expanded, setExpanded]       = useState<Record<string, boolean>>(
     // All sections open by default
     Object.fromEntries(SECTIONS.map(s => [s.key, true])),
   );
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   useEffect(() => {
     getSetupState().then(setSetupState);
   }, []);
+
+  // Refresh unread count whenever this screen is focused
+  useFocusEffect(useCallback(() => {
+    let cancelled = false;
+    async function fetchUnread() {
+      try {
+        const list = await api.conversations.list() as Array<{ unreadCount: number; type?: string }>;
+        if (cancelled) return;
+        const total = list
+          .filter((c) => c.type !== 'buyer_to_buyer')
+          .reduce((sum, c) => sum + (c.unreadCount ?? 0), 0);
+        setUnreadMessages(total);
+      } catch {
+        // silently ignore — badge simply won't show if offline
+      }
+    }
+    fetchUnread();
+    return () => { cancelled = true; };
+  }, [api]));
 
   const percent     = setupState ? completionPercent(setupState) : 0;
   const firstName   = user?.firstName ?? 'Seller';
@@ -247,17 +270,24 @@ export default function MoreScreen() {
               {/* Items — hidden when collapsed */}
               {isOpen && (
                 <View style={styles.sectionItems}>
-                  {items.map((item) => (
-                    <NavigationCard
-                      key={item.label}
-                      icon={item.icon}
-                      label={item.label}
-                      description={item.desc}
-                      accent={item.accent}
-                      badge={item.badge}
-                      onPress={() => handleNavPress(item)}
-                    />
-                  ))}
+                  {items.map((item) => {
+                    // Messages row: show numeric unread badge when > 0
+                    const badgeProp: boolean | number | undefined =
+                      item.label === 'Messages' && unreadMessages > 0
+                        ? unreadMessages
+                        : item.badge;
+                    return (
+                      <NavigationCard
+                        key={item.label}
+                        icon={item.icon}
+                        label={item.label}
+                        description={item.desc}
+                        accent={item.accent}
+                        badge={badgeProp}
+                        onPress={() => handleNavPress(item)}
+                      />
+                    );
+                  })}
                 </View>
               )}
             </View>
