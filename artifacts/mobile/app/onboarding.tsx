@@ -29,7 +29,11 @@ import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
 import * as AuthSession from 'expo-auth-session';
+import * as WebBrowser from 'expo-web-browser';
 import { ONBOARDING_KEY } from './_layout';
+
+// Required on Android so the in-app browser tab closes after OAuth redirect
+WebBrowser.maybeCompleteAuthSession();
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { useApi } from '@/lib/api';
 

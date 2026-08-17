@@ -104,13 +104,22 @@ export default function SignInScreen() {
     setOAuth(provider);
     setError('');
     try {
-      const { createdSessionId, setActive } = await startSSOFlow({
+      const result = await startSSOFlow({
         strategy,
         redirectUrl: AuthSession.makeRedirectUri(),
       });
+      const { createdSessionId, setActive, signIn: ssoSignIn, signUp: ssoSignUp } = result as any;
+
       if (createdSessionId && setActive) {
+        // Existing user — activate the session; AuthGate will route by user_role
         await setActive({ session: createdSessionId });
+      } else if (ssoSignIn?.status === 'complete' || ssoSignUp?.status === 'complete') {
+        // Session was created by Clerk automatically — AuthGate picks it up
+      } else if (ssoSignUp) {
+        // Brand-new user with no account yet — send them through onboarding
+        router.replace('/account-type' as never);
       }
+      // If user cancelled (result with no session) we fall through silently
     } catch (e: any) {
       if (e?.message?.includes('cancel') || e?.message?.includes('dismiss')) {
         setOAuth(''); return;

@@ -55,7 +55,7 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 // ─── DEV: bypass all auth + onboarding on every platform ─────────────────────
 // Set to 'buyer' or 'seller' to jump straight to that dashboard on device.
 // Set back to null when you're ready to test real sign-in.
-const DEV_BYPASS_ROLE: 'buyer' | 'seller' | null = 'seller';
+const DEV_BYPASS_ROLE: 'buyer' | 'seller' | null = null;
 
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
   if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined') return null;
