@@ -8,7 +8,7 @@ import {
 } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { requireStripe, computeApplicationFeeCents, PLATFORM_COMMISSION_RATE } from "../lib/stripe";
+import { requireStripe, computeApplicationFeeCents, PLATFORM_COMMISSION_RATE, mapStripeError } from "../lib/stripe";
 
 const router = Router();
 router.use(requireAuth);
@@ -358,6 +358,19 @@ router.post("/checkout/session", async (req, res) => {
 
     res.json({ sessionId: session.id, url: session.url });
   } catch (err: any) {
+    // Stripe card errors (e.g. card_declined) → 402 with a buyer-friendly message.
+    // Raw Stripe strings must never reach the buyer UI.
+    const isStripeCardError =
+      err.type === "StripeCardError" ||
+      err.code === "card_declined" ||
+      err.decline_code != null;
+    if (isStripeCardError) {
+      res.status(402).json({
+        error: mapStripeError(err),
+        code: err.decline_code ?? err.code ?? "card_declined",
+      });
+      return;
+    }
     const status = err.status ?? 500;
     if (status < 500) {
       res.status(status).json({ error: err.message });
@@ -391,12 +404,29 @@ router.get("/checkout/session/:sessionId", async (req, res) => {
       .where(eq(orders.stripeCheckoutSessionId, req.params.sessionId))
       .limit(1);
 
+    // If payment was not completed, try to surface a buyer-friendly decline reason
+    // by inspecting the PaymentIntent's last_payment_error.
+    let declineReason: string | null = null;
+    if (session.payment_status !== "paid" && session.payment_intent) {
+      try {
+        const pi = await stripe.paymentIntents.retrieve(
+          session.payment_intent as string,
+        );
+        if (pi.last_payment_error) {
+          declineReason = mapStripeError(pi.last_payment_error as any);
+        }
+      } catch {
+        // Non-fatal — best-effort only; the buyer still sees the generic message
+      }
+    }
+
     res.json({
       status:        session.status,
       paymentStatus: session.payment_status,
       amountTotal:   session.amount_total ?? null,  // Stripe's authoritative charged amount in cents
       orderId:       order?.id ?? null,
       orderNumber:   order?.orderNumber ?? null,
+      declineReason,
     });
   } catch (err: any) {
     const status = err.status ?? 500;

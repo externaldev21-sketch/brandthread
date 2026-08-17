@@ -954,11 +954,13 @@ export default function BuyerCheckoutScreen() {
           const verification = await api.buyer.checkout.verifySession(verifyId);
           if (verification.paymentStatus !== 'paid') {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-            setFailureMessage(
-              verification.paymentStatus === 'unpaid'
-                ? `Payment for ${group.sellerName} was not completed. Please try again.`
-                : `Payment for ${group.sellerName} is pending. Check your Orders for updates.`,
-            );
+            // Prefer the server-translated decline reason (never a raw Stripe string).
+            // Fall back to a generic message when no specific reason is available.
+            const declineMsg = verification.declineReason
+              ?? (verification.paymentStatus === 'unpaid'
+                ? `Payment for ${group.sellerName} was not completed — please try a different card or try again.`
+                : `Payment for ${group.sellerName} is pending. Check your Orders for updates.`);
+            setFailureMessage(declineMsg);
             setPlacing(false);
             return;
           }

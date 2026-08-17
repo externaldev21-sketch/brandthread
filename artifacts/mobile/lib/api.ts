@@ -309,7 +309,7 @@ export function createApi(getToken: GetToken) {
             ...(opts.clientIdempotencyKey  ? { clientIdempotencyKey:  opts.clientIdempotencyKey  } : {}),
           }),
         /** Verify payment status after Stripe redirect.
-         *  Returns { status, paymentStatus, amountTotal, orderId?, orderNumber? }. */
+         *  Returns { status, paymentStatus, amountTotal, orderId?, orderNumber?, declineReason? }. */
         verifySession: (sessionId: string) =>
           get<{
             status: string;
@@ -317,6 +317,8 @@ export function createApi(getToken: GetToken) {
             amountTotal: number | null;  // Stripe's authoritative charge in cents
             orderId: string | null;
             orderNumber: string | null;
+            /** Plain-language decline reason from Stripe, when available. Never a raw Stripe string. */
+            declineReason: string | null;
           }>(`/api/buyer/checkout/session/${encodeURIComponent(sessionId)}`),
       },
       orders: {
