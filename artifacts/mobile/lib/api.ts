@@ -770,6 +770,7 @@ export function createApi(getToken: GetToken) {
       /** Public: resolve invite details for the accept screen (works signed-out) */
       resolveInvite: (token: string) => get<any>(`/api/team/invite/accept/${encodeURIComponent(token)}`),
       accept:    (token: string) => post<any>(`/api/team/invite/accept/${encodeURIComponent(token)}`, {}),
+      regenerateInvite: (memberId: string) => post<any>(`/api/team/invite/${encodeURIComponent(memberId)}/regenerate`, {}),
       changeRole: (memberId: string, role: string) => patch<any>(`/api/team/members/${encodeURIComponent(memberId)}/role`, { role }),
       remove:    (memberId: string) => del<any>(`/api/team/members/${encodeURIComponent(memberId)}`),
       roles:     () => get<any[]>('/api/team/roles'),

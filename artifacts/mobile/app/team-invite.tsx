@@ -49,7 +49,14 @@ export default function TeamInviteScreen() {
       return;
     }
     api.team.resolveInvite(String(token))
-      .then(setInvite)
+      .then((data: any) => {
+        // Expired links return valid:false + expired:true (not a thrown error)
+        if (data && !data.valid && data.expired) {
+          setInvite(data); // keep in invite so we can render the expired state
+        } else {
+          setInvite(data);
+        }
+      })
       .catch((err: any) => setError(err?.message ?? 'This invite link is invalid or has expired.'))
       .finally(() => setLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -90,6 +97,19 @@ export default function TeamInviteScreen() {
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{ margin: 24 }} />
+        ) : invite?.expired ? (
+          <>
+            <View style={[styles.icon, { backgroundColor: '#B98A2E22' }]}>
+              <Feather name="clock" size={26} color="#B98A2E" />
+            </View>
+            <Text style={[styles.title, { color: colors.foreground }]}>Invite link expired</Text>
+            <Text style={[styles.sub, { color: colors.mutedForeground }]}>
+              This invite link is no longer valid. Ask the store owner to send you a fresh one.
+            </Text>
+            <TouchableOpacity onPress={() => router.replace('/' as never)} activeOpacity={0.8} style={[styles.btn, { backgroundColor: colors.secondary }]}>
+              <Text style={[styles.btnText, { color: colors.foreground }]}>Back to Brandthread</Text>
+            </TouchableOpacity>
+          </>
         ) : error ? (
           <>
             <View style={[styles.icon, { backgroundColor: colors.destructive + '22' }]}>

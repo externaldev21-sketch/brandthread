@@ -56,6 +56,7 @@ const ROLE_DEFINITIONS = [
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const ONLINE_WINDOW_MS = 5 * 60 * 1000; // active in the last 5 minutes = online
+const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 const isUuid = (s: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
@@ -71,6 +72,17 @@ function inviteUrls(token: string) {
   };
 }
 
+/**
+ * Returns true when an invite token is expired.
+ * NULL expiry is treated as expired (fail-closed) — the migration backfills all
+ * existing pending rows, so NULL should never appear after upgrade. If it does,
+ * rejecting it is safer than accepting a link with unknown age.
+ */
+function isExpired(m: typeof teamMembers.$inferSelect): boolean {
+  if (!m.expiresAt) return true; // no expiry set → fail-closed
+  return new Date(m.expiresAt) < new Date();
+}
+
 /** Serialize a team_members row for the client. Invite link only for the owner. */
 function decorateMember(m: typeof teamMembers.$inferSelect, includeInvite: boolean) {
   const online =
@@ -84,6 +96,8 @@ function decorateMember(m: typeof teamMembers.$inferSelect, includeInvite: boole
     role: m.role,
     status: m.status,
     invitedAt: m.invitedAt,
+    expiresAt: m.expiresAt ?? null,
+    expired: m.status === "pending" && isExpired(m),
     joinedAt: m.acceptedAt,
     lastActiveAt: m.lastActiveAt,
     memberClerkId: m.memberClerkId,
@@ -168,6 +182,11 @@ router.get("/invite/accept/:token", async (req, res) => {
     res.status(404).json({ valid: false, error: "Invalid or expired invite" });
     return;
   }
+  // Expired tokens: return a 200 with expired=true so the client can show a distinct state
+  if (invite.status === "pending" && isExpired(invite)) {
+    res.json({ valid: false, expired: true, error: "This invite link has expired. Ask the store owner to send a new one." });
+    return;
+  }
   const [owner] = await db
     .select({ name: users.name, displayName: users.displayName, brandName: users.brandName })
     .from(users)
@@ -181,6 +200,7 @@ router.get("/invite/accept/:token", async (req, res) => {
     name: invite.name,
     role: invite.role,
     invitedAt: invite.invitedAt,
+    expiresAt: invite.expiresAt ?? null,
     owner: {
       name: owner?.displayName ?? owner?.name ?? "A Brandthread seller",
       brandName: owner?.brandName ?? null,
@@ -253,6 +273,10 @@ async function handleAccept(req: any, res: any) {
     .limit(1);
   if (!invite || invite.status === "removed") {
     res.status(404).json({ error: "Invalid or expired invite token" });
+    return;
+  }
+  if (invite.status === "pending" && isExpired(invite)) {
+    res.status(410).json({ error: "This invite link has expired. Ask the store owner to send a new one.", expired: true });
     return;
   }
   if (invite.ownerId === actorId) {
@@ -392,14 +416,16 @@ router.post("/invite", requireRole("owner"), async (req, res) => {
   }
 
   const inviteToken = crypto.randomBytes(24).toString("hex");
+  const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
   const [member] = await db
     .insert(teamMembers)
-    .values({ ownerId, email: normEmail, name: name ?? null, role, inviteToken, status: "pending" })
+    .values({ ownerId, email: normEmail, name: name ?? null, role, inviteToken, expiresAt, status: "pending" })
     .onConflictDoUpdate({
       target: [teamMembers.ownerId, teamMembers.email],
       set: {
         role,
         inviteToken,
+        expiresAt,
         status: "pending",
         memberClerkId: null,
         acceptedAt: null,
@@ -422,6 +448,44 @@ router.post("/invite", requireRole("owner"), async (req, res) => {
   const emailSent = await trySendInviteEmail(normEmail, ownerName, role, inviteUrl);
 
   res.json({ ok: true, member: decorateMember(member, true), inviteToken, inviteUrl, deepLink, emailSent });
+});
+
+// POST /api/team/invite/:id/regenerate — owner rotates the token + resets expiry for a pending invite
+router.post("/invite/:id/regenerate", requireRole("owner"), async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  const { id } = req.params;
+  if (!isUuid(id)) {
+    res.status(404).json({ error: "Member not found" });
+    return;
+  }
+  const [m] = await db
+    .select()
+    .from(teamMembers)
+    .where(and(eq(teamMembers.id, id), eq(teamMembers.ownerId, ownerId), eq(teamMembers.status, "pending")))
+    .limit(1);
+  if (!m) {
+    res.status(404).json({ error: "Pending invite not found" });
+    return;
+  }
+  const inviteToken = crypto.randomBytes(24).toString("hex");
+  const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
+  const [updated] = await db
+    .update(teamMembers)
+    .set({ inviteToken, expiresAt, invitedAt: new Date(), updatedAt: new Date() })
+    .where(eq(teamMembers.id, id))
+    .returning();
+  if (!updated) {
+    res.status(500).json({ error: "Failed to regenerate invite" });
+    return;
+  }
+  const { inviteUrl, deepLink } = inviteUrls(inviteToken);
+  const actor = reqActor(req);
+  void logActivity(
+    ownerId, actor.actorClerkId, actor.actorRole,
+    `Regenerated invite link for ${updated.email}`,
+    "team", id, { email: updated.email },
+  );
+  res.json({ ok: true, member: decorateMember(updated, true), inviteUrl, deepLink });
 });
 
 // PATCH /api/team/members/:id (+ legacy /members/:id/role) — owner changes a role

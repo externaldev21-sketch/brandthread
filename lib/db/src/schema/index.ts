@@ -702,6 +702,8 @@ export const teamMembers = pgTable('team_members', {
   status:       text('status').notNull().default('pending'),
   inviteToken:  text('invite_token').unique(),
   invitedAt:    timestamp('invited_at').defaultNow().notNull(),
+  /** NULL = legacy invite (no expiry); otherwise the token is invalid after this time. */
+  expiresAt:    timestamp('expires_at'),
   acceptedAt:   timestamp('accepted_at'),
   lastActiveAt: timestamp('last_active_at'),
   createdAt:    timestamp('created_at').defaultNow().notNull(),

@@ -19,6 +19,16 @@ function relTime(iso: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+/** Returns "Expires in Xd" / "Expires in Xh" / "Expired" for a pending invite's expiresAt. */
+function expiryLabel(expiresAt: string | null | undefined): string | null {
+  if (!expiresAt) return null; // legacy invite — no expiry
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  if (ms <= 0) return 'Expired';
+  const h = Math.floor(ms / 3600000);
+  if (h < 24) return `Expires in ${h}h`;
+  return `Expires in ${Math.floor(h / 24)}d`;
+}
+
 function initials(name: string) {
   return name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('');
 }
@@ -48,6 +58,7 @@ export default function TeamScreen() {
   const [inviteRole, setInviteRole]       = useState<'staff' | 'manager'>('staff');
   const [inviting, setInviting]           = useState(false);
   const [inviteResult, setInviteResult]   = useState<{ inviteUrl: string; emailSent: boolean; email: string } | null>(null);
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -104,6 +115,27 @@ export default function TeamScreen() {
     }
   };
 
+  const handleRegenerate = async (m: any) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setRegeneratingId(m.id);
+    try {
+      const res = await api.team.regenerateInvite(m.id);
+      await load();
+      Alert.alert(
+        'New link ready',
+        'The invite link has been refreshed. Copy and share it again.',
+        [
+          { text: 'Copy link', onPress: () => copyLink(res.inviteUrl) },
+          { text: 'OK', style: 'cancel' },
+        ],
+      );
+    } catch (err: any) {
+      Alert.alert('Error', err.message ?? 'Failed to regenerate invite');
+    } finally {
+      setRegeneratingId(null);
+    }
+  };
+
   const copyLink = async (url: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await Clipboard.setStringAsync(url);
@@ -146,10 +178,13 @@ export default function TeamScreen() {
             const color = avatarColor(i);
             const ini   = initials(m.name ?? m.email ?? '?');
             const isPending = m.status === 'pending';
+            const isExpired = isPending && !!m.expiresAt && new Date(m.expiresAt) < new Date();
             const roleLabel = m.role === 'owner' ? 'Owner' : m.role === 'manager' ? 'Manager' : 'Staff';
+            const expLabel  = isPending ? expiryLabel(m.expiresAt) : null;
             const accessLabel = isPending
-              ? `Invited ${m.invitedAt ? relTime(m.invitedAt) : ''} · awaiting acceptance`
+              ? `Invited ${m.invitedAt ? relTime(m.invitedAt) : ''}${expLabel ? ` · ${expLabel}` : ' · awaiting acceptance'}`
               : m.role === 'owner' ? 'Full Access' : m.role === 'manager' ? 'Orders, Products, Inventory' : 'Fulfillment only';
+            const isRegenerating = regeneratingId === m.id;
             return (
               <TouchableOpacity
                 key={m.id}
@@ -165,20 +200,26 @@ export default function TeamScreen() {
                 </View>
                 <View style={styles.memberInfo}>
                   <Text style={[styles.memberName, { color: colors.foreground }]}>{m.name ?? m.email}</Text>
-                  <Text style={[styles.memberAccess, { color: colors.mutedForeground }]} numberOfLines={1}>{accessLabel}</Text>
+                  <Text
+                    style={[styles.memberAccess, { color: isExpired ? '#B98A2E' : colors.mutedForeground }]}
+                    numberOfLines={1}
+                  >{accessLabel}</Text>
                 </View>
-                {isPending && m.inviteUrl && (
+                {isPending && (
                   <TouchableOpacity
-                    onPress={() => copyLink(m.inviteUrl)}
+                    onPress={() => isExpired ? handleRegenerate(m) : (m.inviteUrl ? copyLink(m.inviteUrl) : null)}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    style={[styles.linkBtn, { borderColor: colors.border }]}
+                    style={[styles.linkBtn, { borderColor: isExpired ? '#B98A2E44' : colors.border }]}
+                    disabled={isRegenerating}
                   >
-                    <Feather name="link" size={13} color={colors.mutedForeground} />
+                    {isRegenerating
+                      ? <ActivityIndicator size="small" color={colors.primary} />
+                      : <Feather name={isExpired ? 'refresh-cw' : 'link'} size={13} color={isExpired ? '#B98A2E' : colors.mutedForeground} />}
                   </TouchableOpacity>
                 )}
                 <Badge
-                  label={isPending ? 'Invited' : roleLabel}
-                  variant={isPending ? 'warning' : m.role === 'owner' ? 'gold' : 'default'}
+                  label={isExpired ? 'Expired' : isPending ? 'Invited' : roleLabel}
+                  variant={isExpired ? 'warning' : isPending ? 'default' : m.role === 'owner' ? 'gold' : 'default'}
                 />
               </TouchableOpacity>
             );
