@@ -55,13 +55,14 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 // ─── DEV: bypass all auth + onboarding on every platform ─────────────────────
 // Set to 'buyer' or 'seller' to jump straight to that dashboard on device.
 // Set back to null when you're ready to test real sign-in.
-const DEV_BYPASS_ROLE: 'buyer' | 'seller' | null = 'buyer';
+const DEV_BYPASS_ROLE: 'buyer' | 'seller' | null = 'seller';
 
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
   if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined') return null;
   const v = new URLSearchParams(window.location.search).get('bt_preview');
-  // Default to buyer in dev/web so the preview pane skips sign-in automatically.
-  return v === 'seller' ? 'seller' : 'buyer';
+  // Default to seller in dev/web so the preview pane shows the seller dashboard.
+  // Use ?bt_preview=buyer to see the buyer side instead.
+  return v === 'buyer' ? 'buyer' : 'seller';
 })();
 
 // Seed storage so AuthGate doesn't loop waiting on onboarding data.
@@ -152,7 +153,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const inProtectedArea = !inAuthScreen && !inOnboarding && !inAccountType;
 
     // DEV bypass (all platforms): skip auth and go straight to dashboard.
-    const devRole = DEV_BYPASS_ROLE ?? PREVIEW_ROLE;
+    const devRole = PREVIEW_ROLE ?? DEV_BYPASS_ROLE;
     if (devRole) {
       if (atRoot || inAuthScreen || inOnboarding || inAccountType) {
         router.replace((devRole === 'buyer' ? '/(buyer)/' : '/(tabs)/') as never);

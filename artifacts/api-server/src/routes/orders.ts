@@ -4,7 +4,6 @@ import { eq, desc, sql, and, ne } from "drizzle-orm";
 import { stripe, PLATFORM_COMMISSION_RATE } from "../lib/stripe";
 import { requireAuth } from "../middlewares/requireAuth";
 import { publishNotification } from "./notifications-feed";
-import { db, orders, orderItems, customers, drops, productVariants, products, users } from "@workspace/db";
 
 const router = Router();
 router.use(requireAuth);
