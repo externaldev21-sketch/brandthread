@@ -357,6 +357,8 @@ function RootLayoutNav() {
         <Stack.Screen name="return-request"        options={{ headerShown: false, animation: 'slide_from_right' }} />
         {/* Buyer social screens */}
         <Stack.Screen name="buyer-conversation"      options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="seller-inbox"            options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="seller-conversation"     options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-other-profile"     options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-post-create"       options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
         <Stack.Screen name="buyer-friend-requests"   options={{ headerShown: false, animation: 'slide_from_right' }} />

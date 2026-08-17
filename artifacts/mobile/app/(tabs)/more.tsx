@@ -47,6 +47,7 @@ const OPERATIONS: NavItem[] = [
 ];
 
 const GROWTH: NavItem[] = [
+  { icon: 'message-circle', label: 'Messages', desc: 'Read and reply to buyer DMs',   accent: PURPLE,       route: '/seller-inbox' },
   { icon: 'video',        label: 'Content',    desc: 'Posts, drafts and scheduled',   accent: CYAN,         route: '/content' },
   { icon: 'users',        label: 'Customers',  desc: 'Browse your customer list',      accent: PURPLE_LIGHT },
   { icon: 'trending-up',  label: 'Marketing',  desc: 'Campaigns and promotions',       accent: ORANGE,       route: '/(tabs)/marketing' },
