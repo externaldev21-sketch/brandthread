@@ -81,11 +81,12 @@ function insightBg(type: AnalyticsInsight['type']): string {
 }
 
 function Sparkline({ points, color = PURPLE }: { points: AnalyticsPoint[]; color?: string }) {
-  if (!points.length) return null;
-  const max = Math.max(...points.map(p => p.value), 1);
+  const safePoints = Array.isArray(points) ? points : [];
+  if (!safePoints.length) return null;
+  const max = Math.max(...safePoints.map(p => p.value), 1);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 18, gap: 1.5 }}>
-      {points.slice(-10).map((p, i) => (
+      {safePoints.slice(-10).map((p, i) => (
         <View
           key={i}
           style={{
@@ -148,8 +149,11 @@ export default function AnalyticsScreen() {
       if (!filter) setFilter(f);
       const ov = await getOverview(f);
       setOverview(ov);
-      setInsights(ov.insights.filter(i => !i.dismissed).slice(0, 3));
-    } catch { /* non-fatal */ }
+      setInsights((Array.isArray(ov.insights) ? ov.insights : []).filter(i => !i.dismissed).slice(0, 3));
+    } catch {
+      setOverview(null);
+      setInsights([]);
+    }
     setLoading(false);
     setRefreshing(false);
   }, [filter]);
@@ -183,13 +187,14 @@ export default function AnalyticsScreen() {
 
   const chartPoints = (): AnalyticsPoint[] => {
     if (!overview) return [];
+    const safe = (arr: unknown): AnalyticsPoint[] => Array.isArray(arr) ? arr : [];
     switch (chartMetric) {
-      case 'revenue':    return overview.revenueChart;
-      case 'orders':     return overview.ordersChart;
-      case 'visitors':   return overview.visitorsChart;
-      case 'profit':     return overview.grossRevenue.sparkline;
-      case 'conversion': return overview.conversionRate.sparkline;
-      default:           return overview.revenueChart;
+      case 'revenue':    return safe(overview.revenueChart);
+      case 'orders':     return safe(overview.ordersChart);
+      case 'visitors':   return safe(overview.visitorsChart);
+      case 'profit':     return safe(overview.grossRevenue?.sparkline);
+      case 'conversion': return safe(overview.conversionRate?.sparkline);
+      default:           return safe(overview.revenueChart);
     }
   };
 

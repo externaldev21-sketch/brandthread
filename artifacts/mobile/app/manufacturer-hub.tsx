@@ -296,11 +296,13 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
         verifiedOnly: f.verifiedOnly || undefined,
         ratingMin: f.ratingMin,
       });
-      setManufacturers(results);
+      setManufacturers(Array.isArray(results) ? results : []);
       // Load saved state
       const rels = await getRelationships();
-      setSavedIds(new Set(rels.map(r => r.manufacturerId)));
+      const safeRels = Array.isArray(rels) ? rels : [];
+      setSavedIds(new Set(safeRels.map(r => r.manufacturerId)));
     } catch (e) {
+      setManufacturers([]);
       console.error(e);
     } finally {
       setLoading(false);
@@ -456,7 +458,7 @@ function ManufacturerCard({ mfg, saved, onSave, onMessage, onProfile, onQuote }:
 
       {/* Row 2: specialties + stats */}
       <Text style={card.specialties} numberOfLines={1}>
-        {mfg.specialties.slice(0, 3).join(' • ')}
+        {(Array.isArray(mfg.specialties) ? mfg.specialties : []).slice(0, 3).join(' • ')}
       </Text>
       <Text style={card.stats}>
         MOQ: {mfg.moq} · Lead: {mfg.leadTimeDays}d · ${mfg.unitPriceMin}–${mfg.unitPriceMax}/unit
@@ -466,7 +468,7 @@ function ManufacturerCard({ mfg, saved, onSave, onMessage, onProfile, onQuote }:
       <View style={card.divider} />
 
       {/* Certifications */}
-      {mfg.certifications.length > 0 && (
+      {Array.isArray(mfg.certifications) && mfg.certifications.length > 0 && (
         <View style={card.certRow}>
           {mfg.certifications.map(cert => (
             <View key={cert.id} style={card.certChip}>
@@ -649,15 +651,17 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
   const load = useCallback(async () => {
     try {
       const rels = await getRelationships();
-      setRelationships(rels);
+      const safeRels = Array.isArray(rels) ? rels : [];
+      setRelationships(safeRels);
       const map: Record<string, Manufacturer> = {};
-      await Promise.all(rels.map(async rel => {
+      await Promise.all(safeRels.map(async rel => {
         const { getManufacturer } = await import('@/services/manufacturerService');
         const mfg = await getManufacturer(rel.manufacturerId);
         if (mfg) map[mfg.id] = mfg;
       }));
       setMfgMap(map);
     } catch (e) {
+      setRelationships([]);
       console.error(e);
     } finally {
       setLoading(false);
@@ -790,9 +794,11 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const load = useCallback(async () => {
     try {
       const [reqs, qs] = await Promise.all([getQuoteRequests(), getQuotes()]);
-      setQuoteRequests(reqs.filter(r => r.status !== 'accepted'));
-      setQuotes(qs);
+      setQuoteRequests((Array.isArray(reqs) ? reqs : []).filter(r => r.status !== 'accepted'));
+      setQuotes(Array.isArray(qs) ? qs : []);
     } catch (e) {
+      setQuoteRequests([]);
+      setQuotes([]);
       console.error(e);
     } finally {
       setLoading(false);

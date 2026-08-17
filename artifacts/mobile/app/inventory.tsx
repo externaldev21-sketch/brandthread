@@ -206,15 +206,23 @@ export default function InventoryScreen() {
         getCounts(),
         getEvents(),
       ]);
-      setOverview(ov);
-      setItems(its);
-      setFiltered(filterInventory(its, activeFilter));
-      setAlerts(alrts);
-      setTransfers(trfs);
-      setIncoming(inc);
-      setCounts(cnts);
-      setEvents(evts);
+      setOverview(ov ?? null);
+      const safeIts = Array.isArray(its) ? its : [];
+      setItems(safeIts);
+      setFiltered(filterInventory(safeIts, activeFilter));
+      setAlerts(Array.isArray(alrts) ? alrts : []);
+      setTransfers(Array.isArray(trfs) ? trfs : []);
+      setIncoming(Array.isArray(inc) ? inc : []);
+      setCounts(Array.isArray(cnts) ? cnts : []);
+      setEvents(Array.isArray(evts) ? evts : []);
     } catch (e) {
+      setItems([]);
+      setFiltered([]);
+      setAlerts([]);
+      setTransfers([]);
+      setIncoming([]);
+      setCounts([]);
+      setEvents([]);
       Alert.alert('Error', 'Failed to load inventory data.');
     } finally {
       setLoading(false);
@@ -227,7 +235,7 @@ export default function InventoryScreen() {
   const handleSearch = useCallback(async (q: string) => {
     setSearchQuery(q);
     const results = await searchInventory(q);
-    setFiltered(filterInventory(results, activeFilter));
+    setFiltered(filterInventory(Array.isArray(results) ? results : [], activeFilter));
   }, [activeFilter]);
 
   const handleFilter = useCallback((f: InventoryFilterKey) => {

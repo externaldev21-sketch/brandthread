@@ -388,11 +388,11 @@ export default function ProductsScreen() {
     setLoading(true);
     try {
       const result = await getProducts({ filter, text: searchQuery || undefined });
-      setProducts(result);
+      setProducts(Array.isArray(result) ? result : []);
       // Always refresh stats after products refresh
       await loadStats();
     } catch {
-      setProducts(DEMO_FULL_PRODUCTS);
+      setProducts([]);
     } finally {
       setLoading(false);
     }
@@ -405,7 +405,7 @@ export default function ProductsScreen() {
   // Reload when the tab comes back into focus (e.g. after creating a product)
   useFocusEffect(useCallback(() => {
     loadProducts();
-    listDrafts().then(setInProgressDrafts).catch(() => {});
+    listDrafts().then(rows => setInProgressDrafts(Array.isArray(rows) ? rows : [])).catch(() => {});
   }, [loadProducts]));
 
   function refresh() {
