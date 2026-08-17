@@ -1206,8 +1206,8 @@ export default function OnboardingScreen() {
   const { signUp }              = useSignUp();
   const { signIn }              = useSignIn();
   const { startSSOFlow } = useSSO();
-  const startGoogleOAuth = useCallback(() => startSSOFlow({ strategy: 'oauth_google', redirectUrl: AuthSession.makeRedirectUri() }), [startSSOFlow]);
-  const startAppleOAuth  = useCallback(() => startSSOFlow({ strategy: 'oauth_apple',  redirectUrl: AuthSession.makeRedirectUri() }), [startSSOFlow]);
+  const startGoogleOAuth = useCallback(() => startSSOFlow({ strategy: 'oauth_google', redirectUrl: AuthSession.makeRedirectUri({ scheme: 'brandthread' }) }), [startSSOFlow]);
+  const startAppleOAuth  = useCallback(() => startSSOFlow({ strategy: 'oauth_apple',  redirectUrl: AuthSession.makeRedirectUri({ scheme: 'brandthread' }) }), [startSSOFlow]);
   const api = useApi();
 
   const router  = useRouter();

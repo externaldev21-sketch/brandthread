@@ -106,7 +106,7 @@ export default function SignInScreen() {
     try {
       const result = await startSSOFlow({
         strategy,
-        redirectUrl: AuthSession.makeRedirectUri(),
+        redirectUrl: AuthSession.makeRedirectUri({ scheme: 'brandthread' }),
       });
       const { createdSessionId, setActive, signIn: ssoSignIn, signUp: ssoSignUp } = result as any;
 
