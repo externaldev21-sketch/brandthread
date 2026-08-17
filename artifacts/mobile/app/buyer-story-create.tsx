@@ -319,11 +319,8 @@ export default function BuyerStoryCreate() {
             style={styles.advancedBtn}
             onPress={() =>
               router.push({
-                pathname: '/story-creator',
-                params: {
-                  uri:         type === 'photo' ? photoUris[0] : videoUri!,
-                  accountType: params.accountType ?? 'buyer',
-                },
+                pathname: '/create-post',
+                params: { accountType: params.accountType ?? 'buyer' },
               } as any)
             }
           >

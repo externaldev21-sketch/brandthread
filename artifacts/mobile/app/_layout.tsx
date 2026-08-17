@@ -261,7 +261,6 @@ function RootLayoutNav() {
         {/* Feature screens */}
         <Stack.Screen name="chat/[id]"        options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="camera-capture"    options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
-        <Stack.Screen name="story-creator"    options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
         <Stack.Screen name="brand"            options={{ headerShown: false }} />
         <Stack.Screen name="seller-profile"   options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="create-post"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
@@ -360,7 +359,6 @@ function RootLayoutNav() {
         <Stack.Screen name="seller-inbox"            options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="seller-conversation"     options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-other-profile"     options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="buyer-post-create"       options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
         <Stack.Screen name="buyer-friend-requests"   options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-story-viewer"      options={{ headerShown: false, animation: 'fade', presentation: 'fullScreenModal' }} />
         <Stack.Screen name="buyer-story-create"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
@@ -428,7 +426,6 @@ function RootLayoutNav() {
         <Stack.Screen name="product-size-chart" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="product-bundles"    options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="product-bundle-edit" options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
-        <Stack.Screen name="story-picker"       options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
         <Stack.Screen name="community-chat"     options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="manufacturer-onboard" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="request-sample"     options={{ headerShown: false, animation: 'slide_from_right' }} />

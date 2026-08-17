@@ -392,7 +392,7 @@ export default function ProfileScreen() {
                 <Feather name="image" size={32} color={MUTED} />
                 <Text style={styles.emptyTitle}>No posts yet</Text>
                 <Text style={styles.emptyDesc}>Your posts will appear here.</Text>
-                <TouchableOpacity style={styles.emptyAction} onPress={() => router.push('/buyer-post-create' as any)}>
+                <TouchableOpacity style={styles.emptyAction} onPress={() => router.push('/create-post?accountType=buyer' as any)}>
                   <Text style={styles.emptyActionText}>Create Post</Text>
                 </TouchableOpacity>
               </View>

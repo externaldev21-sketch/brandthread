@@ -175,7 +175,7 @@ export default function ProfileScreen() {
                   params: { storyId: myStoryIds[0], allStoryIds: myStoryIds.join(',') },
                 });
               } else {
-                router.push({ pathname: '/story-picker' as any, params: { accountType: 'seller' } });
+                router.push('/create-post' as any);
               }
             }}
           >
@@ -224,7 +224,7 @@ export default function ProfileScreen() {
             activeOpacity={0.85}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              router.push({ pathname: '/story-picker' as any, params: { accountType: 'seller' } });
+              router.push('/create-post' as any);
             }}
           >
             <Feather name="plus" size={12} color={FG} />

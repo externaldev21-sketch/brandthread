@@ -45,8 +45,8 @@ const CREATION_CARDS: CreationCard[] = [
   { icon: 'layers',      label: 'Garment Design',       desc: 'Design any apparel piece',        accent: CYAN,         route: '/design-project?type=garment' },
   { icon: 'zap',         label: 'AI Design',            desc: 'Generate from a prompt',          accent: BLUE,         route: '/design-text-to-design' },
   { icon: 'box',         label: 'Product Mockup',        desc: 'Realistic product visuals',       accent: ORANGE,       route: '/design-project?type=mockup' },
-  { icon: 'camera',      label: 'Fashion Photoshoot',   desc: 'AI model & scene photography',    accent: PURPLE_LIGHT, route: '/design-ai-photoshoot' },
-  { icon: 'trending-up', label: 'Social Campaign',      desc: 'Multi-format content kit',        accent: SUCCESS,      route: '/design-campaign' },
+  { icon: 'camera',      label: 'AI Photoshoot',        desc: 'AI model & scene photography',    accent: PURPLE_LIGHT, route: '/design-ai-photoshoot' },
+  { icon: 'trending-up', label: 'Campaign',             desc: 'Multi-format content kit',        accent: SUCCESS,      route: '/design-campaign' },
   { icon: 'scissors',    label: 'Background Removal',   desc: 'Clean cutouts instantly',         accent: GOLD,         route: '/design-bg-removal' },
 ];
 
@@ -58,11 +58,8 @@ const AI_TOOLS: AITool[] = [
   { icon: 'zap',         label: 'Text to Design',     route: '/design-text-to-design',   accent: BLUE },
   { icon: 'upload',      label: 'Upload Sketch',       route: '/design-sketch-upload',    accent: PURPLE },
   { icon: 'image',       label: 'Mockup to Model',     route: '/design-mockup-model',     accent: CYAN },
-  { icon: 'camera',      label: 'AI Photoshoot',       route: '/design-ai-photoshoot',    accent: PURPLE_LIGHT },
   { icon: 'edit',        label: 'Edit with Prompt',    route: '/design-prompt-edit',      accent: ORANGE },
-  { icon: 'scissors',    label: 'Remove BG',           route: '/design-bg-removal',       accent: GOLD },
   { icon: 'refresh-cw',  label: 'Replace BG',          route: '/design-bg-replace',       accent: SUCCESS },
-  { icon: 'trending-up', label: 'Campaign',            route: '/design-campaign',         accent: CYAN },
 ];
 
 // ─── Filter chips ─────────────────────────────────────────────────────────────

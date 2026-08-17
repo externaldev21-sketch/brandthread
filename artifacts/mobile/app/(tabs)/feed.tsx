@@ -822,7 +822,7 @@ export default function FeedScreen() {
               style={styles.topIconBtn}
               activeOpacity={0.7}
               hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
-              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/story-picker' as never); }}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/create-post' as never); }}
             >
               <Feather name="plus-square" size={21} color={ON_DARK} />
             </TouchableOpacity>

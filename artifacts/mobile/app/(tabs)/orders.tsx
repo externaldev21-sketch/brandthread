@@ -461,11 +461,18 @@ export default function OrdersScreen() {
   const loadData = useCallback(async () => {
     try {
       const rows = await api.orders.list();
-      const all = (rows as any[]).map(apiRowToOrder);
+      // Guard: API can return null/undefined/error-object when the request fails
+      // or when the seller has no orders yet. Array.isArray prevents the
+      // "rows.map is not a function" TypeError that crashes the screen.
+      const all = Array.isArray(rows) ? (rows as any[]).map(apiRowToOrder) : [];
       setOrders(all);
       setStats(computeStats(all));
     } catch (e) {
       console.error('Failed to load seller orders', e);
+      // Ensure we always land in a clean empty state, never leave stale
+      // loading=true or a partially-rendered broken list.
+      setOrders([]);
+      setStats({ newOrders: 0, toProcess: 0, readyToShip: 0, returnRequests: 0, disputes: 0, total: 0 });
     } finally {
       setLoading(false);
       setRefreshing(false);

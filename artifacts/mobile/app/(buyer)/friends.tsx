@@ -362,7 +362,7 @@ export default function FriendsScreen() {
       <View style={[s.header, { paddingTop: insets.top + SP.md }]}>
         <TouchableOpacity
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          onPress={() => router.push('/buyer-post-create' as never)}
+          onPress={() => router.push('/create-post?accountType=buyer' as never)}
         >
           <Feather name="plus" size={ICON.lg} color={MUTED} />
         </TouchableOpacity>

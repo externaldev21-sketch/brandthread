@@ -86,19 +86,21 @@ export default function StoreBuilderScreen() {
     ? store.aiSuggestions.filter(s => !s.dismissed && !s.applied).length
     : 0;
 
-  const managementRows = [
-    [
-      { label: 'Sections', icon: 'layout' as const, route: '/store-sections' },
-      { label: 'Collections', icon: 'grid' as const, route: '/store-collections' },
-      { label: 'Pages', icon: 'file-text' as const, route: '/store-pages' },
-      { label: 'Navigation', icon: 'menu' as const, route: '/store-nav' },
-    ],
-    [
-      { label: 'Policies', icon: 'shield' as const, route: '/store-policies' },
-      { label: 'SEO', icon: 'search' as const, route: '/store-seo' },
-      { label: 'Domains', icon: 'globe' as const, route: '/store-domain' },
-      { label: 'Versions', icon: 'clock' as const, route: '/store-versions' },
-    ],
+  // ── Store management sections ─────────────────────────────────────────────
+  const contentItems = [
+    { label: 'Sections',    icon: 'layout'    as const, route: '/store-sections' },
+    { label: 'Pages',       icon: 'file-text' as const, route: '/store-pages' },
+    { label: 'Navigation',  icon: 'menu'      as const, route: '/store-nav' },
+    { label: 'Collections', icon: 'grid'      as const, route: '/store-collections' },
+  ];
+  const discoveryItems = [
+    { label: 'SEO',     icon: 'search' as const, route: '/store-seo' },
+    { label: 'Domains', icon: 'globe'  as const, route: '/store-domain' },
+  ];
+  const managementItems = [
+    { label: 'Policies', icon: 'shield'    as const, route: '/store-policies' },
+    { label: 'Versions', icon: 'clock'     as const, route: '/store-versions' },
+    { label: 'Settings', icon: 'settings'  as const, route: '/store-settings' },
   ];
 
   if (loading) {
@@ -158,11 +160,10 @@ export default function StoreBuilderScreen() {
               </View>
               <View style={s.quickActions}>
                 {[
-                  { label: 'Preview', route: '/store-preview' },
+                  { label: 'Preview',    route: '/store-preview' },
                   { label: 'Edit Store', route: '/store-editor' },
-                  { label: 'Analytics', route: '/(tabs)/analytics' },
-                  { label: 'Publish', route: '/store-publish' },
-                  { label: 'Settings', route: '/store-settings' },
+                  { label: 'Publish',    route: '/store-publish' },
+                  { label: 'Analytics',  route: '/(tabs)/analytics' },
                 ].map(({ label, route }) => (
                   <TouchableOpacity
                     key={label}
@@ -299,26 +300,60 @@ export default function StoreBuilderScreen() {
           {/* STORE MANAGEMENT */}
           <View style={s.section}>
             <SectionHeader title="Manage Your Store" />
-            {managementRows.map((row, rowIdx) => (
-              <View key={rowIdx} style={s.mgmtRow}>
-                {row.map(({ label, icon, route }) => (
-                  <TouchableOpacity
-                    key={label}
-                    style={s.mgmtCard}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      router.push(route as never);
-                    }}
-                    activeOpacity={0.75}
-                  >
-                    <View style={s.mgmtIconWrap}>
-                      <Feather name={icon} size={ICON.md} color={PURPLE_LIGHT} />
-                    </View>
-                    <Text style={s.mgmtLabel}>{label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ))}
+
+            {/* Content — Sections, Pages, Navigation, Collections */}
+            <Text style={s.mgmtSubLabel}>Content</Text>
+            <View style={s.mgmtRow}>
+              {contentItems.map(({ label, icon, route }) => (
+                <TouchableOpacity
+                  key={label}
+                  style={s.mgmtCard}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(route as never); }}
+                  activeOpacity={0.75}
+                >
+                  <View style={s.mgmtIconWrap}>
+                    <Feather name={icon} size={ICON.md} color={PURPLE_LIGHT} />
+                  </View>
+                  <Text style={s.mgmtLabel}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Discovery — SEO, Domains */}
+            <Text style={s.mgmtSubLabel}>Discovery</Text>
+            <View style={s.mgmtRow}>
+              {discoveryItems.map(({ label, icon, route }) => (
+                <TouchableOpacity
+                  key={label}
+                  style={s.mgmtCard}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(route as never); }}
+                  activeOpacity={0.75}
+                >
+                  <View style={s.mgmtIconWrap}>
+                    <Feather name={icon} size={ICON.md} color={PURPLE_LIGHT} />
+                  </View>
+                  <Text style={s.mgmtLabel}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Management — Policies, Versions, Settings */}
+            <Text style={s.mgmtSubLabel}>Management</Text>
+            <View style={s.mgmtRow}>
+              {managementItems.map(({ label, icon, route }) => (
+                <TouchableOpacity
+                  key={label}
+                  style={s.mgmtCard}
+                  onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(route as never); }}
+                  activeOpacity={0.75}
+                >
+                  <View style={s.mgmtIconWrap}>
+                    <Feather name={icon} size={ICON.md} color={PURPLE_LIGHT} />
+                  </View>
+                  <Text style={s.mgmtLabel}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
 
           {/* AI IMPROVE STORE */}
@@ -479,6 +514,15 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   mgmtLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, textAlign: 'center' },
+  mgmtSubLabel: {
+    fontSize: 10,
+    fontFamily: FONT.bold,
+    color: SUBTLE,
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    marginTop: SP.sm,
+    marginBottom: SP.xs,
+  },
   // AI improve
   aiImproveRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, marginBottom: SP.md },
   aiImproveIconWrap: { position: 'relative' },

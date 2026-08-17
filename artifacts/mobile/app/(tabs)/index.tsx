@@ -339,27 +339,6 @@ export default function SellerHomeScreen() {
           </View>
         )}
 
-        {/* ── Next Best Action ──────────────────────────────────────────── */}
-        <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
-          <GradientCard
-            colors={['rgba(139,92,246,0.15)', 'rgba(34,211,238,0.06)']}
-            glow
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-              <Feather name="zap" size={12} color={CYAN} />
-              <Text style={s.recommendedLabel}>RECOMMENDED</Text>
-            </View>
-            <Text style={s.nbaLabel} numberOfLines={2}>{nba.label}</Text>
-            <View style={{ marginTop: 12, alignSelf: 'flex-start' }}>
-              <SecondaryButton
-                label="Go →"
-                onPress={() => nav(nba.route)}
-                small
-                accent={CYAN}
-              />
-            </View>
-          </GradientCard>
-        </View>
 
         {/* ── Setup Progress Card ───────────────────────────────────────── */}
         {showProgress && (
@@ -399,47 +378,28 @@ export default function SellerHomeScreen() {
           </View>
         )}
 
-        {/* ── Stats Row ─────────────────────────────────────────────────── */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: SP.md, gap: 8, paddingBottom: 4 }}
-          style={{ marginBottom: SP.md }}
-        >
-          <StatCard
-            label="Revenue"
-            value="$0"
-            icon="dollar-sign"
-            accent={GREEN_BRIGHT}
-            change="+0% this week"
-            positive
-            style={{ minWidth: 110 }}
-          />
-          <StatCard
-            label="Orders"
-            value="0"
-            icon="shopping-bag"
-            accent={PURPLE}
-            change="0 new today"
-            style={{ minWidth: 110 }}
-          />
-          <StatCard
-            label="Visitors"
-            value="0"
-            icon="users"
-            accent={CYAN}
-            style={{ minWidth: 110 }}
-          />
-          <StatCard
-            label="Conversion"
-            value="0%"
-            icon="trending-up"
-            accent={BLUE}
-            style={{ minWidth: 110 }}
-          />
-        </ScrollView>
+        {/* ── Zone A: Key Stats (3 chips) ───────────────────────────────── */}
+        <View style={s.statsRow}>
+          <View style={s.statChip}>
+            <Text style={s.statChipVal}>$0</Text>
+            <Text style={s.statChipLbl}>Revenue</Text>
+          </View>
+          <View style={s.statChip}>
+            <Text style={s.statChipVal}>
+              {(orderStats?.newOrders ?? 0) + (orderStats?.toProcess ?? 0)}
+            </Text>
+            <Text style={s.statChipLbl}>Pending</Text>
+          </View>
+          <View style={[s.statChip, invStats?.lowStockCount ? s.statChipWarn : undefined]}>
+            <Text style={[s.statChipVal, invStats?.lowStockCount ? { color: ORANGE } : undefined]}>
+              {invStats?.lowStockCount ?? 0}
+            </Text>
+            <Text style={s.statChipLbl}>Low Stock</Text>
+          </View>
+        </View>
 
-        {/* ── Quick Actions ─────────────────────────────────────────────── */}
+        {/* ── Zone B: Action Zone — Quick Actions (established sellers only) ── */}
+        {!showWelcome && !showProgress && (
         <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
           <SectionHeader title="Quick actions" style={{ paddingHorizontal: 0, marginBottom: SP.sm }} />
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
@@ -477,162 +437,9 @@ export default function SellerHomeScreen() {
             />
           </View>
         </View>
-
-        {/* ── Today Priorities ──────────────────────────────────────────── */}
-        <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
-          <SectionHeader title="Today" style={{ paddingHorizontal: 0, marginBottom: SP.sm }} />
-          <View style={{ gap: 8 }}>
-            <NavigationCard
-              label="3 orders ready to ship"
-              icon="truck"
-              accent={SUCCESS}
-              description="Tap to view"
-              onPress={() => nav('/(tabs)/orders')}
-            />
-            <NavigationCard
-              label="Review manufacturer quote"
-              icon="tool"
-              accent={ORANGE}
-              description="New message"
-              badge
-              onPress={() => nav('/manufacturer-hub')}
-            />
-            <NavigationCard
-              label="Upload product images"
-              icon="image"
-              accent={PURPLE}
-              description="Complete your product"
-              onPress={() => nav('/(tabs)/products')}
-            />
-          </View>
-        </View>
-
-        {/* ── Order Stats ───────────────────────────────────────────────── */}
-        {orderStats && (orderStats.newOrders > 0 || orderStats.readyToShip > 0 || orderStats.returnRequests > 0 || orderStats.disputes > 0) && (
-          <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
-            <SectionHeader title="Orders" style={{ paddingHorizontal: 0, marginBottom: SP.sm }} action={{ label: 'View all', onPress: () => nav('/(tabs)/orders') }} />
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-              {(orderStats.newOrders > 0) && (
-                <QuickActionCard
-                  label={`${orderStats.newOrders} New order${orderStats.newOrders > 1 ? 's' : ''}`}
-                  icon="shopping-bag"
-                  accent={BLUE}
-                  badge
-                  onPress={() => nav('/(tabs)/orders')}
-                  style={{ width: '48.5%' }}
-                />
-              )}
-              {(orderStats.readyToShip > 0) && (
-                <QuickActionCard
-                  label={`${orderStats.readyToShip} Ready to ship`}
-                  icon="truck"
-                  accent={SUCCESS}
-                  badge
-                  onPress={() => nav('/(tabs)/orders')}
-                  style={{ width: '48.5%' }}
-                />
-              )}
-              {(orderStats.returnRequests > 0) && (
-                <QuickActionCard
-                  label={`${orderStats.returnRequests} Return${orderStats.returnRequests > 1 ? 's' : ''}`}
-                  icon="refresh-ccw"
-                  accent={ORANGE}
-                  badge
-                  onPress={() => nav('/(tabs)/orders')}
-                  style={{ width: '48.5%' }}
-                />
-              )}
-              {(orderStats.disputes > 0) && (
-                <QuickActionCard
-                  label={`${orderStats.disputes} Dispute${orderStats.disputes > 1 ? 's' : ''}`}
-                  icon="alert-circle"
-                  accent={RED}
-                  badge
-                  onPress={() => nav('/(tabs)/orders')}
-                  style={{ width: '48.5%' }}
-                />
-              )}
-            </View>
-          </View>
         )}
 
-        {/* ── Inventory Alerts ─────────────────────────────────────────── */}
-        {invStats && (invStats.outOfStockCount > 0 || invStats.lowStockCount > 0 || invStats.incomingCount > 0) && (
-          <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
-            <SectionHeader title="Inventory" style={{ paddingHorizontal: 0, marginBottom: SP.sm }} action={{ label: 'View all', onPress: () => nav('/inventory') }} />
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-              {(invStats.outOfStockCount > 0) && (
-                <QuickActionCard
-                  label={`${invStats.outOfStockCount} out of stock`}
-                  icon="alert-circle"
-                  accent={RED}
-                  badge
-                  onPress={() => nav('/inventory')}
-                  style={{ width: '48.5%' }}
-                />
-              )}
-              {(invStats.lowStockCount > 0) && (
-                <QuickActionCard
-                  label={`${invStats.lowStockCount} low stock`}
-                  icon="trending-down"
-                  accent={ORANGE}
-                  badge
-                  onPress={() => nav('/inventory')}
-                  style={{ width: '48.5%' }}
-                />
-              )}
-              {(invStats.incomingCount > 0) && (
-                <QuickActionCard
-                  label={`${invStats.incomingCount} incoming`}
-                  icon="truck"
-                  accent={CYAN}
-                  onPress={() => nav('/inventory')}
-                  style={{ width: '48.5%' }}
-                />
-              )}
-            </View>
-          </View>
-        )}
-
-        {/* ── Manufacturer Hub Stats ────────────────────────────────────── */}
-        {hubStats && (hubStats.samplesNeedingReview > 0 || hubStats.activeProduction > 0 || hubStats.unreadMessages > 0) && (
-          <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
-            <SectionHeader title="Manufacturer Hub" style={{ paddingHorizontal: 0, marginBottom: SP.sm }} action={{ label: 'Open hub', onPress: () => nav('/manufacturer-hub') }} />
-            <View style={{ gap: 8 }}>
-              {hubStats.samplesNeedingReview > 0 && (
-                <NavigationCard
-                  label={`${hubStats.samplesNeedingReview} sample${hubStats.samplesNeedingReview > 1 ? 's' : ''} need review`}
-                  icon="package"
-                  accent={ORANGE}
-                  description="Tap to review"
-                  badge
-                  onPress={() => nav('/manufacturer-hub')}
-                />
-              )}
-              {hubStats.activeProduction > 0 && (
-                <NavigationCard
-                  label={`${hubStats.activeProduction} active production order${hubStats.activeProduction > 1 ? 's' : ''}`}
-                  icon="layers"
-                  accent={PURPLE}
-                  description="Track progress"
-                  onPress={() => nav('/manufacturer-hub')}
-                />
-              )}
-              {hubStats.unreadMessages > 0 && (
-                <NavigationCard
-                  label={`${hubStats.unreadMessages} new manufacturer message${hubStats.unreadMessages > 1 ? 's' : ''}`}
-                  icon="message-circle"
-                  accent={CYAN}
-                  description="Tap to reply"
-                  badge
-                  onPress={() => nav('/manufacturer-hub')}
-                />
-              )}
-            </View>
-          </View>
-        )}
-
-        {/* ── Recent Activity ───────────────────────────────────────────── */}
+        {/* ── Zone C: Recent Activity (unified — order + inventory + manufacturer) ── */}
         <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
           <SectionHeader
             title="Recent activity"
@@ -640,7 +447,9 @@ export default function SellerHomeScreen() {
             style={{ paddingHorizontal: 0 }}
           />
           <View style={{ gap: 8 }}>
-            {DEMO_ORDERS.slice(0, 3).map((order) => (
+
+            {/* Most recent order */}
+            {DEMO_ORDERS.slice(0, 1).map((order) => (
               <BrandthreadCard
                 key={order.id}
                 style={{ marginBottom: 0 }}
@@ -668,6 +477,72 @@ export default function SellerHomeScreen() {
                 </View>
               </BrandthreadCard>
             ))}
+
+            {/* Order alerts — new orders take priority over ready-to-ship */}
+            {orderStats && orderStats.newOrders > 0 && (
+              <NavigationCard
+                label={`${orderStats.newOrders} new order${orderStats.newOrders > 1 ? 's' : ''} — action needed`}
+                icon="shopping-bag"
+                accent={BLUE}
+                description="Tap to review"
+                badge
+                onPress={() => nav('/(tabs)/orders')}
+              />
+            )}
+            {orderStats && orderStats.newOrders === 0 && orderStats.readyToShip > 0 && (
+              <NavigationCard
+                label={`${orderStats.readyToShip} order${orderStats.readyToShip > 1 ? 's' : ''} ready to ship`}
+                icon="truck"
+                accent={SUCCESS}
+                description="Mark as shipped"
+                badge
+                onPress={() => nav('/(tabs)/orders')}
+              />
+            )}
+
+            {/* Inventory alert — out-of-stock takes priority over low-stock */}
+            {invStats && invStats.outOfStockCount > 0 && (
+              <NavigationCard
+                label={`${invStats.outOfStockCount} item${invStats.outOfStockCount > 1 ? 's' : ''} out of stock`}
+                icon="alert-circle"
+                accent={RED}
+                description="Restock now"
+                badge
+                onPress={() => nav('/inventory')}
+              />
+            )}
+            {invStats && invStats.outOfStockCount === 0 && invStats.lowStockCount > 0 && (
+              <NavigationCard
+                label={`${invStats.lowStockCount} item${invStats.lowStockCount > 1 ? 's' : ''} running low`}
+                icon="trending-down"
+                accent={ORANGE}
+                description="Review stock levels"
+                onPress={() => nav('/inventory')}
+              />
+            )}
+
+            {/* Manufacturer update — samples take priority over messages */}
+            {hubStats && hubStats.samplesNeedingReview > 0 && (
+              <NavigationCard
+                label={`${hubStats.samplesNeedingReview} sample${hubStats.samplesNeedingReview > 1 ? 's' : ''} need review`}
+                icon="package"
+                accent={ORANGE}
+                description="Open Manufacturer Hub"
+                badge
+                onPress={() => nav('/manufacturer-hub')}
+              />
+            )}
+            {hubStats && hubStats.samplesNeedingReview === 0 && hubStats.unreadMessages > 0 && (
+              <NavigationCard
+                label={`${hubStats.unreadMessages} new manufacturer message${hubStats.unreadMessages > 1 ? 's' : ''}`}
+                icon="message-circle"
+                accent={CYAN}
+                description="Tap to reply"
+                badge
+                onPress={() => nav('/manufacturer-hub')}
+              />
+            )}
+
           </View>
         </View>
 
@@ -876,6 +751,38 @@ const s = StyleSheet.create({
     borderRadius: 99,
   },
   progressNext: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: MUTED,
+  },
+
+  // Zone A — compact stats row
+  statsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: SP.md,
+    marginBottom: SP.md,
+    marginTop: SP.sm,
+  },
+  statChip: {
+    flex: 1,
+    backgroundColor: CARD,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingVertical: SP.sm,
+    alignItems: 'center',
+    gap: 2,
+  },
+  statChipWarn: {
+    borderColor: 'rgba(249,115,22,0.4)',
+  },
+  statChipVal: {
+    fontSize: FS.xl,
+    fontFamily: FONT.bold,
+    color: FG,
+  },
+  statChipLbl: {
     fontSize: FS.xs,
     fontFamily: FONT.regular,
     color: MUTED,

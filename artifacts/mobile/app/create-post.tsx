@@ -98,7 +98,9 @@ function VideoPreview({ uri }: { uri: string }) {
 export default function CreatePostScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const _params = useLocalSearchParams();
+  const params = useLocalSearchParams<{ accountType?: string; type?: string; productId?: string; editId?: string }>();
+  // Buyers may only post Stories — hide Video / Slideshow / seller-only types.
+  const isBuyer = params.accountType === 'buyer';
 
   // ── Step & content ──
   const [step, setStep] = useState<Step>('type-select');
@@ -368,18 +370,21 @@ export default function CreatePostScreen() {
       { label: 'Story', icon: 'circle', color: BLUE, type: 'story', nextStep: 'post-details' },
     ];
 
+    // Buyers can only create Stories — the main feed is seller-only territory.
+    const visibleTypes = isBuyer ? types.filter(t => t.type === 'story') : types;
+
     return (
       <View style={[s.root, { paddingTop: topPad }]}>
         <View style={s.header}>
           <TouchableOpacity onPress={() => hapticNav(() => router.back())} style={s.backBtn}>
             <Feather name="arrow-left" size={22} color={FG} />
           </TouchableOpacity>
-          <Text style={s.headerTitle}>Create Post</Text>
+          <Text style={s.headerTitle}>{isBuyer ? 'Add to Story' : 'Create Post'}</Text>
           <View style={{ width: 38 }} />
         </View>
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
           <View style={s.typeGrid}>
-            {types.map((t) => (
+            {visibleTypes.map((t) => (
               <TouchableOpacity
                 key={t.type}
                 style={s.typeCard}
