@@ -81,6 +81,7 @@ const GROWTH_ITEMS: NavItem[] = [
   { icon: 'trending-up',    label: 'Marketing', desc: 'Campaigns and promotions',      accent: ORANGE, route: '/(tabs)/marketing' },
   { icon: 'bar-chart-2',    label: 'Analytics', desc: 'Sales, traffic and insights',   accent: BLUE,   route: '/(tabs)/analytics' },
   { icon: 'video',          label: 'Content',   desc: 'Posts, drafts and scheduled',   accent: CYAN,   route: '/content' },
+  { icon: 'briefcase',      label: 'Community', desc: 'Hire freelance creatives',      accent: CYAN,   route: '/community' },
 ];
 
 const MONEY_ITEMS: NavItem[] = [
@@ -404,3 +405,4 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
 });
+

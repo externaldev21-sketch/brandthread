@@ -27,6 +27,7 @@ const STATIC_GROUPS: SettingsGroup[] = [
     items: [
       { label: 'Edit profile',         icon: 'user',        route: '/edit-profile' },
       { label: 'Edit brand setup',     icon: 'briefcase',   route: '/general-settings' },
+      { label: 'Freelance jobs',       icon: 'zap',         route: '/freelancer-jobs' },
       { label: 'Shopping preferences', icon: 'shopping-bag', route: '/shopping-preferences' },
       { label: 'Account type',         icon: 'layers',      route: '/account-type-settings' },
       { label: 'Connected login methods', icon: 'link',     route: '/login-methods' },

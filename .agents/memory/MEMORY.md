@@ -19,7 +19,7 @@
 - [AI Brain Architecture](ai-brain-architecture.md) — unified seller AI; api-server /api/ai/chat route; AIBrainFAB on 9 screens; 3 new screens; bt:ai:*:v1 keys; nanoid replaced with inline fn; mock fallback always present.
 - [expo-file-system v19 API](expo-file-system-v19.md) — legacy API (readAsStringAsync/writeAsStringAsync/EncodingType/cacheDirectory) removed; use File+Paths classes; for reading images before API call, request base64:true in ImagePicker instead.
 - [Background Removal Architecture](bg-removal-architecture.md) — GCS+local-file dual cache; named wildcard gotcha; ProductMedia required fields; integration actions pattern.
-- [EXPO_PUBLIC_API_BASE_URL](expo-public-api-base-url.md) — set in shared env to the Replit dev domain root; needed by designService.ts for all AI calls (bg-removal, photoshoot, mockup-to-model, text-to-design).
+- [Dev API routing](expo-public-api-base-url.md) — base URL must be domain ROOT; proxy forwards /api/* verbatim; /api-server/* returns SPA HTML with 200 (silent fallback trap); verify via Metro's /proc environ, not shell env.
 - [Content Publishing Architecture](content-publishing-architecture.md) — seller post → AsyncStorage → Thread feed; SellerThreadPost expanded to 30+ fields; seed data; feed.tsx dynamic loading; create-post purple theme.
 - [Expo web boot & root route](expo-web-boot.md) — boot never blank; AuthGate must handle bare "/"; ?bt_preview=buyer|seller (dev+web) bypasses auth for captures/canvas frames; static screenshots catch FOIT.
 - [Push notifications & service config](push-notifications-service-config.md) — expo-notifications wired in _layout.tsx; configureServices(getToken) + PushRegistrar components; expo-camera must be ~17.0.10 for Expo 54.
@@ -42,3 +42,5 @@
 - [Live Shopping Architecture](live-shopping-architecture.md) — Agora RTC live streams; 3 screens; 2 DB tables; Metro web shim for react-native-agora; live items woven into Thread feed.
 - [Support Chatbot Architecture](support-chatbot-architecture.md) — teal SupportChatBubble (Modal, bottom-left) separate from purple AIBrainFAB; /api/support-chat fetches real seller/buyer data; no new API key needed.
 - [Stories Architecture](stories-architecture.md) — what existed vs. built; StoryOverlay type; multi-slide reel; link/gif/text overlays; seller story ring; non-follower visibility already enforced in backend.
+- [Freelancer marketplace payments](freelancer-marketplace.md) — escrow transfer-on-complete; live payout-readiness gate; source_transaction mandatory; claim-then-pay idempotency; 5% fee pending.
+- [DB migration runner](db-migrations-runner.md) — ordered schema_migrations-tracked runner; every migration statement must be idempotent; clean boot = push then migrate.

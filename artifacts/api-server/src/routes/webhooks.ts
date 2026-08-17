@@ -6,10 +6,11 @@ import { Router, type Request, type Response } from "express";
 import crypto from "crypto";
 import {
   db, checkoutSessions, orders, orderItems, productVariants, products, users, notificationsFeed, disputes,
-  dropWallets, dropWalletTransactions,
+  dropWallets, dropWalletTransactions, freelancers, freelancerJobs,
 } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq, and, ne, sql } from "drizzle-orm";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe";
+import { refundJobPayment } from "../lib/freelancerEscrow";
 
 const router = Router();
 
@@ -134,12 +135,30 @@ router.post("/stripe", async (req: Request, res: Response) => {
  * The unique index on stripe_checkout_session_id plus the early-exit guard
  * ensure at-most-once order creation even on webhook retries.
  */
-async function handleCheckoutPaid(session: any) {
+export async function handleCheckoutPaid(session: any) {
   const sessionId: string   = session.id;
   const buyerId:   string   = session.client_reference_id ?? "";
   const piId:      string | null = session.payment_intent ?? null;
   const metadata:  Record<string, string> = session.metadata ?? {};
   const csRef:     string | undefined = metadata["csRef"];
+
+  // Freelancer job escrow payments are a separate flow from cart orders.
+  // Fast path: session metadata (set at session creation). Fallback: match by
+  // the session id persisted on the job row at creation — dispatch works even
+  // for a session whose metadata is missing or stripped.
+  if (metadata["freelancerJobId"]) {
+    await handleFreelancerJobPaid(session, metadata["freelancerJobId"]);
+    return;
+  }
+  const [freelancerJobBySession] = await db
+    .select({ id: freelancerJobs.id })
+    .from(freelancerJobs)
+    .where(eq(freelancerJobs.stripeCheckoutSessionId, sessionId))
+    .limit(1);
+  if (freelancerJobBySession) {
+    await handleFreelancerJobPaid(session, freelancerJobBySession.id);
+    return;
+  }
 
   if (!buyerId) {
     console.error("checkout paid: missing client_reference_id", sessionId);
@@ -678,6 +697,70 @@ async function handleDisputeClosed(stripeDispute: any) {
   console.log(`Dispute closed: ${stripeDispute.id} — outcome ${stripeDispute.status}`);
 }
 
+/**
+ * checkout.session.completed for a freelancer job escrow payment.
+ * Marks the job paid; the payout transfer happens later, when the freelancer
+ * completes the job (see routes/freelancer-jobs.ts).
+ */
+async function handleFreelancerJobPaid(session: any, jobIdOverride?: string) {
+  const jobId: string = jobIdOverride ?? session.metadata?.["freelancerJobId"] ?? "";
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(jobId)) {
+    console.error("freelancer job paid: invalid job id in metadata", session.id);
+    return;
+  }
+  const piId: string | null =
+    typeof session.payment_intent === "string"
+      ? session.payment_intent
+      : session.payment_intent?.id ?? null;
+
+  const [updated] = await db
+    .update(freelancerJobs)
+    .set({
+      paymentStatus: "paid",
+      ...(piId ? { stripePaymentIntentId: piId } : {}),
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(freelancerJobs.id, jobId),
+        eq(freelancerJobs.paymentStatus, "unpaid"),
+        ne(freelancerJobs.status, "cancelled"),
+      ),
+    )
+    .returning({ id: freelancerJobs.id });
+
+  if (updated) {
+    console.log(`Freelancer job ${jobId} marked paid (session ${session.id})`);
+    return;
+  }
+
+  // Late payment for a cancelled job → refund it instead of recording it.
+  const [job] = await db
+    .select()
+    .from(freelancerJobs)
+    .where(eq(freelancerJobs.id, jobId))
+    .limit(1);
+  if (job && job.status === "cancelled" && job.paymentStatus !== "refunded" && piId && stripe) {
+    try {
+      await refundJobPayment(stripe, {
+        jobId,
+        paymentIntentId: piId,
+        context: "webhook_after_cancel",
+      });
+      await db
+        .update(freelancerJobs)
+        .set({ paymentStatus: "refunded", stripePaymentIntentId: piId, updatedAt: new Date() })
+        .where(eq(freelancerJobs.id, jobId));
+      console.log(`Freelancer job ${jobId} was cancelled — late payment refunded`);
+    } catch (refundErr) {
+      console.error(`freelancer job ${jobId}: late-payment refund failed`, refundErr);
+    }
+    return;
+  }
+
+  console.log(`Freelancer job ${jobId} already paid or not found, skipping`);
+}
+
 async function handleAccountUpdated(account: any) {
   const stripeAccountId: string  = account.id;
   const chargesEnabled:  boolean = account.charges_enabled ?? false;
@@ -695,6 +778,13 @@ async function handleAccountUpdated(account: any) {
     .update(users)
     .set({ stripeAccountStatus: status, updatedAt: new Date() })
     .where(eq(users.stripeAccountId, stripeAccountId));
+
+  // Freelancer rows track the same Connect account status (the account may be
+  // shared with a seller profile, or freelancer-only).
+  await db
+    .update(freelancers)
+    .set({ stripeAccountStatus: status, updatedAt: new Date() })
+    .where(eq(freelancers.stripeAccountId, stripeAccountId));
 
   console.log(`Connect account ${stripeAccountId} updated — status: ${status}`);
 }

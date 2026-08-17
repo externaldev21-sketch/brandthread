@@ -495,6 +495,7 @@ export default function ProfileScreen() {
         <SheetRow icon="archive" label="Archive" onPress={() => { setMenuOpen(false); router.push('/buyer-archive' as any); }} />
         <SheetRow icon="activity" label="Your Activity" onPress={() => { setMenuOpen(false); router.push('/buyer-your-activity' as any); }} />
         <SheetRow icon="package" label="My Orders" onPress={() => { setMenuOpen(false); router.push('/(buyer)/orders'); }} />
+        <SheetRow icon="briefcase" label="My Freelancer Jobs" onPress={() => { setMenuOpen(false); router.push('/freelancer-jobs' as any); }} />
         <SheetRow icon="bookmark" label="Saved Items" onPress={() => { setMenuOpen(false); router.push('/buyer-saved' as any); }} />
         <SheetRow icon="grid" label="QR Code" onPress={() => { setMenuOpen(false); router.push('/buyer-qr-code' as any); }} />
         <SheetRow icon="settings" label="Settings" onPress={() => { setMenuOpen(false); router.push('/buyer-settings' as any); }} />

@@ -90,8 +90,11 @@ CREATE INDEX IF NOT EXISTS dwt_wallet_idx ON drop_wallet_transactions(wallet_id)
 CREATE INDEX IF NOT EXISTS dwt_order_idx  ON drop_wallet_transactions(order_id);
 
 -- 6. Add wallet FK to sample_orders now that drop_wallets exists
-ALTER TABLE sample_orders ADD CONSTRAINT sample_orders_wallet_fk
-  FOREIGN KEY (wallet_id) REFERENCES drop_wallets(id) ON DELETE SET NULL;
+DO $$ BEGIN
+  ALTER TABLE sample_orders ADD CONSTRAINT sample_orders_wallet_fk
+    FOREIGN KEY (wallet_id) REFERENCES drop_wallets(id) ON DELETE SET NULL;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- 7. Add media column to manufacturer_messages for photo sharing
 ALTER TABLE manufacturer_messages ADD COLUMN IF NOT EXISTS media_urls JSONB NOT NULL DEFAULT '[]';

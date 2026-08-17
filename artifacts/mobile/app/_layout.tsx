@@ -427,6 +427,9 @@ function RootLayoutNav() {
         <Stack.Screen name="product-bundles"    options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="product-bundle-edit" options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
         <Stack.Screen name="community-chat"     options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="freelancer-profile" options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="freelancer-apply"   options={{ headerShown: false, animation: 'slide_from_bottom' }} />
+        <Stack.Screen name="freelancer-jobs"    options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="manufacturer-onboard" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="request-sample"     options={{ headerShown: false, animation: 'slide_from_right' }} />
         {/* AI Studio sub-screens */}

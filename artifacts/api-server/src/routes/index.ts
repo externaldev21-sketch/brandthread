@@ -59,6 +59,9 @@ import buyerPaymentsRouter from "./buyer-payments";
 import supportRouter from "./support";
 import sellerExportRouter from "./seller-export";
 import supportChatRouter from "./support-chat";
+import freelancersRouter from "./freelancers";
+import freelancerConnectRouter from "./freelancer-connect";
+import freelancerJobsRouter from "./freelancer-jobs";
 
 const router = Router();
 
@@ -127,6 +130,13 @@ router.use("/taxes",                     taxesRouter);
 router.use("/team",                      teamRouter);
 router.use("/store/ai",                  storeAiRouter);
 router.use("/store",                     storeRouter);
+
+// ─── Freelancer marketplace (Community tab) ───────────────────────────────────
+// Connect sub-path BEFORE the generic /freelancers router so /connect/* isn't
+// swallowed by /freelancers/:id.
+router.use("/freelancers/connect",       freelancerConnectRouter);
+router.use("/freelancers",               freelancersRouter);
+router.use("/freelancer-jobs",           freelancerJobsRouter);
 
 // ─── New seller settings + buyer payments routes ──────────────────────────────
 router.use("/seller/locations",          sellerLocationsRouter);

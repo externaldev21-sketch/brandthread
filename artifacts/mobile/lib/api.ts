@@ -8,7 +8,7 @@ import { useMemo } from 'react';
 
 const BASE =
   process.env.EXPO_PUBLIC_API_BASE_URL ??
-  `https://${process.env.EXPO_PUBLIC_DOMAIN}/api-server`;
+  `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
 type GetToken = () => Promise<string | null>;
 
@@ -33,6 +33,53 @@ async function request<T = any>(
   }
   if (asText) return res.text() as Promise<T>;
   return res.json() as Promise<T>;
+}
+
+// ─── Freelancer marketplace types ────────────────────────────────────────────
+export interface Freelancer {
+  id: string;
+  userId: string;
+  name: string;
+  username: string | null;
+  avatarUrl: string | null;
+  serviceType: string;
+  skillTags: string[];
+  hourlyRateCents: number;
+  bio: string;
+  portfolioUrls: string[];
+  isActive: boolean;
+  totalJobsCompleted: number;
+  avgRatingTenths: number | null;
+  /** Freelancer has begun Connect onboarding — hireable. */
+  hasConnectedAccount: boolean;
+  /** Connect account fully verified (charges + payouts enabled). */
+  payoutsReady: boolean;
+  stripeAccountStatus?: string | null;
+  createdAt: string;
+}
+
+export interface FreelancerJob {
+  id: string;
+  freelancerId: string;
+  sellerId: string;
+  title: string;
+  description: string;
+  agreedPriceCents: number;
+  status: 'pending' | 'accepted' | 'in_progress' | 'completed' | 'cancelled';
+  paymentStatus: 'unpaid' | 'paid' | 'refunded';
+  platformFeeCents: number;
+  freelancerPayoutCents: number;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** Extras returned by list/get endpoints. */
+  role?: 'hirer' | 'freelancer';
+  freelancerName?: string;
+  freelancerAvatarUrl?: string | null;
+  freelancerUserId?: string;
+  hirerName?: string;
+  hirerAvatarUrl?: string | null;
+  serviceType?: string;
 }
 
 export function createApi(getToken: GetToken) {
@@ -779,6 +826,50 @@ export function createApi(getToken: GetToken) {
         del<{ reserved: boolean }>(`/api/buyer/products/${encodeURIComponent(productId)}/reserve`),
       checkReservation: (productId: string) =>
         get<{ reserved: boolean; demandCount: number }>(`/api/buyer/products/${encodeURIComponent(productId)}/reservation`),
+    },
+    /** Freelancer marketplace (Community tab). */
+    freelancers: {
+      list: (filters?: { serviceType?: string; minRate?: number; maxRate?: number; available?: boolean }) => {
+        const params = new URLSearchParams();
+        if (filters?.serviceType)     params.set('serviceType', filters.serviceType);
+        if (filters?.minRate != null) params.set('minRate', String(filters.minRate));
+        if (filters?.maxRate != null) params.set('maxRate', String(filters.maxRate));
+        if (filters?.available)       params.set('available', 'true');
+        const qs = params.toString();
+        return get<{ freelancers: Freelancer[] }>(`/api/freelancers${qs ? `?${qs}` : ''}`);
+      },
+      get:        (id: string) => get<{ freelancer: Freelancer }>(`/api/freelancers/${encodeURIComponent(id)}`),
+      me:         () => get<{ freelancer: Freelancer | null }>('/api/freelancers/me'),
+      apply:      (body: { serviceType: string; hourlyRateCents: number; bio?: string; skillTags?: string[]; portfolioUrls?: string[] }) =>
+        post<{ freelancer: Freelancer }>('/api/freelancers/apply', body),
+      deactivate: () => del<{ ok: boolean }>('/api/freelancers/me'),
+    },
+    /** Stripe Connect Express onboarding for freelancer payouts. */
+    freelancerConnect: {
+      onboard: () => post<{ url: string; stripeAccountId: string }>('/api/freelancers/connect/onboard', {}),
+      status:  () => get<{
+        connected: boolean;
+        chargesEnabled: boolean;
+        payoutsEnabled: boolean;
+        detailsSubmitted: boolean;
+        status: string;
+      }>('/api/freelancers/connect/status'),
+    },
+    /** Freelancer job lifecycle (escrow payments). */
+    freelancerJobs: {
+      create: (body: { freelancerId: string; title: string; description?: string; agreedPriceCents: number }) =>
+        post<{ job: FreelancerJob; checkoutUrl: string | null; sessionId: string }>('/api/freelancer-jobs', {
+          ...body,
+          successUrl: 'mobile://checkout/return?session_id={CHECKOUT_SESSION_ID}',
+          cancelUrl:  'mobile://checkout/cancel',
+        }),
+      list:        () => get<{ isFreelancer: boolean; asHirer: FreelancerJob[]; asFreelancer: FreelancerJob[] }>('/api/freelancer-jobs'),
+      get:         (id: string) => get<{ job: FreelancerJob }>(`/api/freelancer-jobs/${encodeURIComponent(id)}`),
+      accept:      (id: string) => patch<{ job: FreelancerJob }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/accept`, {}),
+      start:       (id: string) => patch<{ job: FreelancerJob }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/start`, {}),
+      complete:    (id: string) => patch<{ job: FreelancerJob; payout: { amountCents: number; transferId: string | null } }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/complete`, {}),
+      cancel:      (id: string) => patch<{ job: FreelancerJob }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/cancel`, {}),
+      syncPayment: (id: string) => post<{ job: FreelancerJob; paymentStatus: string }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/sync-payment`, {}),
     },
   };
 }
