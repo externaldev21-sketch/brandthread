@@ -3,8 +3,9 @@
  * Mounted at /api/public — no requireAuth middleware.
  */
 import { Router } from "express";
-import { db, products, productVariants, users, drops, posts, postTaggedProducts, interactions } from "@workspace/db";
-import { eq, and, desc, inArray, or, ilike, sql, count } from "drizzle-orm";
+import { db, products, productVariants, users, drops, posts, postTaggedProducts, interactions, trendingCache } from "@workspace/db";
+import { eq, and, desc, inArray, or, ilike, sql, count, gte } from "drizzle-orm";
+import { computeTrendingForToday, isCacheFresh } from "../jobs/computeTrending";
 
 const router = Router();
 
@@ -230,14 +231,16 @@ router.get("/sellers/:sellerId", async (req, res) => {
 
   const [seller] = await db
     .select({
-      clerkId:     users.clerkId,
-      displayName: users.displayName,
-      brandName:   users.brandName,
-      bio:         users.bio,
-      website:     users.website,
-      verified:    users.verified,
-      brandType:   users.brandType,
-      accountType: users.accountType,
+      clerkId:         users.clerkId,
+      displayName:     users.displayName,
+      brandName:       users.brandName,
+      bio:             users.bio,
+      website:         users.website,
+      verified:        users.verified,
+      brandType:       users.brandType,
+      accountType:     users.accountType,
+      vacationMode:    users.vacationMode,
+      vacationMessage: users.vacationMessage,
     })
     .from(users)
     .where(and(eq(users.clerkId, sellerId), eq(users.accountType, "seller")))
@@ -487,6 +490,58 @@ router.get("/posts", async (req, res) => {
   } catch (err) {
     console.error("GET /api/public/posts error:", err);
     return res.status(500).json({ error: "Failed to fetch posts" });
+  }
+});
+
+// ─── GET /api/public/trending ─────────────────────────────────────────────────
+// Serves the pre-computed daily trending list from trending_cache.
+// The list is calculated once per day by the computeTrending background job
+// (velocity-normalised engagement, category diversity, seeded jitter, boost bump).
+// On a cache miss (e.g. very first request of the day), computation runs
+// synchronously so the response is still correct.
+// Query params: ?limit=20
+router.get("/trending", async (req, res) => {
+  try {
+    const lim   = Math.min(parseInt((req.query.limit as string) || "20", 10) || 20, 50);
+    const today = new Date().toISOString().slice(0, 10); // 'YYYY-MM-DD' UTC
+
+    // ── Attempt cache read ───────────────────────────────────────────────────
+    const [cached] = await db
+      .select()
+      .from(trendingCache)
+      .where(eq(trendingCache.cacheDate, today))
+      .limit(1);
+
+    if (cached && isCacheFresh(cached.computedAt) && Array.isArray(cached.results) && cached.results.length > 0) {
+      const items = (cached.results as any[]).slice(0, lim).map((item: any, i: number) => ({
+        ...item,
+        rank: i + 1,
+      }));
+      return res.json({ trending: items, computedAt: cached.computedAt, source: "cache" });
+    }
+
+    // ── Cache miss — compute synchronously (once per day maximum) ───────────
+    console.log("[computeTrending] Cache miss for", today, "— computing synchronously");
+    await computeTrendingForToday();
+
+    const [fresh] = await db
+      .select()
+      .from(trendingCache)
+      .where(eq(trendingCache.cacheDate, today))
+      .limit(1);
+
+    if (fresh && Array.isArray(fresh.results)) {
+      const items = (fresh.results as any[]).slice(0, lim).map((item: any, i: number) => ({
+        ...item,
+        rank: i + 1,
+      }));
+      return res.json({ trending: items, computedAt: fresh.computedAt, source: "computed" });
+    }
+
+    return res.json({ trending: [], source: "empty" });
+  } catch (err) {
+    console.error("GET /api/public/trending error:", err);
+    return res.status(500).json({ error: "Failed to fetch trending" });
   }
 });
 

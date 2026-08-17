@@ -55,6 +55,10 @@ export const users = pgTable('users', {
   // Storefront visit counter — incremented by a public endpoint each time a buyer
   // views this seller's storefront. Drives the real conversion rate stat.
   storefrontVisitCount: integer('storefront_visit_count').notNull().default(0),
+  // Vacation / away mode
+  vacationMode:    boolean('vacation_mode').notNull().default(false),
+  vacationMessage: text('vacation_message'),
+  vacationUntil:   timestamp('vacation_until', { withTimezone: true }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -748,6 +752,53 @@ export const disputes = pgTable('disputes', {
   customerClaim:          text('customer_claim').notNull().default(''),
   createdAt:              timestamp('created_at').defaultNow().notNull(),
   updatedAt:              timestamp('updated_at').defaultNow().notNull(),
+});
+
+// ─── Paid Promotion Boosts ────────────────────────────────────────────────────
+export const boosts = pgTable('boosts', {
+  id:                      uuid('id').primaryKey().defaultRandom(),
+  sellerId:                text('seller_id').notNull(),
+  targetType:              text('target_type').notNull(),             // 'post' | 'product'
+  targetId:                text('target_id').notNull(),
+  budgetCents:             integer('budget_cents').notNull(),
+  spentCents:              integer('spent_cents').notNull().default(0),
+  durationDays:            integer('duration_days').notNull().default(7),
+  stripePaymentIntentId:   text('stripe_payment_intent_id'),
+  status:                  text('status').notNull().default('active'), // 'active' | 'paused' | 'completed' | 'cancelled'
+  impressionsCount:        integer('impressions_count').notNull().default(0),
+  startsAt:                timestamp('starts_at').defaultNow().notNull(),
+  endsAt:                  timestamp('ends_at').notNull(),
+  createdAt:               timestamp('created_at').defaultNow().notNull(),
+});
+
+// ─── Loyalty / Rewards Points Ledger ─────────────────────────────────────────
+export const loyaltyPoints = pgTable('loyalty_points', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  buyerId:     text('buyer_id').notNull(),
+  points:      integer('points').notNull(),                            // +earned / -redeemed
+  source:      text('source').notNull(),                               // 'purchase' | 'referral' | 'signup' | 'redemption' | 'bonus'
+  referenceId: text('reference_id'),
+  note:        text('note'),
+  createdAt:   timestamp('created_at').defaultNow().notNull(),
+});
+
+// ─── Drop Broadcast Throttle ──────────────────────────────────────────────────
+export const dropBroadcasts = pgTable('drop_broadcasts', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  dropId:    uuid('drop_id').notNull().unique(),
+  sellerId:  text('seller_id').notNull(),
+  sentAt:    timestamp('sent_at').defaultNow().notNull(),
+  sentCount: integer('sent_count').notNull().default(0),
+});
+
+// ─── Trending Cache — pre-computed daily list ─────────────────────────────────
+// Written once/day by the computeTrending background job; read by GET /api/public/trending.
+export const trendingCache = pgTable('trending_cache', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  computedAt:  timestamp('computed_at').defaultNow().notNull(),
+  cacheDate:   text('cache_date').notNull().unique(),   // 'YYYY-MM-DD' UTC
+  results:     json('results').$type<any[]>().notNull().default([]),
+  itemCount:   integer('item_count').notNull().default(0),
 });
 
 // ─── Seller Tax Configuration ─────────────────────────────────────────────────

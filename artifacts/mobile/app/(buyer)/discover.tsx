@@ -418,6 +418,27 @@ export default function DiscoverScreen() {
   // API-backed products replace the hardcoded FOR_YOU list when available
   const [liveForYou, setLiveForYou] = useState<ForYouItem[]>([]);
   const [forYouLoading, setForYouLoading] = useState(true);
+  // Real trending data from /api/public/trending
+  const [liveTrending, setLiveTrending] = useState<typeof TRENDING>([]);
+
+  useEffect(() => {
+    // Fetch real trending data
+    (api as any).publicTrending?.get?.(20)
+      .then((data: any) => {
+        const items = (data?.trending ?? []).map((t: any) => ({
+          id:       t.id,
+          rank:     t.rank,
+          brand:    t.brand,
+          name:     t.caption ? t.caption.slice(0, 60) : 'Trending Post',
+          price:    `${t.likesCount} ♥`,
+          color:    PURPLE,
+          initials: (t.brand ?? 'B').slice(0, 2).toUpperCase(),
+          hype:     t.hype ?? '✨ Fresh',
+        }));
+        if (items.length > 0) setLiveTrending(items);
+      })
+      .catch(() => {/* fallback to hardcoded */});
+  }, []);
 
   useEffect(() => {
     api.publicProducts.list({ limit: 8 })
@@ -548,12 +569,17 @@ export default function DiscoverScreen() {
         {DROPPING_SOON.map(item => <DroppingRow key={item.id} item={item} />)}
       </View>
 
-      {/* ─ Trending ─ */}
+      {/* ─ Trending Near You ─ */}
       <View style={{ paddingHorizontal: 20, marginBottom: 4 }}>
-        <SectionHead title="Trending" sub="Most saved this week" />
+        <SectionHead
+          title="Trending Near You"
+          sub={liveTrending.length > 0 ? 'Real-time engagement across the platform' : 'Most saved this week'}
+        />
       </View>
       <View style={{ paddingHorizontal: 20, gap: 10 }}>
-        {TRENDING.map(item => <TrendingRow key={item.id} item={item} />)}
+        {(liveTrending.length > 0 ? liveTrending : TRENDING).map(item => (
+          <TrendingRow key={item.id} item={item} />
+        ))}
       </View>
     </ScrollView>
   );

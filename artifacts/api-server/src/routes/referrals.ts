@@ -6,7 +6,7 @@
  * POST /api/referrals/apply     — apply an invite code (call once after signup)
  */
 import { Router } from "express";
-import { db, users, referrals } from "@workspace/db";
+import { db, users, referrals, loyaltyPoints } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 
@@ -165,6 +165,17 @@ router.post("/apply", async (req, res) => {
       .set({ referredByCode: normalizedCode, updatedAt: new Date() })
       .where(eq(users.clerkId, myId)),
   ]);
+
+  // Award 500 loyalty points to the inviter for the successful referral (fire-and-forget)
+  db.insert(loyaltyPoints)
+    .values({
+      buyerId:     inviter.clerkId,
+      points:      500,
+      source:      "referral",
+      referenceId: myId,
+      note:        "Referral bonus — friend joined",
+    })
+    .catch((err) => console.error("loyalty award error:", err));
 
   res.json({ ok: true, inviterId: inviter.clerkId });
 });

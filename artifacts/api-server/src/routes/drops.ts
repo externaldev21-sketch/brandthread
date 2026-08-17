@@ -1,7 +1,8 @@
 import { Router } from "express";
-import { db, drops, orders, customers } from "@workspace/db";
-import { eq, desc, and } from "drizzle-orm";
+import { db, drops, orders, customers, follows, pushTokens, dropBroadcasts } from "@workspace/db";
+import { eq, desc, and, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { sendPushNotifications } from "../lib/sendPush";
 
 const router = Router();
 router.use(requireAuth);
@@ -84,6 +85,68 @@ router.patch("/:id", async (req, res) => {
     .returning();
   if (!updated) { res.status(404).json({ error: "Not found" }); return; }
   res.json(updated);
+});
+
+// ─── POST /api/drops/:id/broadcast ───────────────────────────────────────────
+// Send a push notification to all followers announcing a live/active drop.
+// Idempotent: each drop can only be broadcast once (unique drop_id constraint).
+router.post("/:id/broadcast", async (req, res) => {
+  const sellerId = (req as any).clerkUserId as string;
+
+  // Verify the drop belongs to this seller
+  const [drop] = await db
+    .select({ id: drops.id, name: drops.name, status: drops.status })
+    .from(drops)
+    .where(and(eq(drops.id, req.params.id), eq(drops.ownerId, sellerId)))
+    .limit(1);
+  if (!drop) return res.status(404).json({ error: "Drop not found" });
+
+  // Check if already broadcast (one broadcast per drop)
+  const [existing] = await db
+    .select({ id: dropBroadcasts.id })
+    .from(dropBroadcasts)
+    .where(eq(dropBroadcasts.dropId, drop.id))
+    .limit(1);
+  if (existing) {
+    return res.status(409).json({ error: "This drop has already been broadcast to your followers.", code: "ALREADY_BROADCAST" });
+  }
+
+  // Get all followers of this seller
+  const followerRows = await db
+    .select({ followerId: follows.followerId })
+    .from(follows)
+    .where(eq(follows.followingId, sellerId));
+
+  if (followerRows.length === 0) {
+    return res.json({ ok: true, sent: 0, message: "No followers to notify yet." });
+  }
+
+  const followerIds = followerRows.map((r) => r.followerId);
+
+  // Get push tokens for all followers
+  const tokenRows = await db
+    .select({ token: pushTokens.token })
+    .from(pushTokens)
+    .where(inArray(pushTokens.userId, followerIds));
+
+  const messages = tokenRows.map((t) => ({
+    to:    t.token,
+    title: `🔥 Drop is live!`,
+    body:  `${drop.name} is available now — limited stock. Tap to shop.`,
+    data:  { dropId: drop.id, sellerId, type: "drop_live" },
+    sound: "default" as const,
+  }));
+
+  const { sent, errors } = await sendPushNotifications(messages);
+
+  // Record the broadcast (idempotency key)
+  await db.insert(dropBroadcasts).values({
+    dropId:    drop.id,
+    sellerId,
+    sentCount: sent,
+  }).onConflictDoNothing();
+
+  return res.json({ ok: true, sent, errors, followers: followerIds.length });
 });
 
 export default router;

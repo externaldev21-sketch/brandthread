@@ -69,6 +69,9 @@ import supportChatRouter from "./support-chat";
 import freelancersRouter from "./freelancers";
 import freelancerConnectRouter from "./freelancer-connect";
 import freelancerJobsRouter from "./freelancer-jobs";
+import boostsRouter    from "./boosts";
+import vacationRouter  from "./vacation";
+import loyaltyRouter   from "./loyalty";
 
 const router = Router();
 
@@ -159,5 +162,10 @@ router.use("/buyer/payment-methods",     buyerPaymentsRouter);
 // ─── Live shopping ─────────────────────────────────────────────────────────────
 import liveRouter from "./live";
 router.use("/live",                      tc, liveRouter);
+
+// ─── Paid boosts, vacation mode, loyalty/rewards ──────────────────────────────
+router.use("/boosts",         tc, boostsRouter);
+router.use("/seller/vacation", tc, vacationRouter);
+router.use("/loyalty",             loyaltyRouter); // buyer-scoped; no tc
 
 export default router;

@@ -546,6 +546,17 @@ export function createApi(getToken: GetToken) {
       saveOnboardingData: (body: {
         goals?: string[]; brandStage?: string; sellModel?: string; styleInterests?: string[];
       }) => post<{ ok: boolean }>('/api/seller/onboarding/data', body),
+      /** Vacation / away mode — pause storefront without removing listings. */
+      vacation: {
+        get: () =>
+          get<{ vacationMode: boolean; vacationMessage: string | null; vacationUntil: string | null }>(
+            '/api/seller/vacation'
+          ),
+        update: (body: { vacationMode: boolean; vacationMessage?: string | null; vacationUntil?: string | null }) =>
+          put<{ vacationMode: boolean; vacationMessage: string | null; vacationUntil: string | null }>(
+            '/api/seller/vacation', body
+          ),
+      },
     },
     /** In-app support tickets */
     support: {
@@ -909,6 +920,34 @@ export function createApi(getToken: GetToken) {
         post<{ freelancer: Freelancer }>('/api/freelancers/apply', body),
       deactivate: () => del<{ ok: boolean }>('/api/freelancers/me'),
     },
+    /** Paid promotion boosts — boost a post or product for increased reach. */
+    boosts: {
+      list:   (targetId?: string) =>
+        get<any[]>(`/api/boosts${targetId ? `?targetId=${encodeURIComponent(targetId)}` : ''}`),
+      create: (body: { targetType: string; targetId: string; budgetCents: number; durationDays: number }) =>
+        post<any>('/api/boosts', body),
+      update: (id: string, body: { status: 'paused' | 'cancelled' }) =>
+        patch<any>(`/api/boosts/${encodeURIComponent(id)}`, body),
+    },
+    /** Buyer loyalty / rewards points. */
+    loyalty: {
+      get:    () =>
+        get<{ balance: number; valueCents: number; history: any[] }>('/api/loyalty'),
+      earn:   (body: { points: number; source: string; referenceId?: string; note?: string }) =>
+        post<any>('/api/loyalty/earn', body),
+      redeem: (body: { points: number }) =>
+        post<{ ok: boolean; pointsUsed: number; discountCents: number; token: string }>('/api/loyalty/redeem', body),
+    },
+    /** Public trending feed — no auth required. */
+    publicTrending: {
+      get: (limit = 20) =>
+        get<{ trending: Array<{
+          rank: number; id: string; brand: string; brandId: string;
+          caption: string | null; mediaType: string | null;
+          verified: boolean; engagementScore: number;
+          likesCount: number; repostsCount: number; hype: string;
+        }> }>(`/api/public/trending?limit=${limit}`),
+    },
     /** Stripe Connect Express onboarding for freelancer payouts. */
     freelancerConnect: {
       onboard: () => post<{ url: string; stripeAccountId: string }>('/api/freelancers/connect/onboard', {}),
@@ -935,6 +974,13 @@ export function createApi(getToken: GetToken) {
       complete:    (id: string) => patch<{ job: FreelancerJob; payout: { amountCents: number; transferId: string | null } }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/complete`, {}),
       cancel:      (id: string) => patch<{ job: FreelancerJob }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/cancel`, {}),
       syncPayment: (id: string) => post<{ job: FreelancerJob; paymentStatus: string }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/sync-payment`, {}),
+    },
+    /** Drop broadcast — send push to all followers when a drop goes live. */
+    drops: {
+      broadcast: (dropId: string) =>
+        post<{ ok: boolean; sent: number; errors: number; followers: number }>(
+          `/api/drops/${encodeURIComponent(dropId)}/broadcast`, {}
+        ),
     },
   };
 }

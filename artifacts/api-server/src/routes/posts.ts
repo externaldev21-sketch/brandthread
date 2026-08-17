@@ -9,9 +9,9 @@
  */
 import { Router } from "express";
 import {
-  db, posts, postTaggedProducts, products, users, interactions, follows,
+  db, posts, postTaggedProducts, products, users, interactions, follows, boosts,
 } from "@workspace/db";
-import { eq, and, inArray, count, sql, desc, lt } from "drizzle-orm";
+import { eq, and, inArray, count, sql, desc, lt, gte } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router = Router();
@@ -119,6 +119,19 @@ router.get("/feed", requireAuth, async (req, res) => {
     const commentsByPost: Record<string, number> = {};
     for (const r of commentRows) if (r.postId) commentsByPost[r.postId] = Number(r.cnt);
 
+    // ─── Boost ranking: find active boosts for this page of posts ────────────
+    const now = new Date();
+    const boostRows = await db
+      .select({ targetId: boosts.targetId })
+      .from(boosts)
+      .where(and(
+        eq(boosts.targetType, "post"),
+        eq(boosts.status, "active"),
+        gte(boosts.endsAt, now),
+        inArray(boosts.targetId, postIds),
+      ));
+    const boostedPostIds = new Set(boostRows.map((b) => b.targetId));
+
     const result = rows.map((p) => ({
       id:        p.id,
       userId:    p.userId,
@@ -127,6 +140,7 @@ router.get("/feed", requireAuth, async (req, res) => {
       caption:   p.caption,
       styleTags: p.styleTags,
       createdAt: p.createdAt,
+      boosted:   boostedPostIds.has(p.id),
       seller: {
         displayName: p.displayName,
         brandName:   p.brandName,
@@ -142,6 +156,12 @@ router.get("/feed", requireAuth, async (req, res) => {
       repostsCount:  repostsByPost[p.id]  ?? 0,
       commentsCount: commentsByPost[p.id] ?? 0,
     }));
+
+    // Stable-sort: boosted posts surface first, rest preserve createdAt DESC order
+    result.sort((a, b) => {
+      const boost = (b.boosted ? 1 : 0) - (a.boosted ? 1 : 0);
+      return boost; // ties keep their original relative order (stable in V8)
+    });
 
     return res.json(result);
   } catch (err) {

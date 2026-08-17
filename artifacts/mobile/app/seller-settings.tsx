@@ -62,18 +62,20 @@ const STUDIO_ITEMS: NavItem[] = [
 ];
 
 const OPERATIONS_ITEMS: NavItem[] = [
-  { icon: 'archive', label: 'Inventory',        desc: 'Track stock levels',             accent: BLUE,   route: '/inventory' },
-  { icon: 'truck',   label: 'Shipping',         desc: 'Rates, zones and carriers',      accent: ORANGE, route: '/shipping' },
-  { icon: 'tool',    label: 'Manufacturer Hub', desc: 'Find and manage manufacturers',  accent: PURPLE, badge: true, route: '/manufacturer-hub' },
-  { icon: 'users',   label: 'Customers',        desc: 'Browse your customer list',      accent: PURPLE_LIGHT, route: '/customer-accounts' },
+  { icon: 'archive',   label: 'Inventory',        desc: 'Track stock levels',             accent: BLUE,   route: '/inventory' },
+  { icon: 'truck',     label: 'Shipping',         desc: 'Rates, zones and carriers',      accent: ORANGE, route: '/shipping' },
+  { icon: 'tool',      label: 'Manufacturer Hub', desc: 'Find and manage manufacturers',  accent: PURPLE, badge: true, route: '/manufacturer-hub' },
+  { icon: 'users',     label: 'Customers',        desc: 'Browse your customer list',      accent: PURPLE_LIGHT, route: '/customer-accounts' },
+  { icon: 'sun',       label: 'Vacation Mode',    desc: 'Pause your store while away',    accent: ORANGE, route: '/vacation-mode' },
 ];
 
 const GROWTH_ITEMS: NavItem[] = [
-  { icon: 'message-circle', label: 'Messages',  desc: 'Read and reply to buyer DMs',  accent: PURPLE, route: '/seller-inbox' },
-  { icon: 'trending-up',    label: 'Marketing', desc: 'Campaigns and promotions',      accent: ORANGE, route: '/(tabs)/marketing' },
-  { icon: 'bar-chart-2',    label: 'Analytics', desc: 'Sales, traffic and insights',   accent: BLUE,   route: '/(tabs)/analytics' },
-  { icon: 'video',          label: 'Content',   desc: 'Posts, drafts and scheduled',   accent: CYAN,   route: '/content' },
-  { icon: 'briefcase',      label: 'Community', desc: 'Hire freelance creatives',      accent: CYAN,   route: '/community' },
+  { icon: 'message-circle', label: 'Messages',   desc: 'Read and reply to buyer DMs',       accent: PURPLE, route: '/seller-inbox' },
+  { icon: 'zap',            label: 'Boost Posts', desc: 'Promote content for wider reach',   accent: GOLD,   route: '/boost' },
+  { icon: 'trending-up',    label: 'Marketing',  desc: 'Campaigns and promotions',           accent: ORANGE, route: '/(tabs)/marketing' },
+  { icon: 'bar-chart-2',    label: 'Analytics',  desc: 'Sales, traffic and insights',        accent: BLUE,   route: '/(tabs)/analytics' },
+  { icon: 'video',          label: 'Content',    desc: 'Posts, drafts and scheduled',        accent: CYAN,   route: '/content' },
+  { icon: 'briefcase',      label: 'Community',  desc: 'Hire freelance creatives',           accent: CYAN,   route: '/community' },
 ];
 
 const MONEY_ITEMS: NavItem[] = [
