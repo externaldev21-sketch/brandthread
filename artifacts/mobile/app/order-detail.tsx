@@ -23,15 +23,230 @@ import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, StatusBadge, SectionHeader, EmptyState,
 } from '@/components/BrandthreadUI';
-import {
-  getOrder, markProcessing, markReadyToShip, markShipped,
-  markDelivered, addOrderNote, cancelOrder, updateReturnStatus,
-  addTracking,
-} from '@/services/orderService';
+import { useApi } from '@/lib/api';
 import {
   Order, PAYOUT_MILESTONES, CANCELLATION_REASONS,
   CancellationReason, ReturnStatus, RETURN_REASONS,
+  OrderStatus, FulfillmentType, FulfillmentStatus,
+  OrderAddress, OrderLineItem, Fulfillment, Shipment,
+  OrderTimelineEvent, PaymentSummary,
 } from '@/services/orderTypes';
+
+// ─── API → Order adapter ──────────────────────────────────────────────────────
+
+function adaptApiOrder(raw: any): Order {
+  const customer = raw.customer ?? null;
+  const items: any[] = raw.items ?? [];
+
+  // DB status → UI order status
+  const statusMap: Record<string, OrderStatus> = {
+    pending:        'new',
+    processing:     'processing',
+    fulfilled:      'ready_to_ship',
+    shipped:        'shipped',
+    delivered:      'delivered',
+    cancelled:      'cancelled',
+    refunded:       'refunded',
+    refund_pending: 'cancelled',  // order was cancelled; refund may need manual resolution
+    disputed:       'disputed',
+  };
+  const uiStatus: OrderStatus = statusMap[raw.status] ?? 'cancelled';
+
+  // Derive payment status from DB order status
+  type PaymentStatus = 'pending' | 'authorized' | 'paid' | 'partially_refunded' | 'refunded' | 'voided' | 'failed';
+  const paymentStatusMap: Record<string, PaymentStatus> = {
+    pending:        'pending',
+    processing:     'paid',
+    fulfilled:      'paid',
+    shipped:        'paid',
+    delivered:      'paid',
+    cancelled:      'voided',
+    refunded:       'refunded',
+    refund_pending: 'authorized',  // payment received but refund not yet confirmed — shows WARNING
+    disputed:       'partially_refunded',
+  };
+  const uiPaymentStatus: PaymentStatus = paymentStatusMap[raw.status] ?? 'pending';
+  const isRefundPending = raw.status === 'refund_pending';
+
+  // Parse shipping address (stored as JSON in DB)
+  const defaultAddr: OrderAddress = {
+    name: customer?.name ?? 'Customer',
+    line1: '', city: '', state: '', zip: '', country: 'US',
+  };
+  let shippingAddr: OrderAddress = defaultAddr;
+  if (raw.shippingAddress) {
+    try {
+      const sa = typeof raw.shippingAddress === 'string'
+        ? JSON.parse(raw.shippingAddress)
+        : raw.shippingAddress;
+      shippingAddr = {
+        name:    sa.name    ?? customer?.name ?? 'Customer',
+        line1:   sa.street  ?? sa.line1 ?? '',
+        line2:   sa.line2,
+        city:    sa.city    ?? '',
+        state:   sa.state   ?? '',
+        zip:     sa.zip     ?? '',
+        country: sa.country ?? 'US',
+        phone:   sa.phone,
+      };
+    } catch { /* keep defaultAddr */ }
+  }
+
+  // Line items
+  const lineItems: OrderLineItem[] = items.map((item: any) => ({
+    id:               item.id,
+    productId:        item.variantId ?? item.id,
+    productName:      item.productName,
+    variant:          item.variantLabel ?? '',
+    sku:              undefined,
+    quantity:         item.quantity,
+    unitPrice:        (item.priceCents ?? 0) / 100,
+    discountAmount:   0,
+    taxAmount:        0,
+    total:            ((item.priceCents ?? 0) * item.quantity) / 100,
+    fulfillmentSource: 'seller' as FulfillmentType,
+    isPreOrder:       false,
+  }));
+
+  const totalDollars    = (raw.totalCents    ?? 0) / 100;
+  const subtotalDollars = (raw.subtotalCents ?? 0) / 100;
+  const shippingDollars = (raw.shippingCents ?? 0) / 100;
+
+  const groupId = `group-${raw.id}`;
+  const groupStatus: FulfillmentStatus =
+    uiStatus === 'shipped' || uiStatus === 'delivered' ? 'fulfilled' :
+    uiStatus === 'cancelled' ? 'cancelled' : 'unfulfilled';
+
+  const fulfillment: Fulfillment = {
+    id:      `fulfill-${raw.id}`,
+    orderId: raw.id,
+    groups: [{
+      id:         groupId,
+      orderId:    raw.id,
+      type:       'seller',
+      status:     groupStatus,
+      lineItemIds: lineItems.map(li => li.id),
+      createdAt:  raw.createdAt,
+      updatedAt:  raw.updatedAt ?? raw.createdAt,
+    }],
+    type:     'seller',
+    status:   groupStatus,
+    isPicked: false,
+    isPacked: false,
+  };
+
+  const shipments: Shipment[] = raw.trackingNumber
+    ? [{
+        id:                `shipment-${raw.id}`,
+        orderId:           raw.id,
+        fulfillmentGroupId: groupId,
+        carrier:           raw.carrier ?? undefined,
+        trackingNumber:    raw.trackingNumber,
+        trackingEvents:    [],
+        isDemo:            false,
+        shippedAt:         raw.shippedAt ?? undefined,
+      }]
+    : [];
+
+  const timeline: OrderTimelineEvent[] = [
+    {
+      id:                `tl-created-${raw.id}`,
+      type:              'order_created',
+      message:           'Order created',
+      isCustomerVisible: true,
+      isSystemEvent:     true,
+      isSellerNote:      false,
+      createdAt:         raw.createdAt,
+    },
+  ];
+  if (raw.shippedAt) {
+    timeline.push({
+      id:                `tl-shipped-${raw.id}`,
+      type:              'shipped',
+      message:           `Order shipped${raw.carrier ? ` via ${raw.carrier}` : ''}${raw.trackingNumber ? ` · ${raw.trackingNumber}` : ''}`,
+      isCustomerVisible: true,
+      isSystemEvent:     true,
+      isSellerNote:      false,
+      createdAt:         raw.shippedAt,
+    });
+  }
+
+  const initials = customer?.name
+    ? customer.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
+    : 'C';
+
+  return {
+    id:          raw.id,
+    orderNumber: raw.orderNumber,
+    sellerId:    raw.ownerId ?? '',
+    sellerName:  '',
+    sellerHandle: '',
+    source:       'app',
+    salesChannel: 'Brandthread',
+    status:          uiStatus,
+    paymentStatus:   uiPaymentStatus,
+    fulfillmentStatus: groupStatus === 'fulfilled' ? 'fulfilled' : 'unfulfilled',
+    fulfillmentType: 'seller',
+    riskLevel: 'low',
+    riskFlags: [],
+    customer: {
+      id:            customer?.id ?? '',
+      name:          customer?.name ?? 'Customer',
+      email:         customer?.email ?? '',
+      phone:         customer?.phone ?? undefined,
+      initials,
+      totalOrders:   customer?.orderCount ?? 1,
+      lifetimeValue: (customer?.totalSpentCents ?? 0) / 100,
+      tags:          customer?.tags ?? [],
+      shippingAddress: shippingAddr,
+      billingAddress:  shippingAddr,
+    },
+    lineItems,
+    fulfillment,
+    payment: {
+      subtotal:                subtotalDollars,
+      discountTotal:           0,
+      shippingTotal:           shippingDollars,
+      taxTotal:                0,
+      total:                   totalDollars,
+      // Payment was received for active/shipped/delivered; held in limbo for refund_pending
+      amountPaid:              isRefundPending ? 0 : (uiStatus === 'cancelled' || uiStatus === 'refunded') ? 0 : totalDollars,
+      amountRefunded:          uiStatus === 'refunded' ? totalDollars : 0,
+      amountHeld:              isRefundPending ? totalDollars : 0,
+      amountPending:           0,
+      sellerAllocation:        subtotalDollars,
+      manufacturerAllocation:  0,
+      shippingLabelAllocation: shippingDollars,
+      platformFee:             0,
+      payoutStatus:            isRefundPending ? 'held' : uiStatus === 'refunded' ? 'paid' : 'pending',
+    },
+    shipments,
+    labels:    [],
+    returns:   [],
+    refunds:   [],
+    disputes:  [],
+    timeline,
+    notes: isRefundPending
+      ? [{
+          id:         `note-refund-pending-${raw.id}`,
+          orderId:    raw.id,
+          type:       'internal' as const,
+          content:    '⚠️ This order was cancelled and a refund was attempted automatically, but the refund may not have completed. Please verify in your Stripe dashboard and issue a manual refund if needed.',
+          isPinned:   true,
+          fileIds:    [],
+          authorName: 'System',
+          createdAt:  raw.updatedAt ?? raw.createdAt,
+        }]
+      : [],
+    hasUnreadMessage:       false,
+    isPreOrder:             false,
+    isManufacturerFulfilled: false,
+    currency: 'USD',
+    tags:     [],
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt ?? raw.createdAt,
+  };
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -136,6 +351,7 @@ export default function OrderDetailScreen() {
   const { id, tab } = useLocalSearchParams<{ id: string; tab?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const api = useApi();
 
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -160,10 +376,15 @@ export default function OrderDetailScreen() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const o = await getOrder(id);
-    setOrder(o ?? null);
-    setLoading(false);
-  }, [id]);
+    try {
+      const raw = await api.orders.get(id);
+      setOrder(adaptApiOrder(raw));
+    } catch {
+      setOrder(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [id, api]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -171,25 +392,25 @@ export default function OrderDetailScreen() {
 
   async function handleMarkProcessing() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await markProcessing(id);
+    try { await api.orders.updateStatus(id, 'processing'); } catch (e: any) { Alert.alert('Error', e.message); return; }
     load();
   }
 
   async function handleMarkReadyToShip() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await markReadyToShip(id);
+    try { await api.orders.updateStatus(id, 'fulfilled'); } catch (e: any) { Alert.alert('Error', e.message); return; }
     load();
   }
 
   async function handleMarkShipped() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await markShipped(id);
+    try { await api.orders.updateStatus(id, 'shipped'); } catch (e: any) { Alert.alert('Error', e.message); return; }
     load();
   }
 
   async function handleMarkDelivered() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await markDelivered(id);
+    try { await api.orders.updateStatus(id, 'delivered'); } catch (e: any) { Alert.alert('Error', e.message); return; }
     load();
   }
 
@@ -199,19 +420,36 @@ export default function OrderDetailScreen() {
       return;
     }
     setCancelling(true);
-    await cancelOrder(id, cancelReason, cancelNote || undefined);
-    setCancelling(false);
-    setShowCancelModal(false);
+    try {
+      await api.orders.updateStatus(id, 'cancelled');
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    } finally {
+      setCancelling(false);
+      setShowCancelModal(false);
+    }
     load();
   }
 
   async function handleAddNote() {
     if (!noteText.trim()) return;
     setAddingNote(true);
-    await addOrderNote(id, noteText.trim(), noteType);
+    // Notes are stored locally (no API endpoint) — optimistically append
+    if (order) {
+      const newNote = {
+        id: `note-${Date.now()}`,
+        orderId: id,
+        type: noteType,
+        content: noteText.trim(),
+        isPinned: false,
+        fileIds: [],
+        authorName: 'You',
+        createdAt: new Date().toISOString(),
+      };
+      setOrder({ ...order, notes: [...order.notes, newNote] });
+    }
     setNoteText('');
     setAddingNote(false);
-    load();
   }
 
   async function handleAddTracking(groupId: string) {
@@ -220,23 +458,46 @@ export default function OrderDetailScreen() {
       Alert.alert('Missing info', 'Please enter carrier and tracking number.');
       return;
     }
-    await addTracking(id, form.carrier.trim(), form.tracking.trim());
+    try {
+      await api.orders.addTracking(id, {
+        trackingNumber: form.tracking.trim(),
+        carrier:        form.carrier.trim(),
+      });
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+      return;
+    }
     setTrackingForms(prev => ({ ...prev, [groupId]: { ...prev[groupId], visible: false } }));
     load();
   }
 
+  async function handleAddTrackingQuick(carrier: string, trackingNumber: string) {
+    try {
+      await api.orders.addTracking(id, { trackingNumber, carrier });
+      load();
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+    }
+  }
+
   async function handlePinNote(noteId: string, current: boolean) {
     if (!order) return;
-    // Toggle pin locally (service doesn't expose togglePin, update in-memory and reload)
-    const note = order.notes.find(n => n.id === noteId);
-    if (note) { note.isPinned = !current; }
-    setOrder({ ...order, notes: [...order.notes] });
+    // Toggle pin locally (no API endpoint)
+    setOrder({
+      ...order,
+      notes: order.notes.map(n => n.id === noteId ? { ...n, isPinned: !current } : n),
+    });
   }
 
   async function handleReturnAction(returnId: string, status: ReturnStatus, deniedReason?: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await updateReturnStatus(id, returnId, status, deniedReason);
-    load();
+    // Returns not yet wired to API — update locally
+    if (order) {
+      setOrder({
+        ...order,
+        returns: order.returns.map(r => r.id === returnId ? { ...r, status, deniedReason } : r),
+      });
+    }
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
@@ -303,7 +564,7 @@ export default function OrderDetailScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {activeTab === 'overview'    && <OverviewTab order={order} onMarkProcessing={handleMarkProcessing} onMarkReadyToShip={handleMarkReadyToShip} onMarkShipped={handleMarkShipped} onMarkDelivered={handleMarkDelivered} onCancelPress={() => setShowCancelModal(true)} router={router} reload={load} />}
+        {activeTab === 'overview'    && <OverviewTab order={order} onMarkProcessing={handleMarkProcessing} onMarkReadyToShip={handleMarkReadyToShip} onMarkShipped={handleMarkShipped} onMarkDelivered={handleMarkDelivered} onCancelPress={() => setShowCancelModal(true)} router={router} reload={load} onAddTrackingQuick={handleAddTrackingQuick} />}
         {activeTab === 'customer'    && <CustomerTab order={order} />}
         {activeTab === 'payment'     && <PaymentTab order={order} />}
         {activeTab === 'fulfillment' && <FulfillmentTab order={order} trackingForms={trackingForms} setTrackingForms={setTrackingForms} onAddTracking={handleAddTracking} onMarkShipped={handleMarkShipped} onShowTracking={(sid) => setTrackingModalShipmentId(sid)} router={router} />}
@@ -343,7 +604,7 @@ export default function OrderDetailScreen() {
               <View style={s.warningRow}>
                 <Feather name="alert-triangle" size={ICON.sm} color={RED} />
                 <Text style={s.warningText}>
-                  This will refund {usd(order.payment.amountPaid - order.payment.amountRefunded)} to customer. This cannot be undone.
+                  This will cancel the order. Any refund must be issued separately through your payment provider. This cannot be undone.
                 </Text>
               </View>
             </BrandthreadCard>
@@ -393,7 +654,7 @@ export default function OrderDetailScreen() {
 // TAB: OVERVIEW
 // ═══════════════════════════════════════════════════════
 
-function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped, onMarkDelivered, onCancelPress, router, reload }: {
+function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped, onMarkDelivered, onCancelPress, router, reload, onAddTrackingQuick }: {
   order: Order;
   onMarkProcessing: () => void;
   onMarkReadyToShip: () => void;
@@ -402,6 +663,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
   onCancelPress: () => void;
   router: ReturnType<typeof useRouter>;
   reload: () => void;
+  onAddTrackingQuick: (carrier: string, trackingNumber: string) => Promise<void>;
 }) {
   const [addingTracking, setAddingTracking] = useState(false);
   const [trackingCarrier, setTrackingCarrier] = useState('');
@@ -412,8 +674,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
       Alert.alert('Missing info', 'Enter carrier and tracking number.');
       return;
     }
-    await addTracking(order.id, trackingCarrier.trim(), trackingNum.trim());
-    reload();
+    await onAddTrackingQuick(trackingCarrier.trim(), trackingNum.trim());
     setAddingTracking(false);
   }
 

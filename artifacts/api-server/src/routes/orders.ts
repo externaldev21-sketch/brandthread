@@ -1,6 +1,6 @@
 import { Router } from "express";
 import crypto from "crypto";
-import { db, orders, orderItems, customers, drops, productVariants, products, notificationsFeed } from "@workspace/db";
+import { db, orders, orderItems, customers, drops, productVariants, products, notificationsFeed, users } from "@workspace/db";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 
@@ -202,9 +202,30 @@ router.get("/:id", async (req, res) => {
     .limit(1);
   if (!order) { res.status(404).json({ error: "Not found" }); return; }
   const items = await db.select().from(orderItems).where(eq(orderItems.orderId, order.id));
-  const [customer] = order.customerId
-    ? await db.select().from(customers).where(eq(customers.id, order.customerId)).limit(1)
-    : [null];
+
+  // Resolve customer: prefer the customers record, fall back to the buyer's user row
+  let customer: any = null;
+  if (order.customerId) {
+    const [c] = await db.select().from(customers)
+      .where(eq(customers.id, order.customerId)).limit(1);
+    customer = c ?? null;
+  }
+  if (!customer && order.buyerId) {
+    const [u] = await db.select({
+      id:          users.id,
+      // Prefer displayName (brand/buyer alias) when set; fall back to the required name field
+      name:        sql<string>`COALESCE(NULLIF(${users.displayName}, ''), ${users.name})`,
+      email:       users.email,
+      orderCount:  sql<number>`1`,
+      totalSpentCents: sql<number>`0`,
+      tags:        sql<string[]>`ARRAY[]::text[]`,
+    }).from(users)
+      .where(eq(users.clerkId, order.buyerId)).limit(1);
+    if (u) {
+      customer = u;
+    }
+  }
+
   res.json({ ...order, items, customer });
 });
 
@@ -212,7 +233,7 @@ router.get("/:id", async (req, res) => {
 router.patch("/:id/status", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { status } = req.body;
-  const valid = ["pending", "processing", "fulfilled", "shipped", "cancelled"];
+  const valid = ["pending", "processing", "fulfilled", "shipped", "delivered", "cancelled"];
   if (!valid.includes(status)) {
     res.status(400).json({ error: `status must be one of: ${valid.join(", ")}` }); return;
   }
