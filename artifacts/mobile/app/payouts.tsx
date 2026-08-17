@@ -9,6 +9,8 @@ import {
   CYAN, CYAN_DIM, SUCCESS, RED, ORANGE, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useApi } from '@/lib/api';
+import { parseRoleError } from '@/lib/roleError';
+import { RoleLockedView } from '@/components/RoleLockedView';
 
 type PayoutStatus = 'paid' | 'pending' | 'in_transit' | 'failed';
 
@@ -45,6 +47,7 @@ export default function PayoutsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api    = useApi();
+  const [lockedRole, setLockedRole] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'payouts' | 'settings'>('payouts');
   const [loading,   setLoading]   = useState(true);
   const [balance,   setBalance]   = useState<any>(null);
@@ -66,7 +69,11 @@ export default function PayoutsScreen() {
         bankLast4:  p.destination?.last4 ?? '····',
         ordersCount: 0,
       })));
-    } catch { /* stay with empty state if not connected */ }
+    } catch (err) {
+      const roleErr = parseRoleError(err);
+      if (roleErr) setLockedRole(roleErr.currentRole);
+      // else stay with empty state if not connected
+    }
     setLoading(false);
   }, []);
 
@@ -81,6 +88,21 @@ export default function PayoutsScreen() {
   const nextDate   = balance?.nextPayout
     ? fmtDate(balance.nextPayout.arrivalDate)
     : '—';
+
+  if (lockedRole) {
+    return (
+      <View style={[styles.root, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => { haptic(); router.back(); }} style={styles.backBtn}>
+            <Feather name="chevron-left" size={24} color={FG} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Payouts</Text>
+          <View style={styles.backBtn} />
+        </View>
+        <RoleLockedView screenTitle="payouts" currentRole={lockedRole} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>

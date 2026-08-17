@@ -12,6 +12,8 @@ import {
 } from '@/lib/theme';
 import { useApi } from '@/hooks/useApi';
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
+import { parseRoleError } from '@/lib/roleError';
+import { RoleLockedView } from '@/components/RoleLockedView';
 
 // ─── Static plan catalogue ────────────────────────────────────────────────────
 
@@ -91,6 +93,7 @@ export default function SubscriptionScreen() {
   const api = useApi();
 
   const [activeTab, setActiveTab] = useState<'plan' | 'usage' | 'billing'>('plan');
+  const [lockedRole, setLockedRole] = useState<string | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
   const [currentPlan, setCurrentPlan] = useState({
     name:               'Starter',
@@ -123,7 +126,11 @@ export default function SubscriptionScreen() {
           paymentMethodLabel: data.paymentMethodLabel,
         });
       })
-      .catch(() => { /* keep defaults (Starter / free) */ })
+      .catch((err: unknown) => {
+        const roleErr = parseRoleError(err);
+        if (roleErr) setLockedRole(roleErr.currentRole);
+        // else keep defaults (Starter / free)
+      })
       .finally(() => setStatusLoading(false));
   }, [api]);
 
@@ -191,6 +198,21 @@ export default function SubscriptionScreen() {
     : currentPlan.status === 'canceled' ? 'Cancelled'
     : currentPlan.name !== 'Starter'    ? 'Active'
     : 'Free';
+
+  if (lockedRole) {
+    return (
+      <View style={[styles.root, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => { haptic(); router.back(); }} style={styles.backBtn}>
+            <Feather name="chevron-left" size={24} color={FG} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Subscription</Text>
+          <View style={styles.backBtn} />
+        </View>
+        <RoleLockedView screenTitle="subscription & billing" currentRole={lockedRole} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>

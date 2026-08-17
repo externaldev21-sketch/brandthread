@@ -6,6 +6,8 @@ import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
+import { parseRoleError } from '@/lib/roleError';
+import { RoleLockedView } from '@/components/RoleLockedView';
 
 function fmtCents(cents: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
@@ -28,6 +30,7 @@ export default function FinanceScreen() {
   const colors = useColors();
   const router = useRouter();
   const api = useApi();
+  const [lockedRole, setLockedRole] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [balance,      setBalance]      = useState<any>(null);
   const [loading,      setLoading]      = useState(true);
@@ -41,7 +44,11 @@ export default function FinanceScreen() {
       ]);
       setBalance(bal);
       setTransactions(txs.transactions ?? []);
-    } catch { /* stay with empty if not connected */ }
+    } catch (err) {
+      const roleErr = parseRoleError(err);
+      if (roleErr) setLockedRole(roleErr.currentRole);
+      // else stay with empty if not connected
+    }
     setLoading(false);
   }, []);
 
@@ -79,6 +86,15 @@ export default function FinanceScreen() {
     { label: 'Fees',          value: '-' + fmtCents(transactions.reduce((a, t) => a + Math.abs(t.fee ?? 0), 0)),        positive: false },
     { label: 'Net Total',     value: fmtCents(Math.abs(totalNet)), positive: totalNet >= 0, highlight: true },
   ];
+
+  if (lockedRole) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ScreenHeader title="Finance" subtitle="P&L, cash flow & expenses" />
+        <RoleLockedView screenTitle="finance" currentRole={lockedRole} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

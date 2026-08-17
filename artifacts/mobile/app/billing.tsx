@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, Linking, Share } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useApi } from '@/lib/api';
+import { parseRoleError } from '@/lib/roleError';
+import { RoleLockedView } from '@/components/RoleLockedView';
 
 type BillFilter = 'all' | 'paid' | 'unpaid';
 
@@ -17,8 +20,20 @@ const BILLS = [
 export default function BillingScreen() {
   const colors = useColors();
   const router = useRouter();
+  const api = useApi();
   const [bannerVisible, setBannerVisible] = useState(true);
   const [filter, setFilter] = useState<BillFilter>('all');
+  const [lockedRole, setLockedRole] = useState<string | null>(null);
+
+  // Check role access on mount by calling an owner-only endpoint.
+  // Staff/manager will get 403 ROLE_REQUIRED immediately.
+  useEffect(() => {
+    api.seller.subscription.status().catch((err: unknown) => {
+      const roleErr = parseRoleError(err);
+      if (roleErr) setLockedRole(roleErr.currentRole);
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function haptic() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -49,6 +64,15 @@ export default function BillingScreen() {
     if (filter === 'all') return true;
     return b.status.toLowerCase() === filter;
   });
+
+  if (lockedRole) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ScreenHeader title="Billing" />
+        <RoleLockedView screenTitle="billing" currentRole={lockedRole} />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
