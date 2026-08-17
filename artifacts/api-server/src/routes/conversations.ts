@@ -17,6 +17,7 @@
 import { Router } from "express";
 import {
   db, conversations, conversationParticipants, messages, blocks, follows, users,
+  products, orders,
 } from "@workspace/db";
 import { eq, and, desc, inArray, sql, or } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -312,11 +313,12 @@ router.post("/:id/messages", async (req, res) => {
     replyToId?: string;
   };
 
-  if (!text?.trim()) return res.status(400).json({ error: "text required" });
+  // Require either text or an attachment
+  if (!text?.trim() && !attachment) return res.status(400).json({ error: "text or attachment required" });
 
   // ── Content moderation ───────────────────────────────────────────────────
   // Casual profanity passes freely; only genuinely harmful content is blocked.
-  const modResult = moderateMessage(text);
+  const modResult = text?.trim() ? moderateMessage(text) : { blocked: false };
   if (modResult.blocked) {
     return res.status(422).json({
       error:    modResult.reason ?? "Message was flagged by safety filters.",
@@ -352,13 +354,61 @@ router.post("/:id/messages", async (req, res) => {
     }
   }
 
+  // ── Attachment validation ────────────────────────────────────────────────
+  if (attachment != null) {
+    const att = attachment as { type?: string; title?: string; subtitle?: string; meta?: { productId?: string; orderId?: string } };
+    const allowedTypes = ["product", "order", "post", "profile"];
+    if (!att.type || !allowedTypes.includes(att.type)) {
+      return res.status(400).json({ error: "Invalid attachment type." });
+    }
+
+    if (att.type === "product") {
+      // productId is required and must belong to the sender with status 'active'
+      const pid = att.meta?.productId;
+      if (!pid) return res.status(400).json({ error: "Attachment product requires meta.productId." });
+      const [product] = await db
+        .select({ id: products.id, ownerId: products.ownerId, status: products.status })
+        .from(products)
+        .where(eq(products.id, pid))
+        .limit(1);
+      if (!product) return res.status(400).json({ error: "Attached product not found." });
+      if (product.ownerId !== userId) return res.status(403).json({ error: "You can only attach your own products." });
+      if (product.status !== "active") return res.status(400).json({ error: "Only active products can be attached." });
+    }
+
+    if (att.type === "order") {
+      // For order attachments, orderId must match the conversation's contextOrderId
+      // and the conversation must belong to the sender
+      const [conv] = await db
+        .select({ contextOrderId: conversations.contextOrderId })
+        .from(conversations)
+        .where(eq(conversations.id, id))
+        .limit(1);
+      const orderId = att.meta?.orderId ?? conv?.contextOrderId ?? null;
+      if (!orderId) return res.status(400).json({ error: "No order linked to this conversation." });
+      const [order] = await db
+        .select({ id: orders.id, ownerId: orders.ownerId })
+        .from(orders)
+        .where(eq(orders.id, orderId))
+        .limit(1);
+      if (!order) return res.status(400).json({ error: "Attached order not found." });
+      if (order.ownerId !== userId) return res.status(403).json({ error: "You can only attach your own orders." });
+      // Normalize meta to include the validated orderId
+      (att as any).meta = { ...((att as any).meta ?? {}), orderId };
+    }
+  }
+
+  const bodyText = text?.trim() ?? "";
+  const attachmentTitle = (attachment as any)?.title as string | undefined;
+  const previewText = bodyText || (attachmentTitle ? `📎 ${attachmentTitle}` : "Attachment");
+
   const [msg] = await db.insert(messages).values({
     conversationId: id,
     senderId:       userId,
     senderName:     sender.name,
     senderInitials: sender.initials,
     senderColor:    sender.color,
-    body:           text.trim(),
+    body:           bodyText,
     attachment:     attachment ?? null,
     replyToId:      replyToId ?? null,
     status:         "sent",
@@ -367,7 +417,7 @@ router.post("/:id/messages", async (req, res) => {
   // Update conversation preview + increment other participants' unread
   await Promise.all([
     db.update(conversations)
-      .set({ lastMessage: text.trim().slice(0, 100), lastMessageAt: new Date(), updatedAt: new Date() })
+      .set({ lastMessage: previewText.slice(0, 100), lastMessageAt: new Date(), updatedAt: new Date() })
       .where(eq(conversations.id, id)),
     db.update(conversationParticipants)
       .set({ unreadCount: sql`unread_count + 1` })
@@ -388,7 +438,7 @@ router.post("/:id/messages", async (req, res) => {
             category:      "messages",
             type:          notifType,
             title:         `New message from ${sender.name || "someone"}`,
-            body:          text.trim().slice(0, 100),
+            body:          previewText.slice(0, 100),
             actorName:     sender.name,
             actorHandle:   sender.handle,
             actorInitials: sender.initials,
