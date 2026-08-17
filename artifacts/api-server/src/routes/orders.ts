@@ -233,19 +233,52 @@ router.get("/:id", async (req, res) => {
   res.json({ ...order, items, customer });
 });
 
+// Recognized cancellation reasons — kept in sync with mobile orderTypes.ts
+const VALID_CANCELLATION_REASONS = [
+  "customer_request", "out_of_stock", "production_issue",
+  "fraud_risk", "shipping_restriction", "duplicate_order",
+  "seller_decision", "other",
+] as const;
+const CANCELLATION_NOTES_MAX_LENGTH = 1000;
+
 // PATCH /api/orders/:id/status — fulfillment (staff+)
 router.patch("/:id/status", requireRole("staff"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const { status } = req.body;
+  const { status, reason, notes } = req.body;
   const valid = ["pending", "processing", "fulfilled", "shipped", "delivered", "cancelled"];
   if (!valid.includes(status)) {
     res.status(400).json({ error: `status must be one of: ${valid.join(", ")}` }); return;
   }
 
+  // Cancellation-specific validation
+  if (status === "cancelled") {
+    if (!reason) {
+      res.status(400).json({ error: "reason is required when cancelling an order" }); return;
+    }
+    if (!VALID_CANCELLATION_REASONS.includes(reason as any)) {
+      res.status(400).json({ error: `reason must be one of: ${VALID_CANCELLATION_REASONS.join(", ")}` }); return;
+    }
+    if (notes !== undefined) {
+      if (typeof notes !== "string") {
+        res.status(400).json({ error: "notes must be a string" }); return;
+      }
+      if (notes.length > CANCELLATION_NOTES_MAX_LENGTH) {
+        res.status(400).json({ error: `notes must be ${CANCELLATION_NOTES_MAX_LENGTH} characters or fewer` }); return;
+      }
+    }
+  }
+
+  // Build the update payload — include cancellation fields when cancelling
+  const updatePayload: Record<string, any> = { status, updatedAt: new Date() };
+  if (status === "cancelled") {
+    updatePayload.cancellationReason = reason;
+    updatePayload.cancellationNotes  = (notes as string | undefined)?.trim() || null;
+  }
+
   // Atomically update only when status is actually changing — prevents duplicate notifications
   // from concurrent retries that both read the old status before either write completes.
   const [transitioned] = await db.update(orders)
-    .set({ status, updatedAt: new Date() })
+    .set(updatePayload)
     .where(and(
       eq(orders.id, req.params.id),
       eq(orders.ownerId, ownerId),
@@ -267,15 +300,18 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
     void logActivity(
       actor.ownerClerkId, actor.actorClerkId, actor.actorRole,
       `Marked order #${transitioned.orderNumber} as ${status}`,
-      "order", transitioned.id, { status },
+      "order", transitioned.id, { status, reason, notes },
     );
   }
 
   // Genuine transition — notify buyer for meaningful statuses
+  const cancellationReasonLabel = reason
+    ? ` Reason: ${reason.replace(/_/g, " ")}.`
+    : "";
   const notifMap: Record<string, { type: string; title: string; body: string } | undefined> = {
     shipped:   { type: "order_shipped",   title: "Your order has shipped! 🚚", body: `Order #${transitioned.orderNumber} is on its way.` },
     delivered: { type: "order_delivered", title: "Your order was delivered! 📦", body: `Order #${transitioned.orderNumber} has been delivered.` },
-    cancelled: { type: "order_cancelled", title: "Order cancelled", body: `Order #${transitioned.orderNumber} has been cancelled.` },
+    cancelled: { type: "order_cancelled", title: "Order cancelled", body: `Order #${transitioned.orderNumber} has been cancelled.${cancellationReasonLabel}` },
   };
   const notif = notifMap[status];
   if (transitioned.buyerId && notif) {

@@ -172,6 +172,9 @@ export const orders = pgTable('orders', {
   discountAmountCents: integer('discount_amount_cents').notNull().default(0),
   // Post/video that drove the Shop button click (attribution)
   sourcePostId: text('source_post_id'),
+  // Cancellation fields
+  cancellationReason: text('cancellation_reason'),
+  cancellationNotes:  text('cancellation_notes'),
   // Stripe payment fields
   stripePaymentIntentId: text('stripe_payment_intent_id'),
   stripeCheckoutSessionId: text('stripe_checkout_session_id'),

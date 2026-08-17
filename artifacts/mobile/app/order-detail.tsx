@@ -362,6 +362,7 @@ export default function OrderDetailScreen() {
   const [cancelReason, setCancelReason] = useState<CancellationReason | null>(null);
   const [cancelNote, setCancelNote] = useState('');
   const [cancelling, setCancelling] = useState(false);
+  const [cancelConfirmed, setCancelConfirmed] = useState(false);
 
   // Note form
   const [noteText, setNoteText] = useState('');
@@ -421,12 +422,18 @@ export default function OrderDetailScreen() {
     }
     setCancelling(true);
     try {
-      await api.orders.updateStatus(id, 'cancelled');
+      await api.orders.updateStatus(id, 'cancelled', {
+        reason: cancelReason,
+        notes:  cancelNote.trim() || undefined,
+      });
+      setShowCancelModal(false);
+      setCancelConfirmed(true);
+      // Auto-dismiss the banner after 6 seconds
+      setTimeout(() => setCancelConfirmed(false), 6000);
     } catch (e: any) {
       Alert.alert('Error', e.message);
     } finally {
       setCancelling(false);
-      setShowCancelModal(false);
     }
     load();
   }
@@ -556,6 +563,17 @@ export default function OrderDetailScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      {/* Cancellation confirmed banner */}
+      {cancelConfirmed && (
+        <View style={s.cancelBanner}>
+          <Feather name="check-circle" size={ICON.sm} color={FG} />
+          <Text style={s.cancelBannerText}>Order cancelled successfully.</Text>
+          <TouchableOpacity onPress={() => setCancelConfirmed(false)}>
+            <Feather name="x" size={ICON.sm} color={FG} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Content */}
       <ScrollView
@@ -1517,6 +1535,8 @@ const s = StyleSheet.create({
   warningCard:      { borderColor: RED + '44' },
   warningRow:       { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start' },
   warningText:      { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: RED, lineHeight: 20 },
+  cancelBanner:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: '#1A3A2A', borderBottomWidth: 1, borderBottomColor: SUCCESS + '55', paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  cancelBannerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
 
   // Tracking modal
   trackingEventRow: { flexDirection: 'row', gap: SP.sm, marginBottom: SP.sm },

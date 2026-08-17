@@ -127,7 +127,8 @@ export function createApi(getToken: GetToken) {
       list:           ()                       => get('/api/orders'),
       get:            (id: string)             => get(`/api/orders/${id}`),
       create:         (body: unknown)          => post('/api/orders', body),
-      updateStatus:   (id: string, status: string) => patch(`/api/orders/${id}/status`, { status }),
+      updateStatus:   (id: string, status: string, opts?: { reason?: string; notes?: string }) =>
+        patch(`/api/orders/${id}/status`, { status, ...opts }),
       addTracking:    (id: string, body: unknown)  => patch(`/api/orders/${id}/tracking`, body),
     },
     customers: {
