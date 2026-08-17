@@ -1,9 +1,10 @@
 import { Router } from "express";
-import crypto from "crypto";
 import { db, orders, orderItems, customers, drops, productVariants, products, notificationsFeed, users, dropWallets, dropWalletTransactions } from "@workspace/db";
-import { eq, desc, sql, and } from "drizzle-orm";
+import { eq, desc, sql, and, ne } from "drizzle-orm";
 import { stripe, PLATFORM_COMMISSION_RATE } from "../lib/stripe";
 import { requireAuth } from "../middlewares/requireAuth";
+import { publishNotification } from "./notifications-feed";
+import { db, orders, orderItems, customers, drops, productVariants, products, users } from "@workspace/db";
 
 const router = Router();
 router.use(requireAuth);
@@ -123,11 +124,9 @@ router.post("/", async (req, res) => {
       const orderNumber = `BT-${String(count + 1).padStart(5, "0")}`;
 
       // Insert order
-      const [order] = await tx.insert(orders).values({
-        ownerId, orderNumber, customerId, dropId,
-        totalCents, subtotalCents, shippingCents,
-        notes, shippingAddress,
-      }).returning();
+  const [order] = await db.select().from(orders)
+    .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId)))
+    .limit(1);
 
       // Insert items
       await tx.insert(orderItems).values(
@@ -238,12 +237,46 @@ router.patch("/:id/status", async (req, res) => {
   if (!valid.includes(status)) {
     res.status(400).json({ error: `status must be one of: ${valid.join(", ")}` }); return;
   }
-  const [updated] = await db.update(orders)
+
+  // Atomically update only when status is actually changing — prevents duplicate notifications
+  // from concurrent retries that both read the old status before either write completes.
+  const [transitioned] = await db.update(orders)
     .set({ status, updatedAt: new Date() })
-    .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId)))
+    .where(and(
+      eq(orders.id, req.params.id),
+      eq(orders.ownerId, ownerId),
+      ne(orders.status, status),           // skip the write if already at target status
+    ))
     .returning();
-  if (!updated) { res.status(404).json({ error: "Not found" }); return; }
-  res.json(updated);
+
+  if (!transitioned) {
+    // Either not found, or order was already at the requested status (idempotent).
+    const [current] = await db.select().from(orders)
+      .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId))).limit(1);
+    if (!current) { res.status(404).json({ error: "Not found" }); return; }
+    res.json(current); return;  // Already at target status — no notification needed
+  }
+
+  // Genuine transition — notify buyer for meaningful statuses
+  const notifMap: Record<string, { type: string; title: string; body: string } | undefined> = {
+    shipped:   { type: "order_shipped",   title: "Your order has shipped! 🚚", body: `Order #${transitioned.orderNumber} is on its way.` },
+    delivered: { type: "order_delivered", title: "Your order was delivered! 📦", body: `Order #${transitioned.orderNumber} has been delivered.` },
+    cancelled: { type: "order_cancelled", title: "Order cancelled", body: `Order #${transitioned.orderNumber} has been cancelled.` },
+  };
+  const notif = notifMap[status];
+  if (transitioned.buyerId && notif) {
+    publishNotification({
+      userId:     transitioned.buyerId,
+      category:   "orders",
+      type:       notif.type,
+      title:      notif.title,
+      body:       notif.body,
+      targetId:   transitioned.id,
+      targetType: "order",
+    }).catch(() => { /* non-critical */ });
+  }
+
+  res.json(transitioned);
 });
 
 // PATCH /api/orders/:id/tracking
@@ -251,39 +284,46 @@ router.patch("/:id/tracking", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { trackingNumber, carrier } = req.body;
   if (!trackingNumber) { res.status(400).json({ error: "trackingNumber required" }); return; }
+
+  // Step 1: Atomically transition to shipped only when status isn't already shipped.
+  // This prevents duplicate ship notifications on repeated tracking updates.
+  const [statusTransition] = await db.update(orders)
+    .set({ status: "shipped", shippedAt: new Date(), updatedAt: new Date() })
+    .where(and(
+      eq(orders.id, req.params.id),
+      eq(orders.ownerId, ownerId),
+      ne(orders.status, "shipped"),        // skip write if already shipped
+    ))
+    .returning({ id: orders.id, buyerId: orders.buyerId, orderNumber: orders.orderNumber, dropId: orders.dropId, ownerId: orders.ownerId, subtotalCents: orders.subtotalCents });
+
+  // Step 2: Always update tracking fields (idempotent for repeated calls)
   const [updated] = await db.update(orders)
-    .set({ trackingNumber, carrier, status: "shipped", shippedAt: new Date(), updatedAt: new Date() })
+    .set({ trackingNumber, carrier: carrier ?? null, updatedAt: new Date() })
     .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId)))
     .returning();
   if (!updated) { res.status(404).json({ error: "Not found" }); return; }
 
-  // Notify buyer that their order has shipped (non-critical)
-  if (updated.buyerId) {
-    try {
-      const carrierLabel = carrier ? carrier : "carrier";
-      await db.insert(notificationsFeed).values({
-        id: crypto.randomUUID(),
-        userId: updated.buyerId,
-        type: 'order_update',
-        title: 'Your order has shipped! 🚚',
-        body: `Your order #${updated.orderNumber} is on its way. Tracking: ${carrierLabel} ${trackingNumber}`,
-        targetId: updated.id,
-        targetType: 'order',
-        isRead: false,
-        createdAt: new Date(),
-      });
-    } catch {
-      // Non-critical — don't fail the response over a notification error
-    }
+  // Notify buyer only when status genuinely transitioned to shipped
+  if (statusTransition?.buyerId) {
+    const carrierLabel = carrier ?? "carrier";
+    publishNotification({
+      userId:     statusTransition.buyerId,
+      category:   "orders",
+      type:       "order_shipped",
+      title:      "Your order has shipped! 🚚",
+      body:       `Order #${statusTransition.orderNumber} is on its way via ${carrierLabel} — tracking: ${trackingNumber}`,
+      targetId:   statusTransition.id,
+      targetType: "order",
+    }).catch(() => { /* non-critical */ });
   }
 
   // Auto-release drop wallet share when order ships
   // Drop order payments sit on the platform account (escrow); on ship, we
   // create a Stripe Transfer to the seller's Connect account (net of fee).
-  if (updated.dropId) {
+  if (statusTransition?.dropId) {
     setImmediate(() => {
-      autoReleaseDropOrder(updated.id, updated.ownerId, updated.dropId!, updated.subtotalCents)
-        .catch(err => console.error(`Auto drop-wallet release failed for order ${updated.id}:`, err));
+      autoReleaseDropOrder(statusTransition.id, statusTransition.ownerId, statusTransition.dropId!, statusTransition.subtotalCents)
+        .catch(err => console.error(`Auto drop-wallet release failed for order ${statusTransition.id}:`, err));
     });
   }
 

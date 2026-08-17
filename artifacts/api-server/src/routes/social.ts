@@ -13,6 +13,7 @@ import { Router } from "express";
 import { db, users, follows, stories, storyLikes, storyViews, blocks } from "@workspace/db";
 import { eq, and, or, ilike, ne, inArray, sql, gt } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { publishNotification } from "./notifications-feed";
 
 const router = Router();
 router.use(requireAuth);
@@ -75,8 +76,37 @@ router.post("/follow", async (req, res) => {
     .where(and(eq(blocks.blockerId, userId), eq(blocks.blockedId, myId))).limit(1);
   if (blockRow) { res.status(403).json({ error: "Unable to follow this user.", code: "BLOCKED" }); return; }
 
-  await db.insert(follows).values({ followerId: myId, followingId: userId })
-    .onConflictDoNothing();
+  const inserted = await db.insert(follows).values({ followerId: myId, followingId: userId })
+    .onConflictDoNothing().returning();
+
+  // Only notify when this is a genuinely new follow (not a duplicate/retry)
+  if (inserted.length > 0) {
+    (async () => {
+      try {
+        const [follower] = await db
+          .select({ name: users.name, displayName: users.displayName, username: users.username })
+          .from(users).where(eq(users.clerkId, myId)).limit(1);
+        if (follower) {
+          const displayName = follower.displayName || follower.name || "Someone";
+          const handle = follower.username ? `@${follower.username}` : undefined;
+          const inits = displayName.split(" ").slice(0, 2).map((w: string) => w[0]?.toUpperCase() ?? "").join("") || "?";
+          await publishNotification({
+            userId:        userId,
+            category:      "social",
+            type:          "new_follower",
+            title:         `${displayName} started following you`,
+            actorName:     displayName,
+            actorHandle:   handle,
+            actorInitials: inits,
+            actorColor:    "#8B5CF6",
+            targetId:      myId,
+            targetType:    "user",
+          });
+        }
+      } catch { /* non-critical */ }
+    })();
+  }
+
   res.json({ ok: true });
 });
 

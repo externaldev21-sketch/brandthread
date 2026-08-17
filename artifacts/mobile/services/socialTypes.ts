@@ -280,7 +280,7 @@ export type NotificationType =
   | 'friend_request' | 'friend_accepted' | 'post_like' | 'post_comment'
   | 'repost' | 'mention' | 'story_reaction' | 'story_reply' | 'new_follower'
   | 'order_confirmed' | 'order_processing' | 'order_production'
-  | 'order_shipped' | 'order_delivered' | 'order_delay'
+  | 'order_shipped' | 'order_delivered' | 'order_cancelled' | 'order_delay'
   | 'return_update' | 'refund_update' | 'dispute_update'
   | 'product_restocked' | 'drop_live' | 'preorder_closing'
   | 'price_drop' | 'saved_product_update'

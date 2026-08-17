@@ -21,6 +21,7 @@ import {
 import { eq, and, desc, inArray, sql, or } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { moderateMessage } from "../lib/contentModerator";
+import { publishNotification } from "./notifications-feed";
 
 const router = Router();
 router.use(requireAuth);
@@ -372,6 +373,33 @@ router.post("/:id/messages", async (req, res) => {
       .set({ unreadCount: sql`unread_count + 1` })
       .where(and(eq(conversationParticipants.conversationId, id), sql`user_id != ${userId}`)),
   ]);
+
+  // Notify each recipient of the new message (non-critical, fire-and-forget)
+  if (otherIds.length > 0) {
+    (async () => {
+      try {
+        const [conv] = await db.select({ type: conversations.type })
+          .from(conversations).where(eq(conversations.id, id)).limit(1);
+        // Map conversation type to the notification type the mobile client expects
+        const notifType = conv?.type === "buyer_to_buyer" ? "new_friend_message" : "new_order_message";
+        for (const recipientId of otherIds) {
+          await publishNotification({
+            userId:        recipientId,
+            category:      "messages",
+            type:          notifType,
+            title:         `New message from ${sender.name || "someone"}`,
+            body:          text.trim().slice(0, 100),
+            actorName:     sender.name,
+            actorHandle:   sender.handle,
+            actorInitials: sender.initials,
+            actorColor:    sender.color,
+            targetId:      id,
+            targetType:    "conversation",
+          });
+        }
+      } catch { /* non-critical */ }
+    })();
+  }
 
   return res.status(201).json(adaptMessage(msg));
 });
