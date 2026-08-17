@@ -31,6 +31,7 @@ export default function StoreFromLogoScreen() {
     suggestedTypography: TypographyStyle;
     brandMoods: BrandMood[];
     aiSections: import('@/services/storeTypes').StoreSection[];
+    source: 'ai' | 'fallback';
   } | null>(null);
 
   const pickLogo = async () => {
@@ -143,6 +144,22 @@ export default function StoreFromLogoScreen() {
 
         {result && (
           <>
+            {/* Fallback warning */}
+            {result.source === 'fallback' && (
+              <BrandthreadCard style={[fl.card, { borderColor: 'rgba(251,191,36,0.4)', backgroundColor: 'rgba(251,191,36,0.07)' }]}>
+                <View style={fl.bannerRow}>
+                  <Feather name="alert-triangle" size={ICON.sm} color="#fbbf24" />
+                  <Text style={[fl.bannerText, { color: '#fbbf24' }]}>
+                    We couldn't fully analyze your image — showing a suggested starting point.
+                  </Text>
+                </View>
+                <TouchableOpacity style={fl.retryBtn} onPress={handleAnalyze} disabled={analyzing}>
+                  <Feather name="refresh-cw" size={12} color="#fbbf24" />
+                  <Text style={fl.retryText}>Retry Analysis</Text>
+                </TouchableOpacity>
+              </BrandthreadCard>
+            )}
+
             {/* Detected Colors */}
             <BrandthreadCard style={fl.card}>
               <Text style={fl.resultSectionLabel}>Detected Colors</Text>
@@ -259,4 +276,11 @@ const fl = StyleSheet.create({
   previewLink: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   actionBtn: { marginHorizontal: SP.md, marginBottom: SP.sm },
+  retryBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    alignSelf: 'flex-start', marginTop: SP.xs,
+    paddingVertical: 4, paddingHorizontal: 8,
+    borderRadius: RADIUS.xs, borderWidth: 1, borderColor: 'rgba(251,191,36,0.35)',
+  },
+  retryText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: '#fbbf24' },
 });

@@ -31,6 +31,7 @@ export default function StoreFromMoodboardScreen() {
     suggestedThemeId: string;
     suggestedSections: StoreSectionType[];
     aiSections: import('@/services/storeTypes').StoreSection[];
+    source: 'ai' | 'fallback';
   } | null>(null);
 
   const addImages = async () => {
@@ -140,6 +141,22 @@ export default function StoreFromMoodboardScreen() {
 
         {result && (
           <>
+            {/* Fallback warning */}
+            {result.source === 'fallback' && (
+              <BrandthreadCard style={[mb.card, { borderColor: 'rgba(251,191,36,0.4)', backgroundColor: 'rgba(251,191,36,0.07)' }]}>
+                <View style={mb.bannerRow}>
+                  <Feather name="alert-triangle" size={ICON.sm} color="#fbbf24" />
+                  <Text style={[mb.bannerText, { color: '#fbbf24' }]}>
+                    We couldn't fully analyze your images — showing a suggested starting point.
+                  </Text>
+                </View>
+                <TouchableOpacity style={mb.retryBtn} onPress={handleAnalyze} disabled={analyzing}>
+                  <Feather name="refresh-cw" size={12} color="#fbbf24" />
+                  <Text style={mb.retryText}>Retry Analysis</Text>
+                </TouchableOpacity>
+              </BrandthreadCard>
+            )}
+
             {/* Color Palette */}
             <BrandthreadCard style={mb.card}>
               <Text style={mb.resultLabel}>Color Palette</Text>
@@ -268,4 +285,11 @@ const mb = StyleSheet.create({
   previewLink: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   actionBtn: { marginHorizontal: SP.md, marginBottom: SP.sm },
+  retryBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    alignSelf: 'flex-start', marginTop: SP.xs,
+    paddingVertical: 4, paddingHorizontal: 8,
+    borderRadius: RADIUS.xs, borderWidth: 1, borderColor: 'rgba(251,191,36,0.35)',
+  },
+  retryText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: '#fbbf24' },
 });

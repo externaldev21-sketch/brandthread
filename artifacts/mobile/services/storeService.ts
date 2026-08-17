@@ -1117,6 +1117,7 @@ export async function generateFromLogo(logoUri: string, base64?: string | null):
   suggestedTypography: TypographyStyle;
   brandMoods: BrandMood[];
   aiSections: StoreSection[];
+  source: 'ai' | 'fallback';
 }> {
   if (base64) {
     try {
@@ -1138,6 +1139,7 @@ export async function generateFromLogo(logoUri: string, base64?: string | null):
           suggestedTypography: 'modern',
           brandMoods: ['premium', 'clean'],
           aiSections: mapAiConfigToSections(cfg),
+          source: 'ai',
         };
       }
     } catch { /* fall through to mock */ }
@@ -1161,11 +1163,12 @@ export async function generateFromLogo(logoUri: string, base64?: string | null):
         suggestedTypography: 'modern',
         brandMoods: ['premium', 'clean'],
         aiSections: mapAiConfigToSections(cfg),
+        source: 'ai',
       };
     }
   } catch { /* fall through to mock */ }
 
-  // Deterministic mock fallback
+  // Deterministic mock fallback — AI could not read the image
   await new Promise(r => setTimeout(r, 800));
   const idx = logoUri.length % COLOR_PRESETS.length;
   const palette = COLOR_PRESETS[idx];
@@ -1176,6 +1179,7 @@ export async function generateFromLogo(logoUri: string, base64?: string | null):
     suggestedTypography: TYPOGRAPHY_STYLES[idx % TYPOGRAPHY_STYLES.length].value,
     brandMoods: ['premium', 'clean'],
     aiSections: [],
+    source: 'fallback',
   };
 }
 
@@ -1188,6 +1192,7 @@ export async function generateFromMoodBoard(imageUris: string[], base64List?: st
   suggestedThemeId: string;
   suggestedSections: StoreSectionType[];
   aiSections: StoreSection[];
+  source: 'ai' | 'fallback';
 }> {
   if (base64List?.length) {
     try {
@@ -1210,6 +1215,7 @@ export async function generateFromMoodBoard(imageUris: string[], base64List?: st
           suggestedThemeId: (cfg.theme as any)?.themeId ?? 'vertex',
           suggestedSections: ['hero_image', 'lookbook', 'featured_collection', 'brand_story', 'seller_posts', 'newsletter'],
           aiSections: mapAiConfigToSections(cfg),
+          source: 'ai',
         };
       }
     } catch { /* fall through */ }
@@ -1234,11 +1240,12 @@ export async function generateFromMoodBoard(imageUris: string[], base64List?: st
         suggestedThemeId: 'vertex',
         suggestedSections: ['hero_image', 'lookbook', 'featured_collection', 'brand_story', 'seller_posts', 'newsletter'],
         aiSections: mapAiConfigToSections(cfg),
+        source: 'ai',
       };
     }
   } catch { /* fall through to mock */ }
 
-  // Mock fallback
+  // Mock fallback — AI could not read the images
   await new Promise(r => setTimeout(r, 1000));
   const idx = imageUris.length % COLOR_PRESETS.length;
   const palette = COLOR_PRESETS[idx];
@@ -1250,6 +1257,7 @@ export async function generateFromMoodBoard(imageUris: string[], base64List?: st
     suggestedThemeId: BUILTIN_THEMES[(idx + 2) % BUILTIN_THEMES.length].id,
     suggestedSections: ['hero_image', 'lookbook', 'featured_collection', 'brand_story', 'seller_posts', 'newsletter'],
     aiSections: [],
+    source: 'fallback',
   };
 }
 
