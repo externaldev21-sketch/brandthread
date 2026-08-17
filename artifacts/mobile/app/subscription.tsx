@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIn
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import {
@@ -10,6 +11,7 @@ import {
   CYAN, SUCCESS, ORANGE, RED, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useApi } from '@/hooks/useApi';
+import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 
 // ─── Static plan catalogue ────────────────────────────────────────────────────
 
@@ -103,7 +105,8 @@ export default function SubscriptionScreen() {
   // Derive the active plan id from loaded data
   const selectedPlan = currentPlan.name.toLowerCase();
 
-  useEffect(() => {
+  const fetchStatus = useCallback(() => {
+    setStatusLoading(true);
     api.seller.subscription.status()
       .then(data => {
         const planName =
@@ -122,7 +125,17 @@ export default function SubscriptionScreen() {
       })
       .catch(() => { /* keep defaults (Starter / free) */ })
       .finally(() => setStatusLoading(false));
-  }, []);
+  }, [api]);
+
+  // Re-fetch and invalidate the plan cache every time this screen comes into
+  // focus. This ensures that sellers who upgraded via the Stripe portal and
+  // returned to the app immediately see their new plan — without restarting.
+  useFocusEffect(
+    useCallback(() => {
+      invalidatePlanCache();
+      fetchStatus();
+    }, [fetchStatus]),
+  );
 
   function haptic() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
