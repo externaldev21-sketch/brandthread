@@ -29,7 +29,7 @@ import {
 } from '@/components/BrandthreadUI';
 import {
   getProducts, getProductStats, archiveProduct, unarchiveProduct,
-  deleteProduct, duplicateProduct, listDrafts, DEMO_FULL_PRODUCTS,
+  deleteProduct, duplicateProduct, listDrafts, deleteDraft, DEMO_FULL_PRODUCTS,
 } from '@/services/productService';
 import { Product, ProductDraft, ProductFilter, ProductCategory } from '@/services/productTypes';
 
@@ -412,6 +412,25 @@ export default function ProductsScreen() {
     loadProducts();
   }
 
+  const handleDiscardDraft = useCallback((draftId: string, draftName: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Alert.alert(
+      'Discard draft?',
+      `"${draftName || 'Untitled product'}" will be permanently deleted.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Discard',
+          style: 'destructive',
+          onPress: async () => {
+            await deleteDraft(draftId);
+            setInProgressDrafts(prev => prev.filter(d => d.id !== draftId));
+          },
+        },
+      ]
+    );
+  }, []);
+
   async function handleDuplicate(id: string) {
     await duplicateProduct(id);
     Alert.alert('Duplicated', 'Product duplicated as a draft.');
@@ -489,7 +508,13 @@ export default function ProductsScreen() {
               >
                 <View style={s.draftCardTop}>
                   <Feather name="edit-3" size={14} color={ORANGE} />
-                  <Text style={s.draftStep}>Step {draft.currentStep ?? 1}/10</Text>
+                  <Text style={[s.draftStep, { flex: 1 }]}>Step {draft.currentStep ?? 1}/10</Text>
+                  <TouchableOpacity
+                    hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                    onPress={() => handleDiscardDraft(draft.id, draft.name ?? '')}
+                  >
+                    <Feather name="x" size={13} color={MUTED} />
+                  </TouchableOpacity>
                 </View>
                 <Text style={s.draftName} numberOfLines={1}>
                   {draft.name || 'Untitled product'}
@@ -554,7 +579,7 @@ export default function ProductsScreen() {
         style={{ marginBottom: SP.sm }}
       />
     </>
-  ), [stats, filter, dismissedTips, inProgressDrafts, router]);
+  ), [stats, filter, dismissedTips, inProgressDrafts, router, handleDiscardDraft]);
 
   const ListEmpty = useMemo(() => (
     <EmptyState
