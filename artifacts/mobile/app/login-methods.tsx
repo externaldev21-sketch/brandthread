@@ -4,16 +4,20 @@
  */
 import React, { useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, TextInput, Modal,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, TextInput, Modal, Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '@clerk/expo';
+import * as WebBrowser from 'expo-web-browser';
+import * as AuthSession from 'expo-auth-session';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, BORDER_ACTIVE,
   FONT, FS, SP, RADIUS, SUCCESS, SUCCESS_DIM, CARD_ELEVATED,
 } from '@/lib/theme';
+
+WebBrowser.maybeCompleteAuthSession();
 
 type MethodRow = {
   id: string;
@@ -31,6 +35,7 @@ export default function LoginMethods() {
   const [totpModal, setTotpModal] = useState<{ secret: string; uri: string; backupCodes: string[] } | null>(null);
   const [verifyCode, setVerifyCode] = useState('');
   const [verifying, setVerifying] = useState(false);
+  const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
 
   const externalAccounts = user?.externalAccounts ?? [];
   const hasGoogle  = externalAccounts.some(a => a.provider === 'google');
@@ -76,6 +81,39 @@ export default function LoginMethods() {
       connected: hasApple,
     },
   ];
+
+  // ── OAuth linking ────────────────────────────────────────────────────────────
+  async function linkOAuth(strategy: 'oauth_google' | 'oauth_apple', provider: string) {
+    if (!user) return;
+    setLinkingProvider(provider);
+    try {
+      const redirectUrl = AuthSession.makeRedirectUri({ scheme: 'brandthread' });
+      const externalAccount = await user.createExternalAccount({
+        strategy,
+        redirectUrl,
+      });
+      const verificationUrl =
+        (externalAccount as any).verification?.externalVerificationRedirectURL?.href;
+      if (!verificationUrl) {
+        Alert.alert('Could not start linking', 'No redirect URL returned from Clerk. Please try again.');
+        return;
+      }
+      const result = await WebBrowser.openAuthSessionAsync(verificationUrl, redirectUrl);
+      if (result.type === 'success') {
+        // Reload user so externalAccounts list reflects the newly linked account
+        await user.reload();
+      } else if (result.type === 'cancel' || result.type === 'dismiss') {
+        // User closed the browser — do nothing
+      } else {
+        Alert.alert(`${provider} linking failed`, 'The browser session did not complete. Please try again.');
+      }
+    } catch (e: any) {
+      const msg = e?.errors?.[0]?.message ?? e?.message ?? 'Please try again.';
+      Alert.alert(`Could not link ${provider}`, msg);
+    } finally {
+      setLinkingProvider(null);
+    }
+  }
 
   // ── 2FA helpers ─────────────────────────────────────────────────────────────
   async function handleEnable2FA() {
@@ -162,9 +200,13 @@ export default function LoginMethods() {
 
           {/* Methods card */}
           <View style={s.card}>
-            {methods.map((method, idx) => (
-              <View key={method.id}>
-                {idx > 0 && <View style={s.divider} />}
+            {methods.map((method, idx) => {
+              const isOAuth = method.id === 'google' || method.id === 'apple';
+              const strategy = method.id === 'google' ? 'oauth_google' : 'oauth_apple';
+              const isLinking = linkingProvider === method.label;
+              const tappable = isOAuth && !method.connected;
+
+              const rowContent = (
                 <View style={s.row}>
                   <View style={[s.iconWrap, method.connected && s.iconWrapActive]}>
                     {method.icon}
@@ -178,12 +220,37 @@ export default function LoginMethods() {
                       <Feather name="check" size={11} color={SUCCESS} />
                       <Text style={s.activeBadgeText}>Active</Text>
                     </View>
+                  ) : isOAuth ? (
+                    isLinking ? (
+                      <ActivityIndicator size="small" color={PURPLE} />
+                    ) : (
+                      <View style={s.enableBtn}>
+                        <Text style={s.enableBtnText}>Connect</Text>
+                      </View>
+                    )
                   ) : (
                     <Text style={s.inactiveBadge}>Not set</Text>
                   )}
                 </View>
-              </View>
-            ))}
+              );
+
+              return (
+                <View key={method.id}>
+                  {idx > 0 && <View style={s.divider} />}
+                  {tappable ? (
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      disabled={!!linkingProvider}
+                      onPress={() => linkOAuth(strategy as 'oauth_google' | 'oauth_apple', method.label)}
+                    >
+                      {rowContent}
+                    </TouchableOpacity>
+                  ) : (
+                    rowContent
+                  )}
+                </View>
+              );
+            })}
           </View>
 
           {/* Two-factor authentication section */}
@@ -217,8 +284,9 @@ export default function LoginMethods() {
           <View style={s.note}>
             <Feather name="info" size={14} color={MUTED} style={{ marginTop: 1 }} />
             <Text style={s.noteText}>
-              To add or remove a login method, contact support or update your account
-              settings. Your primary email is used for account recovery.
+              Tap <Text style={{ color: FG }}>Connect</Text> on Google or Apple to link
+              that account for faster future sign-ins. Your primary email is used for
+              account recovery.
             </Text>
           </View>
         </ScrollView>
