@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -161,6 +161,15 @@ export default function StoreGeneratingScreen() {
         end={{ x: 0, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
+      {/* Back button — lets users cancel generation */}
+      <TouchableOpacity
+        onPress={() => router.back()}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        activeOpacity={0.75}
+        style={{ position: 'absolute', top: insets.top + 12, left: SP.md, width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', zIndex: 10 }}
+      >
+        <Feather name="arrow-left" size={ICON.sm} color={FG} />
+      </TouchableOpacity>
 
       <View style={gen.inner}>
         {/* Heading */}

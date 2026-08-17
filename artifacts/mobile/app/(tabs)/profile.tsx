@@ -154,7 +154,7 @@ export default function ProfileScreen() {
           <TouchableOpacity style={s.headerIconBtn} onPress={() => nav('/notifications-settings')} activeOpacity={0.75}>
             <Feather name="bell" size={18} color={FG} />
           </TouchableOpacity>
-          <TouchableOpacity style={s.headerIconBtn} onPress={() => nav('/settings')} activeOpacity={0.75}>
+          <TouchableOpacity style={s.headerIconBtn} onPress={() => nav('/seller-settings')} activeOpacity={0.75}>
             <Feather name="settings" size={18} color={FG} />
           </TouchableOpacity>
         </View>

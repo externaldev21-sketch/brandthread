@@ -32,7 +32,7 @@ const TABS: {
   { name: 'studio',   label: 'Studio',   icon: 'zap' },
   { name: 'products', label: 'Products', icon: 'package' },
   { name: 'orders',   label: 'Orders',   icon: 'shopping-bag' },
-  { name: 'more',     label: 'More',     icon: 'grid' },
+  { name: 'profile',  label: 'Profile',  icon: 'user' },
 ];
 
 const INACTIVE_COLOR = 'rgba(244,244,255,0.40)';
@@ -119,10 +119,10 @@ export default function TabLayout() {
         <Tabs.Screen name="studio"   options={{ title: 'Studio' }} />
         <Tabs.Screen name="products" options={{ title: 'Products' }} />
         <Tabs.Screen name="orders"   options={{ title: 'Orders' }} />
-        <Tabs.Screen name="more"     options={{ title: 'More' }} />
+        <Tabs.Screen name="profile"  options={{ title: 'Profile' }} />
 
         {/* Hidden routes — resolve but not shown in tab bar */}
-        <Tabs.Screen name="profile"   options={{ href: null }} />
+        <Tabs.Screen name="more"      options={{ href: null }} />
         <Tabs.Screen name="feed"      options={{ href: null }} />
         <Tabs.Screen name="following" options={{ href: null }} />
         <Tabs.Screen name="analytics" options={{ href: null }} />

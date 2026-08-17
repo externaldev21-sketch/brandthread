@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 const { width: W } = Dimensions.get('window');
@@ -46,6 +47,15 @@ export default function WelcomeScreen() {
   return (
     <View style={[styles.root, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 28 }]}>
       <StatusBar barStyle="light-content" />
+      {/* Back button — visible when navigated here from within the app */}
+      <TouchableOpacity
+        onPress={() => router.back()}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        activeOpacity={0.75}
+        style={{ position: 'absolute', top: insets.top + 12, left: 20, width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}
+      >
+        <Feather name="arrow-left" size={18} color="#ffffff" />
+      </TouchableOpacity>
 
       {/* Ambient glow */}
       <View style={styles.glowTop} />

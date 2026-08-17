@@ -249,7 +249,15 @@ export default function InventoryScreen() {
 
   const renderHeader = () => (
     <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
-      <Text style={s.headerTitle}>Inventory</Text>
+      <TouchableOpacity
+        onPress={() => router.back()}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        activeOpacity={0.75}
+        style={{ width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center' as const, justifyContent: 'center' as const }}
+      >
+        <Feather name="arrow-left" size={ICON.sm} color={FG} />
+      </TouchableOpacity>
+      <Text style={[s.headerTitle, { flex: 1, marginLeft: SP.sm }]}>Inventory</Text>
       <View style={s.headerActions}>
         <IconButton name="search" onPress={() => setActiveTab('products')} />
         <IconButton name="download" onPress={handleExport} />

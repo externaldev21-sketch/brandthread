@@ -45,3 +45,4 @@
 - [Freelancer marketplace payments](freelancer-marketplace.md) — escrow transfer-on-complete; live payout-readiness gate; source_transaction mandatory; claim-then-pay idempotency; 5% fee pending.
 - [DB migration runner](db-migrations-runner.md) — ordered schema_migrations-tracked runner; every migration statement must be idempotent; clean boot = push then migrate.
 - [Team/Roles/Permissions](team-roles-permissions.md) — teamContext rewrites clerkUserId→owner (mount inside router after requireAuth); typed middleware must be RequestHandler<any> or param inference breaks.
+- [Profile Tab + Seller Settings](profile-tab-seller-settings.md) — Profile replaces More as 5th tab; seller-settings.tsx is the stack screen for all 6 sections; dashboard hero+chart wiring.

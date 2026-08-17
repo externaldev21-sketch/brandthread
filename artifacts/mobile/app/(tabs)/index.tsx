@@ -92,10 +92,10 @@ const COMMAND_ITEMS = [
   { label: 'Create post',       icon: 'video'        as const, route: '/create-post'     },
   { label: 'View orders',       icon: 'shopping-bag' as const, route: '/(tabs)/orders'   },
   { label: 'Manufacturer Hub',  icon: 'package'      as const, route: '/manufacturer-hub' },
-  { label: 'Inventory',         icon: 'layers'       as const, route: '/(tabs)/more'     },
-  { label: 'Store Builder',     icon: 'layout'       as const, route: '/(tabs)/more'     },
-  { label: 'Analytics',         icon: 'bar-chart-2'  as const, route: '/(tabs)/analytics'},
-  { label: 'Settings',          icon: 'settings'     as const, route: '/(tabs)/more'     },
+  { label: 'Inventory',         icon: 'layers'       as const, route: '/inventory'        },
+  { label: 'Store Builder',     icon: 'layout'       as const, route: '/store-builder'    },
+  { label: 'Analytics',         icon: 'bar-chart-2'  as const, route: '/(tabs)/analytics' },
+  { label: 'Settings',          icon: 'settings'     as const, route: '/seller-settings'  },
 ];
 
 // ─── Default setup state ──────────────────────────────────────────────────────
@@ -150,6 +150,10 @@ export default function SellerHomeScreen() {
     incomingCount: number;
     delayedCount: number;
   } | null>(null);
+  // ── Dashboard visual upgrade state ────────────────────────────────────────
+  const [recentOrders, setRecentOrders] = useState<any[] | null>(null);
+  const [payoutInfo,   setPayoutInfo]   = useState<any | null>(null);
+  const [salesTrend,   setSalesTrend]   = useState<Array<{ day: string; totalCents: number }> | null>(null);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
 
@@ -208,6 +212,20 @@ export default function SellerHomeScreen() {
       incomingCount: s.incomingCount,
       delayedCount: s.delayedCount,
     })).catch(() => { setStatsError(true); });
+    // ── Dashboard visual upgrade: hero card + trend chart + real orders ──
+    api.finance.balance().then((data: any) => {
+      setPayoutInfo(data && typeof data === 'object' ? data : null);
+    }).catch(() => setPayoutInfo(null));
+    api.orders.list().then((rows: any) => {
+      setRecentOrders(Array.isArray(rows) ? rows.slice(0, 3) : []);
+    }).catch(() => setRecentOrders([]));
+    api.analytics.revenue('last7').then((data: any) => {
+      const daily = Array.isArray(data?.daily) ? data.daily : [];
+      setSalesTrend(daily.map((d: any) => ({
+        day: String(d.day ?? d.date ?? ''),
+        totalCents: typeof d.total_cents === 'number' ? d.total_cents : 0,
+      })));
+    }).catch(() => setSalesTrend([]));
     return () => { clearTimeout(timer); clearTimeout(minLoad); };
   }, []);
 
@@ -320,6 +338,58 @@ export default function SellerHomeScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+
+        {/* ── Hero Card: Available Balance + Next Payout ───────────────── */}
+        <View style={{ paddingHorizontal: SP.md, paddingTop: SP.md, marginBottom: SP.sm }}>
+          <LinearGradient
+            colors={['#1E0A3C', '#5B21B6', '#0C4A6E']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={s.heroCard}
+          >
+            <View style={s.heroTop}>
+              <View>
+                <Text style={s.heroLabel}>Available Balance</Text>
+                <Text style={s.heroBalance}>
+                  {payoutInfo === null
+                    ? '· · ·'
+                    : (payoutInfo?.available?.formatted ?? '$0.00')}
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={s.heroPayoutsBtn}
+                onPress={() => nav('/payouts')}
+                activeOpacity={0.8}
+              >
+                <Text style={s.heroPayoutsBtnTxt}>Payouts</Text>
+                <Feather name="arrow-right" size={11} color="rgba(255,255,255,0.75)" />
+              </TouchableOpacity>
+            </View>
+            <View style={s.heroBottom}>
+              <Feather
+                name={payoutInfo?.nextPayout ? 'clock' : 'info'}
+                size={12}
+                color="rgba(255,255,255,0.5)"
+              />
+              <Text style={s.heroNextTxt}>
+                {payoutInfo === null
+                  ? 'Loading…'
+                  : payoutInfo?.nextPayout
+                    ? (() => {
+                        const arr = payoutInfo.nextPayout.estimatedArrival
+                          ?? payoutInfo.nextPayout.estimated_arrival;
+                        const dateStr = arr
+                          ? new Date(arr * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                          : 'auto-schedule';
+                        return `Next payout ${payoutInfo.nextPayout.formatted} · ${dateStr}`;
+                      })()
+                    : payoutInfo?.connected
+                      ? 'No pending payouts'
+                      : 'Connect Stripe to enable payouts'}
+              </Text>
+            </View>
+          </LinearGradient>
+        </View>
 
         {/* ── Stats Error Banner ────────────────────────────────────────── */}
         {statsError && (
@@ -454,6 +524,55 @@ export default function SellerHomeScreen() {
           </View>
         </View>
 
+        {/* ── 7-Day Revenue Trend ──────────────────────────────────────── */}
+        <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
+          <View style={s.trendHeaderRow}>
+            <Text style={s.trendTitle}>7-day revenue</Text>
+            {salesTrend !== null && salesTrend.length > 0 && (
+              <Text style={s.trendWeekTotal}>
+                {'$' + (salesTrend.reduce((sum, d) => sum + d.totalCents, 0) / 100)
+                  .toLocaleString('en-US', { maximumFractionDigits: 0 })} this week
+              </Text>
+            )}
+          </View>
+          <View style={s.trendChart}>
+            {salesTrend === null ? (
+              // Loading placeholders
+              Array.from({ length: 7 }).map((_, i) => (
+                <View key={i} style={s.trendBarWrap}>
+                  <View style={[s.trendBar, { height: 8 + i * 3, opacity: 0.18, backgroundColor: PURPLE }]} />
+                  <Text style={s.trendDay}>—</Text>
+                </View>
+              ))
+            ) : salesTrend.length === 0 ? (
+              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: FS.xs, color: SUBTLE, fontFamily: FONT.regular }}>No sales this week yet</Text>
+              </View>
+            ) : (() => {
+              const maxCents  = Math.max(...salesTrend.map(d => d.totalCents), 1);
+              const MAX_BAR   = 50;
+              const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+              const todayStr  = new Date().toDateString();
+              return salesTrend.map((d) => {
+                const barH    = Math.max(4, (d.totalCents / maxCents) * MAX_BAR);
+                const date    = new Date(d.day);
+                const dayLbl  = DAY_LABELS[date.getDay()] ?? '·';
+                const isToday = date.toDateString() === todayStr;
+                return (
+                  <View key={d.day} style={s.trendBarWrap}>
+                    <View style={[s.trendBar, {
+                      height: barH,
+                      backgroundColor: isToday ? CYAN : PURPLE,
+                      opacity: isToday ? 1 : 0.55,
+                    }]} />
+                    <Text style={[s.trendDay, isToday && { color: CYAN }]}>{dayLbl}</Text>
+                  </View>
+                );
+              });
+            })()}
+          </View>
+        </View>
+
         {/* ── Zone B: Action Zone — Quick Actions (established sellers only) ── */}
         {!showWelcome && !showProgress && (
         <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
@@ -504,35 +623,55 @@ export default function SellerHomeScreen() {
           />
           <View style={{ gap: 8 }}>
 
-            {/* Most recent order */}
-            {DEMO_ORDERS.slice(0, 1).map((order) => (
-              <BrandthreadCard
-                key={order.id}
-                style={{ marginBottom: 0 }}
-                onPress={() => Alert.alert('Order', `Order ${order.orderNumber}`)}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm }}>
-                  <View style={s.orderIconCircle}>
-                    <Feather name="shopping-bag" size={ICON.sm} color={PURPLE_LIGHT} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={s.orderNumber}>{order.orderNumber}</Text>
-                      <StatusBadge
-                        label={orderStatusLabel(order.status)}
-                        variant={orderStatusVariant(order.status)}
-                        small
-                      />
-                      <Text style={[s.orderTime, { marginLeft: 'auto' }]}>{timeAgo(order.date)}</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-                      <Text style={s.orderCustomer}>{order.customer.name}</Text>
-                      <Text style={s.orderTotal}>${order.total.toFixed(2)}</Text>
-                    </View>
-                  </View>
-                </View>
+            {/* Recent orders — real API data, up to 3 */}
+            {recentOrders === null ? (
+              <LoadingSkeleton height={68} />
+            ) : recentOrders.length === 0 ? (
+              <BrandthreadCard style={{ marginBottom: 0 }}>
+                <Text style={{ fontSize: FS.sm, color: MUTED, fontFamily: FONT.regular, textAlign: 'center', paddingVertical: 4 }}>
+                  No orders yet
+                </Text>
               </BrandthreadCard>
-            ))}
+            ) : recentOrders.map((order: any) => {
+              const customerName = order.customerName ?? order.customer?.name ?? order.buyerName ?? 'Unknown';
+              const totalCents   = typeof order.totalCents   === 'number' ? order.totalCents
+                                 : typeof order.total_cents  === 'number' ? order.total_cents
+                                 : typeof order.total        === 'number' ? Math.round(order.total * 100) : 0;
+              const orderNum     = order.orderNumber ?? order.order_number
+                                 ?? `#${String(order.id ?? '').slice(-6).toUpperCase()}`;
+              const rawDate      = order.createdAt ?? order.created_at ?? '';
+              const dateStr      = rawDate
+                ? new Date(rawDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                : '';
+              return (
+                <BrandthreadCard
+                  key={order.id}
+                  style={{ marginBottom: 0 }}
+                  onPress={() => nav(`/order-detail?id=${order.id}`)}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm }}>
+                    <View style={s.orderIconCircle}>
+                      <Feather name="shopping-bag" size={ICON.sm} color={PURPLE_LIGHT} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Text style={s.orderNumber}>{orderNum}</Text>
+                        <StatusBadge
+                          label={orderStatusLabel(order.status)}
+                          variant={orderStatusVariant(order.status)}
+                          small
+                        />
+                        <Text style={[s.orderTime, { marginLeft: 'auto' }]}>{dateStr}</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+                        <Text style={s.orderCustomer}>{customerName}</Text>
+                        <Text style={s.orderTotal}>${(totalCents / 100).toFixed(2)}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </BrandthreadCard>
+              );
+            })}
 
             {/* Order alerts — new orders take priority over ready-to-ship */}
             {orderStats && orderStats.newOrders > 0 && (
@@ -925,6 +1064,112 @@ const s = StyleSheet.create({
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
     color: FG,
+  },
+
+  // ── Hero card (gradient balance card) ───────────────────────────────────
+  heroCard: {
+    borderRadius: RADIUS.lg,
+    padding: SP.lg,
+    gap: 14,
+    shadowColor: '#5B21B6',
+    shadowOpacity: 0.45,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 12,
+  },
+  heroTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  heroLabel: {
+    fontSize: 11,
+    fontFamily: FONT.medium,
+    color: 'rgba(255,255,255,0.65)',
+    letterSpacing: 0.6,
+    marginBottom: 6,
+  },
+  heroBalance: {
+    fontSize: 34,
+    fontFamily: FONT.bold,
+    color: '#FFFFFF',
+    letterSpacing: -1.2,
+  },
+  heroPayoutsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  heroPayoutsBtnTxt: {
+    fontSize: 12,
+    fontFamily: FONT.semibold,
+    color: 'rgba(255,255,255,0.9)',
+  },
+  heroBottom: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  heroNextTxt: {
+    fontSize: 12,
+    fontFamily: FONT.regular,
+    color: 'rgba(255,255,255,0.6)',
+    flex: 1,
+  },
+
+  // ── 7-day trend chart ────────────────────────────────────────────────────
+  trendHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  trendTitle: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    color: MUTED,
+  },
+  trendWeekTotal: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: PURPLE_LIGHT,
+  },
+  trendChart: {
+    backgroundColor: CARD,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: BORDER,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-around',
+    paddingHorizontal: SP.sm,
+    paddingBottom: 10,
+    paddingTop: SP.md,
+    height: 90,
+  },
+  trendBarWrap: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 7,
+    justifyContent: 'flex-end',
+  },
+  trendBar: {
+    width: '70%',
+    borderRadius: 3,
+    minHeight: 4,
+  },
+  trendDay: {
+    fontSize: 9,
+    fontFamily: FONT.semibold,
+    color: SUBTLE,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 0.3,
   },
 
   // Command modal

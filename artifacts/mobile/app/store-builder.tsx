@@ -125,6 +125,14 @@ export default function StoreBuilderScreen() {
           end={{ x: 1, y: 1 }}
           style={[s.header, { paddingTop: insets.top + SP.md }]}
         >
+          <TouchableOpacity
+            onPress={() => router.back()}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.75}
+            style={{ width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center' as const, justifyContent: 'center' as const, marginBottom: SP.sm }}
+          >
+            <Feather name="arrow-left" size={ICON.sm} color="#fff" />
+          </TouchableOpacity>
           <Text style={s.headerSubtitle}>Store Builder</Text>
           <Text style={s.headerHeading}>Build your brand's home.</Text>
           <Text style={s.headerDesc}>

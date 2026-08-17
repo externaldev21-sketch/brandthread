@@ -215,12 +215,25 @@ export default function ManufacturerHub() {
 function HubHeader({ activeTab, router }: { activeTab: Tab; router: ReturnType<typeof useRouter> }) {
   return (
     <View style={s.header}>
-      <Text style={s.headerTitle}>Manufacturer Hub</Text>
+      {/* Back button — always visible */}
+      <TouchableOpacity
+        style={s.headerBtn}
+        onPress={() => router.back()}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        activeOpacity={0.75}
+      >
+        <Feather name="arrow-left" size={ICON.sm} color={FG} />
+      </TouchableOpacity>
+
+      <Text style={[s.headerTitle, { flex: 1, marginHorizontal: SP.sm }]}>Manufacturer Hub</Text>
+
       <View style={s.headerActions}>
-        {activeTab === 'my_manufacturers' && (
+        {/* Invite button shown on Discover tab — add your own off-platform manufacturer */}
+        {activeTab === 'discover' && (
           <TouchableOpacity
             style={s.headerBtn}
             onPress={() => router.push('/invite-manufacturer' as never)}
+            activeOpacity={0.75}
           >
             <Feather name="user-plus" size={ICON.sm} color={PURPLE_LIGHT} />
           </TouchableOpacity>

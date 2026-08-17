@@ -129,10 +129,6 @@ export default function ManufacturerProfileScreen() {
     router.push(('/quote-request?manufacturerId=' + id) as never);
   }
 
-  function handleInvite() {
-    router.push(('/invite-manufacturer?manufacturerId=' + id) as never);
-  }
-
   if (loading) {
     return (
       <View style={[s.root, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
@@ -217,10 +213,6 @@ export default function ManufacturerProfileScreen() {
           <TouchableOpacity onPress={handleQuote} style={s.qaBtn} activeOpacity={0.8}>
             <Feather name="file-text" size={ICON.md} color={PURPLE_LIGHT} />
             <Text style={[s.qaBtnLabel, { color: PURPLE_LIGHT }]}>Quote</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleInvite} style={s.qaBtn} activeOpacity={0.8}>
-            <Feather name="user-plus" size={ICON.md} color={GOLD} />
-            <Text style={[s.qaBtnLabel, { color: GOLD }]}>Invite</Text>
           </TouchableOpacity>
         </View>
 
