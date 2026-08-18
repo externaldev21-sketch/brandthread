@@ -201,4 +201,16 @@ Match the visual style, tone, and target audience of the brand.`;
   res.json({ config });
 });
 
+// Return a clear 413 when the client sends an oversized payload (image not
+// pre-resized). Express sets err.type = "entity.too.large" for these cases.
+router.use((err: any, _req: any, res: any, _next: any) => {
+  if (err?.type === "entity.too.large" || err?.status === 413) {
+    res.status(413).json({
+      error: "Image payload too large. Resize your image to 1024 px or smaller before uploading.",
+    });
+    return;
+  }
+  res.status(500).json({ error: String(err) });
+});
+
 export default router;

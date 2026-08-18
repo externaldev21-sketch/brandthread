@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Feather } from '@expo/vector-icons';
 import {
   BG, CARD, SURFACE,
@@ -16,6 +17,38 @@ import { generateFromMoodBoard, applyFromMoodboard } from '@/services/storeServi
 import { StoreColorPalette, StoreSectionType } from '@/services/storeTypes';
 
 const MAX_IMAGES = 8;
+
+/**
+ * Resize an image so its longest edge is at most maxPx, then return the
+ * JPEG base64 string.  If the image is already within bounds it is only
+ * re-encoded (no upscaling).  Portrait and landscape orientations are both
+ * handled correctly by constraining the appropriate axis.
+ *
+ * For moodboards the default cap is 800 px so that eight images together
+ * stay well under the 10 MB server limit (~200 KB each × 8 ≈ 1.6 MB base64).
+ */
+async function resizeToBase64(uri: string, maxPx = 800): Promise<string> {
+  // Resolve original dimensions so we constrain the right axis and never upscale.
+  const { width, height } = await new Promise<{ width: number; height: number }>(
+    (resolve, reject) =>
+      Image.getSize(uri, (w, h) => resolve({ width: w, height: h }), reject),
+  );
+
+  const longest = Math.max(width, height);
+  const actions =
+    longest > maxPx
+      ? width >= height
+        ? [{ resize: { width: maxPx } }]   // landscape / square
+        : [{ resize: { height: maxPx } }]  // portrait
+      : [];                                 // already fits — just re-encode
+
+  const result = await manipulateAsync(
+    uri,
+    actions,
+    { compress: 0.75, format: SaveFormat.JPEG, base64: true },
+  );
+  return result.base64 ?? '';
+}
 
 export default function StoreFromMoodboardScreen() {
   const router = useRouter();
@@ -44,12 +77,13 @@ export default function StoreFromMoodboardScreen() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
       selectionLimit: MAX_IMAGES,
-      quality: 0.7,
-      base64: true,
+      quality: 1,
     });
     if (!res.canceled && res.assets.length > 0) {
       const newUris = res.assets.map(a => a.uri);
-      const newB64s = res.assets.map(a => a.base64 ?? '');
+      // Resize each image to ≤1024 px before base64 encoding — keeps total
+      // payload under the 10 MB server limit even for 8-image moodboards.
+      const newB64s = await Promise.all(newUris.map(resizeToBase64));
       setImageUris(prev => [...prev, ...newUris].slice(0, MAX_IMAGES));
       setImageBase64s(prev => [...prev, ...newB64s].slice(0, MAX_IMAGES));
       setResult(null);

@@ -64,6 +64,7 @@
     "expo-camera": "^17.0.10",
     "expo-clipboard": "^8.0.8",
     "expo-file-system": "~19.0.23",
+    "expo-image-manipulator": "^14.0.8",
     "expo-local-authentication": "^57.0.2",
     "expo-media-library": "~18.2.1",
     "expo-notifications": "~0.32.17",

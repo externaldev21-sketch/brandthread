@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Feather } from '@expo/vector-icons';
 import {
   BG, CARD, SURFACE, BORDER,
@@ -17,6 +18,35 @@ import {
   generateFromLogo, applyFromLogo,
 } from '@/services/storeService';
 import { StoreColorPalette, TypographyStyle, BrandMood } from '@/services/storeTypes';
+
+/**
+ * Resize an image so its longest edge is at most maxPx, then return the
+ * JPEG base64 string.  If the image is already within bounds it is only
+ * re-encoded (no upscaling).  Portrait and landscape orientations are both
+ * handled correctly by constraining the appropriate axis.
+ */
+async function resizeToBase64(uri: string, maxPx = 1024): Promise<string> {
+  // Resolve original dimensions so we constrain the right axis and never upscale.
+  const { width, height } = await new Promise<{ width: number; height: number }>(
+    (resolve, reject) =>
+      Image.getSize(uri, (w, h) => resolve({ width: w, height: h }), reject),
+  );
+
+  const longest = Math.max(width, height);
+  const actions =
+    longest > maxPx
+      ? width >= height
+        ? [{ resize: { width: maxPx } }]   // landscape / square
+        : [{ resize: { height: maxPx } }]  // portrait
+      : [];                                 // already fits — just re-encode
+
+  const result = await manipulateAsync(
+    uri,
+    actions,
+    { compress: 0.8, format: SaveFormat.JPEG, base64: true },
+  );
+  return result.base64 ?? '';
+}
 
 export default function StoreFromLogoScreen() {
   const router = useRouter();
@@ -44,12 +74,15 @@ export default function StoreFromLogoScreen() {
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.7,
-      base64: true,
+      quality: 1,
     });
     if (!res.canceled && res.assets[0]) {
-      setLogoUri(res.assets[0].uri);
-      setLogoBase64(res.assets[0].base64 ?? null);
+      const uri = res.assets[0].uri;
+      setLogoUri(uri);
+      // Resize to ≤1024 px before encoding — keeps payload well under the 10 MB
+      // server limit and reduces GPT-4o vision latency (detail:"low" only needs ~512 px).
+      const b64 = await resizeToBase64(uri);
+      setLogoBase64(b64);
       setResult(null);
     }
   };
