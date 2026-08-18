@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Linking } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Linking, AppState, AppStateStatus } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -108,6 +108,11 @@ export default function SubscriptionScreen() {
   // Derive the active plan id from loaded data
   const selectedPlan = currentPlan.name.toLowerCase();
 
+  // Track whether the billing portal was opened so we know to re-fetch
+  // when the app returns to the foreground (AppState change is more reliable
+  // than useFocusEffect for detecting return from an external browser).
+  const portalOpenedRef = useRef(false);
+
   const fetchStatus = useCallback(() => {
     setStatusLoading(true);
     api.seller.subscription.status()
@@ -135,14 +140,30 @@ export default function SubscriptionScreen() {
   }, [api]);
 
   // Re-fetch and invalidate the plan cache every time this screen comes into
-  // focus. This ensures that sellers who upgraded via the Stripe portal and
-  // returned to the app immediately see their new plan — without restarting.
+  // focus. This ensures that sellers who upgraded or cancelled via the Stripe
+  // portal and returned to the app immediately see their updated plan.
   useFocusEffect(
     useCallback(() => {
       invalidatePlanCache();
       fetchStatus();
     }, [fetchStatus]),
   );
+
+  // Also listen for the app returning to the foreground after the billing
+  // portal was opened. On iOS/Android, Linking.openURL launches an external
+  // browser while keeping the current screen "focused" in React Navigation,
+  // so useFocusEffect alone won't fire when the seller returns. AppState
+  // correctly fires 'active' when the user switches back to the app.
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (nextState === 'active' && portalOpenedRef.current) {
+        portalOpenedRef.current = false;
+        invalidatePlanCache();
+        fetchStatus();
+      }
+    });
+    return () => subscription.remove();
+  }, [fetchStatus]);
 
   function haptic() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -176,6 +197,9 @@ export default function SubscriptionScreen() {
     haptic();
     try {
       const { url } = await api.seller.subscription.portal();
+      // Mark that the portal was opened so the AppState listener knows to
+      // re-fetch and invalidate the cache when the seller returns to the app.
+      portalOpenedRef.current = true;
       Linking.openURL(url);
     } catch (e: any) {
       Alert.alert('Portal error', e?.message ?? 'Could not open billing portal. Please try again.');
