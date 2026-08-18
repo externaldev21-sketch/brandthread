@@ -13,6 +13,22 @@ import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { getSellerPosts, subscribeSocial, type SellerThreadPost } from '@/services/socialService';
 import { useApi } from '@/lib/api';
 
+// ─── Profile data shape ──────────────────────────────────────────────────────
+
+interface SellerProfileData {
+  brandName:          string | null;
+  displayName:        string | null;
+  bio:                string | null;
+  subscriptionStatus: string | null;
+  subscriptionPlanId: string | null;
+}
+
+interface SocialCounts {
+  followers: number;
+  following: number;
+  likes:     number;
+}
+
 // ─── Design tokens ─────────────────────────────────────────────────────────
 
 const BG     = '#07070F';
@@ -24,12 +40,6 @@ const GREEN  = '#8B5CF6';
 const GREEN_DIM = 'rgba(139,92,246,0.18)';
 
 // ─── Mock data ──────────────────────────────────────────────────────────────
-
-const PROFILE_STATS = [
-  { label: 'Following', value: '53'      },
-  { label: 'Followers', value: '2,842'   },
-  { label: 'Likes',     value: '142.3K'  },
-];
 
 const QUICK_ACTIONS: { icon: keyof typeof Feather.glyphMap; label: string; route: string }[] = [
   { icon: 'video',      label: 'Create Post',   route: '/create-post' },
@@ -102,6 +112,8 @@ export default function ProfileScreen() {
   const [activeTab, setActiveTab] = useState(0);
   const [sellerPosts, setSellerPosts] = useState<SellerThreadPost[]>([]);
   const [myStoryIds, setMyStoryIds] = useState<string[]>([]);
+  const [profile, setProfile] = useState<SellerProfileData | null>(null);
+  const [socialCounts, setSocialCounts] = useState<SocialCounts>({ followers: 0, following: 0, likes: 0 });
 
   const loadPosts = useCallback(async () => {
     try {
@@ -121,12 +133,41 @@ export default function ProfileScreen() {
     } catch {}
   }, [api]);
 
+  const loadProfile = useCallback(async () => {
+    try {
+      const data = await api.seller.getProfile();
+      setProfile({
+        brandName:          data.brandName   ?? null,
+        displayName:        data.displayName ?? null,
+        bio:                data.bio         ?? null,
+        subscriptionStatus: data.subscriptionStatus ?? null,
+        subscriptionPlanId: data.subscriptionPlanId ?? null,
+      });
+    } catch {}
+  }, [api]);
+
+  const loadSocialCounts = useCallback(async () => {
+    try {
+      const [followersArr, followingArr] = await Promise.all([
+        api.social.followers(),
+        api.social.following(),
+      ]);
+      setSocialCounts({
+        followers: Array.isArray(followersArr) ? followersArr.length : 0,
+        following: Array.isArray(followingArr) ? followingArr.length : 0,
+        likes:     0,
+      });
+    } catch {}
+  }, [api]);
+
   useEffect(() => {
     loadPosts();
     loadMyStories();
+    loadProfile();
+    loadSocialCounts();
     const unsub = subscribeSocial(() => { loadPosts(); loadMyStories(); });
     return unsub;
-  }, [loadPosts, loadMyStories]);
+  }, [loadPosts, loadMyStories, loadProfile, loadSocialCounts]);
 
   function nav(route: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -146,9 +187,13 @@ export default function ProfileScreen() {
     >
       {/* Header */}
       <View style={s.header}>
-        <View>
-          <Text style={s.headerTitle}>My Brand</Text>
-          <Text style={s.headerSub}>Manage your brand, grow your audience, and scale your empire.</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={s.headerTitle} numberOfLines={1}>
+            {profile?.brandName || profile?.displayName || 'My Brand'}
+          </Text>
+          <Text style={s.headerSub} numberOfLines={2}>
+            {profile?.bio || 'Manage your brand, grow your audience, and scale your empire.'}
+          </Text>
         </View>
         <View style={s.headerIcons}>
           <TouchableOpacity style={s.headerIconBtn} onPress={() => nav('/notifications-settings')} activeOpacity={0.75}>
@@ -234,17 +279,37 @@ export default function ProfileScreen() {
         {/* Name + verified + plan */}
         <View style={s.nameBlock}>
           <View style={s.nameRow}>
-            <Text style={s.brandName}>Brandthread</Text>
+            <Text style={s.brandName} numberOfLines={1}>
+              {profile?.brandName || profile?.displayName || 'My Brand'}
+            </Text>
             <Feather name="check-circle" size={17} color={GREEN} />
           </View>
-          <Text style={s.brandHandle}>@brandthread</Text>
-          <View style={s.planPill}>
-            <Text style={s.planText}>Pro Plan</Text>
-          </View>
+          {profile?.brandName && profile?.displayName && profile.brandName !== profile.displayName && (
+            <Text style={s.brandHandle} numberOfLines={1}>
+              @{profile.displayName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)}
+            </Text>
+          )}
+          {profile?.subscriptionPlanId || profile?.subscriptionStatus === 'active' ? (
+            <View style={s.planPill}>
+              <Text style={s.planText}>
+                {profile?.subscriptionPlanId
+                  ? `${profile.subscriptionPlanId.charAt(0).toUpperCase()}${profile.subscriptionPlanId.slice(1)} Plan`
+                  : 'Active Plan'}
+              </Text>
+            </View>
+          ) : (
+            <View style={s.planPill}>
+              <Text style={s.planText}>Free Plan</Text>
+            </View>
+          )}
 
           {/* Stats */}
           <View style={s.statsRow}>
-            {PROFILE_STATS.map((st, i) => (
+            {([
+              { label: 'Following', value: socialCounts.following > 0 ? socialCounts.following.toLocaleString() : '—' },
+              { label: 'Followers', value: socialCounts.followers > 0 ? socialCounts.followers.toLocaleString() : '—' },
+              { label: 'Likes',     value: socialCounts.likes     > 0 ? socialCounts.likes.toLocaleString()     : '—' },
+            ] as { label: string; value: string }[]).map((st, i) => (
               <React.Fragment key={st.label}>
                 {i > 0 && <View style={s.statDivider} />}
                 <TouchableOpacity style={s.statItem} activeOpacity={0.7}>
