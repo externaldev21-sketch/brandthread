@@ -24,120 +24,31 @@ import { BrandedLoadingState } from '@/components/BrandthreadUI';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
-// ─── Mock spotlight (video) feed data ────────────────────────────────────────
-// Videos are public sample clips standing in for creator-submitted footage.
+// ─── Feed item display type ───────────────────────────────────────────────────
 
-const SPOTLIGHT_ITEMS = [
-  {
-    id: '1',
-    creator: 'Vault Studio',
-    handle: '@vaultstudio',
-    avatarColor: '#8B5CF6',
-    initials: 'VS',
-    verified: true,
-    videoUri: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4',
-    caption: 'New drop just landed 🔥 Oversized canvas jacket — limited run of 50.',
-    sound: 'Original Sound · vaultstudio',
-    productName: 'Canvas Cargo Jacket',
-    productPrice: '$189',
-    productOriginalPrice: null as string | null,
-    accentColor: '#8B5CF6',
-    likes: 1240,
-    comments: [
-      { id: 'c1', user: '@dropzone', text: 'need this in black 😍' },
-      { id: 'c2', user: '@street.era', text: 'copped one already' },
-    ],
-    reposts: 118,
-    shares: 340,
-  },
-  {
-    id: '2',
-    creator: 'Meridian Co.',
-    handle: '@meridianclothing',
-    avatarColor: '#0F766E',
-    initials: 'MC',
-    verified: false,
-    videoUri: 'https://test-videos.co.uk/vids/sintel/mp4/h264/720/Sintel_720_10s_1MB.mp4',
-    caption: 'Clean minimalist tees now in 8 colorways. Basics shouldn\'t be boring.',
-    sound: 'Original Sound · meridianclothing',
-    productName: 'Essential Relaxed Tee',
-    productPrice: '$48',
-    productOriginalPrice: null as string | null,
-    accentColor: '#14B8A6',
-    likes: 892,
-    comments: [
-      { id: 'c1', user: '@basics.only', text: 'the fit on this is clean' },
-    ],
-    reposts: 44,
-    shares: 210,
-  },
-  {
-    id: '3',
-    creator: 'NXGEN',
-    handle: '@nxgendrops',
-    avatarColor: '#B45309',
-    initials: 'NX',
-    verified: true,
-    videoUri: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
-    caption: 'The cargo trousers everyone\'s been asking about. Back in stock 🙌',
-    sound: 'Original Sound · nxgendrops',
-    productName: 'Ripstop Cargo Trousers',
-    productPrice: '$134',
-    productOriginalPrice: '$160',
-    accentColor: '#B98A2E',
-    likes: 3410,
-    comments: [
-      { id: 'c1', user: '@cargofit', text: 'been waiting weeks for this restock' },
-      { id: 'c2', user: '@yn.drip', text: 'link??' },
-    ],
-    reposts: 215,
-    shares: 980,
-  },
-  {
-    id: '4',
-    creator: 'Softwear',
-    handle: '@softwearstudio',
-    avatarColor: '#BE185D',
-    initials: 'SW',
-    verified: false,
-    videoUri: 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/friday.mp4',
-    caption: 'Sunday hoodies are here. 400gsm French terry, washed finish.',
-    sound: 'Original Sound · softwearstudio',
-    productName: 'Sunday Washed Hoodie',
-    productPrice: '$98',
-    productOriginalPrice: null as string | null,
-    accentColor: '#EC4899',
-    likes: 2180,
-    comments: [
-      { id: 'c1', user: '@hoodiehoarder', text: 'the washed finish 😩' },
-    ],
-    reposts: 132,
-    shares: 670,
-  },
-  {
-    id: '5',
-    creator: 'Atlas Goods',
-    handle: '@atlasgoods',
-    avatarColor: '#1D4ED8',
-    initials: 'AG',
-    verified: true,
-    videoUri: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4',
-    caption: 'Workwear inspired, streetwear executed. Built for the city.',
-    sound: 'Original Sound · atlasgoods',
-    productName: 'City Chore Coat',
-    productPrice: '$215',
-    productOriginalPrice: '$260',
-    accentColor: '#4A6FA5',
-    likes: 975,
-    comments: [
-      { id: 'c1', user: '@city.slate', text: 'sand or slate, which one 👀' },
-    ],
-    reposts: 58,
-    shares: 290,
-  },
-];
-
-type SpotlightItem = typeof SPOTLIGHT_ITEMS[number];
+interface SpotlightItem {
+  id: string;
+  creator: string;
+  handle: string;
+  avatarColor: string;
+  initials: string;
+  verified: boolean;
+  videoUri: string;
+  caption: string;
+  sound: string;
+  productName: string;
+  productPrice: string;
+  productOriginalPrice: string | null;
+  accentColor: string;
+  likes: number;
+  comments: { id: string; user: string; text: string }[];
+  reposts: number;
+  shares: number;
+  // Optional fields present on real seller posts
+  productId?: string;
+  sellerId?: string;
+  productTags?: { productId: string; productName: string; price: number }[];
+}
 
 // ─── Live Stream feed item ────────────────────────────────────────────────────
 interface LiveStreamFeedItem {
@@ -494,9 +405,20 @@ function SpotlightPage({
 
 // CommentsModal replaced by navigation to /buyer-post-comments (see handleOpenComments).
 
-// ─── Map a service SellerThreadPost to the feed display format ────────────────
+// ─── Type guard for the feed union ───────────────────────────────────────────
 
-function mapSellerPost(post: SellerThreadPost): SpotlightItem {
+function isLiveStreamItem(item: SpotlightItem | LiveStreamFeedItem): item is LiveStreamFeedItem {
+  return (item as LiveStreamFeedItem)._isLive === true;
+}
+
+// ─── Map a service SellerThreadPost to the feed display format ────────────────
+// Returns null for non-video posts or posts without a media URI — those are
+// skipped from the video feed so a real image URI is never passed to VideoView.
+
+function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
+  if (post.contentType !== 'video') return null; // photo/slideshow posts excluded from video feed
+  const videoUri = post.mediaUris[0];
+  if (!videoUri) return null;
   const tag = post.productTags[0];
   return {
     id: post.id,
@@ -505,24 +427,23 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem {
     avatarColor: post.authorColor,
     initials: post.authorInitials,
     verified: false,
-    videoUri: post.mediaUris[0] ?? 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4',
+    videoUri,
     caption: post.caption,
     sound: post.sound
       ? `${post.sound.soundTitle} · ${post.sound.artist}`
       : `Original Sound · ${post.authorHandle.slice(1)}`,
     productName: tag?.productName ?? 'Shop Now',
     productPrice: tag ? `${Number(tag.price).toFixed(0)}` : '',
-    productOriginalPrice: null as string | null,
+    productOriginalPrice: null,
     accentColor: post.authorColor,
     likes: post.likesCount,
-    comments: [] as { id: string; user: string; text: string }[],
+    comments: [],
     reposts: post.repostsCount,
     shares: 0,
-    // Extra fields used by handleShop via `(item as any).productId`
     productId: tag?.productId,
     sellerId: post.authorId,
     productTags: post.productTags,
-  } as unknown as SpotlightItem;
+  };
 }
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
@@ -531,11 +452,7 @@ export default function FeedScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const [engagements, setEngagements] = useState<Record<string, EngagementState>>(() => {
-    const init: Record<string, EngagementState> = {};
-    SPOTLIGHT_ITEMS.forEach(item => { init[item.id] = initialEngagement(item); });
-    return init;
-  });
+  const [engagements, setEngagements] = useState<Record<string, EngagementState>>({});
   const [activeIndex, setActiveIndex] = useState(0);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -552,7 +469,8 @@ export default function FeedScreen() {
       setFeedLoading(true);
       try {
         const posts = await getThreadPosts();
-        setSellerFeedPosts(posts.map(mapSellerPost));
+        const mapped = posts.map(mapSellerPost).filter((p): p is SpotlightItem => p !== null);
+        setSellerFeedPosts(mapped);
       } catch {} finally {
         setFeedLoading(false);
       }
@@ -595,13 +513,10 @@ export default function FeedScreen() {
     });
   }, [sellerFeedPosts]);
 
-  // Real published seller posts first; demo items fill the rest.
+  // Real published seller posts only — no demo fallback.
   // Live streams are woven in at roughly 1 per 10 regular posts (occasional, not dominant).
   const allItems = useMemo(() => {
-    const regular: (SpotlightItem | LiveStreamFeedItem)[] = [
-      ...sellerFeedPosts,
-      ...SPOTLIGHT_ITEMS.filter(s => !sellerFeedPosts.some(sp => sp.id === s.id)),
-    ];
+    const regular: (SpotlightItem | LiveStreamFeedItem)[] = [...sellerFeedPosts];
     if (!activeLiveStreams.length) return regular;
     // Weave live streams in: first at index 4, then every 10 after
     const result: (SpotlightItem | LiveStreamFeedItem)[] = [...regular];
@@ -615,6 +530,10 @@ export default function FeedScreen() {
   const displayItems = searchQuery.trim()
     ? allItems.filter(item => {
         const q = searchQuery.toLowerCase();
+        if (isLiveStreamItem(item)) {
+          return (item.brandName ?? item.sellerName).toLowerCase().includes(q) ||
+            item.title.toLowerCase().includes(q);
+        }
         return item.creator.toLowerCase().includes(q) ||
           item.handle.toLowerCase().includes(q) ||
           item.productName.toLowerCase().includes(q);
@@ -721,12 +640,24 @@ export default function FeedScreen() {
         viewabilityConfig={viewabilityConfig}
         getItemLayout={(_, index) => ({ length: SCREEN_H, offset: SCREEN_H * index, index })}
         ListEmptyComponent={
-          <View style={{ width: SCREEN_W, height: SCREEN_H, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-            <Feather name="search" size={32} color="#8C8577" />
-            <Text style={{ fontSize: FS.base, fontFamily: FONT.medium, color: '#8C8577' }}>
-              No results for "{searchQuery}"
-            </Text>
-          </View>
+          searchQuery.trim() ? (
+            <View style={{ width: SCREEN_W, height: SCREEN_H, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+              <Feather name="search" size={32} color="#8C8577" />
+              <Text style={{ fontSize: FS.base, fontFamily: FONT.medium, color: '#8C8577' }}>
+                No results for "{searchQuery}"
+              </Text>
+            </View>
+          ) : !feedLoading ? (
+            <View style={{ width: SCREEN_W, height: SCREEN_H, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 40 }}>
+              <Feather name="film" size={40} color={MUTED} />
+              <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center' }}>
+                No posts yet
+              </Text>
+              <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20 }}>
+                Follow sellers to see their drops here
+              </Text>
+            </View>
+          ) : null
         }
         renderItem={({ item, index }) => {
           if ((item as any)._isLive) {
