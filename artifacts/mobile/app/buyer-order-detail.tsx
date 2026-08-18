@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, Alert, StyleSheet, ActivityIndicator, Modal, TextInput,
+  RefreshControl,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -220,6 +221,8 @@ export default function BuyerOrderDetailScreen() {
 
   const [order, setOrder] = useState<BuyerOrderView | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
@@ -244,12 +247,16 @@ export default function BuyerOrderDetailScreen() {
       api.buyer.orders.get(id!).then(row => {
         if (!cancelled) {
           setOrder(adaptOrderDetail(row));
+          setFetchError(false);
           setLoading(false);
+          setRefreshing(false);
           consecutiveFailuresRef.current = 0;
         }
       }).catch(() => {
         if (!cancelled) {
           setLoading(false);
+          setRefreshing(false);
+          setFetchError(true);
           consecutiveFailuresRef.current += 1;
           if (consecutiveFailuresRef.current >= 3 && timerRef.current !== null) {
             clearInterval(timerRef.current);
@@ -269,6 +276,43 @@ export default function BuyerOrderDetailScreen() {
       }
     };
   }, [id]));
+
+  function handleRetry() {
+    if (!id) return;
+    setLoading(true);
+    setFetchError(false);
+    setOrder(null);
+    consecutiveFailuresRef.current = 0;
+    // Clear the stale polling interval so useFocusEffect re-runs cleanly
+    if (timerRef.current !== null) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    api.buyer.orders.get(id).then(row => {
+      setOrder(adaptOrderDetail(row));
+      setFetchError(false);
+      setLoading(false);
+      timerRef.current = setInterval(() => {
+        api.buyer.orders.get(id).then(r => setOrder(adaptOrderDetail(r))).catch(() => {});
+      }, 15_000);
+    }).catch(() => {
+      setLoading(false);
+      setFetchError(true);
+    });
+  }
+
+  function handlePullRefresh() {
+    if (!id || refreshing) return;
+    setRefreshing(true);
+    api.buyer.orders.get(id).then(row => {
+      setOrder(adaptOrderDetail(row));
+      setFetchError(false);
+      setRefreshing(false);
+    }).catch(() => {
+      setRefreshing(false);
+      setFetchError(true);
+    });
+  }
 
   function handleCopyTracking() {
     if (!order?.trackingNumber) return;
@@ -387,15 +431,36 @@ export default function BuyerOrderDetailScreen() {
   }
 
   if (!order) {
+    const isNetworkError = fetchError;
     return (
       <BrandthreadScreen>
-        <BrandthreadHeader title="Order Not Found" onBack={() => router.back()} />
+        <BrandthreadHeader
+          title={isNetworkError ? 'Couldn\'t Load Order' : 'Order Not Found'}
+          onBack={() => router.back()}
+        />
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
-          <Feather name="alert-circle" size={ICON.xxl} color={MUTED} />
-          <Text style={{ marginTop: SP.md, fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' }}>
-            We couldn't find this order. It may have been removed.
+          <Feather
+            name={isNetworkError ? 'wifi-off' : 'alert-circle'}
+            size={ICON.xxl}
+            color={MUTED}
+          />
+          <Text style={{ marginTop: SP.md, fontSize: FS.base, fontFamily: FONT.semibold, color: FG, textAlign: 'center' }}>
+            {isNetworkError ? 'Connection Problem' : 'Order Not Found'}
           </Text>
-          <SecondaryButton label="Go Back" onPress={() => router.back()} style={{ marginTop: SP.md }} />
+          <Text style={{ marginTop: SP.xs, fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20 }}>
+            {isNetworkError
+              ? 'We couldn\'t reach our servers right now. Check your connection and try again.'
+              : 'We couldn\'t find this order. It may have been removed or the link may be invalid.'}
+          </Text>
+          {isNetworkError && (
+            <PrimaryButton
+              label="Try Again"
+              icon="refresh-cw"
+              onPress={handleRetry}
+              style={{ marginTop: SP.lg }}
+            />
+          )}
+          <SecondaryButton label="Go Back" onPress={() => router.back()} style={{ marginTop: SP.sm }} />
         </View>
       </BrandthreadScreen>
     );
@@ -416,6 +481,14 @@ export default function BuyerOrderDetailScreen() {
           paddingTop: SP.md,
           paddingBottom: Math.max(insets.bottom, SP.md) + SP.xxl,
         }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handlePullRefresh}
+            tintColor={PURPLE}
+            colors={[PURPLE]}
+          />
+        }
       >
 
         {/* ── Status Card ──────────────────────────────────────────────────── */}
