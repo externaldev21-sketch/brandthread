@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Animated, Modal, TextInput, FlatList, Alert, Pressable,
+  Animated, Modal, TextInput, FlatList, Alert, Pressable, Linking,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -154,6 +154,14 @@ export default function SellerHomeScreen() {
   const [recentOrders, setRecentOrders] = useState<any[] | null>(null);
   const [payoutInfo,   setPayoutInfo]   = useState<any | null>(null);
   const [salesTrend,   setSalesTrend]   = useState<Array<{ day: string; totalCents: number }> | null>(null);
+  // ── Stripe Connect account status ─────────────────────────────────────────
+  const [connectStatus, setConnectStatus] = useState<{
+    connected: boolean;
+    chargesEnabled: boolean;
+    payoutsEnabled: boolean;
+    status: string;
+  } | null>(null);
+  const [connectBannerLoading, setConnectBannerLoading] = useState(false);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
 
@@ -212,6 +220,20 @@ export default function SellerHomeScreen() {
       incomingCount: s.incomingCount,
       delayedCount: s.delayedCount,
     })).catch(() => { setStatsError(true); });
+    // ── Stripe Connect account status ──────────────────────────────────────
+    api.seller.connect.status().then((data: any) => {
+      if (data && typeof data === 'object') {
+        setConnectStatus({
+          connected: !!data.connected,
+          chargesEnabled: !!data.chargesEnabled,
+          payoutsEnabled: !!data.payoutsEnabled,
+          status: typeof data.status === 'string' ? data.status : 'unknown',
+        });
+      }
+    }).catch(() => {
+      // Leave null — don't show a banner when we can't determine status
+      setConnectStatus(null);
+    });
     // ── Dashboard visual upgrade: hero card + trend chart + real orders ──
     api.finance.balance().then((data: any) => {
       setPayoutInfo(data && typeof data === 'object' ? data : null);
@@ -273,6 +295,21 @@ export default function SellerHomeScreen() {
 
   function closeCommand() {
     setCommandModal(false);
+  }
+
+  async function handleFixStripeConnect() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setConnectBannerLoading(true);
+    try {
+      const data = await api.seller.connect.onboard();
+      if (data?.url) {
+        await Linking.openURL(data.url);
+      }
+    } catch {
+      Alert.alert('Error', 'Could not open Stripe onboarding. Please try again.');
+    } finally {
+      setConnectBannerLoading(false);
+    }
   }
 
   // ── Loading skeleton ──────────────────────────────────────────────────────
@@ -390,6 +427,39 @@ export default function SellerHomeScreen() {
             </View>
           </LinearGradient>
         </View>
+
+        {/* ── Stripe Connect Warning Banner ────────────────────────────── */}
+        {connectStatus !== null && connectStatus.status !== 'active' && (
+          <TouchableOpacity
+            style={s.connectBanner}
+            onPress={handleFixStripeConnect}
+            activeOpacity={0.85}
+            disabled={connectBannerLoading}
+          >
+            <View style={s.connectBannerIcon}>
+              <Feather name="alert-circle" size={20} color={RED} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={s.connectBannerTitle}>
+                {connectStatus.connected
+                  ? 'Payments restricted — fix your Stripe account'
+                  : 'Payments unavailable — connect Stripe to get paid'}
+              </Text>
+              <Text style={s.connectBannerSub}>
+                {connectStatus.connected
+                  ? 'Buyers can\'t checkout until Stripe verifies your account. Tap to complete setup.'
+                  : 'Your store is live but buyers can\'t pay yet. Tap to connect Stripe.'}
+              </Text>
+            </View>
+            <View style={s.connectBannerArrow}>
+              {connectBannerLoading
+                ? <Text style={{ fontSize: 11, color: RED, fontFamily: FONT.medium }}>Opening…</Text>
+                : <><Text style={s.connectBannerFix}>Fix Now</Text>
+                    <Feather name="chevron-right" size={14} color={RED} /></>
+              }
+            </View>
+          </TouchableOpacity>
+        )}
 
         {/* ── Stats Error Banner ────────────────────────────────────────── */}
         {statsError && (
@@ -1165,6 +1235,50 @@ const s = StyleSheet.create({
     fontFamily: FONT.regular,
     color: 'rgba(255,255,255,0.6)',
     flex: 1,
+  },
+
+  // ── Stripe Connect warning banner ───────────────────────────────────────
+  connectBanner: {
+    marginHorizontal: SP.md,
+    marginBottom: SP.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    backgroundColor: 'rgba(239,68,68,0.10)',
+    borderRadius: RADIUS.md,
+    padding: SP.md,
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.30)',
+  },
+  connectBannerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.sm,
+    backgroundColor: 'rgba(239,68,68,0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  connectBannerTitle: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    color: '#F87171',
+    marginBottom: 3,
+  },
+  connectBannerSub: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: 'rgba(248,113,113,0.75)',
+    lineHeight: 16,
+  },
+  connectBannerArrow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  connectBannerFix: {
+    fontSize: 11,
+    fontFamily: FONT.semibold,
+    color: RED,
   },
 
   // ── 7-day trend chart ────────────────────────────────────────────────────
