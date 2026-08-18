@@ -13,6 +13,19 @@ import { requireStripe, computeApplicationFeeCents, PLATFORM_COMMISSION_RATE, ma
 const router = Router();
 router.use(requireAuth);
 
+// ─── Startup migration — add tracking_status + estimated_delivery to orders ───
+(async () => {
+  try {
+    await db.execute(sql`
+      ALTER TABLE orders
+        ADD COLUMN IF NOT EXISTS tracking_status    TEXT,
+        ADD COLUMN IF NOT EXISTS estimated_delivery TEXT
+    `);
+  } catch (err) {
+    console.error("[buyer] migration error:", err);
+  }
+})();
+
 // ─── Checkout ─────────────────────────────────────────────────────────────────
 
 /**
@@ -456,6 +469,8 @@ router.get("/orders", async (req, res) => {
         shippingCents:           orders.shippingCents,
         trackingNumber:          orders.trackingNumber,
         carrier:                 orders.carrier,
+        trackingStatus:          orders.trackingStatus,
+        estimatedDelivery:       orders.estimatedDelivery,
         shippingAddress:         orders.shippingAddress,
         stripePaymentIntentId:   orders.stripePaymentIntentId,
         createdAt:               orders.createdAt,
@@ -486,6 +501,8 @@ router.get("/orders/:id", async (req, res) => {
         shippingCents:           orders.shippingCents,
         trackingNumber:          orders.trackingNumber,
         carrier:                 orders.carrier,
+        trackingStatus:          orders.trackingStatus,
+        estimatedDelivery:       orders.estimatedDelivery,
         shippingAddress:         orders.shippingAddress,
         stripePaymentIntentId:   orders.stripePaymentIntentId,
         cancellationReason:      orders.cancellationReason,

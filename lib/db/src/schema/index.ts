@@ -168,6 +168,8 @@ export const orders = pgTable('orders', {
   }>(),
   trackingNumber: text('tracking_number'),
   carrier: text('carrier'),
+  trackingStatus: text('tracking_status'), // 'label_created'|'accepted'|'in_transit'|'out_for_delivery'|'delivered'|'exception'|'returned_to_sender'
+  estimatedDelivery: text('estimated_delivery'), // ISO date string, e.g. '2026-08-20'
   // Fulfillment timestamps
   packedAt:  timestamp('packed_at'),
   shippedAt: timestamp('shipped_at'),
