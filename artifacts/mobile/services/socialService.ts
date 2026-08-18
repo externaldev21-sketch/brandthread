@@ -898,22 +898,35 @@ function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
   };
 }
 
-/** Returns published posts from sellers the buyer follows, for the buyer Thread feed.
- *  Primary source: GET /api/posts/feed (requires auth — buyer Clerk token).
- *  Returns an empty array when the buyer follows no sellers with posts, or when
- *  the API is unavailable. Never falls back to demo data.
+/** Returns published seller posts for the buyer Thread feed, personalised so
+ *  posts from sellers the buyer follows appear FIRST.
+ *
+ *  Sources (fetched in parallel):
+ *  - GET /api/posts/feed    — followed sellers' posts (requires buyer Clerk token;
+ *                             fails/empty for unauthenticated or new buyers)
+ *  - GET /api/public/posts  — general feed of all seller posts, newest-first
+ *
+ *  Result: followed-seller posts first (recency order from the API), then the
+ *  remaining general-feed posts (deduped by post id). If the personalised call
+ *  fails or returns nothing, the general feed alone is returned. Never falls
+ *  back to demo data.
  */
 export async function getThreadPosts(): Promise<SellerThreadPost[]> {
-  try {
-    const apiPosts = await serviceRequest('/api/posts/feed') as any[];
-    if (Array.isArray(apiPosts)) {
-      // Map all results (empty array = buyer follows no sellers that have posted)
-      return apiPosts.map((p, idx) => mapApiPostToSellerThreadPost(p, idx));
-    }
-  } catch {
-    // API unreachable — return empty rather than surfacing demo content
-  }
-  return [];
+  const [followed, general] = await Promise.all([
+    serviceRequest('/api/posts/feed').then(
+      (r) => (Array.isArray(r) ? (r as any[]) : []),
+      () => [] as any[], // unauthenticated / API error → no personalised posts
+    ),
+    serviceRequest('/api/public/posts').then(
+      (r) => (Array.isArray(r) ? (r as any[]) : []),
+      () => [] as any[],
+    ),
+  ]);
+
+  // Followed sellers' posts first, then general posts not already included
+  const seen = new Set(followed.map((p) => p.id));
+  const merged = [...followed, ...general.filter((p) => !seen.has(p.id))];
+  return merged.map((p, idx) => mapApiPostToSellerThreadPost(p, idx));
 }
 
 // ─── Friendships ──────────────────────────────────────────────────────────────
