@@ -26,18 +26,21 @@ router.get("/", async (req, res) => {
       carrier: orders.carrier,
       createdAt: orders.createdAt,
       updatedAt: orders.updatedAt,
-      customerName: customers.name,
-      customerEmail: customers.email,
+      // Prefer the explicit customers record; fall back to the buyer's user row
+      // (covers Stripe-originated orders where customerId is null but buyerId is set)
+      customerName: sql<string>`COALESCE(${customers.name}, NULLIF(${users.displayName}, ''), ${users.name})`,
+      customerEmail: sql<string>`COALESCE(${customers.email}, ${users.email})`,
       dropName: drops.name,
       dropType: drops.type,
       itemCount: sql<number>`count(${orderItems.id})::int`,
     })
     .from(orders)
     .leftJoin(customers, eq(orders.customerId, customers.id))
+    .leftJoin(users, eq(orders.buyerId, users.clerkId))
     .leftJoin(drops, eq(orders.dropId, drops.id))
     .leftJoin(orderItems, eq(orderItems.orderId, orders.id))
     .where(eq(orders.ownerId, ownerId))
-    .groupBy(orders.id, customers.name, customers.email, drops.name, drops.type)
+    .groupBy(orders.id, customers.name, customers.email, drops.name, drops.type, users.displayName, users.name, users.email)
     .orderBy(desc(orders.createdAt));
   res.json(rows);
 });
