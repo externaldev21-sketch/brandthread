@@ -627,11 +627,55 @@ export default function SellerHomeScreen() {
             {recentOrders === null ? (
               <LoadingSkeleton height={68} />
             ) : recentOrders.length === 0 ? (
-              <BrandthreadCard style={{ marginBottom: 0 }}>
-                <Text style={{ fontSize: FS.sm, color: MUTED, fontFamily: FONT.regular, textAlign: 'center', paddingVertical: 4 }}>
-                  No orders yet
-                </Text>
-              </BrandthreadCard>
+              <GradientCard
+                colors={['rgba(139,92,246,0.22)', 'rgba(34,211,238,0.07)', 'rgba(139,92,246,0.12)']}
+                glow
+                style={{ marginBottom: 0 }}
+              >
+                {/* Icon + headline */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm }}>
+                  <View style={{
+                    width: 40, height: 40, borderRadius: RADIUS.md,
+                    backgroundColor: 'rgba(139,92,246,0.18)',
+                    borderWidth: 1, borderColor: 'rgba(139,92,246,0.35)',
+                    alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    <Feather name="zap" size={ICON.md} color={PURPLE_LIGHT} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: FS.base, fontFamily: FONT.bold, color: FG, letterSpacing: -0.2 }}>
+                      Ready for your first sale?
+                    </Text>
+                    <Text style={{ fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 }}>
+                      A few quick wins to get buyers in the door.
+                    </Text>
+                  </View>
+                </View>
+                {/* CTA buttons */}
+                <PrimaryButton
+                  label="Share Your Store"
+                  icon="share-2"
+                  small
+                  onPress={() => nav('/share-store')}
+                  style={{ marginBottom: 8 }}
+                />
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <SecondaryButton
+                    label="Add Product"
+                    icon="plus-circle"
+                    small
+                    onPress={() => nav('/(tabs)/products')}
+                    style={{ flex: 1 }}
+                  />
+                  <SecondaryButton
+                    label="Post on Threads"
+                    icon="video"
+                    small
+                    onPress={() => nav('/create-post')}
+                    style={{ flex: 1 }}
+                  />
+                </View>
+              </GradientCard>
             ) : recentOrders.map((order: any) => {
               const customerName = order.customerName ?? order.customer?.name ?? order.buyerName ?? 'Unknown';
               const totalCents   = typeof order.totalCents   === 'number' ? order.totalCents
