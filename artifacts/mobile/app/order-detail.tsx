@@ -171,6 +171,35 @@ function adaptApiOrder(raw: any): Order {
     });
   }
 
+  // Build cancellation object and timeline event from API fields
+  const cancellationReasonKey = raw.cancellationReason as string | undefined;
+  const cancellationNotes     = raw.cancellationNotes  as string | undefined;
+  let cancellation: import('@/services/orderTypes').Cancellation | undefined;
+  if (uiStatus === 'cancelled' && cancellationReasonKey) {
+    const reasonLabel = CANCELLATION_REASONS.find(r => r.key === cancellationReasonKey)?.label ?? cancellationReasonKey;
+    cancellation = {
+      id:             `cancel-${raw.id}`,
+      orderId:        raw.id,
+      reason:         cancellationReasonKey as import('@/services/orderTypes').CancellationReason,
+      notes:          cancellationNotes || undefined,
+      refundAmount:   totalDollars,
+      notifyCustomer: true,
+      cancelledAt:    raw.updatedAt ?? raw.createdAt,
+    };
+    const cancelMsg = cancellationNotes
+      ? `Order cancelled · ${reasonLabel} — ${cancellationNotes}`
+      : `Order cancelled · ${reasonLabel}`;
+    timeline.push({
+      id:                `tl-cancelled-${raw.id}`,
+      type:              'cancelled',
+      message:           cancelMsg,
+      isCustomerVisible: false,
+      isSystemEvent:     true,
+      isSellerNote:      false,
+      createdAt:         raw.updatedAt ?? raw.createdAt,
+    });
+  }
+
   const initials = customer?.name
     ? customer.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
     : 'C';
@@ -226,6 +255,7 @@ function adaptApiOrder(raw: any): Order {
     refunds:   [],
     disputes:  [],
     timeline,
+    cancellation,
     notes: isRefundPending
       ? [{
           id:         `note-refund-pending-${raw.id}`,
@@ -318,6 +348,10 @@ function timelineColor(type: string): string {
 
 function returnReasonLabel(key: string): string {
   return RETURN_REASONS.find(r => r.key === key)?.label ?? key;
+}
+
+function cancellationReasonLabel(key: string): string {
+  return CANCELLATION_REASONS.find(r => r.key === key)?.label ?? key;
 }
 
 // ─── InfoRow ─────────────────────────────────────────────────────────────────
@@ -760,6 +794,23 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
           </View>
         )}
       </GradientCard>
+
+      {/* Cancellation reason card */}
+      {order.status === 'cancelled' && order.cancellation && (
+        <View style={s.section}>
+          <BrandthreadCard style={s.cancellationCard}>
+            <View style={s.cancellationHeader}>
+              <Feather name="x-circle" size={ICON.sm} color={RED} />
+              <Text style={s.cancellationTitle}>Order Cancelled</Text>
+            </View>
+            <InfoRow label="Reason" value={cancellationReasonLabel(order.cancellation.reason)} valueColor={FG} />
+            {order.cancellation.notes ? (
+              <InfoRow label="Notes" value={order.cancellation.notes} valueColor={MUTED} />
+            ) : null}
+            <InfoRow label="Cancelled" value={fmt(order.cancellation.cancelledAt)} valueColor={MUTED} />
+          </BrandthreadCard>
+        </View>
+      )}
 
       {/* Action Buttons */}
       <View style={s.actionSection}>
@@ -1565,7 +1616,10 @@ const s = StyleSheet.create({
   modalSubtitle:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
   modalActions:     { flexDirection: 'row', gap: SP.sm },
   cancelNoteInput:  { backgroundColor: SURFACE, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, fontSize: FS.sm, padding: SP.md, minHeight: 80, textAlignVertical: 'top' },
-  warningCard:      { borderColor: RED + '44' },
+  cancellationCard:   { borderColor: RED + '44' },
+  cancellationHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
+  cancellationTitle:  { fontSize: FS.base, fontFamily: FONT.semibold, color: RED },
+  warningCard:        { borderColor: RED + '44' },
   warningRow:       { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start' },
   warningText:      { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: RED, lineHeight: 20 },
   cancelBanner:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: '#1A3A2A', borderBottomWidth: 1, borderBottomColor: SUCCESS + '55', paddingHorizontal: SP.md, paddingVertical: SP.sm },
