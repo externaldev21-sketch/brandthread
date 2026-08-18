@@ -3,13 +3,13 @@
  * Tabs: overview | customer | payment | fulfillment | timeline | returns | disputes | notes
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, TextInput,
   StyleSheet, Alert, ActivityIndicator, Modal,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -375,44 +375,77 @@ export default function OrderDetailScreen() {
   // Tracking events modal
   const [trackingModalShipmentId, setTrackingModalShipmentId] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // Backoff: stop polling after 3 consecutive failures; resume on next focus.
+  const consecutiveFailuresRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const generationRef = useRef(0);
+  const hasLoadedRef = useRef(false);
+
+  const load = useCallback(async (generation: number) => {
+    if (!hasLoadedRef.current) setLoading(true);
     try {
       const raw = await api.orders.get(id);
+      if (generationRef.current !== generation) return; // stale focus cycle
       setOrder(adaptApiOrder(raw));
+      consecutiveFailuresRef.current = 0;
     } catch {
-      setOrder(null);
+      if (generationRef.current !== generation) return; // stale focus cycle
+      if (!hasLoadedRef.current) setOrder(null);
+      consecutiveFailuresRef.current += 1;
+      if (consecutiveFailuresRef.current >= 3 && timerRef.current !== null) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     } finally {
-      setLoading(false);
+      if (generationRef.current === generation) {
+        setLoading(false);
+        hasLoadedRef.current = true;
+      }
     }
   }, [id, api]);
 
-  useEffect(() => { load(); }, [load]);
+  // Poll every 15 s while focused so status updates surface quickly.
+  // After 3 consecutive failures the interval clears to avoid hammering a
+  // down/offline server; it resets automatically on the next screen focus.
+  useFocusEffect(
+    useCallback(() => {
+      const generation = ++generationRef.current;
+      consecutiveFailuresRef.current = 0;
+      load(generation);
+      timerRef.current = setInterval(() => load(generation), 15_000);
+      return () => {
+        if (timerRef.current !== null) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+      };
+    }, [load])
+  );
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
   async function handleMarkProcessing() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try { await api.orders.updateStatus(id, 'processing'); } catch (e: any) { Alert.alert('Error', e.message); return; }
-    load();
+    load(generationRef.current);
   }
 
   async function handleMarkReadyToShip() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try { await api.orders.updateStatus(id, 'fulfilled'); } catch (e: any) { Alert.alert('Error', e.message); return; }
-    load();
+    load(generationRef.current);
   }
 
   async function handleMarkShipped() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try { await api.orders.updateStatus(id, 'shipped'); } catch (e: any) { Alert.alert('Error', e.message); return; }
-    load();
+    load(generationRef.current);
   }
 
   async function handleMarkDelivered() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try { await api.orders.updateStatus(id, 'delivered'); } catch (e: any) { Alert.alert('Error', e.message); return; }
-    load();
+    load(generationRef.current);
   }
 
   async function handleCancelOrder() {
@@ -435,7 +468,7 @@ export default function OrderDetailScreen() {
     } finally {
       setCancelling(false);
     }
-    load();
+    load(generationRef.current);
   }
 
   async function handleAddNote() {
@@ -475,13 +508,13 @@ export default function OrderDetailScreen() {
       return;
     }
     setTrackingForms(prev => ({ ...prev, [groupId]: { ...prev[groupId], visible: false } }));
-    load();
+    load(generationRef.current);
   }
 
   async function handleAddTrackingQuick(carrier: string, trackingNumber: string) {
     try {
       await api.orders.addTracking(id, { trackingNumber, carrier });
-      load();
+      load(generationRef.current);
     } catch (e: any) {
       Alert.alert('Error', e.message);
     }
@@ -543,7 +576,7 @@ export default function OrderDetailScreen() {
           <Text style={s.headerTitle}>{order.orderNumber}</Text>
           <Text style={s.headerSub}>{order.customer.name}</Text>
         </View>
-        <IconButton name="refresh-cw" onPress={load} color={MUTED} />
+        <IconButton name="refresh-cw" onPress={() => load(generationRef.current)} color={MUTED} />
       </View>
 
       {/* Tab bar */}
@@ -582,7 +615,7 @@ export default function OrderDetailScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {activeTab === 'overview'    && <OverviewTab order={order} onMarkProcessing={handleMarkProcessing} onMarkReadyToShip={handleMarkReadyToShip} onMarkShipped={handleMarkShipped} onMarkDelivered={handleMarkDelivered} onCancelPress={() => setShowCancelModal(true)} router={router} reload={load} onAddTrackingQuick={handleAddTrackingQuick} />}
+        {activeTab === 'overview'    && <OverviewTab order={order} onMarkProcessing={handleMarkProcessing} onMarkReadyToShip={handleMarkReadyToShip} onMarkShipped={handleMarkShipped} onMarkDelivered={handleMarkDelivered} onCancelPress={() => setShowCancelModal(true)} router={router} reload={() => load(generationRef.current)} onAddTrackingQuick={handleAddTrackingQuick} />}
         {activeTab === 'customer'    && <CustomerTab order={order} />}
         {activeTab === 'payment'     && <PaymentTab order={order} />}
         {activeTab === 'fulfillment' && <FulfillmentTab order={order} trackingForms={trackingForms} setTrackingForms={setTrackingForms} onAddTracking={handleAddTracking} onMarkShipped={handleMarkShipped} onShowTracking={(sid) => setTrackingModalShipmentId(sid)} router={router} />}

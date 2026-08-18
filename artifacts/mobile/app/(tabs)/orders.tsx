@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
@@ -458,40 +458,64 @@ export default function OrdersScreen() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [stats, setStats] = useState<OrderStats | null>(null);
 
-  const loadData = useCallback(async () => {
+  // Backoff: stop polling after 3 consecutive failures; resume on next focus.
+  // A generation counter ensures requests from a previous focus cycle cannot
+  // increment the failure count or clear the timer of the current focus cycle.
+  const consecutiveFailuresRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const generationRef = useRef(0);
+  const hasLoadedRef = useRef(false);
+
+  const loadData = useCallback(async (generation: number) => {
     try {
       const rows = await api.orders.list();
+      if (generationRef.current !== generation) return; // stale focus cycle
       // Guard: API can return null/undefined/error-object when the request fails
       // or when the seller has no orders yet. Array.isArray prevents the
       // "rows.map is not a function" TypeError that crashes the screen.
       const all = Array.isArray(rows) ? (rows as any[]).map(apiRowToOrder) : [];
       setOrders(all);
       setStats(computeStats(all));
+      consecutiveFailuresRef.current = 0;
     } catch (e) {
+      if (generationRef.current !== generation) return; // stale focus cycle
       console.error('Failed to load seller orders', e);
-      // Ensure we always land in a clean empty state, never leave stale
-      // loading=true or a partially-rendered broken list.
-      setOrders([]);
-      setStats({ newOrders: 0, toProcess: 0, readyToShip: 0, returnRequests: 0, disputes: 0, total: 0 });
+      consecutiveFailuresRef.current += 1;
+      if (consecutiveFailuresRef.current >= 3 && timerRef.current !== null) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (generationRef.current === generation) {
+        setLoading(false);
+        setRefreshing(false);
+        hasLoadedRef.current = true;
+      }
     }
   }, [api]);
 
   // Load on focus and poll every 30 s so status updates appear live.
+  // After 3 consecutive failures the interval is cleared to avoid hammering a
+  // down/offline server; it resets on the next focus event.
   useFocusEffect(
     useCallback(() => {
-      setLoading(true);
-      loadData();
-      const timer = setInterval(loadData, 30_000);
-      return () => clearInterval(timer);
+      const generation = ++generationRef.current;
+      consecutiveFailuresRef.current = 0;
+      if (!hasLoadedRef.current) setLoading(true);
+      loadData(generation);
+      timerRef.current = setInterval(() => loadData(generation), 30_000);
+      return () => {
+        if (timerRef.current !== null) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
+      };
     }, [loadData])
   );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadData();
+    loadData(generationRef.current);
   }, [loadData]);
 
   // Filtered + sorted list
@@ -527,7 +551,7 @@ export default function OrdersScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await api.orders.updateStatus(orderId, 'processing');
-      await loadData();
+      await loadData(generationRef.current);
     } catch {
       Alert.alert('Error', 'Could not update order.');
     }
@@ -537,7 +561,7 @@ export default function OrdersScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await api.orders.updateStatus(orderId, 'fulfilled');
-      await loadData();
+      await loadData(generationRef.current);
     } catch {
       Alert.alert('Error', 'Could not update order.');
     }
@@ -570,7 +594,7 @@ export default function OrdersScreen() {
     try {
       await Promise.all(selectedIds.map(id => api.orders.updateStatus(id, 'processing')));
       setSelectedIds([]);
-      await loadData();
+      await loadData(generationRef.current);
     } catch {
       Alert.alert('Error', 'Could not bulk update orders.');
     }
@@ -581,7 +605,7 @@ export default function OrdersScreen() {
     try {
       await Promise.all(selectedIds.map(id => api.orders.updateStatus(id, 'fulfilled')));
       setSelectedIds([]);
-      await loadData();
+      await loadData(generationRef.current);
     } catch {
       Alert.alert('Error', 'Could not bulk update orders.');
     }
