@@ -461,6 +461,8 @@ export interface BuyerOrderView {
   isPreOrder: boolean;
   preOrderEstShipDate?: string;
   hasReturnRequest: boolean;
+  cancellationReason?: string | null;
+  cancellationNotes?: string | null;
   createdAt: string;
 }
 

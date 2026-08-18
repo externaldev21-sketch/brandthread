@@ -181,12 +181,33 @@ function adaptOrderDetail(row: any): BuyerOrderView {
       taxTotal:      0,
       total:         (row.totalCents     ?? 0) / 100,
     },
-    trackingNumber:  row.trackingNumber ?? undefined,
-    trackingCarrier: row.carrier ?? undefined,
-    isPreOrder:       false,
-    hasReturnRequest: false,
-    createdAt:        row.createdAt ?? new Date().toISOString(),
+    trackingNumber:      row.trackingNumber ?? undefined,
+    trackingCarrier:     row.carrier ?? undefined,
+    isPreOrder:           false,
+    hasReturnRequest:     false,
+    cancellationReason:  row.cancellationReason ?? null,
+    cancellationNotes:   row.cancellationNotes ?? null,
+    createdAt:            row.createdAt ?? new Date().toISOString(),
   };
+}
+
+// ─── Cancellation reason → human-friendly label ───────────────────────────────
+
+const CANCELLATION_REASON_LABELS: Record<string, string> = {
+  customer_request:      'You requested the cancellation',
+  out_of_stock:          'Out of stock',
+  production_issue:      'Production issue',
+  fraud_risk:            'Flagged for security review',
+  shipping_restriction:  'Cannot ship to your address',
+  duplicate_order:       'Duplicate order',
+  seller_decision:       'Seller decision',
+  buyer_requested:       'You requested the cancellation',
+  other:                 'Other',
+};
+
+function cancellationReasonLabel(reason: string | null | undefined): string {
+  if (!reason) return 'No reason provided';
+  return CANCELLATION_REASON_LABELS[reason] ?? reason.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
 export default function BuyerOrderDetailScreen() {
@@ -425,6 +446,29 @@ export default function BuyerOrderDetailScreen() {
             )}
           </GradientCard>
         </View>
+
+        {/* ── Cancellation Reason ───────────────────────────────────────────── */}
+        {order.status === 'cancelled' && (
+          <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
+            <GradientCard
+              colors={['rgba(239,68,68,0.14)', 'rgba(239,68,68,0.05)']}
+              style={{ borderColor: 'rgba(239,68,68,0.35)' }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs }}>
+                <Feather name="x-circle" size={ICON.sm} color={RED} />
+                <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: RED }}>Order Cancelled</Text>
+              </View>
+              <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginBottom: 2 }}>
+                {cancellationReasonLabel(order.cancellationReason)}
+              </Text>
+              {!!order.cancellationNotes && (
+                <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: SP.xs, lineHeight: 18 }}>
+                  {order.cancellationNotes}
+                </Text>
+              )}
+            </GradientCard>
+          </View>
+        )}
 
         {/* ── Products ─────────────────────────────────────────────────────── */}
         <SectionCard title={`Items (${order.lineItems.length})`}>

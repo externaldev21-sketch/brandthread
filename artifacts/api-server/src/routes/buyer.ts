@@ -488,6 +488,8 @@ router.get("/orders/:id", async (req, res) => {
         carrier:                 orders.carrier,
         shippingAddress:         orders.shippingAddress,
         stripePaymentIntentId:   orders.stripePaymentIntentId,
+        cancellationReason:      orders.cancellationReason,
+        cancellationNotes:       orders.cancellationNotes,
         createdAt:               orders.createdAt,
       })
       .from(orders)
