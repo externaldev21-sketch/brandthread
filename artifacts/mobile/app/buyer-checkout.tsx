@@ -752,6 +752,12 @@ export default function BuyerCheckoutScreen() {
   const [placedOrderNumbers, setPlacedOrderNumbers] = useState<string[]>([]);
   const [placedTotal, setPlacedTotal] = useState(0);
   const [failureMessage, setFailureMessage] = useState('');
+  /**
+   * True only when the last failure was a card decline from Stripe's verification
+   * (not a cancel, not a seller-account error, not a network error).
+   * Controls whether the "Try a different card" shortcut is shown.
+   */
+  const [isCardDecline, setIsCardDecline] = useState(false);
   /** Set when the API confirms the seller's Stripe Connect account isn't ready. */
   const [sellerPaymentError, setSellerPaymentError] = useState<{ sellerName: string; sellerId: string } | null>(null);
 
@@ -764,6 +770,14 @@ export default function BuyerCheckoutScreen() {
   const paidGroupsRef = useRef<Map<string, { stripeSessionId: string; orderNumber: string; amountTotalCents: number }>>(new Map());
 
   const placeOrderIdempotencyRef = useRef<string>('');
+
+  /**
+   * Incremented each time the buyer taps "Try a different card".
+   * Appended to the per-seller clientIdempotencyKey so the server treats
+   * the retry as a brand-new Stripe Checkout Session rather than returning
+   * the previously-declined (and now expired/uncollectable) session.
+   */
+  const cardRetryCountRef = useRef<number>(0);
 
   useEffect(() => {
     (async () => {
@@ -887,6 +901,7 @@ export default function BuyerCheckoutScreen() {
       if (!validateAcknowledgments()) return;
       setPlacing(true);
       setFailureMessage('');
+      setIsCardDecline(false);
       setSellerPaymentError(null);
       // Tracks which group was active when an error occurred so the catch block
       // can identify the seller and show a targeted error message.
@@ -920,10 +935,13 @@ export default function BuyerCheckoutScreen() {
               }
             : undefined;
 
-          // Derive a stable per-attempt key: checkoutId + sellerId.
-          // Changes when a new checkout session is created (cart edit → fresh idempotencyKey).
-          // Stable on retries within the same checkout → server returns the existing session.
-          const clientIdempotencyKey = `${sess.idempotencyKey}_${group.sellerId}`;
+          // Derive a per-attempt key: checkoutId + sellerId [+ retry suffix].
+          // The base key is stable across re-renders so the server deduplicates identical
+          // in-flight sessions. When the buyer taps "Try a different card", cardRetryCountRef
+          // is incremented so the suffix changes, forcing the server to create a fresh Stripe
+          // Checkout Session rather than returning the previously-declined one.
+          const retrySuffix = cardRetryCountRef.current > 0 ? `_r${cardRetryCountRef.current}` : '';
+          const clientIdempotencyKey = `${sess.idempotencyKey}_${group.sellerId}${retrySuffix}`;
 
           const { sessionId, url } = await api.buyer.checkout.createSession(groupItems, {
             contactEmail:        contact.email ?? undefined,
@@ -956,11 +974,15 @@ export default function BuyerCheckoutScreen() {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             // Prefer the server-translated decline reason (never a raw Stripe string).
             // Fall back to a generic message when no specific reason is available.
+            const isPending = verification.paymentStatus !== 'unpaid';
             const declineMsg = verification.declineReason
-              ?? (verification.paymentStatus === 'unpaid'
-                ? `Payment for ${group.sellerName} was not completed — please try a different card or try again.`
-                : `Payment for ${group.sellerName} is pending. Check your Orders for updates.`);
+              ?? (isPending
+                ? `Payment for ${group.sellerName} is pending. Check your Orders for updates.`
+                : `Payment for ${group.sellerName} was not completed — please try a different card or try again.`);
             setFailureMessage(declineMsg);
+            // Show "Try a different card" only for unpaid/declined sessions, not for
+            // pending ones (which may resolve on their own via webhook).
+            setIsCardDecline(!isPending);
             setPlacing(false);
             return;
           }
@@ -1044,6 +1066,20 @@ export default function BuyerCheckoutScreen() {
       }
       setPlacing(false);
     }
+  }
+
+  /**
+   * Bump the card-retry counter so the next call to handleContinue sends a fresh
+   * idempotency key to the server, forcing a new Stripe Checkout Session.
+   * Clears the existing decline banner and re-runs the review step immediately.
+   */
+  async function handleRetryWithDifferentCard() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    cardRetryCountRef.current += 1;
+    setFailureMessage('');
+    setIsCardDecline(false);
+    // handleContinue is guarded by step === 'review'; we stay on that step.
+    await handleContinue();
   }
 
   async function handleBack() {
@@ -1209,8 +1245,21 @@ export default function BuyerCheckoutScreen() {
 
         {!!failureMessage && (
           <View style={co.errorBanner}>
-            <Feather name="alert-circle" size={16} color={RED} />
-            <Text style={co.errorText}>{failureMessage}</Text>
+            <Feather name="alert-circle" size={16} color={RED} style={{ marginTop: 2 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={co.errorText}>{failureMessage}</Text>
+              {isCardDecline && (
+                <TouchableOpacity
+                  style={co.retryCardBtn}
+                  onPress={handleRetryWithDifferentCard}
+                  activeOpacity={0.8}
+                  disabled={placing}
+                >
+                  <Feather name="credit-card" size={13} color={RED} />
+                  <Text style={co.retryCardText}>Try a different card</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         )}
       </ScrollView>
@@ -1256,7 +1305,17 @@ const co = StyleSheet.create({
   continueGrad: { height: COMP.buttonH, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm },
   continueText: { fontSize: FS.base, fontFamily: FONT.bold, color: ON_DARK },
   errorBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, backgroundColor: RED_DIM, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md, borderWidth: 1, borderColor: 'rgba(248,113,113,0.3)' },
-  errorText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: RED, lineHeight: 20 },
+  errorText: { fontSize: FS.sm, fontFamily: FONT.medium, color: RED, lineHeight: 20 },
+  retryCardBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    alignSelf: 'flex-start',
+    marginTop: SP.sm,
+    paddingVertical: 7, paddingHorizontal: 12,
+    backgroundColor: 'rgba(248,113,113,0.12)',
+    borderRadius: RADIUS.pill,
+    borderWidth: 1, borderColor: 'rgba(248,113,113,0.4)',
+  },
+  retryCardText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: RED },
   sellerPaymentErrorCard: { backgroundColor: ORANGE_DIM, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md, borderWidth: 1, borderColor: 'rgba(251,146,60,0.35)' },
   sellerPaymentErrorHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: 8 },
   sellerPaymentErrorTitle: { fontSize: FS.sm, fontFamily: FONT.bold, color: ORANGE },
