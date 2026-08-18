@@ -27,6 +27,10 @@ import {
   BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
   GradientCard, StatusBadge, PrimaryButton, SecondaryButton,
 } from '@/components/BrandthreadUI';
+import { fmtCurrency } from '@/lib/format';
+
+// 60-minute cancellation window (mirrors server enforcement)
+const CANCEL_WINDOW_MS = 60 * 60 * 1000;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -198,6 +202,8 @@ export default function BuyerOrderDetailScreen() {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewBody, setReviewBody] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   // Backoff: stop polling after 3 consecutive failures; resume on next focus.
   const consecutiveFailuresRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -312,6 +318,27 @@ export default function BuyerOrderDetailScreen() {
     router.push(('/buyer-problem-report?orderId=' + order.id) as never);
   }
 
+  async function handleCancelOrder() {
+    if (!order) return;
+    setCancelling(true);
+    setShowCancelModal(false);
+    try {
+      const result = await api.buyer.orders.cancel(order.id);
+      if (result.cancelled) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        const msg = result.refunded
+          ? 'Your order has been cancelled and a full refund has been issued. It may take 5–10 business days to appear on your statement.'
+          : 'Your order has been cancelled.';
+        Alert.alert('Order Cancelled', msg, [{ text: 'OK', onPress: () => router.back() }]);
+      }
+    } catch (err: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert('Cannot Cancel', err?.message ?? 'Could not cancel this order. Please contact the seller.');
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   function handleBuyAgain() {
     if (!order) return;
     const firstItem = order.lineItems[0];
@@ -414,7 +441,7 @@ export default function BuyerOrderDetailScreen() {
                 <Text style={styles.lineItemVariant}>{item.variant}</Text>
               </View>
               <Text style={styles.lineItemPrice}>
-                {item.quantity} × ${item.unitPrice.toFixed(2)}
+                {item.quantity} × {fmtCurrency(item.unitPrice)}
               </Text>
             </View>
           ))}
@@ -422,13 +449,13 @@ export default function BuyerOrderDetailScreen() {
 
         {/* ── Payment Summary ───────────────────────────────────────────────── */}
         <SectionCard title="Payment Summary">
-          <Row label="Subtotal" value={`$${order.payment.subtotal.toFixed(2)}`} />
-          <Row label="Shipping" value={`$${order.payment.shippingTotal.toFixed(2)}`} />
-          <Row label="Tax" value={`$${order.payment.taxTotal.toFixed(2)}`} />
+          <Row label="Subtotal" value={fmtCurrency(order.payment.subtotal)} />
+          <Row label="Shipping" value={fmtCurrency(order.payment.shippingTotal)} />
+          <Row label="Tax"      value={fmtCurrency(order.payment.taxTotal)} />
           <View style={styles.divider} />
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalAmount}>${order.payment.total.toFixed(2)}</Text>
+            <Text style={styles.totalAmount}>{fmtCurrency(order.payment.total)}</Text>
           </View>
           <Text style={styles.paymentNote}>Payment processed securely via Brandthread</Text>
         </SectionCard>
@@ -519,6 +546,22 @@ export default function BuyerOrderDetailScreen() {
         {/* ── Actions ──────────────────────────────────────────────────────── */}
         <View style={{ paddingHorizontal: SP.md, gap: SP.sm, marginBottom: SP.md }}>
           <Text style={[sc.title, { paddingHorizontal: 0 }]}>Actions</Text>
+
+          {/* Cancel button — only visible within the 60-min window while pending */}
+          {order.status === 'new' &&
+            (Date.now() - new Date(order.createdAt).getTime()) < CANCEL_WINDOW_MS && (
+            <SecondaryButton
+              label={cancelling ? 'Cancelling…' : 'Cancel Order'}
+              icon="x-circle"
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                setShowCancelModal(true);
+              }}
+              accent={RED}
+              disabled={cancelling}
+            />
+          )}
+
           <PrimaryButton
             label="Contact Seller"
             icon="message-circle"
@@ -584,6 +627,37 @@ export default function BuyerOrderDetailScreen() {
           </View>
         </View>
       )}
+
+      {/* ── Cancel Confirmation Modal ─────────────────────────────────────── */}
+      <Modal visible={showCancelModal} transparent animationType="slide" onRequestClose={() => setShowCancelModal(false)}>
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' }}>
+          <View style={{ backgroundColor: CARD, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: SP.lg, paddingBottom: SP.xl + 20 }}>
+            <View style={{ alignItems: 'center', marginBottom: SP.md }}>
+              <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: RED_DIM, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm }}>
+                <Feather name="x-circle" size={24} color={RED} />
+              </View>
+              <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG }}>Cancel this order?</Text>
+            </View>
+            <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20, marginBottom: SP.lg }}>
+              Your payment will be fully refunded. Refunds typically appear within 5–10 business days depending on your bank.
+            </Text>
+            <View style={{ flexDirection: 'row', gap: SP.sm }}>
+              <SecondaryButton
+                label="Keep Order"
+                onPress={() => setShowCancelModal(false)}
+                style={{ flex: 1 }}
+              />
+              <TouchableOpacity
+                style={{ flex: 1, height: COMP.buttonH, borderRadius: RADIUS.md, backgroundColor: RED_DIM, borderWidth: 1, borderColor: RED + '60', alignItems: 'center', justifyContent: 'center' }}
+                onPress={handleCancelOrder}
+                activeOpacity={0.8}
+              >
+                <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: RED }}>Yes, Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* ── Review Modal ─────────────────────────────────────────────────── */}
       <Modal visible={showReviewModal} transparent animationType="slide" onRequestClose={() => setShowReviewModal(false)}>

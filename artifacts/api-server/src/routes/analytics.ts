@@ -227,4 +227,77 @@ router.get("/post-clicks", async (req, res) => {
   }
 });
 
+// GET /api/analytics/customers?limit=10
+// Top customers by total spend + repeat-buyer stats derived from real orders.
+// Returns topCustomers list and aggregate stats (totalCustomers, repeatRate).
+router.get("/customers", async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  const limit   = Math.min(parseInt((req.query.limit as string) ?? "10", 10) || 10, 50);
+
+  try {
+    // Top customers — group orders by buyer; join users for display name and
+    // customers table (via order.customer_id) for email.
+    const topRows = await db.execute(sql`
+      SELECT
+        o.buyer_id,
+        COALESCE(u.display_name, c.name, 'Customer')  AS name,
+        COALESCE(c.email, '')                           AS email,
+        COUNT(o.id)::int                               AS order_count,
+        COALESCE(SUM(o.total_cents), 0)::int           AS total_cents,
+        MAX(o.created_at)                              AS last_order_at,
+        MIN(o.created_at)                              AS first_order_at
+      FROM orders o
+      LEFT JOIN users      u ON u.clerk_id  = o.buyer_id
+      LEFT JOIN customers  c ON c.id        = o.customer_id
+      WHERE o.owner_id = ${ownerId}
+        AND o.status != 'cancelled'
+      GROUP BY o.buyer_id, u.display_name, c.name, c.email
+      ORDER BY total_cents DESC
+      LIMIT ${limit}
+    `);
+
+    // Aggregate repeat-buyer stats
+    const statsRows = await db.execute(sql`
+      SELECT
+        COUNT(DISTINCT buyer_id)::int                                          AS total_customers,
+        SUM(CASE WHEN order_count > 1 THEN 1 ELSE 0 END)::int                 AS repeat_customers,
+        COALESCE(AVG(order_count), 0)::numeric(10,2)                           AS avg_orders_per_customer
+      FROM (
+        SELECT buyer_id, COUNT(*) AS order_count
+        FROM orders
+        WHERE owner_id = ${ownerId} AND status != 'cancelled'
+        GROUP BY buyer_id
+      ) sub
+    `);
+
+    const stats         = (statsRows as any[])[0] ?? {};
+    const totalCustomers  = Number(stats.total_customers  ?? 0);
+    const repeatCustomers = Number(stats.repeat_customers ?? 0);
+    const repeatRate      = totalCustomers > 0
+      ? Math.round((repeatCustomers / totalCustomers) * 100)
+      : 0;
+
+    res.json({
+      topCustomers: (topRows as any[]).map((r: any) => ({
+        buyerId:      r.buyer_id,
+        name:         r.name         ?? "Customer",
+        email:        r.email        ?? "",
+        orderCount:   Number(r.order_count),
+        totalCents:   Number(r.total_cents),
+        lastOrderAt:  r.last_order_at  ?? null,
+        firstOrderAt: r.first_order_at ?? null,
+      })),
+      stats: {
+        totalCustomers,
+        repeatCustomers,
+        repeatRate,
+        avgOrdersPerCustomer: parseFloat(stats.avg_orders_per_customer ?? "0"),
+      },
+    });
+  } catch (err) {
+    console.error("GET /analytics/customers error:", err);
+    res.status(500).json({ error: "Failed to fetch customer analytics" });
+  }
+});
+
 export default router;

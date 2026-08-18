@@ -1,9 +1,24 @@
-import React, { useState } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
-import { useColors } from '@/hooks/useColors';
+/**
+ * Notification Settings — seller push notification preferences.
+ * Includes digest mode toggle (real-time vs daily summary) backed by real API.
+ */
+import React, { useState, useEffect } from 'react';
+import {
+  ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Switch, ActivityIndicator,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useApi } from '@/hooks/useApi';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import {
+  BG, CARD, BORDER, FG, MUTED, SUBTLE,
+  PURPLE, PURPLE_DIM, PURPLE_LIGHT,
+  SUCCESS,
+  FONT, FS, SP,
+} from '@/lib/theme';
+
+type DigestMode = 'realtime' | 'daily';
 
 interface NotifRow {
   key: string;
@@ -13,88 +28,192 @@ interface NotifRow {
 }
 
 const ROWS: NotifRow[] = [
-  { key: 'customer', icon: 'user', label: 'Customer notifications', description: 'Notify customers about order and account events' },
-  { key: 'staff', icon: 'users', label: 'Staff notifications', description: 'Notify staff members about new order events' },
-  { key: 'fulfillment', icon: 'package', label: 'Fulfillment request notification', description: 'Notify your fulfillment service provider when you mark an order as fulfilled' },
-  { key: 'webhooks', icon: 'code', label: 'Webhooks', description: 'Send XML or JSON notifications about store events to a URL' },
+  { key: 'customer',    icon: 'user',    label: 'Customer notifications',              description: 'Notify customers about order and account events' },
+  { key: 'staff',       icon: 'users',   label: 'Staff notifications',                 description: 'Notify staff members about new order events' },
+  { key: 'fulfillment', icon: 'package', label: 'Fulfillment request notification',    description: 'Notify your fulfillment service when you mark an order as fulfilled' },
+  { key: 'webhooks',    icon: 'code',    label: 'Webhooks',                            description: 'Send XML or JSON notifications about store events to a URL' },
 ];
 
 export default function NotificationsSettingsScreen() {
-  const colors = useColors();
-  const [email, setEmail] = useState('store@brandthread.com');
+  const insets = useSafeAreaInsets();
+  const api    = useApi();
+  const [email, setEmail]   = useState('store@brandthread.com');
+  const [digest, setDigest] = useState<DigestMode>('realtime');
+  const [loading, setLoading] = useState(true);
+  const [saving,  setSaving]  = useState(false);
+
+  // Load current preference from API
+  useEffect(() => {
+    api.seller.notificationPrefs.get()
+      .then(data => { setDigest(data.digest); })
+      .catch(() => {/* fallback to realtime */})
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function handleDigestToggle(val: boolean) {
+    const next: DigestMode = val ? 'daily' : 'realtime';
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setDigest(next);
+    setSaving(true);
+    try {
+      await api.seller.notificationPrefs.update({ digest: next });
+    } catch {
+      // revert on error
+      setDigest(val ? 'realtime' : 'daily');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   function haptic() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[s.container, { backgroundColor: BG }]}>
       <ScreenHeader title="Notifications" />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Sender email</Text>
-          <Text style={[styles.sectionSubtitle, { color: colors.mutedForeground }]}>
-            The email your store uses to send and receive emails from your customers
-          </Text>
 
-          <View style={[styles.infoBox, { backgroundColor: colors.primary + '12' }]}>
-            <Feather name="info" size={15} color={colors.primary} style={{ marginTop: 2 }} />
-            <Text style={[styles.infoText, { color: colors.foreground }]}>
+        {/* ── Sender email ── */}
+        <View style={s.section}>
+          <Text style={s.sectionTitle}>Sender email</Text>
+          <Text style={s.sectionSubtitle}>
+            The email your store uses to send and receive emails from customers
+          </Text>
+          <View style={[s.infoBox, { backgroundColor: PURPLE_DIM }]}>
+            <Feather name="info" size={15} color={PURPLE_LIGHT} style={{ marginTop: 2 }} />
+            <Text style={[s.infoText, { color: FG }]}>
               Public domains like Gmail don't support custom sending. Customers will see your email as{' '}
-              <Text style={{ fontFamily: 'Inter_700Bold' }}>store+70327206006@brandthreademail.com</Text>. For better brand recognition, use a custom domain or{' '}
-              <Text style={{ textDecorationLine: 'underline', color: colors.primary }} onPress={haptic}>create a new one</Text>.
+              <Text style={{ fontFamily: FONT.bold }}>store+70327206006@brandthreademail.com</Text>.{' '}
+              For better brand recognition, use a custom domain.
             </Text>
           </View>
-
           <TextInput
             value={email}
             onChangeText={setEmail}
             placeholder="you@example.com"
-            placeholderTextColor={colors.mutedForeground}
+            placeholderTextColor={MUTED}
             keyboardType="email-address"
             autoCapitalize="none"
-            style={[styles.emailInput, { borderColor: colors.border, color: colors.foreground, backgroundColor: colors.card }]}
+            style={[s.emailInput, { borderColor: BORDER, color: FG, backgroundColor: CARD }]}
           />
         </View>
 
-        <View style={[styles.divider, { backgroundColor: colors.secondary }]} />
+        <View style={[s.divider, { backgroundColor: SUBTLE }]} />
 
-        <View style={styles.section}>
-          <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        {/* ── Push frequency ── */}
+        <View style={s.section}>
+          <Text style={s.sectionTitle}>Push notification frequency</Text>
+          <Text style={s.sectionSubtitle}>
+            Control how often Brandthread sends push notifications to your device. Daily digest reduces interruptions by batching updates into a single morning summary.
+          </Text>
+
+          {loading ? (
+            <View style={[s.digestCard, { backgroundColor: CARD, borderColor: BORDER }]}>
+              <ActivityIndicator color={PURPLE} size="small" />
+            </View>
+          ) : (
+            <View style={[s.digestCard, { backgroundColor: CARD, borderColor: BORDER }]}>
+              {/* Real-time option */}
+              <TouchableOpacity
+                style={[s.digestOption, digest === 'realtime' && s.digestOptionActive, { borderColor: digest === 'realtime' ? PURPLE : BORDER }]}
+                onPress={() => handleDigestToggle(false)}
+                activeOpacity={0.8}
+              >
+                <View style={[s.digestIconBox, { backgroundColor: digest === 'realtime' ? PURPLE_DIM : SUBTLE + '60' }]}>
+                  <Feather name="bell" size={18} color={digest === 'realtime' ? PURPLE_LIGHT : MUTED} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.digestOptionLabel, { color: digest === 'realtime' ? FG : MUTED }]}>Real-time</Text>
+                  <Text style={s.digestOptionDesc}>Get a push for every event as it happens</Text>
+                </View>
+                {digest === 'realtime' && (
+                  <Feather name="check-circle" size={18} color={PURPLE_LIGHT} />
+                )}
+              </TouchableOpacity>
+
+              <View style={[s.optionDivider, { backgroundColor: BORDER }]} />
+
+              {/* Daily digest option */}
+              <TouchableOpacity
+                style={[s.digestOption, digest === 'daily' && s.digestOptionActive, { borderColor: digest === 'daily' ? PURPLE : BORDER }]}
+                onPress={() => handleDigestToggle(true)}
+                activeOpacity={0.8}
+              >
+                <View style={[s.digestIconBox, { backgroundColor: digest === 'daily' ? PURPLE_DIM : SUBTLE + '60' }]}>
+                  <Feather name="sun" size={18} color={digest === 'daily' ? PURPLE_LIGHT : MUTED} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[s.digestOptionLabel, { color: digest === 'daily' ? FG : MUTED }]}>Daily digest</Text>
+                  <Text style={s.digestOptionDesc}>One morning summary of everything from the past 24 hours</Text>
+                </View>
+                {digest === 'daily' && (
+                  <Feather name="check-circle" size={18} color={PURPLE_LIGHT} />
+                )}
+              </TouchableOpacity>
+
+              {saving && (
+                <View style={s.savingRow}>
+                  <ActivityIndicator color={PURPLE} size="small" />
+                  <Text style={s.savingText}>Saving…</Text>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
+
+        <View style={[s.divider, { backgroundColor: SUBTLE }]} />
+
+        {/* ── Notification types ── */}
+        <View style={s.section}>
+          <View style={[s.listCard, { backgroundColor: CARD, borderColor: BORDER }]}>
             {ROWS.map((row, i) => (
               <TouchableOpacity
                 key={row.key}
                 onPress={haptic}
                 activeOpacity={0.7}
-                style={[styles.row, i !== ROWS.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
+                style={[s.row, i !== ROWS.length - 1 && { borderBottomWidth: 1, borderBottomColor: BORDER }]}
               >
-                <Feather name={row.icon} size={17} color={colors.foreground} style={styles.rowIcon} />
+                <Feather name={row.icon} size={17} color={FG} style={s.rowIcon} />
                 <View style={{ flex: 1, paddingRight: 10 }}>
-                  <Text style={[styles.rowLabel, { color: colors.foreground }]}>{row.label}</Text>
-                  <Text style={[styles.rowDescription, { color: colors.mutedForeground }]}>{row.description}</Text>
+                  <Text style={[s.rowLabel, { color: FG }]}>{row.label}</Text>
+                  <Text style={[s.rowDescription, { color: MUTED }]}>{row.description}</Text>
                 </View>
-                <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
+                <Feather name="chevron-right" size={16} color={MUTED} />
               </TouchableOpacity>
             ))}
           </View>
         </View>
+
       </ScrollView>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  section: { paddingHorizontal: 20, paddingVertical: 18 },
-  sectionTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginBottom: 6 },
-  sectionSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17, marginBottom: 14 },
-  divider: { height: 10 },
-  infoBox: { flexDirection: 'row', gap: 10, borderRadius: 12, padding: 14, marginBottom: 14 },
-  infoText: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 17, flex: 1 },
-  emailInput: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, fontFamily: 'Inter_400Regular' },
-  listCard: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
-  row: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14 },
-  rowIcon: { width: 20, marginTop: 2 },
-  rowLabel: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  rowDescription: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 3, lineHeight: 17 },
+const s = StyleSheet.create({
+  container:        { flex: 1 },
+  section:          { paddingHorizontal: 20, paddingVertical: 18 },
+  sectionTitle:     { fontSize: FS.sm + 1, fontFamily: FONT.semibold, color: FG, marginBottom: 6 },
+  sectionSubtitle:  { fontSize: 12, fontFamily: FONT.regular, color: MUTED, lineHeight: 17, marginBottom: 14 },
+  divider:          { height: 10 },
+
+  infoBox:   { flexDirection: 'row', gap: 10, borderRadius: 12, padding: 14, marginBottom: 14 },
+  infoText:  { fontSize: 12, fontFamily: FONT.regular, lineHeight: 17, flex: 1 },
+  emailInput:{ borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, fontFamily: FONT.regular },
+
+  digestCard:        { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
+  digestOption:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
+  digestOptionActive:{ backgroundColor: PURPLE_DIM + '30' },
+  digestIconBox:     { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  digestOptionLabel: { fontSize: 14, fontFamily: FONT.semibold, marginBottom: 2 },
+  digestOptionDesc:  { fontSize: 12, fontFamily: FONT.regular, color: MUTED, lineHeight: 16 },
+  optionDivider:     { height: 1, marginHorizontal: 14 },
+  savingRow:         { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, paddingTop: 4 },
+  savingText:        { fontSize: 12, fontFamily: FONT.regular, color: MUTED },
+
+  listCard:    { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
+  row:         { flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14 },
+  rowIcon:     { width: 20, marginTop: 2 },
+  rowLabel:    { fontSize: 14, fontFamily: FONT.semibold },
+  rowDescription: { fontSize: 12, fontFamily: FONT.regular, color: MUTED, marginTop: 3, lineHeight: 17 },
 });

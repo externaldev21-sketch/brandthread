@@ -256,6 +256,34 @@ export async function getProductAnalytics(_filter?: AnalyticsFilterState): Promi
 // ── Customers ─────────────────────────────────────────────────────────────────
 
 export async function getCustomerAnalytics(_filter?: AnalyticsFilterState): Promise<CustomerAnalytics> {
+  // Try real API first; fall back to demo on any error
+  try {
+    const apiData = await serviceRequest<any>('/api/analytics/customers?limit=10');
+    if (apiData?.stats && apiData.stats.totalCustomers > 0) {
+      const s = apiData.stats;
+      const flat = Array(30).fill(0);
+      return {
+        totalCustomers:       metric('total_cust',   'Total Customers',          s.totalCustomers,  0,  'number',  flat),
+        newCustomers:         metric('new_cust',     'New Customers',            s.totalCustomers - s.repeatCustomers, 0, 'number', flat),
+        returningCustomers:   metric('ret_cust',     'Returning Customers',      s.repeatCustomers, 0,  'number',  flat),
+        repeatRate:           metric('repeat_rate',  'Repeat Rate',              s.repeatRate,      0,  'percent', flat),
+        avgCustomerValue:     metric('acv',          'Avg Customer Value',
+          apiData.topCustomers?.length > 0
+            ? Math.round(apiData.topCustomers.reduce((sum: number, c: any) => sum + c.totalCents, 0) / apiData.topCustomers.length / 100)
+            : 0, 0, 'currency', flat),
+        clv:                  metric('clv',          'Customer LTV',             0, 0, 'currency', flat),
+        purchaseFrequency:    metric('freq',         'Purchase Frequency',       parseFloat((s.avgOrdersPerCustomer ?? 1).toFixed(1)), 0, 'number', flat),
+        avgDaysBetweenOrders: metric('days_between', 'Avg Days Between Orders',  0, 0, 'days',     flat),
+        churnRisk:            metric('churn',        'Churn Risk',               0, 0, 'percent',  flat),
+        vipCount:             metric('vip',          'VIP Customers',            0, 0, 'number',   flat),
+        atRiskCount:          metric('at_risk',      'At-Risk Customers',        0, 0, 'number',   flat),
+        cohorts: [],
+        topLocations: [],
+        newVsReturningChart: flat.map((_, i) => ({ date: `2026-06-${String(i+1).padStart(2,'0')}`, value: 0 })),
+      };
+    }
+  } catch { /* fall through to demo */ }
+
   await delay(340);
   const sp30 = [12,14,10,18,22,16,24,20,18,26,12,20,22,20,16,18,20,24,18,22,24,14,20,28,18,16,20,28,24,32];
   return {

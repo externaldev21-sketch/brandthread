@@ -67,6 +67,7 @@ const OPERATIONS_ITEMS: NavItem[] = [
   { icon: 'tool',      label: 'Manufacturer Hub', desc: 'Find and manage manufacturers',  accent: PURPLE, badge: true, route: '/manufacturer-hub' },
   { icon: 'users',     label: 'Customers',        desc: 'Browse your customer list',      accent: PURPLE_LIGHT, route: '/customer-accounts' },
   { icon: 'sun',       label: 'Vacation Mode',    desc: 'Pause your store while away',    accent: ORANGE, route: '/vacation-mode' },
+  { icon: 'flag',      label: 'Review Reports',   desc: 'Moderate flagged content',       accent: RED,    route: '/admin-reports' },
 ];
 
 const GROWTH_ITEMS: NavItem[] = [

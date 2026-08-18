@@ -35,6 +35,7 @@ import conversationsRouter from "./conversations";
 import savedRouter from "./saved";
 import cartDbRouter from "./cart-db";
 import notificationsFeedRouter from "./notifications-feed";
+import notificationPrefsRouter from "./notification-prefs";
 import postsRouter from "./posts";
 import reportsRouter from "./reports";
 import socialRouter from "./social";
@@ -165,7 +166,8 @@ router.use("/live",                      tc, liveRouter);
 
 // ─── Paid boosts, vacation mode, loyalty/rewards ──────────────────────────────
 router.use("/boosts",         tc, boostsRouter);
-router.use("/seller/vacation", tc, vacationRouter);
+router.use("/seller/vacation",          tc, vacationRouter);
+router.use("/seller/notification-prefs", tc, notificationPrefsRouter);
 router.use("/loyalty",             loyaltyRouter); // buyer-scoped; no tc
 
 export default router;

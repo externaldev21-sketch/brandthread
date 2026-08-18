@@ -175,9 +175,18 @@ export function createApi(getToken: GetToken) {
       update:  (id: string, body: unknown) => patch(`/api/drops/${id}`, body),
     },
     analytics: {
-      dashboard: () => get('/api/analytics/dashboard'),
-      revenue:   (period: string) => get(`/api/analytics/revenue?period=${period}`),
-      products:  () => get<any[]>('/api/analytics/products'),
+      dashboard:  () => get('/api/analytics/dashboard'),
+      revenue:    (period: string) => get(`/api/analytics/revenue?period=${period}`),
+      products:   () => get<any[]>('/api/analytics/products'),
+      /** Top customers by spend + repeat-buyer stats — derived from real orders */
+      customers:  (limit = 10) => get<{
+        topCustomers: Array<{
+          buyerId: string; name: string; email: string;
+          orderCount: number; totalCents: number;
+          lastOrderAt: string | null; firstOrderAt: string | null;
+        }>;
+        stats: { totalCustomers: number; repeatCustomers: number; repeatRate: number; avgOrdersPerCustomer: number };
+      }>(`/api/analytics/customers?limit=${limit}`),
     },
     inventory: {
       list:   () => get<any[]>('/api/inventory'),
@@ -350,8 +359,12 @@ export function createApi(getToken: GetToken) {
           }>(`/api/buyer/checkout/session/${encodeURIComponent(sessionId)}`),
       },
       orders: {
-        list: () => get<any[]>('/api/buyer/orders'),
-        get:  (id: string) => get<any>(`/api/buyer/orders/${encodeURIComponent(id)}`),
+        list:   () => get<any[]>('/api/buyer/orders'),
+        get:    (id: string) => get<any>(`/api/buyer/orders/${encodeURIComponent(id)}`),
+        /** Cancel a pending order within the 60-minute window. Returns { cancelled, refunded, orderNumber }. */
+        cancel: (id: string) => post<{ cancelled: boolean; refunded: boolean; orderNumber: string }>(
+          `/api/buyer/orders/${encodeURIComponent(id)}/cancel`, {}
+        ),
       },
       /** Saved / wishlisted items — DB-backed. */
       saved: {
@@ -547,6 +560,13 @@ export function createApi(getToken: GetToken) {
         goals?: string[]; brandStage?: string; sellModel?: string; styleInterests?: string[];
       }) => post<{ ok: boolean }>('/api/seller/onboarding/data', body),
       /** Vacation / away mode — pause storefront without removing listings. */
+      /** Push notification frequency preference (realtime vs daily digest) */
+      notificationPrefs: {
+        get: () =>
+          get<{ digest: 'realtime' | 'daily' }>('/api/seller/notification-prefs'),
+        update: (body: { digest: 'realtime' | 'daily' }) =>
+          put<{ digest: 'realtime' | 'daily' }>('/api/seller/notification-prefs', body),
+      },
       vacation: {
         get: () =>
           get<{ vacationMode: boolean; vacationMessage: string | null; vacationUntil: string | null }>(
@@ -596,9 +616,12 @@ export function createApi(getToken: GetToken) {
         targetType: string; targetId: string; targetLabel?: string;
         reason: string; description?: string;
       }) => post<any>('/api/reports', body),
-      /** Admin/moderation list */
+      /** Admin/moderation list — optionally filtered by status */
       list: (status?: string) =>
         get<any[]>(`/api/reports${status ? `?status=${encodeURIComponent(status)}` : ''}`),
+      /** Update a report's review status (reviewed | actioned | dismissed | pending) */
+      updateStatus: (id: string, status: string) =>
+        patch<any>(`/api/reports/${encodeURIComponent(id)}/status`, { status }),
     },
     /** Buyer-to-buyer social graph: follows, profiles, search */
     social: {

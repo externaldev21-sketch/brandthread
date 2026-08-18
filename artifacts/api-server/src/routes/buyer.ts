@@ -512,6 +512,91 @@ router.get("/orders/:id", async (req, res) => {
   }
 });
 
+// ─── Buyer Order Cancellation ────────────────────────────────────────────────
+/**
+ * POST /api/buyer/orders/:id/cancel
+ * Allows a buyer to cancel their own order within a 60-minute window while
+ * the order is still in 'pending' status. Automatically issues a full Stripe
+ * refund via the stored payment intent. Fails explicitly if Stripe errors —
+ * we never mark an order cancelled without confirming the refund.
+ */
+router.post("/orders/:id/cancel", async (req, res) => {
+  try {
+    const buyerId = (req as any).clerkUserId as string;
+    const { id }  = req.params;
+    const CANCEL_WINDOW_MS = 60 * 60 * 1000; // 60 minutes
+
+    // ── Fetch order — must belong to this buyer ─────────────────────────────
+    const [order] = await db
+      .select({
+        id:                    orders.id,
+        orderNumber:           orders.orderNumber,
+        status:                orders.status,
+        createdAt:             orders.createdAt,
+        stripePaymentIntentId: orders.stripePaymentIntentId,
+      })
+      .from(orders)
+      .where(and(eq(orders.id, id), eq(orders.buyerId, buyerId)))
+      .limit(1);
+
+    if (!order) {
+      res.status(404).json({ error: "Order not found" }); return;
+    }
+
+    // ── Only pending orders are cancellable ────────────────────────────────
+    if (order.status !== "pending") {
+      res.status(409).json({
+        error: "Order cannot be cancelled",
+        detail: `Only pending orders can be cancelled. Current status: ${order.status}.`,
+      }); return;
+    }
+
+    // ── Enforce the 60-minute window ────────────────────────────────────────
+    const ageMs = Date.now() - new Date(order.createdAt!).getTime();
+    if (ageMs > CANCEL_WINDOW_MS) {
+      res.status(409).json({
+        error: "Cancellation window has closed",
+        detail: "Orders can only be cancelled within 60 minutes of placement. Contact the seller to request a cancellation.",
+      }); return;
+    }
+
+    // ── Refund via Stripe (fail loudly — don't cancel without refunding) ───
+    let refunded = false;
+    if (order.stripePaymentIntentId) {
+      try {
+        const stripe = requireStripe();
+        await stripe.refunds.create({
+          payment_intent: order.stripePaymentIntentId,
+          reason: "requested_by_customer",
+        });
+        refunded = true;
+      } catch (stripeErr: any) {
+        console.error("[buyerCancel] Stripe refund failed:", stripeErr?.message);
+        res.status(502).json({
+          error: "Refund could not be processed. Please contact support to cancel this order.",
+        });
+        return;
+      }
+    }
+
+    // ── Mark cancelled ──────────────────────────────────────────────────────
+    await db
+      .update(orders)
+      .set({
+        status:              "cancelled",
+        cancellationReason:  "buyer_requested",
+        cancellationNotes:   "Cancelled by buyer within the 60-minute cancellation window.",
+        updatedAt:           new Date(),
+      })
+      .where(eq(orders.id, id));
+
+    res.json({ cancelled: true, refunded, orderNumber: order.orderNumber });
+  } catch (err) {
+    console.error("POST /buyer/orders/:id/cancel error:", err);
+    res.status(500).json({ error: "Failed to cancel order" });
+  }
+});
+
 // ─── Seller Payment Status ────────────────────────────────────────────────────
 
 /**
