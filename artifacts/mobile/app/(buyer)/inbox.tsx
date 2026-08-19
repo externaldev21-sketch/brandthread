@@ -38,6 +38,10 @@ function getParticipant(conv: Conversation) {
   return conv.participants[0];
 }
 
+function previewText(lastMessage: string | undefined, fallback: string): string {
+  return lastMessage?.trim() || fallback;
+}
+
 // ─── Segment tabs ─────────────────────────────────────────────────────────────
 
 const TABS = ['All', 'Friends', 'Sellers', 'Orders', 'Requests', 'Archived'] as const;
@@ -208,7 +212,7 @@ export default function InboxScreen() {
               {participant.name}
             </Text>
             <Text style={[s.convPreview]} numberOfLines={1}>
-              {conv.lastMessage ?? 'Sent you a message'}
+              {previewText(conv.lastMessage, 'Sent you a message')}
             </Text>
 
             {/* Accept / Decline buttons */}
@@ -272,7 +276,7 @@ export default function InboxScreen() {
             style={[s.convPreview, isUnread && { color: FG }]}
             numberOfLines={1}
           >
-            {conv.lastMessage ?? 'No messages yet'}
+            {previewText(conv.lastMessage, 'No messages yet')}
           </Text>
         </View>
 

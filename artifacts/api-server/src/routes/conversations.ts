@@ -47,10 +47,23 @@ async function isFollowedBy(followerId: string, targetId: string): Promise<boole
   return !!row;
 }
 
+function getAttachmentPreview(attachment: unknown): string | undefined {
+  if (!attachment || typeof attachment !== "object") return undefined;
+  const title = (attachment as { title?: unknown }).title;
+  return typeof title === "string" && title.trim() ? title.trim() : "Attachment";
+}
+
+function getMessagePreview(body: string | null | undefined, attachment: unknown): string | undefined {
+  const attachmentPreview = getAttachmentPreview(attachment);
+  if (attachmentPreview) return attachmentPreview;
+  return body?.trim() || undefined;
+}
+
 function buildConversationView(
   conv: typeof conversations.$inferSelect,
   parts: (typeof conversationParticipants.$inferSelect)[],
   myUserId: string,
+  lastMessagePreview?: string,
 ) {
   const me = parts.find((p) => p.userId === myUserId);
   return {
@@ -64,7 +77,7 @@ function buildConversationView(
       color:       p.color,
       accountType: p.accountType,
     })),
-    lastMessage:        conv.lastMessage       ?? undefined,
+    lastMessage:        lastMessagePreview ?? conv.lastMessage ?? undefined,
     lastMessageTs:      conv.lastMessageAt
       ? new Date(conv.lastMessageAt).getTime()
       : undefined,
@@ -116,12 +129,20 @@ router.get("/", async (req, res) => {
 
   const convIds = myParts.map((p) => p.conversationId);
 
-  const [convs, allParts] = await Promise.all([
+  const [convs, allParts, allMessages] = await Promise.all([
     db.select().from(conversations)
       .where(inArray(conversations.id, convIds))
       .orderBy(desc(conversations.updatedAt)),
     db.select().from(conversationParticipants)
       .where(inArray(conversationParticipants.conversationId, convIds)),
+    db.selectDistinctOn([messages.conversationId], {
+      conversationId: messages.conversationId,
+      body: messages.body,
+      attachment: messages.attachment,
+    })
+      .from(messages)
+      .where(inArray(messages.conversationId, convIds))
+      .orderBy(messages.conversationId, desc(messages.createdAt)),
   ]);
 
   const partsByConv = new Map<string, typeof allParts>();
@@ -130,7 +151,19 @@ router.get("/", async (req, res) => {
     partsByConv.get(p.conversationId)!.push(p);
   }
 
-  return res.json(convs.map((c) => buildConversationView(c, partsByConv.get(c.id) ?? [], userId)));
+  const previewByConversation = new Map<string, string>();
+  for (const message of allMessages) {
+    if (previewByConversation.has(message.conversationId)) continue;
+    const preview = getMessagePreview(message.body, message.attachment);
+    if (preview) previewByConversation.set(message.conversationId, preview);
+  }
+
+  return res.json(convs.map((c) => buildConversationView(
+    c,
+    partsByConv.get(c.id) ?? [],
+    userId,
+    previewByConversation.get(c.id),
+  )));
 });
 
 // ─── POST /api/conversations ──────────────────────────────────────────────────
@@ -445,8 +478,7 @@ router.post("/:id/messages", async (req, res) => {
   }
 
   const bodyText = text?.trim() ?? "";
-  const attachmentTitle = (attachment as any)?.title as string | undefined;
-  const previewText = bodyText || (attachmentTitle ? `📎 ${attachmentTitle}` : "Attachment");
+  const previewText = getMessagePreview(bodyText, attachment) ?? "Attachment";
 
   const [msg] = await db.insert(messages).values({
     conversationId: id,

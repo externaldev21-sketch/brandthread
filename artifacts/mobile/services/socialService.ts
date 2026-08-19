@@ -74,6 +74,9 @@ function uid(): string {
   return `${Date.now()}_${++_uidCounter}_${Math.random().toString(36).slice(2, 7)}`;
 }
 function iso(): string { return new Date().toISOString(); }
+function getMessagePreview(text: string, attachment?: MessageAttachment): string {
+  return attachment?.title?.trim() || (attachment ? 'Attachment' : text);
+}
 
 export const MY_USER_ID = 'me';
 export const MY_NAME    = 'Jordan';
@@ -1194,7 +1197,15 @@ export async function sendMessage(conversationId: string, text: string, attachme
   // Update conversation last message
   const convs = await getConversations(k);
   const idx = convs.findIndex(c => c.id === conversationId);
-  if (idx >= 0) { convs[idx] = { ...convs[idx], lastMessage: text, lastMessageTs: msg.ts, updatedAt: iso() }; await save(convsKey, convs); }
+  if (idx >= 0) {
+    convs[idx] = {
+      ...convs[idx],
+      lastMessage: getMessagePreview(text, attachment),
+      lastMessageTs: msg.ts,
+      updatedAt: iso(),
+    };
+    await save(convsKey, convs);
+  }
   notify();
   // Send to API in background; update status on success or failure.
   // Always read from the pre-captured msgKey — never re-call K() inside these callbacks.

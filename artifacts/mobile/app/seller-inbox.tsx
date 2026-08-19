@@ -42,6 +42,10 @@ function timeAgo(ts?: number): string {
   return `${Math.floor(hrs / 24)}d`;
 }
 
+function previewText(lastMessage?: string): string {
+  return lastMessage?.trim() || 'No messages yet';
+}
+
 export default function SellerInboxScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -115,7 +119,7 @@ export default function SellerInboxScreen() {
               style={[s.preview, hasUnread && { color: FG, fontFamily: FONT.medium }]}
               numberOfLines={1}
             >
-              {item.lastMessage ?? 'No messages yet'}
+              {previewText(item.lastMessage)}
             </Text>
             {hasUnread && (
               <View style={s.unreadBadge}>
