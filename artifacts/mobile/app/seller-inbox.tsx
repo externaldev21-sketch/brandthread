@@ -139,7 +139,15 @@ export default function SellerInboxScreen() {
         >
           <Feather name="arrow-left" size={ICON.lg} color={FG} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Messages</Text>
+        <View style={s.headerCenter}>
+          <Text style={s.headerTitle}>Messages</Text>
+          {(() => {
+            const totalUnread = convs.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+            return totalUnread > 0 ? (
+              <Text style={s.headerSubtitle}>{totalUnread} unread</Text>
+            ) : null;
+          })()}
+        </View>
         <View style={{ width: ICON.lg }} />
       </View>
 
@@ -179,9 +187,13 @@ const s = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: BORDER,
   },
   headerBack: { marginRight: SP.sm },
+  headerCenter: { flex: 1, alignItems: 'center' },
   headerTitle: {
-    flex: 1, textAlign: 'center',
+    textAlign: 'center',
     fontSize: FS.md, fontFamily: FONT.semibold, color: FG,
+  },
+  headerSubtitle: {
+    fontSize: FS.xs, fontFamily: FONT.medium, color: PURPLE, marginTop: 1,
   },
   centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
   emptyTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, marginTop: SP.md },
