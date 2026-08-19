@@ -147,6 +147,7 @@ const row = StyleSheet.create({
 
 function adaptOrderDetail(row: any): BuyerOrderView {
   const dbAddr = row.shippingAddress;
+  const items = Array.isArray(row.items) ? row.items : [];
   const shippingAddress: import('@/services/orderTypes').OrderAddress = dbAddr
     ? {
         name:    dbAddr.name ?? '',
@@ -169,7 +170,7 @@ function adaptOrderDetail(row: any): BuyerOrderView {
     status:            (row.status ?? 'new') as OrderStatus,
     paymentStatus:     row.stripePaymentIntentId ? 'paid' : 'pending',
     fulfillmentStatus: 'unfulfilled',
-    lineItems: (row.items ?? []).map((item: any) => ({
+    lineItems: items.map((item: any) => ({
       productName: item.productName,
       variant:     item.variantLabel ?? '',
       quantity:    item.quantity,

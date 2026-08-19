@@ -76,6 +76,7 @@ export default function CustomerOrdersScreen() {
       setCustomer(cust as Customer);
       setOrders(Array.isArray(ords) ? ords : []);
     } catch {
+      setOrders([]);
       setError('Could not load customer data.');
     } finally {
       setLoading(false);

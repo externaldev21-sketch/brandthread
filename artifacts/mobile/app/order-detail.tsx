@@ -36,7 +36,7 @@ import {
 
 function adaptApiOrder(raw: any): Order {
   const customer = raw.customer ?? null;
-  const items: any[] = raw.items ?? [];
+  const items: any[] = Array.isArray(raw.items) ? raw.items : [];
 
   // DB status → UI order status
   const statusMap: Record<string, OrderStatus> = {

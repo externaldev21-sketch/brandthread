@@ -485,6 +485,8 @@ export default function OrdersScreen() {
     } catch (e) {
       if (generationRef.current !== generation) return; // stale focus cycle
       console.error('Failed to load seller orders', e);
+      setOrders([]);
+      setStats(computeStats([]));
       setLoadError('Could not load orders. Check your connection and try again.');
       consecutiveFailuresRef.current += 1;
       if (consecutiveFailuresRef.current >= 3 && timerRef.current !== null) {
@@ -856,6 +858,7 @@ export default function OrdersScreen() {
         ListEmptyComponent={ListEmpty}
         contentContainerStyle={[
           s.listContent,
+          filtered.length === 0 && { flexGrow: 1 },
           { paddingBottom: insets.bottom + COMP.tabBarH + (selectedIds.length > 0 ? 80 : SP.md) },
         ]}
         scrollEventThrottle={16}

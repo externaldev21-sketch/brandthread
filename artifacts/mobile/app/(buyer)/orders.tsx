@@ -69,9 +69,10 @@ function adaptOrder(row: any): BuyerOrderView {
 
 function adaptOrderDetail(row: any): BuyerOrderView {
   const base = adaptOrder(row);
+  const items = Array.isArray(row.items) ? row.items : [];
   return {
     ...base,
-    lineItems: (row.items ?? []).map((item: any) => ({
+    lineItems: items.map((item: any) => ({
       productName: item.productName,
       variant:     item.variantLabel ?? '',
       quantity:    item.quantity,
@@ -253,10 +254,12 @@ export default function BuyerOrdersScreen() {
     try {
       const rows = await api.buyer.orders.list();
       if (generationRef.current !== generation) return; // stale focus cycle
-      setOrders(rows.map(adaptOrder));
+      const orderRows = Array.isArray(rows) ? rows : [];
+      setOrders(orderRows.map(adaptOrder));
       consecutiveFailuresRef.current = 0;
     } catch {
       if (generationRef.current !== generation) return; // stale focus cycle
+      setOrders([]);
       setLoadError(true);
       consecutiveFailuresRef.current += 1;
       if (consecutiveFailuresRef.current >= 3 && timerRef.current !== null) {
