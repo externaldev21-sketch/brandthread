@@ -29,6 +29,8 @@ import {
   OrderStatus, PaymentStatus,
 } from '@/services/orderTypes';
 import { useApi } from '@/hooks/useApi';
+import { useAuth } from '@clerk/expo';
+import { clearBadge } from '@/lib/orderBadgeStore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -446,6 +448,7 @@ export default function OrdersScreen() {
   const insets = useSafeAreaInsets();
 
   const api = useApi();
+  const { userId } = useAuth();
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -499,6 +502,12 @@ export default function OrdersScreen() {
   // down/offline server; it resets on the next focus event.
   useFocusEffect(
     useCallback(() => {
+      // Immediately zero the Orders tab badge and record the viewed timestamp.
+      // clearBadge() updates the shared in-memory store (instant re-render in
+      // the tab bar) and persists the per-seller watermark to AsyncStorage for
+      // the next app launch. No-op when not authenticated.
+      if (userId) clearBadge(userId);
+
       const generation = ++generationRef.current;
       consecutiveFailuresRef.current = 0;
       if (!hasLoadedRef.current) setLoading(true);

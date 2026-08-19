@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Platform,
   Pressable,
@@ -20,6 +20,15 @@ import {
   FS,
   SP,
 } from '@/lib/theme';
+import { useAuth } from '@clerk/expo';
+import { useApi } from '@/hooks/useApi';
+import {
+  getBadgeCount,
+  getLastViewedAt,
+  setBadgeCount,
+  subscribe,
+  initFromStorage,
+} from '@/lib/orderBadgeStore';
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
@@ -41,6 +50,75 @@ const INACTIVE_COLOR = 'rgba(244,244,255,0.40)';
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
+  const api = useApi();
+  const { userId } = useAuth();
+
+  // Sync local state with the shared in-memory badge store so the badge
+  // clears immediately when orders.tsx calls clearBadge(userId), without
+  // waiting for the next poll cycle.
+  const [newOrderCount, setNewOrderCount] = useState(() =>
+    userId ? getBadgeCount(userId) : 0,
+  );
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    // No authenticated seller → clear badge and stop.
+    if (!userId) {
+      setNewOrderCount(0);
+      return;
+    }
+
+    // Subscribe to store changes → re-render on any badge update.
+    const unsub = subscribe(() => setNewOrderCount(getBadgeCount(userId)));
+
+    let cancelled = false;
+
+    const poll = async () => {
+      // Record poll start time before the async fetch. If the seller opens
+      // Orders while the request is in-flight, clearBadge() advances
+      // lastViewedAt past pollStartMs, and setBadgeCount will discard the
+      // stale result.
+      const pollStartMs = Date.now();
+      try {
+        const rows = await api.orders.list();
+        if (cancelled) return;
+
+        // Count orders placed after the seller last viewed the Orders screen.
+        const lastViewed = getLastViewedAt(userId);
+        const count = Array.isArray(rows)
+          ? (rows as any[]).filter(
+              (r: any) =>
+                r.status === 'pending' &&
+                new Date(r.createdAt).getTime() > lastViewed,
+            ).length
+          : 0;
+
+        // setBadgeCount discards this result if lastViewedAt advanced past
+        // pollStartMs (i.e. the seller opened Orders mid-flight).
+        setBadgeCount(userId, count, pollStartMs);
+      } catch {
+        // Non-critical — badge simply won't show if offline.
+      }
+    };
+
+    // Hydrate the per-seller watermark from AsyncStorage (cross-launch
+    // persistence), then kick off the first poll and periodic interval.
+    initFromStorage(userId).then(() => {
+      if (!cancelled) {
+        poll();
+        pollRef.current = setInterval(poll, 30_000);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      unsub();
+      if (pollRef.current !== null) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [api, userId]);
 
   if (Platform.OS === 'web') return null;
 
@@ -62,6 +140,10 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
 
         const isFocused = state.index === index;
         const color = isFocused ? PURPLE : INACTIVE_COLOR;
+
+        // Show new-order badge on Orders tab only when the tab is not active
+        const showOrderBadge =
+          tabDef.name === 'orders' && newOrderCount > 0 && !isFocused;
 
         const onPress = () => {
           const event = navigation.emit({
@@ -93,7 +175,17 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
               {isFocused && <View style={styles.pill} />}
             </View>
 
-            <Feather name={tabDef.icon} size={22} color={color} />
+            {/* Icon + optional new-order badge */}
+            <View style={styles.iconWrap}>
+              <Feather name={tabDef.icon} size={22} color={color} />
+              {showOrderBadge && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {newOrderCount > 99 ? '99+' : String(newOrderCount)}
+                  </Text>
+                </View>
+              )}
+            </View>
 
             <Text style={[styles.label, { color }]} numberOfLines={1}>
               {tabDef.label}
@@ -165,5 +257,28 @@ const styles = StyleSheet.create({
     fontSize:   10,
     fontFamily: FONT.medium,
     lineHeight: 12,
+  },
+  iconWrap: {
+    position: 'relative',
+  },
+  badge: {
+    position:        'absolute',
+    top:             -5,
+    right:           -8,
+    minWidth:        16,
+    height:          16,
+    borderRadius:    8,
+    backgroundColor: PURPLE,
+    alignItems:      'center',
+    justifyContent:  'center',
+    paddingHorizontal: 3,
+    borderWidth:     1.5,
+    borderColor:     '#07070F',
+  },
+  badgeText: {
+    fontSize:   9,
+    fontFamily: FONT.medium,
+    color:      '#FFFFFF',
+    lineHeight: 11,
   },
 });
