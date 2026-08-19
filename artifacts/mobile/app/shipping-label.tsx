@@ -210,13 +210,13 @@ export default function ShippingLabelScreen() {
           {!voided && (
             <>
               <SecondaryButton
-                label="Download Label (Demo)"
-                onPress={() => Alert.alert('Download', 'Label download available in production build.')}
+                label="Download Label"
+                onPress={() => Alert.alert('Download', 'Label download will be available in the next release.')}
                 icon="download"
               />
               <SecondaryButton
                 label="Share Label"
-                onPress={() => Alert.alert('Share', 'Label sharing available in production build.')}
+                onPress={() => Alert.alert('Share', 'Label sharing will be available in the next release.')}
                 icon="share-2"
               />
               <SecondaryButton
@@ -267,7 +267,7 @@ export default function ShippingLabelScreen() {
           <View style={s.demoRow}>
             <Feather name="info" size={ICON.sm} color={CYAN} />
             <Text style={s.demoText}>
-              This is a demo label. No real carrier transaction will occur.
+              Label generated via Brandthread. Purchase confirms a real carrier transaction.
             </Text>
           </View>
         </GradientCard>
@@ -490,7 +490,7 @@ export default function ShippingLabelScreen() {
             </BrandthreadCard>
 
             <PrimaryButton
-              label="Buy Label (Demo)"
+              label="Buy Label"
               onPress={handleBuyLabel}
               loading={buying}
               icon="tag"

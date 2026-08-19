@@ -1,7 +1,6 @@
 /**
  * Brandthread Cart & Checkout Service
- * AsyncStorage-backed demo layer. All payment flows are demo-mode.
- * Mock services are separated from UI — no fake success in screen code.
+ * AsyncStorage-backed layer. Real API failures propagate; no fake product substitution.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -54,220 +53,89 @@ function daysFromNow(n: number): string {
   const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString();
 }
 
-// ─── Demo Products ────────────────────────────────────────────────────────────
-// Stable buyer-facing product catalogue used by buyer-product-detail
-
-const DEMO_PRODUCTS: BuyerProduct[] = [
-  {
-    id: 'prod_canvas_cargo',
-    sellerId: 'seller_001',
-    sellerName: 'Arc Studio',
-    sellerHandle: '@arcstudio',
-    name: 'Canvas Cargo Jacket',
-    description: 'Heavyweight 12oz canvas shell with adjustable drawcord waist and articulated elbows. Built for the city and beyond.',
-    price: 189,
-    compareAtPrice: undefined,
-    imageUris: [],
-    category: 'Jacket',
-    isPreOrder: false,
-    cancellationPolicy: 'Orders may be cancelled within 24 hours of placement.',
-    refundPolicy: '30-day returns on unworn items in original packaging.',
-    isActive: true,
-    tags: ['jacket', 'cargo', 'canvas'],
-    options: [
-      {
-        id: 'opt_size', name: 'Size',
-        values: [
-          { id: 'v_xs', label: 'XS' }, { id: 'v_s', label: 'S' },
-          { id: 'v_m', label: 'M' }, { id: 'v_l', label: 'L' },
-          { id: 'v_xl', label: 'XL' },
-        ],
-      },
-      {
-        id: 'opt_color', name: 'Color',
-        values: [
-          { id: 'c_black', label: 'Black', colorHex: '#1A1A1A' },
-          { id: 'c_olive', label: 'Olive', colorHex: '#6B7C45' },
-          { id: 'c_sand', label: 'Sand', colorHex: '#C4A882' },
-        ],
-      },
-    ],
-    variants: [
-      { id: 'var_xs_black', title: 'XS / Black', optionValues: [{ optionId: 'opt_size', valueId: 'v_xs' }, { optionId: 'opt_color', valueId: 'c_black' }], price: 189, inventoryQuantity: 4, isAvailable: true },
-      { id: 'var_s_black',  title: 'S / Black',  optionValues: [{ optionId: 'opt_size', valueId: 'v_s'  }, { optionId: 'opt_color', valueId: 'c_black' }], price: 189, inventoryQuantity: 8, isAvailable: true },
-      { id: 'var_m_black',  title: 'M / Black',  optionValues: [{ optionId: 'opt_size', valueId: 'v_m'  }, { optionId: 'opt_color', valueId: 'c_black' }], price: 189, inventoryQuantity: 12, isAvailable: true },
-      { id: 'var_l_black',  title: 'L / Black',  optionValues: [{ optionId: 'opt_size', valueId: 'v_l'  }, { optionId: 'opt_color', valueId: 'c_black' }], price: 189, inventoryQuantity: 7, isAvailable: true },
-      { id: 'var_xl_black', title: 'XL / Black', optionValues: [{ optionId: 'opt_size', valueId: 'v_xl' }, { optionId: 'opt_color', valueId: 'c_black' }], price: 189, inventoryQuantity: 3, isAvailable: true },
-      { id: 'var_xs_olive', title: 'XS / Olive', optionValues: [{ optionId: 'opt_size', valueId: 'v_xs' }, { optionId: 'opt_color', valueId: 'c_olive' }], price: 189, inventoryQuantity: 2, isAvailable: true },
-      { id: 'var_s_olive',  title: 'S / Olive',  optionValues: [{ optionId: 'opt_size', valueId: 'v_s'  }, { optionId: 'opt_color', valueId: 'c_olive' }], price: 189, inventoryQuantity: 6, isAvailable: true },
-      { id: 'var_m_olive',  title: 'M / Olive',  optionValues: [{ optionId: 'opt_size', valueId: 'v_m'  }, { optionId: 'opt_color', valueId: 'c_olive' }], price: 189, inventoryQuantity: 9, isAvailable: true },
-      { id: 'var_l_olive',  title: 'L / Olive',  optionValues: [{ optionId: 'opt_size', valueId: 'v_l'  }, { optionId: 'opt_color', valueId: 'c_olive' }], price: 189, inventoryQuantity: 5, isAvailable: true },
-      { id: 'var_xl_olive', title: 'XL / Olive', optionValues: [{ optionId: 'opt_size', valueId: 'v_xl' }, { optionId: 'opt_color', valueId: 'c_olive' }], price: 189, inventoryQuantity: 0, isAvailable: false },
-      { id: 'var_m_sand',   title: 'M / Sand',   optionValues: [{ optionId: 'opt_size', valueId: 'v_m'  }, { optionId: 'opt_color', valueId: 'c_sand'  }], price: 189, inventoryQuantity: 4, isAvailable: true },
-      { id: 'var_l_sand',   title: 'L / Sand',   optionValues: [{ optionId: 'opt_size', valueId: 'v_l'  }, { optionId: 'opt_color', valueId: 'c_sand'  }], price: 189, inventoryQuantity: 3, isAvailable: true },
-    ],
-  },
-  {
-    id: 'prod_essential_tee',
-    sellerId: 'seller_002',
-    sellerName: 'Void Supply Co.',
-    sellerHandle: '@voidsupply',
-    name: 'Essential Relaxed Tee',
-    description: 'Brushed 220g heavyweight jersey with a boxy relaxed silhouette. Ringspun cotton. Pre-shrunk.',
-    price: 48,
-    compareAtPrice: undefined,
-    imageUris: [],
-    category: 'T-shirt',
-    isPreOrder: false,
-    cancellationPolicy: 'Orders may be cancelled within 12 hours.',
-    refundPolicy: '14-day returns on unworn items.',
-    isActive: true,
-    tags: ['tee', 'essentials'],
-    options: [
-      {
-        id: 'opt_size2', name: 'Size',
-        values: [
-          { id: 'v2_xs', label: 'XS' }, { id: 'v2_s', label: 'S' },
-          { id: 'v2_m', label: 'M' }, { id: 'v2_l', label: 'L' },
-          { id: 'v2_xl', label: 'XL' }, { id: 'v2_xxl', label: 'XXL' },
-        ],
-      },
-      {
-        id: 'opt_color2', name: 'Color',
-        values: [
-          { id: 'c2_black', label: 'Washed Black', colorHex: '#2D2D2D' },
-          { id: 'c2_white', label: 'Off White',    colorHex: '#F0EDE8' },
-          { id: 'c2_slate', label: 'Slate',        colorHex: '#6C7A89' },
-        ],
-      },
-    ],
-    variants: [
-      { id: 'var2_s_black',  title: 'S / Washed Black',  optionValues: [{ optionId: 'opt_size2', valueId: 'v2_s'  }, { optionId: 'opt_color2', valueId: 'c2_black' }], price: 48, inventoryQuantity: 20, isAvailable: true },
-      { id: 'var2_m_black',  title: 'M / Washed Black',  optionValues: [{ optionId: 'opt_size2', valueId: 'v2_m'  }, { optionId: 'opt_color2', valueId: 'c2_black' }], price: 48, inventoryQuantity: 25, isAvailable: true },
-      { id: 'var2_l_black',  title: 'L / Washed Black',  optionValues: [{ optionId: 'opt_size2', valueId: 'v2_l'  }, { optionId: 'opt_color2', valueId: 'c2_black' }], price: 48, inventoryQuantity: 18, isAvailable: true },
-      { id: 'var2_xl_black', title: 'XL / Washed Black', optionValues: [{ optionId: 'opt_size2', valueId: 'v2_xl' }, { optionId: 'opt_color2', valueId: 'c2_black' }], price: 48, inventoryQuantity: 10, isAvailable: true },
-      { id: 'var2_s_white',  title: 'S / Off White',  optionValues: [{ optionId: 'opt_size2', valueId: 'v2_s'  }, { optionId: 'opt_color2', valueId: 'c2_white' }], price: 48, inventoryQuantity: 14, isAvailable: true },
-      { id: 'var2_m_white',  title: 'M / Off White',  optionValues: [{ optionId: 'opt_size2', valueId: 'v2_m'  }, { optionId: 'opt_color2', valueId: 'c2_white' }], price: 48, inventoryQuantity: 16, isAvailable: true },
-      { id: 'var2_l_white',  title: 'L / Off White',  optionValues: [{ optionId: 'opt_size2', valueId: 'v2_l'  }, { optionId: 'opt_color2', valueId: 'c2_white' }], price: 48, inventoryQuantity: 0,  isAvailable: false },
-      { id: 'var2_m_slate',  title: 'M / Slate',  optionValues: [{ optionId: 'opt_size2', valueId: 'v2_m'  }, { optionId: 'opt_color2', valueId: 'c2_slate' }], price: 48, inventoryQuantity: 8, isAvailable: true },
-      { id: 'var2_l_slate',  title: 'L / Slate',  optionValues: [{ optionId: 'opt_size2', valueId: 'v2_l'  }, { optionId: 'opt_color2', valueId: 'c2_slate' }], price: 48, inventoryQuantity: 6, isAvailable: true },
-    ],
-  },
-  {
-    id: 'prod_ripstop_cargo',
-    sellerId: 'seller_001',
-    sellerName: 'Arc Studio',
-    sellerHandle: '@arcstudio',
-    name: 'Ripstop Cargo Trousers',
-    description: 'Technical 6-pocket ripstop cargo with articulated knees and zip-off legs. Made to move.',
-    price: 134,
-    compareAtPrice: 160,
-    imageUris: [],
-    category: 'Shorts',
-    isPreOrder: false,
-    cancellationPolicy: 'Orders may be cancelled within 24 hours of placement.',
-    refundPolicy: '30-day returns on unworn items in original packaging.',
-    isActive: true,
-    tags: ['cargo', 'trousers', 'technical'],
-    options: [
-      {
-        id: 'opt_size3', name: 'Size',
-        values: [
-          { id: 'v3_28', label: '28' }, { id: 'v3_30', label: '30' },
-          { id: 'v3_32', label: '32' }, { id: 'v3_34', label: '34' },
-          { id: 'v3_36', label: '36' },
-        ],
-      },
-      {
-        id: 'opt_color3', name: 'Color',
-        values: [
-          { id: 'c3_black', label: 'Black', colorHex: '#1A1A1A' },
-          { id: 'c3_khaki', label: 'Khaki', colorHex: '#B5A642' },
-        ],
-      },
-    ],
-    variants: [
-      { id: 'var3_28_black', title: '28 / Black', optionValues: [{ optionId: 'opt_size3', valueId: 'v3_28' }, { optionId: 'opt_color3', valueId: 'c3_black' }], price: 134, compareAtPrice: 160, inventoryQuantity: 3, isAvailable: true },
-      { id: 'var3_30_black', title: '30 / Black', optionValues: [{ optionId: 'opt_size3', valueId: 'v3_30' }, { optionId: 'opt_color3', valueId: 'c3_black' }], price: 134, compareAtPrice: 160, inventoryQuantity: 7, isAvailable: true },
-      { id: 'var3_32_black', title: '32 / Black', optionValues: [{ optionId: 'opt_size3', valueId: 'v3_32' }, { optionId: 'opt_color3', valueId: 'c3_black' }], price: 134, compareAtPrice: 160, inventoryQuantity: 9, isAvailable: true },
-      { id: 'var3_34_black', title: '34 / Black', optionValues: [{ optionId: 'opt_size3', valueId: 'v3_34' }, { optionId: 'opt_color3', valueId: 'c3_black' }], price: 134, compareAtPrice: 160, inventoryQuantity: 4, isAvailable: true },
-      { id: 'var3_30_khaki', title: '30 / Khaki', optionValues: [{ optionId: 'opt_size3', valueId: 'v3_30' }, { optionId: 'opt_color3', valueId: 'c3_khaki' }], price: 134, compareAtPrice: 160, inventoryQuantity: 5, isAvailable: true },
-      { id: 'var3_32_khaki', title: '32 / Khaki', optionValues: [{ optionId: 'opt_size3', valueId: 'v3_32' }, { optionId: 'opt_color3', valueId: 'c3_khaki' }], price: 134, compareAtPrice: 160, inventoryQuantity: 0, isAvailable: false },
-    ],
-  },
-  {
-    id: 'prod_sunday_hoodie',
-    sellerId: 'seller_003',
-    sellerName: 'Muted Works',
-    sellerHandle: '@mutedworks',
-    name: 'Sunday Washed Hoodie',
-    description: 'Garment-washed 420g fleece pullover hoodie. Relaxed fit with a dropped shoulder and kangaroo pocket.',
-    price: 98,
-    compareAtPrice: undefined,
-    imageUris: [],
-    category: 'Hoodie',
-    isPreOrder: true,
-    preOrderClosingDate: daysFromNow(14),
-    preOrderEstShipDate: daysFromNow(60),
-    cancellationPolicy: 'Pre-orders can be cancelled before production begins. Once production starts, cancellations are not accepted.',
-    refundPolicy: 'Pre-orders are final once production begins. Contact us for exceptions.',
-    isActive: true,
-    tags: ['hoodie', 'fleece', 'washed', 'pre-order'],
-    options: [
-      {
-        id: 'opt_size4', name: 'Size',
-        values: [
-          { id: 'v4_s', label: 'S' }, { id: 'v4_m', label: 'M' },
-          { id: 'v4_l', label: 'L' }, { id: 'v4_xl', label: 'XL' },
-        ],
-      },
-      {
-        id: 'opt_color4', name: 'Color',
-        values: [
-          { id: 'c4_ash', label: 'Ash', colorHex: '#A8A8A8' },
-          { id: 'c4_pine', label: 'Pine', colorHex: '#3A5F4A' },
-        ],
-      },
-    ],
-    variants: [
-      { id: 'var4_s_ash',   title: 'S / Ash',  optionValues: [{ optionId: 'opt_size4', valueId: 'v4_s'  }, { optionId: 'opt_color4', valueId: 'c4_ash'  }], price: 98, inventoryQuantity: 50, isAvailable: true },
-      { id: 'var4_m_ash',   title: 'M / Ash',  optionValues: [{ optionId: 'opt_size4', valueId: 'v4_m'  }, { optionId: 'opt_color4', valueId: 'c4_ash'  }], price: 98, inventoryQuantity: 50, isAvailable: true },
-      { id: 'var4_l_ash',   title: 'L / Ash',  optionValues: [{ optionId: 'opt_size4', valueId: 'v4_l'  }, { optionId: 'opt_color4', valueId: 'c4_ash'  }], price: 98, inventoryQuantity: 50, isAvailable: true },
-      { id: 'var4_m_pine',  title: 'M / Pine', optionValues: [{ optionId: 'opt_size4', valueId: 'v4_m'  }, { optionId: 'opt_color4', valueId: 'c4_pine' }], price: 98, inventoryQuantity: 50, isAvailable: true },
-      { id: 'var4_l_pine',  title: 'L / Pine', optionValues: [{ optionId: 'opt_size4', valueId: 'v4_l'  }, { optionId: 'opt_color4', valueId: 'c4_pine' }], price: 98, inventoryQuantity: 50, isAvailable: true },
-    ],
-  },
-];
-
-// Map from feed product names to demo product IDs
-const FEED_PRODUCT_MAP: Record<string, string> = {
-  'Canvas Cargo Jacket':    'prod_canvas_cargo',
-  'Essential Relaxed Tee':  'prod_essential_tee',
-  'Ripstop Cargo Trousers': 'prod_ripstop_cargo',
-  'Sunday Washed Hoodie':   'prod_sunday_hoodie',
-  'City Chore Coat':        'prod_canvas_cargo', // fallback to canvas cargo
-};
-
 // ─── Product lookup ───────────────────────────────────────────────────────────
+// Returns null when the product is not found — callers must handle the absent case.
+// No fallback substitution: an unavailable product must not silently become another.
+
+function adaptApiProduct(row: any): BuyerProduct {
+  const apiVariants: any[] = Array.isArray(row?.variants) ? row.variants : [];
+  const sizes = [...new Set<string>(apiVariants.map(v => v.size).filter(Boolean))];
+  const colors = [...new Set<string>(apiVariants.map(v => v.color).filter(Boolean))];
+
+  const options: BuyerProductOption[] = [];
+  if (sizes.length > 0) {
+    options.push({
+      id: 'opt_size',
+      name: 'Size',
+      values: sizes.map(size => ({ id: `size_${size}`, label: size })),
+    });
+  }
+  if (colors.length > 0) {
+    options.push({
+      id: 'opt_color',
+      name: 'Color',
+      values: colors.map(color => ({ id: `color_${color}`, label: color })),
+    });
+  }
+
+  const firstImage = Array.isArray(row?.images) ? row.images[0] : undefined;
+  const variants: BuyerProductVariant[] = apiVariants.map(variant => {
+    const optionValues: { optionId: string; valueId: string }[] = [];
+    if (variant.size) {
+      optionValues.push({ optionId: 'opt_size', valueId: `size_${variant.size}` });
+    }
+    if (variant.color) {
+      optionValues.push({ optionId: 'opt_color', valueId: `color_${variant.color}` });
+    }
+    return {
+      id: variant.id,
+      title: [variant.size, variant.color].filter(Boolean).join(' / ') || 'Default',
+      optionValues,
+      price: (variant.priceCents ?? 0) / 100,
+      inventoryQuantity: variant.stock ?? 0,
+      isAvailable: (variant.stock ?? 0) > 0,
+      imageUri: firstImage,
+    };
+  });
+
+  return {
+    id: row.id,
+    sellerId: row.ownerId,
+    sellerName: row.sellerDisplayName ?? 'Seller',
+    sellerHandle: row.sellerHandle ?? '',
+    name: row.name,
+    description: row.description ?? '',
+    price: variants.length > 0 ? Math.min(...variants.map(v => v.price)) : 0,
+    imageUris: Array.isArray(row.images) ? row.images : [],
+    category: row.category ?? 'apparel',
+    isPreOrder: row.isPreOrder ?? false,
+    preOrderClosingDate: row.preOrderClosingDate
+      ? new Date(row.preOrderClosingDate).toISOString()
+      : undefined,
+    preOrderEstShipDate: row.preOrderEstShipDate
+      ? new Date(row.preOrderEstShipDate).toISOString()
+      : undefined,
+    cancellationPolicy: 'All sales final unless the item arrives damaged.',
+    refundPolicy: 'Contact seller within 7 days of delivery for returns.',
+    options,
+    variants,
+    isActive: row.status ? row.status === 'active' : true,
+    tags: Array.isArray(row.tags) ? row.tags : [],
+  };
+}
 
 export async function getBuyerProduct(productId: string): Promise<BuyerProduct | null> {
-  const found = DEMO_PRODUCTS.find(p => p.id === productId);
-  if (found) return found;
-  // Fallback: return first product (for demo purposes when linked from feed)
-  return DEMO_PRODUCTS[0];
-}
-
-export async function getBuyerProductByName(name: string): Promise<BuyerProduct> {
-  const id = FEED_PRODUCT_MAP[name];
-  if (id) {
-    const found = DEMO_PRODUCTS.find(p => p.id === id);
-    if (found) return found;
+  if (!productId) return null;
+  try {
+    const row = await serviceRequest<any>(
+      `/api/public/products/${encodeURIComponent(productId)}`,
+    );
+    return row?.id ? adaptApiProduct(row) : null;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message.startsWith('API 404:')) return null;
+    throw error;
   }
-  return DEMO_PRODUCTS[0];
-}
-
-export function getAllDemoProducts(): BuyerProduct[] {
-  return DEMO_PRODUCTS;
 }
 
 // ─── DB sync ──────────────────────────────────────────────────────────────────

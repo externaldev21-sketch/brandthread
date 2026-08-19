@@ -469,7 +469,7 @@ export default function SellerHomeScreen() {
             activeOpacity={0.8}
           >
             <Feather name="alert-triangle" size={14} color={ORANGE} />
-            <Text style={{ flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: ORANGE }}>Couldn't load live stats — tap to dismiss</Text>
+            <Text style={{ flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: ORANGE }}>Live stats unavailable — tap to dismiss</Text>
           </TouchableOpacity>
         )}
 
@@ -482,7 +482,7 @@ export default function SellerHomeScreen() {
             >
               <Text style={s.welcomeTitle}>Your brand workspace is ready.</Text>
               <Text style={[s.welcomeSub, { marginTop: 6, marginBottom: SP.md }]}>
-                Let's build your first product and prepare your store.
+                Build your first drop, set up your storefront, and start selling.
               </Text>
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 <PrimaryButton
@@ -509,7 +509,7 @@ export default function SellerHomeScreen() {
             <BrandthreadCard>
               {/* Header: title + "X of 9 complete" */}
               <View style={s.checklistHeader}>
-                <Text style={s.checklistTitle}>Finish setting up your store</Text>
+                <Text style={s.checklistTitle}>Finish setting up your brand</Text>
                 <Text style={s.checklistCount}>
                   {setupState.tasks.filter(t => t.completed).length} of {setupState.tasks.length} complete
                 </Text>
@@ -714,10 +714,10 @@ export default function SellerHomeScreen() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: FS.base, fontFamily: FONT.bold, color: FG, letterSpacing: -0.2 }}>
-                      Ready for your first sale?
+                      Ready for your first drop?
                     </Text>
                     <Text style={{ fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 }}>
-                      A few quick wins to get buyers in the door.
+                      A few quick moves to get shoppers to your store.
                     </Text>
                   </View>
                 </View>
@@ -738,7 +738,7 @@ export default function SellerHomeScreen() {
                     style={{ flex: 1 }}
                   />
                   <SecondaryButton
-                    label="Post on Threads"
+                    label="Post a Drop"
                     icon="video"
                     small
                     onPress={() => nav('/create-post')}

@@ -85,7 +85,7 @@ export const DEMO_SELLER_POSTS: SellerPost[] = [
   {
     id: 'post-1', sellerId: 'seller-1', brandId: 'sp-1',
     type: 'video', status: 'published',
-    caption: 'New drop just landed 🔥 Oversized canvas jacket — limited run of 50. Link in bio.',
+    caption: 'Drop 07 is live 🔥 Canvas Cargo Jacket — 50 units, no restock. Link in bio.',
     hashtags: [
       { tag: '#streetwear', trending: true }, { tag: '#newdrop' },
       { tag: '#limitededition' }, { tag: '#brandthread' },
@@ -94,7 +94,7 @@ export const DEMO_SELLER_POSTS: SellerPost[] = [
     aspectRatio: '9:16',
     videoDuration: 28,
     maxDuration: 30,
-    mediaUrls: ['https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4'],
+    mediaUrls: ['https://assets.mixkit.co/videos/preview/mixkit-young-woman-posing-in-a-streetwear-outfit-42914-large.mp4'],
     overlays: [],
     productTags: [
       { productId: 'p5', productName: 'Canvas Cargo Jacket', price: 149.99, timestamp: 4 },
@@ -109,7 +109,7 @@ export const DEMO_SELLER_POSTS: SellerPost[] = [
   {
     id: 'post-2', sellerId: 'seller-1', brandId: 'sp-1',
     type: 'slideshow', status: 'published',
-    caption: 'Vintage Washed Tee — 8 colorways. Which one are you grabbing?',
+    caption: 'Vintage Washed Tee — 8 washes. Which colorway is yours?',
     hashtags: [
       { tag: '#vintage' }, { tag: '#tee' }, { tag: '#fashion' }, { tag: '#ootd' },
     ],
@@ -129,7 +129,7 @@ export const DEMO_SELLER_POSTS: SellerPost[] = [
   {
     id: 'post-3', sellerId: 'seller-1', brandId: 'sp-1',
     type: 'video', status: 'published',
-    caption: 'Grind now, shine later. The Cargo Sweatpants restock is live.',
+    caption: 'Cargo Sweatpants restock is live. Grab your size before it\'s gone.',
     hashtags: [{ tag: '#cargo' }, { tag: '#restock' }, { tag: '#streetwear' }],
     aspectRatio: '9:16',
     videoDuration: 15,
@@ -149,7 +149,7 @@ export const DEMO_SELLER_POSTS: SellerPost[] = [
   {
     id: 'post-4', sellerId: 'seller-1', brandId: 'sp-1',
     type: 'announcement', status: 'published',
-    caption: 'Archive Tee Vol.3 pre-order is now open. 50 units only. Ships September.',
+    caption: 'Archive Tee Vol.3 pre-order open now. 50 units. Ships September — no exceptions.',
     hashtags: [{ tag: '#preorder' }, { tag: '#archive' }, { tag: '#limitededition' }],
     aspectRatio: '1:1',
     mediaUrls: [],
@@ -167,7 +167,7 @@ export const DEMO_SELLER_POSTS: SellerPost[] = [
   {
     id: 'post-5', sellerId: 'seller-1', brandId: 'sp-1',
     type: 'behind_scenes', status: 'scheduled',
-    caption: 'Behind the scenes of the Fall Drop campaign shoot.',
+    caption: 'Behind the lens — Fall Drop campaign shoot in LA.',
     hashtags: [{ tag: '#bts' }, { tag: '#falldrop' }, { tag: '#campaign' }],
     aspectRatio: '9:16',
     mediaUrls: [],
@@ -184,7 +184,7 @@ export const DEMO_SELLER_POSTS: SellerPost[] = [
   {
     id: 'post-6', sellerId: 'seller-1', brandId: 'sp-1',
     type: 'video', status: 'draft',
-    caption: 'Heavyweight Crewneck — coming soon.',
+    caption: 'Heavyweight Crewneck dropping this season. Stay locked.',
     hashtags: [{ tag: '#crewneck' }, { tag: '#comingsoon' }],
     aspectRatio: '9:16',
     videoDuration: 10,
@@ -207,51 +207,51 @@ export const DEMO_SELLER_POSTS: SellerPost[] = [
 
 export const DEMO_SOUNDS: Sound[] = [
   {
-    id: 's1', title: 'Street Pulse', artist: 'Demo Library',
+    id: 's1', title: 'Block Energy', artist: 'Vault Audio',
     duration: 30, genre: 'Hip-Hop', category: 'trending',
     uri: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
     isOriginal: false, isTrending: true, useCount: 84200,
-    attribution: 'Royalty-free demo track',
+    attribution: 'Royalty-free track',
   },
   {
-    id: 's2', title: 'Neon Drift', artist: 'Demo Library',
+    id: 's2', title: 'Infrared', artist: 'Vault Audio',
     duration: 60, genre: 'Electronic', category: 'trending',
     uri: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
     isOriginal: false, isTrending: true, useCount: 62100,
-    attribution: 'Royalty-free demo track',
+    attribution: 'Royalty-free track',
   },
   {
-    id: 's3', title: 'Original Sound', artist: '@vaultstudio',
+    id: 's3', title: 'Vault Original', artist: '@vaultstudio',
     duration: 28, genre: 'Original', category: 'original',
     uri: '', isOriginal: true, isTrending: false, useCount: 320,
   },
   {
-    id: 's4', title: 'Late Night Grind', artist: 'Demo Library',
+    id: 's4', title: 'After Hours Cut', artist: 'Vault Audio',
     duration: 45, genre: 'Lofi', category: 'saved',
     uri: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
     isOriginal: false, isTrending: false, useCount: 21400,
-    attribution: 'Royalty-free demo track',
+    attribution: 'Royalty-free track',
   },
   {
-    id: 's5', title: 'Drop Season', artist: 'Demo Library',
+    id: 's5', title: 'Launch Day', artist: 'Vault Audio',
     duration: 15, genre: 'Trap', category: 'recent',
     uri: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
     isOriginal: false, isTrending: false, useCount: 9800,
-    attribution: 'Royalty-free demo track',
+    attribution: 'Royalty-free track',
   },
   {
-    id: 's6', title: 'Minimal Bounce', artist: 'Demo Library',
+    id: 's6', title: 'Clean Flex', artist: 'Vault Audio',
     duration: 30, genre: 'Electronic', category: 'royalty_free',
     uri: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
     isOriginal: false, isTrending: false, useCount: 7300,
-    attribution: 'Royalty-free demo track',
+    attribution: 'Royalty-free track',
   },
   {
-    id: 's7', title: 'Concrete Wave', artist: 'Demo Library',
+    id: 's7', title: 'Cement City', artist: 'Vault Audio',
     duration: 60, genre: 'Hip-Hop', category: 'royalty_free',
     uri: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
     isOriginal: false, isTrending: false, useCount: 5100,
-    attribution: 'Royalty-free demo track',
+    attribution: 'Royalty-free track',
   },
 ];
 

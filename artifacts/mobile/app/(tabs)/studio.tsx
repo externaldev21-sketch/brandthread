@@ -173,12 +173,6 @@ const STUDIO_TOOLS: StudioTool[] = [
   },
 ];
 
-const DEMO_PROJECTS = [
-  { name: 'Summer Collection Mockup', type: 'Design',  colors: ['#8B5CF6', '#22D3EE'] as [string,string] },
-  { name: 'Product Launch Video',     type: 'Content', colors: ['#22D3EE', '#3B82F6'] as [string,string] },
-  { name: 'Hoodie AI Photo',          type: 'AI',      colors: ['#3B82F6', '#8B5CF6'] as [string,string] },
-];
-
 const TEMPLATES = [
   { label: 'T-Shirt',      colors: ['#7C3AED', '#4F46E5'] as [string,string] },
   { label: 'Hoodie',       colors: ['#0EA5E9', '#6366F1'] as [string,string] },
@@ -206,6 +200,7 @@ export default function StudioScreen() {
   const [openedFeatures, setOpenedFeatures] = useState<string[]>([]);
   const [projects,       setProjects]       = useState<DesignProject[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
+  const [projectsError,  setProjectsError]  = useState<string | null>(null);
   const [showTutorial,   setShowTutorial]   = useState(false);
 
   // Plan upsell state
@@ -213,11 +208,21 @@ export default function StudioScreen() {
   const [upsellFeature,  setUpsellFeature]  = useState('');
 
   // load design projects
-  useEffect(() => {
+  const loadProjects = useCallback(() => {
+    setLoadingProjects(true);
+    setProjectsError(null);
     getProjects()
-      .then(p => { setProjects(p.filter(x => x.status !== 'archived')); setLoadingProjects(false); })
-      .catch(() => setLoadingProjects(false));
+      .then(p => {
+        setProjects(p.filter(x => x.status !== 'archived'));
+        setProjectsError(null);
+      })
+      .catch(() => {
+        setProjectsError('Could not load projects. Tap to retry.');
+      })
+      .finally(() => setLoadingProjects(false));
   }, []);
+
+  useEffect(() => { loadProjects(); }, [loadProjects]);
 
   // Check if first-time seller — show tutorial overlay once
   useEffect(() => {
@@ -375,6 +380,16 @@ export default function StudioScreen() {
           <View style={s.loadingRow}>
             <ActivityIndicator size="small" color={PURPLE} />
           </View>
+        ) : projectsError ? (
+          <TouchableOpacity
+            style={s.projErrorRow}
+            activeOpacity={0.8}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); loadProjects(); }}
+          >
+            <Feather name="alert-circle" size={16} color={ORANGE} />
+            <Text style={s.projErrorText}>{projectsError}</Text>
+            <Feather name="refresh-cw" size={14} color={ORANGE} />
+          </TouchableOpacity>
         ) : projects.length > 0 ? (
           projects.slice(0, 4).map((proj) => {
             const variant: 'purple'|'success'|'info'|'warning'|'neutral' =
@@ -407,34 +422,17 @@ export default function StudioScreen() {
               </TouchableOpacity>
             );
           })
-        ) : DEMO_PROJECTS.map((proj) => (
+        ) : (
           <TouchableOpacity
-            key={proj.name}
-            activeOpacity={0.85}
+            style={s.projEmptyRow}
+            activeOpacity={0.8}
             onPress={() => router.push('/design' as never)}
-            style={s.projCard}
           >
-            <LinearGradient
-              colors={proj.colors}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={s.projThumb}
-            />
-            <View style={s.projInfo}>
-              <Text style={s.projName} numberOfLines={1}>{proj.name}</Text>
-              <View style={s.projMeta}>
-                <StatusBadge
-                  label={proj.type}
-                  variant={proj.type === 'Design' ? 'purple' : proj.type === 'Content' ? 'info' : 'warning'}
-                  small
-                />
-                <Text style={s.projType}>3 days ago</Text>
-              </View>
-              <Text style={s.projCta}>Tap to open →</Text>
-            </View>
-            <Feather name="chevron-right" size={16} color={MUTED} />
+            <Feather name="folder" size={20} color={MUTED} style={{ marginRight: SP.sm }} />
+            <Text style={s.projEmptyText}>No projects yet — tap to create your first</Text>
+            <Feather name="chevron-right" size={14} color={MUTED} />
           </TouchableOpacity>
-        ))}
+        )}
 
         {/* ── TEMPLATES ── */}
         <View style={[s.sectionHeader, s.sectionHeaderTop]}>
@@ -642,6 +640,45 @@ const s = StyleSheet.create({
   loadingRow: {
     paddingVertical: SP.lg,
     alignItems: 'center',
+  },
+
+  // Project error row
+  projErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    marginHorizontal: H_PAD,
+    marginBottom: 8,
+    backgroundColor: ORANGE_DIM,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: ORANGE + '44',
+    padding: SP.md,
+  },
+  projErrorText: {
+    flex: 1,
+    fontSize: FS.sm,
+    fontFamily: FONT.medium,
+    color: ORANGE,
+  },
+
+  // Project empty row
+  projEmptyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: H_PAD,
+    marginBottom: 8,
+    backgroundColor: CARD,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: SP.md,
+  },
+  projEmptyText: {
+    flex: 1,
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    color: MUTED,
   },
 
   // Project cards (full-width rows)

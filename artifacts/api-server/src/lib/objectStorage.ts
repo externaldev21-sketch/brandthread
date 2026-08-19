@@ -112,6 +112,19 @@ export class ObjectStorageService {
   }
 
   async getObjectEntityUploadURL(): Promise<string> {
+    const { uploadURL } = await this.getObjectEntityUploadURLWithPath();
+    return uploadURL;
+  }
+
+  /**
+   * Generates a presigned PUT URL AND the normalized `/objects/<id>` path the
+   * uploaded object will be reachable at. Returning both means callers never
+   * have to parse the (opaque, query-signed) GCS URL to recover the object id.
+   */
+  async getObjectEntityUploadURLWithPath(): Promise<{
+    uploadURL: string;
+    objectPath: string;
+  }> {
     const privateObjectDir = this.getPrivateObjectDir();
     if (!privateObjectDir) {
       throw new Error(
@@ -125,12 +138,52 @@ export class ObjectStorageService {
 
     const { bucketName, objectName } = parseObjectPath(fullPath);
 
-    return signObjectURL({
+    const uploadURL = await signObjectURL({
       bucketName,
       objectName,
       method: 'PUT',
       ttlSec: 900,
     });
+
+    return { uploadURL, objectPath: `/objects/uploads/${objectId}` };
+  }
+
+  /** Store a validated private upload without exposing a client-direct write URL. */
+  async createObjectEntityFromBuffer(
+    contents: Buffer,
+    contentType: string,
+  ): Promise<string> {
+    const privateObjectDir = this.getPrivateObjectDir();
+    const objectId = randomUUID();
+    const fullPath = `${privateObjectDir}/uploads/${objectId}`;
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+    const file = objectStorageClient.bucket(bucketName).file(objectName);
+    await file.save(contents, {
+      resumable: false,
+      contentType,
+      metadata: { cacheControl: 'private, max-age=0' },
+    });
+    return `/objects/uploads/${objectId}`;
+  }
+
+  async deleteObjectEntity(objectPath: string): Promise<void> {
+    const file = await this.getObjectEntityFile(objectPath);
+    await file.delete({ ignoreNotFound: true });
+  }
+
+  /**
+   * Generates a short-lived presigned GET URL for a stored object entity.
+   * Lets clients (e.g. React Native `<Image>`) fetch a private object over a
+   * time-boxed URL without attaching an Authorization header to a stream route.
+   */
+  async getObjectEntityDownloadURL(
+    objectPath: string,
+    ttlSec: number = 900,
+  ): Promise<string> {
+    const objectFile = await this.getObjectEntityFile(objectPath);
+    const bucketName = objectFile.bucket.name;
+    const objectName = objectFile.name;
+    return signObjectURL({ bucketName, objectName, method: 'GET', ttlSec });
   }
 
   async getObjectEntityFile(objectPath: string): Promise<File> {

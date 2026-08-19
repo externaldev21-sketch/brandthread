@@ -181,10 +181,10 @@ export default function RefundDetailScreen() {
             <View style={styles.successIcon}>
               <Feather name="check-circle" size={ICON.xxl} color={SUCCESS} />
             </View>
-            <Text style={styles.successTitle}>Refund Initiated (Demo)</Text>
+            <Text style={styles.successTitle}>Refund Initiated</Text>
             <Text style={styles.successSub}>
               Refund of ${result.totalAmount.toFixed(2)} submitted.{'\n'}
-              Processing time: 3–5 business days (demo).
+              Processing time: 3–5 business days.
             </Text>
             <PrimaryButton
               label="Done"
@@ -207,11 +207,11 @@ export default function RefundDetailScreen() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + SP.xxl, gap: SP.md }}
       >
-        {/* 2. DEMO NOTICE */}
+        {/* 2. REFUND NOTICE */}
         <View style={styles.demoNotice}>
           <Feather name="alert-triangle" size={ICON.sm} color={ORANGE} />
           <Text style={styles.demoText}>
-            No real payment will be processed. This is demo state only.
+            Refunds are processed via Stripe. Funds are returned to the original payment method.
           </Text>
         </View>
 

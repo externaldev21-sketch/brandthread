@@ -466,7 +466,7 @@ export default function StoreNavScreen() {
                     style={styles.textInput}
                     value={itemForm.url}
                     onChangeText={(v) => setItemForm((p) => ({ ...p, url: v }))}
-                    placeholder="https://example.com"
+                    placeholder="https://nightshiftstudio.co"
                     placeholderTextColor={SUBTLE}
                     keyboardType="url"
                     autoCapitalize="none"

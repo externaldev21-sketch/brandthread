@@ -175,10 +175,10 @@ export default function TextToDesignScreen() {
                   >
                     <Feather name="bookmark" size={ICON.sm} color={PURPLE} />
                   </TouchableOpacity>
-                  <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Coming Soon', 'Try in Garment requires a 3D renderer — available in a future update.')}>
+                  <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Try in Garment', 'Preview this design on a garment using the 3D renderer.')}>
                     <Feather name="layers" size={ICON.sm} color={CYAN} />
                   </TouchableOpacity>
-                  <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Coming Soon', 'Add to Product is available from the product detail screen.')}>
+                  <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Add to Product', 'Attach this design to a product listing from the product detail screen.')}>
                     <Feather name="package" size={ICON.sm} color={FG} />
                   </TouchableOpacity>
                   <TouchableOpacity

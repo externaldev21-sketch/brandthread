@@ -294,7 +294,7 @@ async function ensureInitialized() {
       status: 'active',
       activeProductIds: [],
       lastMessageAt: now(),
-      lastMessagePreview: 'Looking forward to working with you!',
+      lastMessagePreview: 'We specialize in heavyweight fleece and cut-and-sew — happy to walk you through our MOQs and lead times.',
       unreadCount: 1,
       createdAt: now(),
       updatedAt: now(),
@@ -307,7 +307,7 @@ async function ensureInitialized() {
       manufacturerId: 'mfg_001',
       manufacturerName: 'Apex Apparel Co.',
       contextLabel: 'General',
-      lastMessage: 'Looking forward to working with you!',
+      lastMessage: 'We specialize in heavyweight fleece and cut-and-sew — happy to walk you through our MOQs and lead times.',
       lastMessageAt: now(),
       unreadCount: 1,
       messages: [
@@ -316,7 +316,7 @@ async function ensureInitialized() {
           conversationId: 'conv_001',
           senderId: 'mfg_001',
           senderType: 'manufacturer',
-          text: 'Hi! Thank you for connecting. Looking forward to working with you!',
+          text: 'Hey, thanks for reaching out! We specialize in heavyweight fleece, cut-and-sew hoodies, and woven-label finishes for independent streetwear labels. Happy to walk you through our MOQs, sampling process, and lead times whenever you\'re ready.',
           imageUris: [],
           fileIds: [],
           isInternalNote: false,
@@ -725,14 +725,85 @@ export async function getCounteroffersForQuote(quoteId: string): Promise<Counter
 
 // ─── Samples ──────────────────────────────────────────────────────────────────
 
+/**
+ * Extracts an HTTP status from a serviceRequest error, if present.
+ * serviceRequest throws `Error("API <status>: <body>")`; "Services not
+ * configured" (no token wired) is treated as "not available" (status 0).
+ */
+function errorStatus(err: unknown): number | null {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (msg.includes("Services not configured")) return 0;
+  const m = /^API (\d+):/.exec(msg);
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * Request a presigned PUT URL for uploading a sample image directly to GCS.
+ * The server validates ownership + MIME/size and returns both the upload URL
+ * and the normalized objectPath (client never parses the signed URL).
+ */
+export async function uploadSampleImage(
+  sampleOrderId: string,
+  contentType: string,
+  bytes: Uint8Array,
+): Promise<string[]> {
+  const result = await serviceRequest<{ imageUrls: string[] }>(
+    `/api/sample-orders/${sampleOrderId}/images/upload`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': contentType },
+      body: bytes as unknown as BodyInit,
+    },
+  );
+  return result.imageUrls ?? [];
+}
+
+/** Fetch the order's images as short-lived signed GET URLs. */
+export async function getSampleImageUrls(sampleOrderId: string): Promise<string[]> {
+  const result = await serviceRequest<{ imageUrls: string[] }>(
+    `/api/sample-orders/${sampleOrderId}/images`,
+  );
+  return result.imageUrls ?? [];
+}
+
 export async function getSamples(): Promise<Sample[]> {
-  await ensureInitialized();
-  return [..._samples];
+  const rows = await serviceRequest<any[]>('/api/sample-orders');
+  if (!Array.isArray(rows)) throw new Error('Sample orders response was invalid.');
+  return rows.map(row => mapSampleOrder(row));
 }
 
 export async function getSample(id: string): Promise<Sample | undefined> {
-  await ensureInitialized();
-  return _samples.find(s => s.id === id);
+  const row = await serviceRequest<any>(`/api/sample-orders/${id}`);
+  if (!row?.id) return undefined;
+  const imageUris = await getSampleImageUrls(id);
+  return mapSampleOrder(row, imageUris);
+}
+
+function mapSampleOrder(row: any, imageUris: string[] = []): Sample {
+  let detail: { quoteId?: string; review?: SampleReview; revisions?: SampleRevision[] } = {};
+  try { detail = JSON.parse(row.notes ?? '{}'); } catch { /* legacy freeform notes */ }
+  const statusMap: Record<string, Sample['status']> = {
+    payment_received: 'paid', processing: 'in_development',
+    cut_and_sew: 'in_development', packing: 'in_development',
+  };
+  return {
+    id:             row.id,
+    sellerId:       row.sellerId,
+    manufacturerId: row.manufacturerId ?? '',
+    quoteId:        detail.quoteId,
+    productName:    row.title ?? '',
+    type:           'proto',
+    status:         statusMap[row.status] ?? row.status ?? 'requested',
+    cost:           (row.priceCents ?? 0) / 100,
+    paymentStatus:  row.status === 'payment_received' ? 'paid' : 'pending',
+    imageUris,
+    fileIds:        [],
+    revisions:      detail.revisions ?? [],
+    review:         detail.review,
+    notes:          row.notes ?? undefined,
+    createdAt:      row.createdAt ?? now(),
+    updatedAt:      row.updatedAt ?? now(),
+  } as Sample;
 }
 
 export async function createSample(data: {
@@ -743,64 +814,42 @@ export async function createSample(data: {
   type?: Sample['type'];
   cost: number;
 }): Promise<Sample> {
-  await ensureInitialized();
-  const sample: Sample = {
-    id: 'smp_' + uid(),
-    sellerId: 'seller_001',
-    manufacturerId: data.manufacturerId,
-    quoteId: data.quoteId,
-    productId: data.productId,
-    productName: data.productName,
-    type: data.type ?? 'proto',
-    status: 'requested',
-    cost: data.cost,
-    paymentStatus: 'pending',
-    estimatedCompletionDate: futureDate(21),
-    imageUris: [],
-    fileIds: [],
-    revisions: [],
-    createdAt: now(),
-    updatedAt: now(),
-  };
-  _samples.push(sample);
-  await persistAll();
-  return sample;
+  const row = await serviceRequest<any>('/api/sample-orders', {
+    method: 'POST',
+    body: JSON.stringify({
+      manufacturerId: data.manufacturerId,
+      orderType: 'sample',
+      title: data.productName,
+      quantity: 1,
+      priceCents: Math.max(1, Math.round(data.cost * 100)),
+      notes: JSON.stringify({ quoteId: data.quoteId }),
+    }),
+  });
+  return mapSampleOrder(row);
 }
 
 export async function updateSampleStatus(id: string, status: Sample['status']): Promise<Sample | undefined> {
-  await ensureInitialized();
-  const s = _samples.find(x => x.id === id);
-  if (s) {
-    s.status = status;
-    if (status === 'shipped') s.shippedDate = now();
-    if (status === 'delivered') s.deliveredDate = now();
-    s.updatedAt = now();
-    await persistAll();
-  }
-  return s;
+  const row = await serviceRequest<any>(`/api/sample-orders/${id}/sample-detail`, {
+    method: 'PATCH', body: JSON.stringify({ status }),
+  });
+  return mapSampleOrder(row);
 }
 
 export async function submitSampleReview(sampleId: string, review: Omit<SampleReview, 'id' | 'sampleId' | 'sellerId' | 'createdAt'>): Promise<Sample | undefined> {
-  await ensureInitialized();
-  const s = _samples.find(x => x.id === sampleId);
-  if (!s) return undefined;
-  s.review = { id: 'rev_' + uid(), sampleId, sellerId: 'seller_001', ...review, createdAt: now() };
-  s.status = review.decision === 'approved' ? 'approved' : review.decision === 'rejected' ? 'rejected' : 'revision_requested';
-  s.updatedAt = now();
-  await persistAll();
-  return s;
+  const stored = { id: 'rev_' + uid(), sampleId, sellerId: 'seller_001', ...review, createdAt: now() };
+  const status = review.decision === 'approved' ? 'approved' : review.decision === 'rejected' ? 'rejected' : 'revision_requested';
+  const row = await serviceRequest<any>(`/api/sample-orders/${sampleId}/sample-detail`, {
+    method: 'PATCH', body: JSON.stringify({ status, review: stored }),
+  });
+  return mapSampleOrder(row);
 }
 
 export async function addSampleRevision(sampleId: string, rev: Omit<SampleRevision, 'id' | 'sampleId' | 'sellerId' | 'status' | 'createdAt'>): Promise<Sample | undefined> {
-  await ensureInitialized();
-  const s = _samples.find(x => x.id === sampleId);
-  if (!s) return undefined;
   const revision: SampleRevision = { id: 'svr_' + uid(), sampleId, sellerId: 'seller_001', status: 'pending', ...rev, createdAt: now() };
-  s.revisions.push(revision);
-  s.status = 'revision_requested';
-  s.updatedAt = now();
-  await persistAll();
-  return s;
+  const row = await serviceRequest<any>(`/api/sample-orders/${sampleId}/sample-detail`, {
+    method: 'PATCH', body: JSON.stringify({ status: 'revision_requested', revision }),
+  });
+  return mapSampleOrder(row);
 }
 
 // ─── Production Orders ────────────────────────────────────────────────────────

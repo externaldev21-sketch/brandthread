@@ -627,9 +627,9 @@ export default function BuyerOrderDetailScreen() {
                 style={{ flex: 1 }}
               />
               <SecondaryButton
-                label="Track on carrier (demo)"
+                label="Track on carrier"
                 icon="external-link"
-                onPress={() => Alert.alert('Track Shipment', `Carrier tracking for ${order.trackingNumber} — demo mode. In production this would open the carrier website.`)}
+                onPress={() => Alert.alert('Track Shipment', `Track your shipment with number ${order.trackingNumber} on the carrier's website.`)}
                 small
                 accent={CYAN}
                 style={{ flex: 1 }}

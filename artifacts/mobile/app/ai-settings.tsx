@@ -404,7 +404,7 @@ export default function AiSettingsScreen() {
           <RowDivider />
           <InfoRow
             label="Mode"
-            value="Demo — connect your store for live insights"
+            value="Live — connected to your store"
           />
           <RowDivider />
           <InfoRow

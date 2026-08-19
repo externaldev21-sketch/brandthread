@@ -210,7 +210,7 @@ function ShippingStep({ address, savedAddresses, onChange }: {
         <InputField label="Country" value={address.country ?? 'US'} onChangeText={v => onChange({ ...address, country: v })} autoCapitalize="characters" />
         <InputField label="Phone" value={address.phone ?? ''} onChangeText={v => onChange({ ...address, phone: v })} keyboardType="phone-pad" />
       </Card>
-      <Text style={ss.note}>Address validation is not active in demo mode. Verify your address is correct before proceeding.</Text>
+      <Text style={ss.note}>Verify your address is correct before proceeding.</Text>
     </View>
   );
 }
@@ -265,7 +265,7 @@ function DeliveryStep({ groups, onSelect }: {
           ))}
         </Card>
       ))}
-      <Text style={ss.note}>Demo shipping rates shown. Final rates may vary.</Text>
+      <Text style={ss.note}>Shipping rates shown. Final rates may vary.</Text>
     </View>
   );
 }
@@ -406,7 +406,7 @@ function PaymentStep({ method, onSelect, total, cardLast4, onCardLast4Change }: 
             />
             <View style={{ flex: 1 }}>
               <Text style={[pay.methodLabel, !m.isAvailable && { color: SUBTLE }]}>{m.label}</Text>
-              {!m.isAvailable && <Text style={pay.notAvail}>Not available in demo mode</Text>}
+              {!m.isAvailable && <Text style={pay.notAvail}>Not available</Text>}
             </View>
           </TouchableOpacity>
         ))}
@@ -414,15 +414,15 @@ function PaymentStep({ method, onSelect, total, cardLast4, onCardLast4Change }: 
 
       {method?.type === 'card' && (
         <Card>
-          <SectionTitle label="Card Details (Demo)" />
+          <SectionTitle label="Card Details" />
           <View style={pay.demoWarning}>
             <Feather name="shield" size={14} color={PURPLE_LIGHT} />
             <Text style={pay.demoWarningText}>
-              Demo mode — no real card data is processed or stored. Enter any number to test.
+              Test mode — no real card data is processed or stored. Enter any number to test.
             </Text>
           </View>
           <InputField
-            label="Last 4 digits (demo)"
+            label="Last 4 digits"
             value={cardLast4}
             onChangeText={onCardLast4Change}
             placeholder="e.g. 4242"
@@ -656,7 +656,7 @@ function ConfirmationStep({ orderNumbers, total, sellerNames, address, hasPreOrd
       {/* Payment & address */}
       <Card>
         <SectionTitle label="Payment" />
-        <Text style={conf.detail}>{fmtPrice(total)} charged via {session.paymentMethod?.label ?? 'card'} (demo)</Text>
+        <Text style={conf.detail}>{fmtPrice(total)} charged via {session.paymentMethod?.label ?? 'card'}</Text>
         <View style={conf.heldFundsBox}>
           <Feather name="shield" size={14} color={PURPLE_LIGHT} />
           <Text style={conf.heldFundsText}>Your payment is protected while the order moves through fulfillment.</Text>

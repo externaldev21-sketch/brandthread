@@ -220,7 +220,7 @@ export default function StorePreview() {
         return baseBlock(
           <View style={[{ flex: 1, backgroundColor: primaryColor, justifyContent: 'center', alignItems: 'center' }]}>
             <Text style={{ fontSize: 9, fontFamily: FONT.medium, color: '#fff' }} numberOfLines={1}>
-              {section.settings.heading || 'Free shipping on orders over $150'}
+              {section.settings.heading || 'Free shipping over $120 · Limited drops only'}
             </Text>
           </View>,
           28
@@ -230,7 +230,7 @@ export default function StorePreview() {
         return baseBlock(
           <View style={{ flex: 1, backgroundColor: primaryColor + '18', padding: 8, justifyContent: 'center', alignItems: 'center' }}>
             <Text style={[previewStyles.blockLabel, { color: textColor }]}>
-              {section.settings.heading || 'Join the community.'}
+              {section.settings.heading || 'Get early access to every drop.'}
             </Text>
             <View style={[previewStyles.emailMock, { borderColor: textColor + '44', backgroundColor: phoneBg }]}>
               <Text style={{ fontSize: 8, color: textColor + '88' }}>Enter your email</Text>
@@ -243,7 +243,7 @@ export default function StorePreview() {
         return baseBlock(
           <View style={{ flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }}>
             <Text style={[previewStyles.blockLabel, { color: '#fff', marginBottom: 4 }]}>
-              {section.settings.heading || 'New Drop Coming'}
+              {section.settings.heading || 'Next Drop Countdown'}
             </Text>
             <View style={previewStyles.timerRow}>
               {['00', '12', '34', '56'].map((v, i) => (
@@ -260,7 +260,7 @@ export default function StorePreview() {
         return baseBlock(
           <View style={{ flex: 1, backgroundColor: phoneBg, padding: 6 }}>
             <Text style={[previewStyles.blockLabel, { color: textColor, marginBottom: 4 }]}>
-              {section.settings.heading || 'From the Thread'}
+              {section.settings.heading || 'Latest from the Thread'}
             </Text>
             <View style={previewStyles.postsRow}>
               {[0, 1, 2].map(i => (
@@ -297,7 +297,7 @@ export default function StorePreview() {
             <View style={{ flex: 1, backgroundColor: primaryColor + '33' }} />
             <View style={{ flex: 1, padding: 8, justifyContent: 'center' }}>
               <Text style={[previewStyles.blockLabel, { color: textColor, marginBottom: 4 }]}>
-                {section.settings.heading || 'Designed to last.'}
+                {section.settings.heading || 'Built to outlast the hype.'}
               </Text>
               {[0,1].map(i => <View key={i} style={[previewStyles.textLine, { backgroundColor: textColor + '22', marginTop: 3 }]} />)}
             </View>
@@ -341,8 +341,8 @@ export default function StorePreview() {
       <>
         <View style={[previewStyles.productImage, { backgroundColor: primaryColor + '33' }]} />
         <View style={{ padding: 10, backgroundColor: phoneBg }}>
-          <Text style={[previewStyles.blockLabel, { color: textColor, fontSize: 11 }]}>Product Name</Text>
-          <Text style={{ fontSize: 10, color: accentColor, fontFamily: FONT.semibold, marginTop: 2 }}>$89.00</Text>
+          <Text style={[previewStyles.blockLabel, { color: textColor, fontSize: 11 }]}>Oversized Cargo Jacket</Text>
+          <Text style={{ fontSize: 10, color: accentColor, fontFamily: FONT.semibold, marginTop: 2 }}>$149.00</Text>
           <View style={previewStyles.variantRow}>
             {['S', 'M', 'L', 'XL'].map(v => (
               <View key={v} style={[previewStyles.variantBtn, { borderColor: textColor + '44', backgroundColor: v === 'M' ? primaryColor : 'transparent' }]}>
@@ -371,8 +371,8 @@ export default function StorePreview() {
           {[0,1,2,3].map(i => (
             <View key={i} style={[previewStyles.collectionCard, { backgroundColor: primaryColor + '22' }]}>
               <View style={[previewStyles.collectionCardImg, { backgroundColor: primaryColor + '44' }]} />
-              <Text style={{ fontSize: 8, color: textColor, fontFamily: FONT.medium, marginTop: 4 }}>Product {i + 1}</Text>
-              <Text style={{ fontSize: 7, color: accentColor, fontFamily: FONT.semibold }}>$49.00</Text>
+              <Text style={{ fontSize: 8, color: textColor, fontFamily: FONT.medium, marginTop: 4 }}>Drop {i + 1}</Text>
+              <Text style={{ fontSize: 7, color: accentColor, fontFamily: FONT.semibold }}>$79.00</Text>
             </View>
           ))}
         </View>
@@ -384,7 +384,7 @@ export default function StorePreview() {
     const menuItems = store?.menus?.[0]?.items;
     const items = menuItems && menuItems.length > 0
       ? menuItems.map(item => item.label)
-      : ['Shop', 'Collections', 'Brand Story', 'About', 'Contact'];
+      : ['Shop', 'Drops', 'Brand Story', 'Lookbook', 'Contact'];
 
     return (
       <View style={{ backgroundColor: phoneBg, flex: 1, padding: 10 }}>
@@ -410,8 +410,8 @@ export default function StorePreview() {
           <View key={i} style={[previewStyles.cartRow, { borderBottomColor: textColor + '22' }]}>
             <View style={[previewStyles.cartItemImg, { backgroundColor: primaryColor + '44' }]} />
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 9, color: textColor, fontFamily: FONT.medium }}>Product Name</Text>
-              <Text style={{ fontSize: 8, color: accentColor, fontFamily: FONT.semibold }}>$89.00</Text>
+              <Text style={{ fontSize: 9, color: textColor, fontFamily: FONT.medium }}>Oversized Cargo Jacket</Text>
+              <Text style={{ fontSize: 8, color: accentColor, fontFamily: FONT.semibold }}>$149.00</Text>
             </View>
             <View style={previewStyles.qtyBox}>
               <Text style={{ fontSize: 8, color: textColor }}>1</Text>
@@ -420,7 +420,7 @@ export default function StorePreview() {
         ))}
         <View style={[previewStyles.cartTotal, { borderTopColor: textColor + '22' }]}>
           <Text style={{ fontSize: 9, color: textColor, fontFamily: FONT.medium }}>Total</Text>
-          <Text style={{ fontSize: 10, color: textColor, fontFamily: FONT.bold }}>$178.00</Text>
+          <Text style={{ fontSize: 10, color: textColor, fontFamily: FONT.bold }}>$298.00</Text>
         </View>
         <View style={[previewStyles.addToCartBtn, { backgroundColor: primaryColor, marginTop: 8 }]}>
           <Text style={{ fontSize: 9, color: '#fff', fontFamily: FONT.bold }}>Checkout</Text>
@@ -433,9 +433,9 @@ export default function StorePreview() {
     return (
       <View style={{ backgroundColor: phoneBg, flex: 1, justifyContent: 'center', alignItems: 'center', padding: 16 }}>
         <Feather name="shopping-bag" size={28} color={textColor + '44'} />
-        <Text style={{ fontSize: 11, color: textColor, fontFamily: FONT.bold, marginTop: 8 }}>Your cart is empty</Text>
+        <Text style={{ fontSize: 11, color: textColor, fontFamily: FONT.bold, marginTop: 8 }}>Your bag is empty</Text>
         <Text style={{ fontSize: 9, color: textColor + '88', fontFamily: FONT.regular, marginTop: 4, textAlign: 'center' }}>
-          Looks like you haven't added anything yet.
+          No drops in your bag yet. Keep browsing.
         </Text>
         <View style={[previewStyles.addToCartBtn, { backgroundColor: primaryColor, marginTop: 12, paddingHorizontal: 16 }]}>
           <Text style={{ fontSize: 9, color: '#fff', fontFamily: FONT.bold }}>Continue Shopping</Text>

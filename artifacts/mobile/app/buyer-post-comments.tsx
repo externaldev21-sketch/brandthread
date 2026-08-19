@@ -286,7 +286,7 @@ export default function BuyerPostCommentsScreen() {
               <View style={s.divider} />
               <Text style={s.countLabel}>
                 {commentsCount === 0
-                  ? 'No comments yet — be first!'
+                  ? 'No comments yet — drop the first one.'
                   : `${commentsCount} comment${commentsCount !== 1 ? 's' : ''}`}
               </Text>
               <View style={s.divider} />

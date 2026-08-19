@@ -259,9 +259,9 @@ export default function DesignScreen() {
 
         {/* Hero */}
         <View style={styles.hero}>
-          <Text style={styles.heroHeading}>Create without limits.</Text>
+          <Text style={styles.heroHeading}>Design your next drop.</Text>
           <Text style={styles.heroSubtitle}>
-            Turn an idea into a design, mockup, product visual, or campaign from your phone.
+            From sketch to product visual to campaign content — all from your phone.
           </Text>
           <PrimaryButton
             label="Create new project"
@@ -334,9 +334,9 @@ export default function DesignScreen() {
         ) : filtered.length === 0 ? (
           <EmptyState
             icon="edit-3"
-            title="Your creative projects will appear here."
-            description="Start designing something extraordinary."
-            action={{ label: 'Start creating', onPress: () => router.push('/design-project') }}
+            title="No projects yet."
+            description="Start a garment design, mockup, or campaign and it'll live here."
+            action={{ label: 'Start a project', onPress: () => router.push('/design-project') }}
           />
         ) : (
           filtered.map(project => (

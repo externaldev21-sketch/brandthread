@@ -94,7 +94,7 @@ export default function InviteManufacturerScreen() {
   }
 
   function handleCopyLink() {
-    Alert.alert('Link copied (demo)', inviteLink);
+    Alert.alert('Link copied', inviteLink);
   }
 
   // ── Success state ────────────────────────────────────────────────────────
@@ -182,10 +182,10 @@ export default function InviteManufacturerScreen() {
         >
           <View style={s.demoNoticeRow}>
             <Feather name="info" size={ICON.md} color={CYAN} />
-            <Text style={s.demoNoticeTitle}>Invitation preview</Text>
+            <Text style={s.demoNoticeTitle}>Invitation link</Text>
           </View>
           <Text style={s.demoNoticeText}>
-            No email service is connected. Your invitation link will be generated and displayed, but no email will be sent.
+            Your invitation link will be generated so you can share it directly with the manufacturer via any channel.
           </Text>
         </GradientCard>
 

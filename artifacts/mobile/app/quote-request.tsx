@@ -474,7 +474,7 @@ export default function QuoteRequestScreen() {
     return (
       <View style={sc.stepContent}>
         <Text style={sc.stepHeadline}>Attach files</Text>
-        <Text style={sc.stepSubheadline}>Demo mode — files will be attached in the production build.</Text>
+        <Text style={sc.stepSubheadline}>Attach design files, tech packs, or reference images for your manufacturer.</Text>
 
         <View style={sc.fileGrid}>
           {FILE_TYPES.map(ft => {
@@ -488,13 +488,13 @@ export default function QuoteRequestScreen() {
                 <TouchableOpacity
                   onPress={() => {
                     if (added) return;
-                    Alert.alert('Demo', 'File upload available in production build.');
+                    Alert.alert('Add File', 'File upload will be available in the next release.');
                     setAddedFiles(prev => [...prev, ft.key]);
                   }}
                   style={[sc.addFileBtn, added && sc.addFileBtnDone]}
                 >
                   <Text style={[sc.addFileBtnText, added && { color: SUCCESS }]}>
-                    {added ? 'Added ✓' : 'Add (demo)'}
+                    {added ? 'Added ✓' : 'Add'}
                   </Text>
                 </TouchableOpacity>
               </BrandthreadCard>
@@ -510,7 +510,7 @@ export default function QuoteRequestScreen() {
               return (
                 <View key={key} style={sc.addedFileRow}>
                   <Feather name="file" size={ICON.sm} color={SUCCESS} />
-                  <Text style={sc.addedFileName}>{ft?.label ?? key} (demo)</Text>
+                  <Text style={sc.addedFileName}>{ft?.label ?? key}</Text>
                 </View>
               );
             })}

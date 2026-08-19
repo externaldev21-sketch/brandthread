@@ -1,17 +1,17 @@
 /**
  * ensureWebhookEvents — called once at server startup.
  *
- * Finds the Stripe webhook endpoint that points at this server and makes sure
- * it includes all the event types the handler in webhooks.ts listens for —
- * especially the three subscription events that were missing when the
- * customer.subscription.* handlers were first added.
+ * Keeps one Brandthread Stripe webhook endpoint pointed at the current Replit
+ * API artifact and makes sure it includes every event handled by webhooks.ts.
  *
- * If no matching endpoint is found the function logs a warning and exits
- * cleanly — the server still boots, but real-time subscription updates will
- * not work until the endpoint is registered in the Stripe dashboard.
+ * Replit development hostnames can change. When there is one legacy
+ * Brandthread endpoint, update it in place instead of creating a replacement:
+ * Stripe preserves the endpoint's signing secret, so STRIPE_WEBHOOK_SECRET
+ * remains valid.
  */
 
-import { stripe } from "./stripe";
+import type Stripe from "stripe";
+import { stripe, STRIPE_WEBHOOK_SECRET } from "./stripe";
 import { logger } from "./logger";
 
 /**
@@ -32,7 +32,45 @@ const REQUIRED_EVENTS = [
   "charge.dispute.created",
   "charge.dispute.updated",
   "charge.dispute.closed",
-];
+] as const;
+
+const WEBHOOK_PATH = "/api-server/api/webhooks/stripe";
+const LEGACY_WEBHOOK_PATH = "/api/webhooks/stripe";
+const MANAGED_METADATA = {
+  application: "brandthread",
+  managedBy: "api-server",
+};
+
+function getCurrentWebhookUrl(): string | null {
+  const domain =
+    process.env.REPLIT_DEV_DOMAIN ??
+    process.env.REPLIT_DOMAINS?.split(",")[0]?.trim();
+
+  return domain ? `https://${domain}${WEBHOOK_PATH}` : null;
+}
+
+function isBrandthreadWebhook(endpoint: Stripe.WebhookEndpoint): boolean {
+  if (
+    endpoint.metadata?.application === MANAGED_METADATA.application &&
+    endpoint.metadata?.managedBy === MANAGED_METADATA.managedBy
+  ) {
+    return true;
+  }
+
+  try {
+    const path = new URL(endpoint.url).pathname;
+    return path.endsWith(WEBHOOK_PATH) || path.endsWith(LEGACY_WEBHOOK_PATH);
+  } catch {
+    return false;
+  }
+}
+
+function mergedEvents(
+  enabledEvents: Stripe.WebhookEndpoint["enabled_events"],
+): Stripe.WebhookEndpoint["enabled_events"] {
+  if (enabledEvents.includes("*")) return enabledEvents;
+  return Array.from(new Set([...enabledEvents, ...REQUIRED_EVENTS]));
+}
 
 export async function ensureWebhookEvents(): Promise<void> {
   if (!stripe) {
@@ -40,67 +78,73 @@ export async function ensureWebhookEvents(): Promise<void> {
     return;
   }
 
-  const devDomain = process.env.REPLIT_DEV_DOMAIN;
-  if (!devDomain) {
+  const desiredUrl = getCurrentWebhookUrl();
+  if (!desiredUrl) {
     logger.warn(
-      "ensureWebhookEvents: REPLIT_DEV_DOMAIN not set — cannot locate webhook endpoint",
+      "ensureWebhookEvents: no Replit runtime domain is available",
     );
     return;
   }
 
   try {
-    // List all registered webhook endpoints (Stripe caps at 100, well within range)
     const endpoints = await stripe.webhookEndpoints.list({ limit: 100 });
+    const exact = endpoints.data.find((endpoint) => endpoint.url === desiredUrl);
+    const managed = endpoints.data.filter(isBrandthreadWebhook);
 
-    // Find the endpoint(s) pointing at this server
-    const matching = endpoints.data.filter((ep) =>
-      ep.url.includes(devDomain) && ep.url.includes("/webhooks/stripe"),
-    );
+    let endpoint = exact;
+    if (!endpoint && managed.length === 1) {
+      endpoint = managed[0];
+    }
 
-    if (matching.length === 0) {
-      logger.warn(
-        { devDomain },
-        "ensureWebhookEvents: no webhook endpoint found for this domain — " +
-          "register one in the Stripe dashboard pointing to " +
-          `https://${devDomain}/api-server/api/webhooks/stripe`,
+    if (!endpoint && managed.length > 1) {
+      logger.error(
+        {
+          desiredUrl,
+          endpointIds: managed.map((candidate) => candidate.id),
+        },
+        "ensureWebhookEvents: multiple legacy Brandthread endpoints found; refusing to guess which signing secret is configured",
       );
       return;
     }
 
-    for (const ep of matching) {
-      const current = new Set(ep.enabled_events);
-
-      // Check if ["*"] wildcard already covers everything
-      if (current.has("*")) {
-        logger.info(
-          { endpointId: ep.id },
-          "ensureWebhookEvents: endpoint uses wildcard (*) — all events already enabled",
-        );
-        continue;
-      }
-
-      const missing = REQUIRED_EVENTS.filter((e) => !current.has(e));
-      if (missing.length === 0) {
-        logger.info(
-          { endpointId: ep.id },
-          "ensureWebhookEvents: all required events already enabled",
-        );
-        continue;
-      }
-
-      // Merge and update
-      const updated = Array.from(new Set([...ep.enabled_events, ...missing]));
-      await stripe.webhookEndpoints.update(ep.id, {
-        enabled_events: updated as any,
-      });
-
-      logger.info(
-        { endpointId: ep.id, added: missing },
-        "ensureWebhookEvents: webhook endpoint updated with missing events",
+    if (!endpoint) {
+      logger.error(
+        { desiredUrl },
+        "ensureWebhookEvents: no existing Brandthread endpoint found; refusing to create one because its signing secret cannot be configured safely at runtime",
       );
+      return;
     }
+
+    const currentEvents = endpoint.enabled_events;
+    const enabledEvents = mergedEvents(currentEvents);
+    const urlChanged = endpoint.url !== desiredUrl;
+    const eventsChanged =
+      enabledEvents.length !== currentEvents.length ||
+      enabledEvents.some((event) => !currentEvents.includes(event));
+    const metadataChanged =
+      endpoint.metadata?.application !== MANAGED_METADATA.application ||
+      endpoint.metadata?.managedBy !== MANAGED_METADATA.managedBy;
+
+    if (urlChanged || eventsChanged || metadataChanged) {
+      endpoint = await stripe.webhookEndpoints.update(endpoint.id, {
+        url: desiredUrl,
+        enabled_events: enabledEvents,
+        metadata: MANAGED_METADATA,
+        description: "Brandthread API webhook",
+      });
+    }
+
+    logger.info(
+      {
+        endpointId: endpoint.id,
+        desiredUrl,
+        urlChanged,
+        eventsChanged,
+        signingSecretConfigured: Boolean(STRIPE_WEBHOOK_SECRET),
+      },
+      "ensureWebhookEvents: webhook endpoint is current",
+    );
   } catch (err) {
-    // Non-fatal — the server still boots; log and move on.
     logger.error(
       { err },
       "ensureWebhookEvents: failed to inspect/update Stripe webhook endpoints",

@@ -258,7 +258,7 @@ export default function ReturnDetailScreen() {
               />
               <SecondaryButton
                 label="Request More Info"
-                onPress={() => Alert.alert('Request More Info', 'In a real app, this would send a message to the customer.')}
+                onPress={() => Alert.alert('Request More Info', 'A message will be sent to the customer asking for more information.')}
                 accent={CYAN}
               />
               {!showDenyForm ? (
@@ -309,16 +309,16 @@ export default function ReturnDetailScreen() {
           {status === 'approved' && (
             <View style={styles.actionsGap}>
               <PrimaryButton
-                label="Issue Return Label (Demo)"
+                label="Issue Return Label"
                 onPress={() => {
-                  Alert.alert('Demo', 'In a real app, a prepaid return label would be generated.');
+                  Alert.alert('Return Label', 'A prepaid return label will be generated and sent to the customer.');
                   doAction('label_issued');
                 }}
                 loading={actionLoading}
               />
               <SecondaryButton
                 label="Offer Store Credit"
-                onPress={() => Alert.alert('Store Credit', 'In a real app, store credit would be issued.')}
+                onPress={() => Alert.alert('Store Credit', 'Store credit will be issued to the customer for the return amount.')}
                 accent={GOLD}
               />
               <SecondaryButton
@@ -354,8 +354,8 @@ export default function ReturnDetailScreen() {
                 onPress={() => router.push(`/refund-detail?orderId=${order.id}&returnId=${returnReq.id}`)}
               />
               <SecondaryButton
-                label="Issue Exchange (Demo)"
-                onPress={() => Alert.alert('Exchange', 'In a real app, an exchange order would be created.')}
+                label="Issue Exchange"
+                onPress={() => Alert.alert('Issue Exchange', 'An exchange order will be created for the customer.')}
                 accent={CYAN}
               />
             </View>

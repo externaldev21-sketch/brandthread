@@ -9,17 +9,71 @@
  * PATCH/:id/advance   manufacturer advances production stage
  * PATCH/:id/tracking  add tracking number (triggers payout release to manufacturer)
  * POST /:id/pay-from-wallet  seller pays bulk order from drop wallet
+ *
+ * Sample image flow (no Stripe):
+ * POST /:id/images/request-upload  → { uploadURL, objectPath } presigned GCS PUT
+ * POST /:id/images                 → record objectPath + set ACL owner; returns display URLs
+ * GET  /:id/images                 → list images as short-lived signed GET URLs
  */
-import { Router } from "express";
+import express, { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
 import { sampleOrders, manufacturers, manufacturerThreads, dropWallets, dropWalletTransactions } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireStripe, PLATFORM_COMMISSION_RATE, computeApplicationFeeCents } from "../lib/stripe";
+import { ObjectStorageService } from "../lib/objectStorage";
+import { ObjectPermission } from "../lib/objectAcl";
 
 const router = Router();
 router.use(requireAuth);
+
+const objectStorage = new ObjectStorageService();
+
+// Accepted image MIME types + max size for sample progress photos.
+const ACCEPTED_IMAGE_MIMES = new Set([
+  "image/jpeg", "image/jpg", "image/png", "image/webp",
+  "image/heic", "image/heif",
+]);
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024; // 20 MB
+
+function isValidImageBytes(bytes: Buffer, contentType: string): boolean {
+  if (contentType === "image/jpeg" || contentType === "image/jpg") {
+    return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  }
+  if (contentType === "image/png") {
+    return bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  }
+  if (contentType === "image/webp") {
+    return bytes.length >= 12 && bytes.subarray(0, 4).toString() === "RIFF" && bytes.subarray(8, 12).toString() === "WEBP";
+  }
+  if (contentType === "image/heic" || contentType === "image/heif") {
+    return bytes.length >= 12 && bytes.subarray(4, 8).toString() === "ftyp";
+  }
+  return false;
+}
+
+/**
+ * Loads a sample order and authorizes the caller against the existing
+ * seller/manufacturer model (mirrors the /advance route). Returns the order
+ * row (with mfrClerkId) or null if not found / unauthorized.
+ */
+async function loadAuthorizedOrder(orderId: string, clerkUserId: string) {
+  const [row] = await db
+    .select({ order: sampleOrders, mfrClerkId: manufacturers.clerkId })
+    .from(sampleOrders)
+    .leftJoin(manufacturers, eq(sampleOrders.manufacturerId, manufacturers.id))
+    .where(eq(sampleOrders.id, orderId))
+    .limit(1);
+
+  if (!row) return { status: 404 as const, order: null };
+
+  const isSeller       = row.order.sellerId === clerkUserId;
+  const isManufacturer = row.mfrClerkId === clerkUserId;
+  if (!isSeller && !isManufacturer) return { status: 403 as const, order: null };
+
+  return { status: 200 as const, order: row.order };
+}
 
 const ORDER_STAGES = [
   "payment_received",
@@ -139,7 +193,11 @@ router.post("/", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   try {
-    const sellerId = (req as any).clerkUserId as string;
+    const clerkUserId = (req as any).clerkUserId as string;
+    const auth = await loadAuthorizedOrder(req.params.id, clerkUserId);
+    if (auth.status === 404) { res.status(404).json({ error: "Not found" }); return; }
+    if (auth.status === 403) { res.status(403).json({ error: "Forbidden" }); return; }
+
     const [row] = await db
       .select({
         order:      sampleOrders,
@@ -149,7 +207,7 @@ router.get("/:id", async (req, res) => {
       })
       .from(sampleOrders)
       .leftJoin(manufacturers, eq(sampleOrders.manufacturerId, manufacturers.id))
-      .where(and(eq(sampleOrders.id, req.params.id), eq(sampleOrders.sellerId, sellerId)))
+      .where(eq(sampleOrders.id, req.params.id))
       .limit(1);
 
     if (!row) { res.status(404).json({ error: "Not found" }); return; }
@@ -171,6 +229,55 @@ router.get("/:id", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to get order" });
+  }
+});
+
+// ── PATCH /api/sample-orders/:id/sample-detail ────────────────────────────────
+// Persist seller sample-detail decisions and revision requests with the order.
+// The tracker predates dedicated review/revision tables, so structured detail is
+// kept in the order notes until those entities are introduced.
+router.patch("/:id/sample-detail", async (req, res) => {
+  try {
+    const clerkUserId = (req as any).clerkUserId as string;
+    const auth = await loadAuthorizedOrder(req.params.id, clerkUserId);
+    if (auth.status === 404) { res.status(404).json({ error: "Not found" }); return; }
+    if (auth.status === 403) { res.status(403).json({ error: "Forbidden" }); return; }
+    if (auth.order!.sellerId !== clerkUserId) {
+      res.status(403).json({ error: "Only the seller can submit sample decisions." }); return;
+    }
+
+    const { status, review, revision } = req.body as {
+      status?: string; review?: unknown; revision?: unknown;
+    };
+    if (!review && !revision) {
+      res.status(400).json({ error: "A review or revision request is required." }); return;
+    }
+    if (!["delivered", "review_needed"].includes(auth.order!.status)) {
+      res.status(409).json({ error: "Sample must be delivered before a seller decision." }); return;
+    }
+    const reviewDecision = (review as { decision?: unknown } | undefined)?.decision;
+    const expectedStatus = review
+      ? reviewDecision === "approved" ? "approved" : reviewDecision === "rejected" ? "rejected" : "revision_requested"
+      : "revision_requested";
+    if (status !== expectedStatus) {
+      res.status(400).json({ error: "Invalid seller decision transition." }); return;
+    }
+    let details: { review?: unknown; revisions?: unknown[] } = {};
+    try { details = JSON.parse(auth.order!.notes ?? "{}"); } catch { /* retain legacy notes separately */ }
+    if (review) details.review = review;
+    if (revision) details.revisions = [...(details.revisions ?? []), revision];
+    const [updated] = await db.update(sampleOrders)
+      .set({
+        status: expectedStatus,
+        notes: JSON.stringify(details),
+        updatedAt: new Date(),
+      })
+      .where(eq(sampleOrders.id, req.params.id))
+      .returning();
+    res.json({ ...updated, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to update sample detail" });
   }
 });
 
@@ -395,6 +502,94 @@ router.post("/:id/pay-from-wallet", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to pay from wallet" });
+  }
+});
+
+// ── POST /api/sample-orders/:id/images/request-upload ────────────────────────
+// Returns a presigned GCS PUT URL plus the normalized objectPath. The client
+// never parses the signed URL — the server supplies objectPath authoritatively.
+
+router.post("/:id/images/request-upload", async (_req, res) => {
+  res.status(410).json({ error: "Direct image uploads are no longer supported. Use the authenticated upload endpoint." });
+});
+
+// ── POST /api/sample-orders/:id/images/upload ─────────────────────────────────
+// A raw, authenticated upload avoids an unconstrained client-direct storage write.
+// The parser rejects bodies above 20 MB before any object is created.
+router.post("/:id/images/upload", express.raw({ type: "image/*", limit: MAX_IMAGE_BYTES }), async (req, res) => {
+  try {
+    const clerkUserId = (req as any).clerkUserId as string;
+    const contentType = String(req.headers["content-type"] ?? "").split(";")[0].toLowerCase();
+    const bytes = req.body as Buffer;
+
+    if (!contentType || !ACCEPTED_IMAGE_MIMES.has(contentType)) {
+      res.status(400).json({
+        error: `Invalid content type. Accepted: ${[...ACCEPTED_IMAGE_MIMES].join(", ")}`,
+      });
+      return;
+    }
+    if (!Buffer.isBuffer(bytes) || bytes.length === 0 || bytes.length > MAX_IMAGE_BYTES) {
+      res.status(400).json({ error: `Image too large. Maximum ${MAX_IMAGE_BYTES / 1024 / 1024} MB.` });
+      return;
+    }
+    if (!isValidImageBytes(bytes, contentType)) {
+      res.status(400).json({ error: "Uploaded file content does not match its image type." });
+      return;
+    }
+
+    const auth = await loadAuthorizedOrder(req.params.id, clerkUserId);
+    if (auth.status === 404) { res.status(404).json({ error: "Order not found" }); return; }
+    if (auth.status === 403) { res.status(403).json({ error: "Forbidden" }); return; }
+
+    const objectPath = await objectStorage.createObjectEntityFromBuffer(bytes, contentType);
+    try {
+      await objectStorage.trySetObjectEntityAclPolicy(objectPath, { owner: clerkUserId, visibility: "private" });
+      const currentUrls: string[] = Array.isArray(auth.order!.imageUrls) ? auth.order!.imageUrls as string[] : [];
+      const [updated] = await db.update(sampleOrders)
+        .set({ imageUrls: [...currentUrls, objectPath], updatedAt: new Date() })
+        .where(eq(sampleOrders.id, req.params.id))
+        .returning({ imageUrls: sampleOrders.imageUrls });
+      const imageUrls = await Promise.all((updated.imageUrls as string[]).map(p => objectStorage.getObjectEntityDownloadURL(p)));
+      res.status(201).json({ imageUrls });
+    } catch (err) {
+      await objectStorage.deleteObjectEntity(objectPath).catch(() => undefined);
+      throw err;
+    }
+  } catch (err) {
+    console.error("[sample-orders] request-upload error:", err);
+    res.status(500).json({ error: "Failed to generate upload URL" });
+  }
+});
+
+// ── POST /api/sample-orders/:id/images ───────────────────────────────────────
+// Records an uploaded object path against the order and binds the object's ACL
+// owner to the uploading user. Returns fresh signed display URLs.
+
+router.post("/:id/images", async (_req, res) => {
+  res.status(410).json({ error: "Direct image attachment is no longer supported. Upload the image through the authenticated upload endpoint." });
+});
+
+// ── GET /api/sample-orders/:id/images ─────────────────────────────────────────
+// Lists the order's images as short-lived signed GET URLs so React Native
+// <Image> can load them directly without an Authorization header.
+
+router.get("/:id/images", async (req, res) => {
+  try {
+    const clerkUserId = (req as any).clerkUserId as string;
+
+    const auth = await loadAuthorizedOrder(req.params.id, clerkUserId);
+    if (auth.status === 404) { res.status(404).json({ error: "Order not found" }); return; }
+    if (auth.status === 403) { res.status(403).json({ error: "Forbidden" }); return; }
+
+    const stored: string[] = Array.isArray(auth.order!.imageUrls)
+      ? (auth.order!.imageUrls as string[]) : [];
+    const displayUrls = await Promise.all(
+      stored.map(p => objectStorage.getObjectEntityDownloadURL(p).catch(() => null)),
+    );
+    res.json({ imageUrls: displayUrls.filter((u): u is string => !!u) });
+  } catch (err) {
+    console.error("[sample-orders] list-images error:", err);
+    res.status(500).json({ error: "Failed to list images" });
   }
 });
 

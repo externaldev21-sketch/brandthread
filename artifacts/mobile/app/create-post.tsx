@@ -133,6 +133,8 @@ export default function CreatePostScreen() {
   const [scheduledDateInput, setScheduledDateInput] = useState('');
   const [productTags, setProductTags]             = useState<PostProductTag[]>([]);
   const [taggableProducts, setTaggableProducts]   = useState<Product[]>([]);
+  const [taggableProductsError, setTaggableProductsError] = useState<string | null>(null);
+  const [loadingTaggable, setLoadingTaggable]     = useState(false);
 
   // ── Sound / text overlays ──
   const [selectedSound, setSelectedSound] = useState<SoundSelection | null>(null);
@@ -162,9 +164,16 @@ export default function CreatePostScreen() {
   const topPad = Platform.OS === 'web' ? 20 : insets.top;
   const botPad = Platform.OS === 'web' ? 20 : insets.bottom;
 
-  useEffect(() => {
-    getTaggableProducts().then(setTaggableProducts).catch(() => {});
-  }, []);
+  function fetchTaggableProducts() {
+    setLoadingTaggable(true);
+    setTaggableProductsError(null);
+    getTaggableProducts()
+      .then(p => { setTaggableProducts(p); setTaggableProductsError(null); })
+      .catch(() => { setTaggableProductsError('Could not load products. Tap to retry.'); })
+      .finally(() => setLoadingTaggable(false));
+  }
+
+  useEffect(() => { fetchTaggableProducts(); }, []);
 
   // Pick up camera capture result on focus-return
   useFocusEffect(
@@ -599,10 +608,32 @@ export default function CreatePostScreen() {
                     ))}
                   </View>
                 )}
-                <TouchableOpacity style={[s.outlineBtn, { marginTop: 8 }]} onPress={() => setShowProductModal(true)} activeOpacity={0.8}>
-                  <Feather name="tag" size={14} color={FG} style={{ marginRight: 6 }} />
-                  <Text style={s.outlineBtnText}>Tag products</Text>
-                </TouchableOpacity>
+                {taggableProductsError ? (
+                  /* Error is scoped to this section only — rest of composer remains fully usable */
+                  <TouchableOpacity
+                    style={s.productErrorRow}
+                    activeOpacity={0.8}
+                    onPress={() => fetchTaggableProducts()}
+                  >
+                    <Feather name="alert-circle" size={14} color={ORANGE} />
+                    <Text style={s.productErrorText}>{taggableProductsError}</Text>
+                    <Feather name="refresh-cw" size={13} color={ORANGE} />
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={[s.outlineBtn, { marginTop: 8 }]}
+                    onPress={() => setShowProductModal(true)}
+                    activeOpacity={0.8}
+                    disabled={loadingTaggable}
+                  >
+                    {loadingTaggable ? (
+                      <ActivityIndicator size="small" color={MUTED} style={{ marginRight: 6 }} />
+                    ) : (
+                      <Feather name="tag" size={14} color={FG} style={{ marginRight: 6 }} />
+                    )}
+                    <Text style={s.outlineBtnText}>{loadingTaggable ? 'Loading products…' : 'Tag products'}</Text>
+                  </TouchableOpacity>
+                )}
               </>
             )}
 
@@ -755,7 +786,10 @@ export default function CreatePostScreen() {
             visible={showProductModal} onClose={() => setShowProductModal(false)}
             productSearch={productSearch} setProductSearch={setProductSearch}
             productTags={productTags} onTag={tagProduct}
-            taggableProducts={taggableProducts} insets={insets}
+            taggableProducts={taggableProducts}
+            productsError={taggableProductsError}
+            onRetryProducts={fetchTaggableProducts}
+            insets={insets}
           />
           <SoundModal
             visible={showSoundModal} onClose={() => setShowSoundModal(false)}
@@ -877,7 +911,7 @@ function SoundModal({ visible, onClose, soundTab, setSoundTab, soundSearch, setS
             </View>
           ))}
           <View style={sm.disclaimer}>
-            <Text style={sm.disclaimerText}>⚠ All sounds are royalty-free demo tracks. No licensed commercial music.</Text>
+            <Text style={sm.disclaimerText}>⚠ All sounds are royalty-free tracks cleared for commercial use.</Text>
           </View>
         </ScrollView>
       </View>
@@ -949,9 +983,11 @@ interface ProductModalProps {
   productSearch: string; setProductSearch: (v: string) => void;
   productTags: PostProductTag[]; onTag: (p: Product) => void;
   taggableProducts: Product[];
+  productsError?: string | null;
+  onRetryProducts?: () => void;
   insets: { top: number; bottom: number };
 }
-function ProductModal({ visible, onClose, productSearch, setProductSearch, productTags, onTag, taggableProducts, insets }: ProductModalProps) {
+function ProductModal({ visible, onClose, productSearch, setProductSearch, productTags, onTag, taggableProducts, productsError, onRetryProducts, insets }: ProductModalProps) {
   const filtered = taggableProducts.filter(p => productSearch === '' || p.name.toLowerCase().includes(productSearch.toLowerCase()));
   const statusColor = (st: string) => st === 'active' ? PURPLE : st === 'scheduled' ? ORANGE : MUTED;
   return (
@@ -978,33 +1014,58 @@ function ProductModal({ visible, onClose, productSearch, setProductSearch, produ
             </View>
           </ScrollView>
         )}
-        <View style={[sm.searchWrap, { marginTop: 8 }]}>
-          <Feather name="search" size={14} color={MUTED} style={{ marginRight: 8 }} />
-          <TextInput style={sm.searchInput} value={productSearch} onChangeText={setProductSearch} placeholder="Search products..." placeholderTextColor={MUTED} />
-        </View>
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 20 }}>
-          {filtered.map((p) => {
-            const isTagged = productTags.some(t => t.productId === p.id);
-            return (
-              <View key={p.id} style={sm.productRow}>
-                <View style={[sm.productSwatch, { backgroundColor: BORDER }]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={sm.productName}>{p.name}</Text>
-                  <Text style={sm.productPrice}>${p.pricing.price.toFixed(2)}</Text>
+        {productsError ? (
+          <View style={sm.productModalError}>
+            <Feather name="alert-circle" size={28} color={ORANGE} style={{ marginBottom: 10 }} />
+            <Text style={sm.productModalErrorTitle}>Couldn't load products</Text>
+            <Text style={sm.productModalErrorBody}>{productsError}</Text>
+            <TouchableOpacity
+              style={sm.productModalRetryBtn}
+              activeOpacity={0.8}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onRetryProducts?.(); }}
+            >
+              <Feather name="refresh-cw" size={14} color="#fff" style={{ marginRight: 6 }} />
+              <Text style={sm.productModalRetryText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            <View style={[sm.searchWrap, { marginTop: 8 }]}>
+              <Feather name="search" size={14} color={MUTED} style={{ marginRight: 8 }} />
+              <TextInput style={sm.searchInput} value={productSearch} onChangeText={setProductSearch} placeholder="Search products..." placeholderTextColor={MUTED} />
+            </View>
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 20 }}>
+              {filtered.length === 0 ? (
+                <View style={{ alignItems: 'center', paddingTop: 40 }}>
+                  <Feather name="tag" size={28} color={MUTED} />
+                  <Text style={{ color: MUTED, marginTop: 10, fontFamily: FONT.regular }}>
+                    {productSearch ? 'No products match your search' : 'No products available to tag'}
+                  </Text>
                 </View>
-                <View style={[sm.statusBadge, { backgroundColor: statusColor(p.status) + '22' }]}>
-                  <Text style={[sm.statusBadgeText, { color: statusColor(p.status) }]}>{p.status}</Text>
-                </View>
-                <TouchableOpacity
-                  style={[sm.tagBtn, isTagged && sm.tagBtnActive]}
-                  onPress={() => { Haptics.selectionAsync(); onTag(p); }}
-                >
-                  <Text style={[sm.tagBtnText, isTagged && { color: '#FFFFFF' }]}>{isTagged ? 'Remove' : 'Tag'}</Text>
-                </TouchableOpacity>
-              </View>
-            );
-          })}
-        </ScrollView>
+              ) : filtered.map((p) => {
+                const isTagged = productTags.some(t => t.productId === p.id);
+                return (
+                  <View key={p.id} style={sm.productRow}>
+                    <View style={[sm.productSwatch, { backgroundColor: BORDER }]} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={sm.productName}>{p.name}</Text>
+                      <Text style={sm.productPrice}>${p.pricing.price.toFixed(2)}</Text>
+                    </View>
+                    <View style={[sm.statusBadge, { backgroundColor: statusColor(p.status) + '22' }]}>
+                      <Text style={[sm.statusBadgeText, { color: statusColor(p.status) }]}>{p.status}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[sm.tagBtn, isTagged && sm.tagBtnActive]}
+                      onPress={() => { Haptics.selectionAsync(); onTag(p); }}
+                    >
+                      <Text style={[sm.tagBtnText, isTagged && { color: '#FFFFFF' }]}>{isTagged ? 'Remove' : 'Tag'}</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </>
+        )}
         <View style={{ paddingHorizontal: 16 }}>
           <TouchableOpacity onPress={onClose} activeOpacity={0.85}>
             <LinearGradient colors={[PURPLE, '#6D28D9']} style={sm.addTextBtn}>
@@ -1099,6 +1160,10 @@ const s = StyleSheet.create({
   outlineBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: BORDER, paddingVertical: 12, paddingHorizontal: 16 },
   outlineBtnText:{ fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
 
+  // Inline product error (doesn't block composer)
+  productErrorRow:  { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8, backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: ORANGE + '44', paddingHorizontal: 12, paddingVertical: 10 },
+  productErrorText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.medium, color: ORANGE, lineHeight: 16 },
+
   publishBtn:    { borderRadius: 14, paddingVertical: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
   publishBtnText:{ fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
 
@@ -1151,4 +1216,11 @@ const sm = StyleSheet.create({
   tagBtn:     { backgroundColor: CARD, borderRadius: 8, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 6 },
   tagBtnActive:{ backgroundColor: PURPLE, borderColor: PURPLE },
   tagBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED },
+
+  // Product modal error state
+  productModalError:      { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+  productModalErrorTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG, marginBottom: 6, textAlign: 'center' },
+  productModalErrorBody:  { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 18, marginBottom: 20 },
+  productModalRetryBtn:   { flexDirection: 'row', alignItems: 'center', backgroundColor: ORANGE, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 20 },
+  productModalRetryText:  { fontSize: FS.sm, fontFamily: FONT.bold, color: '#fff' },
 });

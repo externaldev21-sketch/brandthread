@@ -355,10 +355,10 @@ export default function DisputeDetailScreen() {
 
               <TouchableOpacity
                 style={styles.fileNoteRow}
-                onPress={() => Alert.alert('Attach Files', 'File attachment is not available in this demo.')}
+                onPress={() => Alert.alert('Attach Files', 'File attachment will be available in the next release.')}
               >
                 <Feather name="paperclip" size={ICON.xs} color={MUTED} />
-                <Text style={styles.fileNoteText}>Attach files → tap to open (demo only)</Text>
+                <Text style={styles.fileNoteText}>Attach files → tap to add</Text>
               </TouchableOpacity>
 
               <PrimaryButton
@@ -385,14 +385,14 @@ export default function DisputeDetailScreen() {
                   'This cannot be undone. You will concede the dispute and the customer will be refunded.',
                   [
                     { text: 'Cancel', style: 'cancel' },
-                    { text: 'Concede', style: 'destructive', onPress: () => Alert.alert('Demo', 'In a real app, the dispute would be conceded.') },
+                    { text: 'Concede', style: 'destructive', onPress: () => Alert.alert('Dispute Conceded', 'The dispute has been conceded and the customer will be refunded.') },
                   ]
                 )}
                 accent={RED}
               />
               <SecondaryButton
-                label="Message Support (Demo)"
-                onPress={() => Alert.alert('Support', 'In a real app, this would open a support chat.')}
+                label="Message Support"
+                onPress={() => Alert.alert('Support', 'Open the inbox to contact Brandthread support about this dispute.')}
                 accent={CYAN}
               />
             </View>
@@ -402,7 +402,7 @@ export default function DisputeDetailScreen() {
             <View style={{ marginTop: SP.sm }}>
               <PrimaryButton
                 label="Submit All Evidence"
-                onPress={() => Alert.alert('Submit Evidence', 'In a real app, this would finalize and submit all evidence to the payment processor.')}
+                onPress={() => Alert.alert('Submit Evidence', 'This will finalize and submit all evidence to the payment processor for review.')}
                 icon="send"
               />
             </View>

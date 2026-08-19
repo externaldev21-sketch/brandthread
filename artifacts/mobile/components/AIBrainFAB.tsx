@@ -1,16 +1,17 @@
 /**
- * Brandthread AI Brain — Floating Action Button (Nub Edition)
+ * Brandthread AI Brain — Floating Action Button (Side Tab Edition)
  *
- * Default state: a small purple nub sitting on the right edge of the screen.
- * Tapping the nub slides the full circular button into view (tap 1).
+ * Default state: a flat purple tab sitting flush against the right edge.
+ * Tapping the tab slides the full circular button into view (tap 1).
  * Tapping the expanded button opens the AI Brain screen (tap 2).
- * Auto-collapses back to nub after 3 s if the user doesn't proceed.
+ * Auto-collapses back to the tab after 3 s if the user doesn't proceed.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated, Keyboard, Platform, Pressable, StyleSheet, View,
 } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -35,15 +36,11 @@ interface AIBrainFABProps {
 
 const SIZE    = 52;  // diameter of the full circular button
 const MARGIN  = 16;  // right margin when fully expanded
-const NUB_PX  = 18;  // visible pixels of the circle in collapsed state
+const TAB_WIDTH = 28; // visible width of the collapsed side tab
 
-// translateX needed so only NUB_PX of the circle peeks from the right edge.
-// container sits at `right: MARGIN`. Its right edge = MARGIN from screen right.
-// Left edge of button = MARGIN + SIZE from screen right.
-// With translateX = T, left edge → MARGIN + SIZE - T from screen right.
-// Visible width = MARGIN + SIZE - T → set equal to NUB_PX:
-//   T = MARGIN + SIZE - NUB_PX = 16 + 52 - 18 = 50
-const COLLAPSED_TX = MARGIN + SIZE - NUB_PX; // 50
+// The tab is right-aligned in the SIZE-wide container. Translating the
+// container by MARGIN makes the tab's right edge flush with the screen.
+const COLLAPSED_TX = MARGIN; // 16
 
 const AUTO_COLLAPSE_MS = 3000;
 
@@ -101,7 +98,7 @@ export default function AIBrainFAB({
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  function collapseToNub() {
+  function collapseToTab() {
     setExpanded(false);
     Animated.spring(slideX, {
       toValue: COLLAPSED_TX,
@@ -113,7 +110,7 @@ export default function AIBrainFAB({
 
   function scheduleAutoCollapse() {
     if (collapseTimer.current) clearTimeout(collapseTimer.current);
-    collapseTimer.current = setTimeout(collapseToNub, AUTO_COLLAPSE_MS);
+    collapseTimer.current = setTimeout(collapseToTab, AUTO_COLLAPSE_MS);
   }
 
   // ── Press handler ──────────────────────────────────────────────────────────
@@ -135,7 +132,7 @@ export default function AIBrainFAB({
     } else {
       // Tap 2: open AI Brain, then collapse
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-      collapseToNub();
+      collapseToTab();
       router.push({
         pathname: '/ai-brain',
         params: { context: JSON.stringify(context) },
@@ -167,18 +164,31 @@ export default function AIBrainFAB({
         accessibilityLabel={expanded ? 'Open Brandthread AI' : 'Reveal Brandthread AI button'}
         accessibilityRole="button"
       >
-        {/* Purple glow ring — bleeds left of the circle; visible even when collapsed */}
-        <View style={styles.glow} />
+        {expanded ? (
+          <>
+            {/* Purple glow ring — only shown with the expanded circle */}
+            <View style={styles.glow} />
 
-        {/* Main gradient circle */}
-        <LinearGradient
-          colors={['#8B5CF6', '#6D28D9']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.gradient}
-        >
-          <BrandthreadLogo size={22} opacity={1} />
-        </LinearGradient>
+            {/* Main gradient circle */}
+            <LinearGradient
+              colors={['#8B5CF6', '#6D28D9']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.gradient}
+            >
+              <BrandthreadLogo size={22} opacity={1} />
+            </LinearGradient>
+          </>
+        ) : (
+          <LinearGradient
+            colors={['#8B5CF6', '#6D28D9']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.tab}
+          >
+            <Feather name="chevron-left" size={18} color="#FFFFFF" />
+          </LinearGradient>
+        )}
       </Pressable>
     </Animated.View>
   );
@@ -224,5 +234,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.55,
     shadowRadius: 14,
     elevation: 8,
+  },
+  tab: {
+    width: TAB_WIDTH,
+    height: SIZE,
+    alignSelf: 'flex-end',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

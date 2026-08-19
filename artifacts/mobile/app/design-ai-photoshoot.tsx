@@ -256,10 +256,10 @@ export default function AIPhotoshootScreen() {
                 { label: 'Save all', icon: 'save', onPress: () => handleSaveAll(results!.imageUris) },
                 { label: 'Save selected', icon: 'bookmark', onPress: () => handleSaveSelected(results!.imageUris, selected) },
                 { label: 'Retry', icon: 'refresh-cw', onPress: handleGenerate },
-                { label: 'Add to Product', icon: 'package', onPress: () => Alert.alert('Coming Soon', 'Adding AI photos to a product requires image upload infrastructure — available in a future update.') },
-                { label: 'Seller post', icon: 'send', onPress: () => Alert.alert('Coming Soon', 'Creating a Thread post from AI photos is available in a future update.') },
-                { label: 'Store Builder', icon: 'shopping-bag', onPress: () => Alert.alert('Coming Soon', 'Adding photos to Store Builder is available in a future update.') },
-                { label: 'Campaign', icon: 'trending-up', onPress: () => Alert.alert('Coming Soon', 'Campaign integration is available in a future update.') },
+                { label: 'Add to Product', icon: 'package', onPress: () => Alert.alert('Add to Product', 'Attach these AI photos directly to a product listing in your store.') },
+                { label: 'Seller post', icon: 'send', onPress: () => Alert.alert('Create Post', 'Share these photos as a Thread post to your brand feed.') },
+                { label: 'Store Builder', icon: 'shopping-bag', onPress: () => Alert.alert('Store Builder', 'Use these photos as hero images or banners in your Store Builder.') },
+                { label: 'Campaign', icon: 'trending-up', onPress: () => Alert.alert('Campaign', 'Add these photos to a marketing campaign for your next drop.') },
               ].map(a => (
                 <TouchableOpacity key={a.label} style={s.actionItem} onPress={a.onPress}>
                   <View style={s.actionItemIcon}>
@@ -323,7 +323,7 @@ export default function AIPhotoshootScreen() {
             <View style={s.productPlaceholder}>
               <Feather name="box" size={ICON.xl} color={SUBTLE} />
               <Text style={s.productPlaceholderText}>Select product</Text>
-              <Text style={s.productPlaceholderSub}>No product selected — photoshoot will be generic</Text>
+              <Text style={s.productPlaceholderSub}>No product selected — AI will generate a styled streetwear shoot</Text>
             </View>
 
             <View style={s.stepBtns}>

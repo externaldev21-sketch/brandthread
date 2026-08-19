@@ -26,7 +26,7 @@ import {
   BrandthreadCard, PrimaryButton, SecondaryButton,
   StatusBadge, FilterChip, SectionHeader,
 } from '@/components/BrandthreadUI';
-import { getProduct, DEMO_FULL_PRODUCTS } from '@/services/productService';
+import { getProduct } from '@/services/productService';
 import { Product, ProductVariant, OptionValue } from '@/services/productTypes';
 import { calcPricing, formatCurrency } from '@/lib/productUtils';
 
@@ -43,13 +43,6 @@ const CATEGORY_GRADS: Record<string, readonly [string, string]> = {
   default:      ['#12121F', '#1a1a2e'],
 };
 
-// ─── Demo reviews ─────────────────────────────────────────────────────────────
-
-const DEMO_REVIEWS = [
-  { id: 'r1', reviewer: 'Jordan M.', rating: 5, text: 'Incredible quality — fabric is super thick and the fit is exactly as described. Will be buying again.' },
-  { id: 'r2', reviewer: 'Taylor S.', rating: 5, text: 'Best piece I\'ve bought this year. Sizing runs true, delivery was fast.' },
-  { id: 'r3', reviewer: 'Alex P.',   rating: 4, text: 'Love the quality. Took a few extra days to ship but worth the wait.' },
-];
 
 // ─── Helper Components ────────────────────────────────────────────────────────
 
@@ -117,30 +110,30 @@ export default function ProductStoreScreen() {
       if (id) {
         p = await getProduct(id);
       }
-      if (!p) {
-        p = DEMO_FULL_PRODUCTS[0];
-      }
-      setProduct(p);
+      // No demo fallback — if the product is not found, the screen shows an error.
+      setProduct(p ?? null);
 
-      // Pre-select first value for each option
-      const defaults: Record<string, string> = {};
-      p.options.forEach(opt => {
-        if (opt.values.length > 0) {
-          defaults[opt.id] = opt.values[0].id;
+      if (p) {
+        // Pre-select first value for each option
+        const defaults: Record<string, string> = {};
+        p.options.forEach(opt => {
+          if (opt.values.length > 0) {
+            defaults[opt.id] = opt.values[0].id;
+          }
+        });
+
+        // Override with variantId if provided
+        if (variantId) {
+          const variant = p.variants.find(v => v.id === variantId);
+          if (variant) {
+            variant.optionValues.forEach(ov => {
+              defaults[ov.optionId] = ov.valueId;
+            });
+          }
         }
-      });
 
-      // Override with variantId if provided
-      if (variantId) {
-        const variant = p.variants.find(v => v.id === variantId);
-        if (variant) {
-          variant.optionValues.forEach(ov => {
-            defaults[ov.optionId] = ov.valueId;
-          });
-        }
+        setSelectedOptions(defaults);
       }
-
-      setSelectedOptions(defaults);
       setLoading(false);
     }
     load();
@@ -237,10 +230,24 @@ export default function ProductStoreScreen() {
 
   // ── Loading state ──────────────────────────────────────────────────────────
 
-  if (loading || !product) {
+  if (loading) {
     return (
       <View style={[s.screen, { paddingTop: insets.top }]}>
         <Text style={s.loadingText}>Loading…</Text>
+      </View>
+    );
+  }
+
+  if (!product) {
+    return (
+      <View style={[s.screen, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center', padding: SP.xl }]}>
+        <Feather name="alert-circle" size={ICON.xxl} color={MUTED} />
+        <Text style={[s.loadingText, { marginTop: SP.md, textAlign: 'center' }]}>
+          Product not found or no longer available.
+        </Text>
+        <TouchableOpacity style={{ marginTop: SP.md }} onPress={() => router.back()} activeOpacity={0.7}>
+          <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.semibold, fontSize: FS.base }}>Go Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -254,9 +261,8 @@ export default function ProductStoreScreen() {
     ? Math.min(1, (preorder.unitsOrdered ?? 0) / preorder.fundingGoalUnits)
     : 0;
 
-  const relatedProducts = DEMO_FULL_PRODUCTS
-    .filter(p => p.id !== product.id)
-    .slice(0, 3);
+  // Related products are loaded from real product store's storeSettings.relatedProductIds
+  const relatedProductIds: string[] = product.storeSettings?.relatedProductIds ?? [];
 
   const STICKY_BOTTOM_H = COMP.buttonH + SP.md + Math.max(insets.bottom, SP.md);
 
@@ -283,7 +289,7 @@ export default function ProductStoreScreen() {
         {/* Preview notice */}
         <View style={s.previewNotice}>
           <StatusBadge label="Preview" variant="purple" />
-          <Text style={s.previewText}>This is how buyers see your product</Text>
+          <Text style={s.previewText}>Buyer view — this is what shoppers see</Text>
         </View>
 
         {/* 2. Media gallery */}
@@ -338,11 +344,11 @@ export default function ProductStoreScreen() {
                   <Text style={s.sellerName}>{sellerName}</Text>
                   <Feather name="check-circle" size={ICON.xs} color={BLUE} />
                 </View>
-                <Text style={s.sellerSub}>Verified Seller</Text>
+                <Text style={s.sellerSub}>Verified Brand</Text>
               </View>
               <SecondaryButton
                 label="Follow"
-                onPress={() => Alert.alert('Follow', 'This is a buyer-side preview.')}
+                onPress={() => Alert.alert('Follow', 'Follow this seller to get drop alerts.')}
                 small
                 style={s.followBtn}
               />
@@ -499,79 +505,63 @@ export default function ProductStoreScreen() {
           </AccordionSection>
 
           <AccordionSection title="Materials & Care">
-            <AccordionText text="See product description for material and care details." />
+            <AccordionText text="Refer to the product description for fabric and care instructions." />
           </AccordionSection>
 
           <AccordionSection title="Shipping">
-            <AccordionText text="Estimated 3-7 business days. Free shipping over $75." />
+          <AccordionText text="Estimated 3–7 business days. Free shipping on orders over $120." />
           </AccordionSection>
 
           <AccordionSection title="Returns">
-            <AccordionText text="30-day returns on unworn, unwashed items with tags attached." />
+          <AccordionText text="30-day returns on unworn, unwashed items with original tags attached." />
           </AccordionSection>
 
           <AccordionSection title="Reviews">
-            <StarRow rating={4.8} count={23} />
-            <View style={s.reviewsList}>
-              {DEMO_REVIEWS.map(review => (
-                <View key={review.id} style={s.reviewCard}>
-                  <View style={s.reviewHeader}>
-                    <StarRow rating={review.rating} />
-                    <Text style={s.reviewerName}>{review.reviewer}</Text>
-                  </View>
-                  <Text style={s.reviewText}>{review.text}</Text>
-                </View>
-              ))}
-            </View>
+          <Text style={s.accordionText}>No reviews yet — be the first to rate this piece.</Text>
           </AccordionSection>
         </View>
 
-        {/* 9. Related products */}
-        <View style={s.relatedSection}>
-          <SectionHeader title="You may also like" />
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.relatedScroll}>
-            {relatedProducts.map(rp => {
-              const rGrad = CATEGORY_GRADS[rp.category] ?? CATEGORY_GRADS.default;
-              return (
+        {/* 9. Related products — shown only when seller has configured related IDs */}
+        {relatedProductIds.length > 0 && (
+          <View style={s.relatedSection}>
+            <SectionHeader title="You may also like" />
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.relatedScroll}>
+              {relatedProductIds.map(rpId => (
                 <TouchableOpacity
-                  key={rp.id}
+                  key={rpId}
                   style={s.relatedCard}
                   activeOpacity={0.8}
-                  onPress={() => Alert.alert('Product', 'This is a buyer-side preview.')}
+                  onPress={() => router.push(('/product-store?id=' + rpId) as never)}
                 >
-                  {rp.media[0] ? (
-                    <Image source={{ uri: rp.media[0].uri }} style={s.relatedThumb} resizeMode="cover" />
-                  ) : (
-                    <LinearGradient
-                      colors={rGrad as unknown as readonly [string, string, ...string[]]}
-                      style={s.relatedThumb}
-                    />
-                  )}
-                  <Text style={s.relatedName} numberOfLines={1}>{rp.name}</Text>
-                  <Text style={s.relatedPrice}>{formatCurrency(rp.pricing.price)}</Text>
+                  <View style={[s.relatedThumb, { backgroundColor: SURFACE, alignItems: 'center', justifyContent: 'center' }]}>
+                    <Feather name="image" size={ICON.lg} color={SUBTLE} />
+                  </View>
+                  <Text style={s.relatedName} numberOfLines={1}>View product</Text>
                 </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* 10. Seller profile link */}
-        <View style={s.sectionPad}>
-          <TouchableOpacity
-            style={s.sellerProfileCard}
-            activeOpacity={0.8}
-            onPress={() => Alert.alert('Vault Studio', 'This is a buyer-side preview.')}
-          >
-            <View style={s.sellerProfileIcon}>
-              <Feather name="user" size={ICON.md} color={PURPLE_LIGHT} />
-            </View>
-            <View style={s.sellerProfileInfo}>
-              <Text style={s.sellerProfileLabel}>Shop Vault Studio</Text>
-              <Text style={s.sellerProfileDesc}>View all products</Text>
-            </View>
-            <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
-          </TouchableOpacity>
-        </View>
+        {product.vendor ? (
+          <View style={s.sectionPad}>
+            <TouchableOpacity
+              style={s.sellerProfileCard}
+              activeOpacity={0.8}
+              onPress={() => router.push(('/seller-profile?id=' + product.sellerId) as never)}
+            >
+              <View style={s.sellerProfileIcon}>
+                <Feather name="user" size={ICON.md} color={PURPLE_LIGHT} />
+              </View>
+              <View style={s.sellerProfileInfo}>
+                <Text style={s.sellerProfileLabel}>Shop {product.vendor}</Text>
+                <Text style={s.sellerProfileDesc}>View full collection</Text>
+              </View>
+              <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
       </ScrollView>
 

@@ -137,8 +137,8 @@ export default function WishlistScreen() {
       {items.length === 0 ? (
         <View style={c.empty}>
           <Feather name="bookmark" size={48} color={muted} />
-          <Text style={[c.emptyTitle, { color: fg }]}>Nothing saved yet</Text>
-          <Text style={[c.emptySub, { color: muted }]}>Tap the bookmark icon on any drop to save it here.</Text>
+          <Text style={[c.emptyTitle, { color: fg }]}>Your wishlist is empty</Text>
+          <Text style={[c.emptySub, { color: muted }]}>Bookmark items from Discover or any brand drop to track them here.</Text>
         </View>
       ) : (
         <FlatList

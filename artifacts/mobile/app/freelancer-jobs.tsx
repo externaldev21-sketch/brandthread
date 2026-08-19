@@ -218,7 +218,7 @@ export default function FreelancerJobsScreen() {
 
   return (
     <View style={styles.container}>
-      <ScreenHeader title="Freelance Jobs" subtitle="Escrow-protected work" />
+      <ScreenHeader title="Freelance Jobs" subtitle="Escrow-protected gigs" />
 
       {showTabs && (
         <View style={styles.tabsRow}>
@@ -256,7 +256,7 @@ export default function FreelancerJobsScreen() {
         ) : !data ? (
           <View style={styles.centerBox}>
             <Feather name="wifi-off" size={22} color={SUBTLE} />
-            <Text style={styles.emptyText}>Could not load jobs. Pull to retry.</Text>
+            <Text style={styles.emptyText}>Could not load jobs. Pull down to retry.</Text>
           </View>
         ) : jobs.length === 0 ? (
           <View style={styles.centerBox}>
@@ -266,8 +266,8 @@ export default function FreelancerJobsScreen() {
             </Text>
             <Text style={styles.emptyText}>
               {tab === 'gigs'
-                ? 'Jobs will appear here when a brand founder hires you.'
-                : 'Hire a freelance creative to get help with your brand.'}
+                ? 'Gigs appear here when a brand hires you on Brandthread.'
+                : 'Hire a freelance creative to help build your streetwear brand.'}
             </Text>
             {tab === 'hiring' && (
               <TouchableOpacity

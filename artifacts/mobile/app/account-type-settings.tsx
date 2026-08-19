@@ -52,21 +52,27 @@ export default function AccountTypeSettingsScreen() {
   const [currentType, setCurrentType] = useState<AccountType | null>(null);
   const [selectedType, setSelectedType] = useState<AccountType | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    api.auth.getProfile()
+  function fetchProfile() {
+    setLoading(true);
+    setLoadError(null);
+    api.auth.me()
       .then((profile: any) => {
         const t: AccountType = profile?.accountType === 'buyer' ? 'buyer' : 'seller';
         setCurrentType(t);
         setSelectedType(t);
+        setLoadError(null);
       })
       .catch(() => {
-        setCurrentType('seller');
-        setSelectedType('seller');
+        // Do NOT silently default — surface the error so the user can retry.
+        setLoadError('Could not load your account type. Check your connection and try again.');
       })
       .finally(() => setLoading(false));
-  }, []);
+  }
+
+  useEffect(() => { fetchProfile(); }, []);
 
   const isDirty = selectedType !== null && selectedType !== currentType;
 
@@ -115,6 +121,21 @@ export default function AccountTypeSettingsScreen() {
       {loading ? (
         <View style={s.loadingWrap}>
           <ActivityIndicator color={PURPLE} />
+        </View>
+      ) : loadError ? (
+        /* Do NOT silently open with a seller default — show retryable error */
+        <View style={s.errorWrap}>
+          <Feather name="alert-circle" size={36} color={PURPLE} style={{ marginBottom: 12 }} />
+          <Text style={s.errorTitle}>Couldn't load account type</Text>
+          <Text style={s.errorBody}>{loadError}</Text>
+          <TouchableOpacity
+            style={s.retryBtn}
+            activeOpacity={0.8}
+            onPress={() => fetchProfile()}
+          >
+            <Feather name="refresh-cw" size={14} color="#fff" style={{ marginRight: 6 }} />
+            <Text style={s.retryBtnText}>Try again</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 60 }}>
@@ -200,6 +221,13 @@ const s = StyleSheet.create({
   headerTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
   backBtn:     { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
+  // Error state
+  errorWrap:  { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl },
+  errorTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG, marginBottom: SP.sm, textAlign: 'center' },
+  errorBody:  { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20, marginBottom: SP.lg },
+  retryBtn:   { flexDirection: 'row', alignItems: 'center', backgroundColor: PURPLE, borderRadius: RADIUS.md, paddingVertical: 12, paddingHorizontal: SP.lg },
+  retryBtnText: { fontSize: FS.sm, fontFamily: FONT.bold, color: '#fff' },
 
   currentBadge:    { flexDirection: 'row', alignItems: 'center', gap: SP.xs, backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, paddingHorizontal: SP.sm, paddingVertical: SP.xs, alignSelf: 'flex-start', marginBottom: SP.md },
   currentBadgeText:{ fontSize: FS.sm, fontFamily: FONT.semibold },

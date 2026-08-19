@@ -336,7 +336,7 @@ export default function ProductionDetailScreen() {
 
           {order.currentStage !== 'delivered' && (
             <SecondaryButton
-              label="Advance to next stage (demo)"
+              label="Advance to next stage"
               onPress={handleAdvance}
               icon="chevron-right"
               small

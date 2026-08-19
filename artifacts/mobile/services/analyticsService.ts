@@ -188,11 +188,11 @@ export async function getSalesAnalytics(_filter?: AnalyticsFilterState): Promise
     refundsChart: points([1,2,1,3,2,1,2,2,1,3,1,2,3,2,1,1,2,2,1,2,3,1,2,3,1,1,2,3,2,4]),
     breakdownBy: 'product',
     breakdown: [
-      { key: 'p1', label: 'Classic Thread Tee',    revenue: 12400, orders: 120, units: 298, sharePct: 13.2 },
-      { key: 'p2', label: 'Drop-Shoulder Blazer',  revenue:  9180, orders:  48, units:  51, sharePct:  9.7 },
-      { key: 'p3', label: 'Oversized Hoodie',      revenue:  7820, orders:  60, units:  68, sharePct:  8.3 },
-      { key: 'p4', label: 'Wide-Leg Trousers',     revenue:  6506, orders:  58, units:  66, sharePct:  6.9 },
-      { key: 'p5', label: 'Logo Cap',              revenue:  3960, orders: 100, units: 110, sharePct:  4.2 },
+      { key: 'p1', label: 'Vintage Washed Tee',    revenue: 12400, orders: 120, units: 298, sharePct: 13.2 },
+      { key: 'p2', label: 'Oversized Hoodie',       revenue:  9180, orders:  48, units:  51, sharePct:  9.7 },
+      { key: 'p3', label: 'Archive Tee Vol.3',      revenue:  7820, orders:  60, units:  68, sharePct:  8.3 },
+      { key: 'p4', label: 'Cargo Sweatpants',       revenue:  6506, orders:  58, units:  66, sharePct:  6.9 },
+      { key: 'p5', label: 'Canvas Cargo Jacket',    revenue:  3960, orders: 100, units: 110, sharePct:  4.2 },
     ],
   };
 }
@@ -200,13 +200,13 @@ export async function getSalesAnalytics(_filter?: AnalyticsFilterState): Promise
 // ── Products ──────────────────────────────────────────────────────────────────
 
 const DEMO_PRODUCTS = [
-  { productId:'p1', name:'Classic Thread Tee',   revenue:12400, unitsSold:298, profit:4340, conversionRate:4.8, refundRate:1.2, views:6210, inventoryStatus:'in_stock' as const },
-  { productId:'p2', name:'Drop-Shoulder Blazer', revenue: 9180, unitsSold: 51, profit:3670, conversionRate:2.1, refundRate:2.8, views:2430, inventoryStatus:'in_stock' as const },
-  { productId:'p3', name:'Oversized Hoodie',     revenue: 7820, unitsSold: 68, profit:2740, conversionRate:3.4, refundRate:3.1, views:2000, inventoryStatus:'low'      as const },
-  { productId:'p4', name:'Wide-Leg Trousers',    revenue: 6506, unitsSold: 66, profit:2280, conversionRate:2.9, refundRate:1.8, views:2280, inventoryStatus:'in_stock' as const },
-  { productId:'p5', name:'Logo Cap',             revenue: 3960, unitsSold:110, profit:1980, conversionRate:5.2, refundRate:0.9, views:2120, inventoryStatus:'in_stock' as const },
-  { productId:'p6', name:'Cargo Shorts',         revenue: 2840, unitsSold: 88, profit: 996, conversionRate:1.6, refundRate:4.2, views:5500, inventoryStatus:'out_of_stock' as const },
-  { productId:'p7', name:'Essential Crewneck',   revenue: 5100, unitsSold:102, profit:1785, conversionRate:3.8, refundRate:1.4, views:2680, inventoryStatus:'low'      as const },
+  { productId:'p1', name:'Vintage Washed Tee',    revenue:12400, unitsSold:298, profit:4340, conversionRate:4.8, refundRate:1.2, views:6210, inventoryStatus:'in_stock' as const },
+  { productId:'p2', name:'Oversized Hoodie',       revenue: 9180, unitsSold: 51, profit:3670, conversionRate:2.1, refundRate:2.8, views:2430, inventoryStatus:'in_stock' as const },
+  { productId:'p3', name:'Archive Tee Vol.3',      revenue: 7820, unitsSold: 68, profit:2740, conversionRate:3.4, refundRate:3.1, views:2000, inventoryStatus:'low'      as const },
+  { productId:'p4', name:'Cargo Sweatpants',       revenue: 6506, unitsSold: 66, profit:2280, conversionRate:2.9, refundRate:1.8, views:2280, inventoryStatus:'in_stock' as const },
+  { productId:'p5', name:'Canvas Cargo Jacket',    revenue: 3960, unitsSold:110, profit:1980, conversionRate:5.2, refundRate:0.9, views:2120, inventoryStatus:'in_stock' as const },
+  { productId:'p6', name:'Heavyweight Crewneck',   revenue: 2840, unitsSold: 88, profit: 996, conversionRate:1.6, refundRate:4.2, views:5500, inventoryStatus:'out_of_stock' as const },
+  { productId:'p7', name:'Archive Tee Vol.3 — Wht',revenue: 5100, unitsSold:102, profit:1785, conversionRate:3.8, refundRate:1.4, views:2680, inventoryStatus:'low'      as const },
 ];
 
 export async function getProductAnalytics(_filter?: AnalyticsFilterState): Promise<ProductAnalytics> {
@@ -320,11 +320,11 @@ export async function getContentAnalytics(_filter?: AnalyticsFilterState): Promi
   await delay(380);
   const sp = [2200,2800,1900,3600,4200,3100,4800,3800,3400,5200,2400,3800,4200,4000,3200,3600,3800,4600,3400,4000,4400,2600,3800,5200,3600,3200,3800,5400,4600,6000];
   const POSTS = [
-    { postId:'v1', type:'video' as const, caption:'Drop tease - The B Hoodie', views:48200, likes:3840, comments:284, saves:1240, shares:680, productClicks:2840, revenue:4200, completionRate:68, publishedAt:'2026-07-10T14:00:00Z', thumbnailUrl:undefined },
-    { postId:'v2', type:'video' as const, caption:'Behind the scenes - factory visit', views:32100, likes:2640, comments:182, saves:840, shares:420, productClicks:1480, revenue:2100, completionRate:74, publishedAt:'2026-07-08T12:00:00Z', thumbnailUrl:undefined },
-    { postId:'s1', type:'slideshow' as const, caption:'Summer lookbook', views:28400, likes:2180, comments:148, saves:980, shares:360, productClicks:1840, revenue:3100, completionRate:52, publishedAt:'2026-07-06T10:00:00Z', thumbnailUrl:undefined },
-    { postId:'v3', type:'video' as const, caption:'Styling the Wide Leg Trousers', views:19800, likes:1480, comments:96, saves:620, shares:240, productClicks:1240, revenue:1840, completionRate:81, publishedAt:'2026-07-04T09:00:00Z', thumbnailUrl:undefined },
-    { postId:'s2', type:'slideshow' as const, caption:'New arrivals — July', views:16200, likes:1240, comments:84, saves:540, shares:180, productClicks:980, revenue:1420, completionRate:44, publishedAt:'2026-07-02T11:00:00Z', thumbnailUrl:undefined },
+    { postId:'v1', type:'video' as const, caption:'Canvas Cargo Jacket — limited run of 50, link in bio 🔥', views:48200, likes:3840, comments:284, saves:1240, shares:680, productClicks:2840, revenue:4200, completionRate:68, publishedAt:'2026-07-10T14:00:00Z', thumbnailUrl:undefined },
+    { postId:'v2', type:'video' as const, caption:'Behind the seams — how the Oversized Hoodie gets garment dyed', views:32100, likes:2640, comments:182, saves:840, shares:420, productClicks:1480, revenue:2100, completionRate:74, publishedAt:'2026-07-08T12:00:00Z', thumbnailUrl:undefined },
+    { postId:'s1', type:'slideshow' as const, caption:'Vintage Washed Tee — 6 colorways, which one are you grabbing?', views:28400, likes:2180, comments:148, saves:980, shares:360, productClicks:1840, revenue:3100, completionRate:52, publishedAt:'2026-07-06T10:00:00Z', thumbnailUrl:undefined },
+    { postId:'v3', type:'video' as const, caption:'Cargo Sweatpants restock is live — don\'t sleep 💨', views:19800, likes:1480, comments:96, saves:620, shares:240, productClicks:1240, revenue:1840, completionRate:81, publishedAt:'2026-07-04T09:00:00Z', thumbnailUrl:undefined },
+    { postId:'s2', type:'slideshow' as const, caption:'Fall Drop new arrivals — Vault Studio July edit', views:16200, likes:1240, comments:84, saves:540, shares:180, productClicks:980, revenue:1420, completionRate:44, publishedAt:'2026-07-02T11:00:00Z', thumbnailUrl:undefined },
   ];
   const RETENTION = [
     {positionPct:0,retentionPct:100},{positionPct:10,retentionPct:84},{positionPct:20,retentionPct:78},
@@ -403,21 +403,21 @@ export async function getMarketingAnalytics(_filter?: AnalyticsFilterState): Pro
     referralRevenue:        metric('ref_rev',     'Referral Revenue',         560,   80, 'currency', sp.map(v=>Math.round(v*0.03))),
     abandonedCheckoutRecovered: metric('abandon', 'Recovered Carts',         1840,  320, 'currency', sp.map(v=>Math.round(v*0.10))),
     campaigns: [
-      { campaignId:'c1', name:'July Launch Email', type:'email', recipients:4800, delivered:4704, opens:1880, clicks:562, orders:84, revenue:8400, conversionRate:1.75, unsubscribes:14, revenuePerRecipient:1.75, sentAt:'2026-07-01T09:00:00Z' },
-      { campaignId:'c2', name:'Restock SMS Alert', type:'sms',   recipients:1200, delivered:1188, opens:1188, clicks:354, orders:28, revenue:2800, conversionRate:2.33, unsubscribes: 2, revenuePerRecipient:2.33, sentAt:'2026-07-08T10:00:00Z' },
-      { campaignId:'c3', name:'VIP Early Access',  type:'email', recipients:280,  delivered:278,  opens: 184, clicks: 98, orders:18, revenue:1800, conversionRate:6.43, unsubscribes: 1, revenuePerRecipient:6.43, sentAt:'2026-07-12T08:00:00Z' },
+      { campaignId:'c1', name:'Fall Drop Launch Email', type:'email', recipients:4800, delivered:4704, opens:1880, clicks:562, orders:84, revenue:8400, conversionRate:1.75, unsubscribes:14, revenuePerRecipient:1.75, sentAt:'2026-07-01T09:00:00Z' },
+      { campaignId:'c2', name:'Vintage Washed Tee Restock SMS', type:'sms', recipients:1200, delivered:1188, opens:1188, clicks:354, orders:28, revenue:2800, conversionRate:2.33, unsubscribes: 2, revenuePerRecipient:2.33, sentAt:'2026-07-08T10:00:00Z' },
+      { campaignId:'c3', name:'VIP Archive Vol.3 Early Access', type:'email', recipients:280, delivered:278, opens: 184, clicks: 98, orders:18, revenue:1800, conversionRate:6.43, unsubscribes: 1, revenuePerRecipient:6.43, sentAt:'2026-07-12T08:00:00Z' },
     ],
     influencers: [
-      { influencerId:'i1', name:'@vault.studio',   views:48200, clicks:2840, orders:42, revenue:4200, commission:420,  returnOnCost:10.0, discountUsage:284 },
+      { influencerId:'i1', name:'@vaultstudio',    views:48200, clicks:2840, orders:42, revenue:4200, commission:420,  returnOnCost:10.0, discountUsage:284 },
       { influencerId:'i2', name:'@streetwear.pdx', views:32100, clicks:1480, orders:18, revenue:1800, commission:180,  returnOnCost:10.0, discountUsage:148 },
     ],
     referral: {
       shares:848, clicks:2120, referredCustomers:284, orders:212, revenue:2840,
       rewardsIssued:284,
       topAdvocates:[
-        { name:'Marcus T.',  referrals:14, revenue:1400 },
-        { name:'Aria S.',    referrals:12, revenue:1200 },
-        { name:'Jordan R.',  referrals: 8, revenue: 800 },
+        { name:'Jonah B.',   referrals:14, revenue:1400 },
+        { name:'Zoe W.',     referrals:12, revenue:1200 },
+        { name:'David K.',   referrals: 8, revenue: 800 },
       ],
     },
   };
@@ -429,13 +429,13 @@ export async function getInventoryAnalytics(_filter?: AnalyticsFilterState): Pro
   await delay(330);
   const sp = [100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100];
   const PRODS = [
-    { productId:'p1', name:'Classic Thread Tee',   unitsOnHand:840, daysOfStockLeft:62, sellThroughRate:68, status:'healthy'  as const },
-    { productId:'p3', name:'Oversized Hoodie',     unitsOnHand: 48, daysOfStockLeft: 6, sellThroughRate:84, status:'low'      as const },
-    { productId:'p7', name:'Essential Crewneck',   unitsOnHand: 36, daysOfStockLeft: 8, sellThroughRate:78, status:'low'      as const },
-    { productId:'p6', name:'Cargo Shorts',         unitsOnHand:  0, daysOfStockLeft: 0, sellThroughRate:100,status:'out'      as const },
-    { productId:'p4', name:'Wide-Leg Trousers',    unitsOnHand:480, daysOfStockLeft:84, sellThroughRate:42, status:'healthy'  as const },
-    { productId:'p5', name:'Logo Cap',             unitsOnHand:360, daysOfStockLeft:48, sellThroughRate:52, status:'healthy'  as const },
-    { productId:'p2', name:'Drop-Shoulder Blazer', unitsOnHand:240, daysOfStockLeft:148,sellThroughRate:28, status:'overstock' as const },
+    { productId:'p1', name:'Vintage Washed Tee',   unitsOnHand:840, daysOfStockLeft:62, sellThroughRate:68, status:'healthy'  as const },
+    { productId:'p3', name:'Archive Tee Vol.3',    unitsOnHand: 48, daysOfStockLeft: 6, sellThroughRate:84, status:'low'      as const },
+    { productId:'p7', name:'Heavyweight Crewneck', unitsOnHand: 36, daysOfStockLeft: 8, sellThroughRate:78, status:'low'      as const },
+    { productId:'p6', name:'Cargo Sweatpants M',   unitsOnHand:  0, daysOfStockLeft: 0, sellThroughRate:100,status:'out'      as const },
+    { productId:'p4', name:'Cargo Sweatpants',     unitsOnHand:480, daysOfStockLeft:84, sellThroughRate:42, status:'healthy'  as const },
+    { productId:'p5', name:'Canvas Cargo Jacket',  unitsOnHand:360, daysOfStockLeft:48, sellThroughRate:52, status:'healthy'  as const },
+    { productId:'p2', name:'Oversized Hoodie',     unitsOnHand:240, daysOfStockLeft:148,sellThroughRate:28, status:'overstock' as const },
   ];
   return {
     inventoryValue:    metric('inv_value',  'Inventory Value',     124800, 8400, 'currency', sp),
@@ -473,8 +473,8 @@ export async function getProductionAnalytics(_filter?: AnalyticsFilterState): Pr
     avgManufacturerResponse: metric('mfr_response', 'Avg Response Time',    18,  -2, 'hours' as never, sp),
     avgUnitCost:             metric('unit_cost',    'Avg Unit Cost',         18,  -1, 'currency', sp),
     manufacturers: [
-      { manufacturerId:'m1', name:'VaultMFG Shanghai',  productsProduced:4, totalUnits:1400, totalSpend:25200, avgUnitCost:18, avgLeadTimeDays:26, delayRate:8,  qualityIssueRate:1.8, sampleApprovalRate:92 },
-      { manufacturerId:'m2', name:'ThreadCraft LA',     productsProduced:3, totalUnits:1000, totalSpend:22800, avgUnitCost:22.8,avgLeadTimeDays:32, delayRate:14, qualityIssueRate:3.2, sampleApprovalRate:86 },
+      { manufacturerId:'m1', name:'Ace Apparel Co.',     productsProduced:4, totalUnits:1400, totalSpend:25200, avgUnitCost:18, avgLeadTimeDays:22, delayRate:8,  qualityIssueRate:1.8, sampleApprovalRate:92 },
+      { manufacturerId:'m2', name:'Stitch Labs',         productsProduced:3, totalUnits:1000, totalSpend:22800, avgUnitCost:22.8,avgLeadTimeDays:18, delayRate:14, qualityIssueRate:3.2, sampleApprovalRate:86 },
     ],
   };
 }
@@ -552,11 +552,11 @@ export async function getAttribution(): Promise<AttributionRecord[]> {
 // ── Insights ──────────────────────────────────────────────────────────────────
 
 const SEED_INSIGHTS: AnalyticsInsight[] = [
-  { id:'i1', type:'warning',     title:'Low hoodie stock', what:'Oversized Hoodie has 6 days of stock remaining.', why:'Running out during a peak period will cost you sales.', action:'Reorder stock or pause the product listing.', route:'/inventory', dismissed:false, completed:false, createdAt:'2026-07-14T08:00:00Z' },
-  { id:'i2', type:'opportunity', title:'15-second videos outperform', what:'Your 15-second videos average 74% completion vs 52% for 30-second videos.', why:'Higher completion means more algorithm distribution.', action:'Create more 15-second product reveal videos.', route:'/content', dismissed:false, completed:false, createdAt:'2026-07-13T08:00:00Z' },
-  { id:'i3', type:'opportunity', title:'Hero section needs better CTAs', what:'Your Store hero has 20% CTR but the product grid drives 2× more purchases.', why:'The hero is the first thing visitors see — low click-through wastes visibility.', action:'Update the hero button to link directly to your best-selling collection.', route:'/store-builder', dismissed:false, completed:false, createdAt:'2026-07-12T08:00:00Z' },
-  { id:'i4', type:'info',        title:'Returning customers spend more', what:'Returning customers average $186 per order vs $102 for first-time buyers.', why:'Loyalty drives higher LTV without additional acquisition cost.', action:'Set up a loyalty email sequence for customers after their first purchase.', route:'/(tabs)/marketing', dismissed:false, completed:false, createdAt:'2026-07-11T08:00:00Z' },
-  { id:'i5', type:'action_needed', title:'Cargo Shorts out of stock', what:'Cargo Shorts ran out of stock 3 days ago.', why:'Out-of-stock products lose search placement and buyer confidence.', action:'Start a production order or restock from inventory.', route:'/manufacturer-hub', dismissed:false, completed:false, createdAt:'2026-07-11T08:00:00Z' },
+  { id:'i1', type:'warning',     title:'Low Archive Tee stock', what:'Archive Tee Vol.3 has 6 days of stock remaining at current sales velocity.', why:'Running out mid pre-order window will delay fulfilment and hurt buyer trust.', action:'Confirm production quantity with Ace Apparel Co. before pre-order closes.', route:'/inventory', dismissed:false, completed:false, createdAt:'2026-07-14T08:00:00Z' },
+  { id:'i2', type:'opportunity', title:'15-second videos outperform', what:'Your 15-second posts average 74% completion vs 52% for 30-second posts.', why:'Higher completion signals the algorithm to push your content further.', action:'Film a 15-second reveal clip for the upcoming Heavyweight Crewneck drop.', route:'/content', dismissed:false, completed:false, createdAt:'2026-07-13T08:00:00Z' },
+  { id:'i3', type:'opportunity', title:'Hero section needs a sharper CTA', what:'Your Vault Studio store hero sits at 20% CTR while the product grid drives 2× more purchases.', why:'The hero is the first thing shoppers see — a weak CTA wastes premium real estate.', action:'Point the hero button directly to the Core Collection to lift click-throughs.', route:'/store-builder', dismissed:false, completed:false, createdAt:'2026-07-12T08:00:00Z' },
+  { id:'i4', type:'info',        title:'Returning customers spend more', what:'Returning Vault Studio customers average $186 per order vs $102 for first-timers.', why:'Repeat buyers deliver higher LTV with zero extra acquisition spend.', action:'Build a post-purchase email flow that rewards customers after their first order.', route:'/(tabs)/marketing', dismissed:false, completed:false, createdAt:'2026-07-11T08:00:00Z' },
+  { id:'i5', type:'action_needed', title:'Cargo Sweatpants M out of stock', what:'Cargo Sweatpants (Charcoal — M) sold out 3 days ago with 7 more orders since.', why:'Out-of-stock variants lose search placement and frustrate repeat buyers.', action:'Request a restock quote from Elite Garments or adjust the listing to Notify Me.', route:'/manufacturer-hub', dismissed:false, completed:false, createdAt:'2026-07-11T08:00:00Z' },
 ];
 
 export async function getInsights(): Promise<AnalyticsInsight[]> {

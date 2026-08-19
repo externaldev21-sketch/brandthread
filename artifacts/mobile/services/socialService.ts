@@ -237,14 +237,14 @@ const DEMO_NOTIFS: Notification[] = [
   { id: 'n12', category: 'products', type: 'price_drop',       title: 'Price drop alert',     body: 'Raw Denim Jacket by Coldform dropped to $280.', isRead: false, isMuted: false, cta: 'Shop now', createdAt: new Date(now - 1 * 3600000).toISOString() },
   { id: 'n13', category: 'social',   type: 'friend_accepted',  title: 'Friend request accepted', body: 'Sofia Reyes accepted your friend request.', isRead: true, isMuted: false, actorName: 'Sofia Reyes', actorInitials: 'SR', actorColor: '#B45309', createdAt: new Date(now - 5 * 24 * 3600000).toISOString() },
   { id: 'n14', category: 'messages', type: 'new_order_message', title: 'Message from Meridian Co.', body: 'Your order has shipped! Tracking: TRK-884921', isRead: false, isMuted: false, targetId: 'conv_order', cta: 'View', createdAt: new Date(now - 24 * 3600000).toISOString() },
-  { id: 'n15', category: 'system',   type: 'system',           title: 'Welcome to Brandthread', body: 'Your buyer account is set up. Start following brands!', isRead: true, isMuted: false, createdAt: new Date(now - 30 * 24 * 3600000).toISOString() },
+  { id: 'n15', category: 'system',   type: 'system',           title: 'Welcome to Brandthread', body: 'You\'re all set. Follow your favourite brands and never miss a drop again.', isRead: true, isMuted: false, createdAt: new Date(now - 30 * 24 * 3600000).toISOString() },
 ];
 
 const DEMO_SAVED: SavedItem[] = [
-  { id: 'sav1', type: 'post',       targetId: 'post_maya_1', title: 'Maya\'s wishlist post',     subtitle: '@mayachen · June 28',         accentColor: '#BE185D', savedAt: new Date(now - 2 * 24 * 3600000).toISOString() },
-  { id: 'sav2', type: 'product',    targetId: 'prod_canvas_cargo', title: 'Canvas Cargo Jacket', subtitle: '$189 · Vault Studio',         accentColor: '#00C853', savedAt: new Date(now - 3 * 24 * 3600000).toISOString() },
-  { id: 'sav3', type: 'store',      targetId: 'store_vault', title: 'Vault Studio Store',        subtitle: 'vaultstudio.brandthread.app', accentColor: '#00C853', savedAt: new Date(now - 7 * 24 * 3600000).toISOString() },
-  { id: 'sav4', type: 'collection', targetId: 'coll_summer', title: 'Summer Drops 2026',         subtitle: '12 products',                 accentColor: '#F59E0B', savedAt: new Date(now - 10 * 24 * 3600000).toISOString() },
+  { id: 'sav1', type: 'post',       targetId: 'post_maya_1', title: 'Maya copped the sage fleece',  subtitle: '@mayachen · June 28',       accentColor: '#BE185D', savedAt: new Date(now - 2 * 24 * 3600000).toISOString() },
+  { id: 'sav2', type: 'product',    targetId: 'prod_canvas_cargo', title: 'Canvas Cargo Jacket',    subtitle: '$189 · Vault Studio',       accentColor: '#00C853', savedAt: new Date(now - 3 * 24 * 3600000).toISOString() },
+  { id: 'sav3', type: 'store',      targetId: 'store_vault', title: 'Vault Studio',                 subtitle: 'Independent streetwear — London', accentColor: '#00C853', savedAt: new Date(now - 7 * 24 * 3600000).toISOString() },
+  { id: 'sav4', type: 'collection', targetId: 'coll_summer', title: 'Heavy Outerwear S/S 2026',    subtitle: '12 products',               accentColor: '#F59E0B', savedAt: new Date(now - 10 * 24 * 3600000).toISOString() },
 ];
 
 const DEMO_COMMENTS: Record<string, Comment[]> = {
@@ -360,7 +360,7 @@ export async function clearSocialCache(userId?: string): Promise<void> {
 
 const DEFAULT_PROFILE: BuyerSocialProfile = {
   id: MY_USER_ID, userId: MY_USER_ID, accountType: 'buyer',
-  name: 'Jordan', username: 'jordan', pronouns: '', bio: '', website: '', location: '',
+  name: 'Jordan', username: 'jordan', pronouns: '', bio: 'Into archive pieces, heavy outerwear & limited drops. DMs open for fit checks.', website: '', location: 'London, UK',
   avatarColor: MY_COLOR, avatarInitials: MY_INITIALS,
   profileVisibility: 'public', postsCount: 3, friendsCount: 5, savedCount: 4,
   followingBrandsCount: 5, createdAt: new Date(now - 30 * 24 * 3600000).toISOString(),
@@ -668,7 +668,7 @@ const SELLER_POSTS_SEED: SellerThreadPost[] = [
     sellerId: 'seller_dropsociety', brandId: 'brand_dropsociety', feedEligibility: 'thread_eligible',
     caption: 'Limited-run canvas jacket just dropped. 50 units. First come, first served. Tap the bag to shop.',
     hashtags: ['#streetwear', '#newdrop', '#limitededition', '#brandthread'],
-    mediaUris: ['https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4'],
+    mediaUris: ['https://assets.mixkit.co/videos/preview/mixkit-stylish-young-man-walking-through-the-city-42913-large.mp4'],
     aspectRatio: '9:16', contentType: 'video', postStatus: 'published',
     isDraft: false, isArchived: false, isDeleted: false,
     productTags: [{ productId: 'prod_canvas_jacket', productName: 'Canvas Cargo Jacket', price: 189 }],
@@ -684,7 +684,7 @@ const SELLER_POSTS_SEED: SellerThreadPost[] = [
     sellerId: 'seller_formstudio', brandId: 'brand_formstudio', feedEligibility: 'thread_eligible',
     caption: 'Minimalist tees. Eight colorways. Basics done right — tap to shop.',
     hashtags: ['#minimalist', '#essentials', '#tees', '#brandthread'],
-    mediaUris: ['https://test-videos.co.uk/vids/sintel/mp4/h264/720/Sintel_720_10s_1MB.mp4'],
+    mediaUris: ['https://assets.mixkit.co/videos/preview/mixkit-young-woman-posing-in-a-streetwear-outfit-42914-large.mp4'],
     aspectRatio: '9:16', contentType: 'video', postStatus: 'published',
     isDraft: false, isArchived: false, isDeleted: false,
     productTags: [{ productId: 'prod_essential_tee', productName: 'Essential Relaxed Tee', price: 48 }],

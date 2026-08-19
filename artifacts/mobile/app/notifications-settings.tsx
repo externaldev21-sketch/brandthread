@@ -91,7 +91,7 @@ export default function NotificationsSettingsScreen() {
           <TextInput
             value={email}
             onChangeText={setEmail}
-            placeholder="you@example.com"
+            placeholder="mila@nightshiftstudio.co"
             placeholderTextColor={MUTED}
             keyboardType="email-address"
             autoCapitalize="none"

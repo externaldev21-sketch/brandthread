@@ -322,11 +322,11 @@ export const DEMO_QUOTES: Quote[] = [
 // ─── Inventory ────────────────────────────────────────────────────────────────
 
 export const DEMO_INVENTORY: InventoryItem[] = [
-  { id: 'i1', productId: 'p1', productName: 'Vintage Washed Tee', variant: 'Washed Black — M',  sku: 'VWT-BLK-M',  quantity: 3,  lowStockThreshold: 10, location: 'Warehouse A', lastUpdated: 'Jul 12, 2026' },
-  { id: 'i2', productId: 'p1', productName: 'Vintage Washed Tee', variant: 'Washed Slate — M',  sku: 'VWT-SLT-M',  quantity: 0,  lowStockThreshold: 10, location: 'Warehouse A', lastUpdated: 'Jul 10, 2026' },
-  { id: 'i3', productId: 'p2', productName: 'Oversized Hoodie',   variant: 'Midnight — M',      sku: 'OSH-MID-M',  quantity: 5,  lowStockThreshold: 10, location: 'Warehouse A', lastUpdated: 'Jul 11, 2026' },
-  { id: 'i4', productId: 'p5', productName: 'Canvas Cargo Jacket', variant: 'Olive — L',        sku: 'CCJ-OLV-L',  quantity: 3,  lowStockThreshold: 5,  location: 'Warehouse B', lastUpdated: 'Jul 9, 2026' },
-  { id: 'i5', productId: 'p4', productName: 'Cargo Sweatpants',   variant: 'Charcoal — M',      sku: 'CSP-CHR-M',  quantity: 7,  lowStockThreshold: 10, location: 'Warehouse A', lastUpdated: 'Jul 8, 2026' },
+  { id: 'i1', productId: 'p1', productName: 'Vintage Washed Tee', variant: 'Washed Black — M',  sku: 'VWT-BLK-M',  quantity: 3,  lowStockThreshold: 10, location: 'VS Fulfillment — LA', lastUpdated: 'Jul 12, 2026' },
+  { id: 'i2', productId: 'p1', productName: 'Vintage Washed Tee', variant: 'Washed Slate — M',  sku: 'VWT-SLT-M',  quantity: 0,  lowStockThreshold: 10, location: 'VS Fulfillment — LA', lastUpdated: 'Jul 10, 2026' },
+  { id: 'i3', productId: 'p2', productName: 'Oversized Hoodie',   variant: 'Midnight — M',      sku: 'OSH-MID-M',  quantity: 5,  lowStockThreshold: 10, location: 'VS Fulfillment — LA', lastUpdated: 'Jul 11, 2026' },
+  { id: 'i4', productId: 'p5', productName: 'Canvas Cargo Jacket', variant: 'Olive — L',        sku: 'CCJ-OLV-L',  quantity: 3,  lowStockThreshold: 5,  location: 'VS Overflow — Ontario', lastUpdated: 'Jul 9, 2026' },
+  { id: 'i5', productId: 'p4', productName: 'Cargo Sweatpants',   variant: 'Charcoal — M',      sku: 'CSP-CHR-M',  quantity: 7,  lowStockThreshold: 10, location: 'VS Fulfillment — LA', lastUpdated: 'Jul 8, 2026' },
 ];
 
 // ─── Customers ────────────────────────────────────────────────────────────────
@@ -481,7 +481,7 @@ export interface ActivityItem {
 
 export const RECENT_ACTIVITY: ActivityItem[] = [
   { id: 'a1', type: 'order',        title: 'New order — #BT-78291',        desc: 'Jonah B. — $152.45',          time: '2 min ago',  icon: 'shopping-bag',  color: '#39FF88', route: '/order-detail', unread: true  },
-  { id: 'a2', type: 'manufacturer', title: 'Quote received from Stitch Labs', desc: 'Graphic Zip Hoodie — $28/unit', time: '1 hr ago',   icon: 'tool',          color: '#8B5CF6', route: '/manufacturer', unread: true  },
+  { id: 'a2', type: 'manufacturer', title: 'Quote received from Stitch Labs', desc: 'Graphic Zip Hoodie — $28/unit (MOQ 150)', time: '1 hr ago',   icon: 'tool',          color: '#8B5CF6', route: '/manufacturer', unread: true  },
   { id: 'a3', type: 'inventory',    title: 'Low stock: Vintage Washed Tee M', desc: '3 units remaining',             time: '3 hrs ago',  icon: 'alert-triangle',color: '#F97316', route: '/inventory',   unread: false },
   { id: 'a4', type: 'payout',       title: 'Payout processed',              desc: '$3,920.00 sent to your bank',  time: 'Yesterday',  icon: 'dollar-sign',   color: '#06B6D4', route: '/payments',    unread: false },
   { id: 'a5', type: 'review',       title: 'New 5-star review',             desc: '"Perfect quality, fast ship"',  time: 'Yesterday',  icon: 'star',          color: '#FBBF24', route: '/customers',   unread: false },

@@ -182,7 +182,7 @@ function PostCard({
         </TouchableOpacity>
         <TouchableOpacity
           style={s.actionIcon}
-          onPress={() => Share.share({ message: 'Check this post out on Brandthread!' })}
+          onPress={() => Share.share({ message: `${post.authorName} posted on Brandthread — check it out!` })}
         >
           <Feather name="send" size={ICON.lg} color={MUTED} />
         </TouchableOpacity>
@@ -312,7 +312,7 @@ export default function FriendsScreen() {
     saveItem({
       type: 'post',
       targetId: post.id,
-      title: post.authorName + ' post',
+      title: post.authorName + '\'s post',
       accentColor: post.authorColor,
     });
   }
@@ -503,9 +503,9 @@ export default function FriendsScreen() {
             {!hasFriends && feedPosts.length === 0 && apiFollowing.length === 0 && (
               <View style={s.emptyState}>
                 <Feather name="users" size={48} color={MUTED} />
-                <Text style={s.emptyTitle}>Connect with friends</Text>
+                <Text style={s.emptyTitle}>Find your crew</Text>
                 <Text style={s.emptyBody}>
-                  Add friends to see their posts here.
+                  Add friends to see what they're copping, saving, and dropping.
                 </Text>
                 <TouchableOpacity
                   onPress={() => router.push('/buyer-friend-requests' as never)}

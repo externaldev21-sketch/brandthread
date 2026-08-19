@@ -143,6 +143,8 @@ export const sampleOrders = pgTable('sample_orders', {
   deliveredAt:             timestamp('delivered_at'),
   walletId:                uuid('wallet_id'),   // FK enforced in migration
   notes:                   text('notes'),
+  // Sample progress images — array of object storage paths (e.g. /objects/uploads/<uuid>)
+  imageUrls:               json('image_urls').$type<string[]>().notNull().default([]),
   createdAt:               timestamp('created_at').defaultNow().notNull(),
   updatedAt:               timestamp('updated_at').defaultNow().notNull(),
 }, (t) => ({

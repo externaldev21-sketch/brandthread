@@ -113,12 +113,13 @@ router.patch("/onboarding", requireAuth, async (req, res) => {
 // Update editable profile fields. Validates and enforces uniqueness on username.
 router.patch("/profile", requireAuth, async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
-  const { displayName, bio, website, name, username } = req.body as {
+  const { displayName, bio, website, name, username, accountType } = req.body as {
     displayName?: string;
     bio?:         string;
     website?:     string;
     name?:        string;
     username?:    string;
+    accountType?: "buyer" | "seller";
   };
 
   const updates: Record<string, any> = { updatedAt: new Date() };
@@ -126,6 +127,13 @@ router.patch("/profile", requireAuth, async (req, res) => {
   if (bio         !== undefined) updates.bio         = bio;
   if (website     !== undefined) updates.website     = website;
   if (name        !== undefined) updates.name        = name;
+  if (accountType !== undefined) {
+    if (accountType !== "buyer" && accountType !== "seller") {
+      res.status(400).json({ error: "accountType must be buyer or seller" });
+      return;
+    }
+    updates.accountType = accountType;
+  }
 
   // Username: format + uniqueness check
   if (username !== undefined) {

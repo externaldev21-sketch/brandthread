@@ -39,7 +39,7 @@ import StyleTagsPicker from '@/components/StyleTagsPicker';
 
 import {
   getProduct, saveDraft, loadDraft, deleteDraft,
-  getCollections, DEMO_FULL_PRODUCTS,
+  getCollections,
 } from '@/services/productService';
 import { useApi } from '@/hooks/useApi';
 
@@ -640,7 +640,7 @@ export default function AddProductScreen() {
         )}
 
         <FormInput
-          label="Image URL (demo)"
+          label="Image URL"
           value={mediaUrlInput}
           onChange={setMediaUrlInput}
           placeholder="https://..."
@@ -1161,7 +1161,7 @@ export default function AddProductScreen() {
             <FormInput label="Target cost per unit" value={targetCost} onChange={setTargetCost} placeholder="0.00" keyboardType="decimal-pad" />
             <FormInput label="Required quantity" value={reqQty} onChange={setReqQty} placeholder="50" keyboardType="numeric" />
             <FormInput label="Production deadline" value={prodDeadline} onChange={setProdDeadline} placeholder="YYYY-MM-DD" />
-            <SecondaryButton label="Upload tech pack (coming soon)" onPress={() => Alert.alert('Coming soon', 'Tech pack upload will be available in a future update.')} icon="upload" disabled />
+            <SecondaryButton label="Upload tech pack" onPress={() => Alert.alert('Tech Pack', 'Tech pack upload will be available in the next release.')} icon="upload" disabled />
           </>
         )}
       </>

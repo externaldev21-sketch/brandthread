@@ -46,8 +46,9 @@ export default function ProductSizeChartScreen() {
   const insets = useSafeAreaInsets();
   const api    = useApi();
 
-  const [loading, setLoading]   = useState(true);
-  const [saving,  setSaving]    = useState(false);
+  const [loading, setLoading]     = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saving,  setSaving]      = useState(false);
 
   const [columns, setColumns]   = useState<string[]>(DEFAULT_COLUMNS);
   const [rows,    setRows]      = useState<SizeChartRow[]>(
@@ -59,21 +60,36 @@ export default function ProductSizeChartScreen() {
   const [newSizeName, setNewSizeName] = useState('');
 
   // Load existing chart from product
-  useEffect(() => {
+  function loadProduct() {
     if (!productId) { setLoading(false); return; }
-    (api as any).products?.get?.(productId)
-      ?.then((p: any) => {
+    setLoading(true);
+    setLoadError(null);
+    const req = (api as any).products?.get?.(productId);
+    if (!req) { setLoading(false); return; }
+    req
+      .then((p: any) => {
         const chart: SizeChart | null = p?.sizeChart ?? null;
         if (chart?.columns?.length) {
           setColumns(chart.columns);
           setRows(chart.rows ?? []);
           setUnit((chart.unit as any) ?? 'inches');
           setNotes(chart.notes ?? '');
+        } else {
+          // No existing chart — start with blank defaults (not an error)
+          setColumns(DEFAULT_COLUMNS);
+          setRows(DEFAULT_SIZES.map(size => ({ size, values: new Array(DEFAULT_COLUMNS.length).fill('') })));
         }
+        setLoadError(null);
       })
-      ?.catch(() => {})
-      ?.finally(() => setLoading(false));
-  }, [productId]);
+      .catch(() => {
+        // Do NOT silently open with defaults when the product request failed.
+        // Show a visible error so the user knows the product data wasn't loaded.
+        setLoadError('Could not load product data. Please go back and try again.');
+      })
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => { loadProduct(); }, [productId]);
 
   // ── Cell edit ───────────────────────────────────────────────────────────────
   function updateCell(rowIdx: number, colIdx: number, value: string) {
@@ -165,6 +181,35 @@ export default function ProductSizeChartScreen() {
     return (
       <View style={[s.root, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
         <ActivityIndicator color={PURPLE_LIGHT} />
+      </View>
+    );
+  }
+
+  // Show a visible, retryable error — do NOT silently open with default chart data
+  if (loadError) {
+    return (
+      <View style={[s.root, { paddingTop: insets.top }]}>
+        <BrandthreadHeader
+          title="Size Chart"
+          subtitle={productName ?? undefined}
+          onBack={() => router.back()}
+        />
+        <View style={s.errorWrap}>
+          <Feather name="alert-circle" size={36} color={RED} style={{ marginBottom: 14 }} />
+          <Text style={s.errorTitle}>Couldn't load product</Text>
+          <Text style={s.errorBody}>{loadError}</Text>
+          <TouchableOpacity
+            style={s.retryBtn}
+            activeOpacity={0.8}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); loadProduct(); }}
+          >
+            <Feather name="refresh-cw" size={14} color="#fff" style={{ marginRight: 6 }} />
+            <Text style={s.retryBtnText}>Try again</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.backLink} onPress={() => router.back()} activeOpacity={0.7}>
+            <Text style={s.backLinkText}>← Go back</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -306,7 +351,7 @@ export default function ProductSizeChartScreen() {
 
         {/* Actions */}
         <PrimaryButton
-          title={saving ? 'Saving…' : 'Save Size Chart'}
+          label={saving ? 'Saving…' : 'Save Size Chart'}
           onPress={save}
           loading={saving}
           disabled={saving}
@@ -343,6 +388,15 @@ const s = StyleSheet.create({
   notesInput:    { borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, padding: SP.sm, fontFamily: FONT.regular, fontSize: FS.sm, color: FG, minHeight: 72, textAlignVertical: 'top' },
   clearBtn:      { alignItems: 'center', paddingVertical: SP.md, marginTop: SP.sm },
   clearBtnText:  { fontFamily: FONT.regular, fontSize: FS.sm, color: RED },
+
+  // Error state — shown when product request failed (no silent defaults)
+  errorWrap:    { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl },
+  errorTitle:   { fontSize: FS.md, fontFamily: FONT.bold, color: FG, marginBottom: SP.sm, textAlign: 'center' },
+  errorBody:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20, marginBottom: SP.lg },
+  retryBtn:     { flexDirection: 'row', alignItems: 'center', backgroundColor: PURPLE, borderRadius: RADIUS.md, paddingVertical: 12, paddingHorizontal: SP.lg, marginBottom: SP.md },
+  retryBtnText: { fontSize: FS.sm, fontFamily: FONT.bold, color: '#fff' },
+  backLink:     { paddingVertical: SP.sm },
+  backLinkText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
 });
 
 const t = StyleSheet.create({

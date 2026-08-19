@@ -166,8 +166,8 @@ export default function ManufacturerOnboardScreen() {
       Alert.alert(
         '🎉 Application Submitted!',
         inviteToken
-          ? `Welcome, ${form.companyName}! Your manufacturer profile is now live.`
-          : `Thank you, ${form.companyName}! Your profile is now live on the Brandthread Manufacturer Hub. Sellers can find and contact you immediately.`,
+          ? `Welcome, ${form.companyName}! Your manufacturer profile is live on Brandthread.`
+          : `You're listed, ${form.companyName}! Your profile is live on the Brandthread Manufacturer Hub. Brand founders can find and contact you right now.`,
         [{ text: 'Done', onPress: () => router.back() }],
       );
     } catch (e: any) {
@@ -207,8 +207,8 @@ export default function ManufacturerOnboardScreen() {
         {step === 0 && (
           <View style={s.stepWrap}>
             <Text style={s.stepTitle}>Create your manufacturer account</Text>
-            <Text style={s.stepSub}>This gives you a login to receive and answer messages from brand owners.</Text>
-            <Field label="Business Email" value={form.email} onChange={(v) => set('email', v)} placeholder="factory@example.com" keyboardType="email-address" />
+            <Text style={s.stepSub}>Your login for receiving quote requests and messages from brand founders.</Text>
+            <Field label="Business Email" value={form.email} onChange={(v) => set('email', v)} placeholder="production@nightshiftstudio.co" keyboardType="email-address" />
             <Field label="Password" value={form.password} onChange={(v) => set('password', v)} placeholder="Min. 8 characters" secure />
             <Field label="Confirm Password" value={form.confirmPassword} onChange={(v) => set('confirmPassword', v)} placeholder="Re-enter password" secure />
           </View>
@@ -218,7 +218,7 @@ export default function ManufacturerOnboardScreen() {
         {step === 1 && (
           <View style={s.stepWrap}>
             <Text style={s.stepTitle}>Your company details</Text>
-            <Text style={s.stepSub}>This is shown on your Brandthread profile.</Text>
+            <Text style={s.stepSub}>Shown publicly on your Brandthread manufacturer profile.</Text>
             <Field label="Company / Factory Name" value={form.companyName} onChange={(v) => set('companyName', v)} placeholder="e.g. Apex Garment Co." />
             <Field label="Country" value={form.country} onChange={(v) => set('country', v)} placeholder="e.g. China, Bangladesh, India" />
             <Field label="City" value={form.city} onChange={(v) => set('city', v)} placeholder="e.g. Guangzhou" />
@@ -231,7 +231,7 @@ export default function ManufacturerOnboardScreen() {
         {step === 2 && (
           <View style={s.stepWrap}>
             <Text style={s.stepTitle}>What do you produce?</Text>
-            <Text style={s.stepSub}>Select all that apply — this helps brands find you.</Text>
+            <Text style={s.stepSub}>Select everything that applies — brands filter by speciality to find you.</Text>
 
             <Text style={s.groupLabel}>Product types</Text>
             <View style={s.chipGrid}>
@@ -276,7 +276,7 @@ export default function ManufacturerOnboardScreen() {
         {step === 3 && (
           <View style={s.stepWrap}>
             <Text style={s.stepTitle}>Photos & pricing</Text>
-            <Text style={s.stepSub}>Upload up to 8 photos of your factory, samples, or finished goods. These appear on your profile.</Text>
+            <Text style={s.stepSub}>Upload up to 8 photos — factory floor, samples, or finished pieces. Brands browse these before reaching out.</Text>
 
             {/* Photo upload grid */}
             <View style={s.photoGrid}>
@@ -315,7 +315,7 @@ export default function ManufacturerOnboardScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={s.escrowTitle}>Brandthread Escrow Protection</Text>
                 <Text style={s.escrowDesc}>
-                  Payments from brand owners are held in secure escrow and only released to you once they confirm production is complete. This protects both parties.
+                  Brand payments are held in escrow and released to you only after they confirm production is complete — protecting both sides of every deal.
                 </Text>
               </View>
             </View>

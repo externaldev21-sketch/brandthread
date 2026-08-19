@@ -71,7 +71,7 @@ export default function CommunityScreen() {
     <View style={styles.container}>
       <ScreenHeader
         title="Community"
-        subtitle="Hire vetted freelance creatives"
+        subtitle="Hire vetted creatives for your brand"
         rightElement={
           <TouchableOpacity
             onPress={() => router.push('/freelancer-jobs' as any)}
@@ -135,9 +135,9 @@ export default function CommunityScreen() {
                   <Feather name="zap" size={20} color={ON_DARK} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.ctaTitle}>Become a Freelancer</Text>
+                  <Text style={styles.ctaTitle}>List Your Skills</Text>
                   <Text style={styles.ctaSub}>
-                    Offer your skills to thousands of brand founders — get paid through Brandthread
+                    Offer your creative services to streetwear brand founders — get paid via Brandthread
                   </Text>
                 </View>
                 <Feather name="arrow-right" size={20} color={ON_DARK} />
@@ -194,7 +194,7 @@ export default function CommunityScreen() {
               </Text>
               {!me && (
                 <Text style={styles.emptyText}>
-                  Be the first — offer your skills to the community.
+                  Be the first — list your skills and get hired by brands on Brandthread.
                 </Text>
               )}
             </View>

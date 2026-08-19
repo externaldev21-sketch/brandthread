@@ -865,7 +865,7 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
           <Text style={sa.label}>Email address</Text>
           <TextInput
             style={sa.input}
-            placeholder="you@example.com"
+            placeholder="mila@nightshiftstudio.co"
             placeholderTextColor={MUTED2}
             value={email}
             onChangeText={setEmail}

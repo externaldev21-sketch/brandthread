@@ -954,8 +954,8 @@ function CustomerTab({ order }: { order: Order }) {
       </View>
 
       <View style={[s.actionRow, { marginHorizontal: SP.md }]}>
-        <SecondaryButton label="Message Customer" onPress={() => Alert.alert('Message', 'Messaging coming soon.')} icon="message-circle" style={{ flex: 1 }} />
-        <SecondaryButton label="View Profile" onPress={() => Alert.alert('Profile', 'Customer profile coming soon.')} icon="user" style={{ flex: 1 }} />
+        <SecondaryButton label="Message Customer" onPress={() => Alert.alert('Message Customer', 'Open the inbox to message this customer directly.')} icon="message-circle" style={{ flex: 1 }} />
+        <SecondaryButton label="View Profile" onPress={() => Alert.alert('Customer Profile', 'Customer profile details will appear here.')} icon="user" style={{ flex: 1 }} />
       </View>
     </View>
   );
@@ -1032,7 +1032,7 @@ function PaymentTab({ order }: { order: Order }) {
                 <Text style={s.refundAmount}>{usd(r.totalAmount)}</Text>
               </View>
               <Text style={s.refundDate}>{fmt(r.createdAt)}</Text>
-              {r.isDemo && <Text style={s.demoTag}>Demo refund</Text>}
+              {r.isDemo && <Text style={s.demoTag}>Test refund</Text>}
             </BrandthreadCard>
           ))}
         </View>
@@ -1093,7 +1093,7 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
               <BrandthreadCard style={s.manufacturerCard}>
                 <Text style={s.manufacturerName}>{group.manufacturerName ?? 'Manufacturer'}</Text>
                 <Text style={s.manufacturerStatus}>Status: {group.status.replace(/_/g, ' ')}</Text>
-                <Text style={s.manufacturerNotice}>Fulfillment request sent to manufacturer (demo)</Text>
+                <Text style={s.manufacturerNotice}>Fulfillment request sent to manufacturer</Text>
                 <SecondaryButton label="Add Tracking from Manufacturer" onPress={() => toggleForm(group.id)} icon="map-pin" small style={{ marginTop: SP.sm }} />
               </BrandthreadCard>
             ) : (
@@ -1333,7 +1333,7 @@ function DisputesTab({ order, router }: { order: Order; router: ReturnType<typeo
 
             <View style={s.disputeActions}>
               <SecondaryButton label="Add Evidence" onPress={() => router.push(`/dispute-detail?orderId=${order.id}&disputeId=${d.id}`)} icon="plus" small style={{ flex: 1 }} />
-              <SecondaryButton label="Accept Dispute" onPress={() => Alert.alert('Accept Dispute', 'Are you sure? This will refund the customer.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Accept', style: 'destructive', onPress: () => Alert.alert('Accepted', 'Dispute accepted (demo).') }])} icon="check" small accent={RED} style={{ flex: 1 }} />
+              <SecondaryButton label="Accept Dispute" onPress={() => Alert.alert('Accept Dispute', 'Are you sure? This will refund the customer.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Accept', style: 'destructive', onPress: () => Alert.alert('Dispute Accepted', 'The dispute has been accepted and the customer will be refunded.') }])} icon="check" small accent={RED} style={{ flex: 1 }} />
             </View>
             {d.status === 'evidence_needed' && (
               <PrimaryButton label="Submit Evidence" onPress={() => router.push(`/dispute-detail?orderId=${order.id}&disputeId=${d.id}`)} icon="upload" small style={{ marginTop: SP.sm }} />

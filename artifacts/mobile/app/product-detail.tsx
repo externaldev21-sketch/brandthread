@@ -449,7 +449,7 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
     <View style={{ gap: SP.md, paddingTop: SP.md }}>
       <SectionHeader
         title="Variants"
-        action={{ label: 'Add variant', onPress: () => Alert.alert('Add Variant', 'Variant editor coming soon.') }}
+        action={{ label: 'Add variant', onPress: () => Alert.alert('Add Variant', 'Select sizes, colors, and other options for this product.') }}
       />
 
       {/* Bulk edit */}

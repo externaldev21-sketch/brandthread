@@ -400,9 +400,9 @@ export default function BuyerNotifications() {
       {!notifLoading && listData.length === 0 ? (
         <View style={styles.emptyState}>
           <Feather name="bell" size={48} color={MUTED} />
-          <Text style={styles.emptyTitle}>You're all caught up.</Text>
+          <Text style={styles.emptyTitle}>All caught up.</Text>
           <Text style={styles.emptyBody}>
-            When someone likes your post, follows you, or sends a message — it shows up here.
+            Likes, new followers, order updates, and drop alerts will appear here.
           </Text>
         </View>
       ) : (

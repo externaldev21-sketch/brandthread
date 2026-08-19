@@ -114,7 +114,7 @@ export default function BuyerDownloadData() {
             <View style={s.note}>
               <Feather name="info" size={14} color={MUTED} />
               <Text style={s.noteText}>
-                Data export is coming soon. Your request will be queued and you'll be notified when the archive is ready. Contact support@brandthread.com for immediate assistance.
+                Your request will be queued and you'll be notified when the archive is ready. Contact support@brandthread.com for immediate assistance.
               </Text>
             </View>
           </>

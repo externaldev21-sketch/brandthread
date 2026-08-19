@@ -453,6 +453,7 @@ export default function OrdersScreen() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchActive, setSearchActive] = useState(false);
   const [activeFilter, setActiveFilter] = useState<OrderFilterKey>('all');
@@ -479,10 +480,12 @@ export default function OrdersScreen() {
       const all = Array.isArray(rows) ? (rows as any[]).map(apiRowToOrder) : [];
       setOrders(all);
       setStats(computeStats(all));
+      setLoadError(null);
       consecutiveFailuresRef.current = 0;
     } catch (e) {
       if (generationRef.current !== generation) return; // stale focus cycle
       console.error('Failed to load seller orders', e);
+      setLoadError('Could not load orders. Check your connection and try again.');
       consecutiveFailuresRef.current += 1;
       if (consecutiveFailuresRef.current >= 3 && timerRef.current !== null) {
         clearInterval(timerRef.current);
@@ -625,8 +628,8 @@ export default function OrdersScreen() {
       const rows = orders.map(o => {
         const customer = o.customer?.name ?? o.customer?.email ?? 'Unknown';
         const date = new Date(o.createdAt).toLocaleDateString('en-US');
-        const total = (o.total / 100).toFixed(2);
-        const itemCount = o.items?.length ?? 0;
+        const total = o.payment.total.toFixed(2);
+        const itemCount = o.lineItems.length;
         return [
           o.orderNumber ?? o.id.slice(0, 8),
           `"${customer.replace(/"/g, '""')}"`,
@@ -709,6 +712,7 @@ export default function OrdersScreen() {
 
   const ListEmpty = useCallback(() => {
     if (loading) return null;
+    if (loadError) return null; // error banner shown above the list
     return (
       <EmptyState
         icon="shopping-bag"
@@ -717,7 +721,7 @@ export default function OrdersScreen() {
         style={{ marginTop: SP.xl }}
       />
     );
-  }, [loading]);
+  }, [loading, loadError]);
 
   const ListHeader = useCallback(() => (
     <View>
@@ -823,6 +827,22 @@ export default function OrdersScreen() {
             style={s.searchClose}
           >
             <Feather name="x" size={ICON.sm} color={MUTED} />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Error banner with retry */}
+      {loadError && !loading && (
+        <View style={s.errorBanner}>
+          <Feather name="alert-circle" size={ICON.sm} color={RED} />
+          <Text style={s.errorBannerText} numberOfLines={2}>{loadError}</Text>
+          <TouchableOpacity
+            style={s.errorRetryBtn}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); onRefresh(); }}
+            activeOpacity={0.8}
+          >
+            <Feather name="refresh-cw" size={12} color={PURPLE_LIGHT} />
+            <Text style={s.errorRetryText}>Retry</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -1380,5 +1400,44 @@ const s = StyleSheet.create({
     fontSize: FS.base,
     fontFamily: FONT.semibold,
     color: MUTED,
+  },
+
+  // Error banner
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    marginHorizontal: SP.md,
+    marginTop: SP.sm,
+    marginBottom: SP.xs,
+    backgroundColor: RED_DIM,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: RED + '44',
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+  },
+  errorBannerText: {
+    flex: 1,
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: RED,
+    lineHeight: 16,
+  },
+  errorRetryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: PURPLE_DIM,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: PURPLE_LIGHT + '44',
+    paddingHorizontal: SP.sm,
+    paddingVertical: SP.xs,
+  },
+  errorRetryText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: PURPLE_LIGHT,
   },
 });

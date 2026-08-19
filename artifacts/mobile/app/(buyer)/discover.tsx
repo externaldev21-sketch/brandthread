@@ -516,7 +516,7 @@ export default function DiscoverScreen() {
       {/* ─ Header ─ */}
       <View style={[s.header, { paddingTop: topPad + 16, paddingHorizontal: 20 }]}>
         <View>
-          <Text style={[s.greeting, { color: muted }]}>Good morning ✦</Text>
+          <Text style={[s.greeting, { color: muted }]}>What's dropping ✦</Text>
           <Text style={[s.pageTitle, { color: fg }]}>Discover</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -547,7 +547,7 @@ export default function DiscoverScreen() {
       <View style={{ paddingHorizontal: 20, marginBottom: 4 }}>
         <SectionHead
           title="For You"
-          sub="Based on your Archive Fashion taste"
+          sub="Picked from brands in your style"
           action="See all"
           onAction={() => router.push('/(buyer)/' as never)}
         />

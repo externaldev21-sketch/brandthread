@@ -278,7 +278,7 @@ export default function UsersScreen() {
           )}
           <View style={[styles.body, { backgroundColor: colors.secondary }]}>
             <TouchableOpacity onPress={haptic} activeOpacity={0.7}>
-              <Text style={[styles.learnMore, { color: colors.mutedForeground }]}>Learn more about users</Text>
+              <Text style={[styles.learnMore, { color: colors.mutedForeground }]}>Learn more about team roles</Text>
             </TouchableOpacity>
           </View>
         </ScrollView>

@@ -143,7 +143,7 @@ export default function ProductImportScreen() {
         <View style={s.tip}>
           <Feather name="zap" size={ICON.xs} color={CYAN} style={{ marginTop: 1 }} />
           <Text style={s.tipText}>
-            Import allows you to bring existing products into Brandthread from another platform or a CSV file.
+            Import your existing products into Brandthread from another platform or a CSV spreadsheet.
           </Text>
         </View>
 
@@ -159,7 +159,7 @@ export default function ProductImportScreen() {
             </View>
             <View style={s.methodInfo}>
               <Text style={s.methodTitle}>CSV File</Text>
-              <Text style={s.methodDesc}>Upload a spreadsheet with your product data</Text>
+              <Text style={s.methodDesc}>Upload a spreadsheet with your product catalogue</Text>
             </View>
             <StatusBadge label="Supported" variant="success" />
           </View>
@@ -168,9 +168,9 @@ export default function ProductImportScreen() {
             <View style={s.expanded}>
               <View style={s.divider} />
               <BrandthreadCard style={s.stepsCard}>
-                <Text style={s.stepText}>1. Download our CSV template</Text>
-                <Text style={s.stepText}>2. Fill in your product data</Text>
-                <Text style={s.stepText}>3. Upload the completed file</Text>
+                <Text style={s.stepText}>1. Download the Brandthread CSV template</Text>
+                <Text style={s.stepText}>2. Fill in your product names, prices, and categories</Text>
+                <Text style={s.stepText}>3. Upload the completed file to import</Text>
               </BrandthreadCard>
               <PrimaryButton
                 label="Download template"
@@ -201,7 +201,7 @@ export default function ProductImportScreen() {
             </View>
             <View style={s.methodInfo}>
               <Text style={s.methodTitle}>Shopify</Text>
-              <Text style={s.methodDesc}>Import products from your existing Shopify store</Text>
+              <Text style={s.methodDesc}>Sync your existing Shopify catalogue into Brandthread</Text>
             </View>
             <StatusBadge label="Coming soon" variant="neutral" />
           </View>
@@ -211,7 +211,7 @@ export default function ProductImportScreen() {
               <View style={s.divider} />
               <BrandthreadCard>
                 <Text style={s.noticeText}>
-                  Connect your Shopify store to enable automatic product sync. This feature requires the Shopify integration — available in the next update.
+                  Connect your Shopify store for automatic product sync. Shopify import is coming in the next update.
                 </Text>
               </BrandthreadCard>
             </View>
@@ -230,7 +230,7 @@ export default function ProductImportScreen() {
             </View>
             <View style={s.methodInfo}>
               <Text style={s.methodTitle}>Manual bulk entry</Text>
-              <Text style={s.methodDesc}>Enter multiple products manually using a guided form</Text>
+              <Text style={s.methodDesc}>Type in product names and details one line at a time</Text>
             </View>
             <StatusBadge label="Available" variant="success" />
           </View>
@@ -243,14 +243,14 @@ export default function ProductImportScreen() {
                 value={bulkNames}
                 onChange={setBulkNames}
                 multiline
-                placeholder={'Vintage Tee\nOversized Hoodie\nCargo Pants'}
+                placeholder={'Washed Oversized Tee\nHeavyweight Hoodie\nCargo Sweatpants'}
                 style={s.formInput}
               />
               <FormInput
                 label="Default category"
                 value={bulkCategory}
                 onChange={setBulkCategory}
-                placeholder="T-shirt"
+                placeholder="e.g. Tops, Bottoms, Outerwear"
                 style={s.formInput}
               />
               <FormInput

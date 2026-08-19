@@ -7,11 +7,14 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, ScrollView, Alert, Image,
   StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as ImagePicker from 'expo-image-picker';
+import { File as FSFile } from 'expo-file-system';
 
 import {
   BrandthreadScreen, BrandthreadHeader, BrandthreadCard, GradientCard,
@@ -20,8 +23,9 @@ import {
 } from '@/components/BrandthreadUI';
 
 import {
-  getSample, updateSampleStatus, submitSampleReview, addSampleRevision,
+  getSample, submitSampleReview, addSampleRevision,
   getOrCreateConversation, getManufacturer,
+  uploadSampleImage,
 } from '@/services/manufacturerService';
 import { Sample, SampleReview, SampleStatus } from '@/services/manufacturerTypes';
 
@@ -155,6 +159,7 @@ export default function SampleDetailScreen() {
   const [sample, setSample] = useState<Sample | null>(null);
   const [manufacturerName, setManufacturerName] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   // Review form state
@@ -175,16 +180,25 @@ export default function SampleDetailScreen() {
   const [revDeadline, setRevDeadline] = useState('');
   const [revSubmitting, setRevSubmitting] = useState(false);
 
+  // Image upload state
+  const [imageUploading, setImageUploading] = useState(false);
+
   const load = useCallback(async () => {
     if (!id) return;
     setLoading(true);
+    setLoadError(null);
     try {
       const s = await getSample(id);
       if (s) {
         setSample(s);
         const mfg = await getManufacturer(s.manufacturerId);
         setManufacturerName(mfg?.name ?? 'Manufacturer');
+      } else {
+        setSample(null);
       }
+    } catch {
+      setSample(null);
+      setLoadError('Could not load this sample. Check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -194,17 +208,6 @@ export default function SampleDetailScreen() {
 
   const setRating = (dim: keyof RatingState) => (val: number) =>
     setRatings(prev => ({ ...prev, [dim]: val }));
-
-  const handleStatusUpdate = async (status: SampleStatus) => {
-    if (!sample) return;
-    setActionLoading(true);
-    try {
-      await updateSampleStatus(sample.id, status);
-      await load();
-    } finally {
-      setActionLoading(false);
-    }
-  };
 
   const handleSubmitReview = async () => {
     if (!sample) return;
@@ -255,6 +258,54 @@ export default function SampleDetailScreen() {
     }
   };
 
+  const handleAddImage = useCallback(async () => {
+    if (!sample || imageUploading) return;
+
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission Required',
+        'Please allow access to your photo library to upload sample images.',
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.85,
+      allowsMultipleSelection: false,
+      allowsEditing: false,
+    });
+    if (result.canceled || result.assets.length === 0) return;
+
+    const asset = result.assets[0];
+    const uri = asset.uri;
+    const ext = uri.split('.').pop()?.toLowerCase() ?? 'jpg';
+    const mimeMap: Record<string, string> = {
+      jpg: 'image/jpeg', jpeg: 'image/jpeg',
+      png: 'image/png', webp: 'image/webp',
+      heic: 'image/heic', heif: 'image/heif',
+    };
+    const contentType = asset.mimeType ?? mimeMap[ext] ?? 'image/jpeg';
+
+    setImageUploading(true);
+    try {
+      // Read the file bytes so we can send them as the raw PUT body and report
+      // an accurate size for server-side validation.
+      const file = new FSFile(uri);
+      const bytes = await file.bytes();
+      // The authenticated API enforces the byte limit and validates image
+      // signatures before it writes any object to private storage.
+      await uploadSampleImage(sample.id, contentType, bytes);
+      await load();
+    } catch (err: any) {
+      console.error('[SampleDetail] image upload error:', err);
+      Alert.alert('Upload Failed', err?.message ?? 'Could not upload image. Please try again.');
+    } finally {
+      setImageUploading(false);
+    }
+  }, [sample, imageUploading, load]);
+
   const handleMessage = async () => {
     if (!sample) return;
     const conv = await getOrCreateConversation(sample.manufacturerId, {
@@ -282,7 +333,13 @@ export default function SampleDetailScreen() {
       <BrandthreadScreen>
         <BrandthreadHeader title="Sample Details" onBack={() => router.back()} />
         <View style={s.centered}>
-          <Text style={s.errorText}>Sample not found.</Text>
+          <Text style={s.errorText}>{loadError ?? 'Sample not found.'}</Text>
+          {loadError && (
+            <TouchableOpacity style={s.retryBtn} onPress={load} activeOpacity={0.8}>
+              <Feather name="refresh-cw" size={14} color={ON_DARK} />
+              <Text style={s.retryBtnText}>Try again</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </BrandthreadScreen>
     );
@@ -398,9 +455,15 @@ export default function SampleDetailScreen() {
           {/* ── IMAGES ───────────────────────────────────────────── */}
           <SectionHeader
             title="Images"
-            action={{ label: 'Add image (demo)', onPress: () => Alert.alert('Add Image', 'Image upload would open camera / gallery here.') }}
+            action={imageUploading ? undefined : { label: 'Add Image', onPress: handleAddImage }}
             style={s.sectionHeader}
           />
+          {imageUploading && (
+            <View style={s.uploadingRow}>
+              <ActivityIndicator size="small" color={PURPLE_LIGHT} />
+              <Text style={s.uploadingText}>Uploading…</Text>
+            </View>
+          )}
           {sample.imageUris.length > 0 ? (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.imageScroll} contentContainerStyle={s.imageScrollContent}>
               {sample.imageUris.map((uri, i) => (
@@ -408,11 +471,13 @@ export default function SampleDetailScreen() {
               ))}
             </ScrollView>
           ) : (
-            <GradientCard style={[s.section, s.imagePlaceholder]}>
-              <Feather name="image" size={ICON.xl} color={PURPLE_LIGHT} style={{ marginBottom: SP.sm }} />
-              <Text style={s.imagePlaceholderText}>No images yet</Text>
-              <Text style={s.imagePlaceholderSub}>The manufacturer will share progress photos here</Text>
-            </GradientCard>
+            <TouchableOpacity onPress={handleAddImage} disabled={imageUploading} activeOpacity={0.75}>
+              <GradientCard style={[s.section, s.imagePlaceholder]}>
+                <Feather name="camera" size={ICON.xl} color={PURPLE_LIGHT} style={{ marginBottom: SP.sm }} />
+                <Text style={s.imagePlaceholderText}>No images yet</Text>
+                <Text style={s.imagePlaceholderSub}>Tap to add a sample progress photo</Text>
+              </GradientCard>
+            </TouchableOpacity>
           )}
 
           {/* ── REVISION HISTORY ─────────────────────────────────── */}
@@ -594,24 +659,6 @@ export default function SampleDetailScreen() {
 
         {/* ── ACTION BAR ───────────────────────────────────────────── */}
         <View style={[s.actionBar, { paddingBottom: insets.bottom + SP.sm }]}>
-          {sample.status === 'in_development' && (
-            <PrimaryButton
-              label="Mark as Shipped (Demo)"
-              onPress={() => handleStatusUpdate('shipped')}
-              loading={actionLoading}
-              icon="truck"
-              style={s.actionBtn}
-            />
-          )}
-          {sample.status === 'shipped' && (
-            <PrimaryButton
-              label="Mark as Delivered"
-              onPress={() => handleStatusUpdate('delivered')}
-              loading={actionLoading}
-              icon="package"
-              style={s.actionBtn}
-            />
-          )}
           {(sample.status === 'delivered' || sample.status === 'review_needed') && !sample.review && (
             <PrimaryButton
               label="Write Review"
@@ -669,6 +716,21 @@ const s = StyleSheet.create({
     fontSize: FS.base,
     fontFamily: FONT.medium,
     color: MUTED,
+  },
+  retryBtn: {
+    marginTop: SP.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
+    backgroundColor: PURPLE,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+    borderRadius: RADIUS.sm,
+  },
+  retryBtnText: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    color: ON_DARK,
   },
 
   // Badge row
@@ -816,6 +878,18 @@ const s = StyleSheet.create({
     fontFamily: FONT.regular,
     color: SUBTLE,
     textAlign: 'center',
+  },
+  uploadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.sm,
+  },
+  uploadingText: {
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    color: MUTED,
   },
 
   // Revision

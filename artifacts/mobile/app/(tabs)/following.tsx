@@ -1,9 +1,10 @@
 /**
  * Brandthread — Following / Drops
  * Shows brands the buyer follows, with their latest drops and real countdown timers.
- * Loads real active drops from /api/public/drops; keeps mock brands as fallback.
+ * Loads real active drops from /api/public/drops.
+ * Never shows mock/invented brands — shows real empty state or retryable error instead.
  */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   FlatList, ActivityIndicator,
@@ -16,7 +17,7 @@ import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM,
-  SUCCESS, SUCCESS_DIM,
+  SUCCESS, RED, RED_DIM,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 
@@ -157,45 +158,6 @@ const c = StyleSheet.create({
   shopBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: '#FFFFFF' },
 });
 
-// ─── Mock fallback brands (shown if no real drops yet) ────────────────────────
-
-const MOCK_BRANDS = [
-  { id: 'b1', name: 'Vault Studio', handle: '@vaultstudio', initials: 'VS', color: '#8B5CF6', verified: true, followers: '12.4K', hasNew: true, latestDrop: { name: 'Canvas Cargo Jacket', price: '$189', tag: 'New Drop', tagColor: '#8B5CF6', desc: 'Oversized canvas jacket — limited run of 50.' } },
-  { id: 'b2', name: 'Meridian Co.', handle: '@meridianclothing', initials: 'MC', color: '#0F766E', verified: false, followers: '8.1K', hasNew: true, latestDrop: { name: 'Essential Relaxed Tee', price: '$48', tag: 'Pre-order', tagColor: '#0F766E', desc: 'Clean minimal tees now in 6 colorways.' } },
-  { id: 'b3', name: 'NxGen Drops', handle: '@nxgendrops', initials: 'NX', color: '#B45309', verified: true, followers: '31.2K', hasNew: false, latestDrop: { name: 'Archive Hoodie Vol. 3', price: '$135', tag: 'In Stock', tagColor: '#10B981', desc: 'Garment-dyed heavyweight fleece, unisex sizing.' } },
-  { id: 'b4', name: 'Softwear__', handle: '@softwear__', initials: 'SW', color: '#BE185D', verified: false, followers: '5.8K', hasNew: true, latestDrop: { name: 'Micro-Fleece Jogger', price: '$92', tag: 'New Drop', tagColor: '#BE185D', desc: 'Ultra-soft fleece with a relaxed silhouette.' } },
-  { id: 'b5', name: 'Atlas Goods', handle: '@atlasgoods', initials: 'AG', color: '#1D4ED8', verified: true, followers: '19.7K', hasNew: false, latestDrop: { name: 'Utility Vest — Slate', price: '$220', tag: 'Limited', tagColor: '#1D4ED8', desc: 'Waxed cotton shell, 8 pockets. Ships in 2 weeks.' } },
-];
-
-function MockDropCard({ brand }: { brand: typeof MOCK_BRANDS[0] }) {
-  return (
-    <View style={[c.card, { borderColor: BORDER }]}>
-      <LinearGradient colors={[brand.color + 'CC', brand.color + '44', BG + 'FF']} style={c.visual}>
-        <View style={c.visualContent}>
-          <Text style={c.dropName}>{brand.latestDrop.name}</Text>
-          <View style={[c.typePill, { backgroundColor: brand.latestDrop.tagColor + '30', borderColor: brand.latestDrop.tagColor + '60' }]}>
-            <Text style={[c.typeText, { color: brand.latestDrop.tagColor }]}>{brand.latestDrop.tag}</Text>
-          </View>
-        </View>
-        <Text style={{ fontSize: 22, fontFamily: FONT.bold, color: '#FFF' }}>{brand.latestDrop.price}</Text>
-      </LinearGradient>
-      <View style={c.info}>
-        <View style={c.sellerRow}>
-          <View style={[c.sellerDot, { backgroundColor: brand.color }]}>
-            <Text style={c.sellerInitials}>{brand.initials}</Text>
-          </View>
-          <Text style={c.sellerName}>{brand.name}</Text>
-        </View>
-        <Text style={c.desc} numberOfLines={2}>{brand.latestDrop.desc}</Text>
-        <TouchableOpacity style={[c.shopBtn, { backgroundColor: brand.color }]} activeOpacity={0.85} onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)}>
-          <Feather name="shopping-bag" size={14} color="#FFF" />
-          <Text style={c.shopBtnText}>Shop Now</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-}
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function FollowingScreen() {
@@ -205,8 +167,11 @@ export default function FollowingScreen() {
 
   const [drops, setDrops] = useState<DropItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadDrops = useCallback(() => {
+    setLoading(true);
+    setError(null);
     api.publicDrops.list()
       .then((raw: any) => {
         const list: any[] = Array.isArray(raw) ? raw : raw?.drops ?? [];
@@ -232,23 +197,31 @@ export default function FollowingScreen() {
           };
         });
         setDrops(mapped);
+        setError(null);
       })
-      .catch(() => { /* use empty — show mock */ })
+      .catch(() => {
+        setError('Could not load drops. Check your connection and try again.');
+      })
       .finally(() => setLoading(false));
-  }, []);
+  }, [api]);
 
-  const showMock = !loading && drops.length === 0;
+  useEffect(() => { loadDrops(); }, [loadDrops]);
+
   const liveCount = drops.filter(d => !d.releaseAt || new Date(d.releaseAt).getTime() <= Date.now()).length;
   const upcomingCount = drops.filter(d => d.releaseAt && new Date(d.releaseAt).getTime() > Date.now()).length;
   const subtitle = loading ? 'Loading drops…'
-    : showMock ? `${MOCK_BRANDS.filter(b => b.hasNew).length} new drops today`
+    : error ? 'Failed to load'
+    : drops.length === 0 ? 'No drops yet'
     : upcomingCount > 0 ? `${upcomingCount} upcoming, ${liveCount} live`
     : `${liveCount} active drop${liveCount === 1 ? '' : 's'}`;
 
-  // Avatar rows: from real drops or mock brands
-  const avatarBrands = showMock
-    ? MOCK_BRANDS
-    : drops.map(d => ({ id: d.id, initials: d.sellerInitials, color: d.sellerColor, handle: d.sellerName, hasNew: true }));
+  // Avatar rows: from real drops only
+  const avatarBrands = drops.map(d => ({
+    id: d.id,
+    initials: d.sellerInitials,
+    color: d.sellerColor,
+    handle: d.sellerName,
+  }));
 
   return (
     <View style={[s.container, { backgroundColor: BG }]}>
@@ -263,13 +236,13 @@ export default function FollowingScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Brand avatars row */}
-      <View style={[s.avatarsRow, { borderBottomColor: BORDER }]}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.avatarsScroll}>
-          {avatarBrands.map(brand => (
-            <TouchableOpacity key={brand.id} style={s.avatarItem} activeOpacity={0.8}
-              onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}>
-              {brand.hasNew ? (
+      {/* Brand avatars row — only shown when real drops exist */}
+      {avatarBrands.length > 0 && (
+        <View style={[s.avatarsRow, { borderBottomColor: BORDER }]}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.avatarsScroll}>
+            {avatarBrands.map(brand => (
+              <TouchableOpacity key={brand.id} style={s.avatarItem} activeOpacity={0.8}
+                onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}>
                 <LinearGradient colors={[PURPLE, '#6D28D9', PURPLE]} style={s.avatarRing}>
                   <View style={[s.avatarRingInner, { backgroundColor: BG }]}>
                     <View style={[s.avatarCircle, { backgroundColor: brand.color }]}>
@@ -277,32 +250,45 @@ export default function FollowingScreen() {
                     </View>
                   </View>
                 </LinearGradient>
-              ) : (
-                <View style={[s.avatarRingViewed, { borderColor: BORDER }]}>
-                  <View style={[s.avatarCircle, { backgroundColor: brand.color }]}>
-                    <Text style={s.avatarInitials}>{brand.initials}</Text>
-                  </View>
-                </View>
-              )}
-              <Text style={[s.avatarLabel, { color: MUTED }]} numberOfLines={1}>
-                {(brand.handle ?? '').replace('@', '').slice(0, 8)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
+                <Text style={[s.avatarLabel, { color: MUTED }]} numberOfLines={1}>
+                  {(brand.handle ?? '').replace('@', '').slice(0, 8)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
-      {/* Drop cards */}
+      {/* Drop cards / loading / empty / error */}
       {loading ? (
         <View style={s.loadingWrap}><ActivityIndicator color={PURPLE} /></View>
-      ) : showMock ? (
-        <FlatList
-          data={MOCK_BRANDS}
-          keyExtractor={b => b.id}
-          contentContainerStyle={{ padding: 16, paddingBottom: 120 }}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => <MockDropCard brand={item} />}
-        />
+      ) : error ? (
+        <View style={s.centeredWrap}>
+          <View style={s.errorBox}>
+            <Feather name="wifi-off" size={32} color={RED} style={{ marginBottom: 12 }} />
+            <Text style={s.errorTitle}>Couldn't load drops</Text>
+            <Text style={s.errorBody}>{error}</Text>
+            <TouchableOpacity
+              style={s.retryBtn}
+              activeOpacity={0.8}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                loadDrops();
+              }}
+            >
+              <Feather name="refresh-cw" size={14} color={PURPLE} style={{ marginRight: 6 }} />
+              <Text style={s.retryBtnText}>Try again</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : drops.length === 0 ? (
+        <View style={s.centeredWrap}>
+          <Feather name="heart" size={36} color={MUTED} style={{ marginBottom: 12 }} />
+          <Text style={s.emptyTitle}>No drops yet</Text>
+          <Text style={s.emptyBody}>
+            Follow sellers to see their latest drops here.{'\n'}New drops from sellers you follow will appear when they go live.
+          </Text>
+        </View>
       ) : (
         <FlatList
           data={drops}
@@ -341,10 +327,28 @@ const s = StyleSheet.create({
   avatarItem:    { alignItems: 'center', gap: 5, width: 60 },
   avatarRing:    { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center' },
   avatarRingInner: { width: 50, height: 50, borderRadius: 25, alignItems: 'center', justifyContent: 'center' },
-  avatarRingViewed: { width: 54, height: 54, borderRadius: 27, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
   avatarCircle:  { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
   avatarInitials: { fontSize: 13, fontFamily: FONT.bold, color: '#FFFFFF' },
   avatarLabel:   { fontSize: 10, fontFamily: FONT.regular, textAlign: 'center' },
 
-  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  loadingWrap:  { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  centeredWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
+
+  // Error state
+  errorBox: {
+    alignItems: 'center', backgroundColor: RED_DIM, borderRadius: RADIUS.lg,
+    borderWidth: 1, borderColor: RED + '44', padding: SP.lg, width: '100%',
+  },
+  errorTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG, marginBottom: 6 },
+  errorBody:  { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 18 },
+  retryBtn: {
+    flexDirection: 'row', alignItems: 'center', marginTop: SP.md,
+    backgroundColor: PURPLE_DIM, borderRadius: RADIUS.sm, borderWidth: 1,
+    borderColor: PURPLE + '44', paddingHorizontal: SP.md, paddingVertical: SP.sm,
+  },
+  retryBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE },
+
+  // Empty state
+  emptyTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG, marginBottom: 8, textAlign: 'center' },
+  emptyBody:  { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20 },
 });

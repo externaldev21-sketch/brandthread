@@ -12,8 +12,8 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import {
-  getBuyerProduct, getBuyerProductByName, addToCart, createBuyNowSession,
-  getCart, calculateCartSummary,
+  addToCart, createBuyNowSession,
+  getCart,
 } from '@/services/cartService';
 import { BuyerProduct, BuyerProductOption, BuyerProductVariant, CheckoutAttribution } from '@/services/cartTypes';
 import { useApi } from '@/hooks/useApi';
@@ -69,7 +69,7 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
   return {
     id:                 row.id,
     sellerId:           row.ownerId,
-    sellerName:         row.sellerDisplayName ?? 'Seller',
+    sellerName:         row.sellerDisplayName ?? 'Independent Seller',
     sellerHandle:       '',
     name:               row.name,
     description:        row.description ?? '',
@@ -77,10 +77,10 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
     imageUris:          row.images ?? [],
     category:           row.category ?? 'apparel',
     isPreOrder:           row.isPreOrder           ?? false,
-    preOrderClosingDate:  row.preOrderClosingDate ? new Date(row.preOrderClosingDate) : undefined,
-    preOrderEstShipDate:  row.preOrderEstShipDate ? new Date(row.preOrderEstShipDate) : undefined,
-    cancellationPolicy:   'All sales final unless the item arrives damaged.',
-    refundPolicy:       'Contact seller within 7 days of delivery for returns.',
+    preOrderClosingDate:  row.preOrderClosingDate ? new Date(row.preOrderClosingDate).toISOString() : undefined,
+    preOrderEstShipDate:  row.preOrderEstShipDate ? new Date(row.preOrderEstShipDate).toISOString() : undefined,
+    cancellationPolicy:   'All sales final. Returns accepted only for damaged or incorrect items.',
+    refundPolicy:       'Contact the seller within 7 days of delivery to start a return.',
     options,
     variants,
     isActive:           true,
@@ -250,9 +250,8 @@ const qs = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function BuyerProductDetailScreen() {
-  const { productId, productName, sourcePostId, sourceTagId } = useLocalSearchParams<{
+  const { productId, sourcePostId, sourceTagId } = useLocalSearchParams<{
     productId?: string;
-    productName?: string;
     sourcePostId?: string;
     sourceTagId?: string;
   }>();
@@ -284,26 +283,22 @@ export default function BuyerProductDetailScreen() {
         let prod: BuyerProduct | null = null;
 
         if (productId) {
-          // Attempt to load the live product from the public API first.
-          // This ensures that DB product UUIDs from the discover feed carry real
-          // variant IDs so the checkout server can look them up.
+          // Load the live product from the public API.
+          // DB product UUIDs from the discover feed carry real variant IDs
+          // so the checkout server can look them up correctly.
           try {
             const row = await api.publicProducts.get(productId);
             if (row && !row.error) prod = adaptApiProductToBuyerProduct(row);
-          } catch { /* fall through to demo data */ }
-
-          // Fall back to local demo data (for hardcoded discover items that use
-          // non-UUID ids like prod_canvas_cargo, or when the server is offline).
-          if (!prod) prod = await getBuyerProduct(productId);
-        } else if (productName) {
-          prod = await getBuyerProductByName(productName);
+          } catch { /* API unavailable — product will show as not found */ }
         }
+        // productName-only navigation is not supported; all entry points
+        // must supply a productId so real variant data is loaded.
 
         setProduct(prod);
       } catch {}
       setLoading(false);
     })();
-  }, [productId, productName]);
+  }, [productId]);
 
   useEffect(() => {
     if (!product?.id) return;
@@ -390,7 +385,7 @@ export default function BuyerProductDetailScreen() {
     try {
       await (api as any).waitlist.join(product.id, variant.id);
       setWaitlistJoined(true);
-      Alert.alert("You're on the list", "We'll send a push notification when this item is restocked.");
+      Alert.alert("You're on the waitlist", "We'll notify you the moment this drops back in stock.");
     } catch { Alert.alert('Error', 'Could not join waitlist. Please try again.'); }
     finally { setWaitlistLoading(false); }
   }
@@ -402,7 +397,7 @@ export default function BuyerProductDetailScreen() {
     try {
       await (api as any).buyer.reserve(product.id);
       setReserved(true);
-      Alert.alert('Reserved!', "You're on the list. We'll notify you when production is confirmed.");
+      Alert.alert('Reserved!', "Spot secured. We'll notify you once production is confirmed.");
     } catch { Alert.alert('Error', 'Could not reserve. Please try again.'); }
     finally { setReserveLoading(false); }
   }
@@ -608,7 +603,7 @@ export default function BuyerProductDetailScreen() {
 
           {/* Description */}
           <View style={s.divider} />
-          <Text style={s.descTitle}>About this product</Text>
+          <Text style={s.descTitle}>About this piece</Text>
           <Text style={s.desc}>{product.description}</Text>
 
           {/* Policies */}

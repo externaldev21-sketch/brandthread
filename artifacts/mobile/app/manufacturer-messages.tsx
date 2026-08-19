@@ -570,7 +570,7 @@ export default function ManufacturerMessagesScreen() {
       <View style={{ paddingTop: insets.top, backgroundColor: BG, borderBottomWidth: 1, borderBottomColor: BORDER }}>
         <BrandthreadHeader
           title={mfrDisplayName}
-          subtitle={mode === 'api' ? 'Connected' : 'Demo Mode'}
+          subtitle={mode === 'api' ? 'Connected' : 'Offline'}
           onBack={() => router.back()}
           rightElement={
             <TouchableOpacity

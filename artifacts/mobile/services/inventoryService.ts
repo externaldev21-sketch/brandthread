@@ -1,6 +1,8 @@
 /**
- * Brandthread Inventory Service — demo layer with AsyncStorage persistence.
+ * Brandthread Inventory Service — AsyncStorage-backed persistence.
  * Single source of truth for all inventory quantities and events.
+ * Starts empty; data is created by sellers via adjustments/transfers/incoming.
+ * Real API failures propagate; no demo seed data substituted.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -32,15 +34,28 @@ const KEYS = {
   counts:      'inv:counts:v1',
 };
 
+/** One-time migration marker — written after legacy demo records are purged. */
+const INV_MIGRATION_V1_KEY = 'inv:migration_v1_demo_purged';
+
+// ─── Known legacy demo IDs (seeded in v1 demo build) ─────────────────────────
+// These exact IDs are removed on first run to clear stale demo data from devices
+// that ran the previous demo build. Legitimate user-created records are never
+// affected because user records receive random IDs from uid().
+
+const LEGACY_DEMO_ITEM_IDS        = new Set(['inv_001','inv_002','inv_003','inv_004','inv_005','inv_006']);
+const LEGACY_DEMO_ADJUSTMENT_IDS  = new Set(['adj_001','adj_002']);
+const LEGACY_DEMO_EVENT_IDS       = new Set(['evt_001','evt_002']);
+const LEGACY_DEMO_TRANSFER_IDS    = new Set(['trf_001']);
+const LEGACY_DEMO_INCOMING_IDS    = new Set(['inc_001','inc_002']);
+const LEGACY_DEMO_ALERT_IDS       = new Set(['alr_001','alr_002']);
+const LEGACY_DEMO_LOCATION_IDS    = new Set(['loc_main','loc_studio']);
+
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
 function uid(): string { return Math.random().toString(36).slice(2, 11); }
 function now(): string { return new Date().toISOString(); }
 function daysFromNow(n: number): string {
   const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString();
-}
-function daysAgo(n: number): string {
-  const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString();
 }
 
 function computeStatus(item: InventoryItem): InventoryStatus {
@@ -51,182 +66,6 @@ function computeStatus(item: InventoryItem): InventoryStatus {
   if (item.incoming > 0 && item.available === 0) return 'incoming';
   return 'available';
 }
-
-// ─── Demo seed data ───────────────────────────────────────────────────────────
-
-const DEFAULT_LOCATION: InventoryLocation = {
-  id: 'loc_main', name: 'Main Warehouse', type: 'warehouse',
-  address: '123 Commerce St, Los Angeles, CA 90001',
-  isPrimary: true, fulfillmentEnabled: true, isArchived: false,
-  totalUnits: 247, availableUnits: 198, reservedUnits: 32,
-  incomingUnits: 17, lowStockCount: 2,
-  createdAt: daysAgo(30), updatedAt: now(),
-};
-
-const STUDIO_LOCATION: InventoryLocation = {
-  id: 'loc_studio', name: 'Home Studio', type: 'home_studio',
-  address: '456 Creator Ave, Los Angeles, CA 90010',
-  isPrimary: false, fulfillmentEnabled: true, isArchived: false,
-  totalUnits: 43, availableUnits: 38, reservedUnits: 5,
-  incomingUnits: 0, lowStockCount: 1,
-  createdAt: daysAgo(20), updatedAt: now(),
-};
-
-function makeLevel(locationId: string, locationName: string, onHand: number, reserved = 0, incoming = 0, damaged = 0): InventoryLevel {
-  return { locationId, locationName, onHand, available: Math.max(0, onHand - reserved), reserved, incoming, damaged, unavailable: 0 };
-}
-
-const DEMO_ITEMS: InventoryItem[] = [
-  {
-    id: 'inv_001', productId: 'p1', productName: 'Oversized Hoodie', variantId: 'v1a',
-    variantLabel: 'Black / L', sku: 'HOD-BLK-L', barcode: '094922356789',
-    cost: 28, retailPrice: 98, onHand: 42, available: 35, reserved: 7, incoming: 0,
-    committed: 0, damaged: 0, unavailable: 0, lowStockThreshold: 10,
-    oversellPolicy: 'block', trackInventory: true, status: 'available',
-    inventoryValue: 42 * 28, fulfillmentType: 'seller',
-    levels: [makeLevel('loc_main', 'Main Warehouse', 30, 7), makeLevel('loc_studio', 'Home Studio', 12, 0)],
-    createdAt: daysAgo(30), updatedAt: now(),
-  },
-  {
-    id: 'inv_002', productId: 'p1', productName: 'Oversized Hoodie', variantId: 'v1b',
-    variantLabel: 'Black / M', sku: 'HOD-BLK-M', barcode: '094922356790',
-    cost: 28, retailPrice: 98, onHand: 8, available: 6, reserved: 2, incoming: 15,
-    committed: 0, damaged: 0, unavailable: 0, lowStockThreshold: 10,
-    oversellPolicy: 'block', trackInventory: true, status: 'low_stock',
-    inventoryValue: 8 * 28, fulfillmentType: 'seller',
-    levels: [makeLevel('loc_main', 'Main Warehouse', 8, 2, 15)],
-    createdAt: daysAgo(30), updatedAt: now(),
-  },
-  {
-    id: 'inv_003', productId: 'p1', productName: 'Oversized Hoodie', variantId: 'v1c',
-    variantLabel: 'Grey / XL', sku: 'HOD-GRY-XL', barcode: '094922356791',
-    cost: 28, retailPrice: 98, onHand: 0, available: 0, reserved: 0, incoming: 0,
-    committed: 0, damaged: 0, unavailable: 0, lowStockThreshold: 10,
-    oversellPolicy: 'block', trackInventory: true, status: 'out_of_stock',
-    inventoryValue: 0, fulfillmentType: 'seller',
-    levels: [makeLevel('loc_main', 'Main Warehouse', 0)],
-    createdAt: daysAgo(30), updatedAt: now(),
-  },
-  {
-    id: 'inv_004', productId: 'p2', productName: 'Logo Tee', variantId: 'v2a',
-    variantLabel: 'White / M', sku: 'TEE-WHT-M', barcode: '094922356792',
-    cost: 8, retailPrice: 32, onHand: 85, available: 78, reserved: 7, incoming: 0,
-    committed: 0, damaged: 2, unavailable: 0, lowStockThreshold: 15,
-    oversellPolicy: 'allow', trackInventory: true, status: 'available',
-    inventoryValue: 85 * 8, fulfillmentType: 'seller',
-    levels: [makeLevel('loc_main', 'Main Warehouse', 55, 7, 0, 2), makeLevel('loc_studio', 'Home Studio', 30, 0)],
-    createdAt: daysAgo(25), updatedAt: now(),
-  },
-  {
-    id: 'inv_005', productId: 'p3', productName: 'Track Jacket', variantId: 'v3a',
-    variantLabel: 'Navy / L', sku: 'TRK-NVY-L', barcode: '094922356793',
-    cost: 45, retailPrice: 145, onHand: 0, available: 0, reserved: 0, incoming: 0,
-    committed: 12, damaged: 0, unavailable: 0, lowStockThreshold: 5,
-    oversellPolicy: 'convert_to_preorder', trackInventory: true, status: 'pre_order',
-    inventoryValue: 0, fulfillmentType: 'manufacturer', manufacturerId: 'mfg_001',
-    levels: [],
-    createdAt: daysAgo(14), updatedAt: now(),
-  },
-  {
-    id: 'inv_006', productId: 'p4', productName: 'Vintage Cap', variantId: 'v4a',
-    variantLabel: 'Washed Black / One Size', sku: 'CAP-BLK-OS', barcode: '094922356794',
-    cost: 12, retailPrice: 45, onHand: 120, available: 115, reserved: 5, incoming: 30,
-    committed: 0, damaged: 0, unavailable: 0, lowStockThreshold: 20,
-    oversellPolicy: 'block', trackInventory: true, status: 'available',
-    inventoryValue: 120 * 12, fulfillmentType: 'seller',
-    levels: [makeLevel('loc_main', 'Main Warehouse', 120, 5, 30)],
-    createdAt: daysAgo(20), updatedAt: now(),
-  },
-];
-
-const DEMO_ADJUSTMENTS: InventoryAdjustment[] = [
-  {
-    id: 'adj_001', itemId: 'inv_001', productId: 'p1', productName: 'Oversized Hoodie',
-    variantLabel: 'Black / L', locationId: 'loc_main', locationName: 'Main Warehouse',
-    type: 'received_stock', quantityBefore: 30, quantityChange: 12, quantityAfter: 42,
-    availableBefore: 23, availableAfter: 35, inventoryValueImpact: 12 * 28,
-    reason: 'Received from supplier', teamMember: 'Seller', createdAt: daysAgo(3),
-  },
-  {
-    id: 'adj_002', itemId: 'inv_004', productId: 'p2', productName: 'Logo Tee',
-    variantLabel: 'White / M', locationId: 'loc_main', locationName: 'Main Warehouse',
-    type: 'damage', quantityBefore: 87, quantityChange: -2, quantityAfter: 85,
-    availableBefore: 80, availableAfter: 78, inventoryValueImpact: -2 * 8,
-    reason: 'Water damage during storage', teamMember: 'Seller', createdAt: daysAgo(5),
-  },
-];
-
-const DEMO_EVENTS: InventoryEvent[] = [
-  {
-    id: 'evt_001', itemId: 'inv_001', productId: 'p1', productName: 'Oversized Hoodie',
-    variantLabel: 'Black / L', locationId: 'loc_main', locationName: 'Main Warehouse',
-    type: 'adjustment', quantityBefore: 30, quantityChanged: 12, quantityAfter: 42,
-    reason: 'Received stock', source: 'Manual adjustment', teamMember: 'Seller', createdAt: daysAgo(3),
-  },
-  {
-    id: 'evt_002', itemId: 'inv_001', productId: 'p1', productName: 'Oversized Hoodie',
-    variantLabel: 'Black / L', locationId: 'loc_main', locationName: 'Main Warehouse',
-    type: 'reservation', quantityBefore: 42, quantityChanged: -7, quantityAfter: 35,
-    reason: 'Order #1042 reserved 7 units', source: 'Order', relatedOrderId: 'ord_001',
-    teamMember: 'System', createdAt: daysAgo(1),
-  },
-];
-
-const DEMO_TRANSFERS: InventoryTransfer[] = [
-  {
-    id: 'trf_001', transferNumber: 'TRF-0001',
-    sourceLocationId: 'loc_main', sourceLocationName: 'Main Warehouse',
-    destinationLocationId: 'loc_studio', destinationLocationName: 'Home Studio',
-    status: 'in_transit',
-    items: [
-      { itemId: 'inv_001', productId: 'p1', productName: 'Oversized Hoodie', variantLabel: 'Black / L', sku: 'HOD-BLK-L', quantitySent: 5, quantityReceived: 0, quantityDamaged: 0, quantityMissing: 0 },
-    ],
-    trackingNumber: 'UPS1234567890', notes: 'Replenishing studio stock',
-    expectedArrival: daysFromNow(2), shippedAt: daysAgo(1),
-    hasDiscrepancy: false, createdAt: daysAgo(2), updatedAt: now(),
-  },
-];
-
-const DEMO_INCOMING: IncomingInventory[] = [
-  {
-    id: 'inc_001', source: 'manufacturer',
-    itemId: 'inv_002', productId: 'p1', productName: 'Oversized Hoodie',
-    variantLabel: 'Black / M', sku: 'HOD-BLK-M', quantity: 15, receivedQuantity: 0, damagedQuantity: 0,
-    expectedDate: daysFromNow(5),
-    destinationLocationId: 'loc_main', destinationLocationName: 'Main Warehouse',
-    status: 'in_transit', trackingNumber: 'FDX9876543210',
-    manufacturerId: 'mfg_001', manufacturerName: 'Apex Apparel Co.',
-    productionOrderId: 'prod_001',
-    createdAt: daysAgo(7), updatedAt: now(),
-  },
-  {
-    id: 'inc_002', source: 'manufacturer',
-    itemId: 'inv_006', productId: 'p4', productName: 'Vintage Cap',
-    variantLabel: 'Washed Black / One Size', sku: 'CAP-BLK-OS', quantity: 30, receivedQuantity: 0, damagedQuantity: 0,
-    expectedDate: daysFromNow(12),
-    destinationLocationId: 'loc_main', destinationLocationName: 'Main Warehouse',
-    status: 'in_production',
-    manufacturerId: 'mfg_001', manufacturerName: 'Apex Apparel Co.',
-    createdAt: daysAgo(3), updatedAt: now(),
-  },
-];
-
-const DEMO_ALERTS: InventoryAlert[] = [
-  {
-    id: 'alr_001', itemId: 'inv_002', productId: 'p1', productName: 'Oversized Hoodie',
-    variantLabel: 'Black / M', sku: 'HOD-BLK-M',
-    level: 'low', available: 6, reserved: 2, incoming: 15, threshold: 10,
-    recentSalesRate: 1.4, daysOfStockEstimate: 4, suggestedRestockQty: 20,
-    isDismissed: false, isReviewed: false, createdAt: daysAgo(1), updatedAt: now(),
-  },
-  {
-    id: 'alr_002', itemId: 'inv_003', productId: 'p1', productName: 'Oversized Hoodie',
-    variantLabel: 'Grey / XL', sku: 'HOD-GRY-XL',
-    level: 'out_of_stock', available: 0, reserved: 0, incoming: 0, threshold: 10,
-    recentSalesRate: 0.8, daysOfStockEstimate: null, suggestedRestockQty: 15,
-    isDismissed: false, isReviewed: false, createdAt: daysAgo(2), updatedAt: now(),
-  },
-];
 
 // ─── In-memory store ──────────────────────────────────────────────────────────
 
@@ -260,32 +99,54 @@ async function persist() {
 async function ensureInitialized() {
   if (_init) return;
   _init = true;
+
+  // One-time migration: remove known legacy demo records on existing devices.
+  // Uses exact known IDs so no user-created record is ever removed.
+  const migrated = await AsyncStorage.getItem(INV_MIGRATION_V1_KEY).catch(() => null);
+  if (!migrated) {
+    try {
+      const pairs = await AsyncStorage.multiGet(Object.values(KEYS));
+      const updates: [string, string][] = [];
+      pairs.forEach(([k, v]) => {
+        if (!v) return;
+        try {
+          const arr: any[] = JSON.parse(v);
+          let filtered: any[];
+          if (k === KEYS.items)            filtered = arr.filter((x: any) => !LEGACY_DEMO_ITEM_IDS.has(x.id));
+          else if (k === KEYS.adjustments) filtered = arr.filter((x: any) => !LEGACY_DEMO_ADJUSTMENT_IDS.has(x.id));
+          else if (k === KEYS.events)      filtered = arr.filter((x: any) => !LEGACY_DEMO_EVENT_IDS.has(x.id));
+          else if (k === KEYS.transfers)   filtered = arr.filter((x: any) => !LEGACY_DEMO_TRANSFER_IDS.has(x.id));
+          else if (k === KEYS.incoming)    filtered = arr.filter((x: any) => !LEGACY_DEMO_INCOMING_IDS.has(x.id));
+          else if (k === KEYS.alerts)      filtered = arr.filter((x: any) => !LEGACY_DEMO_ALERT_IDS.has(x.id));
+          else if (k === KEYS.locations)   filtered = arr.filter((x: any) => !LEGACY_DEMO_LOCATION_IDS.has(x.id));
+          else return; // reservations, preorders, counts — no legacy demo data
+          if (filtered.length !== arr.length) updates.push([k, JSON.stringify(filtered)]);
+        } catch { /* skip malformed entry */ }
+      });
+      if (updates.length > 0) await AsyncStorage.multiSet(updates);
+    } catch { /* non-fatal */ }
+    await AsyncStorage.setItem(INV_MIGRATION_V1_KEY, '1').catch(() => {});
+  }
+
   try {
     const pairs = await AsyncStorage.multiGet(Object.values(KEYS));
     const map: Record<string, string | null> = {};
     pairs.forEach(([k, v]) => { map[k] = v; });
 
-    _items       = map[KEYS.items]        ? JSON.parse(map[KEYS.items]!)        : DEMO_ITEMS;
-    _locations   = map[KEYS.locations]    ? JSON.parse(map[KEYS.locations]!)    : [DEFAULT_LOCATION, STUDIO_LOCATION];
-    _adjustments = map[KEYS.adjustments]  ? JSON.parse(map[KEYS.adjustments]!)  : DEMO_ADJUSTMENTS;
-    _events      = map[KEYS.events]       ? JSON.parse(map[KEYS.events]!)       : DEMO_EVENTS;
-    _transfers   = map[KEYS.transfers]    ? JSON.parse(map[KEYS.transfers]!)    : DEMO_TRANSFERS;
-    _incoming    = map[KEYS.incoming]     ? JSON.parse(map[KEYS.incoming]!)     : DEMO_INCOMING;
-    _alerts      = map[KEYS.alerts]       ? JSON.parse(map[KEYS.alerts]!)       : DEMO_ALERTS;
-    _reservations= map[KEYS.reservations] ? JSON.parse(map[KEYS.reservations]!) : [];
-    _preorders   = map[KEYS.preorders]    ? JSON.parse(map[KEYS.preorders]!)    : [];
-    _counts      = map[KEYS.counts]       ? JSON.parse(map[KEYS.counts]!)       : [];
-
-    // Seed AsyncStorage on first run
-    if (!map[KEYS.items]) await persist();
+    _items        = map[KEYS.items]        ? JSON.parse(map[KEYS.items]!)        : [];
+    _locations    = map[KEYS.locations]    ? JSON.parse(map[KEYS.locations]!)    : [];
+    _adjustments  = map[KEYS.adjustments]  ? JSON.parse(map[KEYS.adjustments]!)  : [];
+    _events       = map[KEYS.events]       ? JSON.parse(map[KEYS.events]!)       : [];
+    _transfers    = map[KEYS.transfers]    ? JSON.parse(map[KEYS.transfers]!)    : [];
+    _incoming     = map[KEYS.incoming]     ? JSON.parse(map[KEYS.incoming]!)     : [];
+    _alerts       = map[KEYS.alerts]       ? JSON.parse(map[KEYS.alerts]!)       : [];
+    _reservations = map[KEYS.reservations] ? JSON.parse(map[KEYS.reservations]!) : [];
+    _preorders    = map[KEYS.preorders]    ? JSON.parse(map[KEYS.preorders]!)    : [];
+    _counts       = map[KEYS.counts]       ? JSON.parse(map[KEYS.counts]!)       : [];
   } catch {
-    _items = DEMO_ITEMS;
-    _locations = [DEFAULT_LOCATION, STUDIO_LOCATION];
-    _adjustments = DEMO_ADJUSTMENTS;
-    _events = DEMO_EVENTS;
-    _transfers = DEMO_TRANSFERS;
-    _incoming = DEMO_INCOMING;
-    _alerts = DEMO_ALERTS;
+    // All stores start empty on error — no demo fallback
+    _items = []; _locations = []; _adjustments = []; _events = [];
+    _transfers = []; _incoming = []; _alerts = [];
   }
 }
 
@@ -298,8 +159,8 @@ function addEvent(
   _events.unshift({
     id: 'evt_' + uid(), itemId: item.id, productId: item.productId,
     productName: item.productName, variantLabel: item.variantLabel,
-    locationId: item.levels[0]?.locationId ?? 'loc_main',
-    locationName: item.levels[0]?.locationName ?? 'Main Warehouse',
+    locationId: item.levels[0]?.locationId ?? 'unassigned',
+    locationName: item.levels[0]?.locationName ?? 'Unassigned',
     type, quantityBefore: qBefore, quantityChanged: qChanged, quantityAfter: qAfter,
     reason, source,
     relatedOrderId: refs?.orderId,
@@ -337,7 +198,7 @@ function apiRowToInventoryItem(row: any): InventoryItem {
     fulfillmentType:  'seller' as any,
     levels: [{
       locationId:   'default',
-      locationName: 'Default Location',
+      locationName: 'VS Fulfillment — LA',
       onHand:       row.stock,
       available:    row.stock,
       reserved:     0,
@@ -365,42 +226,20 @@ export async function getInventoryOverview(): Promise<InventoryOverview> {
       lowStockCount:         rows.filter(r => r.status === 'low_stock').length,
       outOfStockCount:       rows.filter(r => r.status === 'out_of_stock').length,
       inventoryValue:        rows.reduce((s, r) => s + r.stock * ((r.priceCents ?? 0) / 100), 0),
-      locationCount:         1,
+      locationCount:         0,
       unitsInProduction:     0,
       recentAdjustmentCount: 0,
     } as InventoryOverview;
-  } catch { /* fall through to local */ }
-  await ensureInitialized();
-  const items = _items;
-  return {
-    totalOnHand:     items.reduce((s, i) => s + i.onHand,    0),
-    totalAvailable:  items.reduce((s, i) => s + i.available, 0),
-    totalReserved:   items.reduce((s, i) => s + i.reserved,  0),
-    totalIncoming:   items.reduce((s, i) => s + i.incoming,  0),
-    totalCommitted:  items.reduce((s, i) => s + i.committed, 0),
-    totalDamaged:    items.reduce((s, i) => s + i.damaged,   0),
-    lowStockCount:   items.filter(i => i.status === 'low_stock').length,
-    outOfStockCount: items.filter(i => i.status === 'out_of_stock').length,
-    inventoryValue:  items.reduce((s, i) => s + i.inventoryValue, 0),
-    locationCount:   _locations.filter(l => !l.isArchived).length,
-    unitsInProduction: _incoming.filter(i => i.status === 'in_production').reduce((s, i) => s + i.quantity, 0),
-    recentAdjustmentCount: _adjustments.filter(a => {
-      const d = new Date(a.createdAt);
-      const week = new Date(); week.setDate(week.getDate() - 7);
-      return d > week;
-    }).length,
-  };
+  } catch (error) {
+    throw error;
+  }
 }
 
 // ─── Public API — Items ───────────────────────────────────────────────────────
 
 export async function getInventoryItems(): Promise<InventoryItem[]> {
-  try {
-    const rows = await serviceRequest<any[]>('/api/inventory');
-    _items = rows.map(apiRowToInventoryItem);
-    return [..._items];
-  } catch { /* fall through to local */ }
-  await ensureInitialized();
+  const rows = await serviceRequest<any[]>('/api/inventory');
+  _items = rows.map(apiRowToInventoryItem);
   return [..._items];
 }
 
@@ -899,7 +738,7 @@ export async function processReturnInventory(itemId: string, quantity: number, d
     default:              type = 'other'; break;
   }
   await adjustStock({
-    itemId, locationId: _locations.find(l => l.isPrimary)?.id ?? 'loc_main',
+    itemId, locationId: _locations.find(l => l.isPrimary)?.id ?? 'unassigned',
     type, quantityChange: disposition === 'restock' ? quantity : 0,
     reason: `Return processed — ${disposition}`, relatedReturnId: returnId,
   });
@@ -963,7 +802,7 @@ export async function completeCount(countId: string): Promise<InventoryCount | u
     if (ci.countedQty !== null && ci.discrepancy !== null && ci.discrepancy !== 0) {
       await adjustStock({
         itemId: ci.itemId,
-        locationId: count.locationId ?? _locations.find(l => l.isPrimary)?.id ?? 'loc_main',
+        locationId: count.locationId ?? _locations.find(l => l.isPrimary)?.id ?? 'unassigned',
         type: 'manual_count',
         quantityChange: ci.discrepancy,
         reason: `Inventory count ${count.countNumber}`,
@@ -1017,7 +856,7 @@ export function getRestockRecommendations(items: InventoryItem[]): RestockRecomm
         leadTimeDays: leadDays, preOrderCommitments: i.committed,
         suggestedQty: toOrder,
         urgency: i.available === 0 ? 'critical' : i.available <= Math.floor(i.lowStockThreshold / 2) ? 'urgent' : 'normal',
-        note: `Based on ~${salesRate} units/day × ${leadDays}-day lead time. Estimate only.`,
+        note: `Based on ~${salesRate} units/day × ${leadDays}-day lead time (Vault Studio avg). Estimate only.`,
       } as RestockRecommendation;
     });
 }

@@ -154,7 +154,7 @@ export default function PayoutsScreen() {
             <View style={{ alignItems: 'center', paddingVertical: 40 }}>
               <Feather name="inbox" size={28} color={MUTED} />
               <Text style={{ color: MUTED, fontSize: FS.sm, fontFamily: FONT.regular, marginTop: 10 }}>
-                {balance?.connected === false ? 'Connect Stripe to see payouts' : 'No payouts yet'}
+                {balance?.connected === false ? 'Connect Stripe to receive payouts' : 'No payouts yet'}
               </Text>
             </View>
           ) : (
@@ -182,7 +182,7 @@ export default function PayoutsScreen() {
           <View style={styles.bankCard}>
             <Feather name="credit-card" size={20} color={PURPLE} />
             <View style={{ flex: 1, marginLeft: SP.md }}>
-              <Text style={styles.bankLabel}>Chase Business ···4242</Text>
+              <Text style={styles.bankLabel}>Bank account ···{balance?.bankLast4 ?? '——'}</Text>
               <Text style={styles.bankSub}>Default payout account</Text>
             </View>
             <View style={[styles.statusPill, { backgroundColor: `${SUCCESS}20` }]}>
@@ -193,7 +193,7 @@ export default function PayoutsScreen() {
           <View style={styles.settingsSection}>
             <Text style={styles.sectionTitle}>Payout schedule</Text>
             {[
-              { label: 'Frequency',     value: 'Weekly (every Monday)' },
+              { label: 'Frequency',     value: 'Weekly' },
               { label: 'Minimum',       value: '$1.00' },
               { label: 'Currency',      value: 'USD' },
             ].map((r) => (

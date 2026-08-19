@@ -29,7 +29,7 @@ import {
 } from '@/components/BrandthreadUI';
 import {
   getProducts, getProductStats, archiveProduct, unarchiveProduct,
-  deleteProduct, duplicateProduct, listDrafts, deleteDraft, DEMO_FULL_PRODUCTS,
+  deleteProduct, duplicateProduct, listDrafts, deleteDraft,
 } from '@/services/productService';
 import { Product, ProductDraft, ProductFilter, ProductCategory } from '@/services/productTypes';
 

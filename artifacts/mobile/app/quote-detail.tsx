@@ -252,6 +252,15 @@ export default function QuoteDetailScreen() {
 
   const handleStartSample = async () => {
     if (!quote) return;
+    // Sample orders are persisted against real manufacturer records. Legacy
+    // offline/demo quote IDs are intentionally not sent to the API.
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(quote.manufacturerId)) {
+      Alert.alert(
+        'Sample unavailable',
+        'This quote is a local preview and cannot start a real sample order. Choose a manufacturer from the live directory and request a fresh quote.',
+      );
+      return;
+    }
     setActionLoading(true);
     try {
       const sample = await createSample({
@@ -262,6 +271,8 @@ export default function QuoteDetailScreen() {
         cost: quote.sampleCost,
       });
       router.push({ pathname: '/sample-detail', params: { id: sample.id } } as any);
+    } catch (err: any) {
+      Alert.alert('Could not start sample', err?.message ?? 'Please try again after refreshing the quote.');
     } finally {
       setActionLoading(false);
     }

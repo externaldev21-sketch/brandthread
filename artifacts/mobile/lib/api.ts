@@ -120,7 +120,7 @@ export function createApi(getToken: GetToken) {
   return {
     auth: {
       sync:        ()             => post('/api/auth/sync', {}),
-      me:          ()             => get('/api/auth/me'),
+      me:          ()             => get<{ accountType?: 'buyer' | 'seller' }>('/api/auth/me'),
       onboarding:  (body: unknown) => patch('/api/auth/onboarding', body),
       /** Check whether a username handle is available for the current user.
        *  Returns { available: true } if free (or already owned by this user),
@@ -136,6 +136,7 @@ export function createApi(getToken: GetToken) {
         website?:     string;
         name?:        string;
         username?:    string;
+        accountType?: 'buyer' | 'seller';
       }) => patch<any>('/api/auth/profile', body),
     },
     products: {

@@ -115,7 +115,7 @@ export default function BuyerInviteScreen() {
             </View>
             <Text style={styles.heroTitle}>Invite to Brandthread</Text>
             <Text style={styles.heroSub}>
-              Share your invite code with friends. When they join, they're linked to you — rewards coming soon.
+              Share your invite code with friends. When they join, they're linked to your account.
             </Text>
           </LinearGradient>
 
