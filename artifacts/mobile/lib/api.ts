@@ -141,6 +141,8 @@ export function createApi(getToken: GetToken) {
     },
     products: {
       list:           ()                       => get('/api/products'),
+      publicList:     (ownerId?: string)       =>
+        get<any[]>(`/api/public/products${ownerId ? `?ownerId=${encodeURIComponent(ownerId)}` : ''}`),
       get:            (id: string)             => get(`/api/products/${id}`),
       create:         (body: unknown)          => post('/api/products', body),
       update:         (id: string, body: unknown) => put(`/api/products/${id}`, body),
@@ -608,6 +610,8 @@ export function createApi(getToken: GetToken) {
         mediaUrl?: string; mediaType?: string; caption?: string;
         styleTags?: string[]; taggedProductIds?: string[];
       }) => post<any>('/api/posts', body),
+      publicList: (ownerId?: string) =>
+        get<any[]>(`/api/public/posts${ownerId ? `?ownerId=${encodeURIComponent(ownerId)}` : ''}`),
       get: (id: string) => get<any>(`/api/posts/${encodeURIComponent(id)}`),
       interact: (id: string, body: { type: 'like' | 'repost' | 'watch_time' | 'shop_click'; value?: string }) =>
         post<{ action: string; count?: number }>(`/api/posts/${encodeURIComponent(id)}/interact`, body),

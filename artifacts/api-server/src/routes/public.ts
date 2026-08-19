@@ -17,23 +17,25 @@ let trendingInflight: Promise<void> | null = null;
 const router = Router();
 
 // GET /api/public/products
-// Optional query params: ?category=apparel&tag=streetwear&limit=50&offset=0
+// Optional query params: ?category=apparel&tag=streetwear&ownerId=user_xxx&limit=50&offset=0
 router.get("/products", async (req, res) => {
   try {
-    const { category, tag, limit = "50", offset = "0" } = req.query as Record<string, string>;
+    const { category, tag, ownerId, limit = "50", offset = "0" } = req.query as Record<string, string>;
     const lim = Math.min(parseInt(limit, 10) || 50, 100);
     const off = parseInt(offset, 10) || 0;
 
-    // Fetch active products
-    let query = db
+    // Fetch active products, optionally scoped to a specific seller
+    const whereClause = ownerId
+      ? and(eq(products.status, "active"), eq(products.ownerId, ownerId))
+      : eq(products.status, "active");
+
+    const rows = await db
       .select()
       .from(products)
-      .where(eq(products.status, "active"))
+      .where(whereClause)
       .orderBy(desc(products.createdAt))
       .limit(lim)
       .offset(off);
-
-    const rows = await query;
 
     // Filter by category / tag in JS (keeps query simple; replace with DB filter for scale)
     let filtered = rows;
@@ -390,9 +392,10 @@ router.post("/sellers/:sellerId/visit", async (req, res) => {
 
 // ─── GET /api/public/posts ────────────────────────────────────────────────────
 // Paginated public feed of all seller posts, newest-first. No auth required.
-// Query params: ?limit=30&offset=0
+// Query params: ?ownerId=seller_xxx&limit=30&offset=0
 router.get("/posts", async (req, res) => {
   try {
+    const ownerId = req.query.ownerId as string | undefined;
     const lim = Math.min(parseInt((req.query.limit as string) || "30", 10) || 30, 50);
     const off = Math.max(parseInt((req.query.offset as string) || "0", 10) || 0, 0);
 
@@ -412,6 +415,7 @@ router.get("/posts", async (req, res) => {
       })
       .from(posts)
       .leftJoin(users, eq(users.clerkId, posts.userId))
+      .where(ownerId ? eq(posts.userId, ownerId) : undefined)
       .orderBy(desc(posts.createdAt))
       .limit(lim)
       .offset(off);

@@ -35,7 +35,13 @@ interface MsgAttachment {
   type: 'product' | 'order' | 'post' | 'profile';
   title?: string;
   subtitle?: string;
-  meta?: { productId?: string; orderId?: string };
+  meta?: {
+    productId?: string;
+    orderId?: string;
+    postId?: string;
+    authorName?: string;
+    mediaType?: string;
+  };
 }
 interface Msg {
   id: string; conversationId: string;
@@ -270,7 +276,9 @@ export default function SellerConversationScreen() {
             <TouchableOpacity
               style={s.attachCard}
               activeOpacity={
-                msg.attachment.type === 'product' || msg.attachment.type === 'order' ? 0.7 : 1
+                msg.attachment.type === 'product'
+                || msg.attachment.type === 'order'
+                || msg.attachment.type === 'post' ? 0.7 : 1
               }
               onPress={() => {
                 if (msg.attachment?.type === 'product') {
@@ -280,6 +288,19 @@ export default function SellerConversationScreen() {
                   }
                 } else if (msg.attachment?.type === 'order') {
                   router.push('/seller-orders' as never);
+                } else if (msg.attachment?.type === 'post') {
+                  const postId = msg.attachment.meta?.postId;
+                  if (postId) {
+                    const qs = [
+                      'postId=' + encodeURIComponent(postId),
+                      'postAuthorName=' + encodeURIComponent(msg.attachment.meta?.authorName ?? 'Seller'),
+                      'postCaption=' + encodeURIComponent(msg.attachment.title ?? ''),
+                      'postType=' + encodeURIComponent(msg.attachment.meta?.mediaType ?? 'photo'),
+                      'postMediaColor1=' + encodeURIComponent(PURPLE_DIM),
+                      'postMediaColor2=' + encodeURIComponent(BG),
+                    ].join('&');
+                    router.push(('/buyer-post-viewer?' + qs) as never);
+                  }
                 }
               }}
             >
@@ -292,7 +313,9 @@ export default function SellerConversationScreen() {
                   <Text style={s.attachSubtitle} numberOfLines={1}>{msg.attachment.subtitle}</Text>
                 ) : null}
               </View>
-              {(msg.attachment.type === 'product' || msg.attachment.type === 'order') && (
+              {(msg.attachment.type === 'product'
+                || msg.attachment.type === 'order'
+                || msg.attachment.type === 'post') && (
                 <Feather name="chevron-right" size={ICON.xs} color={MUTED} />
               )}
             </TouchableOpacity>

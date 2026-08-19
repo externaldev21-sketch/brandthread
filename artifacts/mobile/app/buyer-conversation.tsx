@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   KeyboardAvoidingView, Alert, Platform, StyleSheet, Dimensions,
-  ListRenderItemInfo,
+  ListRenderItemInfo, Modal, ScrollView, ActivityIndicator, Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -23,6 +23,26 @@ import {
 import type {
   Conversation, Message, MessageAttachment, ConversationParticipant,
 } from '@/services/socialTypes';
+import { useApi } from '@/lib/api';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type SellerProduct = {
+  id: string;
+  name: string;
+  images?: string[] | null;
+  variants?: Array<{ priceCents?: number | null }>;
+  category?: string | null;
+};
+
+type SellerPost = {
+  id: string;
+  userId: string;
+  mediaUrl?: string | null;
+  mediaType?: string | null;
+  caption?: string | null;
+  displayName?: string | null;
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -104,6 +124,7 @@ export default function BuyerConversationScreen() {
   }>();
 
   const flatListRef = useRef<FlatList<ListRow>>(null);
+  const api = useApi();
 
   const [conv, setConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -111,6 +132,15 @@ export default function BuyerConversationScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [replyTo, setReplyTo] = useState<Message | null>(null);
+
+  // Attachment state
+  const [selectedAttachment, setSelectedAttachment] = useState<MessageAttachment | null>(null);
+  const [showAttachmentPicker, setShowAttachmentPicker] = useState(false);
+  const [attachmentTab, setAttachmentTab] = useState<'product' | 'post'>('product');
+  const [sellerProducts, setSellerProducts] = useState<SellerProduct[]>([]);
+  const [sellerPosts, setSellerPosts] = useState<SellerPost[]>([]);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [postsLoading, setPostsLoading] = useState(false);
 
   // ── Load conversation + messages ────────────────────────────────────────────
 
@@ -174,33 +204,124 @@ export default function BuyerConversationScreen() {
 
   // ── Derived ─────────────────────────────────────────────────────────────────
 
-  const participant = conv?.participants[0] ?? null;
+  // API conversations include both participants, and SQL does not guarantee their
+  // order. Resolve the seller explicitly so attachment pickers never load the
+  // buyer's own catalog.
+  const participant = conv?.participants.find(
+    (p) => p.accountType === 'seller' && p.userId !== MY_USER_ID,
+  ) ?? conv?.participants.find((p) => p.accountType === 'seller')
+    ?? conv?.participants.find((p) => p.userId !== MY_USER_ID)
+    ?? conv?.participants[0]
+    ?? null;
   const displayName = participant?.name ?? params.participantName ?? 'Unknown';
   const displayHandle = participant?.handle ?? params.participantHandle ?? '';
   const isDisabled = conv?.isFriendshipActive === false;
-  const canSend = text.trim().length > 0 && !isDisabled && !isSending;
+  const canSend = (text.trim().length > 0 || selectedAttachment != null) && !isDisabled && !isSending;
 
   // Show "View store" button for any seller conversation (resolved or pre-created)
   const convType = conv?.type ?? params.type ?? '';
-  const isSellerConv = convType === 'buyer_to_seller' || convType === 'buyer_to_seller_product';
+  const isSellerConv = convType === 'buyer_to_seller'
+    || convType === 'buyer_to_seller_product'
+    || convType === 'buyer_to_seller_order';
   const sellerUserId = participant?.userId ?? params.participantId ?? '';
+
+  // ── Load seller products for attachment picker ───────────────────────────────
+
+  async function loadSellerProducts() {
+    if (!sellerUserId) return;
+    setProductsLoading(true);
+    try {
+      const data = await api.products.publicList(sellerUserId);
+      setSellerProducts(data ?? []);
+    } catch {
+      setSellerProducts([]);
+      Alert.alert('Could not load products', 'Please try again in a moment.');
+    } finally {
+      setProductsLoading(false);
+    }
+  }
+
+  async function loadSellerPosts() {
+    if (!sellerUserId) return;
+    setPostsLoading(true);
+    try {
+      const data = await api.posts.publicList(sellerUserId);
+      setSellerPosts(data ?? []);
+    } catch {
+      setSellerPosts([]);
+      Alert.alert('Could not load posts', 'Please try again in a moment.');
+    } finally {
+      setPostsLoading(false);
+    }
+  }
+
+  function openAttachmentPicker() {
+    if (!isSellerConv || !sellerUserId) {
+      Alert.alert('Attachments', 'You can attach products or posts when messaging a seller.');
+      return;
+    }
+    setShowAttachmentPicker(true);
+    if (sellerProducts.length === 0) {
+      loadSellerProducts();
+    }
+    if (sellerPosts.length === 0) {
+      loadSellerPosts();
+    }
+  }
+
+  function pickProduct(product: SellerProduct) {
+    const prices = (product.variants ?? [])
+      .map((variant) => variant.priceCents ?? 0)
+      .filter((price) => price > 0);
+    const lowestPrice = prices.length > 0 ? Math.min(...prices) / 100 : null;
+    const attachment: MessageAttachment = {
+      type: 'product',
+      title: product.name,
+      subtitle: `${lowestPrice == null ? 'Product' : `$${lowestPrice.toFixed(2)}`}${product.category ? ` · ${product.category}` : ''}`,
+      accentColor: PURPLE,
+      uri: product.images?.[0] ?? undefined,
+      meta: { productId: product.id },
+    };
+    setSelectedAttachment(attachment);
+    setShowAttachmentPicker(false);
+  }
+
+  function pickPost(post: SellerPost) {
+    const attachment: MessageAttachment = {
+      type: 'post',
+      title: post.caption?.trim() || 'Seller post',
+      subtitle: `${displayName} · ${post.mediaType ?? 'post'}`,
+      accentColor: PURPLE,
+      uri: post.mediaUrl ?? undefined,
+      meta: {
+        postId: post.id,
+        authorName: post.displayName ?? displayName,
+        mediaType: post.mediaType ?? 'photo',
+      },
+    };
+    setSelectedAttachment(attachment);
+    setShowAttachmentPicker(false);
+  }
 
   // ── Send message ────────────────────────────────────────────────────────────
 
   async function handleSend() {
     if (!conv || !canSend) return;
     const t = text.trim();
+    const att = selectedAttachment;
     setText('');
+    setSelectedAttachment(null);
     setReplyTo(null);
     setIsSending(true);
     try {
-      await sendMessage(conv.id, t);
+      await sendMessage(conv.id, t, att ?? undefined);
       const msgs = await getMessages(conv.id);
       setMessages(msgs);
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 50);
     } catch (e) {
       Alert.alert('Error', 'Failed to send message. Please try again.');
       setText(t);
+      setSelectedAttachment(att);
     } finally {
       setIsSending(false);
     }
@@ -354,11 +475,15 @@ export default function BuyerConversationScreen() {
             },
           ]}
         >
-          {/* Attachment — tappable for product/order types */}
+          {/* Attachment — tappable for product/order/post types */}
           {msg.attachment && (
             <TouchableOpacity
               style={s.attachCard}
-              activeOpacity={msg.attachment.type === 'product' || msg.attachment.type === 'order' ? 0.7 : 1}
+              activeOpacity={
+                msg.attachment.type === 'product'
+                || msg.attachment.type === 'order'
+                || msg.attachment.type === 'post' ? 0.7 : 1
+              }
               onPress={() => {
                 if (msg.attachment?.type === 'product') {
                   const productId = msg.attachment.meta?.productId;
@@ -369,6 +494,23 @@ export default function BuyerConversationScreen() {
                   }
                 } else if (msg.attachment?.type === 'order') {
                   router.push('/(buyer)/orders' as never);
+                } else if (msg.attachment?.type === 'post') {
+                  const postId = msg.attachment.meta?.postId;
+                  if (postId) {
+                    const postAuthorName = msg.attachment.meta?.authorName ?? participant?.name ?? 'Seller';
+                    const postType = msg.attachment.meta?.mediaType ?? 'photo';
+                    const qs = [
+                      'postId=' + encodeURIComponent(postId),
+                      'postAuthorName=' + encodeURIComponent(postAuthorName),
+                      'postAuthorInitials=' + encodeURIComponent(participant?.initials ?? '?'),
+                      'postAuthorColor=' + encodeURIComponent(participant?.color ?? PURPLE),
+                      'postCaption=' + encodeURIComponent(msg.attachment.title ?? ''),
+                      'postMediaColor1=' + encodeURIComponent(PURPLE_DIM),
+                      'postMediaColor2=' + encodeURIComponent(BG),
+                      'postType=' + encodeURIComponent(postType),
+                    ].join('&');
+                    router.push(('/buyer-post-viewer?' + qs) as never);
+                  }
                 }
               }}
             >
@@ -385,7 +527,9 @@ export default function BuyerConversationScreen() {
                   <Text style={s.attachSubtitle} numberOfLines={1}>{msg.attachment.subtitle}</Text>
                 ) : null}
               </View>
-              {(msg.attachment.type === 'product' || msg.attachment.type === 'order') && (
+              {(msg.attachment.type === 'product'
+                || msg.attachment.type === 'order'
+                || msg.attachment.type === 'post') && (
                 <Feather name="chevron-right" size={ICON.xs} color={MUTED} />
               )}
             </TouchableOpacity>
@@ -584,17 +728,34 @@ export default function BuyerConversationScreen() {
 
       {/* Input row */}
       {!isDisabled ? (
-        <View style={[s.inputRow, { paddingBottom: insets.bottom + SP.sm }]}>
+        <View>
+          {selectedAttachment && (
+            <View style={s.selectedAttachment}>
+              <Feather
+                name={selectedAttachment.type === 'post' ? 'image' : 'shopping-bag'}
+                size={ICON.sm}
+                color={PURPLE}
+              />
+              <View style={{ flex: 1, marginLeft: SP.sm }}>
+                <Text style={s.selectedAttachmentLabel}>
+                  {selectedAttachment.type === 'post' ? 'Post attached' : 'Product attached'}
+                </Text>
+                <Text style={s.selectedAttachmentTitle} numberOfLines={1}>
+                  {selectedAttachment.title}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setSelectedAttachment(null)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Feather name="x" size={ICON.sm} color={MUTED} />
+              </TouchableOpacity>
+            </View>
+          )}
+          <View style={[s.inputRow, { paddingBottom: insets.bottom + SP.sm }]}>
           {/* Attach */}
           <TouchableOpacity
-            onPress={() => {
-              Alert.alert('Attach', undefined, [
-                { text: 'Attach product', onPress: () => {} },
-                { text: 'Attach post',    onPress: () => {} },
-                { text: 'Attach order',   onPress: () => {} },
-                { text: 'Cancel',         style: 'cancel' },
-              ]);
-            }}
+            onPress={openAttachmentPicker}
             style={s.attachBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
@@ -626,12 +787,151 @@ export default function BuyerConversationScreen() {
           >
             <Feather name="send" size={ICON.sm} color={canSend ? PURPLE : MUTED} />
           </TouchableOpacity>
+          </View>
         </View>
       ) : (
         <View style={[s.inputRow, s.disabledInputRow, { paddingBottom: insets.bottom + SP.sm }]}>
           <Text style={s.disabledInputText}>Messaging disabled</Text>
         </View>
       )}
+
+      <Modal
+        visible={showAttachmentPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAttachmentPicker(false)}
+      >
+        <View style={s.modalBackdrop}>
+          <View style={s.productPicker}>
+            <View style={s.pickerHeader}>
+              <View>
+                <Text style={s.pickerTitle}>Attach to message</Text>
+                <Text style={s.pickerSubtitle}>Choose from {displayName}'s store</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowAttachmentPicker(false)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Feather name="x" size={ICON.md} color={MUTED} />
+              </TouchableOpacity>
+            </View>
+            <View style={s.attachmentTabs}>
+              <TouchableOpacity
+                style={[s.attachmentTab, attachmentTab === 'product' && s.attachmentTabActive]}
+                onPress={() => setAttachmentTab('product')}
+              >
+                <Feather name="shopping-bag" size={ICON.sm} color={attachmentTab === 'product' ? PURPLE : MUTED} />
+                <Text style={[s.attachmentTabText, attachmentTab === 'product' && s.attachmentTabTextActive]}>
+                  Products
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.attachmentTab, attachmentTab === 'post' && s.attachmentTabActive]}
+                onPress={() => setAttachmentTab('post')}
+              >
+                <Feather name="image" size={ICON.sm} color={attachmentTab === 'post' ? PURPLE : MUTED} />
+                <Text style={[s.attachmentTabText, attachmentTab === 'post' && s.attachmentTabTextActive]}>
+                  Posts
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {attachmentTab === 'product' ? (
+              productsLoading ? (
+                <View style={s.pickerLoading}>
+                  <ActivityIndicator color={PURPLE} />
+                  <Text style={s.pickerEmptyText}>Loading products…</Text>
+                </View>
+              ) : sellerProducts.length === 0 ? (
+                <View style={s.pickerLoading}>
+                  <Feather name="shopping-bag" size={ICON.lg} color={SUBTLE} />
+                  <Text style={s.pickerEmptyText}>No active products available.</Text>
+                </View>
+              ) : (
+                <ScrollView
+                  contentContainerStyle={s.productList}
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {sellerProducts.map((product) => {
+                    const prices = (product.variants ?? [])
+                      .map((variant) => variant.priceCents ?? 0)
+                      .filter((price) => price > 0);
+                    const lowestPrice = prices.length > 0 ? Math.min(...prices) / 100 : null;
+                    return (
+                      <TouchableOpacity
+                        key={product.id}
+                        style={s.productOption}
+                        onPress={() => pickProduct(product)}
+                        activeOpacity={0.75}
+                      >
+                        {product.images?.[0] ? (
+                          <Image source={{ uri: product.images[0] }} style={s.productThumb} />
+                        ) : (
+                          <View style={s.productThumbPlaceholder}>
+                            <Feather name="shopping-bag" size={ICON.md} color={PURPLE} />
+                          </View>
+                        )}
+                        <View style={{ flex: 1, marginLeft: SP.sm }}>
+                          <Text style={s.productOptionName} numberOfLines={1}>{product.name}</Text>
+                          <Text style={s.productOptionMeta} numberOfLines={1}>
+                            {lowestPrice == null ? 'Product' : `$${lowestPrice.toFixed(2)}`}
+                            {product.category ? ` · ${product.category}` : ''}
+                          </Text>
+                        </View>
+                        <Feather name="plus-circle" size={ICON.md} color={PURPLE} />
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              )
+            ) : (
+              postsLoading ? (
+                <View style={s.pickerLoading}>
+                  <ActivityIndicator color={PURPLE} />
+                  <Text style={s.pickerEmptyText}>Loading posts…</Text>
+                </View>
+              ) : sellerPosts.length === 0 ? (
+                <View style={s.pickerLoading}>
+                  <Feather name="image" size={ICON.lg} color={SUBTLE} />
+                  <Text style={s.pickerEmptyText}>No published posts available.</Text>
+                </View>
+              ) : (
+                <ScrollView
+                  contentContainerStyle={s.productList}
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {sellerPosts.map((post) => (
+                    <TouchableOpacity
+                      key={post.id}
+                      style={s.productOption}
+                      onPress={() => pickPost(post)}
+                      activeOpacity={0.75}
+                    >
+                      {post.mediaUrl ? (
+                        <Image source={{ uri: post.mediaUrl }} style={s.productThumb} />
+                      ) : (
+                        <View style={s.productThumbPlaceholder}>
+                          <Feather name="image" size={ICON.md} color={PURPLE} />
+                        </View>
+                      )}
+                      <View style={{ flex: 1, marginLeft: SP.sm }}>
+                        <Text style={s.productOptionName} numberOfLines={2}>
+                          {post.caption?.trim() || 'Seller post'}
+                        </Text>
+                        <Text style={s.productOptionMeta} numberOfLines={1}>
+                          {post.mediaType ?? 'post'} · {displayName}
+                        </Text>
+                      </View>
+                      <Feather name="plus-circle" size={ICON.md} color={PURPLE} />
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )
+            )}
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -818,6 +1118,26 @@ const s = StyleSheet.create({
     color: MUTED,
     marginTop: 1,
   },
+  selectedAttachment: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+    backgroundColor: CARD,
+    borderTopWidth: 1,
+    borderTopColor: BORDER,
+  },
+  selectedAttachmentLabel: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: PURPLE,
+  },
+  selectedAttachmentTitle: {
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    color: FG,
+    marginTop: 1,
+  },
 
   // Message text
   msgText: {
@@ -919,6 +1239,119 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     marginBottom: 2,
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.65)',
+  },
+  productPicker: {
+    maxHeight: '78%',
+    backgroundColor: BG,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    borderTopWidth: 1,
+    borderColor: BORDER,
+    paddingBottom: SP.xl,
+  },
+  pickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.md,
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+  },
+  pickerTitle: {
+    fontSize: FS.lg,
+    fontFamily: FONT.semibold,
+    color: FG,
+  },
+  pickerSubtitle: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: MUTED,
+    marginTop: 2,
+  },
+  attachmentTabs: {
+    flexDirection: 'row',
+    paddingHorizontal: SP.md,
+    paddingTop: SP.sm,
+    gap: SP.sm,
+  },
+  attachmentTab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SP.xs,
+    paddingVertical: SP.sm,
+    borderRadius: RADIUS.md,
+    backgroundColor: CARD,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  attachmentTabActive: {
+    backgroundColor: PURPLE_DIM,
+    borderColor: BORDER_ACTIVE,
+  },
+  attachmentTabText: {
+    fontSize: FS.sm,
+    fontFamily: FONT.medium,
+    color: MUTED,
+  },
+  attachmentTabTextActive: {
+    color: PURPLE,
+  },
+  pickerLoading: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 150,
+    gap: SP.sm,
+  },
+  pickerEmptyText: {
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    color: MUTED,
+  },
+  productList: {
+    padding: SP.md,
+    gap: SP.sm,
+  },
+  productOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SP.sm,
+    backgroundColor: CARD,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  productThumb: {
+    width: 52,
+    height: 52,
+    borderRadius: RADIUS.sm,
+    backgroundColor: CARD_ELEVATED,
+  },
+  productThumbPlaceholder: {
+    width: 52,
+    height: 52,
+    borderRadius: RADIUS.sm,
+    backgroundColor: PURPLE_DIM,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  productOptionName: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    color: FG,
+  },
+  productOptionMeta: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: MUTED,
+    marginTop: 3,
   },
 
   // Disabled input

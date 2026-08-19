@@ -17,7 +17,7 @@
 import { Router } from "express";
 import {
   db, conversations, conversationParticipants, messages, blocks, follows, users,
-  products, orders,
+  products, orders, posts,
 } from "@workspace/db";
 import { eq, and, desc, inArray, sql, or } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -356,14 +356,21 @@ router.post("/:id/messages", async (req, res) => {
 
   // ── Attachment validation ────────────────────────────────────────────────
   if (attachment != null) {
-    const att = attachment as { type?: string; title?: string; subtitle?: string; meta?: { productId?: string; orderId?: string } };
+    const att = attachment as {
+      type?: string;
+      title?: string;
+      subtitle?: string;
+      meta?: { productId?: string; orderId?: string; postId?: string };
+    };
     const allowedTypes = ["product", "order", "post", "profile"];
     if (!att.type || !allowedTypes.includes(att.type)) {
       return res.status(400).json({ error: "Invalid attachment type." });
     }
 
     if (att.type === "product") {
-      // productId is required and must belong to the sender with status 'active'
+      // productId is required; the product must be active and owned either by the sender
+      // (seller attaching their own product) or by another participant in the conversation
+      // (buyer attaching the seller's product they are asking about).
       const pid = att.meta?.productId;
       if (!pid) return res.status(400).json({ error: "Attachment product requires meta.productId." });
       const [product] = await db
@@ -372,8 +379,22 @@ router.post("/:id/messages", async (req, res) => {
         .where(eq(products.id, pid))
         .limit(1);
       if (!product) return res.status(400).json({ error: "Attached product not found." });
-      if (product.ownerId !== userId) return res.status(403).json({ error: "You can only attach your own products." });
       if (product.status !== "active") return res.status(400).json({ error: "Only active products can be attached." });
+      // Allow if sender owns the product OR the product belongs to another participant
+      if (product.ownerId !== userId) {
+        const [conversation] = await db
+          .select({ type: conversations.type })
+          .from(conversations)
+          .where(eq(conversations.id, id))
+          .limit(1);
+        const isSellerConversation = conversation?.type === "buyer_to_seller"
+          || conversation?.type === "buyer_to_seller_product"
+          || conversation?.type === "buyer_to_seller_order";
+        const isParticipantProduct = otherIds.includes(product.ownerId);
+        if (!isSellerConversation || !isParticipantProduct) {
+          return res.status(403).json({ error: "You can only attach products from this conversation's seller." });
+        }
+      }
     }
 
     if (att.type === "order") {
@@ -395,6 +416,31 @@ router.post("/:id/messages", async (req, res) => {
       if (order.ownerId !== userId) return res.status(403).json({ error: "You can only attach your own orders." });
       // Normalize meta to include the validated orderId
       (att as any).meta = { ...((att as any).meta ?? {}), orderId };
+    }
+
+    if (att.type === "post") {
+      const postId = att.meta?.postId;
+      if (!postId) return res.status(400).json({ error: "Attachment post requires meta.postId." });
+      const [post] = await db
+        .select({ id: posts.id, userId: posts.userId })
+        .from(posts)
+        .where(eq(posts.id, postId))
+        .limit(1);
+      if (!post) return res.status(400).json({ error: "Attached post not found." });
+      if (post.userId !== userId) {
+        const [conversation] = await db
+          .select({ type: conversations.type })
+          .from(conversations)
+          .where(eq(conversations.id, id))
+          .limit(1);
+        const isSellerConversation = conversation?.type === "buyer_to_seller"
+          || conversation?.type === "buyer_to_seller_product"
+          || conversation?.type === "buyer_to_seller_order";
+        if (!isSellerConversation || !otherIds.includes(post.userId)) {
+          return res.status(403).json({ error: "You can only attach posts from this conversation's seller." });
+        }
+      }
+      (att as any).meta = { ...((att as any).meta ?? {}), postId };
     }
   }
 
