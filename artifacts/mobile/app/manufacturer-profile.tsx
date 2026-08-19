@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator, Platform,
+  Alert, ActivityIndicator, Platform, Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -238,7 +238,7 @@ export default function ManufacturerProfileScreen() {
               <View style={s.overviewItem}>
                 <Feather name="zap" size={ICON.sm} color={GOLD} />
                 <Text style={s.overviewLabel}>Response</Text>
-                <Text style={s.overviewValue}>{m.responseTimeHours}h</Text>
+              <Text style={s.overviewValue}>{m.responseTimeHours > 0 ? `${m.responseTimeHours}h` : '—'}</Text>
               </View>
               <View style={s.overviewItem}>
                 <Feather name="calendar" size={ICON.sm} color={ORANGE} />
@@ -346,29 +346,20 @@ export default function ManufacturerProfileScreen() {
 
           {/* ── Gallery ── */}
           <SectionCard title="Gallery">
-            <GradientCard colors={GRAD_CARD_GLOW} style={s.galleryPlaceholder}>
-              <Feather name="image" size={ICON.xl} color={MUTED} style={{ alignSelf: 'center' }} />
-              <Text style={s.galleryText}>Factory images coming soon</Text>
-              <Text style={s.gallerySubText}>Photos and videos will be available once the manufacturer connects their profile.</Text>
-            </GradientCard>
+            {m.galleryUris.length > 0 ? (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.galleryRow}>
+                {m.galleryUris.map((uri, index) => (
+                  <Image key={`${uri}-${index}`} source={{ uri }} style={s.galleryImage} />
+                ))}
+              </ScrollView>
+            ) : (
+              <EmptyState icon="image" title="No factory photos yet" description="This manufacturer has not added production photos to their profile." />
+            )}
           </SectionCard>
 
           {/* ── Reviews ── */}
           <SectionCard title="Reviews">
-            {DEMO_REVIEWS.length === 0 ? (
-              <EmptyState icon="star" title="No reviews yet" description="Be the first to review this manufacturer after completing an order." />
-            ) : (
-              DEMO_REVIEWS.slice(0, 3).map(rev => (
-                <View key={rev.id} style={s.reviewCard}>
-                  <View style={s.reviewHeader}>
-                    <Text style={s.reviewerName}>{rev.sellerName}</Text>
-                    <Text style={s.reviewDate}>{rev.createdAt}</Text>
-                  </View>
-                  <StarRating rating={rev.rating} size={12} />
-                  <Text style={s.reviewComment}>{rev.comment}</Text>
-                </View>
-              ))
-            )}
+            <EmptyState icon="star" title="No reviews yet" description="Ratings will appear here after completed orders are reviewed." />
           </SectionCard>
 
           {/* ── Shipping ── */}
@@ -568,14 +559,15 @@ const s = StyleSheet.create({
   pricingValue: {
     fontSize: FS.md, fontFamily: FONT.bold, color: PURPLE_LIGHT,
   },
-  galleryPlaceholder: {
-    alignItems: 'center', padding: SP.xl, gap: SP.sm,
+  galleryRow: {
+    gap: SP.sm,
+    paddingRight: SP.sm,
   },
-  galleryText: {
-    fontSize: FS.base, fontFamily: FONT.semibold, color: MUTED, textAlign: 'center',
-  },
-  gallerySubText: {
-    fontSize: FS.sm, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', lineHeight: 18,
+  galleryImage: {
+    width: 220,
+    height: 150,
+    borderRadius: RADIUS.md,
+    backgroundColor: CARD_ELEVATED,
   },
   reviewCard: {
     backgroundColor: SURFACE, borderRadius: RADIUS.md, borderWidth: 1,

@@ -22,6 +22,7 @@
 - [Dev API routing](expo-public-api-base-url.md) — base URL must be domain ROOT; proxy forwards /api/* verbatim; /api-server/* returns SPA HTML with 200 (silent fallback trap); verify via Metro's /proc environ, not shell env.
 - [Content Publishing Architecture](content-publishing-architecture.md) — seller post → AsyncStorage → Thread feed; SellerThreadPost expanded to 30+ fields; seed data; feed.tsx dynamic loading; create-post purple theme.
 - [Expo web boot & root route](expo-web-boot.md) — boot never blank; AuthGate must handle bare "/"; ?bt_preview=buyer|seller (dev+web) bypasses auth for captures/canvas frames; static screenshots catch FOIT.
+- [Expo root navigation readiness](expo-root-navigation-readiness.md) — defer preview redirects until Expo Router registers the root Stack or web preview crashes before first paint.
 - [Push notifications & service config](push-notifications-service-config.md) — expo-notifications wired in _layout.tsx; configureServices(getToken) + PushRegistrar components; expo-camera must be ~17.0.10 for Expo 54.
 - [DB package project references](db-project-references.md) — lib/db uses composite:true + emitDeclarationOnly; must run tsc --build in lib/db before api-server TypeScript checks will see new exports.
 - [Analytics service API wiring](analytics-api-wiring.md) — getOverview/getSalesAnalytics/getProductAnalytics try real API first, fall back to demo; dashboard=monthly totals, revenue=daily chart, products=top by revenue.

@@ -9,12 +9,16 @@
 export interface ManufacturerInput {
   businessName: string;
   country: string;
+  city?: string;
   specialty: string;
   description?: string;
+  yearsInBusiness?: number;
   moq: number;
   priceRange: string;
   bulkTurnaround: string;
   sampleTurnaround: string;
   photos?: string[];
   website?: string;
+  contactEmail?: string;
+  contactPhone?: string;
 }

@@ -338,22 +338,22 @@ function apiRowToManufacturer(row: any): Manufacturer {
     id:                 row.id,
     name:               row.businessName,
     country:            row.country,
-    city:               '',
+    city:               row.city ?? '',
     specialty:          row.specialty ?? '',
     description:        row.description ?? '',
     moq:                row.moq ?? 100,
-    samplePriceMin:     50,
-    samplePriceMax:     150,
-    unitPriceMin:       8,
-    unitPriceMax:       30,
-    leadTimeDays:       30,
-    responseTimeHours:  24,
+    samplePriceMin:     0,
+    samplePriceMax:     0,
+    unitPriceMin:       0,
+    unitPriceMax:       0,
+    leadTimeDays:       Number(String(row.bulkTurnaround ?? '').match(/\d+/)?.[0] ?? 0),
+    responseTimeHours:  0,
     rating:             0,
     reviewCount:        0,
     isVerified:         !!row.verifiedAt,
     profileImageUri:    row.photos?.[0] ?? undefined,
     galleryUris:        row.photos ?? [],
-    yearsInBusiness:    0,
+    yearsInBusiness:    Number(row.yearsInBusiness ?? 0),
     teamSize:           '',
     productionCapacity: '',
     specialties:        [row.specialty ?? ''].filter(Boolean),
@@ -363,7 +363,7 @@ function apiRowToManufacturer(row: any): Manufacturer {
     materials:          [],
     shippingRegions:    [row.country].filter(Boolean),
     website:            row.website ?? undefined,
-    email:              undefined,
+    email:              row.contactEmail ?? undefined,
     createdAt:          row.createdAt ?? now(),
   } as unknown as Manufacturer;
 }
@@ -406,26 +406,16 @@ export async function searchManufacturers(opts: {
   ratingMin?: number;
   material?: string;
 }): Promise<Manufacturer[]> {
-  // Try real public directory API first
-  try {
-    const params: Record<string, string> = {};
-    if (opts.query)    params.q         = opts.query;
-    if (opts.country)  params.country   = opts.country;
-    if (opts.category) params.specialty = opts.category;
+  const params: Record<string, string> = {};
+  if (opts.query)    params.q         = opts.query;
+  if (opts.country)  params.country   = opts.country;
+  if (opts.category) params.specialty = opts.category;
 
-    const qs = Object.keys(params).length
-      ? '?' + Object.entries(params).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&')
-      : '';
-    const apiRows = await serviceRequest<any[]>(`/api/manufacturers/public${qs}`);
-    if (apiRows.length > 0) {
-      const apiMfgs = apiRows.map(apiRowToManufacturer);
-      const apiIds  = new Set(apiMfgs.map(m => m.id));
-      const demoOnly = DEMO_MANUFACTURERS.filter(m => !apiIds.has(m.id));
-      _manufacturers = [...apiMfgs, ...demoOnly];
-    }
-  } catch { /* fall through to demo */ }
-  await ensureInitialized();
-  let results = [..._manufacturers];
+  const qs = Object.keys(params).length
+    ? '?' + Object.entries(params).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&')
+    : '';
+  const apiRows = await serviceRequest<any[]>(`/api/manufacturers/public${qs}`);
+  let results = apiRows.map(apiRowToManufacturer);
   const q = opts.query?.toLowerCase().trim() ?? '';
   if (q) {
     results = results.filter(m =>
@@ -450,8 +440,11 @@ export async function searchManufacturers(opts: {
 }
 
 export async function getManufacturer(id: string): Promise<Manufacturer | undefined> {
-  await ensureInitialized();
-  return _manufacturers.find(m => m.id === id);
+  try {
+    return apiRowToManufacturer(await serviceRequest<any>(`/api/manufacturers/public/${encodeURIComponent(id)}`));
+  } catch {
+    return undefined;
+  }
 }
 
 // ─── Relationships ────────────────────────────────────────────────────────────

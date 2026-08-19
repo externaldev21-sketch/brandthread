@@ -249,8 +249,10 @@ components:
         clerkId:          { type: string }
         businessName:     { type: string }
         country:          { type: string }
+        city:             { type: ["string", "null"] }
         specialty:        { type: string }
         description:      { type: ["string", "null"] }
+        yearsInBusiness:  { type: integer }
         moq:              { type: integer }
         priceRange:       { type: string }
         bulkTurnaround:   { type: string }
@@ -259,6 +261,8 @@ components:
           type: array
           items: { type: string }
         website:          { type: ["string", "null"] }
+        contactEmail:     { type: ["string", "null"] }
+        contactPhone:     { type: ["string", "null"] }
         status:           { type: string }
         verifiedAt:       { type: ["string", "null"] }
         paymentSetup:     { type: boolean }
@@ -270,8 +274,10 @@ components:
       properties:
         businessName:     { type: string }
         country:          { type: string }
+        city:             { type: string }
         specialty:        { type: string }
         description:      { type: string }
+        yearsInBusiness:  { type: integer }
         moq:              { type: integer }
         priceRange:       { type: string }
         bulkTurnaround:   { type: string }
@@ -280,14 +286,18 @@ components:
           type: array
           items: { type: string }
         website:          { type: string }
+        contactEmail:     { type: string }
+        contactPhone:     { type: string }
 
     ManufacturerUpdate:
       type: object
       properties:
         businessName:     { type: string }
         country:          { type: string }
+        city:             { type: string }
         specialty:        { type: string }
         description:      { type: string }
+        yearsInBusiness:  { type: integer }
         moq:              { type: integer }
         priceRange:       { type: string }
         bulkTurnaround:   { type: string }
@@ -296,6 +306,8 @@ components:
           type: array
           items: { type: string }
         website:          { type: string }
+        contactEmail:     { type: string }
+        contactPhone:     { type: string }
 
     ManufacturerDashboard:
       type: object

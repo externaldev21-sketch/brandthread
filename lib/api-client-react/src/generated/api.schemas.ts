@@ -14,9 +14,12 @@ export interface Manufacturer {
   clerkId: string;
   businessName: string;
   country: string;
+  /** @nullable */
+  city?: string | null;
   specialty: string;
   /** @nullable */
   description?: string | null;
+  yearsInBusiness?: number;
   moq: number;
   priceRange: string;
   bulkTurnaround: string;
@@ -24,6 +27,10 @@ export interface Manufacturer {
   photos?: string[];
   /** @nullable */
   website?: string | null;
+  /** @nullable */
+  contactEmail?: string | null;
+  /** @nullable */
+  contactPhone?: string | null;
   status: string;
   /** @nullable */
   verifiedAt?: string | null;
@@ -34,27 +41,35 @@ export interface Manufacturer {
 export interface ManufacturerInput {
   businessName: string;
   country: string;
+  city?: string;
   specialty: string;
   description?: string;
+  yearsInBusiness?: number;
   moq: number;
   priceRange: string;
   bulkTurnaround: string;
   sampleTurnaround: string;
   photos?: string[];
   website?: string;
+  contactEmail?: string;
+  contactPhone?: string;
 }
 
 export interface ManufacturerUpdate {
   businessName?: string;
   country?: string;
+  city?: string;
   specialty?: string;
   description?: string;
+  yearsInBusiness?: number;
   moq?: number;
   priceRange?: string;
   bulkTurnaround?: string;
   sampleTurnaround?: string;
   photos?: string[];
   website?: string;
+  contactEmail?: string;
+  contactPhone?: string;
 }
 
 export interface ManufacturerOrder {

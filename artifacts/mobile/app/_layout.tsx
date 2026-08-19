@@ -12,7 +12,7 @@ import {
   useFonts,
 } from '@expo-google-fonts/inter';
 import { Platform } from 'react-native';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useUser } from '@clerk/expo';
 import { tokenCache } from '@/lib/tokenCache';
@@ -96,10 +96,11 @@ const DEV_FORCE_ONBOARDING_START = false;
 const AUTH_SCREENS = ['welcome', 'sign-in', 'forgot-password', 'splash'];
 
 // ─── Auth gate ────────────────────────────────────────────────────────────────
-function AuthGate({ children }: { children: React.ReactNode }) {
+function AuthGate() {
   const { isSignedIn, isLoaded, signOut } = useAuth();
   const router   = useRouter();
   const segments = useSegments();
+  const rootNavigationState = useRootNavigationState();
   const devForcedRef = useRef(false);
   const topSegment = segments[0];
 
@@ -168,6 +169,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }, [isSignedIn, topSegment]);
 
   useEffect(() => {
+    // Expo Router's root navigator is mounted by the Stack below. Waiting for
+    // its navigation key prevents the initial auth redirect from racing that
+    // mount and producing a blank error screen in web previews.
+    if (!rootNavigationState?.key) return;
+
     const inAuthScreen    = AUTH_SCREENS.includes(segments[0] as string);
     const inOnboarding    = segments[0] === 'onboarding';
     const inAccountType   = segments[0] === 'account-type';
@@ -184,9 +190,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     // DEV bypass (all platforms): skip auth and go straight to dashboard.
     const devRole = PREVIEW_ROLE ?? DEV_BYPASS_ROLE;
     if (devRole) {
-      if (atRoot || inAuthScreen || inOnboarding || inAccountType) {
-        router.replace((devRole === 'buyer' ? '/(buyer)/' : '/(tabs)/') as never);
-      }
+      // The index route handles the preview redirect after the root Stack has
+      // mounted. Redirecting from this root-level effect races Expo Router's
+      // initial navigator on web and produces a blank error screen.
       return;
     }
 
@@ -238,9 +244,9 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     } else if (onboardingDone && storedRole === 'seller' && inBuyerGroup) {
       router.replace('/(tabs)/' as never);
     }
-  }, [isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole, splashSeen, pendingInvite]);
+  }, [isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole, splashSeen, pendingInvite, rootNavigationState?.key]);
 
-  return <>{children}</>;
+  return null;
 }
 
 // ─── Wire background services + module-level API singleton to Clerk token ─────
@@ -325,9 +331,7 @@ function PushRegistrar() {
 
 function RootLayoutNav() {
   return (
-    <AuthGate>
-      <ServiceConfigurer />
-      <PushRegistrar />
+    <>
       <Stack screenOptions={{ headerShown: false }}>
         {/* Boot: "/" renders BootScreen until AuthGate redirects */}
         <Stack.Screen name="index"          options={{ headerShown: false, animation: 'fade' }} />
@@ -536,7 +540,10 @@ function RootLayoutNav() {
         <Stack.Screen name="account-type-settings"   options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="login-methods"           options={{ headerShown: false, animation: 'slide_from_right' }} />
       </Stack>
-    </AuthGate>
+      <AuthGate />
+      <ServiceConfigurer />
+      <PushRegistrar />
+    </>
   );
 }
 
@@ -547,12 +554,22 @@ export default function RootLayout() {
     Inter_600SemiBold,
     Inter_700Bold,
   });
+  const [fontGateExpired, setFontGateExpired] = useState(false);
 
   useEffect(() => {
-    if (fontsLoaded || fontError) SplashScreen.hideAsync();
-  }, [fontsLoaded, fontError]);
+    // Web previews can occasionally leave expo-font pending forever after a
+    // hot reload or a stale font cache. Never keep the entire application on
+    // the boot screen for a cosmetic resource; React Native will fall back to
+    // the system font until the Inter faces become available.
+    const timeout = setTimeout(() => setFontGateExpired(true), 2500);
+    return () => clearTimeout(timeout);
+  }, []);
 
-  if (!fontsLoaded && !fontError) return <BootScreen />;
+  const appReady = Platform.OS === 'web' || fontsLoaded || !!fontError || fontGateExpired;
+
+  useEffect(() => {
+    if (appReady) SplashScreen.hideAsync();
+  }, [appReady]);
 
   const appTree = (
     <SafeAreaProvider>

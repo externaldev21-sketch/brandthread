@@ -19,6 +19,7 @@ export const manufacturers = pgTable('manufacturers', {
   photos:             json('photos').$type<string[]>().notNull().default([]),
   website:            text('website'),
   contactEmail:       text('contact_email'),
+  contactPhone:       text('contact_phone'),
   // 'pending' | 'active' | 'suspended'
   status:             text('status').notNull().default('pending'),
   // true  = appears in the public Discover directory

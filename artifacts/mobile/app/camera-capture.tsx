@@ -43,21 +43,19 @@ function formatTime(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-// ─── Web fallback ─────────────────────────────────────────────────────────────
-if (Platform.OS === 'web') {
-  // expo-camera doesn't run on web — export a stub that immediately goes back
-  module.exports = function CameraCaptureWeb() {
-    useEffect(() => {
-      Alert.alert('Not supported', 'In-app recording is not available on web. Use the upload option instead.');
-      router.back();
-    }, []);
-    return null;
-  };
+function CameraCaptureWeb() {
+  useEffect(() => {
+    Alert.alert('Not supported', 'In-app recording is not available on web. Use the upload option instead.');
+    router.back();
+  }, []);
+  return null;
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function CameraCapture() {
+  if (Platform.OS === 'web') return <CameraCaptureWeb />;
+
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ maxDuration?: string }>();
 

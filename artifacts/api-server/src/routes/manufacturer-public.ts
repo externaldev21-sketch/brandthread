@@ -14,6 +14,37 @@ import crypto from "crypto";
 
 const router = Router();
 
+const publicManufacturerFields = {
+  id:              manufacturers.id,
+  businessName:    manufacturers.businessName,
+  country:         manufacturers.country,
+  city:            manufacturers.city,
+  specialty:       manufacturers.specialty,
+  description:     manufacturers.description,
+  yearsInBusiness: manufacturers.yearsInBusiness,
+  moq:             manufacturers.moq,
+  photos:          manufacturers.photos,
+  website:         manufacturers.website,
+  contactEmail:    manufacturers.contactEmail,
+  contactPhone:    manufacturers.contactPhone,
+  priceRange:      manufacturers.priceRange,
+  sampleTurnaround: manufacturers.sampleTurnaround,
+  bulkTurnaround:  manufacturers.bulkTurnaround,
+  verifiedAt:      manufacturers.verifiedAt,
+  createdAt:       manufacturers.createdAt,
+  updatedAt:       manufacturers.updatedAt,
+};
+
+function serializePublicManufacturer(mfr: typeof publicManufacturerFields extends infer _T ? any : never) {
+  return {
+    ...mfr,
+    isVerified: !!mfr.verifiedAt,
+    verifiedAt: mfr.verifiedAt?.toISOString() ?? null,
+    createdAt: mfr.createdAt.toISOString(),
+    updatedAt: mfr.updatedAt.toISOString(),
+  };
+}
+
 // ── GET /api/manufacturers/public ─────────────────────────────────────────────
 
 router.get("/", async (req, res) => {
@@ -46,33 +77,12 @@ router.get("/", async (req, res) => {
     }
 
     const rows = await db
-      .select({
-        id:              manufacturers.id,
-        businessName:    manufacturers.businessName,
-        country:         manufacturers.country,
-        city:            manufacturers.city,
-        specialty:       manufacturers.specialty,
-        description:     manufacturers.description,
-        yearsInBusiness: manufacturers.yearsInBusiness,
-        moq:             manufacturers.moq,
-        photos:          manufacturers.photos,
-        website:         manufacturers.website,
-        priceRange:      manufacturers.priceRange,
-        sampleTurnaround: manufacturers.sampleTurnaround,
-        bulkTurnaround:  manufacturers.bulkTurnaround,
-        verifiedAt:      manufacturers.verifiedAt,
-        createdAt:       manufacturers.createdAt,
-      })
+      .select(publicManufacturerFields)
       .from(manufacturers)
       .where(and(...conditions))
       .orderBy(sql`${manufacturers.verifiedAt} DESC NULLS LAST, ${manufacturers.createdAt} DESC`);
 
-    res.json(rows.map(r => ({
-      ...r,
-      isVerified:  !!r.verifiedAt,
-      verifiedAt:  r.verifiedAt?.toISOString() ?? null,
-      createdAt:   r.createdAt.toISOString(),
-    })));
+    res.json(rows.map(serializePublicManufacturer));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch manufacturers" });
@@ -140,7 +150,7 @@ router.post("/apply", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     const [mfr] = await db
-      .select()
+      .select(publicManufacturerFields)
       .from(manufacturers)
       .where(
         and(
@@ -155,13 +165,7 @@ router.get("/:id", async (req, res) => {
       res.status(404).json({ error: "Not found" }); return;
     }
 
-    res.json({
-      ...mfr,
-      isVerified: !!mfr.verifiedAt,
-      verifiedAt: mfr.verifiedAt?.toISOString() ?? null,
-      createdAt:  mfr.createdAt.toISOString(),
-      updatedAt:  mfr.updatedAt.toISOString(),
-    });
+    res.json(serializePublicManufacturer(mfr));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch manufacturer" });

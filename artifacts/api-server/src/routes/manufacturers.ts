@@ -1,4 +1,4 @@
-import { Router } from "express";
+import express, { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
 import {
@@ -19,8 +19,19 @@ import {
   SetupManufacturerPaymentBody,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
+import { ObjectStorageService } from "../lib/objectStorage";
 
 const router = Router();
+const objectStorage = new ObjectStorageService();
+const MAX_PROFILE_IMAGE_BYTES = 5 * 1024 * 1024;
+
+function isSupportedImage(buffer: Buffer): boolean {
+  return (
+    (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) ||
+    (buffer.length >= 8 && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) ||
+    (buffer.length >= 12 && buffer.subarray(0, 4).toString("ascii") === "RIFF" && buffer.subarray(8, 12).toString("ascii") === "WEBP")
+  );
+}
 
 // ── Helper ─────────────────────────────────────────────────────────────────────
 
@@ -124,7 +135,7 @@ router.post("/register-via-invite/:token", async (req, res) => {
     .insert(manufacturers)
     .values({
       clerkId:           userId,
-      isPublicDirectory: false,   // private invite — not in public directory
+       isPublicDirectory: true,
       status:            "active",
       ...parsed.data,
     })
@@ -161,6 +172,43 @@ router.get("/me", async (req, res) => {
     createdAt:  mfr.createdAt.toISOString(),
   });
 });
+
+// Store production photos through the authenticated API rather than trusting
+// client supplied URLs. Objects stay private and the directory only receives
+// time-limited display URLs.
+router.post(
+  "/me/photos",
+  requireAuth,
+  express.raw({ type: ["image/jpeg", "image/png", "image/webp"], limit: MAX_PROFILE_IMAGE_BYTES }),
+  async (req, res) => {
+    try {
+      const clerkId = (req as any).clerkUserId as string;
+      const mfr = await resolveManufacturer(clerkId);
+      if (!mfr) return res.status(404).json({ error: "Manufacturer profile not found" });
+      if (!Buffer.isBuffer(req.body) || req.body.length === 0 || !isSupportedImage(req.body)) {
+        return res.status(400).json({ error: "Upload a valid JPEG, PNG, or WebP image" });
+      }
+
+      const contentType = req.headers["content-type"]?.split(";")[0] ?? "application/octet-stream";
+      const objectPath = await objectStorage.createObjectEntityFromBuffer(req.body, contentType);
+      await objectStorage.trySetObjectEntityAclPolicy(objectPath, {
+        owner: clerkId,
+        visibility: "public",
+      });
+      const photos = [...(mfr.photos ?? []), objectPath].slice(-8);
+      const [updated] = await db
+        .update(manufacturers)
+        .set({ photos, updatedAt: new Date() })
+        .where(eq(manufacturers.id, mfr.id))
+        .returning({ photos: manufacturers.photos });
+
+      res.status(201).json({ photo: objectPath, photos: updated.photos });
+    } catch (error) {
+      console.error("manufacturer photo upload failed", error);
+      res.status(500).json({ error: "Unable to upload factory image" });
+    }
+  },
+);
 
 router.patch("/me", async (req, res) => {
   const { userId } = getAuth(req);

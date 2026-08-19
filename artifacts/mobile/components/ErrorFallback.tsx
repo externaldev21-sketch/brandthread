@@ -75,6 +75,11 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
         <Text style={[styles.message, { color: colors.mutedForeground }]}>
           Please reload the app to continue.
         </Text>
+        {__DEV__ ? (
+          <Text style={[styles.devMessage, { color: colors.mutedForeground }]}>
+            {error.message}
+          </Text>
+        ) : null}
 
         <Pressable
           onPress={handleRestart}
@@ -193,6 +198,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     lineHeight: 24,
+  },
+  devMessage: {
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 18,
+    maxWidth: 320,
   },
   topButton: {
     position: 'absolute',
