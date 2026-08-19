@@ -14,7 +14,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, BORDER_ACTIVE,
-  FONT, FS, SP, RADIUS, SUCCESS, SUCCESS_DIM, CARD_ELEVATED,
+  FONT, FS, SP, RADIUS, SUCCESS, SUCCESS_DIM, CARD_ELEVATED, RED, RED_DIM,
 } from '@/lib/theme';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -27,6 +27,8 @@ type MethodRow = {
   connected: boolean;
 };
 
+type OAuthProvider = 'google' | 'apple';
+
 export default function LoginMethods() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -36,6 +38,7 @@ export default function LoginMethods() {
   const [verifyCode, setVerifyCode] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
+  const [removingProvider, setRemovingProvider] = useState<OAuthProvider | null>(null);
 
   const externalAccounts = user?.externalAccounts ?? [];
   const hasGoogle  = externalAccounts.some(a => a.provider === 'google');
@@ -113,6 +116,50 @@ export default function LoginMethods() {
     } finally {
       setLinkingProvider(null);
     }
+  }
+
+  // ── OAuth unlinking ──────────────────────────────────────────────────────────
+  async function removeOAuth(provider: OAuthProvider, externalAccount: (typeof externalAccounts)[number]) {
+    if (!user) return;
+
+    const remainingLoginMethods =
+      (hasPassword ? 1 : 0) + externalAccounts.filter(account => account.id !== externalAccount.id).length;
+
+    if (remainingLoginMethods === 0) {
+      Alert.alert(
+        'Keep a login method',
+        'This is your only sign-in method. Add a password or connect another account before removing it.',
+        [{ text: 'OK' }],
+      );
+      return;
+    }
+
+    const providerLabel = provider === 'google' ? 'Google' : 'Apple';
+    Alert.alert(
+      `Remove ${providerLabel}?`,
+      `You will no longer be able to sign in with this ${providerLabel} account.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setRemovingProvider(provider);
+            try {
+              await externalAccount.destroy();
+              await user.reload();
+            } catch (e: any) {
+              Alert.alert(
+                `Could not remove ${providerLabel}`,
+                e?.errors?.[0]?.message ?? e?.message ?? 'Please try again.',
+              );
+            } finally {
+              setRemovingProvider(null);
+            }
+          },
+        },
+      ],
+    );
   }
 
   // ── 2FA helpers ─────────────────────────────────────────────────────────────
@@ -204,6 +251,8 @@ export default function LoginMethods() {
               const isOAuth = method.id === 'google' || method.id === 'apple';
               const strategy = method.id === 'google' ? 'oauth_google' : 'oauth_apple';
               const isLinking = linkingProvider === method.label;
+              const externalAccount = method.id === 'google' ? googleAccount : appleAccount;
+              const isRemoving = removingProvider === method.id;
               const tappable = isOAuth && !method.connected;
 
               const rowContent = (
@@ -216,9 +265,26 @@ export default function LoginMethods() {
                     <Text style={s.methodSub} numberOfLines={1}>{method.sublabel}</Text>
                   </View>
                   {method.connected ? (
-                    <View style={s.activeBadge}>
-                      <Feather name="check" size={11} color={SUCCESS} />
-                      <Text style={s.activeBadgeText}>Active</Text>
+                    <View style={s.connectedActions}>
+                      <View style={s.activeBadge}>
+                        <Feather name="check" size={11} color={SUCCESS} />
+                        <Text style={s.activeBadgeText}>Active</Text>
+                      </View>
+                      {isOAuth && externalAccount && (
+                        <TouchableOpacity
+                          testID={`remove-${method.id}-login-method`}
+                          activeOpacity={0.7}
+                          disabled={!!linkingProvider || !!removingProvider}
+                          onPress={() => removeOAuth(method.id as OAuthProvider, externalAccount)}
+                          style={[s.removeBtn, isRemoving && s.removeBtnLoading]}
+                        >
+                          {isRemoving ? (
+                            <ActivityIndicator size="small" color={RED} />
+                          ) : (
+                            <Text style={s.removeBtnText}>Remove</Text>
+                          )}
+                        </TouchableOpacity>
+                      )}
                     </View>
                   ) : isOAuth ? (
                     isLinking ? (
@@ -239,8 +305,9 @@ export default function LoginMethods() {
                   {idx > 0 && <View style={s.divider} />}
                   {tappable ? (
                     <TouchableOpacity
+                      testID={tappable ? `connect-${method.id}-login-method` : undefined}
                       activeOpacity={0.7}
-                      disabled={!!linkingProvider}
+                      disabled={!!linkingProvider || !!removingProvider}
                       onPress={() => linkOAuth(strategy as 'oauth_google' | 'oauth_apple', method.label)}
                     >
                       {rowContent}
@@ -411,6 +478,9 @@ const s = StyleSheet.create({
   activeBadgeText: {
     fontSize: FS.xs, fontFamily: FONT.semibold, color: SUCCESS,
   },
+  connectedActions: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+  },
   inactiveBadge: {
     fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE,
   },
@@ -421,6 +491,15 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: BORDER_ACTIVE,
   },
   enableBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: PURPLE },
+
+  removeBtn: {
+    minWidth: 56, minHeight: 30, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: RED_DIM, borderRadius: RADIUS.sm,
+    paddingHorizontal: 8, paddingVertical: 5,
+    borderWidth: 1, borderColor: 'rgba(248,113,113,0.3)',
+  },
+  removeBtnLoading: { opacity: 0.7 },
+  removeBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: RED },
 
   disableBtn: {
     backgroundColor: 'rgba(239,68,68,0.12)', borderRadius: RADIUS.sm,
