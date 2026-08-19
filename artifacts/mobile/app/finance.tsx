@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
 import { parseRoleError } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
+import { PURPLE, CYAN, SUCCESS, ORANGE } from '@/lib/theme';
 
 function fmtCents(cents: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
@@ -35,15 +36,22 @@ export default function FinanceScreen() {
   const [balance,      setBalance]      = useState<any>(null);
   const [loading,      setLoading]      = useState(true);
 
+  // Subscription status for the dashboard card
+  const [subStatus, setSubStatus] = useState<{
+    plan: string; status: string; renewsOn: string | null; trialEnd: string | null; amountCents: number;
+  } | null>(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [bal, txs] = await Promise.all([
+      const [bal, txs, sub] = await Promise.all([
         api.finance.balance(),
         api.finance.transactions(20),
+        api.seller.subscription.status().catch(() => null),
       ]);
       setBalance(bal);
       setTransactions(txs.transactions ?? []);
+      if (sub) setSubStatus(sub as any);
     } catch (err) {
       const roleErr = parseRoleError(err);
       if (roleErr) setLockedRole(roleErr.currentRole);
@@ -104,6 +112,52 @@ export default function FinanceScreen() {
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
         showsVerticalScrollIndicator={false}
       >
+
+      {/* Platform Subscription Card */}
+      {subStatus && (
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => router.push('/subscription' as any)}
+          style={[styles.subCard, { borderColor: colors.border, backgroundColor: colors.card }]}
+        >
+          <View style={styles.subCardLeft}>
+            <Text style={[styles.subCardLabel, { color: colors.mutedForeground }]}>Platform subscription</Text>
+            <Text style={[styles.subCardPlan, { color: colors.foreground }]}>
+              {subStatus.plan === 'growth' ? 'Growth' : subStatus.plan === 'scale' ? 'Scale' : 'Starter'}
+              {' '}
+              <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular' }}>
+                {subStatus.amountCents > 0 ? `$${subStatus.amountCents / 100}/mo` : '$29/mo'}
+              </Text>
+            </Text>
+            {subStatus.trialEnd ? (
+              <Text style={[styles.subCardMeta, { color: CYAN }]}>Trial ends {subStatus.trialEnd}</Text>
+            ) : subStatus.renewsOn ? (
+              <Text style={[styles.subCardMeta, { color: colors.mutedForeground }]}>Renews {subStatus.renewsOn}</Text>
+            ) : null}
+          </View>
+          <View style={styles.subCardRight}>
+            <View style={[
+              styles.subStatusPill,
+              { backgroundColor: subStatus.status === 'trialing' ? `${CYAN}22`
+                  : subStatus.status === 'active' ? `${SUCCESS}22`
+                  : `${ORANGE}22` },
+            ]}>
+              <Text style={[
+                styles.subStatusText,
+                { color: subStatus.status === 'trialing' ? CYAN
+                    : subStatus.status === 'active' ? SUCCESS
+                    : ORANGE },
+              ]}>
+                {subStatus.status === 'trialing' ? 'Trial'
+                  : subStatus.status === 'active' ? 'Active'
+                  : subStatus.status === 'past_due' ? 'Past due'
+                  : 'Manage'}
+              </Text>
+            </View>
+            <Feather name="chevron-right" size={16} color={colors.mutedForeground} style={{ marginTop: 8 }} />
+          </View>
+        </TouchableOpacity>
+      )}
 
       {/* Overview */}
       <View style={styles.overviewRow}>
@@ -216,4 +270,17 @@ const styles = StyleSheet.create({
   docRow: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 12 },
   docIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   docLabel: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
+
+  // Subscription card
+  subCard: {
+    flexDirection: 'row', alignItems: 'center', borderRadius: 14,
+    borderWidth: 1, padding: 14, marginBottom: 20, gap: 12,
+  },
+  subCardLeft:    { flex: 1, gap: 3 },
+  subCardLabel:   { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  subCardPlan:    { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  subCardMeta:    { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  subCardRight:   { alignItems: 'flex-end' },
+  subStatusPill:  { borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3 },
+  subStatusText:  { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
 });

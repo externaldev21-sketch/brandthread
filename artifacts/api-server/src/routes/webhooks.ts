@@ -481,8 +481,11 @@ async function handleSubscriptionUpdated(sub: any) {
   // Determine plan from the price lookup_key on the first subscription item
   const lookupKey: string | undefined = sub.items?.data?.[0]?.price?.lookup_key;
   const planId =
-    lookupKey === "brandthread_pro_monthly"    ? "pro"
+    lookupKey === "brandthread_scale_monthly"   ? "scale"
     : lookupKey === "brandthread_growth_monthly" ? "growth"
+    : lookupKey === "brandthread_starter_monthly" ? "starter"
+    // Legacy keys from old catalogue — keep mapping so existing subscribers aren't orphaned
+    : lookupKey === "brandthread_pro_monthly"    ? "growth"
     : undefined; // don't overwrite plan if lookup_key absent (e.g. expand not requested)
 
   const periodEnd: Date | null = sub.current_period_end

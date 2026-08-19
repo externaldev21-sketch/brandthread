@@ -511,21 +511,22 @@ export function createApi(getToken: GetToken) {
       /** Update the current user's public profile. username must be letters/numbers/underscores, 3-30 chars. */
       updateProfile: (body: { displayName?: string; bio?: string; website?: string; name?: string; username?: string }) =>
         patch<any>('/api/auth/profile', body),
-      /** Platform subscription — billed to the seller's own payment method.
+      /** Platform subscription — billed to the seller's own payment method (sellers only).
        *  Completely separate from Stripe Connect (buyer payouts). */
       subscription: {
         /** Returns the seller's current plan, subscription status, renewal date,
          *  and payment-method label. */
         status: () => get<{
-          plan: string;               // 'starter' | 'growth' | 'pro'
+          plan: string;               // 'starter' | 'growth' | 'scale'
           status: string;             // 'active' | 'trialing' | 'past_due' | 'canceled' | 'none'
+          trialEnd: string | null;    // formatted date when in trial, null otherwise
           renewsOn: string | null;    // e.g. "Aug 14, 2026"
           amountCents: number;        // monthly charge in cents (0 for starter)
           paymentMethodLabel: string | null; // e.g. "Visa ···4242"
         }>('/api/seller/subscription/status'),
         /** Create a Stripe Checkout Session in subscription mode.
          *  Returns { url } for the mobile client to open in the system browser. */
-        checkout: (planId: 'growth' | 'pro') =>
+        checkout: (planId: 'starter' | 'growth' | 'scale') =>
           post<{ url: string }>('/api/seller/subscription/checkout', { planId }),
         /** Create a Stripe Billing Portal session so the seller can manage their
          *  payment method, view invoices, or cancel. Returns { url }. */

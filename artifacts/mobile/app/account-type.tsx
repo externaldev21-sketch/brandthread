@@ -162,8 +162,6 @@ export default function AccountTypeScreen() {
         colors={['rgba(7,7,15,0)', 'rgba(7,7,15,1)']}
         style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}
       >
-        <Text style={styles.footerNote}>You can change this later in Settings.</Text>
-
         <TouchableOpacity
           activeOpacity={0.88}
           onPress={handleContinue}
@@ -251,13 +249,6 @@ const styles = StyleSheet.create({
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     paddingTop: 32, paddingHorizontal: 20,
-  },
-  footerNote: {
-    textAlign: 'center',
-    fontSize: 12,
-    fontFamily: 'Inter_400Regular',
-    color: 'rgba(255,255,255,0.3)',
-    marginBottom: 12,
   },
   continueBtn: {
     borderRadius: 16,

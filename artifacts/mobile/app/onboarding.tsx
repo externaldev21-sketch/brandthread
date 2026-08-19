@@ -1,8 +1,8 @@
 /**
  * Brandthread Onboarding — complete buyer + seller flows
  *
- * BUYER  steps: 0=Name 1=Style 2=Auth 3=Loading 4=ThreadPreview 5=Notifications 6=Success
- * SELLER steps: 0=Name 1=BrandName 2=Stage 3=Model 4=Goals 5=Auth 6=Loading 7=DashPreview 8=Notifications 9=Success
+ * BUYER  steps: 0=Name 1=Style 2=Auth 3=Loading 4=Notifications 5=Success
+ * SELLER steps: 0=Name 1=BrandName 2=Stage 3=Model 4=Goals 5=Auth 6=Loading 7=Notifications 8=Success
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -11,6 +11,7 @@ import {
   Animated,
   Dimensions,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   ScrollView,
   StatusBar,
@@ -27,7 +28,7 @@ import { useAuth, useSSO, useSignIn, useSignUp, useUser } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Feather } from '@expo/vector-icons';
+import { Feather, Ionicons } from '@expo/vector-icons';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { ONBOARDING_KEY } from './_layout';
@@ -338,221 +339,15 @@ const sl = StyleSheet.create({
   barFill:  { height: 3, borderRadius: 2, overflow: 'hidden' },
 });
 
-// ─── Thread preview ───────────────────────────────────────────────────────────
-function ThreadPreview({ firstName, onEnter }: { firstName: string; onEnter: () => void }) {
-  const insets  = useSafeAreaInsets();
-  const opacity = useRef(new Animated.Value(0)).current;
-  const slideY  = useRef(new Animated.Value(30)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(opacity,  { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.spring(slideY,   { toValue: 0, damping: 18, stiffness: 110, useNativeDriver: true }),
-    ]).start();
-  }, []);
-
-  return (
-    <View style={[stp.root, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 24 }]}>
-      <LinearGradient colors={[BG, '#0D0820', BG]} style={StyleSheet.absoluteFill} />
-      <View style={stp.glow} />
-
-      <Animated.View style={{ opacity, transform: [{ translateY: slideY }], flex: 1 }}>
-        <Text style={stp.headline}>Your Thread is ready.</Text>
-        {firstName ? <Text style={stp.sub}>Welcome, {firstName}.</Text> : null}
-
-        {/* Mock Thread card */}
-        <View style={stp.card}>
-          {/* Image placeholder */}
-          <LinearGradient
-            colors={['#1a0a2e', '#0a1628', '#0a2818']}
-            style={stp.imageArea}
-          >
-            <Text style={stp.imagePlaceholder}>NOIR COLLECTIVE</Text>
-            <View style={stp.dropBadge}><Text style={stp.dropBadgeText}>NEW DROP</Text></View>
-          </LinearGradient>
-
-          {/* Card content */}
-          <View style={stp.cardBody}>
-            <View style={stp.brandRow}>
-              <View style={stp.avatar}><Text style={stp.avatarLetter}>N</Text></View>
-              <View>
-                <Text style={stp.brandName}>Noir Collective</Text>
-                <Text style={stp.timestamp}>Just dropped</Text>
-              </View>
-            </View>
-            <Text style={stp.caption}>New season. Limited run. Copped or not?</Text>
-
-            {/* Tagged product */}
-            <View style={stp.taggedProduct}>
-              <View style={stp.taggedThumb} />
-              <View>
-                <Text style={stp.taggedName}>Shadow Hoodie</Text>
-                <Text style={stp.taggedPrice}>$128</Text>
-              </View>
-              <TouchableOpacity style={stp.shopBtn}>
-                <Feather name="shopping-bag" size={14} color={FG} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Action icons */}
-            <View style={stp.actions}>
-              {(['heart', 'message-circle', 'repeat', 'bookmark', 'shopping-bag'] as const).map((icon) => (
-                <TouchableOpacity key={icon} style={stp.actionBtn}>
-                  <Feather name={icon} size={20} color={MUTED} />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </View>
-      </Animated.View>
-
-      <Animated.View style={{ opacity }}>
-        <PrimaryButton label="Enter my Thread" onPress={onEnter} />
-      </Animated.View>
-    </View>
-  );
-}
-const stp = StyleSheet.create({
-  root:      { flex: 1, backgroundColor: BG, paddingHorizontal: 20 },
-  glow:      { position: 'absolute', top: -40, width: '80%', height: 200, borderRadius: 120, backgroundColor: '#8B5CF610', alignSelf: 'center' },
-  headline:  { fontSize: 30, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.6, marginBottom: 6 },
-  sub:       { fontSize: 15, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 24 },
-  card:      { backgroundColor: CARD, borderRadius: 20, borderWidth: 1, borderColor: BORDER, overflow: 'hidden', marginBottom: 24, flex: 1 },
-  imageArea: { height: 180, alignItems: 'center', justifyContent: 'center' },
-  imagePlaceholder: { fontSize: 13, fontFamily: 'Inter_700Bold', color: 'rgba(255,255,255,0.2)', letterSpacing: 4 },
-  dropBadge: { position: 'absolute', top: 12, right: 12, backgroundColor: PURPLE, borderRadius: 100, paddingHorizontal: 10, paddingVertical: 4 },
-  dropBadgeText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: 1 },
-  cardBody:  { padding: 16, gap: 12 },
-  brandRow:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatar:    { width: 32, height: 32, borderRadius: 16, backgroundColor: PURPLE + '44', alignItems: 'center', justifyContent: 'center' },
-  avatarLetter: { fontSize: 14, fontFamily: 'Inter_700Bold', color: FG },
-  brandName: { fontSize: 14, fontFamily: 'Inter_700Bold', color: FG },
-  timestamp: { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
-  caption:   { fontSize: 14, fontFamily: 'Inter_400Regular', color: FG, lineHeight: 20 },
-  taggedProduct: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 10 },
-  taggedThumb: { width: 36, height: 36, borderRadius: 8, backgroundColor: MUTED2 },
-  taggedName:  { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
-  taggedPrice: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
-  shopBtn:     { marginLeft: 'auto', width: 32, height: 32, borderRadius: 16, backgroundColor: PURPLE + '33', alignItems: 'center', justifyContent: 'center' },
-  actions:   { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 4 },
-  actionBtn: { padding: 4 },
-});
-
-// ─── Dashboard preview ────────────────────────────────────────────────────────
-function DashboardPreview({ firstName, brandName, onOpen }: { firstName: string; brandName: string; onOpen: () => void }) {
-  const insets  = useSafeAreaInsets();
-  const opacity = useRef(new Animated.Value(0)).current;
-  const slideY  = useRef(new Animated.Value(30)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(opacity,  { toValue: 1, duration: 500, useNativeDriver: true }),
-      Animated.spring(slideY,   { toValue: 0, damping: 18, stiffness: 110, useNativeDriver: true }),
-    ]).start();
-  }, []);
-
-  const STATS = [
-    { label: 'Revenue',    value: '$0',  icon: '💰' },
-    { label: 'Orders',     value: '0',   icon: '📦' },
-    { label: 'Visitors',   value: '0',   icon: '👥' },
-    { label: 'Conversion', value: '0%',  icon: '📈' },
-  ];
-
-  const MODULES = [
-    { icon: '🎨', label: 'Design Studio' },
-    { icon: '📦', label: 'Products' },
-    { icon: '🏭', label: 'Manufacturer Hub' },
-    { icon: '🛍', label: 'Store Builder' },
-    { icon: '📋', label: 'Orders' },
-    { icon: '📊', label: 'Analytics' },
-  ];
-
-  return (
-    <View style={[sdp.root, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 24 }]}>
-      <LinearGradient colors={[BG, '#0D0820', BG]} style={StyleSheet.absoluteFill} />
-      <View style={sdp.glow} />
-
-      <Animated.ScrollView
-        style={{ opacity }}
-        contentContainerStyle={{ paddingBottom: 24 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <Animated.View style={{ transform: [{ translateY: slideY }] }}>
-          <Text style={sdp.headline}>Your brand is ready.</Text>
-          {brandName ? <Text style={sdp.brandName}>{brandName}</Text> : null}
-          <Text style={sdp.greeting}>Good to have you, {firstName || 'Founder'}. 👋</Text>
-
-          {/* Stats grid */}
-          <View style={sdp.statsGrid}>
-            {STATS.map((s) => (
-              <View key={s.label} style={sdp.statCard}>
-                <Text style={sdp.statIcon}>{s.icon}</Text>
-                <Text style={sdp.statValue}>{s.value}</Text>
-                <Text style={sdp.statLabel}>{s.label}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Setup progress */}
-          <View style={sdp.progressCard}>
-            <Text style={sdp.progressTitle}>Setup progress</Text>
-            <View style={sdp.progressTrack}>
-              <LinearGradient
-                colors={[PURPLE, CYAN]}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={[sdp.progressFill, { width: '12%' }]}
-              />
-            </View>
-            <Text style={sdp.progressNote}>Complete setup to unlock all features</Text>
-          </View>
-
-          {/* Modules grid */}
-          <Text style={sdp.sectionLabel}>Your workspace</Text>
-          <View style={sdp.modulesGrid}>
-            {MODULES.map((m) => (
-              <View key={m.label} style={sdp.moduleCard}>
-                <Text style={sdp.moduleIcon}>{m.icon}</Text>
-                <Text style={sdp.moduleLabel}>{m.label}</Text>
-              </View>
-            ))}
-          </View>
-        </Animated.View>
-      </Animated.ScrollView>
-
-      <Animated.View style={{ opacity, paddingHorizontal: 0 }}>
-        <PrimaryButton label="Open my dashboard" onPress={onOpen} />
-      </Animated.View>
-    </View>
-  );
-}
-const sdp = StyleSheet.create({
-  root:       { flex: 1, backgroundColor: BG, paddingHorizontal: 20 },
-  glow:       { position: 'absolute', top: -40, width: '80%', height: 200, borderRadius: 120, backgroundColor: '#22D3EE08', alignSelf: 'center' },
-  headline:   { fontSize: 28, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.5, marginBottom: 4 },
-  brandName:  { fontSize: 18, fontFamily: 'Inter_700Bold', color: CYAN, marginBottom: 4 },
-  greeting:   { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 20 },
-  statsGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
-  statCard:   { width: (SW - 40 - 10) / 2, backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, padding: 14, gap: 4 },
-  statIcon:   { fontSize: 18, marginBottom: 4 },
-  statValue:  { fontSize: 22, fontFamily: 'Inter_700Bold', color: FG },
-  statLabel:  { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
-  progressCard: { backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, padding: 14, marginBottom: 20, gap: 8 },
-  progressTitle:{ fontSize: 13, fontFamily: 'Inter_600SemiBold', color: FG },
-  progressTrack:{ height: 4, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' },
-  progressFill: { height: 4, borderRadius: 2 },
-  progressNote: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
-  sectionLabel: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: MUTED, marginBottom: 10, letterSpacing: 0.5 },
-  modulesGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  moduleCard:   { width: (SW - 40 - 20) / 3, backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, padding: 12, alignItems: 'center', gap: 6 },
-  moduleIcon:   { fontSize: 22 },
-  moduleLabel:  { fontSize: 11, fontFamily: 'Inter_500Medium', color: MUTED, textAlign: 'center' },
-});
 
 // ─── Notifications step ────────────────────────────────────────────────────────
-function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: () => void; onSkip: () => void }) {
+// onEnable receives whether the OS permission was actually granted.
+// This is stored in AsyncStorage so downstream code (push service) can check it.
+function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (granted: boolean) => void; onSkip: () => void }) {
   const insets  = useSafeAreaInsets();
   const opacity = useRef(new Animated.Value(0)).current;
   const slideY  = useRef(new Animated.Value(30)).current;
+  const [requesting, setRequesting] = useState(false);
 
   useEffect(() => {
     Animated.parallel([
@@ -599,9 +394,15 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
       <Animated.View style={[sn.btns, { opacity }]}>
         <TouchableOpacity
           activeOpacity={0.88}
+          disabled={requesting}
           onPress={async () => {
-            try { await Notifications.requestPermissionsAsync(); } catch { /* not supported in web */ }
-            onEnable();
+            setRequesting(true);
+            let granted = false;
+            try {
+              const result = await Notifications.requestPermissionsAsync();
+              granted = result.status === 'granted';
+            } catch { /* not supported in web */ }
+            onEnable(granted);
           }}
         >
           <LinearGradient colors={[PURPLE, CYAN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sn.enableBtn}>
@@ -636,7 +437,7 @@ const sn = StyleSheet.create({
 });
 
 // ─── Success screen ────────────────────────────────────────────────────────────
-function SuccessScreen({ flow, firstName, brandName, onFinish, onDevReset }: { flow: Flow; firstName: string; brandName: string; onFinish: () => void; onDevReset: () => void }) {
+function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { flow: Flow; firstName: string; brandName: string; onFinish: () => void; finishing?: boolean }) {
   const insets  = useSafeAreaInsets();
   const opacity = useRef(new Animated.Value(0)).current;
   const scale   = useRef(new Animated.Value(0.85)).current;
@@ -664,24 +465,11 @@ function SuccessScreen({ flow, firstName, brandName, onFinish, onDevReset }: { f
 
       <Animated.View style={[ss.body, { opacity, transform: [{ scale }, { translateY: slideY }] }]}>
         {/* Checkmark circle */}
-        <TouchableOpacity
-          onLongPress={() => {
-            Alert.alert(
-              '🛠 Developer Reset',
-              'Reset onboarding so you can run through the flow again?',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Reset', style: 'destructive', onPress: onDevReset },
-              ],
-            );
-          }}
-          delayLongPress={1500}
-          activeOpacity={1}
-        >
+        <View>
           <LinearGradient colors={[PURPLE, CYAN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={ss.checkCircle}>
             <Feather name="check" size={36} color={FG} />
           </LinearGradient>
-        </TouchableOpacity>
+        </View>
 
         <Text style={ss.headline}>Welcome to{'\n'}Brandthread.</Text>
 
@@ -708,7 +496,7 @@ function SuccessScreen({ flow, firstName, brandName, onFinish, onDevReset }: { f
       </Animated.View>
 
       <Animated.View style={{ opacity }}>
-        <PrimaryButton label={ctaLabel} onPress={onFinish} />
+        <PrimaryButton label={finishing ? 'Saving…' : ctaLabel} onPress={onFinish} loading={finishing} />
       </Animated.View>
     </View>
   );
@@ -1059,7 +847,7 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
             disabled={!!oauthLoading || loading || !isUsernameValid}
           >
             {oauthLoading === 'Apple' ? <ActivityIndicator color="#FFFFFF" size="small" /> : <>
-              <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 18, color: '#FFFFFF', lineHeight: 20 }}></Text>
+              <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
               <Text style={[sa.oauthText, { color: '#FFFFFF' }]}>Continue with Apple</Text>
             </>}
           </TouchableOpacity>
@@ -1077,7 +865,7 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
           <Text style={sa.label}>Email address</Text>
           <TextInput
             style={sa.input}
-            placeholder="you@yourbrand.com"
+            placeholder="you@example.com"
             placeholderTextColor={MUTED2}
             value={email}
             onChangeText={setEmail}
@@ -1120,22 +908,10 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
 
         <Text style={sa.legal}>
           By continuing you agree to our{' '}
-          <Text style={{ color: MUTED }}>Terms</Text>
+          <Text style={{ color: PURPLE }} onPress={() => Linking.openURL('https://brandthread.com/terms')}>Terms</Text>
           {' and '}
-          <Text style={{ color: MUTED }}>Privacy Policy</Text>.
+          <Text style={{ color: PURPLE }} onPress={() => Linking.openURL('https://brandthread.com/privacy')}>Privacy Policy</Text>.
         </Text>
-
-        {/* Developer: clear local test session */}
-        <TouchableOpacity
-          style={sa.devClearBtn}
-          onPress={handleClearSession}
-          disabled={clearingSession}
-          activeOpacity={0.7}
-        >
-          {clearingSession
-            ? <ActivityIndicator color={MUTED2} size="small" />
-            : <Text style={sa.devClearText}>Clear local test session</Text>}
-        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -1195,9 +971,6 @@ const sa = StyleSheet.create({
   sessionBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
   continueBtn:    { paddingVertical: 14, alignItems: 'center' },
   continueBtnText:{ fontSize: 14, fontFamily: 'Inter_500Medium', color: MUTED },
-  // Developer reset
-  devClearBtn:    { paddingVertical: 12, alignItems: 'center', marginTop: 10 },
-  devClearText:   { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED2, textDecorationLine: 'underline' },
 });
 
 // ─── Main onboarding component ────────────────────────────────────────────────
@@ -1227,6 +1000,10 @@ export default function OnboardingScreen() {
   const [brandStage, setBrandStage]       = useState('');
   const [productModel, setProductModel]   = useState('');
   const [goals, setGoals]                 = useState<string[]>([]);
+
+  // Shared post-questionnaire state
+  const [notificationsGranted, setNotificationsGranted] = useState<boolean>(false);
+  const [finishing, setFinishing]         = useState(false);
 
   const slideAnim = useRef(new Animated.Value(0)).current;
 
@@ -1317,43 +1094,82 @@ export default function OnboardingScreen() {
 
   // ── Finish handlers ─────────────────────────────────────────────────────────
   async function finishBuyer() {
-    await AsyncStorage.multiSet([
-      [ONBOARDING_KEY, 'true'],
-      ['user_role', 'buyer'],
-      ['onboarding_first_name', firstName],
-      ['onboarding_style_interests', JSON.stringify(styleInterests)],
-    ]);
-    await AsyncStorage.removeItem(DRAFT_KEY);
-    // Persist username to DB — fire-and-forget; user can refine in edit-profile later
-    const uname = username.trim().toLowerCase();
-    if (/^[a-zA-Z0-9_]{3,30}$/.test(uname)) {
-      api.auth.updateProfile({ username: uname }).catch(() => {});
+    if (finishing) return;
+    setFinishing(true);
+    try {
+      await AsyncStorage.multiSet([
+        [ONBOARDING_KEY, 'true'],
+        ['user_role', 'buyer'],
+        ['onboarding_first_name', firstName],
+        ['onboarding_style_interests', JSON.stringify(styleInterests)],
+        ['notifications_granted', notificationsGranted ? 'true' : 'false'],
+      ]);
+      await AsyncStorage.removeItem(DRAFT_KEY);
+      // Username save is non-critical — fire-and-forget
+      const uname = username.trim().toLowerCase();
+      if (/^[a-zA-Z0-9_]{3,30}$/.test(uname)) {
+        api.auth.updateProfile({ username: uname }).catch(() => {});
+      }
+      // Style interest preferences — non-critical for buyer
+      if (styleInterests.length > 0) {
+        api.seller.saveOnboardingData({ styleInterests }).catch(() => {});
+      }
+      router.replace('/(buyer)/' as never);
+    } catch {
+      setFinishing(false);
+      Alert.alert(
+        'Setup incomplete',
+        "We couldn\u2019t save your preferences. Check your connection and try again.",
+        [{ text: 'Retry', onPress: finishBuyer }],
+      );
     }
-    // Persist questionnaire answers to DB — fire-and-forget
-    if (styleInterests.length > 0) {
-      api.seller.saveOnboardingData({ styleInterests }).catch(() => {});
-    }
-    router.replace('/(buyer)/' as never);
   }
 
   async function finishSeller() {
-    await AsyncStorage.multiSet([
-      [ONBOARDING_KEY, 'true'],
-      ['user_role', 'seller'],
-      ['onboarding_first_name', firstName],
-      ['onboarding_brand_name', brandName],
-    ]);
-    await AsyncStorage.removeItem(DRAFT_KEY);
-    // Persist username to DB — fire-and-forget; user can refine in settings later
-    const uname = username.trim().toLowerCase();
-    if (/^[a-zA-Z0-9_]{3,30}$/.test(uname)) {
-      api.auth.updateProfile({ username: uname }).catch(() => {});
+    if (finishing) return;
+    setFinishing(true);
+    try {
+      await AsyncStorage.multiSet([
+        [ONBOARDING_KEY, 'true'],
+        ['user_role', 'seller'],
+        ['onboarding_first_name', firstName],
+        ['onboarding_brand_name', brandName],
+        ['onboarding_brand_stage', brandStage],   // read by plans.tsx for tier recommendation
+        ['notifications_granted', notificationsGranted ? 'true' : 'false'],
+      ]);
+      await AsyncStorage.removeItem(DRAFT_KEY);
+      // Username save is non-critical — fire-and-forget
+      const uname = username.trim().toLowerCase();
+      if (/^[a-zA-Z0-9_]{3,30}$/.test(uname)) {
+        api.auth.updateProfile({ username: uname }).catch(() => {});
+      }
+      // Brand profile data — critical; surface error if it fails
+      if (goals.length > 0 || brandStage || productModel) {
+        await api.seller.saveOnboardingData({ goals, brandStage, sellModel: productModel });
+      }
+      // Seed the AI brand memory in the background so the assistant has real
+      // context on the seller's stage/goals from day one — non-blocking
+      api.ai.brandMemoryRebuild().catch(() => {});
+      router.replace('/(tabs)/' as never);
+    } catch {
+      setFinishing(false);
+      Alert.alert(
+        'Setup incomplete',
+        "We couldn\u2019t save your brand profile. Check your connection and try again.",
+        [
+          {
+            text: 'Skip for now',
+            style: 'destructive',
+            onPress: async () => {
+              // Allow entry even if the API save fails — data can be updated in settings
+              await AsyncStorage.multiSet([[ONBOARDING_KEY, 'true'], ['user_role', 'seller'], ['onboarding_brand_name', brandName]]);
+              router.replace('/(tabs)/' as never);
+            },
+          },
+          { text: 'Retry', onPress: finishSeller },
+        ],
+      );
     }
-    // Persist questionnaire answers to DB — fire-and-forget
-    if (goals.length > 0 || brandStage || productModel) {
-      api.seller.saveOnboardingData({ goals, brandStage, sellModel: productModel }).catch(() => {});
-    }
-    router.replace('/(tabs)/' as never);
   }
 
   // ── Developer reset ─────────────────────────────────────────────────────────
@@ -1472,23 +1288,18 @@ export default function OnboardingScreen() {
         <LoadingAnimation steps={BUYER_LOADING_STEPS} onDone={() => { setStep(4); }} />
       );
 
-      // Step 4: Thread preview
+      // Step 4: Notifications
       if (step === 4) return (
-        <ThreadPreview firstName={firstName} onEnter={() => setStep(5)} />
-      );
-
-      // Step 5: Notifications
-      if (step === 5) return (
         <NotificationsStep
           flow="buyer"
-          onEnable={() => setStep(6)}
-          onSkip={() => setStep(6)}
+          onEnable={(granted) => { setNotificationsGranted(granted); setStep(5); }}
+          onSkip={() => setStep(5)}
         />
       );
 
-      // Step 6: Success
-      if (step === 6) return (
-        <SuccessScreen flow="buyer" firstName={firstName} brandName="" onFinish={finishBuyer} onDevReset={devReset} />
+      // Step 5: Success
+      if (step === 5) return (
+        <SuccessScreen flow="buyer" firstName={firstName} brandName="" onFinish={finishBuyer} finishing={finishing} />
       );
     }
 
@@ -1635,23 +1446,18 @@ export default function OnboardingScreen() {
         <LoadingAnimation steps={SELLER_LOADING_STEPS} onDone={() => setStep(7)} />
       );
 
-      // Step 7: Dashboard preview
+      // Step 7: Notifications
       if (step === 7) return (
-        <DashboardPreview firstName={firstName} brandName={brandName} onOpen={() => setStep(8)} />
-      );
-
-      // Step 8: Notifications
-      if (step === 8) return (
         <NotificationsStep
           flow="seller"
-          onEnable={() => setStep(9)}
-          onSkip={() => setStep(9)}
+          onEnable={(granted) => { setNotificationsGranted(granted); setStep(8); }}
+          onSkip={() => setStep(8)}
         />
       );
 
-      // Step 9: Success
-      if (step === 9) return (
-        <SuccessScreen flow="seller" firstName={firstName} brandName={brandName} onFinish={finishSeller} onDevReset={devReset} />
+      // Step 8: Success
+      if (step === 8) return (
+        <SuccessScreen flow="seller" firstName={firstName} brandName={brandName} onFinish={finishSeller} finishing={finishing} />
       );
     }
 
@@ -1659,6 +1465,7 @@ export default function OnboardingScreen() {
   }
 
   // ── Which steps get the standard header wrapper ─────────────────────────────
+  // Steps at or after loading are full-screen (no header/progress bar)
   const isFullScreen = (flow === 'buyer'  && step >= 3)
                     || (flow === 'seller' && step >= 6);
 
