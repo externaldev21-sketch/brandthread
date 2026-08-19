@@ -14,7 +14,7 @@ import {
 import { Platform } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth } from '@clerk/expo';
+import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useUser } from '@clerk/expo';
 import { tokenCache } from '@/lib/tokenCache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RoleProvider } from '@/contexts/RoleContext';
@@ -22,8 +22,8 @@ import BootScreen from '@/components/BootScreen';
 import * as Notifications from 'expo-notifications';
 import { configureServices } from '@/lib/serviceConfig';
 import { configureApi, setStoreContext, useApi } from '@/lib/api';
-import { clearSocialCache } from '@/services/socialService';
-import { clearCartCache } from '@/services/cartService';
+import { clearSocialCache, initSocialService } from '@/services/socialService';
+import { clearCartCache, initCartService } from '@/services/cartService';
 
 // ─── Push notification handler (show alerts while app is foregrounded) ────────
 Notifications.setNotificationHandler({
@@ -248,13 +248,36 @@ const STORE_CTX_KEY = '@brandthread/store_context';
 
 function ServiceConfigurer() {
   const { getToken, isSignedIn, isLoaded } = useAuth();
+  const { user } = useUser();
   const prevSignedInRef2 = useRef<boolean | null>(null);
+  // Track the previously active user ID so we can clear their cache before
+  // switching to the next user (or to 'anon' on sign-out).
+  const prevUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     configureServices(() => getToken());
     configureApi(() => getToken());
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Scope social and cart AsyncStorage keys by Clerk user ID so two accounts
+  // on the same device never share data — even without a full sign-out cycle.
+  // Clears the OLD user's cache first (before resetting the service userId) so
+  // clearSocialCache / clearCartCache always target the correct key prefix.
+  useEffect(() => {
+    const newUserId = user?.id ?? null;
+    const oldUserId = prevUserIdRef.current;
+    if (oldUserId !== null && oldUserId !== newUserId) {
+      // User changed or signed out — wipe the previous user's local caches
+      // using the explicit userId argument to avoid an 'anon' prefix race.
+      clearSocialCache(oldUserId).catch(() => {});
+      clearCartCache(oldUserId).catch(() => {});
+    }
+    prevUserIdRef.current = newUserId;
+    initSocialService(newUserId);
+    initCartService(newUserId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   // Hydrate persisted store context once per sign-in session.
   useEffect(() => {

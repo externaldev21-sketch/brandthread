@@ -1,7 +1,7 @@
 /**
  * Close Friends — manage close friends list with star toggle.
- * Selection is persisted to AsyncStorage under bt:close-friends:v1.
- * Only friends in this list can see Close Friends-gated posts/stories.
+ * Selection is persisted via socialService.getCloseFriendIds / saveCloseFriendIds,
+ * which scope the key by the current Clerk user ID so accounts never share the list.
  */
 import React, { useCallback, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput } from 'react-native';
@@ -10,28 +10,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, ON_DARK,
   FONT, FS, SP, RADIUS, GRAD_PRIMARY,
 } from '@/lib/theme';
-import { getAcceptedFriends } from '@/services/socialService';
+import { getAcceptedFriends, getCloseFriendIds, saveCloseFriendIds } from '@/services/socialService';
 import type { Friendship } from '@/services/socialTypes';
-
-const STORAGE_KEY = 'bt:close-friends:v1';
-
-async function loadCloseFriendIds(): Promise<string[]> {
-  try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as string[]) : [];
-  } catch { return []; }
-}
-
-async function saveCloseFriendIds(ids: string[]): Promise<void> {
-  await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(ids));
-}
 
 export default function BuyerCloseFriends() {
   const insets = useSafeAreaInsets();
@@ -41,7 +25,7 @@ export default function BuyerCloseFriends() {
   const [query, setQuery] = useState('');
 
   useFocusEffect(useCallback(() => {
-    Promise.all([getAcceptedFriends(), loadCloseFriendIds()]).then(([list, ids]) => {
+    Promise.all([getAcceptedFriends(), getCloseFriendIds()]).then(([list, ids]) => {
       setFriends(list);
       setCloseFriends(new Set(ids));
     });

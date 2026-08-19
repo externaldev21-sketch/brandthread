@@ -19,28 +19,53 @@ import type {
 } from './socialTypes';
 import { DEFAULT_PRIVACY_SETTINGS, DEFAULT_NOTIFICATION_PREFS } from './socialTypes';
 
-// ─── Keys ─────────────────────────────────────────────────────────────────────
+// ─── Keys (scoped by user ID so two accounts never share storage) ─────────────
 
-const K = {
-  profile:       'bt:social:profile:v1',
-  posts:         'bt:social:posts:v1',
-  reposts:       'bt:social:reposts:v1',
-  friendships:   'bt:social:friendships:v1',
-  requests:      'bt:social:requests:v1',
-  conversations: 'bt:social:convs:v1',
-  messages:      (id: string) => `bt:social:msgs:${id}:v1`,
-  comments:      (postId: string) => `bt:social:comments:${postId}:v1`,
-  stories:       'bt:social:stories:v1',
-  notifications: 'bt:social:notifs:v1',
-  notifPrefs:    'bt:social:notif_prefs:v1',
-  blocks:        'bt:social:blocks:v1',
-  mutes:         'bt:social:mutes:v1',
-  restricts:     'bt:social:restricts:v1',
-  saved:         'bt:social:saved:v1',
-  privacy:       'bt:social:privacy:v1',
-  seeded:        'bt:social:seeded:v1',
-  friendLikes:   'bt:social:friend-likes:v1',
-} as const;
+/** Set by initSocialService() after sign-in. Falls back to 'anon' so the
+ *  service is safe to call before the user ID is available. */
+let _socialUserId = 'anon';
+
+/** Call once after Clerk resolves the current user ID (and again on sign-out
+ *  with null to reset to 'anon'). */
+export function initSocialService(userId: string | null): void {
+  _socialUserId = userId ?? 'anon';
+}
+
+/**
+ * Returns a snapshot of AsyncStorage keys scoped to the given user ID.
+ * Each exported function captures its own snapshot at entry (before any await)
+ * so that a mid-flight userId change cannot corrupt another user's data.
+ */
+function K(uid = _socialUserId) {
+  return {
+    /** Baked-in user ID — compare against _socialUserId after awaits to detect account switches. */
+    userId:             uid,
+    profile:            `bt:social:${uid}:profile:v1`,
+    posts:              `bt:social:${uid}:posts:v1`,
+    reposts:            `bt:social:${uid}:reposts:v1`,
+    friendships:        `bt:social:${uid}:friendships:v1`,
+    requests:           `bt:social:${uid}:requests:v1`,
+    conversations:      `bt:social:${uid}:convs:v1`,
+    messages:           (id: string) => `bt:social:${uid}:msgs:${id}:v1`,
+    comments:           (postId: string) => `bt:social:${uid}:comments:${postId}:v1`,
+    stories:            `bt:social:${uid}:stories:v1`,
+    notifications:      `bt:social:${uid}:notifs:v1`,
+    notifPrefs:         `bt:social:${uid}:notif_prefs:v1`,
+    blocks:             `bt:social:${uid}:blocks:v1`,
+    mutes:              `bt:social:${uid}:mutes:v1`,
+    restricts:          `bt:social:${uid}:restricts:v1`,
+    saved:              `bt:social:${uid}:saved:v1`,
+    privacy:            `bt:social:${uid}:privacy:v1`,
+    seeded:             `bt:social:${uid}:seeded:v1`,
+    friendLikes:        `bt:social:${uid}:friend-likes:v1`,
+    sellerPosts:        `bt:social:${uid}:seller-posts:v1`,
+    sellerPostsSeeded:  `bt:social:${uid}:seller-posts:seeded:v1`,
+    closeFriends:       `bt:close-friends:${uid}:v1`,
+  };
+}
+/** Keys snapshot type — passed through the call chain so inner helpers
+ *  never re-resolve _socialUserId in async continuations. */
+type SocialKeys = ReturnType<typeof K>;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -284,25 +309,26 @@ const DEMO_POSTS: BuyerPost[] = [
 // ─── Seed ─────────────────────────────────────────────────────────────────────
 
 async function seedIfNeeded(): Promise<void> {
-  const done = await AsyncStorage.getItem(K.seeded);
+  const k = K(); // single snapshot — no re-reads across awaits
+  const done = await AsyncStorage.getItem(k.seeded);
   if (done === 'true') return;
   await Promise.all([
-    save(K.friendships, DEMO_FRIENDS),
-    save(K.requests, DEMO_REQUESTS),
-    save(K.conversations, DEMO_CONVS),
-    save(K.stories, DEMO_STORIES),
-    save(K.notifications, DEMO_NOTIFS),
-    save(K.saved, DEMO_SAVED),
-    save(K.posts, DEMO_POSTS),
-    save(K.reposts, []),
-    save(K.blocks, []),
-    save(K.mutes, []),
-    save(K.privacy, DEFAULT_PRIVACY_SETTINGS),
-    save(K.notifPrefs, DEFAULT_NOTIFICATION_PREFS),
-    ...Object.entries(DEMO_MESSAGES).map(([id, msgs]) => save(K.messages(id), msgs)),
-    ...Object.entries(DEMO_COMMENTS).map(([postId, comments]) => save(K.comments(postId), comments)),
+    save(k.friendships, DEMO_FRIENDS),
+    save(k.requests, DEMO_REQUESTS),
+    save(k.conversations, DEMO_CONVS),
+    save(k.stories, DEMO_STORIES),
+    save(k.notifications, DEMO_NOTIFS),
+    save(k.saved, DEMO_SAVED),
+    save(k.posts, DEMO_POSTS),
+    save(k.reposts, []),
+    save(k.blocks, []),
+    save(k.mutes, []),
+    save(k.privacy, DEFAULT_PRIVACY_SETTINGS),
+    save(k.notifPrefs, DEFAULT_NOTIFICATION_PREFS),
+    ...Object.entries(DEMO_MESSAGES).map(([id, msgs]) => save(k.messages(id), msgs)),
+    ...Object.entries(DEMO_COMMENTS).map(([postId, comments]) => save(k.comments(postId), comments)),
   ]);
-  await AsyncStorage.setItem(K.seeded, 'true');
+  await AsyncStorage.setItem(k.seeded, 'true');
 }
 
 // Trigger seed immediately
@@ -311,18 +337,21 @@ seedIfNeeded();
 // ─── Cache invalidation ───────────────────────────────────────────────────────
 
 /**
- * Clear all social AsyncStorage keys for the current device.
- * Call this on sign-out so the next account sees fresh data instead of stale cache.
+ * Clear all social AsyncStorage keys for the given user (defaults to current).
+ * Scanned by prefix so message/comment keys are also removed.
+ * Pass an explicit userId when calling during sign-out to avoid a race between
+ * this function and initSocialService(null) resetting _socialUserId to 'anon'.
  */
-export async function clearSocialCache(): Promise<void> {
+export async function clearSocialCache(userId?: string): Promise<void> {
+  const u = userId ?? _socialUserId;
   try {
-    // Collect all flat string keys from K (message/comment keys are functions, not stored here)
-    const flatKeys = Object.values(K).filter((v): v is string => typeof v === 'string');
-    await AsyncStorage.multiRemove(flatKeys);
-    // Also clear any in-flight message/comment keys by scanning AsyncStorage
     const allKeys = await AsyncStorage.getAllKeys();
-    const socialKeys = allKeys.filter(k => k.startsWith('bt:social:'));
-    if (socialKeys.length > 0) await AsyncStorage.multiRemove(socialKeys as string[]);
+    const socialPrefix = `bt:social:${u}:`;
+    const cfPrefix     = `bt:close-friends:${u}:`;
+    const toRemove = (allKeys as string[]).filter(
+      k => k.startsWith(socialPrefix) || k.startsWith(cfPrefix),
+    );
+    if (toRemove.length > 0) await AsyncStorage.multiRemove(toRemove);
   } catch {}
   notify();
 }
@@ -337,21 +366,21 @@ const DEFAULT_PROFILE: BuyerSocialProfile = {
   followingBrandsCount: 5, createdAt: new Date(now - 30 * 24 * 3600000).toISOString(),
 };
 
-export async function getMyProfile(): Promise<BuyerSocialProfile> {
-  return load(K.profile, DEFAULT_PROFILE);
+export async function getMyProfile(k: SocialKeys = K()): Promise<BuyerSocialProfile> {
+  return load(k.profile, DEFAULT_PROFILE);
 }
-export async function updateMyProfile(updates: Partial<BuyerSocialProfile>): Promise<BuyerSocialProfile> {
-  const current = await getMyProfile();
+export async function updateMyProfile(updates: Partial<BuyerSocialProfile>, k: SocialKeys = K()): Promise<BuyerSocialProfile> {
+  const current = await getMyProfile(k);
   const next = { ...current, ...updates };
-  await save(K.profile, next);
+  await save(k.profile, next);
   notify();
   return next;
 }
 
 // ─── Posts ────────────────────────────────────────────────────────────────────
 
-export async function getMyPosts(): Promise<BuyerPost[]> {
-  return load<BuyerPost[]>(K.posts, DEMO_POSTS);
+export async function getMyPosts(k: SocialKeys = K()): Promise<BuyerPost[]> {
+  return load<BuyerPost[]>(k.posts, DEMO_POSTS);
 }
 export async function createPost(params: {
   type: BuyerPost['type'];
@@ -361,7 +390,8 @@ export async function createPost(params: {
   profileVisibility: BuyerPost['profileVisibility'];
   isDraft?: boolean;
 }): Promise<BuyerPost> {
-  const profile = await getMyProfile();
+  const k = K();
+  const profile = await getMyProfile(k);
   const post: BuyerPost = {
     id: uid(), authorId: MY_USER_ID, authorName: profile.name, authorHandle: '@' + profile.username,
     authorInitials: profile.avatarInitials, authorColor: profile.avatarColor,
@@ -372,57 +402,61 @@ export async function createPost(params: {
     likedByMe: false, savedByMe: false, repostedByMe: false, isArchived: false,
     isDraft: params.isDraft ?? false, createdAt: iso(), updatedAt: iso(),
   };
-  const posts = await getMyPosts();
-  await save(K.posts, [post, ...posts]);
-  const p = await getMyProfile();
-  await updateMyProfile({ postsCount: p.postsCount + 1 });
+  const posts = await getMyPosts(k);
+  await save(k.posts, [post, ...posts]);
+  const p = await getMyProfile(k);
+  await updateMyProfile({ postsCount: p.postsCount + 1 }, k);
   notify();
   return post;
 }
-export async function updatePost(id: string, updates: Partial<Pick<BuyerPost, 'caption' | 'hashtags' | 'profileVisibility' | 'isDraft'>>): Promise<BuyerPost | null> {
-  const posts = await getMyPosts();
+export async function updatePost(id: string, updates: Partial<Pick<BuyerPost, 'caption' | 'hashtags' | 'profileVisibility' | 'isDraft'>>, k: SocialKeys = K()): Promise<BuyerPost | null> {
+  const posts = await getMyPosts(k);
   const idx = posts.findIndex(p => p.id === id);
   if (idx < 0) return null;
   const updated = { ...posts[idx], ...updates, updatedAt: iso() };
   posts[idx] = updated;
-  await save(K.posts, posts);
+  await save(k.posts, posts);
   notify();
   return updated;
 }
 export async function deletePost(id: string): Promise<void> {
-  const posts = await getMyPosts();
-  await save(K.posts, posts.filter(p => p.id !== id));
-  const p = await getMyProfile();
-  await updateMyProfile({ postsCount: Math.max(0, p.postsCount - 1) });
+  const k = K();
+  const posts = await getMyPosts(k);
+  await save(k.posts, posts.filter(p => p.id !== id));
+  const p = await getMyProfile(k);
+  await updateMyProfile({ postsCount: Math.max(0, p.postsCount - 1) }, k);
   notify();
 }
 export async function archivePost(id: string): Promise<void> {
-  await updatePost(id, {});
-  const posts = await getMyPosts();
+  const k = K();
+  await updatePost(id, {}, k);
+  const posts = await getMyPosts(k);
   const idx = posts.findIndex(p => p.id === id);
-  if (idx >= 0) { posts[idx].isArchived = true; await save(K.posts, posts); notify(); }
+  if (idx >= 0) { posts[idx].isArchived = true; await save(k.posts, posts); notify(); }
 }
 export async function unarchivePost(id: string): Promise<void> {
-  const posts = await getMyPosts();
+  const k = K();
+  const posts = await getMyPosts(k);
   const idx = posts.findIndex(p => p.id === id);
-  if (idx >= 0) { posts[idx].isArchived = false; await save(K.posts, posts); notify(); }
+  if (idx >= 0) { posts[idx].isArchived = false; await save(k.posts, posts); notify(); }
 }
 export async function likePost(id: string): Promise<void> {
-  const posts = await getMyPosts();
+  const k = K();
+  const posts = await getMyPosts(k);
   const idx = posts.findIndex(p => p.id === id);
   if (idx >= 0) {
     posts[idx].likedByMe = !posts[idx].likedByMe;
     posts[idx].likesCount += posts[idx].likedByMe ? 1 : -1;
-    await save(K.posts, posts); notify();
+    await save(k.posts, posts); notify();
   }
 }
 
-// ─── Friend-post engagement (likes persisted independently of K.posts) ─────────
+// ─── Friend-post engagement (likes persisted independently of K().posts) ─────────
 
 type FriendLikeState = { likedByMe: boolean; likesCount: number };
 
-export async function getFriendPostEngagements(): Promise<Record<string, FriendLikeState>> {
-  return load<Record<string, FriendLikeState>>(K.friendLikes, {});
+export async function getFriendPostEngagements(k: SocialKeys = K()): Promise<Record<string, FriendLikeState>> {
+  return load<Record<string, FriendLikeState>>(k.friendLikes, {});
 }
 
 export async function likeFriendPost(
@@ -430,29 +464,31 @@ export async function likeFriendPost(
   baseLikesCount: number,
   baseLikedByMe: boolean,
 ): Promise<FriendLikeState> {
-  const all = await getFriendPostEngagements();
+  const k = K();
+  const all = await getFriendPostEngagements(k);
   const cur = all[postId] ?? { likedByMe: baseLikedByMe, likesCount: baseLikesCount };
   const next: FriendLikeState = {
     likedByMe: !cur.likedByMe,
     likesCount: cur.likedByMe ? cur.likesCount - 1 : cur.likesCount + 1,
   };
   all[postId] = next;
-  await save(K.friendLikes, all);
+  await save(k.friendLikes, all);
   notify();
   return next;
 }
 type FriendPostMeta = { authorId: string; authorName: string; authorHandle: string; caption: string };
 
 export async function repostPost(id: string, friendMeta?: FriendPostMeta): Promise<void> {
-  const posts = await getMyPosts();
+  const k = K();
+  const posts = await getMyPosts(k);
   const idx = posts.findIndex(p => p.id === id);
-  const reposts = await load<RepostRecord[]>(K.reposts, []);
+  const reposts = await load<RepostRecord[]>(k.reposts, []);
 
   if (idx >= 0) {
     // Own post — toggle repostedByMe flag in the posts store
     posts[idx].repostedByMe = !posts[idx].repostedByMe;
     posts[idx].repostsCount += posts[idx].repostedByMe ? 1 : -1;
-    await save(K.posts, posts);
+    await save(k.posts, posts);
     if (posts[idx].repostedByMe) {
       reposts.unshift({ id: uid(), reposterId: MY_USER_ID, originalPostId: id, originalAuthorId: posts[idx].authorId, originalAuthorName: posts[idx].authorName, originalAuthorHandle: posts[idx].authorHandle, originalCaption: posts[idx].caption, feedEligibility: 'profile_only', createdAt: iso() });
     } else {
@@ -470,7 +506,7 @@ export async function repostPost(id: string, friendMeta?: FriendPostMeta): Promi
       reposts.unshift({ id: uid(), reposterId: MY_USER_ID, originalPostId: id, originalAuthorId: friendMeta.authorId, originalAuthorName: friendMeta.authorName, originalAuthorHandle: friendMeta.authorHandle, originalCaption: friendMeta.caption, feedEligibility: 'profile_only', createdAt: iso() });
     }
   }
-  await save(K.reposts, reposts);
+  await save(k.reposts, reposts);
   notify();
 
   // Fire-and-forget: log repost interaction to DB for real posts
@@ -489,18 +525,18 @@ export async function repostPost(id: string, friendMeta?: FriendPostMeta): Promi
 }
 
 /** Returns a Set of post IDs that the current user has reposted (persisted). */
-export async function getRepostedPostIds(): Promise<Set<string>> {
-  const reposts = await load<RepostRecord[]>(K.reposts, []);
+export async function getRepostedPostIds(k: SocialKeys = K()): Promise<Set<string>> {
+  const reposts = await load<RepostRecord[]>(k.reposts, []);
   return new Set(reposts.filter(r => r.reposterId === MY_USER_ID).map(r => r.originalPostId));
 }
-export async function getMyReposts(): Promise<RepostRecord[]> {
-  return load<RepostRecord[]>(K.reposts, []);
+export async function getMyReposts(k: SocialKeys = K()): Promise<RepostRecord[]> {
+  return load<RepostRecord[]>(k.reposts, []);
 }
 
 // ─── Comments ────────────────────────────────────────────────────────────────
 
-export async function getComments(postId: string): Promise<Comment[]> {
-  return load<Comment[]>(K.comments(postId), DEMO_COMMENTS[postId] ?? []);
+export async function getComments(postId: string, k: SocialKeys = K()): Promise<Comment[]> {
+  return load<Comment[]>(k.comments(postId), DEMO_COMMENTS[postId] ?? []);
 }
 
 export async function postComment(params: {
@@ -510,6 +546,7 @@ export async function postComment(params: {
   replyToAuthorName?: string;
   replyToText?: string;
 }): Promise<Comment> {
+  const k = K();
   const comment: Comment = {
     id: uid(),
     postId: params.postId,
@@ -526,46 +563,47 @@ export async function postComment(params: {
     likesCount: 0,
     createdAt: iso(),
   };
-  const existing = await getComments(params.postId);
-  await save(K.comments(params.postId), [...existing, comment]);
+  const existing = await getComments(params.postId, k);
+  await save(k.comments(params.postId), [...existing, comment]);
   // Bump commentsCount on the parent post
-  const posts = await getMyPosts();
+  const posts = await getMyPosts(k);
   const idx = posts.findIndex(p => p.id === params.postId);
   if (idx >= 0) {
     posts[idx].commentsCount += 1;
-    await save(K.posts, posts);
+    await save(k.posts, posts);
   }
   notify();
   return comment;
 }
 
 export async function likeComment(postId: string, commentId: string): Promise<void> {
-  const comments = await getComments(postId);
+  const k = K();
+  const comments = await getComments(postId, k);
   const idx = comments.findIndex(c => c.id === commentId);
   if (idx < 0) return;
   comments[idx].likedByMe = !comments[idx].likedByMe;
   comments[idx].likesCount += comments[idx].likedByMe ? 1 : -1;
-  await save(K.comments(postId), comments);
+  await save(k.comments(postId), comments);
   notify();
 }
 
 export async function deleteComment(postId: string, commentId: string): Promise<void> {
-  const comments = await getComments(postId);
+  const k = K();
+  const comments = await getComments(postId, k);
   const next = comments.filter(c => c.id !== commentId);
-  await save(K.comments(postId), next);
-  const posts = await getMyPosts();
+  await save(k.comments(postId), next);
+  const posts = await getMyPosts(k);
   const idx = posts.findIndex(p => p.id === postId);
   if (idx >= 0) {
     posts[idx].commentsCount = Math.max(0, posts[idx].commentsCount - 1);
-    await save(K.posts, posts);
+    await save(k.posts, posts);
   }
   notify();
 }
 
 // ─── Seller posts (Thread-eligible) ──────────────────────────────────────────
 
-const SELLER_POSTS_KEY = 'bt:social:seller-posts:v1';
-const SELLER_SEED_KEY  = 'bt:social:seller-posts:seeded:v1';
+// Keys are now part of K() — user-scoped — no global constants needed.
 
 export interface SellerPostProductTag {
   productId:   string;
@@ -674,14 +712,14 @@ const SELLER_POSTS_SEED: SellerThreadPost[] = [
   },
 ];
 
-async function ensureSellerPostsSeed(): Promise<void> {
-  const done = await load<boolean>(SELLER_SEED_KEY, false);
+async function ensureSellerPostsSeed(k: SocialKeys = K()): Promise<void> {
+  const done = await load<boolean>(k.sellerPostsSeeded, false);
   if (done) return;
-  const existing = await load<SellerThreadPost[]>(SELLER_POSTS_KEY, []);
+  const existing = await load<SellerThreadPost[]>(k.sellerPosts, []);
   if (existing.length === 0) {
-    await save(SELLER_POSTS_KEY, SELLER_POSTS_SEED);
+    await save(k.sellerPosts, SELLER_POSTS_SEED);
   }
-  await save(SELLER_SEED_KEY, true);
+  await save(k.sellerPostsSeeded, true);
 }
 
 // ─── CRUD ──────────────────────────────────────────────────────────────────────
@@ -703,9 +741,10 @@ export async function createSellerPost(params: {
   isDraft?: boolean;
   scheduledAt?: string | null;
 }): Promise<SellerThreadPost> {
-  await ensureSellerPostsSeed();
-  const profile = await getMyProfile();
-  const existing = await load<SellerThreadPost[]>(SELLER_POSTS_KEY, []);
+  const k = K();
+  await ensureSellerPostsSeed(k);
+  const profile = await getMyProfile(k);
+  const existing = await load<SellerThreadPost[]>(k.sellerPosts, []);
   const isDraft = params.isDraft ?? false;
   const now = iso();
   const post: SellerThreadPost = {
@@ -739,7 +778,7 @@ export async function createSellerPost(params: {
     likesCount: 0, commentsCount: 0, repostsCount: 0, savedCount: 0,
     likedByMe: false, savedByMe: false, repostedByMe: false,
   };
-  await save(SELLER_POSTS_KEY, [post, ...existing]);
+  await save(k.sellerPosts, [post, ...existing]);
   notify();
   // Fire-and-forget to real API
   serviceRequest('/api/posts', {
@@ -764,12 +803,13 @@ export async function updateSellerPost(
     'sound' | 'productTags' | 'visibility' | 'scheduledAt' | 'publishedAt'
   >>,
 ): Promise<void> {
-  await ensureSellerPostsSeed();
-  const posts = await load<SellerThreadPost[]>(SELLER_POSTS_KEY, []);
+  const k = K();
+  await ensureSellerPostsSeed(k);
+  const posts = await load<SellerThreadPost[]>(k.sellerPosts, []);
   const idx = posts.findIndex(p => p.id === id);
   if (idx < 0) return;
   posts[idx] = { ...posts[idx], ...patch, updatedAt: iso() };
-  await save(SELLER_POSTS_KEY, posts);
+  await save(k.sellerPosts, posts);
   notify();
 }
 
@@ -782,26 +822,29 @@ export async function deleteSellerPost(id: string): Promise<void> {
 }
 
 export async function likeSellerPost(id: string): Promise<void> {
-  const posts = await load<SellerThreadPost[]>(SELLER_POSTS_KEY, []);
+  const k = K();
+  const posts = await load<SellerThreadPost[]>(k.sellerPosts, []);
   const idx = posts.findIndex(p => p.id === id);
   if (idx < 0) return;
   const liked = !posts[idx].likedByMe;
   posts[idx] = { ...posts[idx], likedByMe: liked, likesCount: posts[idx].likesCount + (liked ? 1 : -1), updatedAt: iso() };
-  await save(SELLER_POSTS_KEY, posts);
+  await save(k.sellerPosts, posts);
   notify();
 }
 
 export async function saveSellerPost(id: string): Promise<void> {
-  const posts = await load<SellerThreadPost[]>(SELLER_POSTS_KEY, []);
+  const k = K();
+  const posts = await load<SellerThreadPost[]>(k.sellerPosts, []);
   const idx = posts.findIndex(p => p.id === id);
   if (idx < 0) return;
   const saved = !posts[idx].savedByMe;
   posts[idx] = { ...posts[idx], savedByMe: saved, savedCount: posts[idx].savedCount + (saved ? 1 : -1), updatedAt: iso() };
-  await save(SELLER_POSTS_KEY, posts);
+  await save(k.sellerPosts, posts);
   notify();
 }
 
 export async function getSellerPosts(): Promise<SellerThreadPost[]> {
+  const k = K();
   // Try real API first so sellers see their actual published posts
   try {
     const apiPosts = await serviceRequest('/api/posts') as any[];
@@ -809,6 +852,12 @@ export async function getSellerPosts(): Promise<SellerThreadPost[]> {
       const now = iso();
       const mapped: SellerThreadPost[] = apiPosts.map(p => ({
         id:              p.id,
+        authorId:        p.ownerId        ?? MY_USER_ID,
+        authorAccountType: 'seller' as const,
+        authorName:      p.seller?.brandName ?? p.seller?.displayName ?? 'Seller',
+        authorHandle:    '@' + (p.seller?.brandName ?? 'seller').toLowerCase().replace(/[^a-z0-9]/g, ''),
+        authorInitials:  (p.seller?.brandName ?? 'S').slice(0, 2).toUpperCase(),
+        authorColor:     '#8B5CF6',
         sellerId:        p.ownerId        ?? MY_USER_ID,
         brandId:         p.ownerId        ?? MY_USER_ID,
         feedEligibility: 'thread_eligible' as const,
@@ -837,15 +886,16 @@ export async function getSellerPosts(): Promise<SellerThreadPost[]> {
         savedByMe:       false,
         repostedByMe:    false,
       }));
-      await save(SELLER_POSTS_KEY, mapped);
+      // Guard: discard if account changed while request was in-flight
+      if (_socialUserId === k.userId) await save(k.sellerPosts, mapped);
       return mapped;
     }
   } catch {
     // Fall through to local cache
   }
   // Fall back to AsyncStorage (cached real data or demo seeds on first run)
-  await ensureSellerPostsSeed();
-  return load<SellerThreadPost[]>(SELLER_POSTS_KEY, []);
+  await ensureSellerPostsSeed(k);
+  return load<SellerThreadPost[]>(k.sellerPosts, []);
 }
 
 /** Maps a raw API post object from /api/posts/feed to a SellerThreadPost. */
@@ -931,26 +981,28 @@ export async function getThreadPosts(): Promise<SellerThreadPost[]> {
 
 // ─── Friendships ──────────────────────────────────────────────────────────────
 
-export async function getFriendships(): Promise<Friendship[]> {
-  return load<Friendship[]>(K.friendships, DEMO_FRIENDS);
+export async function getFriendships(k: SocialKeys = K()): Promise<Friendship[]> {
+  return load<Friendship[]>(k.friendships, DEMO_FRIENDS);
 }
-export async function getAcceptedFriends(): Promise<Friendship[]> {
-  const all = await getFriendships();
+export async function getAcceptedFriends(k: SocialKeys = K()): Promise<Friendship[]> {
+  const all = await getFriendships(k);
   return all.filter(f => f.status === 'accepted');
 }
-export async function getFriendRequests(): Promise<FriendRequest[]> {
-  return load<FriendRequest[]>(K.requests, DEMO_REQUESTS);
+export async function getFriendRequests(k: SocialKeys = K()): Promise<FriendRequest[]> {
+  return load<FriendRequest[]>(k.requests, DEMO_REQUESTS);
 }
 export async function getFriendSuggestions(): Promise<FriendSuggestion[]> {
   return Promise.resolve([...DEMO_SUGGESTIONS]);
 }
 export async function isFriend(userId: string): Promise<boolean> {
-  const friends = await getFriendships();
+  const k = K();
+  const friends = await getFriendships(k);
   return friends.some(f => f.userId === userId && f.status === 'accepted');
 }
 export async function canMessage(userId: string): Promise<boolean> {
   // Buyer-to-buyer requires accepted friendship
-  const friends = await getFriendships();
+  const k = K();
+  const friends = await getFriendships(k);
   const entry = friends.find(f => f.userId === userId);
   return entry?.status === 'accepted';
 }
@@ -963,87 +1015,107 @@ export async function canMessage(userId: string): Promise<boolean> {
  */
 export async function isCloseFriendOf(userId: string): Promise<boolean> {
   try {
-    const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
-    const raw = await AsyncStorage.getItem('bt:close-friends:v1');
+    const raw = await AsyncStorage.getItem(K().closeFriends);
     if (!raw) return false;
     const ids: string[] = JSON.parse(raw);
     return Array.isArray(ids) && ids.includes(userId);
   } catch { return false; }
 }
+
+/** Load close-friends IDs for the current user (buyer-close-friends screen). */
+export async function getCloseFriendIds(): Promise<string[]> {
+  try {
+    const raw = await AsyncStorage.getItem(K().closeFriends);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as string[]) : [];
+  } catch { return []; }
+}
+
+/** Persist close-friends IDs for the current user (buyer-close-friends screen). */
+export async function saveCloseFriendIds(ids: string[]): Promise<void> {
+  await AsyncStorage.setItem(K().closeFriends, JSON.stringify(ids));
+}
 export async function sendFriendRequest(params: { userId: string; name: string; handle: string; initials: string; color: string; }): Promise<{ success: boolean; message: string; request?: FriendRequest }> {
+  const k = K();
   if (params.userId === MY_USER_ID) return { success: false, message: 'You cannot send a request to yourself.' };
-  const blocks = await getBlockedUsers();
+  const blocks = await getBlockedUsers(k);
   if (blocks.some(b => b.blockedUserId === params.userId)) return { success: false, message: 'Cannot send request to this user.' };
-  const existing = await getFriendships();
+  const existing = await getFriendships(k);
   if (existing.some(f => f.userId === params.userId)) return { success: false, message: 'Already connected or pending.' };
   const req: FriendRequest = { id: uid(), fromId: MY_USER_ID, fromName: MY_NAME, fromHandle: MY_HANDLE, fromInitials: MY_INITIALS, fromColor: MY_COLOR, toId: params.userId, status: 'pending', mutualFriends: 0, createdAt: iso() };
-  const requests = await getFriendRequests();
-  await save(K.requests, [...requests, req]);
-  const friendships = await getFriendships();
-  await save(K.friendships, [...friendships, { id: uid(), userId: params.userId, name: params.name, handle: params.handle, initials: params.initials, color: params.color, status: 'pending_sent' as FriendshipStatus, mutualFriendsCount: 0, updatedAt: iso() }]);
+  const requests = await getFriendRequests(k);
+  await save(k.requests, [...requests, req]);
+  const friendships = await getFriendships(k);
+  await save(k.friendships, [...friendships, { id: uid(), userId: params.userId, name: params.name, handle: params.handle, initials: params.initials, color: params.color, status: 'pending_sent' as FriendshipStatus, mutualFriendsCount: 0, updatedAt: iso() }]);
   notify();
   return { success: true, message: 'Friend request sent.', request: req };
 }
 export async function acceptFriendRequest(requestId: string): Promise<void> {
-  const requests = await getFriendRequests();
+  const k = K();
+  const requests = await getFriendRequests(k);
   const req = requests.find(r => r.id === requestId);
   if (!req) return;
   const updated = requests.map(r => r.id === requestId ? { ...r, status: 'accepted' as const } : r);
-  await save(K.requests, updated);
-  const friendships = await getFriendships();
+  await save(k.requests, updated);
+  const friendships = await getFriendships(k);
   const existing = friendships.findIndex(f => f.userId === req.fromId);
   if (existing >= 0) {
     friendships[existing] = { ...friendships[existing], status: 'accepted', updatedAt: iso() };
   } else {
     friendships.push({ id: uid(), userId: req.fromId, name: req.fromName, handle: req.fromHandle, initials: req.fromInitials, color: req.fromColor, status: 'accepted', mutualFriendsCount: req.mutualFriends, updatedAt: iso() });
   }
-  await save(K.friendships, friendships);
-  const p = await getMyProfile();
-  await updateMyProfile({ friendsCount: p.friendsCount + 1 });
+  await save(k.friendships, friendships);
+  const p = await getMyProfile(k);
+  await updateMyProfile({ friendsCount: p.friendsCount + 1 }, k);
   notify();
 }
 export async function declineFriendRequest(requestId: string): Promise<void> {
-  const requests = await getFriendRequests();
-  await save(K.requests, requests.map(r => r.id === requestId ? { ...r, status: 'declined' as const } : r));
+  const k = K();
+  const requests = await getFriendRequests(k);
+  await save(k.requests, requests.map(r => r.id === requestId ? { ...r, status: 'declined' as const } : r));
   notify();
 }
 export async function cancelFriendRequest(requestId: string): Promise<void> {
-  const requests = await getFriendRequests();
+  const k = K();
+  const requests = await getFriendRequests(k);
   const req = requests.find(r => r.id === requestId);
-  await save(K.requests, requests.filter(r => r.id !== requestId));
+  await save(k.requests, requests.filter(r => r.id !== requestId));
   if (req) {
-    const friendships = await getFriendships();
-    await save(K.friendships, friendships.filter(f => f.userId !== req.toId));
+    const friendships = await getFriendships(k);
+    await save(k.friendships, friendships.filter(f => f.userId !== req.toId));
   }
   notify();
 }
-export async function removeFriend(userId: string): Promise<void> {
-  const friendships = await getFriendships();
-  await save(K.friendships, friendships.filter(f => f.userId !== userId));
-  const p = await getMyProfile();
-  await updateMyProfile({ friendsCount: Math.max(0, p.friendsCount - 1) });
+export async function removeFriend(userId: string, k: SocialKeys = K()): Promise<void> {
+  const friendships = await getFriendships(k);
+  await save(k.friendships, friendships.filter(f => f.userId !== userId));
+  const p = await getMyProfile(k);
+  await updateMyProfile({ friendsCount: Math.max(0, p.friendsCount - 1) }, k);
   // Disable messaging in existing conversation
-  const convs = await getConversations();
+  const convs = await getConversations(k);
   const updated = convs.map(c => c.type === 'buyer_to_buyer' && c.participants.some(p => p.userId === userId) ? { ...c, isFriendshipActive: false } : c);
-  await save(K.conversations, updated);
+  await save(k.conversations, updated);
   notify();
 }
 
 // ─── Conversations ────────────────────────────────────────────────────────────
 
-export async function getConversations(): Promise<Conversation[]> {
+export async function getConversations(k: SocialKeys = K()): Promise<Conversation[]> {
   try {
     const remote = await serviceRequest<Conversation[]>('/api/conversations');
     // Only use API result if it has data — empty means first-login DB (fall back to local demo data)
     if (Array.isArray(remote) && remote.length > 0) {
-      await save(K.conversations, remote); // cache for offline / next-launch use
+      // Guard: discard if account changed while request was in-flight
+      if (_socialUserId === k.userId) await save(k.conversations, remote);
       return remote;
     }
   } catch { /* fall through to local */ }
-  return load<Conversation[]>(K.conversations, DEMO_CONVS);
+  return load<Conversation[]>(k.conversations, DEMO_CONVS);
 }
 export async function getConversation(id: string): Promise<Conversation | null> {
-  const convs = await getConversations();
+  const k = K();
+  const convs = await getConversations(k);
   return convs.find(c => c.id === id) ?? null;
 }
 export async function createOrGetConversation(params: {
@@ -1052,6 +1124,7 @@ export async function createOrGetConversation(params: {
   contextOrderId?: string; contextOrderNumber?: string; contextOrderStatus?: string;
   contextProductId?: string; contextProductName?: string; contextSellerName?: string;
 }): Promise<Conversation> {
+  const k = K();
   try {
     const conv = await serviceRequest<Conversation>('/api/conversations', {
       method: 'POST',
@@ -1071,7 +1144,7 @@ export async function createOrGetConversation(params: {
     notify();
     return conv;
   } catch { /* fall through to existing local logic */ }
-  const convs = await getConversations();
+  const convs = await getConversations(k);
   // For order threads, match by orderId
   if (params.contextOrderId) {
     const existing = convs.find(c => c.contextOrderId === params.contextOrderId);
@@ -1088,98 +1161,123 @@ export async function createOrGetConversation(params: {
     contextProductName: params.contextProductName, contextSellerName: params.contextSellerName,
     updatedAt: iso(),
   };
-  await save(K.conversations, [...convs, conv]);
+  await save(k.conversations, [...convs, conv]);
   notify();
   return conv;
 }
-export async function getMessages(conversationId: string): Promise<Message[]> {
+export async function getMessages(conversationId: string, k: SocialKeys = K()): Promise<Message[]> {
+  const msgKey = k.messages(conversationId);
   try {
     const remote = await serviceRequest<Message[]>(`/api/conversations/${conversationId}/messages`);
     // Only use API result if it has data — empty means conversation not yet in DB (use local demo/cached)
     if (Array.isArray(remote) && remote.length > 0) {
-      await save(K.messages(conversationId), remote); // cache for offline use
+      // Guard: discard if account changed while request was in-flight
+      if (_socialUserId === k.userId) await save(msgKey, remote);
       return remote;
     }
   } catch { /* fall through to local */ }
-  return load<Message[]>(K.messages(conversationId), DEMO_MESSAGES[conversationId] ?? []);
+  return load<Message[]>(msgKey, DEMO_MESSAGES[conversationId] ?? []);
 }
 export async function sendMessage(conversationId: string, text: string, attachment?: MessageAttachment): Promise<Message> {
+  // Snapshot keys at function entry so async callbacks use the same userId
+  // even if _socialUserId changes while the network request is in-flight.
+  const k = K();
+  const msgKey  = k.messages(conversationId);
+  const convsKey = k.conversations;
   const msg: Message = {
     id: uid(), conversationId, fromId: MY_USER_ID, fromName: MY_NAME, fromInitials: MY_INITIALS, fromColor: MY_COLOR,
     text, attachment, reactions: [], status: 'sending', ts: Date.now(), deletedForMe: false,
   };
-  const msgs = await getMessages(conversationId);
+  const msgs = await getMessages(conversationId, k);
   const updated = [...msgs, msg];
-  await save(K.messages(conversationId), updated);
+  await save(msgKey, updated);
   // Update conversation last message
-  const convs = await getConversations();
+  const convs = await getConversations(k);
   const idx = convs.findIndex(c => c.id === conversationId);
-  if (idx >= 0) { convs[idx] = { ...convs[idx], lastMessage: text, lastMessageTs: msg.ts, updatedAt: iso() }; await save(K.conversations, convs); }
+  if (idx >= 0) { convs[idx] = { ...convs[idx], lastMessage: text, lastMessageTs: msg.ts, updatedAt: iso() }; await save(convsKey, convs); }
   notify();
-  // Send to API in background; update status on success or failure
-  serviceRequest(`/api/conversations/${conversationId}/messages`, { method: 'POST', body: JSON.stringify({ text, attachment }) })
-    .then(async (apiMsg: any) => {
-      const m2 = await load<Message[]>(K.messages(conversationId), []);
-      const mi = m2.findIndex(m => m.id === msg.id);
-      if (mi >= 0) { m2[mi] = { ...m2[mi], id: apiMsg?.id ?? m2[mi].id, status: 'delivered' }; await save(K.messages(conversationId), m2); notify(); }
-    })
-    .catch(async () => {
-      const m2 = await load<Message[]>(K.messages(conversationId), []);
-      const mi = m2.findIndex(m => m.id === msg.id);
-      if (mi >= 0) { m2[mi] = { ...m2[mi], status: 'failed' }; await save(K.messages(conversationId), m2); notify(); }
-    });
+  // Send to API in background; update status on success or failure.
+  // Always read from the pre-captured msgKey — never re-call K() inside these callbacks.
+  // Pre-dispatch guard: check identity immediately before firing the request so user A's
+  // message is never POSTed using user B's Clerk token. The guards in .then/.catch also
+  // prevent stale cache writes if a switch occurs while the request is in-flight.
+  if (_socialUserId === k.userId) {
+    serviceRequest(`/api/conversations/${conversationId}/messages`, { method: 'POST', body: JSON.stringify({ text, attachment }) })
+      .then(async (apiMsg: any) => {
+        if (_socialUserId !== k.userId) return; // account switched mid-flight — discard
+        const m2 = await load<Message[]>(msgKey, []);
+        const mi = m2.findIndex(m => m.id === msg.id);
+        if (mi >= 0) { m2[mi] = { ...m2[mi], id: apiMsg?.id ?? m2[mi].id, status: 'delivered' }; await save(msgKey, m2); notify(); }
+      })
+      .catch(async () => {
+        if (_socialUserId !== k.userId) return; // account switched — don't mark failed under wrong key
+        const m2 = await load<Message[]>(msgKey, []);
+        const mi = m2.findIndex(m => m.id === msg.id);
+        if (mi >= 0) { m2[mi] = { ...m2[mi], status: 'failed' }; await save(msgKey, m2); notify(); }
+      });
+  }
   return msg;
 }
 export async function retryMessage(conversationId: string, messageId: string): Promise<void> {
-  const msgs = await getMessages(conversationId);
+  // Snapshot key at function entry; do NOT call getMessages() inside setTimeout
+  // (that would re-invoke K() after the delay with a potentially different userId).
+  const msgKey = K().messages(conversationId);
+  const msgs = await load<Message[]>(msgKey, []);
   const idx = msgs.findIndex(m => m.id === messageId);
-  if (idx >= 0) { msgs[idx] = { ...msgs[idx], status: 'sending' }; await save(K.messages(conversationId), msgs); notify(); }
+  if (idx >= 0) { msgs[idx] = { ...msgs[idx], status: 'sending' }; await save(msgKey, msgs); notify(); }
   setTimeout(async () => {
-    const m2 = await getMessages(conversationId);
+    const m2 = await load<Message[]>(msgKey, []); // read from pre-captured key, never K()
     const mi = m2.findIndex(m => m.id === messageId);
-    if (mi >= 0) { m2[mi] = { ...m2[mi], status: 'sent' }; await save(K.messages(conversationId), m2); notify(); }
+    if (mi >= 0) { m2[mi] = { ...m2[mi], status: 'sent' }; await save(msgKey, m2); notify(); }
   }, 800);
 }
 export async function addReaction(conversationId: string, messageId: string, emoji: string): Promise<void> {
-  const msgs = await getMessages(conversationId);
+  const k = K();
+  const msgKey = k.messages(conversationId);
+  const msgs = await getMessages(conversationId, k);
   const idx = msgs.findIndex(m => m.id === messageId);
   if (idx < 0) return;
   const existing = msgs[idx].reactions.findIndex(r => r.fromId === MY_USER_ID && r.emoji === emoji);
   if (existing >= 0) { msgs[idx].reactions.splice(existing, 1); }
   else { msgs[idx].reactions = [...msgs[idx].reactions, { emoji, fromId: MY_USER_ID, fromName: MY_NAME }]; }
-  await save(K.messages(conversationId), msgs); notify();
+  await save(msgKey, msgs); notify();
 }
 export async function deleteMessageForMe(conversationId: string, messageId: string): Promise<void> {
-  const msgs = await getMessages(conversationId);
+  const k = K();
+  const msgKey = k.messages(conversationId);
+  const msgs = await getMessages(conversationId, k);
   const idx = msgs.findIndex(m => m.id === messageId);
-  if (idx >= 0) { msgs[idx] = { ...msgs[idx], deletedForMe: true }; await save(K.messages(conversationId), msgs); notify(); }
+  if (idx >= 0) { msgs[idx] = { ...msgs[idx], deletedForMe: true }; await save(msgKey, msgs); notify(); }
 }
 export async function markConversationRead(conversationId: string): Promise<void> {
+  const k = K();
   serviceRequest(`/api/conversations/${conversationId}/read`, { method: 'PATCH', body: JSON.stringify({}) }).catch(() => {});
-  const convs = await getConversations();
+  const convs = await getConversations(k);
   const updated = convs.map(c => c.id === conversationId ? { ...c, unreadCount: 0 } : c);
-  await save(K.conversations, updated); notify();
+  await save(k.conversations, updated); notify();
 }
 export async function archiveConversation(conversationId: string): Promise<void> {
-  const convs = await getConversations();
-  await save(K.conversations, convs.map(c => c.id === conversationId ? { ...c, isArchived: true } : c)); notify();
+  const k = K();
+  const convs = await getConversations(k);
+  await save(k.conversations, convs.map(c => c.id === conversationId ? { ...c, isArchived: true } : c)); notify();
 }
 
 // ─── Stories ─────────────────────────────────────────────────────────────────
 
-async function loadStories(): Promise<Story[]> {
-  const all = await load<Story[]>(K.stories, DEMO_STORIES);
+async function loadStories(k: SocialKeys = K()): Promise<Story[]> {
+  const all = await load<Story[]>(k.stories, DEMO_STORIES);
   return all.filter(s => s.expiresAt > Date.now()); // prune expired
 }
-export async function getStories(): Promise<Story[]> {
-  return loadStories();
+export async function getStories(k: SocialKeys = K()): Promise<Story[]> {
+  return loadStories(k);
 }
-export async function getMyStories(): Promise<Story[]> {
-  const all = await loadStories();
+export async function getMyStories(k: SocialKeys = K()): Promise<Story[]> {
+  const all = await loadStories(k);
   return all.filter(s => s.authorId === MY_USER_ID);
 }
 export async function createStory(params: { media: StoryMedia[]; privacy: StoryPrivacySettings; repliesDisabled: boolean; }): Promise<Story> {
-  const profile = await getMyProfile();
+  const k = K();
+  const profile = await getMyProfile(k);
   const ts = Date.now();
   const story: Story = {
     id: uid(), authorId: MY_USER_ID, authorName: profile.name, authorHandle: '@' + profile.username,
@@ -1187,132 +1285,149 @@ export async function createStory(params: { media: StoryMedia[]; privacy: StoryP
     authorAccountType: 'buyer', media: params.media, privacy: params.privacy,
     viewers: [], repliesDisabled: params.repliesDisabled, createdAt: ts, expiresAt: ts + H24,
   };
-  const stories = await loadStories();
-  await save(K.stories, [...stories, story]); notify();
+  const stories = await loadStories(k);
+  await save(k.stories, [...stories, story]); notify();
   return story;
 }
 export async function trackStoryView(storyId: string): Promise<void> {
-  const stories = await loadStories();
+  const k = K();
+  const stories = await loadStories(k);
   const idx = stories.findIndex(s => s.id === storyId);
   if (idx < 0) return;
   const alreadyViewed = stories[idx].viewers.some(v => v.userId === MY_USER_ID);
   if (!alreadyViewed) {
     stories[idx].viewers = [...stories[idx].viewers, { userId: MY_USER_ID, name: MY_NAME, handle: MY_HANDLE, viewedAt: Date.now() }];
-    await save(K.stories, stories); notify();
+    await save(k.stories, stories); notify();
   }
 }
 export async function deleteStory(storyId: string): Promise<void> {
-  const stories = await loadStories();
-  await save(K.stories, stories.filter(s => s.id !== storyId)); notify();
+  const k = K();
+  const stories = await loadStories(k);
+  await save(k.stories, stories.filter(s => s.id !== storyId)); notify();
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 
-export async function getNotifications(): Promise<Notification[]> {
+export async function getNotifications(k: SocialKeys = K()): Promise<Notification[]> {
   try {
     const remote = await serviceRequest<Notification[]>('/api/buyer/notifications');
     // Only use API result if it has data — empty means first-login DB (fall back to local demo data)
     if (Array.isArray(remote) && remote.length > 0) {
-      await save(K.notifications, remote); // cache for offline / next-launch use
+      // Guard: discard if account changed while request was in-flight
+      if (_socialUserId === k.userId) await save(k.notifications, remote);
       return remote;
     }
   } catch { /* fall through to local */ }
-  return load<Notification[]>(K.notifications, DEMO_NOTIFS);
+  return load<Notification[]>(k.notifications, DEMO_NOTIFS);
 }
 export async function markNotificationRead(id: string): Promise<void> {
+  const k = K();
   serviceRequest('/api/buyer/notifications/' + encodeURIComponent(id) + '/read', { method: 'PATCH', body: JSON.stringify({}) }).catch(() => {});
-  const notifs = await getNotifications();
-  await save(K.notifications, notifs.map(n => n.id === id ? { ...n, isRead: true } : n)); notify();
+  const notifs = await getNotifications(k);
+  await save(k.notifications, notifs.map(n => n.id === id ? { ...n, isRead: true } : n)); notify();
 }
 export async function markNotificationUnread(id: string): Promise<void> {
-  const notifs = await getNotifications();
-  await save(K.notifications, notifs.map(n => n.id === id ? { ...n, isRead: false } : n)); notify();
+  const k = K();
+  const notifs = await getNotifications(k);
+  await save(k.notifications, notifs.map(n => n.id === id ? { ...n, isRead: false } : n)); notify();
 }
 export async function deleteNotification(id: string): Promise<void> {
+  const k = K();
   try {
     await serviceRequest('/api/buyer/notifications/' + encodeURIComponent(id), { method: 'DELETE' });
-    const notifs = await getNotifications();
-    await save(K.notifications, notifs.filter(n => n.id !== id));
+    const notifs = await getNotifications(k);
+    await save(k.notifications, notifs.filter(n => n.id !== id));
     notify(); return;
   } catch { /* fall through to existing local logic */ }
-  const notifs = await getNotifications();
-  await save(K.notifications, notifs.filter(n => n.id !== id)); notify();
+  const notifs = await getNotifications(k);
+  await save(k.notifications, notifs.filter(n => n.id !== id)); notify();
 }
 export async function muteNotificationCategory(category: NotificationCategory): Promise<void> {
-  const notifs = await getNotifications();
-  await save(K.notifications, notifs.map(n => n.category === category ? { ...n, isMuted: true } : n)); notify();
+  const k = K();
+  const notifs = await getNotifications(k);
+  await save(k.notifications, notifs.map(n => n.category === category ? { ...n, isMuted: true } : n)); notify();
 }
 export async function clearAllReadNotifications(): Promise<void> {
+  const k = K();
   try {
     await serviceRequest('/api/buyer/notifications/read-all', { method: 'PATCH', body: JSON.stringify({}) });
-    const notifs = await getNotifications();
-    await save(K.notifications, notifs.filter(n => !n.isRead));
+    const notifs = await getNotifications(k);
+    await save(k.notifications, notifs.filter(n => !n.isRead));
     notify(); return;
   } catch { /* fall through to existing local logic */ }
-  const notifs = await getNotifications();
-  await save(K.notifications, notifs.filter(n => !n.isRead)); notify();
+  const notifs = await getNotifications(k);
+  await save(k.notifications, notifs.filter(n => !n.isRead)); notify();
 }
-export async function getNotificationPreferences(): Promise<NotificationPreference[]> {
-  return load<NotificationPreference[]>(K.notifPrefs, DEFAULT_NOTIFICATION_PREFS);
+export async function getNotificationPreferences(k: SocialKeys = K()): Promise<NotificationPreference[]> {
+  return load<NotificationPreference[]>(k.notifPrefs, DEFAULT_NOTIFICATION_PREFS);
 }
 export async function updateNotificationPreference(category: NotificationCategory, updates: Partial<Omit<NotificationPreference, 'category'>>): Promise<void> {
-  const prefs = await getNotificationPreferences();
-  await save(K.notifPrefs, prefs.map(p => p.category === category ? { ...p, ...updates } : p)); notify();
+  const k = K();
+  const prefs = await getNotificationPreferences(k);
+  await save(k.notifPrefs, prefs.map(p => p.category === category ? { ...p, ...updates } : p)); notify();
 }
 export async function addNotification(n: Omit<Notification, 'id' | 'createdAt'>): Promise<void> {
-  const notifs = await getNotifications();
-  await save(K.notifications, [{ ...n, id: uid(), createdAt: iso() }, ...notifs]); notify();
+  const k = K();
+  const notifs = await getNotifications(k);
+  await save(k.notifications, [{ ...n, id: uid(), createdAt: iso() }, ...notifs]); notify();
 }
 
 // ─── Blocking & Muting ────────────────────────────────────────────────────────
 
-export async function getBlockedUsers(): Promise<BlockRecord[]> {
-  return load<BlockRecord[]>(K.blocks, []);
+export async function getBlockedUsers(k: SocialKeys = K()): Promise<BlockRecord[]> {
+  return load<BlockRecord[]>(k.blocks, []);
 }
 export async function isBlocked(userId: string): Promise<boolean> {
-  const blocks = await getBlockedUsers();
+  const k = K();
+  const blocks = await getBlockedUsers(k);
   return blocks.some(b => b.blockedUserId === userId);
 }
 export async function blockUser(params: { userId: string; name: string; handle: string; initials: string; color: string; }): Promise<void> {
-  const blocks = await getBlockedUsers();
+  const k = K();
+  const blocks = await getBlockedUsers(k);
   if (blocks.some(b => b.blockedUserId === params.userId)) return;
   blocks.unshift({ id: uid(), blockedUserId: params.userId, blockedUserName: params.name, blockedUserHandle: params.handle, blockedUserInitials: params.initials, blockedUserColor: params.color, createdAt: iso() });
-  await save(K.blocks, blocks);
-  await removeFriend(params.userId);
+  await save(k.blocks, blocks);
+  await removeFriend(params.userId, k);
   notify();
 }
 export async function unblockUser(userId: string): Promise<void> {
-  const blocks = await getBlockedUsers();
-  await save(K.blocks, blocks.filter(b => b.blockedUserId !== userId)); notify();
+  const k = K();
+  const blocks = await getBlockedUsers(k);
+  await save(k.blocks, blocks.filter(b => b.blockedUserId !== userId)); notify();
 }
-export async function getMutedUsers(): Promise<MuteRecord[]> {
-  return load<MuteRecord[]>(K.mutes, []);
+export async function getMutedUsers(k: SocialKeys = K()): Promise<MuteRecord[]> {
+  return load<MuteRecord[]>(k.mutes, []);
 }
 export async function muteUser(params: { userId: string; name: string; handle: string; initials: string; color: string; }): Promise<void> {
-  const mutes = await getMutedUsers();
+  const k = K();
+  const mutes = await getMutedUsers(k);
   if (mutes.some(m => m.mutedUserId === params.userId)) return;
   mutes.unshift({ id: uid(), mutedUserId: params.userId, mutedUserName: params.name, mutedUserHandle: params.handle, mutedUserInitials: params.initials, mutedUserColor: params.color, createdAt: iso() });
-  await save(K.mutes, mutes); notify();
+  await save(k.mutes, mutes); notify();
 }
 export async function unmuteUser(userId: string): Promise<void> {
-  const mutes = await getMutedUsers();
-  await save(K.mutes, mutes.filter(m => m.mutedUserId !== userId)); notify();
+  const k = K();
+  const mutes = await getMutedUsers(k);
+  await save(k.mutes, mutes.filter(m => m.mutedUserId !== userId)); notify();
 }
 
 // ─── Restriction ─────────────────────────────────────────────────────────────
 
-export async function getRestrictedUsers(): Promise<RestrictRecord[]> {
-  return load<RestrictRecord[]>(K.restricts, []);
+export async function getRestrictedUsers(k: SocialKeys = K()): Promise<RestrictRecord[]> {
+  return load<RestrictRecord[]>(k.restricts, []);
 }
 export async function restrictUser(params: { userId: string; name: string; handle: string; initials: string; color: string; }): Promise<void> {
-  const restricts = await getRestrictedUsers();
+  const k = K();
+  const restricts = await getRestrictedUsers(k);
   if (restricts.some(r => r.restrictedUserId === params.userId)) return;
   restricts.unshift({ id: uid(), restrictedUserId: params.userId, restrictedUserName: params.name, restrictedUserHandle: params.handle, restrictedUserInitials: params.initials, restrictedUserColor: params.color, createdAt: iso() });
-  await save(K.restricts, restricts); notify();
+  await save(k.restricts, restricts); notify();
 }
 export async function unrestrictUser(userId: string): Promise<void> {
-  const restricts = await getRestrictedUsers();
-  await save(K.restricts, restricts.filter(r => r.restrictedUserId !== userId)); notify();
+  const k = K();
+  const restricts = await getRestrictedUsers(k);
+  await save(k.restricts, restricts.filter(r => r.restrictedUserId !== userId)); notify();
 }
 
 // ─── Reports ─────────────────────────────────────────────────────────────────
@@ -1325,59 +1440,64 @@ export async function submitReport(params: { targetType: ReportTargetType; targe
 
 // ─── Saved Content ────────────────────────────────────────────────────────────
 
-export async function getSavedItems(): Promise<SavedItem[]> {
+export async function getSavedItems(k: SocialKeys = K()): Promise<SavedItem[]> {
   try {
     const remote = await serviceRequest<SavedItem[]>('/api/buyer/saved');
     // Only use API result if it has data — empty means first-login DB (fall back to local demo data)
     if (Array.isArray(remote) && remote.length > 0) {
-      await save(K.saved, remote); // cache for offline / next-launch use
+      // Guard: discard if account changed while request was in-flight
+      if (_socialUserId === k.userId) await save(k.saved, remote);
       return remote;
     }
   } catch { /* fall through to local */ }
-  return load<SavedItem[]>(K.saved, DEMO_SAVED);
+  return load<SavedItem[]>(k.saved, DEMO_SAVED);
 }
 export async function saveItem(params: { type: SavedItemType; targetId: string; title: string; subtitle?: string; accentColor?: string; }): Promise<SavedItem> {
+  const k = K();
   try {
     const saved = await serviceRequest<SavedItem>('/api/buyer/saved', { method: 'POST', body: JSON.stringify(params) });
     notify();
     return saved;
   } catch { /* fall through to existing local logic */ }
-  const items = await getSavedItems();
+  const items = await getSavedItems(k);
   const existing = items.find(i => i.targetId === params.targetId);
   if (existing) return existing;
   const item: SavedItem = { id: uid(), savedAt: iso(), ...params };
-  await save(K.saved, [item, ...items]);
-  const p = await getMyProfile();
-  await updateMyProfile({ savedCount: p.savedCount + 1 });
+  await save(k.saved, [item, ...items]);
+  const p = await getMyProfile(k);
+  await updateMyProfile({ savedCount: p.savedCount + 1 }, k);
   notify();
   return item;
 }
 export async function removeSavedItem(targetId: string): Promise<void> {
+  const k = K();
   try {
     await serviceRequest('/api/buyer/saved/' + encodeURIComponent(targetId), { method: 'DELETE' });
     notify();
     return;
   } catch { /* fall through to existing local logic */ }
-  const items = await getSavedItems();
-  await save(K.saved, items.filter(i => i.targetId !== targetId));
-  const p = await getMyProfile();
-  await updateMyProfile({ savedCount: Math.max(0, p.savedCount - 1) });
+  const items = await getSavedItems(k);
+  await save(k.saved, items.filter(i => i.targetId !== targetId));
+  const p = await getMyProfile(k);
+  await updateMyProfile({ savedCount: Math.max(0, p.savedCount - 1) }, k);
   notify();
 }
 export async function isItemSaved(targetId: string): Promise<boolean> {
-  const items = await getSavedItems();
+  const k = K();
+  const items = await getSavedItems(k);
   return items.some(i => i.targetId === targetId);
 }
 
 // ─── Privacy ──────────────────────────────────────────────────────────────────
 
-export async function getPrivacySettings(): Promise<PrivacySettings> {
-  return load<PrivacySettings>(K.privacy, DEFAULT_PRIVACY_SETTINGS);
+export async function getPrivacySettings(k: SocialKeys = K()): Promise<PrivacySettings> {
+  return load<PrivacySettings>(k.privacy, DEFAULT_PRIVACY_SETTINGS);
 }
 export async function updatePrivacySettings(updates: Partial<PrivacySettings>): Promise<PrivacySettings> {
-  const current = await getPrivacySettings();
+  const k = K();
+  const current = await getPrivacySettings(k);
   const next = { ...current, ...updates };
-  await save(K.privacy, next); notify();
+  await save(k.privacy, next); notify();
   return next;
 }
 

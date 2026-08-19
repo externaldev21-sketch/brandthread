@@ -34,7 +34,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ONBOARDING_KEY } from './_layout';
 import { useApi } from '@/lib/api';
 import {
-  BG, CARD, BORDER, FG, MUTED, MUTED2, PURPLE, CYAN, SUCCESS, ORANGE,
+  BG, CARD, BORDER, FG, MUTED, PURPLE, CYAN, SUCCESS, ORANGE,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 
@@ -136,10 +136,12 @@ export default function PlansScreen() {
   const { fromOnboarding } = useLocalSearchParams<{ fromOnboarding?: string }>();
   const isOnboarding = fromOnboarding === 'true';
 
-  const [loadingId,       setLoadingId]       = useState<string | null>(null);
-  const [awaitingReturn,  setAwaitingReturn]  = useState(false);
-  const [recommendedId,   setRecommendedId]   = useState<PlanDef['id'] | null>(null);
-  const [currentPlanId,   setCurrentPlanId]   = useState<string | null>(null);
+  const [loadingId,         setLoadingId]         = useState<string | null>(null);
+  const [awaitingReturn,    setAwaitingReturn]    = useState(false);
+  const [recommendedId,     setRecommendedId]     = useState<PlanDef['id'] | null>(null);
+  const [currentPlanId,     setCurrentPlanId]     = useState<string | null>(null);
+  /** 'none' means no paid subscription yet — Starter must remain selectable. */
+  const [currentPlanStatus, setCurrentPlanStatus] = useState<string | null>(null);
 
   // AppState ref to detect return from Stripe Checkout browser tab
   const checkoutOpenedRef = useRef(false);
@@ -156,6 +158,7 @@ export default function PlansScreen() {
         try {
           const status = await api.seller.subscription.status();
           setCurrentPlanId(status.plan ?? null);
+          setCurrentPlanStatus(status.status ?? null);
         } catch { /* non-fatal */ }
       }
     })();
@@ -211,7 +214,9 @@ export default function PlansScreen() {
       return;
     }
 
-    if (!isOnboarding && plan.id === currentPlanId) return;
+    // Only treat the plan as already active when there's a real paid subscription.
+    // status:'none' means no paid plan yet — Starter must remain selectable.
+    if (!isOnboarding && plan.id === currentPlanId && currentPlanStatus !== 'none') return;
 
     setLoadingId(plan.id);
 
@@ -390,8 +395,8 @@ export default function PlansScreen() {
                 ))}
                 {plan.notIncluded.map((f) => (
                   <View key={f} style={styles.featureRow}>
-                    <Feather name="minus" size={13} color={MUTED2} style={{ marginTop: 2 }} />
-                    <Text style={[styles.featureText, { color: MUTED2 }]}>{f}</Text>
+                    <Feather name="minus" size={13} color={MUTED} style={{ marginTop: 2 }} />
+                    <Text style={[styles.featureText, { color: MUTED }]}>{f}</Text>
                   </View>
                 ))}
               </View>
@@ -433,7 +438,7 @@ export default function PlansScreen() {
             activeOpacity={0.7}
           >
             <Text style={styles.skipText}>Skip for now — start with Starter</Text>
-            <Feather name="arrow-right" size={14} color={MUTED2} />
+            <Feather name="arrow-right" size={14} color={MUTED} />
           </TouchableOpacity>
         )}
 
@@ -541,7 +546,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 6, paddingVertical: SP.lg, marginTop: 4,
   },
-  skipText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED2 },
+  skipText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
 
   // Awaiting Stripe overlay
   awaitRoot: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', gap: 20, padding: 40 },

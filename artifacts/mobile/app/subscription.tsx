@@ -16,8 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import {
@@ -182,9 +181,11 @@ export default function SubscriptionScreen() {
 
   async function handleChangePlan(planId: string) {
     haptic();
-    if (planId === selectedPlan) return;
+    // Only treat the current plan as "already selected" when there's an active subscription.
+    // status:'none' means no paid plan yet — Starter must remain selectable.
+    if (planId === selectedPlan && currentPlan.status !== 'none') return;
 
-    if (planId === 'starter' && selectedPlan !== 'none') {
+    if (planId === 'starter' && currentPlan.status !== 'none') {
       Alert.alert(
         'Downgrade plan',
         'To change or cancel your subscription, use the billing portal.',

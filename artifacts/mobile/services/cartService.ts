@@ -19,16 +19,32 @@ import {
   BuyerRefundRequest, BuyerProblemReport, BuyerProblemType,
 } from './cartTypes';
 
-// ─── Storage keys ─────────────────────────────────────────────────────────────
+// ─── Storage keys (scoped by user ID so two accounts never share storage) ─────
 
-const KEYS = {
-  cart:           'bt:cart:v1',
-  checkout:       'bt:checkout:v1',
-  returns:        'bt:buyer:returns:v1',
-  refunds:        'bt:buyer:refunds:v1',
-  problems:       'bt:buyer:problems:v1',
-  paymentAttempts:'bt:buyer:payment_attempts:v1',
-};
+/** Set by initCartService() after sign-in. Falls back to 'anon'. */
+let _cartUserId = 'anon';
+
+/** Call once after Clerk resolves the current user ID (and again on sign-out
+ *  with null to reset to 'anon'). */
+export function initCartService(userId: string | null): void {
+  _cartUserId = userId ?? 'anon';
+}
+
+function keys(uid = _cartUserId) {
+  return {
+    /** Baked-in user ID — compare against _cartUserId after awaits to detect account switches. */
+    userId:          uid,
+    cart:            `bt:cart:${uid}:v1`,
+    checkout:        `bt:checkout:${uid}:v1`,
+    returns:         `bt:buyer:${uid}:returns:v1`,
+    refunds:         `bt:buyer:${uid}:refunds:v1`,
+    problems:        `bt:buyer:${uid}:problems:v1`,
+    paymentAttempts: `bt:buyer:${uid}:payment_attempts:v1`,
+  };
+}
+/** Keys snapshot type — passed through the call chain so private helpers
+ *  never re-resolve _cartUserId in async continuations. */
+type CartKeys = ReturnType<typeof keys>;
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
@@ -256,7 +272,10 @@ export function getAllDemoProducts(): BuyerProduct[] {
 
 // ─── DB sync ──────────────────────────────────────────────────────────────────
 
-async function syncToDb(items: any[], savedItems: any[]): Promise<void> {
+async function syncToDb(items: any[], savedItems: any[], expectedUserId: string): Promise<void> {
+  // Guard: if the account has changed since saveCart() was called, discard this
+  // sync so user A's cart payload is never POSTed using user B's Clerk token.
+  if (_cartUserId !== expectedUserId) return;
   try {
     await serviceRequest('/api/buyer/cart/sync', {
       method: 'POST',
@@ -267,10 +286,10 @@ async function syncToDb(items: any[], savedItems: any[]): Promise<void> {
 
 // ─── Cart storage ─────────────────────────────────────────────────────────────
 
-async function loadCart(): Promise<Cart> {
+async function loadCart(k: CartKeys = keys()): Promise<Cart> {
   let cart: Cart;
   try {
-    const raw = await AsyncStorage.getItem(KEYS.cart);
+    const raw = await AsyncStorage.getItem(k.cart);
     if (raw) {
       cart = JSON.parse(raw) as Cart;
     } else {
@@ -280,30 +299,36 @@ async function loadCart(): Promise<Cart> {
     cart = { id: uid(), items: [], savedItems: [], updatedAt: now() };
   }
 
-  // Background: attempt to load from DB and merge if DB has data
+  // Background: attempt to load from DB and merge if DB has data.
+  // Uses the already-captured k so the continuation can't pick up a changed userId.
   try {
     const { items, savedItems } = await serviceRequest<{ items: any[]; savedItems: any[] }>('/api/buyer/cart', {});
     if (items.length > 0 || savedItems.length > 0) {
-      // DB has data — use it and update local cache
-      cart.items = items;
-      cart.savedItems = savedItems;
-      await AsyncStorage.setItem(KEYS.cart, JSON.stringify(cart));
+      // DB has data — use it and update local cache.
+      // Guard: skip cache write if account switched while the request was in-flight.
+      if (_cartUserId === k.userId) {
+        cart.items = items;
+        cart.savedItems = savedItems;
+        await AsyncStorage.setItem(k.cart, JSON.stringify(cart));
+      }
     }
   } catch { /* ignore */ }
 
   return cart;
 }
 
-async function saveCart(cart: Cart): Promise<void> {
+async function saveCart(cart: Cart, k: CartKeys = keys()): Promise<void> {
   cart.updatedAt = now();
-  await AsyncStorage.setItem(KEYS.cart, JSON.stringify(cart));
-  void syncToDb(cart.items, cart.savedItems);
+  await AsyncStorage.setItem(k.cart, JSON.stringify(cart));
+  // Pass k.userId so syncToDb can drop the request if the account switches before it fires.
+  void syncToDb(cart.items, cart.savedItems, k.userId);
 }
 
 // ─── Cart operations ──────────────────────────────────────────────────────────
 
 export async function getCart(): Promise<Cart> {
-  return loadCart();
+  const k = keys();
+  return loadCart(k);
 }
 
 export interface AddToCartParams {
@@ -314,8 +339,9 @@ export interface AddToCartParams {
 }
 
 export async function addToCart(params: AddToCartParams): Promise<{ success: boolean; message?: string; cart: Cart }> {
+  const k = keys();
   const { product, variant, quantity, attribution } = params;
-  const cart = await loadCart();
+  const cart = await loadCart(k);
 
   // Validate
   if (!product.isActive) return { success: false, message: 'This product is no longer available.', cart };
@@ -360,12 +386,13 @@ export async function addToCart(params: AddToCartParams): Promise<{ success: boo
     cart.items.push(item);
   }
 
-  await saveCart(cart);
+  await saveCart(cart, k);
   return { success: true, cart };
 }
 
 export async function updateCartItemQuantity(itemId: string, quantity: number): Promise<Cart> {
-  const cart = await loadCart();
+  const k = keys();
+  const cart = await loadCart(k);
   const idx = cart.items.findIndex(i => i.id === itemId);
   if (idx >= 0) {
     if (quantity <= 0) {
@@ -375,33 +402,36 @@ export async function updateCartItemQuantity(itemId: string, quantity: number): 
       const capped = Math.min(quantity, item.maxQuantity || 99);
       cart.items[idx] = { ...item, quantity: capped };
     }
-    await saveCart(cart);
+    await saveCart(cart, k);
   }
   return cart;
 }
 
 export async function removeCartItem(itemId: string): Promise<Cart> {
-  const cart = await loadCart();
+  const k = keys();
+  const cart = await loadCart(k);
   cart.items = cart.items.filter(i => i.id !== itemId);
-  await saveCart(cart);
+  await saveCart(cart, k);
   return cart;
 }
 
 export async function saveForLater(itemId: string): Promise<Cart> {
-  const cart = await loadCart();
+  const k = keys();
+  const cart = await loadCart(k);
   const idx = cart.items.findIndex(i => i.id === itemId);
   if (idx >= 0) {
     const item = cart.items[idx];
     const saved: SavedCartItem = { ...item, savedAt: now() };
     cart.savedItems.push(saved);
     cart.items.splice(idx, 1);
-    await saveCart(cart);
+    await saveCart(cart, k);
   }
   return cart;
 }
 
 export async function moveToCart(savedItemId: string): Promise<Cart> {
-  const cart = await loadCart();
+  const k = keys();
+  const cart = await loadCart(k);
   const idx = cart.savedItems.findIndex(i => i.id === savedItemId);
   if (idx >= 0) {
     const saved = cart.savedItems[idx];
@@ -412,26 +442,29 @@ export async function moveToCart(savedItemId: string): Promise<Cart> {
       cart.items.push({ ...saved, addedAt: now() });
     }
     cart.savedItems.splice(idx, 1);
-    await saveCart(cart);
+    await saveCart(cart, k);
   }
   return cart;
 }
 
 export async function removeSavedItem(savedItemId: string): Promise<Cart> {
-  const cart = await loadCart();
+  const k = keys();
+  const cart = await loadCart(k);
   cart.savedItems = cart.savedItems.filter(i => i.id !== savedItemId);
-  await saveCart(cart);
+  await saveCart(cart, k);
   return cart;
 }
 
 export async function clearCart(): Promise<void> {
+  const k = keys();
   const empty: Cart = { id: uid(), items: [], savedItems: [], updatedAt: now() };
-  await saveCart(empty);
+  await saveCart(empty, k);
 }
 
 // Merge guest cart into authenticated cart (no duplicates)
 export async function mergeGuestCart(guestCart: Cart): Promise<Cart> {
-  const cart = await loadCart();
+  const k = keys();
+  const cart = await loadCart(k);
   for (const guestItem of guestCart.items) {
     const existing = cart.items.findIndex(i => i.variantId === guestItem.variantId);
     if (existing >= 0) {
@@ -443,7 +476,7 @@ export async function mergeGuestCart(guestCart: Cart): Promise<Cart> {
       cart.items.push(guestItem);
     }
   }
-  await saveCart(cart);
+  await saveCart(cart, k);
   return cart;
 }
 
@@ -526,17 +559,17 @@ export async function validateCart(items: CartItem[]): Promise<CartValidationRes
 
 // ─── Checkout session ─────────────────────────────────────────────────────────
 
-async function loadCheckout(): Promise<CheckoutSession | null> {
+async function loadCheckout(k: CartKeys = keys()): Promise<CheckoutSession | null> {
   try {
-    const raw = await AsyncStorage.getItem(KEYS.checkout);
+    const raw = await AsyncStorage.getItem(k.checkout);
     if (raw) return JSON.parse(raw) as CheckoutSession;
   } catch {}
   return null;
 }
 
-async function saveCheckout(session: CheckoutSession): Promise<void> {
+async function saveCheckout(session: CheckoutSession, k: CartKeys = keys()): Promise<void> {
   session.updatedAt = now();
-  await AsyncStorage.setItem(KEYS.checkout, JSON.stringify(session));
+  await AsyncStorage.setItem(k.checkout, JSON.stringify(session));
 }
 
 export async function createCheckoutSession(cart: Cart, isBuyNow = false, buyNowItems?: CartItem[]): Promise<CheckoutSession> {
@@ -593,29 +626,31 @@ export async function createCheckoutSession(cart: Cart, isBuyNow = false, buyNow
     updatedAt: now(),
   };
 
+  const k = keys();
   // Preserve any existing saved addresses from prior session
-  const existing = await loadCheckout();
+  const existing = await loadCheckout(k);
   if (existing) {
     session.savedAddresses = existing.savedAddresses ?? [];
     if (existing.contact) session.contact = existing.contact;
     if (existing.shippingAddress) session.shippingAddress = existing.shippingAddress;
   }
 
-  await saveCheckout(session);
+  await saveCheckout(session, k);
   return session;
 }
 
 export async function getCheckoutSession(): Promise<CheckoutSession | null> {
-  return loadCheckout();
+  return loadCheckout(keys());
 }
 
 export async function saveCheckoutProgress(session: CheckoutSession): Promise<CheckoutSession> {
-  await saveCheckout(session);
+  const k = keys();
+  await saveCheckout(session, k);
   return session;
 }
 
 export async function clearCheckoutSession(): Promise<void> {
-  await AsyncStorage.removeItem(KEYS.checkout);
+  await AsyncStorage.removeItem(keys().checkout);
 }
 
 // ─── Shipping rates ───────────────────────────────────────────────────────────
@@ -845,10 +880,11 @@ export interface PlaceOrderResult {
 
 // Simulate order placement — no real payment processing
 export async function placeOrder(params: PlaceOrderParams): Promise<PlaceOrderResult> {
+  const k = keys();
   const { session } = params;
 
   // Check idempotency — prevent duplicate submissions
-  const attempts = await loadPaymentAttempts();
+  const attempts = await loadPaymentAttempts(k);
   const duplicate = attempts.find(a => a.checkoutId === session.id && a.status === 'succeeded');
   if (duplicate) {
     return {
@@ -872,7 +908,7 @@ export async function placeOrder(params: PlaceOrderParams): Promise<PlaceOrderRe
     createdAt: now(),
   };
   attempts.push(attempt);
-  await savePaymentAttempts(attempts);
+  await savePaymentAttempts(attempts, k);
 
   // Demo: succeed if contact + address exist; fail on specific test conditions
   const cardLast4 = params.cardNumber ?? '';
@@ -880,7 +916,7 @@ export async function placeOrder(params: PlaceOrderParams): Promise<PlaceOrderRe
     attempt.status = 'failed';
     attempt.failureCode = 'card_declined';
     attempt.failureMessage = 'Your card was declined. Please check your card details and try again.';
-    await savePaymentAttempts(attempts.map(a => a.id === attempt.id ? attempt : a));
+    await savePaymentAttempts(attempts.map(a => a.id === attempt.id ? attempt : a), k);
     return {
       success: false,
       orderIds: [],
@@ -896,7 +932,7 @@ export async function placeOrder(params: PlaceOrderParams): Promise<PlaceOrderRe
     attempt.status = 'failed';
     attempt.failureCode = 'insufficient_funds';
     attempt.failureMessage = 'Insufficient funds. Please use a different payment method.';
-    await savePaymentAttempts(attempts.map(a => a.id === attempt.id ? attempt : a));
+    await savePaymentAttempts(attempts.map(a => a.id === attempt.id ? attempt : a), k);
     return {
       success: false,
       orderIds: [],
@@ -913,7 +949,7 @@ export async function placeOrder(params: PlaceOrderParams): Promise<PlaceOrderRe
   const orderNumbers = orderIds.map((_, i) => `BT-${Date.now().toString().slice(-6)}-${i + 1}`);
 
   attempt.status = 'succeeded';
-  await savePaymentAttempts(attempts.map(a => a.id === attempt.id ? attempt : a));
+  await savePaymentAttempts(attempts.map(a => a.id === attempt.id ? attempt : a), k);
 
   // Track attribution
   if (session.attribution) {
@@ -929,16 +965,16 @@ export async function placeOrder(params: PlaceOrderParams): Promise<PlaceOrderRe
   };
 }
 
-async function loadPaymentAttempts(): Promise<PaymentAttempt[]> {
+async function loadPaymentAttempts(k: CartKeys = keys()): Promise<PaymentAttempt[]> {
   try {
-    const raw = await AsyncStorage.getItem(KEYS.paymentAttempts);
+    const raw = await AsyncStorage.getItem(k.paymentAttempts);
     if (raw) return JSON.parse(raw) as PaymentAttempt[];
   } catch {}
   return [];
 }
 
-async function savePaymentAttempts(attempts: PaymentAttempt[]): Promise<void> {
-  await AsyncStorage.setItem(KEYS.paymentAttempts, JSON.stringify(attempts));
+async function savePaymentAttempts(attempts: PaymentAttempt[], k: CartKeys = keys()): Promise<void> {
+  await AsyncStorage.setItem(k.paymentAttempts, JSON.stringify(attempts));
 }
 
 // ─── Attribution ──────────────────────────────────────────────────────────────
@@ -1010,6 +1046,7 @@ export async function createReturnRequest(params: {
   imageUris: string[];
   preferredResolution: BuyerReturnResolution;
 }): Promise<BuyerReturnRequest> {
+  const k = keys();
   // Try real API first
   try {
     const { api } = await import('@/lib/api');
@@ -1037,14 +1074,14 @@ export async function createReturnRequest(params: {
       submittedAt: result.createdAt ?? now(),
       updatedAt: result.updatedAt ?? now(),
     };
-    // Cache locally for offline viewing
-    const returns = await loadReturns();
+    // Cache locally for offline viewing — pass k so we write to the right user's key
+    const returns = await loadReturns(k);
     returns.push(req);
-    await AsyncStorage.setItem(KEYS.returns, JSON.stringify(returns));
+    await AsyncStorage.setItem(k.returns, JSON.stringify(returns));
     return req;
   } catch {
     // AsyncStorage fallback for demo/offline
-    const returns = await loadReturns();
+    const returns = await loadReturns(k);
     const req: BuyerReturnRequest = {
       id: uid(),
       ...params,
@@ -1056,21 +1093,21 @@ export async function createReturnRequest(params: {
       updatedAt: now(),
     };
     returns.push(req);
-    await AsyncStorage.setItem(KEYS.returns, JSON.stringify(returns));
+    await AsyncStorage.setItem(k.returns, JSON.stringify(returns));
     return req;
   }
 }
 
-async function loadReturns(): Promise<BuyerReturnRequest[]> {
+async function loadReturns(k: CartKeys = keys()): Promise<BuyerReturnRequest[]> {
   try {
-    const raw = await AsyncStorage.getItem(KEYS.returns);
+    const raw = await AsyncStorage.getItem(k.returns);
     if (raw) return JSON.parse(raw) as BuyerReturnRequest[];
   } catch {}
   return [];
 }
 
 export async function getBuyerReturns(): Promise<BuyerReturnRequest[]> {
-  return loadReturns();
+  return loadReturns(keys());
 }
 
 // ─── Refunds ──────────────────────────────────────────────────────────────────
@@ -1084,7 +1121,8 @@ export async function createRefundRequest(params: {
   evidenceUris: string[];
   maxRefundAmount: number;
 }): Promise<BuyerRefundRequest> {
-  const refunds = await loadRefunds();
+  const k = keys();
+  const refunds = await loadRefunds(k);
   const req: BuyerRefundRequest = {
     id: uid(),
     ...params,
@@ -1092,13 +1130,13 @@ export async function createRefundRequest(params: {
     submittedAt: now(),
   };
   refunds.push(req);
-  await AsyncStorage.setItem(KEYS.refunds, JSON.stringify(refunds));
+  await AsyncStorage.setItem(k.refunds, JSON.stringify(refunds));
   return req;
 }
 
-async function loadRefunds(): Promise<BuyerRefundRequest[]> {
+async function loadRefunds(k: CartKeys = keys()): Promise<BuyerRefundRequest[]> {
   try {
-    const raw = await AsyncStorage.getItem(KEYS.refunds);
+    const raw = await AsyncStorage.getItem(k.refunds);
     if (raw) return JSON.parse(raw) as BuyerRefundRequest[];
   } catch {}
   return [];
@@ -1114,7 +1152,8 @@ export async function createProblemReport(params: {
   evidenceUris: string[];
   contactedSeller: boolean;
 }): Promise<BuyerProblemReport> {
-  const problems = await loadProblems();
+  const k = keys();
+  const problems = await loadProblems(k);
   const report: BuyerProblemReport = {
     id: uid(),
     ...params,
@@ -1123,13 +1162,13 @@ export async function createProblemReport(params: {
     submittedAt: now(),
   };
   problems.push(report);
-  await AsyncStorage.setItem(KEYS.problems, JSON.stringify(problems));
+  await AsyncStorage.setItem(k.problems, JSON.stringify(problems));
   return report;
 }
 
-async function loadProblems(): Promise<BuyerProblemReport[]> {
+async function loadProblems(k: CartKeys = keys()): Promise<BuyerProblemReport[]> {
   try {
-    const raw = await AsyncStorage.getItem(KEYS.problems);
+    const raw = await AsyncStorage.getItem(k.problems);
     if (raw) return JSON.parse(raw) as BuyerProblemReport[];
   } catch {}
   return [];
@@ -1138,12 +1177,20 @@ async function loadProblems(): Promise<BuyerProblemReport[]> {
 // ─── Cache invalidation ───────────────────────────────────────────────────────
 
 /**
- * Clear all cart/checkout AsyncStorage keys for the current device.
- * Call this on sign-out so the next account starts with an empty cart.
+ * Clear all cart/checkout AsyncStorage keys for the given user (defaults to current).
+ * Pass an explicit userId when calling during sign-out to avoid a race between
+ * this function and initCartService(null) resetting _cartUserId to 'anon'.
  */
-export async function clearCartCache(): Promise<void> {
+export async function clearCartCache(userId?: string): Promise<void> {
+  const u = userId ?? _cartUserId;
   try {
-    await AsyncStorage.multiRemove(Object.values(KEYS));
+    const allKeys = await AsyncStorage.getAllKeys();
+    const toRemove = (allKeys as string[]).filter(k =>
+      k.startsWith(`bt:cart:${u}:`) ||
+      k.startsWith(`bt:checkout:${u}:`) ||
+      k.startsWith(`bt:buyer:${u}:`)
+    );
+    if (toRemove.length > 0) await AsyncStorage.multiRemove(toRemove);
   } catch {}
 }
 

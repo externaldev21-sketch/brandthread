@@ -40,18 +40,37 @@ type PlanId = keyof typeof PLAN_CATALOGUE;
 /**
  * Find or create a Stripe Price for the given plan using lookup_key so the
  * same price is reused across calls and deployments.
+ *
+ * IMPORTANT: if the catalogue price for a plan changes (e.g. Growth $29 → $79)
+ * the existing Stripe Price has the old amount. We detect this by comparing
+ * unit_amount and create a new Price with transfer_lookup_key:true so that:
+ *  - the lookup key moves to the new correct-amount price
+ *  - future calls find the right price
+ *  - legacy subscribers keep their old price ID until their subscription is updated
  */
 async function ensurePrice(stripe: any, planId: PlanId): Promise<string> {
   const cfg = PLAN_CATALOGUE[planId];
   const existing = await stripe.prices.list({ lookup_keys: [cfg.lookupKey], limit: 1 });
-  if (existing.data.length > 0) return existing.data[0].id;
+
+  if (existing.data.length > 0) {
+    const found = existing.data[0];
+    // Amount matches — safe to reuse
+    if (found.unit_amount === cfg.amountCents) return found.id;
+    // Amount mismatch: catalogue was updated but old Stripe Price still holds the key.
+    // Create a corrected price and transfer the lookup_key to it.
+    console.warn(
+      `ensurePrice: lookup_key ${cfg.lookupKey} has stale amount ${found.unit_amount} cents ` +
+      `(expected ${cfg.amountCents}). Creating corrected price with transfer_lookup_key.`,
+    );
+  }
 
   const price = await stripe.prices.create({
-    currency:      "usd",
-    unit_amount:   cfg.amountCents,
-    recurring:     { interval: "month" },
-    product_data:  { name: cfg.name },
-    lookup_key:    cfg.lookupKey,
+    currency:             "usd",
+    unit_amount:          cfg.amountCents,
+    recurring:            { interval: "month" },
+    product_data:         { name: cfg.name },
+    lookup_key:           cfg.lookupKey,
+    transfer_lookup_key:  existing.data.length > 0, // move key from stale price to new one
   });
   return price.id;
 }
@@ -164,10 +183,13 @@ router.get("/status", async (req, res) => {
  * POST /api/seller/subscription/checkout
  * Body: { planId: 'starter' | 'growth' | 'scale' }
  *
- * Creates a Stripe Checkout Session in subscription mode with a 5-day free trial.
- * Card is collected upfront (payment_method_collection: 'always') so the trial
- * auto-converts to paid — no second action required from the seller.
- * Returns { url } for the mobile client to open in a browser.
+ * • If the seller already has an active or trialing subscription, updates it
+ *   in-place (Stripe subscription items update + prorations) instead of creating
+ *   a new Checkout session — this prevents concurrent duplicate subscriptions.
+ * • If no active subscription exists, creates a Stripe Checkout Session in
+ *   subscription mode with a 5-day free trial. Card collected upfront so the
+ *   trial auto-converts to paid on day 6.
+ * Returns { url } for redirect or { updated: true } for in-place update.
  */
 router.post("/checkout", async (req, res) => {
   try {
@@ -180,13 +202,44 @@ router.post("/checkout", async (req, res) => {
       return;
     }
 
+    const devDomain = process.env.REPLIT_DEV_DOMAIN ?? "localhost:3000";
+    const returnBase = `https://${devDomain}/api-server`;
+
+    // Check for an existing active or trialing subscription so we don't create a duplicate.
+    const [user] = await db
+      .select({ subscriptionId: users.subscriptionId })
+      .from(users).where(eq(users.clerkId, clerkUserId)).limit(1);
+
+    if (user?.subscriptionId) {
+      try {
+        const sub = await (stripe.subscriptions.retrieve as any)(user.subscriptionId);
+        if (sub && ["active", "trialing"].includes(sub.status)) {
+          // Update the existing subscription to the new plan — no new Checkout needed.
+          const priceId = await ensurePrice(stripe, planId as PlanId);
+          await (stripe.subscriptions.update as any)(user.subscriptionId, {
+            items: [{ id: sub.items.data[0].id, price: priceId }],
+            proration_behavior: "create_prorations",
+            metadata: { clerkUserId, planId },
+          });
+          // Sync plan to DB immediately; webhook will re-sync when it arrives.
+          await db
+            .update(users)
+            .set({ subscriptionPlanId: planId, updatedAt: new Date() })
+            .where(eq(users.clerkId, clerkUserId));
+          res.json({ updated: true, url: `${returnBase}/seller/subscription/return?status=success&plan=${planId}` });
+          return;
+        }
+      } catch (retrieveErr: any) {
+        // Subscription no longer exists in Stripe — fall through to new Checkout.
+        console.warn("Could not retrieve existing subscription:", retrieveErr?.message);
+      }
+    }
+
+    // No active subscription — create a new Checkout session.
     const [priceId, customerId] = await Promise.all([
       ensurePrice(stripe, planId as PlanId),
       ensureCustomer(stripe, clerkUserId),
     ]);
-
-    const devDomain = process.env.REPLIT_DEV_DOMAIN ?? "localhost:3000";
-    const returnBase = `https://${devDomain}/api-server`;
 
     const session = await stripe.checkout.sessions.create({
       mode:                      "subscription",
