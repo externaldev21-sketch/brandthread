@@ -14,9 +14,12 @@
       "backgroundColor": "#0D0D0D"
     },
     "ios": {
+      "bundleIdentifier": "com.brandthread.mobile",
       "supportsTablet": false
     },
-    "android": {},
+    "android": {
+      "package": "com.brandthread.mobile"
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
