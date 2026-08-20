@@ -9,9 +9,8 @@ import {
   Cart, CartItem, SavedCartItem, CartSellerGroup,
   CheckoutSession, CheckoutContact, CheckoutAddress,
   CheckoutDeliveryGroup, CheckoutShippingMethod, CheckoutDiscount,
-  CheckoutTax, CheckoutPaymentMethod, CheckoutSummary,
+  CheckoutTax, CheckoutSummary,
   CheckoutAcknowledgment, CheckoutAttribution,
-  PaymentAttempt, PaymentAttemptStatus, PaymentFailureCode,
   CartValidationResult, CartValidationIssue,
   BuyerProduct, BuyerProductOption, BuyerProductVariant,
   BuyerReturnRequest, BuyerReturnReason, BuyerReturnResolution,
@@ -275,6 +274,54 @@ export async function updateCartItemQuantity(itemId: string, quantity: number): 
   return cart;
 }
 
+/** Replace one existing cart line after the buyer changes its variant on product detail. */
+export async function replaceCartItemVariant(
+  itemId: string,
+  product: BuyerProduct,
+  variant: BuyerProductVariant,
+  quantity: number,
+): Promise<{ success: boolean; message?: string; cart: Cart }> {
+  const k = keys();
+  const cart = await loadCart(k);
+  const index = cart.items.findIndex(item => item.id === itemId);
+  if (index < 0) return { success: false, message: 'That cart item is no longer available.', cart };
+  if (!product.isActive || !variant.isAvailable) {
+    return { success: false, message: 'The selected variant is no longer available.', cart };
+  }
+  if (!product.isPreOrder && variant.inventoryQuantity < quantity) {
+    return { success: false, message: `Only ${variant.inventoryQuantity} units are available.`, cart };
+  }
+
+  const current = cart.items[index];
+  const duplicateIndex = cart.items.findIndex(item => item.id !== itemId && item.variantId === variant.id);
+  if (duplicateIndex >= 0) {
+    const duplicate = cart.items[duplicateIndex];
+    const mergedQuantity = duplicate.quantity + quantity;
+    if (!product.isPreOrder && mergedQuantity > variant.inventoryQuantity) {
+      return { success: false, message: `You already have ${duplicate.quantity} of this variant in your cart.`, cart };
+    }
+    cart.items[duplicateIndex] = { ...duplicate, quantity: mergedQuantity, maxQuantity: variant.inventoryQuantity || 99 };
+    cart.items.splice(index, 1);
+  } else {
+    cart.items[index] = {
+      ...current,
+      productId: product.id,
+      variantId: variant.id,
+      productName: product.name,
+      variantTitle: variant.title,
+      imageUri: variant.imageUri ?? product.imageUris[0],
+      price: variant.price ?? product.price,
+      compareAtPrice: variant.compareAtPrice ?? product.compareAtPrice,
+      quantity,
+      maxQuantity: variant.inventoryQuantity || 99,
+      isAvailable: true,
+      unavailableReason: undefined,
+    };
+  }
+  await saveCart(cart, k);
+  return { success: true, cart };
+}
+
 export async function removeCartItem(itemId: string): Promise<Cart> {
   const k = keys();
   const cart = await loadCart(k);
@@ -305,7 +352,11 @@ export async function moveToCart(savedItemId: string): Promise<Cart> {
     const saved = cart.savedItems[idx];
     const existing = cart.items.findIndex(i => i.variantId === saved.variantId);
     if (existing >= 0) {
-      cart.items[existing].quantity += saved.quantity;
+      const current = cart.items[existing];
+      cart.items[existing] = {
+        ...current,
+        quantity: Math.min(current.quantity + saved.quantity, current.maxQuantity || 99),
+      };
     } else {
       cart.items.push({ ...saved, addedAt: now() });
     }
@@ -394,35 +445,46 @@ export function calculateCartSummary(items: CartItem[], discountTotal = 0, shipp
 
 /**
  * Fetch the real shipping rate from the seller's configured rates.
- * Returns rate in dollars (not cents). Falls back to 0 (free) on error.
+ * Returns seller-configured rate details in dollars. It deliberately throws on
+ * failure so checkout never labels an unavailable rate as free shipping.
  */
-export async function fetchShippingRate(sellerId: string, subtotalCents: number): Promise<number> {
-  try {
-    const resp = await serviceRequest(
-      `/api/shipping-rates/calculate?sellerId=${encodeURIComponent(sellerId)}&subtotalCents=${subtotalCents}`,
-    ) as any;
-    if (typeof resp?.shippingCents === 'number') return resp.shippingCents / 100;
-  } catch {}
-  return 0;
+async function fetchShippingRateDetails(
+  sellerId: string,
+  subtotalCents: number,
+): Promise<{ id: string; name: string; amount: number }> {
+  const resp = await serviceRequest<{
+    shippingCents: number;
+    rateName: string;
+    isFree: boolean;
+  }>(`/api/shipping-rates/calculate?sellerId=${encodeURIComponent(sellerId)}&subtotalCents=${subtotalCents}`);
+  if (typeof resp.shippingCents !== 'number') throw new Error('Seller shipping rate is unavailable.');
+  return {
+    id: `seller_rate_${sellerId}`,
+    name: resp.rateName || (resp.isFree ? 'Free shipping' : 'Standard shipping'),
+    amount: resp.shippingCents / 100,
+  };
 }
 
 // ─── Cart validation ──────────────────────────────────────────────────────────
 
-export async function validateCart(items: CartItem[]): Promise<CartValidationResult> {
-  // Demo validation: all items are valid (real implementation would hit backend)
-  const issues: CartValidationIssue[] = [];
-  for (const item of items) {
-    if (!item.isAvailable) {
-      issues.push({
-        itemId: item.id,
-        productName: item.productName,
-        type: 'unavailable',
-        message: `${item.productName} is no longer available.`,
-        canContinue: false,
-      });
-    }
-  }
-  return { isValid: issues.length === 0, issues };
+export async function validateCart(items: CartItem[], discountCodes: string[] = []): Promise<CartValidationResult> {
+  const result = await serviceRequest<{ isValid: boolean; issues: CartValidationIssue[] }>(
+    '/api/buyer/cart/validate',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        items: items.map(item => ({
+          id: item.id,
+          productId: item.productId,
+          variantId: item.variantId,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        discountCodes,
+      }),
+    },
+  );
+  return { isValid: result.isValid, issues: result.issues ?? [] };
 }
 
 // ─── Checkout session ─────────────────────────────────────────────────────────
@@ -444,16 +506,34 @@ export async function createCheckoutSession(cart: Cart, isBuyNow = false, buyNow
   const items = isBuyNow && buyNowItems ? buyNowItems : cart.items;
   const groups = groupCartBySeller(items);
 
-  const deliveryGroups: CheckoutDeliveryGroup[] = groups.map(g => ({
-    sellerId: g.sellerId,
-    sellerName: g.sellerName,
-    items: g.items,
-    selectedMethodId: 'rate_usps_priority',
-    availableMethods: getDemoShippingMethods(g.hasPreOrder),
-    hasPreOrder: g.hasPreOrder,
+  const deliveryGroups: CheckoutDeliveryGroup[] = await Promise.all(groups.map(async group => {
+    const rate = await fetchShippingRateDetails(group.sellerId, Math.round(group.subtotal * 100));
+    const method: CheckoutShippingMethod = {
+      id: rate.id,
+      carrier: 'Seller shipping',
+      service: rate.name,
+      price: rate.amount,
+      estimatedDays: 0,
+      estimatedDelivery: group.hasPreOrder ? 'Ships after production' : 'Rate set by seller',
+      trackingIncluded: false,
+      isRecommended: true,
+      ...(group.hasPreOrder ? { isPreOrderEstimate: true } : {}),
+    };
+    return {
+      sellerId: group.sellerId,
+      sellerName: group.sellerName,
+      items: group.items,
+      selectedMethodId: method.id,
+      availableMethods: [method],
+      hasPreOrder: group.hasPreOrder,
+    };
   }));
 
-  const summary = calculateCartSummary(items);
+  const shippingTotal = deliveryGroups.reduce((total, group) => {
+    const selected = group.availableMethods.find(method => method.id === group.selectedMethodId);
+    return total + (selected?.price ?? 0);
+  }, 0);
+  const summary = calculateCartSummary(items, 0, shippingTotal);
 
   const acks: CheckoutAcknowledgment[] = [];
   const hasPreOrder = items.some(i => i.isPreOrder);
@@ -481,7 +561,7 @@ export async function createCheckoutSession(cart: Cart, isBuyNow = false, buyNow
   const session: CheckoutSession = {
     id: uid(),
     cartId: cart.id,
-    step: 'contact',
+    step: 'information',
     savedAddresses: [],
     deliveryGroups,
     discounts: [],
@@ -519,79 +599,6 @@ export async function saveCheckoutProgress(session: CheckoutSession): Promise<Ch
 
 export async function clearCheckoutSession(): Promise<void> {
   await AsyncStorage.removeItem(keys().checkout);
-}
-
-// ─── Shipping rates ───────────────────────────────────────────────────────────
-
-export function getDemoShippingMethods(isPreOrder = false): CheckoutShippingMethod[] {
-  if (isPreOrder) {
-    return [
-      {
-        id: 'rate_preorder_standard',
-        carrier: 'USPS',
-        service: 'Priority Mail (est. after production)',
-        price: 12.40,
-        estimatedDays: 3,
-        estimatedDelivery: 'After production',
-        trackingIncluded: true,
-        isRecommended: true,
-        isPreOrderEstimate: true,
-      },
-      {
-        id: 'rate_preorder_express',
-        carrier: 'FedEx',
-        service: 'Express (est. after production)',
-        price: 19.85,
-        estimatedDays: 2,
-        estimatedDelivery: 'After production',
-        trackingIncluded: true,
-        isRecommended: false,
-        isPreOrderEstimate: true,
-      },
-    ];
-  }
-  return [
-    {
-      id: 'rate_ups_ground',
-      carrier: 'UPS',
-      service: 'Ground',
-      price: 8.99,
-      estimatedDays: 5,
-      estimatedDelivery: '5–7 business days',
-      trackingIncluded: true,
-      isRecommended: false,
-    },
-    {
-      id: 'rate_usps_priority',
-      carrier: 'USPS',
-      service: 'Priority Mail',
-      price: 12.40,
-      estimatedDays: 3,
-      estimatedDelivery: '2–3 business days',
-      trackingIncluded: true,
-      isRecommended: true,
-    },
-    {
-      id: 'rate_fedex_2day',
-      carrier: 'FedEx',
-      service: '2Day',
-      price: 19.85,
-      estimatedDays: 2,
-      estimatedDelivery: '2 business days',
-      trackingIncluded: true,
-      isRecommended: false,
-    },
-    {
-      id: 'rate_ups_next',
-      carrier: 'UPS',
-      service: 'Next Day Air',
-      price: 38.50,
-      estimatedDays: 1,
-      estimatedDelivery: 'Next business day',
-      trackingIncluded: true,
-      isRecommended: false,
-    },
-  ];
 }
 
 // ─── Discounts ────────────────────────────────────────────────────────────────
@@ -688,170 +695,6 @@ export async function removeDiscount(code: string, discounts: CheckoutDiscount[]
 }
 
 // ─── Tax estimation ───────────────────────────────────────────────────────────
-
-export function calculateDemoTax(subtotal: number, state: string): CheckoutTax {
-  // Demo tax rates by state — NOT real tax calculation
-  const rates: Record<string, number> = {
-    CA: 0.0725, NY: 0.0800, TX: 0.0825, FL: 0.0600, WA: 0.0650,
-    IL: 0.1025, PA: 0.0600, OH: 0.0575, GA: 0.0400,
-  };
-  const rate = rates[state.toUpperCase()] ?? 0.0875;
-  return {
-    jurisdiction: state.toUpperCase() || 'Unknown',
-    rate,
-    amount: +(subtotal * rate).toFixed(2),
-    isEstimate: true,
-    note: 'Tax is estimated. Final amount calculated at order completion. Demo rates — not verified.',
-  };
-}
-
-// ─── Payment ──────────────────────────────────────────────────────────────────
-
-export function getDemoPaymentMethods(): CheckoutPaymentMethod[] {
-  return [
-    {
-      type: 'card',
-      label: 'Credit / Debit Card',
-      saveForFuture: false,
-      isAvailable: true,
-    },
-    {
-      type: 'apple_pay',
-      label: 'Apple Pay',
-      saveForFuture: false,
-      isAvailable: false, // requires real payment provider + device support
-    },
-    {
-      type: 'google_pay',
-      label: 'Google Pay',
-      saveForFuture: false,
-      isAvailable: false, // requires real payment provider + device support
-    },
-  ];
-}
-
-export interface PlaceOrderParams {
-  session: CheckoutSession;
-  cardNumber?: string; // last 4 only, never full card
-  idempotencyKey: string;
-}
-
-export interface PlaceOrderResult {
-  success: boolean;
-  orderIds: string[];
-  orderNumbers: string[];
-  paymentAttemptId: string;
-  failureCode?: PaymentFailureCode;
-  failureMessage?: string;
-  totalCharged: number;
-}
-
-// Simulate order placement — no real payment processing
-export async function placeOrder(params: PlaceOrderParams): Promise<PlaceOrderResult> {
-  const k = keys();
-  const { session } = params;
-
-  // Check idempotency — prevent duplicate submissions
-  const attempts = await loadPaymentAttempts(k);
-  const duplicate = attempts.find(a => a.checkoutId === session.id && a.status === 'succeeded');
-  if (duplicate) {
-    return {
-      success: true,
-      orderIds: ['dup_prevented'],
-      orderNumbers: ['Duplicate prevented'],
-      paymentAttemptId: duplicate.id,
-      totalCharged: session.summary.total,
-    };
-  }
-
-  // Record attempt
-  const attempt: PaymentAttempt = {
-    id: uid(),
-    checkoutId: session.id,
-    status: 'processing',
-    method: session.paymentMethod?.type ?? 'card',
-    amount: session.summary.total,
-    currency: 'USD',
-    isDemo: true,
-    createdAt: now(),
-  };
-  attempts.push(attempt);
-  await savePaymentAttempts(attempts, k);
-
-  // Demo: succeed if contact + address exist; fail on specific test conditions
-  const cardLast4 = params.cardNumber ?? '';
-  if (cardLast4 === '0002') {
-    attempt.status = 'failed';
-    attempt.failureCode = 'card_declined';
-    attempt.failureMessage = 'Your card was declined. Please check your card details and try again.';
-    await savePaymentAttempts(attempts.map(a => a.id === attempt.id ? attempt : a), k);
-    return {
-      success: false,
-      orderIds: [],
-      orderNumbers: [],
-      paymentAttemptId: attempt.id,
-      failureCode: 'card_declined',
-      failureMessage: attempt.failureMessage,
-      totalCharged: 0,
-    };
-  }
-
-  if (cardLast4 === '0003') {
-    attempt.status = 'failed';
-    attempt.failureCode = 'insufficient_funds';
-    attempt.failureMessage = 'Insufficient funds. Please use a different payment method.';
-    await savePaymentAttempts(attempts.map(a => a.id === attempt.id ? attempt : a), k);
-    return {
-      success: false,
-      orderIds: [],
-      orderNumbers: [],
-      paymentAttemptId: attempt.id,
-      failureCode: 'insufficient_funds',
-      failureMessage: attempt.failureMessage,
-      totalCharged: 0,
-    };
-  }
-
-  // Success path
-  const orderIds = session.deliveryGroups.map(() => uid());
-  const orderNumbers = orderIds.map((_, i) => `BT-${Date.now().toString().slice(-6)}-${i + 1}`);
-
-  attempt.status = 'succeeded';
-  await savePaymentAttempts(attempts.map(a => a.id === attempt.id ? attempt : a), k);
-
-  // Track attribution
-  if (session.attribution) {
-    await trackCheckoutAttribution(session.attribution, session.summary.total);
-  }
-
-  return {
-    success: true,
-    orderIds,
-    orderNumbers,
-    paymentAttemptId: attempt.id,
-    totalCharged: session.summary.total,
-  };
-}
-
-async function loadPaymentAttempts(k: CartKeys = keys()): Promise<PaymentAttempt[]> {
-  try {
-    const raw = await AsyncStorage.getItem(k.paymentAttempts);
-    if (raw) return JSON.parse(raw) as PaymentAttempt[];
-  } catch {}
-  return [];
-}
-
-async function savePaymentAttempts(attempts: PaymentAttempt[], k: CartKeys = keys()): Promise<void> {
-  await AsyncStorage.setItem(k.paymentAttempts, JSON.stringify(attempts));
-}
-
-// ─── Attribution ──────────────────────────────────────────────────────────────
-
-async function trackCheckoutAttribution(attr: CheckoutAttribution, revenue: number): Promise<void> {
-  // Demo: log to analytics service if available; no real tracking in demo
-  // In production this would hit the analytics endpoint
-  console.info('[Brandthread] Checkout attribution tracked:', { ...attr, revenue });
-}
 
 // ─── Buy Now ──────────────────────────────────────────────────────────────────
 

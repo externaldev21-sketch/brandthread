@@ -4,7 +4,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,7 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import {
-  addToCart, createBuyNowSession,
+  addToCart, createBuyNowSession, replaceCartItemVariant,
   getCart,
 } from '@/services/cartService';
 import { BuyerProduct, BuyerProductOption, BuyerProductVariant, CheckoutAttribution } from '@/services/cartTypes';
@@ -250,10 +250,12 @@ const qs = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function BuyerProductDetailScreen() {
-  const { productId, sourcePostId, sourceTagId } = useLocalSearchParams<{
+  const { productId, sourcePostId, sourceTagId, editVariantId, editCartItemId } = useLocalSearchParams<{
     productId?: string;
     sourcePostId?: string;
     sourceTagId?: string;
+    editVariantId?: string;
+    editCartItemId?: string;
   }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -299,6 +301,13 @@ export default function BuyerProductDetailScreen() {
       setLoading(false);
     })();
   }, [productId]);
+
+  useEffect(() => {
+    if (!product || !editVariantId) return;
+    const cartVariant = product.variants.find(candidate => candidate.id === editVariantId);
+    if (!cartVariant) return;
+    setSelections(Object.fromEntries(cartVariant.optionValues.map(value => [value.optionId, value.valueId])));
+  }, [product, editVariantId]);
 
   useEffect(() => {
     if (!product?.id) return;
@@ -410,7 +419,9 @@ export default function BuyerProductDetailScreen() {
     if (!variant) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setAddingToCart(true);
-    const result = await addToCart({ product: product!, variant, quantity: qty, attribution });
+    const result = editCartItemId
+      ? await replaceCartItemVariant(editCartItemId, product!, variant, qty)
+      : await addToCart({ product: product!, variant, quantity: qty, attribution });
     setAddingToCart(false);
     if (result.success) {
       setAddedToCart(true);
@@ -444,8 +455,9 @@ export default function BuyerProductDetailScreen() {
             return;
           }
         } catch {
-          // Non-fatal: if the status check fails (e.g. network error), proceed —
-          // the server will reject the checkout session if the account is truly unready.
+          Alert.alert('Unable to verify payments', 'We could not confirm this seller can accept payments. Check your connection and try again.');
+          setBuyingNow(false);
+          return;
         }
       }
 
@@ -466,10 +478,14 @@ export default function BuyerProductDetailScreen() {
       >
         {/* Image area */}
         <View style={s.imageArea}>
-          <View style={s.imagePlaceholder}>
-            <Feather name="image" size={ICON.xxl} color={MUTED} />
-            <Text style={s.imagePlaceholderText}>{product.name}</Text>
-          </View>
+          {product.imageUris[0] ? (
+            <Image source={{ uri: product.imageUris[0] }} style={s.productImage} resizeMode="cover" />
+          ) : (
+            <View style={s.imagePlaceholder}>
+              <Feather name="image" size={ICON.xxl} color={MUTED} />
+              <Text style={s.imagePlaceholderText}>Product image unavailable</Text>
+            </View>
+          )}
           {/* Back button */}
           <TouchableOpacity style={[s.backBtn, { top: insets.top + SP.sm }]} onPress={() => router.back()} activeOpacity={0.8}>
             <Feather name="chevron-left" size={ICON.md} color={FG} />
@@ -807,6 +823,7 @@ const pr = StyleSheet.create({
 
 const s = StyleSheet.create({
   imageArea: { height: 360, backgroundColor: CARD, position: 'relative' },
+  productImage: { width: '100%', height: '100%' },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.sm },
   imagePlaceholderText: { fontSize: FS.sm, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', paddingHorizontal: SP.lg },
   backBtn: {

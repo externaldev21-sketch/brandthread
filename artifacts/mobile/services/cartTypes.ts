@@ -56,13 +56,12 @@ export interface Cart {
 // ─── Checkout ─────────────────────────────────────────────────────────────────
 
 export type CheckoutStep =
-  | 'contact'
-  | 'shipping'
+  | 'information'
   | 'delivery'
-  | 'discounts'
-  | 'payment'
   | 'review'
-  | 'confirmation';
+  | 'confirmation'
+  /** Legacy persisted values from pre-four-step checkout sessions. */
+  | 'contact' | 'shipping' | 'discounts' | 'payment';
 
 export interface CheckoutContact {
   email: string;
@@ -124,7 +123,7 @@ export interface CheckoutTax {
   note: string;
 }
 
-export type PaymentMethodType = 'card' | 'apple_pay' | 'google_pay' | 'store_credit';
+export type PaymentMethodType = 'stripe_checkout';
 
 export interface CheckoutPaymentMethod {
   type: PaymentMethodType;
@@ -431,11 +430,8 @@ export const PROBLEM_TYPE_OPTIONS: { key: BuyerProblemType; label: string; icon:
 ];
 
 export const CHECKOUT_STEPS: { key: CheckoutStep; label: string; shortLabel: string }[] = [
-  { key: 'contact',      label: 'Contact',          shortLabel: 'Contact' },
-  { key: 'shipping',     label: 'Shipping Address',  shortLabel: 'Ship To' },
+  { key: 'information',  label: 'Information',       shortLabel: 'Info' },
   { key: 'delivery',     label: 'Delivery',          shortLabel: 'Delivery' },
-  { key: 'discounts',    label: 'Discounts',         shortLabel: 'Discounts' },
-  { key: 'payment',      label: 'Payment',           shortLabel: 'Payment' },
-  { key: 'review',       label: 'Review Order',      shortLabel: 'Review' },
+  { key: 'review',       label: 'Review & Pay',      shortLabel: 'Pay' },
   { key: 'confirmation', label: 'Order Confirmed',   shortLabel: 'Done' },
 ];

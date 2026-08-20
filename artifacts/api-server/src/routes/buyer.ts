@@ -4,7 +4,7 @@
  */
 import { Router } from "express";
 import {
-  db, checkoutSessions, orders, orderItems, productVariants, products, users,
+  db, checkoutSessions, orders, orderItems, productVariants, products, users, shippingRates, discountCodes,
 } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -25,6 +25,98 @@ router.use(requireAuth);
     console.error("[buyer] migration error:", err);
   }
 })();
+
+/**
+ * Re-check every buyer cart line against the current catalogue before the UI
+ * enters checkout. The Checkout Session endpoint repeats these checks as the
+ * final payment boundary; this route exists to return human-readable fixes
+ * before the buyer reaches Stripe.
+ */
+router.post("/cart/validate", async (req, res) => {
+  const items = req.body?.items;
+  const discountCodeValues = Array.isArray(req.body?.discountCodes) ? req.body.discountCodes : [];
+  if (!Array.isArray(items) || items.length === 0) {
+    res.status(400).json({ error: "items required" });
+    return;
+  }
+
+  const issues: Array<{
+    itemId: string; productName: string;
+    type: "unavailable" | "price_changed" | "inventory_changed";
+    message: string; oldValue?: number; newValue?: number; canContinue: boolean;
+  }> = [];
+  const sellerIds = new Set<string>();
+  let subtotalCents = 0;
+
+  for (const item of items) {
+    const [row] = await db
+      .select({
+        variantId: productVariants.id,
+        priceCents: productVariants.priceCents,
+        stock: productVariants.stock,
+        productName: products.name,
+        productStatus: products.status,
+        sellerId: products.ownerId,
+      })
+      .from(productVariants)
+      .innerJoin(products, eq(productVariants.productId, products.id))
+      .where(and(eq(productVariants.id, item.variantId), eq(products.id, item.productId)))
+      .limit(1);
+
+    const itemId = String(item.id ?? item.variantId);
+    if (!row || row.productStatus !== "active") {
+      issues.push({
+        itemId, productName: row?.productName ?? "This item", type: "unavailable",
+        message: `${row?.productName ?? "This item"} is no longer available.`,
+        canContinue: false,
+      });
+      continue;
+    }
+    sellerIds.add(row.sellerId);
+    const quantity = Number(item.quantity);
+    if (!Number.isInteger(quantity) || quantity < 1 || row.stock < quantity) {
+      issues.push({
+        itemId, productName: row.productName, type: "inventory_changed",
+        message: row.stock > 0
+          ? `Only ${row.stock} of ${row.productName} remain.`
+          : `${row.productName} is now out of stock.`,
+        oldValue: quantity, newValue: row.stock, canContinue: false,
+      });
+    }
+    const currentPrice = row.priceCents / 100;
+    if (typeof item.price === "number" && Math.abs(item.price - currentPrice) > 0.001) {
+      issues.push({
+        itemId, productName: row.productName, type: "price_changed",
+        message: `${row.productName} is now $${currentPrice.toFixed(2)}.`,
+        oldValue: item.price, newValue: currentPrice, canContinue: false,
+      });
+    }
+    subtotalCents += row.priceCents * quantity;
+  }
+  if (issues.length === 0 && sellerIds.size === 1) {
+    const sellerId = [...sellerIds][0];
+    for (const codeValue of discountCodeValues) {
+      const code = String(codeValue ?? "").trim().toUpperCase();
+      if (!code) continue;
+      const [discount] = await db
+        .select()
+        .from(discountCodes)
+        .where(and(eq(discountCodes.sellerId, sellerId), eq(discountCodes.code, code), eq(discountCodes.active, true)))
+        .limit(1);
+      const expired = !!discount?.expiresAt && discount.expiresAt.getTime() <= Date.now();
+      const exhausted = discount?.maxUses != null && discount.usesCount >= discount.maxUses;
+      const belowMinimum = !!discount && subtotalCents < discount.minOrderCents;
+      if (!discount || expired || exhausted || belowMinimum) {
+        issues.push({
+          itemId: "discount", productName: "Discount code", type: "unavailable",
+          message: `${code} is no longer valid for this order. Remove it to continue.`,
+          canContinue: false,
+        });
+      }
+    }
+  }
+  res.json({ isValid: issues.length === 0, issues });
+});
 
 // ─── Checkout ─────────────────────────────────────────────────────────────────
 
@@ -96,6 +188,7 @@ router.post("/checkout/session", async (req, res) => {
           productName: products.name,
           productImages: products.images,
           sellerId: products.ownerId,
+          productStatus: products.status,
         })
         .from(productVariants)
         .innerJoin(products, eq(productVariants.productId, products.id))
@@ -109,6 +202,10 @@ router.post("/checkout/session", async (req, res) => {
 
       if (!row) {
         res.status(404).json({ error: `Variant ${item.variantId} not found` });
+        return;
+      }
+      if (row.productStatus !== "active") {
+        res.status(400).json({ error: `${row.productName} is no longer available` });
         return;
       }
       if (row.stock < qty) {
@@ -281,6 +378,25 @@ router.post("/checkout/session", async (req, res) => {
       (sum, item) => sum + item.priceCents * item.quantity,
       0,
     );
+    const [configuredShippingRate] = await db
+      .select()
+      .from(shippingRates)
+      .where(and(eq(shippingRates.sellerId, sellerId), eq(shippingRates.active, true)))
+      .limit(1);
+    const shippingCents = !configuredShippingRate ||
+      (configuredShippingRate.freeAboveCents != null && subtotalCents >= configuredShippingRate.freeAboveCents)
+      ? 0
+      : configuredShippingRate.flatRateCents;
+    if (shippingCents > 0) {
+      lineItems.push({
+        price_data: {
+          currency: "usd",
+          unit_amount: shippingCents,
+          product_data: { name: configuredShippingRate?.name ?? "Shipping" },
+        },
+        quantity: 1,
+      });
+    }
     const applicationFeeCents = computeApplicationFeeCents(subtotalCents);
 
     // Validate dropId if provided — must be a non-empty string
@@ -299,6 +415,10 @@ router.post("/checkout/session", async (req, res) => {
       {
         mode: "payment",
         line_items: lineItems,
+        // Stripe remains the final authority for tax. This replaces the old
+        // client-side state-rate table and keeps the charged tax aligned with
+        // the seller's Stripe Tax configuration.
+        automatic_tax: { enabled: true },
         success_url: successUrl,
         cancel_url: cancelUrl,
         client_reference_id: buyerId,

@@ -4,7 +4,7 @@
  */
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, Image,
   ActivityIndicator, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -80,9 +80,10 @@ function CartItemRow({
 
   return (
     <View style={ir.root}>
-      {/* Image placeholder */}
       <View style={ir.img}>
-        <Feather name="package" size={ICON.lg} color={MUTED} />
+        {item.imageUri
+          ? <Image source={{ uri: item.imageUri }} style={ir.productImage} resizeMode="cover" />
+          : <Feather name="image" size={ICON.lg} color={MUTED} />}
       </View>
 
       {/* Details */}
@@ -150,8 +151,9 @@ const ir = StyleSheet.create({
   img: {
     width: 80, height: 100, borderRadius: RADIUS.md,
     backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER,
-    alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
+  productImage: { width: '100%', height: '100%' },
   name: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginBottom: 4, lineHeight: 18 },
   variantRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
   variant: { fontSize: FS.xs, fontFamily: FONT.regular, color: PURPLE_LIGHT },
@@ -408,7 +410,7 @@ export default function CartScreen() {
   }
 
   function handleEditVariant(item: CartItem) {
-    router.push(('/buyer-product-detail?productId=' + item.productId + '&editVariantId=' + item.variantId) as never);
+    router.push(('/buyer-product-detail?productId=' + item.productId + '&editVariantId=' + item.variantId + '&editCartItemId=' + item.id) as never);
   }
 
   async function handleCheckout() {
@@ -439,8 +441,9 @@ export default function CartScreen() {
             return;
           }
         } catch {
-          // Non-fatal: if the status check fails (e.g. network issue), let the
-          // buyer proceed — the server will reject the checkout session if truly unready.
+          Alert.alert('Unable to verify payments', `We could not confirm ${group.sellerName} can accept payments. Check your connection and try again.`);
+          setValidating(false);
+          return;
         }
       }
 
@@ -511,6 +514,13 @@ export default function CartScreen() {
 
             {/* Summary */}
             {hasItems && (
+              <>
+              {groups.length > 1 && (
+                <View style={s.multiSellerNotice}>
+                  <Feather name="layers" size={16} color={CYAN} />
+                  <Text style={s.multiSellerText}>Items from {groups.length} sellers require a separate secure Stripe payment for each seller.</Text>
+                </View>
+              )}
               <SummaryCard
                 subtotal={summary.subtotal}
                 discountTotal={summary.discountTotal}
@@ -519,6 +529,7 @@ export default function CartScreen() {
                 total={summary.total}
                 hasPreOrder={hasPreOrder}
               />
+              </>
             )}
 
             {/* Saved for later */}
@@ -605,6 +616,8 @@ const s = StyleSheet.create({
   savedTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
   savedCard: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md },
   divider: { height: 1, backgroundColor: BORDER, marginVertical: SP.xs },
+  multiSellerNotice: { flexDirection: 'row', gap: SP.sm, backgroundColor: CYAN_DIM, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md },
+  multiSellerText: { flex: 1, color: CYAN, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
   savedHint: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', marginBottom: SP.lg },
   checkoutBar: {
     position: 'absolute',
