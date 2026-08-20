@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
@@ -133,6 +133,7 @@ function uid() { return Math.random().toString(36).slice(2, 11); }
 
 export default function AddProductScreen() {
   const router = useRouter();
+  const navigation = useNavigation();
   const params = useLocalSearchParams();
   const insets = useSafeAreaInsets();
   const api = useApi();
@@ -201,6 +202,7 @@ export default function AddProductScreen() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [editProductId, setEditProductId] = useState<string | null>(null);
   const [collections, setCollections] = useState<ProductCollection[]>([]);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // ── Collapsible section state — advanced sections start closed ──
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
@@ -213,6 +215,24 @@ export default function AddProductScreen() {
 
   const draftId = useRef('draft_' + uid());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasUnsavedChangesRef = useRef(false);
+  const changeVersionRef = useRef(0);
+  const latestDraftSnapshotRef = useRef<ProductDraft | null>(null);
+  const isExitingRef = useRef(false);
+
+  function markUnsavedChanges() {
+    changeVersionRef.current += 1;
+    hasUnsavedChangesRef.current = true;
+    setHasUnsavedChanges(true);
+  }
+
+  function updateUnsavedState<T>(
+    setter: React.Dispatch<React.SetStateAction<T>>,
+    value: React.SetStateAction<T>,
+  ) {
+    markUnsavedChanges();
+    setter(value);
+  }
 
   function toggleSection(key: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -304,35 +324,42 @@ export default function AddProductScreen() {
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      const productOptions: ProductOption[] = localOptions.map((o, i) => ({
-        id: o.id, type: o.type, name: o.name, values: o.values, sortOrder: i,
-      }));
-      const productVariants: ProductVariant[] = localVariants.map(v => ({
-        id: v.id, productId: '',
-        title: v.title, optionValues: v.optionValues,
-        sku: v.sku, price: parseFloat(v.price) || undefined,
-        inventoryQuantity: parseInt(variantQtys[v.id] ?? v.qty) || 0,
-        reservedQuantity: 0, incomingQuantity: 0,
-        status: 'active' as const,
-        requiresShipping: true, taxable: true,
-        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
-      }));
-      const draft: ProductDraft = {
-        ...draftData,
-        options: productOptions,
-        variants: productVariants,
-        id: draftId.current,
-        isDraft: true,
-        currentStep: 1,
-        lastSavedAt: new Date().toISOString(),
-      };
-      saveDraft(draft);
+      const saveVersion = changeVersionRef.current;
+      saveDraft(buildDraftSnapshot()).then(() => {
+        if (changeVersionRef.current === saveVersion) {
+          hasUnsavedChangesRef.current = false;
+          setHasUnsavedChanges(false);
+        }
+      });
     }, 2000);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [draftData, localOptions, localVariants, variantQtys]);
+  }, [
+    draftData, localOptions, localVariants, variantQtys,
+    priceStr, compareAtStr, costStr, shippingStr, feesStr,
+    trackInventory, allowOversell, stockStr, lowStockStr,
+    mfgMode, mfgName, targetCost, reqQty, prodDeadline,
+  ]);
+
+  // Intercept native back gestures/buttons so the same protection applies
+  // when the seller leaves without tapping the header close button.
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', event => {
+      if (!hasUnsavedChangesRef.current || isExitingRef.current) return;
+
+      event.preventDefault();
+      showExitAlert(() => {
+        isExitingRef.current = true;
+        navigation.dispatch(event.data.action);
+      });
+    });
+    return unsubscribe;
+    // The refs keep the listener current without re-registering on every edit.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigation]);
 
   // ── Helpers ──
   function patchDraft(patch: Partial<Product>) {
+    markUnsavedChanges();
     setDraftData(prev => ({ ...prev, ...patch }));
   }
 
@@ -354,6 +381,35 @@ export default function AddProductScreen() {
       ...draftData,
       options: productOptions,
       variants: productVariants,
+      pricing: {
+        ...(draftData.pricing ?? { currency: 'USD' }),
+        price: parseFloat(priceStr) || 0,
+        compareAtPrice: parseFloat(compareAtStr) || undefined,
+        cost: parseFloat(costStr) || undefined,
+        estimatedShippingCost: parseFloat(shippingStr) || 0,
+        estimatedFees: parseFloat(feesStr) || 0,
+        currency: 'USD',
+      },
+      inventory: {
+        ...(draftData.inventory ?? {
+          productId: '', policy: 'deny', reservedStock: 0, incomingStock: 0,
+          locationStock: [], variantStock: [],
+        }),
+        trackQuantity: trackInventory,
+        allowOverselling: allowOversell,
+        policy: allowOversell ? 'continue' : 'deny',
+        lowStockThreshold: parseInt(lowStockStr) || 5,
+        totalStock: parseInt(stockStr) || 0,
+        availableStock: parseInt(stockStr) || 0,
+      },
+      manufacturing: {
+        ...(draftData.manufacturing ?? {}),
+        stage: mfgMode === 'quote' ? 'quote_requested' : 'none',
+        manufacturerName: mfgName || undefined,
+        targetCostPerUnit: parseFloat(targetCost) || undefined,
+        requiredQuantity: parseInt(reqQty) || undefined,
+        productionDeadline: prodDeadline || undefined,
+      },
       id: draftId.current,
       isDraft: true,
       currentStep: 1,
@@ -361,27 +417,54 @@ export default function AddProductScreen() {
     };
   }
 
-  function handleExit() {
-    Alert.alert('Exit product creation?', 'Your progress will be saved as a draft.', [
-      {
-        text: 'Save draft', onPress: () => {
-          saveDraft(buildDraftSnapshot());
-          router.back();
-        },
-      },
-      { text: 'Discard', style: 'destructive', onPress: () => router.back() },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+  latestDraftSnapshotRef.current = buildDraftSnapshot();
+
+  async function saveDraftAndClear(snapshot: ProductDraft) {
+    const saveVersion = changeVersionRef.current;
+    await saveDraft(snapshot);
+    if (changeVersionRef.current === saveVersion) {
+      hasUnsavedChangesRef.current = false;
+      setHasUnsavedChanges(false);
+    }
   }
 
-  function handleSaveDraftAndExit() {
-    saveDraft(buildDraftSnapshot());
+  function showExitAlert(onExit: () => void) {
+    Alert.alert(
+      'Exit product creation?',
+      'You have unsaved changes — save as draft?',
+      [
+        {
+          text: 'Save draft',
+          onPress: async () => {
+            await saveDraftAndClear(latestDraftSnapshotRef.current ?? buildDraftSnapshot());
+            onExit();
+          },
+        },
+        { text: 'Discard', style: 'destructive', onPress: onExit },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
+  }
+
+  function handleExit() {
+    if (!hasUnsavedChanges) {
+      router.back();
+      return;
+    }
+    showExitAlert(() => {
+      isExitingRef.current = true;
+      router.back();
+    });
+  }
+
+  async function handleSaveDraftAndExit() {
+    await saveDraftAndClear(buildDraftSnapshot());
     Alert.alert('Draft saved', 'You can continue editing later.');
     router.back();
   }
 
-  function handleSaveDraftInPlace() {
-    saveDraft(buildDraftSnapshot());
+  async function handleSaveDraftInPlace() {
+    await saveDraftAndClear(buildDraftSnapshot());
     Alert.alert('Draft saved', 'Your progress has been saved.');
   }
 
@@ -411,7 +494,7 @@ export default function AddProductScreen() {
       optionValues: combo.map(c => ({ optionId: c.optionId, valueId: c.valueId })),
       sku: '', price: '', qty: '',
     }));
-    setLocalVariants(variants);
+    updateUnsavedState(setLocalVariants, variants);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
@@ -642,7 +725,7 @@ export default function AddProductScreen() {
         <FormInput
           label="Image URL"
           value={mediaUrlInput}
-          onChange={setMediaUrlInput}
+          onChange={v => updateUnsavedState(setMediaUrlInput, v)}
           placeholder="https://..."
           returnKeyType="done"
           onSubmitEditing={() => {
@@ -705,7 +788,7 @@ export default function AddProductScreen() {
           label="Tags"
           value={tagsInput}
           onChange={v => {
-            setTagsInput(v);
+            updateUnsavedState(setTagsInput, v);
             patchDraft({ tags: v.split(',').map(t => t.trim()).filter(Boolean) });
           }}
           placeholder="streetwear, hoodie, oversized"
@@ -755,35 +838,35 @@ export default function AddProductScreen() {
         <FormInput
           label="Retail price *"
           value={priceStr}
-          onChange={setPriceStr}
+          onChange={v => updateUnsavedState(setPriceStr, v)}
           placeholder="0.00"
           keyboardType="decimal-pad"
         />
         <FormInput
           label="Compare-at price"
           value={compareAtStr}
-          onChange={setCompareAtStr}
+          onChange={v => updateUnsavedState(setCompareAtStr, v)}
           placeholder="Original price if on sale"
           keyboardType="decimal-pad"
         />
         <FormInput
           label="Product cost"
           value={costStr}
-          onChange={setCostStr}
+          onChange={v => updateUnsavedState(setCostStr, v)}
           placeholder="What it costs to make"
           keyboardType="decimal-pad"
         />
         <FormInput
           label="Est. shipping cost"
           value={shippingStr}
-          onChange={setShippingStr}
+          onChange={v => updateUnsavedState(setShippingStr, v)}
           placeholder="per unit"
           keyboardType="decimal-pad"
         />
         <FormInput
           label="Est. fees"
           value={feesStr}
-          onChange={setFeesStr}
+          onChange={v => updateUnsavedState(setFeesStr, v)}
           placeholder="Platform + payment fees"
           keyboardType="decimal-pad"
         />
@@ -824,7 +907,7 @@ export default function AddProductScreen() {
           <Switch
             value={trackInventory}
             onValueChange={v => {
-              setTrackInventory(v);
+              updateUnsavedState(setTrackInventory, v);
               patchDraft({ inventory: { ...(draftData.inventory!), trackQuantity: v } });
             }}
             trackColor={{ false: BORDER, true: PURPLE }}
@@ -836,14 +919,14 @@ export default function AddProductScreen() {
             <FormInput
               label="Current stock"
               value={stockStr}
-              onChange={setStockStr}
+              onChange={v => updateUnsavedState(setStockStr, v)}
               placeholder="0"
               keyboardType="numeric"
             />
             <FormInput
               label="Low-stock threshold"
               value={lowStockStr}
-              onChange={setLowStockStr}
+              onChange={v => updateUnsavedState(setLowStockStr, v)}
               placeholder="5"
               keyboardType="numeric"
             />
@@ -854,7 +937,7 @@ export default function AddProductScreen() {
           <Switch
             value={allowOversell}
             onValueChange={v => {
-              setAllowOversell(v);
+              updateUnsavedState(setAllowOversell, v);
               patchDraft({ inventory: { ...(draftData.inventory!), allowOverselling: v, policy: v ? 'continue' : 'deny' } });
             }}
             trackColor={{ false: BORDER, true: PURPLE }}
@@ -870,7 +953,7 @@ export default function AddProductScreen() {
                 <TextInput
                   style={s.variantQtyInput}
                   value={variantQtys[v.id] ?? ''}
-                  onChangeText={txt => setVariantQtys(prev => ({ ...prev, [v.id]: txt }))}
+                  onChangeText={txt => updateUnsavedState(setVariantQtys, prev => ({ ...prev, [v.id]: txt }))}
                   placeholder="0"
                   placeholderTextColor={SUBTLE}
                   keyboardType="numeric"
@@ -891,9 +974,9 @@ export default function AddProductScreen() {
           action={{
             label: 'Add option',
             onPress: () => {
-              setLocalOptions(prev => [...prev, {
-                id: uid(), type: 'size', name: 'Size', values: [], customInput: '',
-              }]);
+                updateUnsavedState(setLocalOptions, prev => [...prev, {
+                  id: uid(), type: 'size' as OptionType, name: 'Size', values: [], customInput: '',
+                }]);
             },
           }}
           style={s.sectionHdr}
@@ -911,7 +994,7 @@ export default function AddProductScreen() {
                   onPress={() => {
                     const updated = [...localOptions];
                     updated[idx] = { ...opt, type: t, name: t === 'custom' ? '' : t.charAt(0).toUpperCase() + t.slice(1) };
-                    setLocalOptions(updated);
+                    updateUnsavedState(setLocalOptions, updated);
                   }}
                 />
               ))}
@@ -922,7 +1005,7 @@ export default function AddProductScreen() {
               onChange={v => {
                 const updated = [...localOptions];
                 updated[idx] = { ...opt, name: v };
-                setLocalOptions(updated);
+                updateUnsavedState(setLocalOptions, updated);
               }}
               placeholder="e.g. Size, Color..."
             />
@@ -939,7 +1022,7 @@ export default function AddProductScreen() {
                         const updated = [...localOptions];
                         const already = opt.values.some(v => v.value === sz);
                         updated[idx] = { ...opt, values: already ? opt.values.filter(v => v.value !== sz) : [...opt.values, { id: uid(), value: sz }] };
-                        setLocalOptions(updated);
+                        updateUnsavedState(setLocalOptions, updated);
                       }}
                     />
                   ))}
@@ -959,7 +1042,7 @@ export default function AddProductScreen() {
                           const updated = [...localOptions];
                           const already = opt.values.some(v => v.value === c.name);
                           updated[idx] = { ...opt, values: already ? opt.values.filter(v => v.value !== c.name) : [...opt.values, { id: uid(), value: c.name, colorHex: c.hex }] };
-                          setLocalOptions(updated);
+                          updateUnsavedState(setLocalOptions, updated);
                         }}
                         style={[s.colorSwatch, { backgroundColor: c.hex, borderColor: selected ? PURPLE : BORDER, borderWidth: selected ? 2 : 1 }]}
                       >
@@ -979,7 +1062,7 @@ export default function AddProductScreen() {
                     onPress={() => {
                       const updated = [...localOptions];
                       updated[idx] = { ...opt, values: opt.values.filter(x => x.id !== v.id) };
-                      setLocalOptions(updated);
+                      updateUnsavedState(setLocalOptions, updated);
                     }}
                   >
                     {v.colorHex && <View style={[s.valueDot, { backgroundColor: v.colorHex }]} />}
@@ -996,7 +1079,7 @@ export default function AddProductScreen() {
                 onChangeText={v => {
                   const updated = [...localOptions];
                   updated[idx] = { ...opt, customInput: v };
-                  setLocalOptions(updated);
+                  updateUnsavedState(setLocalOptions, updated);
                 }}
                 placeholder="Add value..."
                 placeholderTextColor={SUBTLE}
@@ -1007,7 +1090,7 @@ export default function AddProductScreen() {
                   if (!opt.customInput.trim()) return;
                   const updated = [...localOptions];
                   updated[idx] = { ...opt, values: [...opt.values, { id: uid(), value: opt.customInput.trim() }], customInput: '' };
-                  setLocalOptions(updated);
+                  updateUnsavedState(setLocalOptions, updated);
                 }}
               >
                 <Feather name="plus" size={16} color={PURPLE_LIGHT} />
@@ -1015,7 +1098,7 @@ export default function AddProductScreen() {
             </View>
             <TouchableOpacity
               style={s.deleteOptionBtn}
-              onPress={() => setLocalOptions(prev => prev.filter((_, i) => i !== idx))}
+              onPress={() => updateUnsavedState(setLocalOptions, prev => prev.filter((_, i) => i !== idx))}
             >
               <Feather name="trash-2" size={14} color={RED} />
               <Text style={s.deleteOptionText}>Remove option</Text>
@@ -1042,19 +1125,19 @@ export default function AddProductScreen() {
                   <TextInput
                     style={s.variantInput}
                     value={v.sku}
-                    onChangeText={txt => setLocalVariants(prev => prev.map(x => x.id === v.id ? { ...x, sku: txt } : x))}
+                    onChangeText={txt => updateUnsavedState(setLocalVariants, prev => prev.map(x => x.id === v.id ? { ...x, sku: txt } : x))}
                     placeholder="SKU"
                     placeholderTextColor={SUBTLE}
                   />
                   <TextInput
                     style={s.variantInput}
                     value={v.price}
-                    onChangeText={txt => setLocalVariants(prev => prev.map(x => x.id === v.id ? { ...x, price: txt } : x))}
+                    onChangeText={txt => updateUnsavedState(setLocalVariants, prev => prev.map(x => x.id === v.id ? { ...x, price: txt } : x))}
                     placeholder="Price override"
                     placeholderTextColor={SUBTLE}
                     keyboardType="decimal-pad"
                   />
-                  <TouchableOpacity onPress={() => setLocalVariants(prev => prev.filter(x => x.id !== v.id))} style={{ padding: 4 }}>
+                  <TouchableOpacity onPress={() => updateUnsavedState(setLocalVariants, prev => prev.filter(x => x.id !== v.id))} style={{ padding: 4 }}>
                     <Feather name="trash-2" size={14} color={RED} />
                   </TouchableOpacity>
                 </View>
@@ -1143,7 +1226,7 @@ export default function AddProductScreen() {
       <>
         <SectionHeader title="Manufacturer" style={s.sectionHdr} />
         {modes.map(m => (
-          <TouchableOpacity key={m.key} onPress={() => { Haptics.selectionAsync(); setMfgMode(m.key); }} activeOpacity={0.8}>
+          <TouchableOpacity key={m.key} onPress={() => { Haptics.selectionAsync(); updateUnsavedState(setMfgMode, m.key); }} activeOpacity={0.8}>
             <BrandthreadCard style={[s.modelCard, mfgMode === m.key && { borderColor: BORDER_ACTIVE, backgroundColor: CARD_ELEVATED }]}>
               <View style={s.modelCardHeader}>
                 <Text style={s.modelTitle}>{m.label}</Text>
@@ -1154,13 +1237,13 @@ export default function AddProductScreen() {
           </TouchableOpacity>
         ))}
         {mfgMode === 'existing' && (
-          <FormInput label="Manufacturer name" value={mfgName} onChange={setMfgName} placeholder="e.g. Euro Stitch Ltd" />
+          <FormInput label="Manufacturer name" value={mfgName} onChange={v => updateUnsavedState(setMfgName, v)} placeholder="e.g. Euro Stitch Ltd" />
         )}
         {mfgMode === 'quote' && (
           <>
-            <FormInput label="Target cost per unit" value={targetCost} onChange={setTargetCost} placeholder="0.00" keyboardType="decimal-pad" />
-            <FormInput label="Required quantity" value={reqQty} onChange={setReqQty} placeholder="50" keyboardType="numeric" />
-            <FormInput label="Production deadline" value={prodDeadline} onChange={setProdDeadline} placeholder="YYYY-MM-DD" />
+            <FormInput label="Target cost per unit" value={targetCost} onChange={v => updateUnsavedState(setTargetCost, v)} placeholder="0.00" keyboardType="decimal-pad" />
+            <FormInput label="Required quantity" value={reqQty} onChange={v => updateUnsavedState(setReqQty, v)} placeholder="50" keyboardType="numeric" />
+            <FormInput label="Production deadline" value={prodDeadline} onChange={v => updateUnsavedState(setProdDeadline, v)} placeholder="YYYY-MM-DD" />
             <SecondaryButton label="Upload tech pack" onPress={() => Alert.alert('Tech Pack', 'Tech pack upload will be available in the next release.')} icon="upload" disabled />
           </>
         )}
