@@ -8,6 +8,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { useApi } from '@/lib/api';
+import { useTeamRole } from '@/hooks/useTeamRole';
 
 function relTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -21,12 +22,19 @@ function relTime(iso: string) {
 
 /** Returns "Expires in Xd" / "Expires in Xh" / "Expired" for a pending invite's expiresAt. */
 function expiryLabel(expiresAt: string | null | undefined): string | null {
-  if (!expiresAt) return null; // legacy invite — no expiry
+  if (!expiresAt) return 'Expired'; // unknown expiry is fail-closed on the API too
   const ms = new Date(expiresAt).getTime() - Date.now();
   if (ms <= 0) return 'Expired';
   const h = Math.floor(ms / 3600000);
   if (h < 24) return `Expires in ${h}h`;
   return `Expires in ${Math.floor(h / 24)}d`;
+}
+
+function isExpiredInvite(member: any): boolean {
+  return member.status === 'pending' && (
+    member.expired === true ||
+    (!!member.expiresAt && new Date(member.expiresAt).getTime() <= Date.now())
+  );
 }
 
 function initials(name: string) {
@@ -43,6 +51,7 @@ export default function TeamScreen() {
   const colors  = useColors();
   const router  = useRouter();
   const api     = useApi();
+  const { currentRole } = useTeamRole();
   const [twoFactor, setTwoFactor] = useState(true);
   const [fraud, setFraud]         = useState(true);
   const [members,  setMembers]    = useState<any[]>([]);
@@ -59,6 +68,8 @@ export default function TeamScreen() {
   const [inviting, setInviting]           = useState(false);
   const [inviteResult, setInviteResult]   = useState<{ inviteUrl: string; emailSent: boolean; email: string } | null>(null);
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
+  const [dismissingId, setDismissingId] = useState<string | null>(null);
+  const [showExpired, setShowExpired] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -147,6 +158,102 @@ export default function TeamScreen() {
     try { await Share.share({ message: `Join my team on Brandthread: ${url}` }); } catch { /* cancelled */ }
   };
 
+  const dismissExpiredInvite = (member: any) => {
+    if (currentRole !== 'owner') return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Alert.alert(
+      'Dismiss expired invite',
+      `${member.name ?? member.email} will be removed from your expired invites.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Dismiss',
+          style: 'destructive',
+          onPress: async () => {
+            setDismissingId(member.id);
+            try {
+              await api.team.remove(member.id);
+              setMembers(prev => prev.filter(m => m.id !== member.id));
+            } catch (err: any) {
+              Alert.alert('Error', err.message ?? 'Failed to dismiss invite');
+            } finally {
+              setDismissingId(null);
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const expiredInvites = members.filter(isExpiredInvite);
+  const currentMembers = members.filter(member => !isExpiredInvite(member));
+
+  const renderMemberRow = (m: any, i: number) => {
+    const color = avatarColor(i);
+    const ini   = initials(m.name ?? m.email ?? '?');
+    const isPending = m.status === 'pending';
+    const isExpired = isExpiredInvite(m);
+    const roleLabel = m.role === 'owner' ? 'Owner' : m.role === 'manager' ? 'Manager' : 'Staff';
+    const expLabel  = isPending ? expiryLabel(m.expiresAt) : null;
+    const accessLabel = isPending
+      ? `Invited ${m.invitedAt ? relTime(m.invitedAt) : ''}${expLabel ? ` · ${expLabel}` : ' · awaiting acceptance'}`
+      : m.role === 'owner' ? 'Full Access' : m.role === 'manager' ? 'Orders, Products, Inventory' : 'Fulfillment only';
+    const isRegenerating = regeneratingId === m.id;
+    const isDismissing = dismissingId === m.id;
+    return (
+      <TouchableOpacity
+        key={m.id}
+        activeOpacity={0.7}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/users?id=${m.id}` as never); }}
+        style={[styles.memberRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
+      >
+        <View style={styles.memberLeft}>
+          <View style={[styles.avatar, { backgroundColor: color + '33' }]}>
+            <Text style={[styles.avatarText, { color }]}>{ini}</Text>
+          </View>
+          {m.online && <View style={[styles.onlineDot, { backgroundColor: colors.success }]} />}
+        </View>
+        <View style={styles.memberInfo}>
+          <Text style={[styles.memberName, { color: colors.foreground }]}>{m.name ?? m.email}</Text>
+          <Text
+            style={[styles.memberAccess, { color: isExpired ? colors.warning : colors.mutedForeground }]}
+            numberOfLines={1}
+          >{accessLabel}</Text>
+        </View>
+        {isPending && (
+          <TouchableOpacity
+            onPress={() => isExpired ? handleRegenerate(m) : (m.inviteUrl ? copyLink(m.inviteUrl) : null)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={[styles.linkBtn, { borderColor: isExpired ? colors.warning + '44' : colors.border }]}
+            disabled={isRegenerating || isDismissing}
+            accessibilityLabel={isExpired ? 'Regenerate expired invite' : 'Copy invite link'}
+          >
+            {isRegenerating
+              ? <ActivityIndicator size="small" color={colors.primary} />
+              : <Feather name={isExpired ? 'refresh-cw' : 'link'} size={13} color={isExpired ? colors.warning : colors.mutedForeground} />}
+          </TouchableOpacity>
+        )}
+        {isExpired && currentRole === 'owner' && (
+          <TouchableOpacity
+            onPress={() => dismissExpiredInvite(m)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={[styles.dismissBtn, { borderColor: colors.border }]}
+            disabled={isDismissing || isRegenerating}
+            accessibilityLabel="Dismiss expired invite"
+          >
+            {isDismissing
+              ? <ActivityIndicator size="small" color={colors.destructive} />
+              : <Feather name="x" size={14} color={colors.destructive} />}
+          </TouchableOpacity>
+        )}
+        <Badge
+          label={isExpired ? 'Expired' : isPending ? 'Invited' : roleLabel}
+          variant={isExpired ? 'warning' : isPending ? 'default' : m.role === 'owner' ? 'gold' : 'default'}
+        />
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScreenHeader title="Team Management" subtitle="Staff, permissions & tasks" />
@@ -169,63 +276,35 @@ export default function TeamScreen() {
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{ margin: 16 }} />
-        ) : members.length === 0 ? (
+        ) : currentMembers.length === 0 ? (
           <View style={{ padding: 20, alignItems: 'center' }}>
             <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>No team members yet. Invite someone to get started.</Text>
           </View>
         ) : (
-          members.map((m, i) => {
-            const color = avatarColor(i);
-            const ini   = initials(m.name ?? m.email ?? '?');
-            const isPending = m.status === 'pending';
-            const isExpired = isPending && !!m.expiresAt && new Date(m.expiresAt) < new Date();
-            const roleLabel = m.role === 'owner' ? 'Owner' : m.role === 'manager' ? 'Manager' : 'Staff';
-            const expLabel  = isPending ? expiryLabel(m.expiresAt) : null;
-            const accessLabel = isPending
-              ? `Invited ${m.invitedAt ? relTime(m.invitedAt) : ''}${expLabel ? ` · ${expLabel}` : ' · awaiting acceptance'}`
-              : m.role === 'owner' ? 'Full Access' : m.role === 'manager' ? 'Orders, Products, Inventory' : 'Fulfillment only';
-            const isRegenerating = regeneratingId === m.id;
-            return (
-              <TouchableOpacity
-                key={m.id}
-                activeOpacity={0.7}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(`/users?id=${m.id}` as never); }}
-                style={[styles.memberRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
-              >
-                <View style={styles.memberLeft}>
-                  <View style={[styles.avatar, { backgroundColor: color + '33' }]}>
-                    <Text style={[styles.avatarText, { color }]}>{ini}</Text>
-                  </View>
-                  {m.online && <View style={[styles.onlineDot, { backgroundColor: colors.success }]} />}
-                </View>
-                <View style={styles.memberInfo}>
-                  <Text style={[styles.memberName, { color: colors.foreground }]}>{m.name ?? m.email}</Text>
-                  <Text
-                    style={[styles.memberAccess, { color: isExpired ? '#B98A2E' : colors.mutedForeground }]}
-                    numberOfLines={1}
-                  >{accessLabel}</Text>
-                </View>
-                {isPending && (
-                  <TouchableOpacity
-                    onPress={() => isExpired ? handleRegenerate(m) : (m.inviteUrl ? copyLink(m.inviteUrl) : null)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    style={[styles.linkBtn, { borderColor: isExpired ? '#B98A2E44' : colors.border }]}
-                    disabled={isRegenerating}
-                  >
-                    {isRegenerating
-                      ? <ActivityIndicator size="small" color={colors.primary} />
-                      : <Feather name={isExpired ? 'refresh-cw' : 'link'} size={13} color={isExpired ? '#B98A2E' : colors.mutedForeground} />}
-                  </TouchableOpacity>
-                )}
-                <Badge
-                  label={isExpired ? 'Expired' : isPending ? 'Invited' : roleLabel}
-                  variant={isExpired ? 'warning' : isPending ? 'default' : m.role === 'owner' ? 'gold' : 'default'}
-                />
-              </TouchableOpacity>
-            );
-          })
+          currentMembers.map(renderMemberRow)
         )}
       </View>
+
+      {expiredInvites.length > 0 && (
+        <View style={[styles.expiredSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <TouchableOpacity
+            onPress={() => setShowExpired(value => !value)}
+            activeOpacity={0.7}
+            style={styles.expiredHeader}
+            accessibilityRole="button"
+            accessibilityLabel={`${showExpired ? 'Hide' : 'Show'} ${expiredInvites.length} expired invite${expiredInvites.length === 1 ? '' : 's'}`}
+          >
+            <View style={styles.expiredTitleRow}>
+              <Feather name="clock" size={15} color={colors.warning} />
+              <Text style={[styles.expiredTitle, { color: colors.foreground }]}>
+                Expired invites ({expiredInvites.length})
+              </Text>
+            </View>
+            <Feather name={showExpired ? 'chevron-up' : 'chevron-down'} size={17} color={colors.mutedForeground} />
+          </TouchableOpacity>
+          {showExpired && expiredInvites.map((member, index) => renderMemberRow(member, currentMembers.length + index))}
+        </View>
+      )}
 
       {/* Approval Workflows */}
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Approval Workflows</Text>
@@ -426,6 +505,11 @@ const styles = StyleSheet.create({
   memberName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   memberAccess: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
   linkBtn: { width: 28, height: 28, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  dismissBtn: { width: 28, height: 28, borderRadius: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  expiredSection: { borderRadius: 14, borderWidth: 1, marginBottom: 24, overflow: 'hidden' },
+  expiredHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
+  expiredTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  expiredTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   workflowRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14 },
   workflowLabel: { fontSize: 14, fontFamily: 'Inter_400Regular' },
   workflowVal: { fontSize: 13, fontFamily: 'Inter_500Medium' },

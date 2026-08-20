@@ -518,6 +518,17 @@ router.delete("/members/:id", requireRole("owner"), async (req, res) => {
     return;
   }
 
+  const [existing] = await db
+    .select()
+    .from(teamMembers)
+    .where(and(eq(teamMembers.id, id), eq(teamMembers.ownerId, ownerId)))
+    .limit(1);
+  if (!existing || existing.status === "removed") {
+    res.status(404).json({ error: "Member not found" });
+    return;
+  }
+  const wasExpiredInvite = existing.status === "pending" && isExpired(existing);
+
   const [removed] = await db
     .update(teamMembers)
     .set({ status: "removed", memberClerkId: null, inviteToken: null, updatedAt: new Date() })
@@ -531,7 +542,9 @@ router.delete("/members/:id", requireRole("owner"), async (req, res) => {
   const actor = reqActor(req);
   void logActivity(
     ownerId, actor.actorClerkId, actor.actorRole,
-    `Removed ${removed.name ?? removed.email} from the team`,
+    wasExpiredInvite
+      ? `Dismissed expired invite for ${removed.name ?? removed.email}`
+      : `Removed ${removed.name ?? removed.email} from the team`,
     "team", id,
   );
   res.json({ ok: true });
