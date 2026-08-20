@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
   BG, SURFACE, CARD, BORDER,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT,
@@ -17,6 +18,7 @@ import { Storefront, StoreSEO } from '@/services/storeTypes';
 
 export default function StoreSEOScreen() {
   const router = useRouter();
+  const headerTopInset = useHeaderTopInset();
   const [store, setStore] = useState<Storefront | null>(null);
   const [seo, setSeo] = useState<StoreSEO>({
     homepageTitle: '',
@@ -53,8 +55,12 @@ export default function StoreSEOScreen() {
 
   return (
     <View style={se.root}>
-      <View style={se.header}>
-        <TouchableOpacity onPress={() => router.back()} style={se.backBtn}>
+      <View style={[se.header, { paddingTop: headerTopInset + SP.sm }]}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={se.backBtn}
+          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+        >
           <Feather name="arrow-left" size={ICON.md} color={FG} />
         </TouchableOpacity>
         <Text style={se.headerTitle}>SEO</Text>

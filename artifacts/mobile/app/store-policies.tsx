@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
   BG, CARD, SURFACE, BORDER,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -35,6 +36,7 @@ const POLICY_TYPES: { type: PolicyType; label: string; icon: keyof typeof Feathe
 
 export default function StorePoliciesScreen() {
   const router = useRouter();
+  const headerTopInset = useHeaderTopInset();
   const api = useApi();
   const [policies, setPolicies] = useState<StorePolicy[]>([]);
   const [selectedType, setSelectedType] = useState<PolicyType | null>(null);
@@ -144,8 +146,8 @@ export default function StorePoliciesScreen() {
     const policyMeta = POLICY_TYPES.find(p => p.type === selectedType)!;
     return (
       <View style={[s.root, { backgroundColor: BG }]}>
-        <View style={[s.header, { borderBottomColor: BORDER }]}>
-          <TouchableOpacity onPress={closeEdit} style={s.backBtn}><Feather name="x" size={21} color={FG} /></TouchableOpacity>
+        <View style={[s.header, { borderBottomColor: BORDER, height: 56 + headerTopInset, paddingTop: headerTopInset }]}>
+          <TouchableOpacity onPress={closeEdit} style={s.backBtn} hitSlop={{ top: 2, bottom: 2, left: 2, right: 2 }}><Feather name="x" size={21} color={FG} /></TouchableOpacity>
           <Text style={[s.headerTitle, { color: FG }]}>{policyMeta.label}</Text>
           <TouchableOpacity onPress={handleSave} disabled={saving} style={[s.saveBtn, { backgroundColor: PURPLE, opacity: saving ? 0.6 : 1 }]}>
             {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.saveBtnText}>Save</Text>}
@@ -190,8 +192,8 @@ export default function StorePoliciesScreen() {
 
   return (
     <View style={[s.root, { backgroundColor: BG }]}>
-      <View style={[s.header, { borderBottomColor: BORDER }]}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}><Feather name="arrow-left" size={21} color={FG} /></TouchableOpacity>
+      <View style={[s.header, { borderBottomColor: BORDER, height: 56 + headerTopInset, paddingTop: headerTopInset }]}>
+        <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 2, bottom: 2, left: 2, right: 2 }}><Feather name="arrow-left" size={21} color={FG} /></TouchableOpacity>
         <Text style={[s.headerTitle, { color: FG }]}>Store policies</Text>
         <View style={{ width: 70 }} />
       </View>

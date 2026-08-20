@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
   BG, SURFACE, CARD, BORDER,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -57,6 +58,7 @@ function langLabel(code: string): string {
 
 export default function StoreSettingsScreen() {
   const router = useRouter();
+  const headerTopInset = useHeaderTopInset();
   const [form, setForm] = useState<StoreSettings>({
     storeName: '',
     storeUrl: '',
@@ -99,7 +101,7 @@ export default function StoreSettingsScreen() {
   return (
     <View style={ss.root}>
       {/* Header */}
-      <View style={ss.header}>
+      <View style={[ss.header, { paddingTop: headerTopInset + SP.sm }]}>
         <TouchableOpacity onPress={() => router.back()} style={ss.backBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Feather name="arrow-left" size={ICON.md} color={FG} />
         </TouchableOpacity>

@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
   BG, CARD, SURFACE, BORDER,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -25,6 +26,7 @@ const ERROR_ROUTES: Record<string, string> = {
 
 export default function StorePublishScreen() {
   const router = useRouter();
+  const headerTopInset = useHeaderTopInset();
   const [store, setStore] = useState<Storefront | null>(null);
   const [validation, setValidation] = useState<StoreValidationResult | null>(null);
   const [validating, setValidating] = useState(true);
@@ -95,8 +97,12 @@ export default function StorePublishScreen() {
 
   return (
     <View style={pub.root}>
-      <View style={pub.header}>
-        <TouchableOpacity onPress={() => router.back()} style={pub.backBtn}>
+      <View style={[pub.header, { paddingTop: headerTopInset + SP.sm }]}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={pub.backBtn}
+          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+        >
           <Feather name="arrow-left" size={ICON.md} color={FG} />
         </TouchableOpacity>
         <Text style={pub.headerTitle}>Publish Store</Text>

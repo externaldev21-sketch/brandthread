@@ -352,6 +352,11 @@ export default function SellerProfileScreen() {
     ) as never);
   }, [router, profile, params.id]);
 
+  const handleOpenInbox = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push((isOwner ? '/seller-inbox' : '/(buyer)/inbox') as never);
+  }, [isOwner, router]);
+
   const handleMoreOptions = useCallback(() => {
     const sellerId = params.id ?? profile.sellerId;
     Alert.alert(
@@ -400,9 +405,14 @@ export default function SellerProfileScreen() {
         <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()}>
           <Feather name="arrow-left" size={20} color={FG} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.headerBtn} onPress={handleShare}>
-          <Feather name="share" size={20} color={FG} />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.headerBtn} onPress={handleOpenInbox}>
+            <Feather name="message-circle" size={20} color={FG} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerBtn} onPress={handleShare}>
+            <Feather name="share" size={20} color={FG} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* ─── Main ScrollView ───────────────────────────────────────────────── */}
@@ -445,6 +455,12 @@ export default function SellerProfileScreen() {
                     onPress={() => router.push('/edit-profile' as never)}
                   >
                     <Text style={styles.outlineBtnText}>Edit Profile</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.outlineBtn}
+                    onPress={handleOpenInbox}
+                  >
+                    <Text style={styles.outlineBtnText}>Messages</Text>
                   </TouchableOpacity>
                   <LinearGradient
                     colors={[GREEN, '#00D4FF']}
@@ -841,6 +857,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 8,
   },
   headerBtn: {
     width: 40,

@@ -210,6 +210,10 @@ export default function ManufacturerProfileScreen() {
             <Feather name="message-circle" size={ICON.md} color={CYAN} />
             <Text style={[s.qaBtnLabel, { color: CYAN }]}>Message</Text>
           </TouchableOpacity>
+          <TouchableOpacity onPress={() => router.push('/manufacturer-hub?tab=messages' as never)} style={s.qaBtn} activeOpacity={0.8}>
+            <Feather name="inbox" size={ICON.md} color={PURPLE_LIGHT} />
+            <Text style={[s.qaBtnLabel, { color: PURPLE_LIGHT }]}>Messages</Text>
+          </TouchableOpacity>
           <TouchableOpacity onPress={handleQuote} style={s.qaBtn} activeOpacity={0.8}>
             <Feather name="file-text" size={ICON.md} color={PURPLE_LIGHT} />
             <Text style={[s.qaBtnLabel, { color: PURPLE_LIGHT }]}>Quote</Text>

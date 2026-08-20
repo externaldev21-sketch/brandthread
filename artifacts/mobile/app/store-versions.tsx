@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
   BG, CARD, SURFACE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT,
@@ -32,6 +33,7 @@ function formatDate(iso: string): string {
 
 export default function StoreVersionsScreen() {
   const router = useRouter();
+  const headerTopInset = useHeaderTopInset();
   const [versions, setVersions] = useState<StoreVersion[]>([]);
   const [creating, setCreating] = useState(false);
   const [newLabel, setNewLabel] = useState('');
@@ -81,8 +83,12 @@ export default function StoreVersionsScreen() {
 
   return (
     <View style={vs.root}>
-      <View style={vs.header}>
-        <TouchableOpacity onPress={() => router.back()} style={vs.backBtn}>
+      <View style={[vs.header, { paddingTop: headerTopInset + SP.sm }]}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={vs.backBtn}
+          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+        >
           <Feather name="arrow-left" size={ICON.md} color={FG} />
         </TouchableOpacity>
         <Text style={vs.headerTitle}>Version History</Text>

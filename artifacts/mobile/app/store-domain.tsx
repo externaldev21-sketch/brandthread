@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
   BG, CARD, SURFACE, BORDER,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -20,6 +21,7 @@ type MergedDomain = StoreDomain & { dnsToken?: string };
 
 export default function StoreDomainScreen() {
   const router = useRouter();
+  const headerTopInset = useHeaderTopInset();
   const api = useApi();
   const [domains, setDomains] = useState<MergedDomain[]>([]);
   const [adding, setAdding] = useState(false);
@@ -122,8 +124,12 @@ export default function StoreDomainScreen() {
 
   return (
     <View style={dm.root}>
-      <View style={dm.header}>
-        <TouchableOpacity onPress={() => router.back()} style={dm.backBtn}>
+      <View style={[dm.header, { paddingTop: headerTopInset + SP.sm }]}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={dm.backBtn}
+          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+        >
           <Feather name="arrow-left" size={ICON.md} color={FG} />
         </TouchableOpacity>
         <Text style={dm.headerTitle}>Domains</Text>

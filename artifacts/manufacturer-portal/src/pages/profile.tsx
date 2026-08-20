@@ -4,8 +4,9 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useRef } from "react";
-import { Save, Factory, CheckCircle2, Upload, X } from "lucide-react";
+import { Save, Factory, CheckCircle2, Upload, X, MessageSquare } from "lucide-react";
 import { useAuth } from "@clerk/react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -131,9 +132,17 @@ export default function Profile() {
           <h1 className="text-3xl font-bold tracking-tight">Business Profile</h1>
           <p className="text-muted-foreground mt-1">This is how your factory appears to verified buyers.</p>
         </div>
-        <div className="flex items-center gap-2 text-sm font-mono px-3 py-1.5 bg-secondary border border-border rounded text-muted-foreground">
-          <CheckCircle2 className="w-4 h-4 text-primary" />
-          Status: {profile?.status.toUpperCase()}
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline">
+            <Link href="/messages">
+              <MessageSquare className="w-4 h-4 mr-2" />
+              Messages
+            </Link>
+          </Button>
+          <div className="flex items-center gap-2 text-sm font-mono px-3 py-1.5 bg-secondary border border-border rounded text-muted-foreground">
+            <CheckCircle2 className="w-4 h-4 text-primary" />
+            Status: {profile?.status.toUpperCase()}
+          </div>
         </div>
       </div>
 

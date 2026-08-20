@@ -6,6 +6,7 @@ import {
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { Feather } from '@expo/vector-icons';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
   BG, CARD, SURFACE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -31,6 +32,7 @@ const FALLBACK_POSTS: SellerPost[] = [
 
 export default function StoreFromSocialScreen() {
   const router = useRouter();
+  const headerTopInset = useHeaderTopInset();
   const api = useApi();
   const [activeTab, setActiveTab] = useState<TabMode>('upload');
   const [screenshots, setScreenshots] = useState<string[]>([]);
@@ -144,8 +146,12 @@ export default function StoreFromSocialScreen() {
 
   return (
     <View style={ss.root}>
-      <View style={ss.header}>
-        <TouchableOpacity onPress={() => router.back()} style={ss.backBtn}>
+      <View style={[ss.header, { paddingTop: headerTopInset + SP.sm }]}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={ss.backBtn}
+          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+        >
           <Feather name="arrow-left" size={ICON.md} color={FG} />
         </TouchableOpacity>
         <Text style={ss.headerTitle}>Generate from Social</Text>

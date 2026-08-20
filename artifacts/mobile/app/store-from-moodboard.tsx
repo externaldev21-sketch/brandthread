@@ -7,6 +7,7 @@ import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Feather } from '@expo/vector-icons';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
   BG, CARD, SURFACE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -52,6 +53,7 @@ async function resizeToBase64(uri: string, maxPx = 800): Promise<string> {
 
 export default function StoreFromMoodboardScreen() {
   const router = useRouter();
+  const headerTopInset = useHeaderTopInset();
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [imageBase64s, setImageBase64s] = useState<string[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
@@ -114,8 +116,12 @@ export default function StoreFromMoodboardScreen() {
 
   return (
     <View style={mb.root}>
-      <View style={mb.header}>
-        <TouchableOpacity onPress={() => router.back()} style={mb.backBtn}>
+      <View style={[mb.header, { paddingTop: headerTopInset + SP.sm }]}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={mb.backBtn}
+          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+        >
           <Feather name="arrow-left" size={ICON.md} color={FG} />
         </TouchableOpacity>
         <Text style={mb.headerTitle}>Generate from Mood Board</Text>

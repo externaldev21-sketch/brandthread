@@ -46,6 +46,7 @@ const QUICK_ACTIONS: { icon: keyof typeof Feather.glyphMap; label: string; route
   { icon: 'tag',        label: 'Add Product',   route: '/add-product' },
   { icon: 'send',       label: 'New Campaign',  route: '/(tabs)/marketing' },
   { icon: 'user',       label: 'My Profile',    route: '/seller-profile?isOwner=true' },
+  { icon: 'message-circle', label: 'Messages',  route: '/seller-inbox' },
 ];
 
 const CONTENT_TABS = ['Posts', 'Drafts', 'Scheduled', 'Analytics'];

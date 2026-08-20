@@ -8,7 +8,7 @@ import {
   StyleSheet, Alert, Modal, Switch, RefreshControl, ActionSheetIOS, Platform,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
@@ -130,10 +130,15 @@ function productionStatusVariant(status: ProductionOrder['status']): 'success' |
 export default function ManufacturerHub() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState<Tab>('discover');
+  const { tab } = useLocalSearchParams<{ tab?: string }>();
+  const [activeTab, setActiveTab] = useState<Tab>(tab === 'messages' ? 'messages' : 'discover');
 
   const { hasPlan, loading: planLoading } = useSubscriptionPlan();
   const [upsellVisible, setUpsellVisible] = useState(false);
+
+  useEffect(() => {
+    if (tab === 'messages') setActiveTab('messages');
+  }, [tab]);
 
   // Show upsell immediately if the seller doesn't have Growth access
   useEffect(() => {

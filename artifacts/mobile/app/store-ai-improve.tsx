@@ -6,6 +6,7 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Feather } from '@expo/vector-icons';
+import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
   BG, CARD, SURFACE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -52,6 +53,7 @@ function categoryVariant(cat: StoreAISuggestion['category']): 'purple' | 'info' 
 
 export default function StoreAiImproveScreen() {
   const router = useRouter();
+  const headerTopInset = useHeaderTopInset();
   const [suggestions, setSuggestions] = useState<StoreAISuggestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState<Category>('all');
@@ -122,8 +124,12 @@ export default function StoreAiImproveScreen() {
 
   return (
     <View style={ai.root}>
-      <View style={ai.header}>
-        <TouchableOpacity onPress={() => router.back()} style={ai.backBtn}>
+      <View style={[ai.header, { paddingTop: headerTopInset + SP.sm }]}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={ai.backBtn}
+          hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
+        >
           <Feather name="arrow-left" size={ICON.md} color={FG} />
         </TouchableOpacity>
         <Text style={ai.headerTitle}>Improve Store</Text>

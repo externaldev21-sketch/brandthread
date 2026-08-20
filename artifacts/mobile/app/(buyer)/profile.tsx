@@ -336,11 +336,11 @@ export default function ProfileScreen() {
           <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/(buyer)/edit-profile')}>
             <Text style={styles.actionBtnText}>Edit Profile</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/(buyer)/inbox' as never)}>
+            <Text style={styles.actionBtnText}>Messages</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.actionBtn} onPress={handleShareProfile}>
             <Text style={styles.actionBtnText}>Share Profile</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionIconBtn} onPress={() => router.push('/buyer-friend-requests' as any)}>
-            <Feather name="user-plus" size={ICON.md} color={FG} />
           </TouchableOpacity>
         </View>
 

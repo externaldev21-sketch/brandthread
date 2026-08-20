@@ -204,6 +204,13 @@ export default function BuyerOtherProfileScreen() {
       >
         <Feather name="arrow-left" size={ICON.md} color={FG} />
       </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.inboxBtn, { top: insets.top + SP.md }]}
+        onPress={() => router.push('/(buyer)/inbox' as never)}
+      >
+        <Feather name="message-circle" size={ICON.sm} color={FG} />
+        <Text style={styles.inboxBtnText}>Messages</Text>
+      </TouchableOpacity>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}>
         {/* Cover gradient */}
@@ -333,6 +340,13 @@ const styles = StyleSheet.create({
     width: 40, height: 40, backgroundColor: 'rgba(7,7,15,0.7)',
     borderRadius: 20, alignItems: 'center', justifyContent: 'center',
   },
+  inboxBtn: {
+    position: 'absolute', right: SP.md, zIndex: 5,
+    height: 40, flexDirection: 'row', alignItems: 'center', gap: SP.xs,
+    paddingHorizontal: SP.sm, borderRadius: RADIUS.pill,
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+  },
+  inboxBtnText: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
   cover: { height: 180, width: '100%' },
   profileRow: {
     flexDirection: 'row', alignItems: 'flex-end',
