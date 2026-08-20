@@ -9,8 +9,9 @@ import {
   CYAN, CYAN_DIM, SUCCESS, RED, ORANGE, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useApi } from '@/lib/api';
-import { parseRoleError } from '@/lib/roleError';
+import { isManagerRole } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
+import { useTeamRole } from '@/hooks/useTeamRole';
 
 type PayoutStatus = 'paid' | 'pending' | 'in_transit' | 'failed';
 
@@ -47,7 +48,8 @@ export default function PayoutsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api    = useApi();
-  const [lockedRole, setLockedRole] = useState<string | null>(null);
+  const { currentRole, isLoadingRole } = useTeamRole();
+  const isReadOnly = isManagerRole(currentRole);
   const [activeTab, setActiveTab] = useState<'payouts' | 'settings'>('payouts');
   const [loading,   setLoading]   = useState(true);
   const [balance,   setBalance]   = useState<any>(null);
@@ -69,10 +71,8 @@ export default function PayoutsScreen() {
         bankLast4:  p.destination?.last4 ?? '····',
         ordersCount: 0,
       })));
-    } catch (err) {
-      const roleErr = parseRoleError(err);
-      if (roleErr) setLockedRole(roleErr.currentRole);
-      // else stay with empty state if not connected
+    } catch {
+      // Keep the empty state when payout data is unavailable.
     }
     setLoading(false);
   }, []);
@@ -89,7 +89,7 @@ export default function PayoutsScreen() {
     ? fmtDate(balance.nextPayout.arrivalDate)
     : '—';
 
-  if (lockedRole) {
+  if (isLoadingRole) {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <View style={styles.header}>
@@ -99,7 +99,24 @@ export default function PayoutsScreen() {
           <Text style={styles.headerTitle}>Payouts</Text>
           <View style={styles.backBtn} />
         </View>
-        <RoleLockedView screenTitle="payouts" currentRole={lockedRole} />
+        <View style={styles.accessLoading}>
+          <ActivityIndicator color={PURPLE} />
+        </View>
+      </View>
+    );
+  }
+
+  if (currentRole !== 'owner' && !isReadOnly) {
+    return (
+      <View style={[styles.root, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => { haptic(); router.back(); }} style={styles.backBtn}>
+            <Feather name="chevron-left" size={24} color={FG} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Payouts</Text>
+          <View style={styles.backBtn} />
+        </View>
+        <RoleLockedView screenTitle="payouts" currentRole={currentRole ?? undefined} />
       </View>
     );
   }
@@ -204,10 +221,12 @@ export default function PayoutsScreen() {
             ))}
           </View>
 
-          <TouchableOpacity style={styles.addBankBtn}>
-            <Feather name="plus" size={16} color={PURPLE} />
-            <Text style={styles.addBankText}>Add bank account</Text>
-          </TouchableOpacity>
+           {!isReadOnly && (
+             <TouchableOpacity style={styles.addBankBtn}>
+               <Feather name="plus" size={16} color={PURPLE} />
+               <Text style={styles.addBankText}>Add bank account</Text>
+             </TouchableOpacity>
+           )}
         </ScrollView>
       )}
     </View>
@@ -216,6 +235,7 @@ export default function PayoutsScreen() {
 
 const styles = StyleSheet.create({
   root:         { flex: 1, backgroundColor: BG },
+  accessLoading:{ flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
   backBtn:      { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { flex: 1, textAlign: 'center', color: FG, fontSize: FS.lg, fontFamily: FONT.semibold },

@@ -13,10 +13,12 @@ import { db } from "@workspace/db";
 import { users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { requireRole, teamContext } from "../middlewares/requireRole";
 import { stripe } from "../lib/stripe";
 
 const router = Router();
 router.use(requireAuth);
+router.use(teamContext());
 
 function getSellerId(req: any): string {
   return (req as any).clerkUserId as string;
@@ -40,7 +42,7 @@ function formatCents(cents: number, currency = "usd"): string {
 
 // ─── GET /api/finance/balance ─────────────────────────────────────────────────
 
-router.get("/balance", async (req, res) => {
+router.get("/balance", requireRole("manager"), async (req, res) => {
   const sellerId = getSellerId(req);
   try {
     const accountId = await getStripeAccount(sellerId);
@@ -93,7 +95,7 @@ router.get("/balance", async (req, res) => {
 
 // ─── GET /api/finance/payouts ─────────────────────────────────────────────────
 
-router.get("/payouts", async (req, res) => {
+router.get("/payouts", requireRole("manager"), async (req, res) => {
   const sellerId = getSellerId(req);
   const limit = Math.min(Number(req.query.limit) || 20, 100);
   try {
@@ -137,7 +139,7 @@ router.get("/payouts", async (req, res) => {
 
 // ─── GET /api/finance/transactions ───────────────────────────────────────────
 
-router.get("/transactions", async (req, res) => {
+router.get("/transactions", requireRole("manager"), async (req, res) => {
   const sellerId = getSellerId(req);
   const limit = Math.min(Number(req.query.limit) || 50, 100);
   const type  = req.query.type as string | undefined; // e.g. 'charge', 'payout', 'refund'
@@ -183,7 +185,7 @@ router.get("/transactions", async (req, res) => {
 
 // ─── GET /api/finance/statement.csv ──────────────────────────────────────────
 
-router.get("/statement.csv", async (req, res) => {
+router.get("/statement.csv", requireRole("owner"), async (req, res) => {
   const sellerId = getSellerId(req);
   try {
     const accountId = await getStripeAccount(sellerId);
@@ -224,7 +226,7 @@ router.get("/statement.csv", async (req, res) => {
 
 // ─── POST /api/finance/payout — manual instant payout ─────────────────────────
 
-router.post("/payout", async (req, res) => {
+router.post("/payout", requireRole("owner"), async (req, res) => {
   const sellerId = getSellerId(req);
   const { amount, currency = "usd" } = req.body;
 

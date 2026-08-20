@@ -25,8 +25,9 @@ import {
 } from '@/lib/theme';
 import { useApi } from '@/hooks/useApi';
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
-import { parseRoleError } from '@/lib/roleError';
+import { isManagerRole } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
+import { useTeamRole } from '@/hooks/useTeamRole';
 
 // ─── Static plan catalogue ────────────────────────────────────────────────────
 
@@ -111,7 +112,8 @@ export default function SubscriptionScreen() {
   const api    = useApi();
 
   const [activeTab,   setActiveTab]   = useState<'plan' | 'usage' | 'billing'>('plan');
-  const [lockedRole,  setLockedRole]  = useState<string | null>(null);
+  const { currentRole, isLoadingRole } = useTeamRole();
+  const isReadOnly = isManagerRole(currentRole);
   const [statusLoading, setStatusLoading] = useState(true);
   const [currentPlan, setCurrentPlan] = useState({
     name:               'Starter',
@@ -152,10 +154,7 @@ export default function SubscriptionScreen() {
           paymentMethodLabel: data.paymentMethodLabel,
         });
       })
-      .catch((err: unknown) => {
-        const roleErr = parseRoleError(err);
-        if (roleErr) setLockedRole(roleErr.currentRole);
-      })
+      .catch(() => {})
       .finally(() => setStatusLoading(false));
   }, [api]);
 
@@ -232,7 +231,7 @@ export default function SubscriptionScreen() {
     : currentPlan.status === 'canceled' ? 'Cancelled'
     : 'Free';
 
-  if (lockedRole) {
+  if (isLoadingRole) {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <View style={styles.header}>
@@ -242,7 +241,24 @@ export default function SubscriptionScreen() {
           <Text style={styles.headerTitle}>Subscription</Text>
           <View style={styles.backBtn} />
         </View>
-        <RoleLockedView screenTitle="subscription & billing" currentRole={lockedRole} />
+        <View style={styles.accessLoading}>
+          <ActivityIndicator color={PURPLE} />
+        </View>
+      </View>
+    );
+  }
+
+  if (currentRole !== 'owner' && !isReadOnly) {
+    return (
+      <View style={[styles.root, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => { haptic(); router.back(); }} style={styles.backBtn}>
+            <Feather name="chevron-left" size={24} color={FG} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Subscription</Text>
+          <View style={styles.backBtn} />
+        </View>
+        <RoleLockedView screenTitle="subscription & billing" currentRole={currentRole ?? undefined} />
       </View>
     );
   }
@@ -351,7 +367,7 @@ export default function SubscriptionScreen() {
                       </View>
                     ))}
                   </View>
-                  {!isCurrent && (
+                   {!isReadOnly && !isCurrent && (
                     <TouchableOpacity
                       style={[styles.changePlanBtn, plan.id === 'starter' && styles.changePlanBtnOutline]}
                       onPress={() => handleChangePlan(plan.id)}
@@ -365,9 +381,11 @@ export default function SubscriptionScreen() {
               );
             })}
 
-            <TouchableOpacity style={styles.cancelBtn} onPress={handleOpenPortal}>
-              <Text style={styles.cancelText}>Manage or cancel subscription</Text>
-            </TouchableOpacity>
+             {!isReadOnly && (
+               <TouchableOpacity style={styles.cancelBtn} onPress={handleOpenPortal}>
+                 <Text style={styles.cancelText}>Manage or cancel subscription</Text>
+               </TouchableOpacity>
+             )}
           </>
         )}
 
@@ -431,11 +449,13 @@ export default function SubscriptionScreen() {
                   </View>
                 </View>
 
-                <TouchableOpacity style={styles.manageBillingBtn} onPress={handleOpenPortal}>
-                  <Feather name="external-link" size={16} color={PURPLE} />
-                  <Text style={styles.manageBillingText}>Manage billing &amp; invoices</Text>
-                  <Feather name="chevron-right" size={16} color={MUTED} />
-                </TouchableOpacity>
+                 {!isReadOnly && (
+                   <TouchableOpacity style={styles.manageBillingBtn} onPress={handleOpenPortal}>
+                     <Feather name="external-link" size={16} color={PURPLE} />
+                     <Text style={styles.manageBillingText}>Manage billing &amp; invoices</Text>
+                     <Feather name="chevron-right" size={16} color={MUTED} />
+                   </TouchableOpacity>
+                 )}
               </>
             )}
           </>
@@ -447,6 +467,7 @@ export default function SubscriptionScreen() {
 
 const styles = StyleSheet.create({
   root:               { flex: 1, backgroundColor: BG },
+  accessLoading:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:             { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
   backBtn:            { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle:        { flex: 1, textAlign: 'center', color: FG, fontSize: FS.lg, fontFamily: FONT.semibold },

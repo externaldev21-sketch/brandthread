@@ -19,6 +19,7 @@
  * store they belong to. All mutations are owner-only.
  */
 import { Router } from "express";
+import { getAuth } from "@clerk/express";
 import { db, teamMembers, teamActivityLogs, users } from "@workspace/db";
 import { eq, and, ne, or, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -260,6 +261,11 @@ router.get("/my-membership", async (req, res) => {
 });
 
 router.use(teamContext());
+
+/** GET /api/team/context — resolved role for the active store context. */
+router.get("/context", (req, res) => {
+  res.json({ role: (req as any).actorRole ?? "owner" });
+});
 
 // POST /api/team/invite/accept/:token — link the signed-in caller to the invite
 async function handleAccept(req: any, res: any) {

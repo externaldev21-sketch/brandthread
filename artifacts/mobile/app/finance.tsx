@@ -6,9 +6,10 @@ import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
-import { parseRoleError } from '@/lib/roleError';
+import { isManagerRole } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import { PURPLE, CYAN, SUCCESS, ORANGE } from '@/lib/theme';
+import { useTeamRole } from '@/hooks/useTeamRole';
 
 function fmtCents(cents: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
@@ -31,7 +32,8 @@ export default function FinanceScreen() {
   const colors = useColors();
   const router = useRouter();
   const api = useApi();
-  const [lockedRole, setLockedRole] = useState<string | null>(null);
+  const { currentRole, isLoadingRole } = useTeamRole();
+  const isReadOnly = isManagerRole(currentRole);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [balance,      setBalance]      = useState<any>(null);
   const [loading,      setLoading]      = useState(true);
@@ -52,10 +54,8 @@ export default function FinanceScreen() {
       setBalance(bal);
       setTransactions(txs.transactions ?? []);
       if (sub) setSubStatus(sub as any);
-    } catch (err) {
-      const roleErr = parseRoleError(err);
-      if (roleErr) setLockedRole(roleErr.currentRole);
-      // else stay with empty if not connected
+    } catch {
+      // Keep the empty state when finance data is unavailable.
     }
     setLoading(false);
   }, []);
@@ -95,11 +95,29 @@ export default function FinanceScreen() {
     { label: 'Net Total',     value: fmtCents(Math.abs(totalNet)), positive: totalNet >= 0, highlight: true },
   ];
 
-  if (lockedRole) {
+  const documents = [
+    ...(!isReadOnly ? [{ label: 'Download Statement (CSV)', icon: 'file-text' as const, onPress: handleDownloadStatement }] : []),
+    { label: 'Tax Report / 1099-K', icon: 'percent' as const, onPress: () => router.push('/taxes-duties' as any) },
+    { label: 'Manufacturer PO', icon: 'shopping-cart' as const, onPress: undefined },
+    { label: 'Inventory Valuation', icon: 'package' as const, onPress: undefined },
+  ];
+
+  if (isLoadingRole) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ScreenHeader title="Finance" subtitle="P&L, cash flow & expenses" />
-        <RoleLockedView screenTitle="finance" currentRole={lockedRole} />
+        <View style={styles.accessLoading}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </View>
+    );
+  }
+
+  if (currentRole !== 'owner' && !isReadOnly) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ScreenHeader title="Finance" subtitle="P&L, cash flow & expenses" />
+        <RoleLockedView screenTitle="finance" currentRole={currentRole ?? undefined} />
       </View>
     );
   }
@@ -222,12 +240,7 @@ export default function FinanceScreen() {
       {/* Documents */}
       <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Documents</Text>
       <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {[
-          { label: 'Download Statement (CSV)', icon: 'file-text' as const, onPress: handleDownloadStatement },
-          { label: 'Tax Report / 1099-K', icon: 'percent' as const, onPress: () => router.push('/taxes-duties' as any) },
-          { label: 'Manufacturer PO', icon: 'shopping-cart' as const, onPress: undefined },
-          { label: 'Inventory Valuation', icon: 'package' as const, onPress: undefined },
-        ].map((item, i) => (
+        {documents.map((item, i) => (
           <TouchableOpacity key={item.label} onPress={item.onPress} activeOpacity={0.75} style={[styles.docRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
             <View style={[styles.docIcon, { backgroundColor: colors.secondary }]}>
               <Feather name={item.icon} size={15} color={colors.mutedForeground} />
@@ -244,6 +257,7 @@ export default function FinanceScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  accessLoading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   back: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
   backText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
   pageTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 4 },

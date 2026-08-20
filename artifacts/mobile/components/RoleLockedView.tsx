@@ -1,5 +1,5 @@
 /**
- * Shown when a team member (staff/manager) opens an owner-only screen.
+ * Shown when a staff team member opens an owner-only screen.
  * Renders a friendly explanation instead of an error or blank state.
  */
 import React from 'react';

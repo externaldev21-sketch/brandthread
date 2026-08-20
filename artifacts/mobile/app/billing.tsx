@@ -1,21 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, Linking, Share } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Linking, Share, ActivityIndicator } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
-import { parseRoleError } from '@/lib/roleError';
+import { isManagerRole } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
+import { useTeamRole } from '@/hooks/useTeamRole';
 
 type BillFilter = 'all' | 'paid' | 'unpaid';
-
-const BILLS = [
-  { id: '551015913', date: 'Jun 28, 2026', note: 'One-time charge incurred', amount: '$10.00', status: 'Paid' },
-  { id: '542433580', date: 'Jun 10, 2026', note: 'Billing cycle ended', amount: '$1.07', status: 'Paid' },
-  { id: '540395769', date: 'Jun 6, 2026', note: 'Billing cycle ended', amount: '$0.00', status: 'Paid' },
-];
 
 export default function BillingScreen() {
   const colors = useColors();
@@ -23,17 +18,44 @@ export default function BillingScreen() {
   const api = useApi();
   const [bannerVisible, setBannerVisible] = useState(true);
   const [filter, setFilter] = useState<BillFilter>('all');
-  const [lockedRole, setLockedRole] = useState<string | null>(null);
+  const { currentRole, isLoadingRole } = useTeamRole();
+  const [bills, setBills] = useState<Array<{
+    id: string; date: string; note: string; amount: string; status: 'Paid' | 'Unpaid';
+  }>>([]);
+  const [billingStatus, setBillingStatus] = useState({
+    amountCents: 0,
+    renewsOn: null as string | null,
+    trialEnd: null as string | null,
+    paymentMethodLabel: null as string | null,
+  });
+  const isReadOnly = isManagerRole(currentRole);
 
-  // Check role access on mount by calling an owner-only endpoint.
-  // Staff/manager will get 403 ROLE_REQUIRED immediately.
   useEffect(() => {
-    api.seller.subscription.status().catch((err: unknown) => {
-      const roleErr = parseRoleError(err);
-      if (roleErr) setLockedRole(roleErr.currentRole);
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    let active = true;
+    Promise.all([api.seller.subscription.status(), api.seller.subscription.invoices()])
+      .then(([status, invoiceData]) => {
+        if (!active) return;
+        setBillingStatus({
+          amountCents: status.amountCents,
+          renewsOn: status.renewsOn,
+          trialEnd: status.trialEnd,
+          paymentMethodLabel: status.paymentMethodLabel,
+        });
+        setBills(invoiceData.invoices.map((invoice) => ({
+          id: invoice.id,
+          date: new Date(invoice.created).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+          note: invoice.description,
+          amount: new Intl.NumberFormat('en-US', { style: 'currency', currency: invoice.currency.toUpperCase() }).format(invoice.amountCents / 100),
+          status: invoice.status === 'paid' ? 'Paid' : 'Unpaid',
+        })));
+      })
+      .catch(() => {
+        // The screen keeps its empty, non-actionable state if live billing data is unavailable.
+      });
+    return () => {
+      active = false;
+    };
+  }, [api]);
 
   function haptic() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -42,13 +64,8 @@ export default function BillingScreen() {
   async function openBillingPortal() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
-      const res = await fetch('/api/seller/subscription/portal', { method: 'POST' });
-      const data = await res.json();
-      if (data?.url) {
-        Linking.openURL(data.url);
-      } else {
-        router.push('/plan-details' as never);
-      }
+      const { url } = await api.seller.subscription.portal();
+      Linking.openURL(url);
     } catch {
       router.push('/plan-details' as never);
     }
@@ -56,20 +73,31 @@ export default function BillingScreen() {
 
   function exportBills() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const text = BILLS.map(b => `${b.date} — ${b.note}: ${b.amount} (${b.status})`).join('\n');
+    const text = bills.map(b => `${b.date} — ${b.note}: ${b.amount} (${b.status})`).join('\n');
     Share.share({ message: `Billing History\n\n${text}` });
   }
 
-  const filteredBills = BILLS.filter((b) => {
+  const filteredBills = bills.filter((b) => {
     if (filter === 'all') return true;
     return b.status.toLowerCase() === filter;
   });
 
-  if (lockedRole) {
+  if (isLoadingRole) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ScreenHeader title="Billing" />
-        <RoleLockedView screenTitle="billing" currentRole={lockedRole} />
+        <View style={styles.accessLoading}>
+          <ActivityIndicator color={colors.primary} />
+        </View>
+      </View>
+    );
+  }
+
+  if (currentRole !== 'owner' && !isReadOnly) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ScreenHeader title="Billing" />
+        <RoleLockedView screenTitle="billing" currentRole={currentRole ?? undefined} />
       </View>
     );
   }
@@ -78,11 +106,11 @@ export default function BillingScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScreenHeader
         title="Billing"
-        rightElement={
+        rightElement={!isReadOnly ? (
           <TouchableOpacity onPress={() => router.push('/plan-details' as never)} activeOpacity={0.7} style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name="more-horizontal" size={17} color={colors.foreground} />
           </TouchableOpacity>
-        }
+        ) : undefined}
       />
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
@@ -104,42 +132,65 @@ export default function BillingScreen() {
         <View style={styles.section}>
           <View style={styles.rowBetween}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Upcoming bill</Text>
-            <TouchableOpacity onPress={() => router.push('/plan-details' as never)} activeOpacity={0.7}>
-              <Text style={[styles.linkText, { color: colors.foreground }]}>View bill</Text>
-            </TouchableOpacity>
+            {!isReadOnly && (
+              <TouchableOpacity onPress={() => router.push('/plan-details' as never)} activeOpacity={0.7}>
+                <Text style={[styles.linkText, { color: colors.foreground }]}>View bill</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <View style={styles.priceRow}>
-            <Text style={[styles.price, { color: colors.foreground }]}>$0.00</Text>
+            <Text style={[styles.price, { color: colors.foreground }]}>
+              {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(billingStatus.amountCents / 100)}
+            </Text>
             <Text style={[styles.priceSuffix, { color: colors.mutedForeground }]}>USD</Text>
           </View>
-          <Text style={[styles.nextBillText, { color: colors.mutedForeground }]}>Next bill will be charged today</Text>
+          <Text style={[styles.nextBillText, { color: colors.mutedForeground }]}>
+            {billingStatus.trialEnd
+              ? `Free trial ends ${billingStatus.trialEnd}`
+              : billingStatus.renewsOn
+                ? `Next bill is due ${billingStatus.renewsOn}`
+                : 'No upcoming bill'}
+          </Text>
 
           <View style={[styles.infoBox, { backgroundColor: colors.primary + '12' }]}>
             <Feather name="info" size={15} color={colors.primary} style={{ marginTop: 2 }} />
             <View style={{ flex: 1 }}>
               <Text style={[styles.infoText, { color: colors.foreground }]}>$20.00 in discounts may apply to relevant charges on your next bill.</Text>
-              <TouchableOpacity onPress={() => router.push('/plan-details' as never)} activeOpacity={0.7}>
-                <Text style={[styles.infoLink, { color: colors.primary }]}>View breakdown</Text>
-              </TouchableOpacity>
+              {!isReadOnly && (
+                <TouchableOpacity onPress={() => router.push('/plan-details' as never)} activeOpacity={0.7}>
+                  <Text style={[styles.infoLink, { color: colors.primary }]}>View breakdown</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
-          <TouchableOpacity onPress={() => openBillingPortal()} activeOpacity={0.7} style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.cardBrand}>
-              <Feather name="credit-card" size={18} color="#FFFFFF" />
+          {isReadOnly ? (
+            <View style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.cardBrand}>
+                <Feather name="credit-card" size={18} color="#FFFFFF" />
+              </View>
+              <Text style={[styles.cardText, { color: colors.foreground }]}>{billingStatus.paymentMethodLabel ?? 'No payment method on file'}</Text>
             </View>
-            <Text style={[styles.cardText, { color: colors.foreground }]}>Mastercard •••• 1870</Text>
-            <Feather name="edit-2" size={16} color={colors.mutedForeground} />
-          </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={() => openBillingPortal()} activeOpacity={0.7} style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={styles.cardBrand}>
+                <Feather name="credit-card" size={18} color="#FFFFFF" />
+              </View>
+              <Text style={[styles.cardText, { color: colors.foreground }]}>{billingStatus.paymentMethodLabel ?? 'No payment method on file'}</Text>
+              <Feather name="edit-2" size={16} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          )}
         </View>
 
-        <View style={[styles.noteBar, { backgroundColor: colors.secondary }]}>
-          <Text style={[styles.noteText, { color: colors.mutedForeground }]}>
-            To make changes to your plan,{' '}
-            <Text style={{ textDecorationLine: 'underline' }} onPress={() => router.push('/plan-details' as never)}>visit plan settings</Text>
-          </Text>
-        </View>
+        {!isReadOnly && (
+          <View style={[styles.noteBar, { backgroundColor: colors.secondary }]}>
+            <Text style={[styles.noteText, { color: colors.mutedForeground }]}>
+              To make changes to your plan,{' '}
+              <Text style={{ textDecorationLine: 'underline' }} onPress={() => router.push('/plan-details' as never)}>visit plan settings</Text>
+            </Text>
+          </View>
+        )}
 
         <View style={styles.section}>
           <View style={styles.rowBetween}>
@@ -173,25 +224,32 @@ export default function BillingScreen() {
           </View>
 
           <View style={[styles.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {filteredBills.map((bill, i) => (
-              <TouchableOpacity
-                key={bill.id}
-                onPress={() => router.push('/plan-details' as never)}
-                activeOpacity={0.7}
-                style={[styles.billRow, i !== filteredBills.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.billId, { color: colors.foreground }]}>Bill #{bill.id}</Text>
-                  <Text style={[styles.billNote, { color: colors.mutedForeground }]}>{bill.date} · {bill.note}</Text>
-                </View>
-                <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                  <Text style={[styles.billAmount, { color: colors.foreground }]}>{bill.amount}</Text>
-                  <View style={[styles.statusPill, { backgroundColor: colors.success + '26' }]}>
-                    <Text style={[styles.statusText, { color: colors.success }]}>{bill.status}</Text>
+            {filteredBills.length === 0 ? (
+              <View style={styles.emptyBills}>
+                <Text style={[styles.billNote, { color: colors.mutedForeground }]}>No bills yet</Text>
+              </View>
+            ) : (
+              filteredBills.map((bill, i) => (
+                <TouchableOpacity
+                  key={bill.id}
+                  onPress={() => router.push('/plan-details' as never)}
+                  disabled={isReadOnly}
+                  activeOpacity={0.7}
+                  style={[styles.billRow, i !== filteredBills.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border }]}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.billId, { color: colors.foreground }]}>Bill #{bill.id}</Text>
+                    <Text style={[styles.billNote, { color: colors.mutedForeground }]}>{bill.date} · {bill.note}</Text>
                   </View>
-                </View>
-              </TouchableOpacity>
-            ))}
+                  <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                    <Text style={[styles.billAmount, { color: colors.foreground }]}>{bill.amount}</Text>
+                    <View style={[styles.statusPill, { backgroundColor: bill.status === 'Paid' ? colors.success + '26' : colors.destructive + '26' }]}>
+                      <Text style={[styles.statusText, { color: bill.status === 'Paid' ? colors.success : colors.destructive }]}>{bill.status}</Text>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
           </View>
 
           <View style={styles.pagerRow}>
@@ -210,6 +268,7 @@ export default function BillingScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  accessLoading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   headerBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   banner: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1 },
   bannerTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginBottom: 4 },
@@ -236,6 +295,7 @@ const styles = StyleSheet.create({
   filterTabText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   iconBtn: { width: 34, height: 34, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   listCard: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
+  emptyBills: { padding: 18, alignItems: 'center' },
   billRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, gap: 10 },
   billId: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   billNote: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },

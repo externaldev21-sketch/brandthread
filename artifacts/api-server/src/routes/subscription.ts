@@ -20,10 +20,12 @@ import { Router } from "express";
 import { db, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { requireRole, teamContext } from "../middlewares/requireRole";
 import { requireStripe } from "../lib/stripe";
 
 const router = Router();
 router.use(requireAuth);
+router.use(teamContext());
 
 // ─── Plan catalogue (server-side source of truth) ─────────────────────────────
 
@@ -109,7 +111,7 @@ async function ensureCustomer(stripe: any, clerkUserId: string): Promise<string>
  * trial end date, and payment method label.
  * If no subscription exists, returns starter/none.
  */
-router.get("/status", async (req, res) => {
+router.get("/status", requireRole("manager"), async (req, res) => {
   try {
     const stripe = requireStripe();
     const clerkUserId = (req as any).clerkUserId as string;
@@ -180,6 +182,48 @@ router.get("/status", async (req, res) => {
 });
 
 /**
+ * GET /api/seller/subscription/invoices
+ * Returns a minimal invoice history for owners and managers. Invoice URLs and
+ * payment-management links remain owner-only through the billing portal.
+ */
+router.get("/invoices", requireRole("manager"), async (req, res) => {
+  try {
+    const stripe = requireStripe();
+    const clerkUserId = (req as any).clerkUserId as string;
+    const [user] = await db
+      .select({ stripeCustomerId: users.stripeCustomerId })
+      .from(users)
+      .where(eq(users.clerkId, clerkUserId))
+      .limit(1);
+
+    if (!user?.stripeCustomerId) {
+      res.json({ invoices: [] });
+      return;
+    }
+
+    const result = await stripe.invoices.list({ customer: user.stripeCustomerId, limit: 50 });
+    res.json({
+      invoices: result.data.map((invoice) => ({
+        id:          invoice.id,
+        created:     new Date(invoice.created * 1000).toISOString(),
+        description: invoice.description ?? "Subscription invoice",
+        amountCents: invoice.amount_paid || invoice.amount_due,
+        currency:    invoice.currency,
+        status:      invoice.status === "paid" ? "paid" : "unpaid",
+      })),
+    });
+  } catch (err: any) {
+    const status = err.status ?? 500;
+    if (status < 500) {
+      res.status(status).json({ error: err.message });
+      return;
+    }
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch invoice history" });
+  }
+});
+
+/**
  * POST /api/seller/subscription/checkout
  * Body: { planId: 'starter' | 'growth' | 'scale' }
  *
@@ -191,7 +235,7 @@ router.get("/status", async (req, res) => {
  *   trial auto-converts to paid on day 6.
  * Returns { url } for redirect or { updated: true } for in-place update.
  */
-router.post("/checkout", async (req, res) => {
+router.post("/checkout", requireRole("owner"), async (req, res) => {
   try {
     const stripe = requireStripe();
     const clerkUserId = (req as any).clerkUserId as string;
@@ -272,7 +316,7 @@ router.post("/checkout", async (req, res) => {
  * payment method, view invoices, and cancel their subscription.
  * Returns { url }.
  */
-router.post("/portal", async (req, res) => {
+router.post("/portal", requireRole("owner"), async (req, res) => {
   try {
     const stripe = requireStripe();
     const clerkUserId = (req as any).clerkUserId as string;

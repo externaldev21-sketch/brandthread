@@ -176,6 +176,11 @@ export function createApi(getToken: GetToken) {
       get:     (id: string)             => get(`/api/drops/${id}`),
       create:  (body: unknown)          => post('/api/drops', body),
       update:  (id: string, body: unknown) => patch(`/api/drops/${id}`, body),
+      /** Send a push broadcast to followers when a drop goes live. */
+      broadcast: (dropId: string) =>
+        post<{ ok: boolean; sent: number; errors: number; followers: number }>(
+          `/api/drops/${encodeURIComponent(dropId)}/broadcast`, {}
+        ),
     },
     analytics: {
       dashboard:  () => get('/api/analytics/dashboard'),
@@ -527,6 +532,17 @@ export function createApi(getToken: GetToken) {
           amountCents: number;        // monthly charge in cents (0 for starter)
           paymentMethodLabel: string | null; // e.g. "Visa ···4242"
         }>('/api/seller/subscription/status'),
+        /** Read-only invoice summaries for the active seller store. */
+        invoices: () => get<{
+          invoices: Array<{
+            id: string;
+            created: string;
+            description: string;
+            amountCents: number;
+            currency: string;
+            status: 'paid' | 'unpaid';
+          }>;
+        }>('/api/seller/subscription/invoices'),
         /** Create a Stripe Checkout Session in subscription mode.
          *  Returns { url } for the mobile client to open in the system browser. */
         checkout: (planId: 'starter' | 'growth' | 'scale') =>
@@ -815,6 +831,8 @@ export function createApi(getToken: GetToken) {
       remove:    (memberId: string) => del<any>(`/api/team/members/${encodeURIComponent(memberId)}`),
       roles:     () => get<any[]>('/api/team/roles'),
       roleMembers: (role: string) => get<any[]>(`/api/team/roles/${encodeURIComponent(role)}/members`),
+      /** Resolves the caller's permission tier for the active store context. */
+      context: () => get<{ role: 'owner' | 'manager' | 'staff' }>('/api/team/context'),
       /** Returns the caller's active membership in another seller's store (null if none).
        *  Used by the store switcher: if non-null the user can toggle between their own
        *  store and the store they joined. */
@@ -1006,13 +1024,6 @@ export function createApi(getToken: GetToken) {
       complete:    (id: string) => patch<{ job: FreelancerJob; payout: { amountCents: number; transferId: string | null } }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/complete`, {}),
       cancel:      (id: string) => patch<{ job: FreelancerJob }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/cancel`, {}),
       syncPayment: (id: string) => post<{ job: FreelancerJob; paymentStatus: string }>(`/api/freelancer-jobs/${encodeURIComponent(id)}/sync-payment`, {}),
-    },
-    /** Drop broadcast — send push to all followers when a drop goes live. */
-    drops: {
-      broadcast: (dropId: string) =>
-        post<{ ok: boolean; sent: number; errors: number; followers: number }>(
-          `/api/drops/${encodeURIComponent(dropId)}/broadcast`, {}
-        ),
     },
   };
 }

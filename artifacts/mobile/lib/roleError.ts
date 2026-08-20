@@ -5,11 +5,22 @@
  * requireRole.ts body: { code: "ROLE_REQUIRED", requiredRole, currentRole, message }
  */
 
+export type TeamRole = 'owner' | 'manager' | 'staff';
+
 export interface RoleError {
   code: 'ROLE_REQUIRED';
   requiredRole: string;
   currentRole: string;
   message: string;
+}
+
+export function isTeamRole(role: unknown): role is TeamRole {
+  return role === 'owner' || role === 'manager' || role === 'staff';
+}
+
+/** Managers can inspect billing data but cannot change owner-only settings. */
+export function isManagerRole(role?: string | null): boolean {
+  return role === 'manager';
 }
 
 /**

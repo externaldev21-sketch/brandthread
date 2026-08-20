@@ -127,7 +127,7 @@ router.use("/buyer/notifications",       notificationsFeedRouter);
 router.use("/buyer",                     buyerRouter);
 router.use("/conversations",             conversationsRouter);
 router.use("/seller/connect",            requireRole("owner"), connectRouter);      // payouts: owner only; requireRole resolves tc internally
-router.use("/seller/subscription",       requireRole("owner"), subscriptionRouter); // billing: owner only; requireRole resolves tc internally
+router.use("/seller/subscription",       subscriptionRouter); // router applies manager reads and owner mutations after team context
 router.use("/seller/verification",       tc, sellerVerificationRouter);
 router.use("/seller",                    tc, sellerProfileRouter);
 router.use("/reviews",                   tc, reviewsRouter);
@@ -141,7 +141,7 @@ router.use("/returns",                   tc, returnsRouter);
 router.use("/sample-orders",             tc, sampleOrdersRouter);
 router.use("/drop-wallets",              tc, dropWalletRouter);
 router.use("/disputes",                  tc, disputesRouter);
-router.use("/finance",                   requireRole("owner"), financeRouter);      // payouts: owner only; requireRole resolves tc internally
+router.use("/finance",                   financeRouter); // router applies manager reads and owner mutations after team context
 router.use("/taxes",                     tc, taxesRouter);
 router.use("/team",                      teamRouter);
 router.use("/store/ai",                  tc, storeAiRouter);
