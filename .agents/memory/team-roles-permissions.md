@@ -32,10 +32,10 @@ description: Team member invites, role tiers (owner/manager/staff), API role enf
 - Don't gate a public screen's initial render on Clerk `isLoaded` — only gate the auth-dependent action buttons, or cold web boots sit on a spinner.
 - Screens: team.tsx (invite modal → copy/share link, pending 'Invited' badges, server `online` flag, paginated audit log), roles.tsx (3 tiers → `/users?role=`), users.tsx (`?id=` detail with change-role/remove, `?role=` filtered list).
 
-## Read-only financial access
-- Managers can read subscription status and invoice summaries plus finance balances, transactions, and payouts; billing portal, subscription changes, statements, and payouts remain owner-only.
-- **Why:** a client cannot safely infer that someone is a manager from a deliberately denied summary request. The active-store role must be resolved separately so controls stay read-only even when data loading fails.
-- **How to apply:** use the team context response for UI access state, and put team context plus a per-route `manager` or `owner` gate inside financial routers. Do not put one broad owner gate around a mixed read/write router.
+## Owner-only financial access
+- Store subscription, Stripe Connect, balances, transactions, invoices, statements, and payout data are owner-only. Managers and staff must be denied in a joined-store context even after owner-id rewriting.
+- **Why:** financial details and Stripe account identifiers belong to the store owner; rewriting the data scope must never be mistaken for rewriting the caller's authority.
+- **How to apply:** resolve team context, then authorize from the preserved actor role. Every financial read and mutation must require owner; test joined-store requests for both manager and staff roles.
 
 ## Verifying expo-web captures
 - Screenshot captures grab the first paint; in-flight fetches show as spinners even when the wiring is correct. Correlate with api-server request logs — a logged 404/401 (or `request aborted` when the capture browser closes) proves the call fired and settled. Don't chase capture-only spinners.

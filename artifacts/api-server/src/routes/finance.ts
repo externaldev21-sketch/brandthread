@@ -42,7 +42,9 @@ function formatCents(cents: number, currency = "usd"): string {
 
 // ─── GET /api/finance/balance ─────────────────────────────────────────────────
 
-router.get("/balance", requireRole("manager"), async (req, res) => {
+// Finance data is owner-only: a joined-store member must not infer balances,
+// payouts, fees, or account status after teamContext rewrites the store owner.
+router.get("/balance", requireRole("owner"), async (req, res) => {
   const sellerId = getSellerId(req);
   try {
     const accountId = await getStripeAccount(sellerId);
@@ -95,7 +97,7 @@ router.get("/balance", requireRole("manager"), async (req, res) => {
 
 // ─── GET /api/finance/payouts ─────────────────────────────────────────────────
 
-router.get("/payouts", requireRole("manager"), async (req, res) => {
+router.get("/payouts", requireRole("owner"), async (req, res) => {
   const sellerId = getSellerId(req);
   const limit = Math.min(Number(req.query.limit) || 20, 100);
   try {
@@ -139,7 +141,7 @@ router.get("/payouts", requireRole("manager"), async (req, res) => {
 
 // ─── GET /api/finance/transactions ───────────────────────────────────────────
 
-router.get("/transactions", requireRole("manager"), async (req, res) => {
+router.get("/transactions", requireRole("owner"), async (req, res) => {
   const sellerId = getSellerId(req);
   const limit = Math.min(Number(req.query.limit) || 50, 100);
   const type  = req.query.type as string | undefined; // e.g. 'charge', 'payout', 'refund'

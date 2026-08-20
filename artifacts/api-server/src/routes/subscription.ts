@@ -110,8 +110,11 @@ async function ensureCustomer(stripe: any, clerkUserId: string): Promise<string>
  * Returns the seller's current plan, subscription status, renewal date,
  * trial end date, and payment method label.
  * If no subscription exists, returns starter/none.
+ *
+ * Billing data belongs to the store owner. In particular, team-context
+ * rewrites must not let a member inspect another store's payment details.
  */
-router.get("/status", requireRole("manager"), async (req, res) => {
+router.get("/status", requireRole("owner"), async (req, res) => {
   try {
     const stripe = requireStripe();
     const clerkUserId = (req as any).clerkUserId as string;
@@ -183,10 +186,10 @@ router.get("/status", requireRole("manager"), async (req, res) => {
 
 /**
  * GET /api/seller/subscription/invoices
- * Returns a minimal invoice history for owners and managers. Invoice URLs and
- * payment-management links remain owner-only through the billing portal.
+ * Returns a minimal invoice history for the store owner. Invoice and payment
+ * details must never be exposed through a joined-store team context.
  */
-router.get("/invoices", requireRole("manager"), async (req, res) => {
+router.get("/invoices", requireRole("owner"), async (req, res) => {
   try {
     const stripe = requireStripe();
     const clerkUserId = (req as any).clerkUserId as string;
