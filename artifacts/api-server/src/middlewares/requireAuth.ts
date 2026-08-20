@@ -23,6 +23,15 @@ const PLAN_ORDER: Record<string, number> = {
 };
 
 /**
+ * TEMPORARY TESTING SWITCH
+ *
+ * Allows authenticated sellers to explore plan-gated product areas without a
+ * paid subscription. It deliberately does not bypass Clerk authentication,
+ * role checks, or any non-subscription authorization. Set false before release.
+ */
+const TEMPORARILY_UNLOCK_ALL_SUBSCRIPTION_FEATURES_FOR_TESTING = true;
+
+/**
  * Middleware factory that enforces a minimum subscription plan.
  * Apply AFTER requireAuth (or standalone — it re-reads Clerk auth internally).
  *
@@ -34,6 +43,11 @@ export function requirePlan(minPlan: "growth" | "pro") {
     const { userId } = getAuth(req);
     if (!userId) {
       res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    if (TEMPORARILY_UNLOCK_ALL_SUBSCRIPTION_FEATURES_FOR_TESTING) {
+      next();
       return;
     }
 

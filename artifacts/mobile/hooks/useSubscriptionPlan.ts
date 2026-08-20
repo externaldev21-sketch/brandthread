@@ -15,6 +15,15 @@ import { useApi } from '@/lib/api';
 
 export type PlanId = 'starter' | 'growth' | 'pro';
 
+/**
+ * TEMPORARY TESTING SWITCH
+ *
+ * Keep this true while the team is exploring the full product without paid
+ * subscriptions. Set it to false before release to restore normal plan gates.
+ * Billing, plan status, and checkout continue to use the seller's real plan.
+ */
+export const TEMPORARILY_UNLOCK_ALL_SUBSCRIPTION_FEATURES_FOR_TESTING = true;
+
 // ─── Module-level state shared across all hook instances ──────────────────────
 
 /** Cached plan — null means not yet loaded. */
@@ -110,6 +119,8 @@ export function useSubscriptionPlan() {
 
   /** True if the user's plan meets or exceeds `minPlan`. */
   function hasPlan(minPlan: PlanId): boolean {
+    if (TEMPORARILY_UNLOCK_ALL_SUBSCRIPTION_FEATURES_FOR_TESTING) return true;
+
     const order: Record<PlanId, number> = { starter: 0, growth: 1, pro: 2 };
     return (order[plan ?? 'starter'] ?? 0) >= (order[minPlan] ?? 1);
   }
