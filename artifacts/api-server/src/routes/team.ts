@@ -25,6 +25,11 @@ import { eq, and, ne, or, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext, requireRole } from "../middlewares/requireRole";
 import { logActivity, reqActor } from "../lib/activityLog";
+import {
+  inviteUrls,
+  resetTeamInviteReminderTracking,
+  sendTeamInviteEmail,
+} from "../lib/teamInvites";
 import crypto from "crypto";
 
 const router = Router();
@@ -61,17 +66,6 @@ const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 const isUuid = (s: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
-
-/** Shareable invite links: web URL (expo web serves the domain root) + native deep link. */
-function inviteUrls(token: string) {
-  const domain =
-    process.env.REPLIT_DOMAINS?.split(",")[0] ?? process.env.REPLIT_DEV_DOMAIN ?? "";
-  const deepLink = `mobile://team-invite?token=${token}`;
-  return {
-    inviteUrl: domain ? `https://${domain}/team-invite?token=${token}` : deepLink,
-    deepLink,
-  };
-}
 
 /**
  * Returns true when an invite token is expired.
@@ -139,34 +133,6 @@ async function ownerRow(ownerClerkId: string, viewerIsOwner: boolean) {
     online: viewerIsOwner, // the owner is online when they're the one looking
     isOwner: true,
   };
-}
-
-/** Best-effort invite email via Resend when the integration is configured. */
-async function trySendInviteEmail(
-  to: string,
-  ownerName: string,
-  role: string,
-  inviteUrl: string,
-): Promise<boolean> {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) return false;
-  try {
-    const r = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: process.env.RESEND_FROM_EMAIL ?? "Brandthread <onboarding@resend.dev>",
-        to: [to],
-        subject: `${ownerName} invited you to join their team on Brandthread`,
-        html: `<p>${ownerName} invited you to join their Brandthread team as <b>${role}</b>.</p><p><a href="${inviteUrl}">Accept the invite</a></p><p>Or paste this link into your browser:<br/>${inviteUrl}</p>`,
-      }),
-    });
-    if (!r.ok) console.error("[team] Resend email failed:", r.status, await r.text());
-    return r.ok;
-  } catch (err) {
-    console.error("[team] Resend email failed:", err);
-    return false;
-  }
 }
 
 // ─── Public routes (no auth) ──────────────────────────────────────────────────
@@ -436,6 +402,7 @@ router.post("/invite", requireRole("owner"), async (req, res) => {
         memberClerkId: null,
         acceptedAt: null,
         invitedAt: new Date(),
+        ...resetTeamInviteReminderTracking(),
         ...(name ? { name } : {}),
         updatedAt: new Date(),
       },
@@ -451,7 +418,7 @@ router.post("/invite", requireRole("owner"), async (req, res) => {
   );
 
   const ownerName = ownerUser?.brandName ?? ownerUser?.displayName ?? ownerUser?.name ?? "A Brandthread seller";
-  const emailSent = await trySendInviteEmail(normEmail, ownerName, role, inviteUrl);
+  const emailSent = await sendTeamInviteEmail(normEmail, ownerName, role, inviteUrl);
 
   res.json({ ok: true, member: decorateMember(member, true), inviteToken, inviteUrl, deepLink, emailSent });
 });
@@ -477,7 +444,13 @@ router.post("/invite/:id/regenerate", requireRole("owner"), async (req, res) => 
   const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
   const [updated] = await db
     .update(teamMembers)
-    .set({ inviteToken, expiresAt, invitedAt: new Date(), updatedAt: new Date() })
+    .set({
+      inviteToken,
+      expiresAt,
+      invitedAt: new Date(),
+      ...resetTeamInviteReminderTracking(),
+      updatedAt: new Date(),
+    })
     .where(eq(teamMembers.id, id))
     .returning();
   if (!updated) {

@@ -39,3 +39,8 @@ description: Team member invites, role tiers (owner/manager/staff), API role enf
 
 ## Verifying expo-web captures
 - Screenshot captures grab the first paint; in-flight fetches show as spinners even when the wiring is correct. Correlate with api-server request logs — a logged 404/401 (or `request aborted` when the capture browser closes) proves the call fired and settled. Don't chase capture-only spinners.
+
+## Expiring invite reminders
+- Reminder delivery uses a recoverable short lease plus a durable successful-send timestamp, and retries carry a deterministic Resend idempotency key derived from the invite and its current token.
+- **Why:** email delivery and database persistence cannot be committed atomically; a crash after either step must neither permanently suppress a reminder nor send a duplicate.
+- **How to apply:** any retryable Resend email with a once-only promise needs its own event-specific idempotency key. Regenerating an invite must clear both reminder fields so the new token is eligible independently.

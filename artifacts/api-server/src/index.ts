@@ -2,6 +2,7 @@ import app from "./app";
 import { logger } from "./lib/logger";
 import { startAbandonedCartJob } from "./jobs/abandonedCartRecovery";
 import { startTrendingJob }       from "./jobs/computeTrending";
+import { startTeamInviteReminderJob } from "./jobs/teamInviteReminder";
 import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
 
 const rawPort = process.env["PORT"];
@@ -35,4 +36,5 @@ app.listen(port, (err) => {
   // Background jobs
   startAbandonedCartJob();
   startTrendingJob();
+  startTeamInviteReminderJob();
 });
