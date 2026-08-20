@@ -33,6 +33,7 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ONBOARDING_KEY } from './_layout';
 import { useApi } from '@/lib/api';
+import { parseRoleError } from '@/lib/roleError';
 import {
   BG, CARD, BORDER, FG, MUTED, PURPLE, CYAN, SUCCESS, ORANGE,
   FONT, FS, SP, RADIUS,
@@ -227,6 +228,10 @@ export default function PlansScreen() {
       // setLoadingId stays set until AppState fires on return
     } catch (e: any) {
       setLoadingId(null);
+      if (parseRoleError(e)) {
+        Alert.alert('Only the store owner can do this');
+        return;
+      }
       Alert.alert(
         'Could not start checkout',
         e?.message ?? 'Please check your connection and try again.',

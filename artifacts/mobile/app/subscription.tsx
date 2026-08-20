@@ -25,7 +25,7 @@ import {
 } from '@/lib/theme';
 import { useApi } from '@/hooks/useApi';
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
-import { isManagerRole } from '@/lib/roleError';
+import { isManagerRole, parseRoleError } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import { useTeamRole } from '@/hooks/useTeamRole';
 
@@ -201,6 +201,10 @@ export default function SubscriptionScreen() {
       portalOpenedRef.current = true;
       Linking.openURL(url);
     } catch (e: any) {
+      if (parseRoleError(e)) {
+        Alert.alert('Only the store owner can do this');
+        return;
+      }
       Alert.alert('Checkout error', e?.message ?? 'Could not start checkout. Please try again.');
     }
   }
@@ -212,6 +216,10 @@ export default function SubscriptionScreen() {
       portalOpenedRef.current = true;
       Linking.openURL(url);
     } catch (e: any) {
+      if (parseRoleError(e)) {
+        Alert.alert('Only the store owner can do this');
+        return;
+      }
       Alert.alert('Portal error', e?.message ?? 'Could not open billing portal. Please try again.');
     }
   }

@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Linking, Share, ActivityIndicator } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Linking, Share, ActivityIndicator, Alert } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
-import { isManagerRole } from '@/lib/roleError';
+import { isManagerRole, parseRoleError } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import { useTeamRole } from '@/hooks/useTeamRole';
 
@@ -66,7 +66,11 @@ export default function BillingScreen() {
     try {
       const { url } = await api.seller.subscription.portal();
       Linking.openURL(url);
-    } catch {
+    } catch (error) {
+      if (parseRoleError(error)) {
+        Alert.alert('Only the store owner can do this');
+        return;
+      }
       router.push('/plan-details' as never);
     }
   }
