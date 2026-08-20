@@ -16,13 +16,12 @@ import { useApi } from '@/lib/api';
 export type PlanId = 'starter' | 'growth' | 'pro';
 
 /**
- * TEMPORARY TESTING SWITCH
- *
- * Keep this true while the team is exploring the full product without paid
- * subscriptions. Set it to false before release to restore normal plan gates.
- * Billing, plan status, and checkout continue to use the seller's real plan.
+ * Development-only visual companion to the server-controlled test override.
+ * The API still enforces paid access unless its separate server environment
+ * switch is also enabled, so this client value can never grant entitlement.
  */
-export const TEMPORARILY_UNLOCK_ALL_SUBSCRIPTION_FEATURES_FOR_TESTING = true;
+export const ALLOW_TEST_SUBSCRIPTION_BYPASS =
+  __DEV__ && process.env.EXPO_PUBLIC_ENABLE_TEST_SUBSCRIPTION_BYPASS === 'true';
 
 // ─── Module-level state shared across all hook instances ──────────────────────
 
@@ -119,7 +118,7 @@ export function useSubscriptionPlan() {
 
   /** True if the user's plan meets or exceeds `minPlan`. */
   function hasPlan(minPlan: PlanId): boolean {
-    if (TEMPORARILY_UNLOCK_ALL_SUBSCRIPTION_FEATURES_FOR_TESTING) return true;
+    if (ALLOW_TEST_SUBSCRIPTION_BYPASS) return true;
 
     const order: Record<PlanId, number> = { starter: 0, growth: 1, pro: 2 };
     return (order[plan ?? 'starter'] ?? 0) >= (order[minPlan] ?? 1);

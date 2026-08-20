@@ -23,13 +23,14 @@ const PLAN_ORDER: Record<string, number> = {
 };
 
 /**
- * TEMPORARY TESTING SWITCH
+ * Development-only subscription override.
  *
- * Allows authenticated sellers to explore plan-gated product areas without a
- * paid subscription. It deliberately does not bypass Clerk authentication,
- * role checks, or any non-subscription authorization. Set false before release.
+ * This remains disabled by default, cannot run in production, and is gated by
+ * a server environment variable so client code can never unlock paid endpoints.
  */
-const TEMPORARILY_UNLOCK_ALL_SUBSCRIPTION_FEATURES_FOR_TESTING = true;
+const ALLOW_TEST_SUBSCRIPTION_BYPASS =
+  process.env.NODE_ENV !== "production" &&
+  process.env.ENABLE_TEST_SUBSCRIPTION_BYPASS === "true";
 
 /**
  * Middleware factory that enforces a minimum subscription plan.
@@ -46,7 +47,7 @@ export function requirePlan(minPlan: "growth" | "pro") {
       return;
     }
 
-    if (TEMPORARILY_UNLOCK_ALL_SUBSCRIPTION_FEATURES_FOR_TESTING) {
+    if (ALLOW_TEST_SUBSCRIPTION_BYPASS) {
       next();
       return;
     }

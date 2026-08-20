@@ -25,6 +25,13 @@ Old lookup keys: `brandthread_pro_monthly` is remapped to `growth` in webhooks f
 `POST /checkout` creates Stripe Checkout Session with `trial_period_days: 5` and `payment_method_collection: 'always'`.
 Card is collected upfront; trial auto-converts to paid on day 6 with no seller action required.
 
+## Testing gated features safely
+Subscription overrides must default to off, be explicitly enabled by a server environment variable, and be impossible in production. A mobile-only development flag may reveal gated UI for test convenience, but API middleware remains the entitlement authority.
+
+**Why:** A client-visible or unconditional toggle can accidentally grant paid API access in a release build.
+
+**How to apply:** Keep server test bypasses behind an exact opt-in flag plus a non-production guard. Never treat a client plan check as authorization.
+
 ## Server routes (`/api/seller/subscription/*`, auth required)
 - `GET /status` — fetches live from Stripe (expand: default_payment_method), returns plan/status/renewsOn/**trialEnd**/amountCents/paymentMethodLabel
 - `POST /checkout` — body `{ planId: 'starter'|'growth'|'scale' }` → Stripe Checkout with trial → returns `{ url }`

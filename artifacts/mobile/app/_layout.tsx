@@ -374,6 +374,7 @@ function RootLayoutNav() {
         {/* Seller dashboard screens */}
         <Stack.Screen name="order-detail"     options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="add-product"      options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="drafts"           options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="product-detail"   options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="product-store"    options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="product-import"   options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />

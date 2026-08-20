@@ -499,7 +499,7 @@ export default function ProductsScreen() {
             contentContainerStyle={{ gap: SP.sm, paddingBottom: SP.sm }}
             style={{ marginBottom: SP.md }}
           >
-            {inProgressDrafts.map(draft => (
+            {inProgressDrafts.slice(0, 3).map(draft => (
               <TouchableOpacity
                 key={draft.id}
                 style={s.draftCard}
@@ -527,6 +527,21 @@ export default function ProductsScreen() {
                 </View>
               </TouchableOpacity>
             ))}
+            {inProgressDrafts.length > 3 && (
+              <TouchableOpacity
+                style={s.seeAllDraftsCard}
+                onPress={() => router.push('/drafts' as never)}
+                activeOpacity={0.75}
+                accessibilityRole="button"
+                accessibilityLabel={`See all ${inProgressDrafts.length} drafts`}
+              >
+                <View style={s.seeAllDraftsIcon}>
+                  <Feather name="list" size={16} color={PURPLE_LIGHT} />
+                </View>
+                <Text style={s.seeAllDraftsLabel}>See all ({inProgressDrafts.length})</Text>
+                <Feather name="chevron-right" size={14} color={PURPLE_LIGHT} />
+              </TouchableOpacity>
+            )}
           </ScrollView>
         </>
       )}
@@ -732,6 +747,33 @@ const s = StyleSheet.create({
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
     color: PURPLE_LIGHT,
+  },
+  seeAllDraftsCard: {
+    width: 132,
+    minHeight: 132,
+    backgroundColor: PURPLE_DIM,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: BORDER_ACTIVE,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SP.xs,
+    paddingHorizontal: SP.sm,
+  },
+  seeAllDraftsIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: RADIUS.sm,
+    backgroundColor: PURPLE + '22',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  seeAllDraftsLabel: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: PURPLE_LIGHT,
+    textAlign: 'center',
   },
   statsRow: {
     paddingHorizontal: SP.md,
