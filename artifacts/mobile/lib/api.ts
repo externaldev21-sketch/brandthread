@@ -20,16 +20,24 @@ type GetToken = () => Promise<string | null>;
 // active team membership).
 export type StoreContext = 'own' | 'joined';
 let _storeContext: StoreContext | null = null;
+const _storeContextListeners = new Set<(ctx: StoreContext | null) => void>();
 
 /** Set the active store context. Call this from the switcher UI and persist
  *  the value to AsyncStorage for the next app launch. */
 export function setStoreContext(ctx: StoreContext | null): void {
   _storeContext = ctx;
+  _storeContextListeners.forEach((listener) => listener(ctx));
 }
 
 /** Read the current store context. */
 export function getStoreContext(): StoreContext | null {
   return _storeContext;
+}
+
+/** Subscribe to context changes made by the store switcher. */
+export function subscribeStoreContext(listener: (ctx: StoreContext | null) => void): () => void {
+  _storeContextListeners.add(listener);
+  return () => _storeContextListeners.delete(listener);
 }
 
 async function request<T = any>(

@@ -11,7 +11,7 @@ import {
   Inter_700Bold,
   useFonts,
 } from '@expo-google-fonts/inter';
-import { Platform } from 'react-native';
+import { Platform, View } from 'react-native';
 import { Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useUser } from '@clerk/expo';
@@ -24,6 +24,7 @@ import { configureServices } from '@/lib/serviceConfig';
 import { configureApi, setStoreContext, useApi } from '@/lib/api';
 import { clearSocialCache, initSocialService } from '@/services/socialService';
 import { clearCartCache, initCartService } from '@/services/cartService';
+import StoreContextBanner from '@/components/StoreContextBanner';
 
 // ─── Push notification handler (show alerts while app is foregrounded) ────────
 Notifications.setNotificationHandler({
@@ -331,7 +332,8 @@ function PushRegistrar() {
 
 function RootLayoutNav() {
   return (
-    <>
+    <View style={{ flex: 1 }}>
+      <StoreContextBanner />
       <Stack screenOptions={{ headerShown: false }}>
         {/* Boot: "/" renders BootScreen until AuthGate redirects */}
         <Stack.Screen name="index"          options={{ headerShown: false, animation: 'fade' }} />
@@ -544,7 +546,7 @@ function RootLayoutNav() {
       <AuthGate />
       <ServiceConfigurer />
       <PushRegistrar />
-    </>
+    </View>
   );
 }
 
