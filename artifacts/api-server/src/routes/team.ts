@@ -19,7 +19,6 @@
  * store they belong to. All mutations are owner-only.
  */
 import { Router } from "express";
-import { getAuth } from "@clerk/express";
 import { db, teamMembers, teamActivityLogs, users } from "@workspace/db";
 import { eq, and, ne, or, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -182,7 +181,7 @@ router.use(requireAuth);
 // Must be placed BEFORE teamContext() so it always reads the real caller's id.
 // Returns null when the user is not a member of any other store.
 router.get("/my-membership", async (req, res) => {
-  const { userId } = getAuth(req);
+  const userId = (req as any).clerkUserId as string | undefined;
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   try {
