@@ -451,7 +451,8 @@ export default function DiscoverScreen() {
   function fetchTrending() {
     api.publicTrending.get(20)
       .then((data) => {
-        const items: TrendingItem[] = (data?.trending ?? []).map((t) => ({
+        const rows = Array.isArray(data?.trending) ? data.trending : [];
+        const items: TrendingItem[] = rows.map((t) => ({
           id:       t.id,
           rank:     t.rank,
           brand:    t.brand,
@@ -462,9 +463,12 @@ export default function DiscoverScreen() {
           initials: (t.brand ?? 'B').slice(0, 2).toUpperCase(),
           hype:     t.hype ?? '✨ Fresh',
         }));
-        if (items.length > 0) setLiveTrending(items);
+        setLiveTrending(items);
       })
-      .catch(() => {/* fallback to hardcoded TRENDING */});
+      .catch(() => {
+        setLiveTrending([]);
+        /* fallback to hardcoded TRENDING */
+      });
   }
 
   useEffect(() => { fetchTrending(); }, []);
@@ -472,7 +476,8 @@ export default function DiscoverScreen() {
   useEffect(() => {
     api.publicProducts.list({ limit: 8 })
       .then((rows) => {
-        const items: ForYouItem[] = rows.map((row: any, i: number) => {
+        const safeRows = Array.isArray(rows) ? rows : [];
+        const items: ForYouItem[] = safeRows.map((row: any, i: number) => {
           const firstVariant = (row.variants ?? [])[0];
           const priceDollars = firstVariant ? (firstVariant.priceCents / 100).toFixed(0) : '0';
           return {
@@ -487,10 +492,14 @@ export default function DiscoverScreen() {
             tag:           (row.tags as string[] | undefined)?.[0] ?? 'New',
           };
         });
-        if (items.length > 0) setLiveForYou(items);
+        setLiveForYou(items);
         setForYouLoading(false);
       })
-      .catch(() => { /* silent — fall back to static FOR_YOU */ setForYouLoading(false); });
+      .catch(() => {
+        setLiveForYou([]);
+        setForYouLoading(false);
+        /* silent — fall back to static FOR_YOU */
+      });
   }, []);
 
   const forYouItems = liveForYou.length > 0 ? liveForYou : FOR_YOU;

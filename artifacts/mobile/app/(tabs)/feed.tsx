@@ -468,10 +468,14 @@ export default function FeedScreen() {
     async function loadFeed() {
       setFeedLoading(true);
       try {
-        const posts = await getThreadPosts();
-        const mapped = posts.map(mapSellerPost).filter((p): p is SpotlightItem => p !== null);
+        const rows = await getThreadPosts();
+        const mapped = (Array.isArray(rows) ? rows : [])
+          .map(mapSellerPost)
+          .filter((p): p is SpotlightItem => p !== null);
         setSellerFeedPosts(mapped);
-      } catch {} finally {
+      } catch {
+        setSellerFeedPosts([]);
+      } finally {
         setFeedLoading(false);
       }
     }
@@ -485,7 +489,8 @@ export default function FeedScreen() {
     async function fetchLive() {
       try {
         const data = await (api as any).live.active() as { streams: any[] };
-        setActiveLiveStreams((data.streams ?? []).map((s: any) => ({
+        const rows = Array.isArray(data?.streams) ? data.streams : [];
+        setActiveLiveStreams(rows.map((s: any) => ({
           _isLive: true as const,
           id:          `live_${s.id}`,
           streamId:    s.id,
@@ -496,7 +501,9 @@ export default function FeedScreen() {
           viewerCount: s.viewer_count ?? 0,
           productTags: Array.isArray(s.product_tags) ? s.product_tags : [],
         })));
-      } catch {}
+      } catch {
+        setActiveLiveStreams([]);
+      }
     }
     fetchLive();
     const id = setInterval(fetchLive, 30_000);
@@ -588,7 +595,7 @@ export default function FeedScreen() {
 
   function handleOpenComments(id: string) {
     const item = allItems.find(i => i.id === id);
-    if (!item) return;
+    if (!item || isLiveStreamItem(item)) return;
     const qs = [
       'postId=' + encodeURIComponent(item.id),
       'postAuthorName=' + encodeURIComponent(item.creator),

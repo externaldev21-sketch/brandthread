@@ -222,42 +222,59 @@ export default function FriendsScreen() {
   const [feedPosts,    setFeedPosts]    = useState<BuyerPost[]>(DEMO_FRIEND_POSTS);
 
   async function loadData() {
-    const postIds = DEMO_FRIEND_POSTS.map(p => p.id);
-    const [fs, reqs, sts, engagements, ...commentArrays] = await Promise.all([
-      getAcceptedFriends(),
-      getFriendRequests(),
-      getStories(),
-      getFriendPostEngagements(),
-      ...postIds.map(id => getComments(id)),
-    ]);
-    setFriends(fs);
-    const incoming = reqs.filter(
-      r => r.toId === MY_USER_ID && r.status === 'pending',
-    );
-    setPendingCount(incoming.length);
-    const now = Date.now();
-    setStories(sts.filter(s => s.expiresAt > now));
-
-    // Real API: load people I actually follow (backed by DB)
     try {
-      const following = await api.social.following();
-      setApiFollowing(following);
-    } catch { /* graceful degrade */ }
+      const postIds = DEMO_FRIEND_POSTS.map(p => p.id);
+      const [friendRows, requestRows, storyRows, engagementRows, ...commentRows] = await Promise.all([
+        getAcceptedFriends(),
+        getFriendRequests(),
+        getStories(),
+        getFriendPostEngagements(),
+        ...postIds.map(id => getComments(id)),
+      ]);
+      const friends = Array.isArray(friendRows) ? friendRows : [];
+      const requests = Array.isArray(requestRows) ? requestRows : [];
+      const stories = Array.isArray(storyRows) ? storyRows : [];
+      const engagements = engagementRows && typeof engagementRows === 'object' && !Array.isArray(engagementRows)
+        ? engagementRows as Record<string, { likedByMe: boolean; likesCount: number }>
+        : {};
 
-    // Merge persisted like + repost state and real comment counts into feed posts
-    const repostedIds = await getRepostedPostIds();
-    setFeedPosts(DEMO_FRIEND_POSTS.map((post, i) => {
-      const eng = (engagements as Record<string, { likedByMe: boolean; likesCount: number }>)[post.id];
-      const commentCount = (commentArrays[i] as { length: number }).length;
-      const repostedByMe = repostedIds.has(post.id);
-      return {
-        ...post,
-        likedByMe:     eng ? eng.likedByMe  : post.likedByMe,
-        likesCount:    eng ? eng.likesCount : post.likesCount,
-        commentsCount: commentCount,
-        repostedByMe,
-      };
-    }));
+      setFriends(friends);
+      const incoming = requests.filter(
+        r => r.toId === MY_USER_ID && r.status === 'pending',
+      );
+      setPendingCount(incoming.length);
+      const now = Date.now();
+      setStories(stories.filter(s => s.expiresAt > now));
+
+      // Real API: load people I actually follow (backed by DB)
+      try {
+        const following = await api.social.following();
+        setApiFollowing(Array.isArray(following) ? following : []);
+      } catch {
+        setApiFollowing([]);
+      }
+
+      // Merge persisted like + repost state and real comment counts into feed posts
+      const repostedIds = await getRepostedPostIds();
+      setFeedPosts(DEMO_FRIEND_POSTS.map((post, i) => {
+        const eng = engagements[post.id];
+        const commentCount = Array.isArray(commentRows[i]) ? commentRows[i].length : 0;
+        const repostedByMe = repostedIds.has(post.id);
+        return {
+          ...post,
+          likedByMe:     eng ? eng.likedByMe  : post.likedByMe,
+          likesCount:    eng ? eng.likesCount : post.likesCount,
+          commentsCount: commentCount,
+          repostedByMe,
+        };
+      }));
+    } catch {
+      setFriends([]);
+      setApiFollowing([]);
+      setStories([]);
+      setPendingCount(0);
+      setFeedPosts([]);
+    }
   }
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
