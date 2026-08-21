@@ -101,6 +101,11 @@ router.post("/:id/broadcast", async (req, res) => {
     .limit(1);
   if (!drop) return res.status(404).json({ error: "Drop not found" });
 
+  // Only active drops may be broadcast — draft/closed/fulfilled should not trigger live notifications
+  if (drop.status !== "active") {
+    return res.status(400).json({ error: "Only active drops can be broadcast to followers.", code: "DROP_NOT_ACTIVE" });
+  }
+
   // Check if already broadcast (one broadcast per drop)
   const [existing] = await db
     .select({ id: dropBroadcasts.id })
@@ -118,7 +123,7 @@ router.post("/:id/broadcast", async (req, res) => {
     .where(eq(follows.followingId, sellerId));
 
   if (followerRows.length === 0) {
-    return res.json({ ok: true, sent: 0, message: "No followers to notify yet." });
+    return res.json({ ok: true, sent: 0, errors: 0, followers: 0, message: "No followers to notify yet." });
   }
 
   const followerIds = followerRows.map((r) => r.followerId);

@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   ScrollView, View, Text, TouchableOpacity,
-  StyleSheet, ActivityIndicator,
+  StyleSheet, ActivityIndicator, Animated,
 } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useApi } from '@/lib/api';
+import * as Haptics from 'expo-haptics';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -114,14 +115,18 @@ const statusConfig: Record<DropStatus, { variant: 'success' | 'warning' | 'info'
 
 // ─── Drop Card ────────────────────────────────────────────────────────────────
 
+type BroadcastState = 'idle' | 'loading' | 'sent' | 'already_sent';
+
 interface DropCardProps {
   drop: Drop;
   colors: ReturnType<typeof useColors>;
   isDark: boolean;
   isLast: boolean;
+  broadcastState: BroadcastState;
+  onBroadcast: () => void;
 }
 
-function DropCard({ drop, colors, isDark, isLast }: DropCardProps) {
+function DropCard({ drop, colors, isDark, isLast, broadcastState, onBroadcast }: DropCardProps) {
   const primary = '#8B5CF6';
   const isPreOrder = drop.type === 'pre-order';
   const s = statusConfig[drop.status];
@@ -213,6 +218,41 @@ function DropCard({ drop, colors, isDark, isLast }: DropCardProps) {
           </Text>
         </View>
       )}
+
+      {/* Notify Followers broadcast button — only for active (live) drops */}
+      {drop.status === 'processing' && (
+        <View style={[styles.broadcastWrap, { borderTopColor: colors.border }]}>
+          <TouchableOpacity
+            style={[
+              styles.broadcastBtn,
+              broadcastState === 'sent' || broadcastState === 'already_sent'
+                ? { backgroundColor: 'rgba(16,185,129,0.12)', borderColor: 'rgba(16,185,129,0.30)' }
+                : { backgroundColor: 'rgba(139,92,246,0.10)', borderColor: 'rgba(139,92,246,0.28)' },
+              broadcastState === 'loading' && { opacity: 0.6 },
+            ]}
+            activeOpacity={broadcastState === 'idle' ? 0.75 : 1}
+            disabled={broadcastState !== 'idle'}
+            onPress={onBroadcast}
+          >
+            {broadcastState === 'loading' ? (
+              <ActivityIndicator size="small" color={primary} />
+            ) : broadcastState === 'sent' || broadcastState === 'already_sent' ? (
+              <Feather name="check-circle" size={14} color={colors.success} />
+            ) : (
+              <Feather name="bell" size={14} color={primary} />
+            )}
+            <Text style={[
+              styles.broadcastBtnText,
+              { color: broadcastState === 'sent' || broadcastState === 'already_sent' ? colors.success : primary },
+            ]}>
+              {broadcastState === 'sent' ? 'Followers notified' :
+               broadcastState === 'already_sent' ? 'Already notified' :
+               broadcastState === 'loading' ? 'Sending…' :
+               'Notify Followers'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
@@ -236,11 +276,80 @@ const CONFIG_ROWS = [
   { label: 'Escrow & release rules',        icon: 'shield'      as const },
 ];
 
+// ─── Toast component ──────────────────────────────────────────────────────────
+
+function Toast({ message, visible }: { message: string; visible: boolean }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(opacity, {
+      toValue: visible ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [visible]);
+
+  return (
+    <Animated.View style={[toastStyles.wrap, { opacity }]} pointerEvents="none">
+      <Feather name="check-circle" size={14} color="#FFFFFF" />
+      <Text style={toastStyles.text}>{message}</Text>
+    </Animated.View>
+  );
+}
+
+const toastStyles = StyleSheet.create({
+  wrap: {
+    position: 'absolute', top: 60, alignSelf: 'center', zIndex: 99,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: 'rgba(16,185,129,0.92)', borderRadius: 24,
+    paddingHorizontal: 18, paddingVertical: 10,
+    shadowColor: '#000', shadowOpacity: 0.25, shadowRadius: 8, shadowOffset: { width: 0, height: 4 },
+  },
+  text: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: '#FFFFFF' },
+});
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
 export default function PaymentsScreen() {
   const colors = useColors();
   const api    = useApi();
   const [drops,   setDrops]   = useState<Drop[]>(DROPS_FALLBACK);
   const [loading, setLoading] = useState(true);
+
+  // Broadcast state per drop id
+  const [broadcastStates, setBroadcastStates] = useState<Record<string, BroadcastState>>({});
+  // Toast
+  const [toast, setToast]       = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = useCallback((message: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ message, visible: true });
+    toastTimer.current = setTimeout(() => setToast((t) => ({ ...t, visible: false })), 3000);
+  }, []);
+
+  const handleBroadcast = useCallback(async (dropId: string, dropName: string) => {
+    setBroadcastStates((prev) => ({ ...prev, [dropId]: 'loading' }));
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      const res = await api.drops.broadcast(dropId);
+      setBroadcastStates((prev) => ({ ...prev, [dropId]: 'sent' }));
+      if (res.sent === 0) {
+        showToast('No followers to notify yet');
+      } else {
+        showToast(`Notified ${res.sent} follower${res.sent === 1 ? '' : 's'}`);
+      }
+    } catch (err: any) {
+      const is409 = err?.message?.includes('409') || err?.message?.includes('already');
+      if (is409) {
+        setBroadcastStates((prev) => ({ ...prev, [dropId]: 'already_sent' }));
+        showToast(`${dropName} followers already notified`);
+      } else {
+        setBroadcastStates((prev) => ({ ...prev, [dropId]: 'idle' }));
+        showToast('Failed to send — please try again');
+      }
+    }
+  }, [api, showToast]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -267,6 +376,7 @@ export default function PaymentsScreen() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
   const isDark = colors.background === '#121110' || colors.background.startsWith('#0');
   const primary = '#8B5CF6';
@@ -280,6 +390,7 @@ export default function PaymentsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Toast message={toast.message} visible={toast.visible} />
       <ScreenHeader title="Payments" subtitle="Drop payouts & methods" />
       <ScrollView
         style={{ flex: 1 }}
@@ -401,7 +512,12 @@ export default function PaymentsScreen() {
           </Text>
         </View>
         {preOrderDrops.map((d, i) => (
-          <DropCard key={d.id} drop={d} colors={colors} isDark={isDark} isLast={i === preOrderDrops.length - 1} />
+          <DropCard
+            key={d.id} drop={d} colors={colors} isDark={isDark}
+            isLast={i === preOrderDrops.length - 1}
+            broadcastState={broadcastStates[d.id] ?? 'idle'}
+            onBroadcast={() => handleBroadcast(d.id, d.name)}
+          />
         ))}
 
         {/* ── Pre Made Drops ── */}
@@ -417,7 +533,12 @@ export default function PaymentsScreen() {
           </Text>
         </View>
         {preMadeDrops.map((d, i) => (
-          <DropCard key={d.id} drop={d} colors={colors} isDark={isDark} isLast={i === preMadeDrops.length - 1} />
+          <DropCard
+            key={d.id} drop={d} colors={colors} isDark={isDark}
+            isLast={i === preMadeDrops.length - 1}
+            broadcastState={broadcastStates[d.id] ?? 'idle'}
+            onBroadcast={() => handleBroadcast(d.id, d.name)}
+          />
         ))}
 
       </ScrollView>
@@ -507,6 +628,15 @@ const styles = StyleSheet.create({
   // Pre Made note
   premadeNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 5, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'transparent' },
   premadeNoteText: { fontSize: 11, fontFamily: 'Inter_400Regular', flex: 1, lineHeight: 16 },
+
+  // Broadcast button
+  broadcastWrap: { marginTop: 14, paddingTop: 14, borderTopWidth: 1 },
+  broadcastBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 7, borderRadius: 10, borderWidth: 1,
+    paddingVertical: 10, paddingHorizontal: 14,
+  },
+  broadcastBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
 
   // Shared card container
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },
