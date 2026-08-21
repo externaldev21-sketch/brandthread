@@ -33,6 +33,7 @@ const SOURCE_META: Record<string, { icon: string; label: string; color: string }
   signup:     { icon: 'gift',         label: 'Welcome',   color: GOLD         },
   bonus:      { icon: 'star',         label: 'Bonus',     color: GOLD         },
   redemption: { icon: 'tag',          label: 'Redeemed',  color: ORANGE       },
+  purchase_reversal: { icon: 'corner-up-left', label: 'Purchase refunded', color: ORANGE },
 };
 
 function fmtDate(iso: string) {

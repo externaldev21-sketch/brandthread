@@ -9,6 +9,7 @@ import {
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireStripe, computeApplicationFeeCents, PLATFORM_COMMISSION_RATE, mapStripeError } from "../lib/stripe";
+import { reversePurchasePointsOnce } from "./loyalty";
 
 const router = Router();
 router.use(requireAuth);
@@ -672,6 +673,7 @@ router.post("/orders/:id/cancel", async (req, res) => {
         orderNumber:           orders.orderNumber,
         status:                orders.status,
         createdAt:             orders.createdAt,
+        totalCents:            orders.totalCents,
         stripePaymentIntentId: orders.stripePaymentIntentId,
       })
       .from(orders)
@@ -704,11 +706,31 @@ router.post("/orders/:id/cancel", async (req, res) => {
     if (order.stripePaymentIntentId) {
       try {
         const stripe = requireStripe();
-        await stripe.refunds.create({
+        const refund = await stripe.refunds.create({
           payment_intent: order.stripePaymentIntentId,
           reason: "requested_by_customer",
         });
         refunded = true;
+
+        await db.transaction(async (tx) => {
+          await tx
+            .update(orders)
+            .set({
+              status:              "cancelled",
+              cancellationReason:  "buyer_requested",
+              cancellationNotes:   "Cancelled by buyer within the 60-minute cancellation window.",
+              updatedAt:           new Date(),
+            })
+            .where(eq(orders.id, id));
+
+          await reversePurchasePointsOnce({
+            buyerId,
+            orderId: id,
+            referenceId: `${id}:refund:${refund.id}`,
+            requestedPoints: Math.floor(order.totalCents / 100),
+            note: `Purchase reward reversed after cancellation of order ${order.orderNumber}`,
+          }, tx);
+        });
       } catch (stripeErr: any) {
         console.error("[buyerCancel] Stripe refund failed:", stripeErr?.message);
         res.status(502).json({
@@ -718,16 +740,18 @@ router.post("/orders/:id/cancel", async (req, res) => {
       }
     }
 
-    // ── Mark cancelled ──────────────────────────────────────────────────────
-    await db
-      .update(orders)
-      .set({
-        status:              "cancelled",
-        cancellationReason:  "buyer_requested",
-        cancellationNotes:   "Cancelled by buyer within the 60-minute cancellation window.",
-        updatedAt:           new Date(),
-      })
-      .where(eq(orders.id, id));
+    // Orders without a payment intent cannot have earned a purchase reward.
+    if (!order.stripePaymentIntentId) {
+      await db
+        .update(orders)
+        .set({
+          status:              "cancelled",
+          cancellationReason:  "buyer_requested",
+          cancellationNotes:   "Cancelled by buyer within the 60-minute cancellation window.",
+          updatedAt:           new Date(),
+        })
+        .where(eq(orders.id, id));
+    }
 
     res.json({ cancelled: true, refunded, orderNumber: order.orderNumber });
   } catch (err) {

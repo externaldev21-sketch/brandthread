@@ -6,6 +6,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext, requireRole } from "../middlewares/requireRole";
 import { logActivity, reqActor } from "../lib/activityLog";
 import { publishNotification } from "./notifications-feed";
+import { reversePurchasePointsOnce } from "./loyalty";
 
 const router = Router();
 router.use(requireAuth);
@@ -278,16 +279,30 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
     updatePayload.cancellationNotes  = (notes as string | undefined)?.trim() || null;
   }
 
-  // Atomically update only when status is actually changing — prevents duplicate notifications
-  // from concurrent retries that both read the old status before either write completes.
-  const [transitioned] = await db.update(orders)
-    .set(updatePayload)
-    .where(and(
-      eq(orders.id, req.params.id),
-      eq(orders.ownerId, ownerId),
-      ne(orders.status, status),           // skip the write if already at target status
-    ))
-    .returning();
+  // Atomically update only when status is actually changing — prevents duplicate
+  // notifications. Cancellation also reverses any purchase award in this same
+  // transaction, so a cancelled order never exposes spendable points.
+  let transitioned: typeof orders.$inferSelect | undefined;
+  await db.transaction(async (tx) => {
+    [transitioned] = await tx.update(orders)
+      .set(updatePayload)
+      .where(and(
+        eq(orders.id, req.params.id),
+        eq(orders.ownerId, ownerId),
+        ne(orders.status, status),           // skip the write if already at target status
+      ))
+      .returning();
+
+    if (status === "cancelled" && transitioned?.buyerId) {
+      await reversePurchasePointsOnce({
+        buyerId: transitioned.buyerId,
+        orderId: transitioned.id,
+        referenceId: `${transitioned.id}:seller-cancellation`,
+        requestedPoints: Math.floor(transitioned.totalCents / 100),
+        note: `Purchase reward reversed after seller cancellation of order ${transitioned.orderNumber}`,
+      }, tx);
+    }
+  });
 
   if (!transitioned) {
     // Either not found, or order was already at the requested status (idempotent).

@@ -3,6 +3,7 @@ import { clerkClient } from "@clerk/express";
 import { db, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { awardLoyaltyPointsOnce } from "./loyalty";
 
 const router = Router();
 
@@ -43,10 +44,22 @@ router.post("/sync", requireAuth, async (req, res) => {
         .returning();
       res.json(updated);
     } else {
-      const [created] = await db
-        .insert(users)
-        .values({ clerkId: clerkUserId, email, name, avatarUrl, role: "owner" })
-        .returning();
+      const created = await db.transaction(async (tx) => {
+        const [newUser] = await tx
+          .insert(users)
+          .values({ clerkId: clerkUserId, email, name, avatarUrl, role: "owner" })
+          .returning();
+
+        await awardLoyaltyPointsOnce({
+          buyerId: clerkUserId,
+          points: 100,
+          source: "signup",
+          referenceId: clerkUserId,
+          note: "Welcome to Brandthread",
+        }, tx);
+
+        return newUser;
+      });
       res.json(created);
     }
   } catch (err) {

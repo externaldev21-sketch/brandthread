@@ -11,6 +11,7 @@ import {
 import { eq, and, ne, sql } from "drizzle-orm";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe";
 import { refundJobPayment } from "../lib/freelancerEscrow";
+import { awardLoyaltyPointsOnce } from "./loyalty";
 
 const router = Router();
 
@@ -167,11 +168,17 @@ export async function handleCheckoutPaid(session: any) {
 
   // ── Fast-path idempotency check (unique DB index is the hard guarantee) ──
   const [existing] = await db
-    .select({ id: orders.id })
+    .select({
+      id: orders.id,
+      buyerId: orders.buyerId,
+      totalCents: orders.totalCents,
+      status: orders.status,
+    })
     .from(orders)
     .where(eq(orders.stripeCheckoutSessionId, sessionId))
     .limit(1);
   if (existing) {
+    await awardPurchasePoints(existing);
     console.log(`Order already exists for session ${sessionId}, skipping`);
     return;
   }
@@ -311,6 +318,12 @@ export async function handleCheckoutPaid(session: any) {
       .returning();
     createdOrderId = order.id;
 
+    // Record the purchase reward in the same transaction as the confirmed
+    // order. A cancellation cannot land between the order commit and award.
+    if (oversoldItems.length === 0) {
+      await awardPurchasePoints(order, tx);
+    }
+
     // Step 5: Insert order items (from original cart, not aggregated map, to preserve line detail)
     await tx.insert(orderItems).values(
       rawItems.map((item) => ({
@@ -418,6 +431,39 @@ export async function handleCheckoutPaid(session: any) {
       }
     }
   }
+}
+
+/**
+ * Paid Checkout Sessions are the confirmation point for buyer purchases.
+ * A retry can arrive after the order transaction committed, so this helper is
+ * also called for an existing order before the webhook exits.
+ */
+async function awardPurchasePoints(order: {
+  id: string;
+  buyerId: string | null;
+  totalCents: number;
+  status: string;
+}, transaction?: any): Promise<void> {
+  if (
+    !order.buyerId ||
+    order.status === "refund_pending" ||
+    order.status === "cancelled"
+  ) {
+    return;
+  }
+
+  const points = Math.floor(order.totalCents / 100);
+  if (points < 1) {
+    return;
+  }
+
+  await awardLoyaltyPointsOnce({
+    buyerId: order.buyerId,
+    points,
+    source: "purchase",
+    referenceId: order.id,
+    note: `Purchase reward for order ${order.id}`,
+  }, transaction);
 }
 
 // ── Drop wallet auto-credit helper ──────────────────────────────────────────

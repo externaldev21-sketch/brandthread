@@ -4,6 +4,7 @@ import { eq, and, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireStripe } from "../lib/stripe";
 import crypto from "crypto";
+import { reversePurchasePointsOnce } from "./loyalty";
 
 const router = Router();
 router.use(requireAuth);
@@ -249,6 +250,8 @@ router.patch("/:id/status", async (req, res) => {
       // a. Look up the order's stripe_payment_intent_id
       const [order] = await db
         .select({
+          id: orders.id,
+          buyerId: orders.buyerId,
           stripePaymentIntentId: orders.stripePaymentIntentId,
           totalCents: orders.totalCents,
         })
@@ -276,24 +279,39 @@ router.patch("/:id/status", async (req, res) => {
           reason: "requested_by_customer",
         });
 
-        // d. Update the return to 'refunded'
-        const [updated] = await db
-          .update(returns)
-          .set({
-            status: "refunded",
-            stripeRefundId: refund.id,
-            refundAmountCents,
-            sellerResponse: sellerResponse ?? null,
-            updatedAt: new Date(),
-          })
-          .where(eq(returns.id, id))
-          .returning();
+        // d. Record the refund, order cancellation, and proportional reward
+        // reversal together. A $12.99 refund reverses 12 points; repeated
+        // partial refunds are capped at the original purchase award.
+        const updated = await db.transaction(async (tx) => {
+          const [updatedReturn] = await tx
+            .update(returns)
+            .set({
+              status: "refunded",
+              stripeRefundId: refund.id,
+              refundAmountCents,
+              sellerResponse: sellerResponse ?? null,
+              updatedAt: new Date(),
+            })
+            .where(eq(returns.id, id))
+            .returning();
 
-        // e. Update the order status to 'cancelled'
-        await db
-          .update(orders)
-          .set({ status: "cancelled", updatedAt: new Date() })
-          .where(eq(orders.id, returnRow.orderId));
+          await tx
+            .update(orders)
+            .set({ status: "cancelled", updatedAt: new Date() })
+            .where(eq(orders.id, returnRow.orderId));
+
+          if (order.buyerId) {
+            await reversePurchasePointsOnce({
+              buyerId: order.buyerId,
+              orderId: order.id,
+              referenceId: `${order.id}:return:${id}`,
+              requestedPoints: Math.floor(refundAmountCents / 100),
+              note: `Purchase reward reversed after refund for order ${order.id}`,
+            }, tx);
+          }
+
+          return updatedReturn;
+        });
 
         return res.json(updated);
       } catch (stripeErr: any) {
