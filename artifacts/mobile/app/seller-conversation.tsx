@@ -8,17 +8,19 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, FlatList, TouchableOpacity, TextInput,
   KeyboardAvoidingView, Alert, Platform, StyleSheet, Dimensions,
-  ActivityIndicator, ListRenderItemInfo, Modal, ScrollView,
+  ActivityIndicator, ListRenderItemInfo, Modal, ScrollView, Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { useUser } from '@clerk/expo';
 import {
-  BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE,
+  BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, RED,
   PURPLE, PURPLE_DIM, ON_DARK, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { useApi } from '@/lib/api';
+import * as ImagePicker from 'expo-image-picker';
+import { Audio } from 'expo-av';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,16 +34,11 @@ interface ConvView {
   contextProductId?: string; contextProductName?: string;
 }
 interface MsgAttachment {
-  type: 'product' | 'order' | 'post' | 'profile';
+  type: 'product' | 'order' | 'post' | 'profile' | 'image' | 'video' | 'voice';
+  uri?: string;
   title?: string;
   subtitle?: string;
-  meta?: {
-    productId?: string;
-    orderId?: string;
-    postId?: string;
-    authorName?: string;
-    mediaType?: string;
-  };
+  meta?: Record<string, string>;
 }
 interface Msg {
   id: string; conversationId: string;
@@ -116,6 +113,12 @@ export default function SellerConversationScreen() {
   const [text, setText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [isRecording, setIsRecording]         = useState(false);
+  const [isUploading, setIsUploading]         = useState(false);
+  const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
+  const [showMediaSheet, setShowMediaSheet]   = useState(false);
+  const recordingRef = useRef<Audio.Recording | null>(null);
+  const soundRef     = useRef<any>(null);
 
   // Attachment state
   const [pendingAttachment, setPendingAttachment] = useState<MsgAttachment | null>(null);
@@ -171,6 +174,227 @@ export default function SellerConversationScreen() {
 
   async function openAttachPicker() {
     setShowAttachPicker(true);
+  }
+
+  // ── Media upload helper ───────────────────────────────────────────────────────
+
+  async function uploadMedia(base64: string, mimeType: string, extension: string): Promise<string> {
+    const result = await api.conversations.uploadMedia({ data: base64, mimeType, extension });
+    return result.url;
+  }
+
+  // ── 1:1 call ─────────────────────────────────────────────────────────────────
+
+  function handleStartCall(mode: 'voice' | 'video') {
+    if (!id) return;
+    const qs = new URLSearchParams({
+      conversationId: id,
+      participantName: other?.name ?? 'User',
+      participantInitials: other?.initials ?? '?',
+      participantColor: other?.color ?? PURPLE,
+      mode,
+    });
+    router.push(('/call-screen?' + qs.toString()) as never);
+  }
+
+  // ── Photo / video picker ──────────────────────────────────────────────────────
+
+  async function handlePickPhoto() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo library access in Settings.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      selectionLimit: 15,
+      quality: 0.85,
+      base64: true,
+    });
+    if (result.canceled || !result.assets.length) return;
+    setShowMediaSheet(false);
+    setIsUploading(true);
+    try {
+      const urls: string[] = [];
+      for (const asset of result.assets) {
+        if (!asset.base64) continue;
+        urls.push(await uploadMedia(asset.base64, 'image/jpeg', 'jpg'));
+      }
+      if (!urls.length) return;
+      setPendingAttachment({
+        type: 'image', uri: urls[0],
+        title: urls.length > 1 ? `${urls.length} photos` : 'Photo',
+        meta: { photoUris: JSON.stringify(urls) },
+      });
+    } catch { Alert.alert('Upload failed', 'Could not upload. Please try again.'); }
+    finally { setIsUploading(false); }
+  }
+
+  async function handlePickVideo() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo library access in Settings.'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Videos,
+      videoMaxDuration: 59,
+      quality: 0.7,
+      base64: true,
+    });
+    if (result.canceled || !result.assets.length) return;
+    const asset = result.assets[0];
+    if ((asset.duration ?? 0) > 60000) { Alert.alert('Video too long', 'Choose a video under 1 minute.'); return; }
+    if (!asset.base64) { Alert.alert('Error', 'Could not read video file.'); return; }
+    setShowMediaSheet(false);
+    setIsUploading(true);
+    try {
+      const ext = (asset.uri.split('.').pop() ?? 'mp4').replace(/\?.*/, '');
+      const url = await uploadMedia(asset.base64, 'video/mp4', ext);
+      setPendingAttachment({ type: 'video', uri: url, title: 'Video clip', meta: { duration: String(Math.round((asset.duration ?? 0) / 1000)) } });
+    } catch { Alert.alert('Upload failed', 'Could not upload video. Please try again.'); }
+    finally { setIsUploading(false); }
+  }
+
+  // ── Voice recording ───────────────────────────────────────────────────────────
+
+  async function handleToggleRecording() {
+    if (isRecording) {
+      setIsRecording(false);
+      const rec = recordingRef.current;
+      recordingRef.current = null;
+      if (!rec) return;
+      try {
+        await rec.stopAndUnloadAsync();
+        const uri = rec.getURI();
+        if (!uri) return;
+        setIsUploading(true);
+        const response = await fetch(uri);
+        const buf = await response.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        let binary = '';
+        const CHUNK = 8192;
+        for (let i = 0; i < bytes.byteLength; i += CHUNK) {
+          binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + CHUNK, bytes.byteLength)));
+        }
+        const url = await uploadMedia(btoa(binary), 'audio/m4a', 'm4a');
+        const st = await rec.getStatusAsync();
+        const dur = Math.round(((st as any).durationMillis ?? 0) / 1000);
+        setPendingAttachment({ type: 'voice', uri: url, title: 'Voice message', meta: { duration: String(dur) } });
+      } catch { Alert.alert('Recording error', 'Could not save voice message. Please try again.'); }
+      finally { setIsUploading(false); }
+    } else {
+      try {
+        await Audio.requestPermissionsAsync();
+        await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+        const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+        recordingRef.current = recording;
+        setIsRecording(true);
+      } catch { Alert.alert('Mic unavailable', 'Check microphone permissions in Settings.'); }
+    }
+  }
+
+  // ── Voice playback ────────────────────────────────────────────────────────────
+
+  async function handlePlayVoice(uri: string) {
+    if (playingVoiceUri === uri) {
+      await soundRef.current?.stopAsync().catch(() => {});
+      await soundRef.current?.unloadAsync().catch(() => {});
+      soundRef.current = null;
+      setPlayingVoiceUri(null);
+      return;
+    }
+    await soundRef.current?.stopAsync().catch(() => {});
+    await soundRef.current?.unloadAsync().catch(() => {});
+    soundRef.current = null;
+    try {
+      setPlayingVoiceUri(uri);
+      const { sound } = await Audio.Sound.createAsync({ uri });
+      soundRef.current = sound;
+      await sound.playAsync();
+      sound.setOnPlaybackStatusUpdate((st: any) => {
+        if (st.didJustFinish) { soundRef.current = null; setPlayingVoiceUri(null); }
+      });
+    } catch { setPlayingVoiceUri(null); }
+  }
+
+  // ── Attachment renderer (media-aware) ─────────────────────────────────────────
+
+  function renderMsgAttachment(att: MsgAttachment) {
+    if (att.type === 'image') {
+      let uris: string[] = [];
+      try { uris = JSON.parse(att.meta?.photoUris ?? '[]'); } catch {}
+      if (!uris.length && att.uri) uris = [att.uri];
+      if (!uris.length) return null;
+      return (
+        <View style={s.photoGrid}>
+          {uris.slice(0, 4).map((uri, idx) => (
+            <View key={idx} style={[s.photoCell, uris.length === 1 && s.photoCellSingle]}>
+              <Image source={{ uri }} style={s.photoImg} resizeMode="cover" />
+              {idx === 3 && uris.length > 4 && (
+                <View style={s.photoMore}><Text style={s.photoMoreText}>+{uris.length - 4}</Text></View>
+              )}
+            </View>
+          ))}
+        </View>
+      );
+    }
+    if (att.type === 'video') {
+      return (
+        <View style={s.videoThumb}>
+          {att.uri ? <Image source={{ uri: att.uri }} style={s.videoThumbImg} resizeMode="cover" /> : null}
+          <View style={s.videoPlayOverlay}><Feather name="play-circle" size={36} color="#fff" /></View>
+          {att.meta?.duration ? <View style={s.videoDurBadge}><Text style={s.videoDurText}>{att.meta.duration}s</Text></View> : null}
+        </View>
+      );
+    }
+    if (att.type === 'voice') {
+      return (
+        <TouchableOpacity style={s.voiceRow} activeOpacity={0.8}
+          onPress={() => att.uri && handlePlayVoice(att.uri)}>
+          <View style={[s.voicePlayBtn, playingVoiceUri === att.uri && s.voicePlayBtnActive]}>
+            <Feather name={playingVoiceUri === att.uri ? 'square' : 'play'} size={14} color="#fff" />
+          </View>
+          <View style={s.voiceWave}>
+            {[...Array(12)].map((_, i) => (
+              <View key={i} style={[s.voiceBar, { height: 4 + Math.abs(Math.sin(i * 0.8)) * 14 }]} />
+            ))}
+          </View>
+          <Text style={s.voiceDur}>{att.meta?.duration ? `${att.meta.duration}s` : '…'}</Text>
+        </TouchableOpacity>
+      );
+    }
+    return (
+      <TouchableOpacity
+        style={s.attachCard}
+        activeOpacity={att.type === 'product' || att.type === 'order' || att.type === 'post' ? 0.7 : 1}
+        onPress={() => {
+          if (att.type === 'product') {
+            const pid = att.meta?.productId;
+            if (pid) router.push(('/buyer-product-detail?productId=' + pid) as never);
+          } else if (att.type === 'order') {
+            router.push('/seller-orders' as never);
+          } else if (att.type === 'post') {
+            const postId = att.meta?.postId;
+            if (postId) {
+              const qs = [
+                'postId=' + encodeURIComponent(postId),
+                'postAuthorName=' + encodeURIComponent(att.meta?.authorName ?? 'Seller'),
+                'postCaption=' + encodeURIComponent(att.title ?? ''),
+                'postType=' + encodeURIComponent(att.meta?.mediaType ?? 'photo'),
+                'postMediaColor1=' + encodeURIComponent(PURPLE_DIM),
+                'postMediaColor2=' + encodeURIComponent(BG),
+              ].join('&');
+              router.push(('/buyer-post-viewer?' + qs) as never);
+            }
+          }
+        }}
+      >
+        <Feather name={attachmentIcon(att.type)} size={ICON.sm} color={PURPLE} />
+        <View style={{ flex: 1, marginLeft: SP.sm }}>
+          {att.title ? <Text style={s.attachTitle} numberOfLines={1}>{att.title}</Text> : null}
+          {att.subtitle ? <Text style={s.attachSubtitle} numberOfLines={1}>{att.subtitle}</Text> : null}
+        </View>
+        {(att.type === 'product' || att.type === 'order' || att.type === 'post') && (
+          <Feather name="chevron-right" size={ICON.sm} color={MUTED} />
+        )}
+      </TouchableOpacity>
+    );
   }
 
   async function loadProducts() {
@@ -271,55 +495,8 @@ export default function SellerConversationScreen() {
             },
           ]}
         >
-          {/* Attachment card */}
-          {msg.attachment && (
-            <TouchableOpacity
-              style={s.attachCard}
-              activeOpacity={
-                msg.attachment.type === 'product'
-                || msg.attachment.type === 'order'
-                || msg.attachment.type === 'post' ? 0.7 : 1
-              }
-              onPress={() => {
-                if (msg.attachment?.type === 'product') {
-                  const pid = msg.attachment.meta?.productId;
-                  if (pid) {
-                    router.push(('/buyer-product-detail?productId=' + pid) as never);
-                  }
-                } else if (msg.attachment?.type === 'order') {
-                  router.push('/seller-orders' as never);
-                } else if (msg.attachment?.type === 'post') {
-                  const postId = msg.attachment.meta?.postId;
-                  if (postId) {
-                    const qs = [
-                      'postId=' + encodeURIComponent(postId),
-                      'postAuthorName=' + encodeURIComponent(msg.attachment.meta?.authorName ?? 'Seller'),
-                      'postCaption=' + encodeURIComponent(msg.attachment.title ?? ''),
-                      'postType=' + encodeURIComponent(msg.attachment.meta?.mediaType ?? 'photo'),
-                      'postMediaColor1=' + encodeURIComponent(PURPLE_DIM),
-                      'postMediaColor2=' + encodeURIComponent(BG),
-                    ].join('&');
-                    router.push(('/buyer-post-viewer?' + qs) as never);
-                  }
-                }
-              }}
-            >
-              <Feather name={attachmentIcon(msg.attachment.type)} size={ICON.sm} color={PURPLE} />
-              <View style={{ flex: 1, marginLeft: SP.sm }}>
-                {msg.attachment.title ? (
-                  <Text style={s.attachTitle} numberOfLines={1}>{msg.attachment.title}</Text>
-                ) : null}
-                {msg.attachment.subtitle ? (
-                  <Text style={s.attachSubtitle} numberOfLines={1}>{msg.attachment.subtitle}</Text>
-                ) : null}
-              </View>
-              {(msg.attachment.type === 'product'
-                || msg.attachment.type === 'order'
-                || msg.attachment.type === 'post') && (
-                <Feather name="chevron-right" size={ICON.xs} color={MUTED} />
-              )}
-            </TouchableOpacity>
-          )}
+          {/* Attachment */}
+          {msg.attachment && renderMsgAttachment(msg.attachment)}
           {/* Text — hide the single-space placeholder */}
           {msg.text && msg.text.trim().length > 0 && (
             <Text style={s.msgText}>{msg.text}</Text>
@@ -357,6 +534,24 @@ export default function SellerConversationScreen() {
           <Text style={s.headerName} numberOfLines={1}>{other?.name ?? 'Buyer'}</Text>
           {other?.handle ? <Text style={s.headerHandle} numberOfLines={1}>{other.handle}</Text> : null}
         </View>
+        {id && (
+          <>
+            <TouchableOpacity
+              style={s.headerCallBtn}
+              onPress={() => handleStartCall('voice')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Feather name="phone" size={ICON.md} color={MUTED} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={s.headerCallBtn}
+              onPress={() => handleStartCall('video')}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Feather name="video" size={ICON.md} color={MUTED} />
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       {/* Order context card */}
@@ -421,6 +616,29 @@ export default function SellerConversationScreen() {
           <Feather name="paperclip" size={ICON.md} color={pendingAttachment ? PURPLE : MUTED} />
         </TouchableOpacity>
 
+        {/* Media */}
+        <TouchableOpacity
+          style={s.attachBtn}
+          onPress={() => setShowMediaSheet(true)}
+          disabled={isUploading || isSending}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          {isUploading
+            ? <ActivityIndicator size="small" color={PURPLE} />
+            : <Feather name="camera" size={ICON.md} color={MUTED} />
+          }
+        </TouchableOpacity>
+
+        {/* Voice */}
+        <TouchableOpacity
+          style={[s.attachBtn, isRecording && s.recordingBtn]}
+          onPress={handleToggleRecording}
+          disabled={isUploading || isSending}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Feather name={isRecording ? 'stop-circle' : 'mic'} size={ICON.md} color={isRecording ? RED : MUTED} />
+        </TouchableOpacity>
+
         <TextInput
           style={s.textInput}
           value={text}
@@ -444,6 +662,35 @@ export default function SellerConversationScreen() {
           <Feather name="send" size={ICON.sm} color={canSend ? PURPLE : MUTED} />
         </TouchableOpacity>
       </View>
+
+      {/* ── Media picker sheet ─────────────────────────────────────────────── */}
+      <Modal
+        visible={showMediaSheet}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowMediaSheet(false)}
+      >
+        <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={() => setShowMediaSheet(false)} />
+        <View style={[s.sheet, { paddingBottom: insets.bottom + SP.md }]}>
+          <View style={s.sheetHandle} />
+          <Text style={s.sheetTitle}>Add to message</Text>
+          <TouchableOpacity style={s.sheetOption} onPress={handlePickPhoto}>
+            <View style={s.sheetOptionIcon}><Feather name="image" size={ICON.md} color={PURPLE} /></View>
+            <View>
+              <Text style={s.sheetOptionLabel}>Photos</Text>
+              <Text style={s.sheetOptionDesc}>Up to 15 at once</Text>
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.sheetOption} onPress={handlePickVideo}>
+            <View style={s.sheetOptionIcon}><Feather name="video" size={ICON.md} color={PURPLE} /></View>
+            <View>
+              <Text style={s.sheetOptionLabel}>Video clip</Text>
+              <Text style={s.sheetOptionDesc}>Under 1 minute</Text>
+            </View>
+          </TouchableOpacity>
+          <View style={{ height: 20 }} />
+        </View>
+      </Modal>
 
       {/* ── Attach picker sheet ─────────────────────────────────────────────── */}
       <Modal
@@ -711,4 +958,31 @@ const s = StyleSheet.create({
   productPrice: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
   emptyState: { alignItems: 'center', paddingVertical: SP.xxl },
   emptyText: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, marginTop: SP.sm },
+
+  // ── Call + media styles ──────────────────────────────────────────────────────
+  headerCallBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', marginLeft: SP.xs },
+  recordingBtn:  { backgroundColor: 'rgba(255,59,48,0.12)', borderRadius: RADIUS.pill },
+
+  // Photo grid
+  photoGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 2, borderRadius: RADIUS.md, overflow: 'hidden' },
+  photoCell:       { width: '48%', aspectRatio: 1, overflow: 'hidden', borderRadius: RADIUS.sm, position: 'relative' },
+  photoCellSingle: { width: '100%', aspectRatio: 4 / 3 },
+  photoImg:        { width: '100%', height: '100%' },
+  photoMore:       { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },
+  photoMoreText:   { color: '#fff', fontSize: FS.lg, fontFamily: FONT.bold },
+
+  // Video thumb
+  videoThumb:       { borderRadius: RADIUS.md, overflow: 'hidden', width: 200, height: 130, position: 'relative' },
+  videoThumbImg:    { width: '100%', height: '100%' },
+  videoPlayOverlay: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
+  videoDurBadge:    { position: 'absolute', bottom: SP.xs, right: SP.xs, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: RADIUS.sm, paddingHorizontal: SP.xs, paddingVertical: 2 },
+  videoDurText:     { color: '#fff', fontSize: FS.xs, fontFamily: FONT.medium },
+
+  // Voice player
+  voiceRow:          { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.xs, minWidth: 160 },
+  voicePlayBtn:      { width: 28, height: 28, borderRadius: 14, backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center' },
+  voicePlayBtnActive:{ backgroundColor: RED },
+  voiceWave:         { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 3 },
+  voiceBar:          { width: 3, backgroundColor: PURPLE_DIM, borderRadius: 2 },
+  voiceDur:          { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
 });

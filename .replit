@@ -26,3 +26,5 @@ channel = "stable-25_05"
 
 [userenv.shared]
 EXPO_PUBLIC_API_BASE_URL = "https://c8017a58-af99-4654-be4f-b3160d5d3e36-00-2s1s4ser85n61.riker.replit.dev"
+ENABLE_TEST_SUBSCRIPTION_BYPASS = "true"
+EXPO_PUBLIC_ENABLE_TEST_SUBSCRIPTION_BYPASS = "true"

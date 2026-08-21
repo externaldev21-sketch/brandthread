@@ -73,6 +73,7 @@ import freelancerJobsRouter from "./freelancer-jobs";
 import boostsRouter    from "./boosts";
 import vacationRouter  from "./vacation";
 import loyaltyRouter   from "./loyalty";
+import callRouter      from "./call";
 
 const router = Router();
 
@@ -88,6 +89,7 @@ router.use("/seller/export",   sellerExportRouter);
 // tc (teamContext) is applied to every seller-scoped route so X-Store-Context
 // is honoured consistently. resolveTeamContext is idempotent (cached on req),
 // so routes that already mount it internally get a free no-op on the second call.
+router.use("/call",            callRouter);
 router.use("/healthz",         healthRouter);
 router.use("/auth",            authRouter);
 router.use("/products",        tc, productsRouter);

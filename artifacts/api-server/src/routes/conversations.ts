@@ -576,6 +576,51 @@ router.patch("/:id/accept", async (req, res) => {
   return res.json(buildConversationView(updated, parts, userId));
 });
 
+// ─── POST /api/conversations/upload-media ────────────────────────────────────
+// Accept a base64-encoded image/video/audio and store it in object storage.
+// Returns { url } — a publicly-accessible URL for use in message attachments.
+router.post("/upload-media", async (req, res) => {
+  const userId = (req as any).clerkUserId as string;
+  const { data, mimeType = "image/jpeg", extension = "jpg" } = req.body ?? {};
+
+  const BUCKET_ID = (process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "").trim();
+  if (!BUCKET_ID) {
+    return res.status(503).json({ error: "Object storage not configured" });
+  }
+
+  if (!data || typeof data !== "string") {
+    return res.status(400).json({ error: "data (base64) is required" });
+  }
+
+  // Strip data-URL prefix if present
+  let base64 = data;
+  const dataUrlMatch = /^data:([^;]+);base64,(.+)$/.exec(data);
+  if (dataUrlMatch) base64 = dataUrlMatch[2];
+
+  // 80 MB safety cap (base64 is ~4/3 × raw size)
+  if (base64.length > 80 * 1024 * 1024) {
+    return res.status(413).json({ error: "File too large (max ~60 MB)" });
+  }
+
+  const { randomUUID } = await import("crypto");
+  const ext      = (extension as string).replace(/^\./, "").slice(0, 10);
+  const filename = `messaging/${userId}/${randomUUID()}.${ext}`;
+
+  try {
+    const { objectStorageClient } = await import("../lib/objectStorage");
+    const buffer = Buffer.from(base64, "base64");
+    const bucket = objectStorageClient.bucket(BUCKET_ID);
+    const file   = bucket.file(filename);
+    await file.save(buffer, { contentType: mimeType as string, resumable: false });
+    await file.makePublic();
+    const url = `https://storage.googleapis.com/${BUCKET_ID}/${filename}`;
+    return res.json({ url });
+  } catch (err: any) {
+    console.error("[conversations/upload-media]", err?.message ?? err);
+    return res.status(500).json({ error: "Upload failed" });
+  }
+});
+
 // ─── DELETE /api/conversations/:id — decline / delete conversation ────────────
 router.delete("/:id", async (req, res) => {
   const userId = (req as any).clerkUserId as string;

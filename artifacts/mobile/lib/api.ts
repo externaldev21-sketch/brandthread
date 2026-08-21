@@ -434,6 +434,16 @@ export function createApi(getToken: GetToken) {
       /** Decline / delete a conversation (used for request rejection) */
       decline: (id: string) =>
         del<{ ok: boolean }>(`/api/conversations/${encodeURIComponent(id)}`),
+      /** Upload a base64-encoded image/video/audio file and get back a public URL. */
+      uploadMedia: (body: { data: string; mimeType: string; extension: string }) =>
+        post<{ url: string }>('/api/conversations/upload-media', body),
+    },
+    /** 1:1 voice / video call tokens (Agora RTC). */
+    call: {
+      token: (body: { conversationId: string; mode: 'voice' | 'video' }) =>
+        post<{ appId: string; token: string; channelName: string; uid: number; mode: string }>(
+          '/api/call/token', body
+        ),
     },
     /** Unauthenticated public endpoints — no Authorization header needed. */
     publicProducts: {
