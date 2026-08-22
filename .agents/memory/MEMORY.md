@@ -3,6 +3,7 @@
 - [Brandthread backend architecture](brandthread-backend-architecture.md) — ownerId scoping, transactional orders, lib/db build requirement, clerkClient usage, healthz double-path gotcha.
 - [Inbox structural flattening](inbox-flattening-pattern.md) — Brandthread screens (profile, inbox) use flat Instagram-style rows, no card chrome; keep new screens consistent.
 - [Buyer/Seller only — no Both](buyer-seller-nav.md) — "Both" account type fully removed; buyer home is Thread (video feed at index); buyer tabs are Thread·Discover·Friends·Inbox·Profile.
+- [User-scoped onboarding state](user-scoped-onboarding-state.md) — auth-gated local completion and identity writes must be owned by a Clerk user, never a shared device-global key.
 - [Onboarding architecture](onboarding-architecture.md) — embedded Clerk auth mid-flow; AsyncStorage draft persistence; dev reset via 1.5s long-press on success checkmark.
 - [Seller Dashboard Architecture](seller-dashboard-architecture.md) — tabs (Home·Studio·Products·Orders·More), services layer at @/services/, screen inventory, color system, navigation gotchas.
 - [Manufacturer Hub Architecture](manufacturer-hub-architecture.md) — 9 screens, types+service files, route list, no-local-const rule, null-safety-in-handlers rule, demo behavior.

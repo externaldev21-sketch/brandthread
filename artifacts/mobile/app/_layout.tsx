@@ -22,8 +22,9 @@ import BootScreen from '@/components/BootScreen';
 import * as Notifications from 'expo-notifications';
 import { configureServices } from '@/lib/serviceConfig';
 import { configureApi, setStoreContext, useApi } from '@/lib/api';
-import { clearSocialCache, initSocialService } from '@/services/socialService';
+import { clearSocialCache, hydrateMyProfileFromAccount, initSocialService, socialKeysForUser } from '@/services/socialService';
 import { clearCartCache, initCartService } from '@/services/cartService';
+import { initBuyerProfile } from '@/lib/buyerProfile';
 import StoreContextBanner from '@/components/StoreContextBanner';
 
 // ─── Push notification handler (show alerts while app is foregrounded) ────────
@@ -88,6 +89,7 @@ const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY ?? '';
 const proxyUrl = process.env.EXPO_PUBLIC_CLERK_PROXY_URL || undefined;
 
 export const ONBOARDING_KEY = 'onboarding_complete';
+export const ONBOARDING_OWNER_KEY = 'onboarding_owner_id';
 
 // ─── DEV: force restart to onboarding start ──────────────────────────────────
 // Set back to false (or remove) when done testing.
@@ -98,7 +100,7 @@ const AUTH_SCREENS = ['welcome', 'sign-in', 'forgot-password', 'splash'];
 
 // ─── Auth gate ────────────────────────────────────────────────────────────────
 function AuthGate() {
-  const { isSignedIn, isLoaded, signOut } = useAuth();
+  const { isSignedIn, isLoaded, signOut, userId } = useAuth();
   const router   = useRouter();
   const segments = useSegments();
   const rootNavigationState = useRootNavigationState();
@@ -161,13 +163,18 @@ function AuthGate() {
   useEffect(() => {
     if (!isSignedIn) { setOnboardingChecked(false); return; }
     setOnboardingChecked(false);
-    AsyncStorage.multiGet([ONBOARDING_KEY, 'user_role']).then((pairs) => {
-      setOnboardingDone(pairs[0][1] === 'true');
-      setStoredRole(pairs[1][1]);
+    AsyncStorage.multiGet([ONBOARDING_KEY, 'user_role', ONBOARDING_OWNER_KEY]).then((pairs) => {
+      // These legacy keys remain readable for the current session, but a
+      // completion is trusted only when it belongs to the signed-in Clerk user.
+      // This prevents a shared device from routing account B into account A's
+      // buyer/seller experience.
+      const belongsToSignedInUser = pairs[2][1] === userId;
+      setOnboardingDone(belongsToSignedInUser && pairs[0][1] === 'true');
+      setStoredRole(belongsToSignedInUser ? pairs[1][1] : null);
       setOnboardingChecked(true);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSignedIn, topSegment]);
+  }, [isSignedIn, userId, topSegment]);
 
   useEffect(() => {
     // Expo Router's root navigator is mounted by the Stack below. Waiting for
@@ -256,6 +263,7 @@ const STORE_CTX_KEY = '@brandthread/store_context';
 function ServiceConfigurer() {
   const { getToken, isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
+  const api = useApi();
   const prevSignedInRef2 = useRef<boolean | null>(null);
   // Track the previously active user ID so we can clear their cache before
   // switching to the next user (or to 'anon' on sign-out).
@@ -283,8 +291,29 @@ function ServiceConfigurer() {
     prevUserIdRef.current = newUserId;
     initSocialService(newUserId);
     initCartService(newUserId);
+    initBuyerProfile(newUserId);
+
+    if (!newUserId || !isSignedIn) return;
+    // Defense in depth for people who sign in on another device or have an
+    // older session from before onboarding started provisioning local users.
+    void api.auth.sync()
+      .then((profile) => {
+        // The request may finish after sign-out or an account switch. Never
+        // hydrate identity into whichever account happens to be active then.
+        if (prevUserIdRef.current !== newUserId) return;
+        if (profile.accountType !== 'buyer') return;
+        return hydrateMyProfileFromAccount({
+          userId: newUserId,
+          name: profile.displayName || profile.name,
+          username: profile.username,
+          bio: profile.bio,
+        }, socialKeysForUser(newUserId));
+      })
+      .catch((error) => {
+        console.warn('[identity] Local profile provisioning failed', error);
+      });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+  }, [user?.id, isSignedIn, api]);
 
   // Hydrate persisted store context once per sign-in session.
   useEffect(() => {

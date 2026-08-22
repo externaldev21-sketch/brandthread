@@ -1,6 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const KEY = 'buyer_profile_fields_v1';
+let activeUserId = 'anon';
+const keyFor = (userId = activeUserId) => `bt:buyer-profile:${userId}:v2`;
+
+/** Scope editable buyer fields to the authenticated Clerk user. */
+export function initBuyerProfile(userId: string | null): void {
+  activeUserId = userId ?? 'anon';
+}
 
 export interface BuyerProfileFields {
   name: string;
@@ -18,9 +24,9 @@ export interface BuyerProfileFields {
 
 export const DEFAULT_BUYER_PROFILE: BuyerProfileFields = {
   name: '',
-  username: 'jordan',
+  username: '',
   pronouns: '',
-  bio: 'Jordan',
+  bio: '',
   links: '',
   location: '',
   gender: '',
@@ -52,7 +58,7 @@ function sanitize(raw: unknown): BuyerProfileFields {
 
 export async function loadBuyerProfile(): Promise<BuyerProfileFields> {
   try {
-    const raw = await AsyncStorage.getItem(KEY);
+    const raw = await AsyncStorage.getItem(keyFor());
     if (!raw) return { ...DEFAULT_BUYER_PROFILE };
     return sanitize(JSON.parse(raw));
   } catch {
@@ -61,8 +67,13 @@ export async function loadBuyerProfile(): Promise<BuyerProfileFields> {
 }
 
 export async function saveBuyerProfile(fields: BuyerProfileFields): Promise<boolean> {
+  return saveBuyerProfileForUser(activeUserId, fields);
+}
+
+/** Write directly to an immutable Clerk-user key for async onboarding flows. */
+export async function saveBuyerProfileForUser(userId: string, fields: BuyerProfileFields): Promise<boolean> {
   try {
-    await AsyncStorage.setItem(KEY, JSON.stringify(fields));
+    await AsyncStorage.setItem(keyFor(userId), JSON.stringify(fields));
     return true;
   } catch {
     return false;

@@ -31,12 +31,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
-import { ONBOARDING_KEY } from './_layout';
+import { ONBOARDING_KEY, ONBOARDING_OWNER_KEY } from './_layout';
 
 // Required on Android so the in-app browser tab closes after OAuth redirect
 WebBrowser.maybeCompleteAuthSession();
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { useApi } from '@/lib/api';
+import { hydrateMyProfileFromAccount, socialKeysForUser } from '@/services/socialService';
+import { DEFAULT_BUYER_PROFILE, saveBuyerProfileForUser } from '@/lib/buyerProfile';
 
 // ─── Palette ────────────────────────────────────────────────────────────────
 const BG      = '#07070F';
@@ -976,6 +978,7 @@ const sa = StyleSheet.create({
 // ─── Main onboarding component ────────────────────────────────────────────────
 export default function OnboardingScreen() {
   const { isSignedIn, signOut } = useAuth();
+  const { user }                = useUser();
   const { signUp }              = useSignUp();
   const { signIn }              = useSignIn();
   const { startSSOFlow } = useSSO();
@@ -1097,19 +1100,35 @@ export default function OnboardingScreen() {
     if (finishing) return;
     setFinishing(true);
     try {
+      const name = firstName.trim();
+      const uname = username.trim().toLowerCase();
+      const profile = await api.auth.sync({ name, accountType: 'buyer' });
+      const updated = await api.auth.updateProfile({
+        name,
+        displayName: name,
+        accountType: 'buyer',
+        ...(uname ? { username: uname } : {}),
+      });
+      await hydrateMyProfileFromAccount({
+        userId: profile.clerkId,
+        name: updated.displayName || updated.name || name,
+        username: updated.username ?? uname,
+        bio: updated.bio,
+      }, socialKeysForUser(profile.clerkId));
+      await saveBuyerProfileForUser(profile.clerkId, {
+        ...DEFAULT_BUYER_PROFILE,
+        name: updated.displayName || updated.name || name,
+        username: updated.username ?? uname,
+      });
       await AsyncStorage.multiSet([
         [ONBOARDING_KEY, 'true'],
+        [ONBOARDING_OWNER_KEY, profile.clerkId],
         ['user_role', 'buyer'],
         ['onboarding_first_name', firstName],
         ['onboarding_style_interests', JSON.stringify(styleInterests)],
         ['notifications_granted', notificationsGranted ? 'true' : 'false'],
       ]);
       await AsyncStorage.removeItem(DRAFT_KEY);
-      // Username save is non-critical — fire-and-forget
-      const uname = username.trim().toLowerCase();
-      if (/^[a-zA-Z0-9_]{3,30}$/.test(uname)) {
-        api.auth.updateProfile({ username: uname }).catch(() => {});
-      }
       // Style interest preferences — non-critical for buyer
       if (styleInterests.length > 0) {
         api.seller.saveOnboardingData({ styleInterests }).catch(() => {});
@@ -1129,8 +1148,29 @@ export default function OnboardingScreen() {
     if (finishing) return;
     setFinishing(true);
     try {
+      const name = firstName.trim();
+      const uname = username.trim().toLowerCase();
+      const profile = await api.auth.sync({ name, accountType: 'seller' });
+      // This is the actual seller profile write. The previous flow only
+      // stored these answers locally and called the optional questionnaire API.
+      await api.auth.onboarding({
+        brandName: brandName.trim(),
+        brandStage,
+        sellModel: productModel,
+        ...(uname ? { username: uname } : {}),
+      });
+      await api.auth.updateProfile({
+        name,
+        displayName: name,
+        accountType: 'seller',
+      });
+      // Brand profile data — critical; surface error if it fails
+      if (goals.length > 0 || brandStage || productModel) {
+        await api.seller.saveOnboardingData({ goals, brandStage, sellModel: productModel });
+      }
       await AsyncStorage.multiSet([
         [ONBOARDING_KEY, 'true'],
+        [ONBOARDING_OWNER_KEY, profile.clerkId],
         ['user_role', 'seller'],
         ['onboarding_first_name', firstName],
         ['onboarding_brand_name', brandName],
@@ -1138,15 +1178,6 @@ export default function OnboardingScreen() {
         ['notifications_granted', notificationsGranted ? 'true' : 'false'],
       ]);
       await AsyncStorage.removeItem(DRAFT_KEY);
-      // Username save is non-critical — fire-and-forget
-      const uname = username.trim().toLowerCase();
-      if (/^[a-zA-Z0-9_]{3,30}$/.test(uname)) {
-        api.auth.updateProfile({ username: uname }).catch(() => {});
-      }
-      // Brand profile data — critical; surface error if it fails
-      if (goals.length > 0 || brandStage || productModel) {
-        await api.seller.saveOnboardingData({ goals, brandStage, sellModel: productModel });
-      }
       // Seed the AI brand memory in the background so the assistant has real
       // context on the seller's stage/goals from day one — non-blocking
       api.ai.brandMemoryRebuild().catch(() => {});
@@ -1156,18 +1187,7 @@ export default function OnboardingScreen() {
       Alert.alert(
         'Setup incomplete',
         "We couldn\u2019t save your brand profile. Check your connection and try again.",
-        [
-          {
-            text: 'Skip for now',
-            style: 'destructive',
-            onPress: async () => {
-              // Allow entry even if the API save fails — data can be updated in settings
-              await AsyncStorage.multiSet([[ONBOARDING_KEY, 'true'], ['user_role', 'seller'], ['onboarding_brand_name', brandName]]);
-              router.replace('/(tabs)/' as never);
-            },
-          },
-          { text: 'Retry', onPress: finishSeller },
-        ],
+        [{ text: 'Retry', onPress: finishSeller }],
       );
     }
   }
@@ -1177,7 +1197,7 @@ export default function OnboardingScreen() {
   async function devReset() {
     try { if (isSignedIn) await signOut(); } catch {}
     await AsyncStorage.multiRemove([
-      ONBOARDING_KEY, 'user_role', DRAFT_KEY,
+      ONBOARDING_KEY, ONBOARDING_OWNER_KEY, 'user_role', DRAFT_KEY,
       'onboarding_first_name', 'onboarding_brand_name',
       'onboarding_style_interests', 'splash_seen',
     ]);

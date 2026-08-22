@@ -117,6 +117,19 @@ export interface FreelancerJob {
   serviceType?: string;
 }
 
+export interface LocalUserProfile {
+  id: string;
+  clerkId: string;
+  email: string;
+  name: string;
+  displayName: string | null;
+  bio: string | null;
+  website: string | null;
+  username: string | null;
+  accountType: 'buyer' | 'seller' | null;
+  brandName: string | null;
+}
+
 export function createApi(getToken: GetToken) {
   const get     = <T>(path: string) => request<T>(path, { method: 'GET' }, getToken);
   const getText  = (path: string)   => request<string>(path, { method: 'GET' }, getToken, true);
@@ -127,8 +140,12 @@ export function createApi(getToken: GetToken) {
 
   return {
     auth: {
-      sync:        ()             => post('/api/auth/sync', {}),
-      me:          ()             => get<{ accountType?: 'buyer' | 'seller' }>('/api/auth/me'),
+      /** Create the matching local user record after Clerk authentication.
+       * During onboarding, pass the name that the person explicitly entered so
+       * it wins over incomplete OAuth provider profile data. */
+      sync:        (body: { name?: string; accountType?: 'buyer' | 'seller' } = {}) =>
+        post<LocalUserProfile>('/api/auth/sync', body),
+      me:          ()             => get<LocalUserProfile>('/api/auth/me'),
       onboarding:  (body: unknown) => patch('/api/auth/onboarding', body),
       /** Check whether a username handle is available for the current user.
        *  Returns { available: true } if free (or already owned by this user),

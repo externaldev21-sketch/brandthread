@@ -67,6 +67,12 @@ function K(uid = _socialUserId) {
  *  never re-resolve _socialUserId in async continuations. */
 type SocialKeys = ReturnType<typeof K>;
 
+/** Capture immutable storage keys for a specific authenticated account before
+ * starting an async operation that may outlive the current Clerk session. */
+export function socialKeysForUser(userId: string): SocialKeys {
+  return K(userId);
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 let _uidCounter = 0;
@@ -361,20 +367,58 @@ export async function clearSocialCache(userId?: string): Promise<void> {
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
 
-const DEFAULT_PROFILE: BuyerSocialProfile = {
-  id: MY_USER_ID, userId: MY_USER_ID, accountType: 'buyer',
-  name: 'Jordan', username: 'jordan', pronouns: '', bio: 'Into archive pieces, heavy outerwear & limited drops. DMs open for fit checks.', website: '', location: 'London, UK',
-  avatarColor: MY_COLOR, avatarInitials: MY_INITIALS,
-  profileVisibility: 'public', postsCount: 3, friendsCount: 5, savedCount: 4,
-  followingBrandsCount: 5, createdAt: new Date(now - 30 * 24 * 3600000).toISOString(),
-};
+function emptyProfile(userId: string): BuyerSocialProfile {
+  return {
+    id: userId, userId, accountType: 'buyer',
+    name: '', username: '', pronouns: '', bio: '', website: '', location: '',
+    avatarColor: MY_COLOR, avatarInitials: '',
+    profileVisibility: 'public', postsCount: 0, friendsCount: 0, savedCount: 0,
+    followingBrandsCount: 0, createdAt: iso(),
+  };
+}
+
+function initialsFor(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '';
+  return parts.length === 1
+    ? parts[0].slice(0, 2).toUpperCase()
+    : `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
 
 export async function getMyProfile(k: SocialKeys = K()): Promise<BuyerSocialProfile> {
-  return load(k.profile, DEFAULT_PROFILE);
+  return load(k.profile, emptyProfile(k.userId));
 }
 export async function updateMyProfile(updates: Partial<BuyerSocialProfile>, k: SocialKeys = K()): Promise<BuyerSocialProfile> {
   const current = await getMyProfile(k);
   const next = { ...current, ...updates };
+  await save(k.profile, next);
+  notify();
+  return next;
+}
+
+/** Hydrate the local buyer surface from the provisioned authenticated account.
+ * This profile is intentionally user-scoped and never receives demo identity
+ * values. It also repairs old locally seeded "Jordan" profiles on first sign-in. */
+export async function hydrateMyProfileFromAccount(
+  identity: { userId: string; name: string; username?: string | null; bio?: string | null },
+  k: SocialKeys = K(),
+): Promise<BuyerSocialProfile> {
+  if (identity.userId !== k.userId) {
+    throw new Error('Cannot hydrate a profile into another user’s storage');
+  }
+  const current = await getMyProfile(k);
+  const name = identity.name.trim();
+  const username = identity.username?.trim().replace(/^@/, '') ?? '';
+  const isLegacyDemo = current.name === MY_NAME && current.username === 'jordan';
+  const next: BuyerSocialProfile = {
+    ...current,
+    id: k.userId,
+    userId: identity.userId,
+    name: name || (isLegacyDemo ? '' : current.name),
+    username: username || (isLegacyDemo ? '' : current.username),
+    bio: identity.bio?.trim() || (isLegacyDemo ? '' : current.bio),
+    avatarInitials: name ? initialsFor(name) : (isLegacyDemo ? '' : current.avatarInitials),
+  };
   await save(k.profile, next);
   notify();
   return next;

@@ -9,7 +9,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { useAuth } from '@clerk/expo';
+import { useAuth, useUser } from '@clerk/expo';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN,
@@ -19,7 +19,7 @@ import {
 import {
   getMyProfile, getMyPosts, getMyReposts, getSavedItems,
   getPrivacySettings, archivePost, deletePost,
-  subscribeSocial, MY_USER_ID, MY_COLOR, MY_INITIALS, MY_HANDLE,
+  subscribeSocial, MY_USER_ID, MY_COLOR,
 } from '@/services/socialService';
 import { useApi } from '@/lib/api';
 import { loadBuyerProfile } from '@/lib/buyerProfile';
@@ -99,6 +99,7 @@ export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router  = useRouter();
   const { signOut } = useAuth();
+  const { user } = useUser();
   const api     = useApi();
 
   const [profile, setProfile] = useState<BuyerSocialProfile | null>(null);
@@ -158,7 +159,9 @@ export default function ProfileScreen() {
 
   const handleShareProfile = async () => {
     setMenuOpen(false);
-    const handle = profile?.username ? `@${profile.username}` : MY_HANDLE;
+    const handle = profile?.username
+      ? `@${profile.username}`
+      : (user?.username ? `@${user.username}` : 'Brandthread');
     try {
       await Share.share({ message: `Find me on Brandthread: ${handle}`, title: 'Share Profile' });
     } catch {}
@@ -194,7 +197,9 @@ export default function ProfileScreen() {
     const post = postSheet;
     setPostSheet(null);
     if (!post) return;
-    const handle = profile?.username ? `@${profile.username}` : MY_HANDLE;
+    const handle = profile?.username
+      ? `@${profile.username}`
+      : (user?.username ? `@${user.username}` : 'Brandthread');
     try {
       await Share.share({
         message: `${handle} on Brandthread: "${post.caption || 'Check this out'}"`,
@@ -234,6 +239,14 @@ export default function ProfileScreen() {
 
   const joinedYear = profile ? new Date(profile.createdAt).getFullYear() : '';
   const isPrivate = privacySettings?.profileVisibility === 'private';
+  const clerkName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.username || '';
+  const displayName = profile?.name || clerkName || 'Your profile';
+  const displayHandle = profile?.username
+    ? `@${profile.username}`
+    : (user?.username ? `@${user.username}` : '');
+  const avatarInitials = profile?.avatarInitials
+    || displayName.split(/\s+/).filter(Boolean).map((part) => part[0]).join('').slice(0, 2).toUpperCase()
+    || '•';
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -241,7 +254,7 @@ export default function ProfileScreen() {
       <View style={styles.topBar}>
         <View style={styles.topBarLeft}>
           <Feather name={isPrivate ? 'lock' : 'globe'} size={ICON.sm} color={MUTED} />
-          <Text style={styles.topHandle}>{profile?.username ? `@${profile.username}` : MY_HANDLE}</Text>
+          <Text style={styles.topHandle}>{displayHandle}</Text>
         </View>
         <View style={styles.topBarRight}>
           <TouchableOpacity onPress={() => router.push('/buyer-notifications' as any)} style={styles.iconBtn}>
@@ -272,7 +285,7 @@ export default function ProfileScreen() {
                   <Image source={{ uri: avatarUri }} style={[styles.avatar, { resizeMode: 'cover', margin: 3 }]} />
                 ) : (
                   <LinearGradient colors={GRAD_PRIMARY} style={[styles.avatar, { margin: 3 }]}>
-                    <Text style={styles.avatarText}>{profile?.avatarInitials || MY_INITIALS}</Text>
+                    <Text style={styles.avatarText}>{avatarInitials}</Text>
                   </LinearGradient>
                 )}
               </LinearGradient>
@@ -280,7 +293,7 @@ export default function ProfileScreen() {
               <Image source={{ uri: avatarUri }} style={[styles.avatar, { resizeMode: 'cover' }]} />
             ) : (
               <LinearGradient colors={GRAD_PRIMARY} style={styles.avatar}>
-                <Text style={styles.avatarText}>{profile?.avatarInitials || MY_INITIALS}</Text>
+                <Text style={styles.avatarText}>{avatarInitials}</Text>
               </LinearGradient>
             )}
             <View style={styles.avatarBadge}>
@@ -308,10 +321,10 @@ export default function ProfileScreen() {
 
         {/* Name Section */}
         <View style={styles.nameSection}>
-          <Text style={styles.profileName}>{profile?.name || 'Jordan'}</Text>
+            <Text style={styles.profileName}>{displayName}</Text>
           {profile?.pronouns ? <Text style={styles.pronouns}>({profile.pronouns})</Text> : null}
           <Text style={styles.handleYear}>
-            {profile?.username ? `@${profile.username}` : MY_HANDLE}{joinedYear ? ` · Joined ${joinedYear}` : ''}
+            {displayHandle}{joinedYear ? ` · Joined ${joinedYear}` : ''}
           </Text>
           {profile?.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
           {profile?.website ? (

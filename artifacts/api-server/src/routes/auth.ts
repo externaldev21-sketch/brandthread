@@ -18,38 +18,58 @@ function validateUsername(u: string): string | null {
   return null; // valid
 }
 
+function normalizeProfileName(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const name = value.trim().replace(/\s+/g, " ");
+  return name || undefined;
+}
+
 // ─── POST /api/auth/sync ──────────────────────────────────────────────────────
 // Create or update the user record from Clerk data.
 router.post("/sync", requireAuth, async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
   try {
+    const preferredName = normalizeProfileName(req.body?.name);
+    const accountType = req.body?.accountType;
+    if (req.body?.name !== undefined && !preferredName) {
+      res.status(400).json({ error: "name must not be blank" });
+      return;
+    }
+    if (accountType !== undefined && accountType !== "buyer" && accountType !== "seller") {
+      res.status(400).json({ error: "accountType must be buyer or seller" });
+      return;
+    }
+
     const clerkUser = await clerkClient.users.getUser(clerkUserId);
     const email = clerkUser.emailAddresses[0]?.emailAddress ?? "";
-    const name =
+    const clerkName =
       [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
       email.split("@")[0];
+    // OAuth providers can leave a generated or incomplete display name. The
+    // onboarding value belongs to the authenticated person and is therefore the
+    // authoritative value for this initial local profile.
+    const name = preferredName ?? clerkName;
     const avatarUrl = clerkUser.imageUrl;
 
-    const [existing] = await db
-      .select()
-      .from(users)
-      .where(eq(users.clerkId, clerkUserId))
-      .limit(1);
-
-    if (existing) {
-      const [updated] = await db
-        .update(users)
-        .set({ email, name, avatarUrl, updatedAt: new Date() })
-        .where(eq(users.clerkId, clerkUserId))
+    // Sync runs both during app startup and explicitly during onboarding. Use a
+    // conflict-safe insert so concurrent first requests cannot turn a real
+    // account into a transient 500/error screen.
+    const { user, created } = await db.transaction(async (tx) => {
+      const [inserted] = await tx
+        .insert(users)
+        .values({
+          clerkId: clerkUserId,
+          email,
+          name,
+          displayName: name,
+          accountType: accountType ?? null,
+          avatarUrl,
+          role: "owner",
+        })
+        .onConflictDoNothing({ target: users.clerkId })
         .returning();
-      res.json(updated);
-    } else {
-      const created = await db.transaction(async (tx) => {
-        const [newUser] = await tx
-          .insert(users)
-          .values({ clerkId: clerkUserId, email, name, avatarUrl, role: "owner" })
-          .returning();
 
+      if (inserted) {
         await awardLoyaltyPointsOnce({
           buyerId: clerkUserId,
           points: 100,
@@ -57,11 +77,35 @@ router.post("/sync", requireAuth, async (req, res) => {
           referenceId: clerkUserId,
           note: "Welcome to Brandthread",
         }, tx);
+        return { user: inserted, created: true };
+      }
 
-        return newUser;
-      });
-      res.json(created);
-    }
+      const [existing] = await tx
+        .select()
+        .from(users)
+        .where(eq(users.clerkId, clerkUserId))
+        .limit(1);
+      if (!existing) throw new Error("User sync conflict did not yield a user record");
+
+      const updates: Record<string, unknown> = { email, avatarUrl, updatedAt: new Date() };
+      if (preferredName) {
+        updates.name = preferredName;
+        // Preserve a deliberately edited display name, but initialize it for
+        // legacy/local rows that only had the raw name field.
+        if (!existing.displayName || existing.displayName === existing.name) {
+          updates.displayName = preferredName;
+        }
+      }
+      if (accountType) updates.accountType = accountType;
+      const [updated] = await tx
+        .update(users)
+        .set(updates)
+        .where(eq(users.clerkId, clerkUserId))
+        .returning();
+      if (!updated) throw new Error("User record disappeared during sync");
+      return { user: updated, created: false };
+    });
+    res.status(created ? 201 : 200).json(user);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to sync user" });
