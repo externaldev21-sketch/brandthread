@@ -988,12 +988,14 @@ export function createApi(getToken: GetToken) {
     },
     /** Paid promotion boosts — boost a post or product for increased reach. */
     boosts: {
-      list:   (targetId?: string) =>
+      list:    (targetId?: string) =>
         get<any[]>(`/api/boosts${targetId ? `?targetId=${encodeURIComponent(targetId)}` : ''}`),
-      create: (body: { targetType: string; targetId: string; budgetCents: number; durationDays: number }) =>
+      create:  (body: { targetType: string; targetId: string; budgetCents: number; durationDays: number }) =>
         post<any>('/api/boosts', body),
-      update: (id: string, body: { status: 'paused' | 'cancelled' }) =>
+      update:  (id: string, body: { status: 'paused' | 'cancelled' }) =>
         patch<any>(`/api/boosts/${encodeURIComponent(id)}`, body),
+      summary: () =>
+        get<{ totalImpressions: number; spentCentsThisMonth: number; activeCount: number }>('/api/boosts/summary'),
     },
     /** Buyer loyalty / rewards points. */
     loyalty: {

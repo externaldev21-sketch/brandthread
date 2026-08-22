@@ -122,7 +122,7 @@ router.get("/feed", requireAuth, async (req, res) => {
     // ─── Boost ranking: find active boosts for this page of posts ────────────
     const now = new Date();
     const boostRows = await db
-      .select({ targetId: boosts.targetId })
+      .select({ id: boosts.id, targetId: boosts.targetId })
       .from(boosts)
       .where(and(
         eq(boosts.targetType, "post"),
@@ -131,6 +131,16 @@ router.get("/feed", requireAuth, async (req, res) => {
         inArray(boosts.targetId, postIds),
       ));
     const boostedPostIds = new Set(boostRows.map((b) => b.targetId));
+
+    // Fire-and-forget: increment impressions_count for each active boost that
+    // appears in this feed page. One increment per boost row per request.
+    if (boostRows.length > 0) {
+      const boostIds = boostRows.map((b) => b.id);
+      db.update(boosts)
+        .set({ impressionsCount: sql`${boosts.impressionsCount} + 1` })
+        .where(inArray(boosts.id, boostIds))
+        .catch(() => {});
+    }
 
     const result = rows.map((p) => ({
       id:        p.id,

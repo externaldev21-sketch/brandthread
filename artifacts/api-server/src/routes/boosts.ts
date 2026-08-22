@@ -10,7 +10,7 @@
  */
 import { Router } from "express";
 import { db, boosts, users } from "@workspace/db";
-import { and, desc, eq, inArray, or, gte } from "drizzle-orm";
+import { and, desc, eq, inArray, or, gte, sum, count } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireStripe } from "../lib/stripe";
 
@@ -96,6 +96,9 @@ router.post("/", async (req, res) => {
       targetType,
       targetId,
       budgetCents,
+      // Record spend immediately: if Stripe charged the seller, the full budget
+      // is committed at boost creation. Unpaid / no-payment-method boosts stay at 0.
+      spentCents: stripePaymentIntentId ? budgetCents : 0,
       durationDays: days,
       stripePaymentIntentId,
       status:   "active",
@@ -172,6 +175,54 @@ router.patch("/:id", async (req, res) => {
     .returning();
 
   return res.json(updated);
+});
+
+// ─── GET /api/boosts/summary ─────────────────────────────────────────────────
+// Returns aggregate stats for the authenticated seller's boosts.
+// { totalImpressions, spentCentsThisMonth, activeCount }
+//
+// totalImpressions — lifetime sum across ALL boosts (no date filter):
+//   impressionsCount is a cumulative counter on each boost row, so filtering
+//   by createdAt would miss ongoing campaigns launched last month and would
+//   double-count impressions for any campaign that spans a month boundary.
+//
+// spentCentsThisMonth — sum of budgetCents for non-cancelled boosts whose
+//   payment was processed this calendar month (createdAt >= first of month).
+router.get("/summary", async (req, res) => {
+  const sellerId = (req as any).clerkUserId as string;
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  // Lifetime impressions — no date filter so all active/completed campaigns count
+  const [impressionTotals] = await db
+    .select({ totalImpressions: sum(boosts.impressionsCount) })
+    .from(boosts)
+    .where(eq(boosts.sellerId, sellerId));
+
+  // Spend this calendar month — only boosts created (and thus charged) this month
+  const [spendTotals] = await db
+    .select({ totalSpentCents: sum(boosts.spentCents) })
+    .from(boosts)
+    .where(and(
+      eq(boosts.sellerId, sellerId),
+      gte(boosts.createdAt, monthStart),
+    ));
+
+  const [activeCnt] = await db
+    .select({ cnt: count() })
+    .from(boosts)
+    .where(and(
+      eq(boosts.sellerId, sellerId),
+      eq(boosts.status, "active"),
+      gte(boosts.endsAt, now),
+    ));
+
+  return res.json({
+    totalImpressions:    Number(impressionTotals?.totalImpressions ?? 0),
+    spentCentsThisMonth: Number(spendTotals?.totalSpentCents ?? 0),
+    activeCount:         Number(activeCnt?.cnt ?? 0),
+  });
 });
 
 // ─── GET /api/boosts/active-post-ids ─────────────────────────────────────────

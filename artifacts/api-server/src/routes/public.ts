@@ -3,7 +3,7 @@
  * Mounted at /api/public — no requireAuth middleware.
  */
 import { Router } from "express";
-import { db, products, productVariants, users, drops, posts, postTaggedProducts, interactions, trendingCache } from "@workspace/db";
+import { db, products, productVariants, users, drops, posts, postTaggedProducts, interactions, trendingCache, boosts } from "@workspace/db";
 import { eq, and, desc, inArray, or, ilike, sql, count, gte } from "drizzle-orm";
 import { computeTrendingForToday, isCacheFresh } from "../jobs/computeTrending";
 
@@ -57,6 +57,30 @@ router.get("/products", async (req, res) => {
 
     // Attach variants
     const productIds = filtered.map((p) => p.id);
+
+    // Fire-and-forget: increment impressions_count for every active product boost
+    // whose targetId appears in this page. Mirrors the same pattern used in the
+    // authenticated post feed so product boosts report real delivery counts.
+    {
+      const now = new Date();
+      db.select({ id: boosts.id })
+        .from(boosts)
+        .where(and(
+          eq(boosts.targetType, "product"),
+          eq(boosts.status, "active"),
+          gte(boosts.endsAt, now),
+          inArray(boosts.targetId, productIds),
+        ))
+        .then((activeBoostRows) => {
+          if (activeBoostRows.length > 0) {
+            db.update(boosts)
+              .set({ impressionsCount: sql`${boosts.impressionsCount} + 1` })
+              .where(inArray(boosts.id, activeBoostRows.map((b) => b.id)))
+              .catch(() => {});
+          }
+        })
+        .catch(() => {});
+    }
     const variants = await db
       .select()
       .from(productVariants)

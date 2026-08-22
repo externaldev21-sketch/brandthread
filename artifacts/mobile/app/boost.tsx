@@ -38,6 +38,17 @@ type Boost = {
   estimatedImpressions: number;
 };
 
+type Summary = {
+  totalImpressions: number;
+  spentCentsThisMonth: number;
+  activeCount: number;
+};
+
+function daysRemaining(endsAt: string): number {
+  const ms = new Date(endsAt).getTime() - Date.now();
+  return Math.max(0, Math.ceil(ms / 86_400_000));
+}
+
 export default function BoostScreen() {
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
@@ -49,16 +60,29 @@ export default function BoostScreen() {
   const [launching,        setLaunching]         = useState(false);
   const [existing,         setExisting]          = useState<Boost[]>([]);
   const [loadingExisting,  setLoadingExisting]   = useState(true);
+  const [summary,          setSummary]           = useState<Summary | null>(null);
+  const [loadingSummary,   setLoadingSummary]    = useState(true);
 
   const estimatedImpressions = Math.round(selectedBudget.cents * 0.4);
 
   useFocusEffect(useCallback(() => {
-    if (!targetId) return;
-    setLoadingExisting(true);
-    (api as any).boosts?.list?.(targetId)
-      .then((rows: Boost[]) => setExisting(rows ?? []))
-      .catch(() => setExisting([]))
-      .finally(() => setLoadingExisting(false));
+    // Load existing boosts for this target
+    if (targetId) {
+      setLoadingExisting(true);
+      (api as any).boosts?.list?.(targetId)
+        .then((rows: Boost[]) => setExisting(rows ?? []))
+        .catch(() => setExisting([]))
+        .finally(() => setLoadingExisting(false));
+    } else {
+      setLoadingExisting(false);
+    }
+
+    // Load summary stats
+    setLoadingSummary(true);
+    (api as any).boosts?.summary?.()
+      .then((s: Summary) => setSummary(s))
+      .catch(() => setSummary(null))
+      .finally(() => setLoadingSummary(false));
   }, [api, targetId]));
 
   async function handleLaunch() {
@@ -101,6 +125,12 @@ export default function BoostScreen() {
     return s.charAt(0).toUpperCase() + s.slice(1);
   }
 
+  /** Clamp 0–1, guard against division by zero */
+  function reachProgress(b: Boost): number {
+    if (!b.estimatedImpressions || b.estimatedImpressions <= 0) return 0;
+    return Math.min(1, b.impressionsCount / b.estimatedImpressions);
+  }
+
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
       {/* Header */}
@@ -113,6 +143,35 @@ export default function BoostScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 100 }}>
+
+        {/* ── Summary card ─────────────────────────────────────────────────── */}
+        {loadingSummary
+          ? <ActivityIndicator color={PURPLE} style={{ marginBottom: SP.md }} />
+          : summary && (
+            <View style={s.summaryCard}>
+              <Text style={s.summaryTitle}>THIS MONTH</Text>
+              <View style={s.summaryRow}>
+                <View style={s.summaryItem}>
+                  <Feather name="eye" size={16} color={PURPLE_LIGHT} />
+                  <Text style={s.summaryValue}>{summary.totalImpressions.toLocaleString()}</Text>
+                  <Text style={s.summaryLabel}>Impressions</Text>
+                </View>
+                <View style={s.summarySep} />
+                <View style={s.summaryItem}>
+                  <Feather name="dollar-sign" size={16} color={GOLD} />
+                  <Text style={s.summaryValue}>${(summary.spentCentsThisMonth / 100).toFixed(2)}</Text>
+                  <Text style={s.summaryLabel}>Spent</Text>
+                </View>
+                <View style={s.summarySep} />
+                <View style={s.summaryItem}>
+                  <Feather name="zap" size={16} color={SUCCESS} />
+                  <Text style={s.summaryValue}>{summary.activeCount}</Text>
+                  <Text style={s.summaryLabel}>Active</Text>
+                </View>
+              </View>
+            </View>
+          )
+        }
 
         {/* What is a boost */}
         <View style={s.infoBanner}>
@@ -196,27 +255,59 @@ export default function BoostScreen() {
           Your stored payment method will be charged {selectedBudget.label}. Boosts can be paused from your Boost history.
         </Text>
 
-        {/* Existing boosts */}
+        {/* ── Boost history ─────────────────────────────────────────────────── */}
         {(loadingExisting ? true : existing.length > 0) && (
           <>
             <Text style={[s.sectionLabel, { marginTop: SP.xl }]}>BOOST HISTORY</Text>
             {loadingExisting
               ? <ActivityIndicator color={PURPLE} style={{ marginTop: SP.sm }} />
-              : existing.map(b => (
-                <View key={b.id} style={s.boostRow}>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <View style={[s.statusDot, { backgroundColor: statusColor(b.status) }]} />
-                      <Text style={s.boostStatus}>{statusLabel(b.status)}</Text>
-                      <Text style={s.boostMeta}>{b.durationDays}d boost</Text>
+              : existing.map(b => {
+                  const progress   = reachProgress(b);
+                  const daysLeft   = daysRemaining(b.endsAt);
+                  const estimated  = b.estimatedImpressions;
+
+                  return (
+                    <View key={b.id} style={s.boostRow}>
+                      {/* Status + meta */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                        <View style={[s.statusDot, { backgroundColor: statusColor(b.status) }]} />
+                        <Text style={s.boostStatus}>{statusLabel(b.status)}</Text>
+                        <Text style={s.boostMeta}>{b.durationDays}d boost</Text>
+                        {b.status === 'active' && (
+                          <Text style={[s.boostMeta, { marginLeft: 'auto' }]}>
+                            {daysLeft === 0 ? 'Ends today' : `${daysLeft}d left`}
+                          </Text>
+                        )}
+                      </View>
+
+                      {/* Impressions + spend */}
+                      <View style={{ flexDirection: 'row', gap: SP.md, marginBottom: 8 }}>
+                        <View style={s.statPill}>
+                          <Feather name="eye" size={11} color={PURPLE_LIGHT} />
+                          <Text style={s.statPillText}>
+                            {b.impressionsCount.toLocaleString()}
+                            <Text style={{ color: MUTED }}> / ~{estimated.toLocaleString()}</Text>
+                          </Text>
+                        </View>
+                        <View style={s.statPill}>
+                          <Feather name="dollar-sign" size={11} color={GOLD} />
+                          <Text style={s.statPillText}>
+                            ${(b.spentCents / 100).toFixed(2)}
+                            <Text style={{ color: MUTED }}> / ${(b.budgetCents / 100).toFixed(2)}</Text>
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Reach progress bar */}
+                      <View style={s.progressTrack}>
+                        <View style={[s.progressFill, { width: `${Math.round(progress * 100)}%` as any }]} />
+                      </View>
+                      <Text style={s.progressLabel}>
+                        {Math.round(progress * 100)}% of estimated reach fulfilled
+                      </Text>
                     </View>
-                    <View style={{ flexDirection: 'row', gap: SP.md }}>
-                      <Text style={s.boostStat}><Text style={{ color: FG }}>{b.impressionsCount.toLocaleString()}</Text> impressions</Text>
-                      <Text style={s.boostStat}><Text style={{ color: FG }}>${(b.spentCents / 100).toFixed(2)}</Text> / ${(b.budgetCents / 100).toFixed(2)}</Text>
-                    </View>
-                  </View>
-                </View>
-              ))
+                  );
+                })
             }
           </>
         )}
@@ -230,6 +321,15 @@ const s = StyleSheet.create({
   header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
   headerBack:    { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle:   { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
+
+  // ── Summary card ──────────────────────────────────────────────────────────
+  summaryCard:  { backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md },
+  summaryTitle: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, letterSpacing: 1, textTransform: 'uppercase', marginBottom: SP.sm },
+  summaryRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
+  summaryItem:  { alignItems: 'center', gap: 4 },
+  summaryValue: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG, marginTop: 2 },
+  summaryLabel: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  summarySep:   { width: 1, height: 40, backgroundColor: BORDER },
 
   infoBanner:     { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#1A1505', borderWidth: 1, borderColor: '#4A3800', borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.lg },
   infoBannerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: '#D97706', lineHeight: 18 },
@@ -254,9 +354,16 @@ const s = StyleSheet.create({
   launchBtnText:  { fontSize: FS.base, fontFamily: FONT.bold, color: '#fff' },
   disclaimer:     { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 16, marginBottom: SP.xl },
 
-  boostRow:   { backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, padding: SP.md, marginBottom: SP.sm, flexDirection: 'row', alignItems: 'center' },
-  statusDot:  { width: 8, height: 8, borderRadius: 4 },
-  boostStatus:{ fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  boostMeta:  { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  boostStat:  { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  // ── Boost history rows ────────────────────────────────────────────────────
+  boostRow:     { backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, padding: SP.md, marginBottom: SP.sm },
+  statusDot:    { width: 8, height: 8, borderRadius: 4 },
+  boostStatus:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
+  boostMeta:    { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+
+  statPill:     { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.xs, paddingHorizontal: 8, paddingVertical: 4 },
+  statPillText: { fontSize: FS.xs, fontFamily: FONT.medium, color: FG },
+
+  progressTrack: { height: 4, backgroundColor: SUBTLE, borderRadius: 2, overflow: 'hidden', marginBottom: 4 },
+  progressFill:  { height: 4, backgroundColor: PURPLE, borderRadius: 2 },
+  progressLabel: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
 });
