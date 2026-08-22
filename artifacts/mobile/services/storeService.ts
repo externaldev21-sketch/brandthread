@@ -190,6 +190,7 @@ export async function getStorefront(): Promise<Storefront> {
       } else if (remote?.status === 'draft' && local.publishStatus === 'published') {
         local.publishStatus = 'unpublished';
       }
+      local.sharePreviewRevokedAt = remote?.sharePreviewRevokedAt ?? null;
       // Sync server title/slug if we don't have one locally
       if (!local.settings.storeUrl && remote?.slug) {
         local.settings.storeUrl = `${remote.slug}.brandthread.app`;

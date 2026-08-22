@@ -67,17 +67,20 @@ export default function StorePreview() {
 
   useFocusEffect(
     useCallback(() => {
-      getStorefront().then(setStore);
+      getStorefront().then(freshStore => {
+        setStore(freshStore);
+        setPreviewRevoked(Boolean(freshStore.sharePreviewRevokedAt));
+      });
     }, [])
   );
 
   const handleSharePreview = async () => {
     if (sharingPreview) return;
     setSharingPreview(true);
-    setPreviewRevoked(false);
     try {
       const result = await (api as any).store.sharePreview() as { url: string; expiresAt: string };
       await Clipboard.setStringAsync(result.url);
+      setPreviewRevoked(false);
       setShareCopied(true);
       setTimeout(() => setShareCopied(false), 3000);
     } catch {
@@ -476,12 +479,17 @@ export default function StorePreview() {
           <Text style={styles.headerTitle}>Store Preview</Text>
           <TouchableOpacity
             onPress={handleSharePreview}
-            style={[styles.shareBtn, shareCopied && styles.shareBtnCopied, previewRevoked && styles.shareBtnRevoked]}
+            style={[styles.shareBtn, previewRevoked && styles.shareBtnRevoked, shareCopied && styles.shareBtnCopied]}
             disabled={sharingPreview || revokingPreview}
+            accessibilityLabel={previewRevoked ? 'Share a fresh preview link' : 'Copy preview link'}
           >
             {sharingPreview
               ? <ActivityIndicator size="small" color={PURPLE_LIGHT} />
-              : <Feather name={shareCopied ? 'check' : 'link'} size={ICON.sm} color={shareCopied ? '#4ade80' : PURPLE_LIGHT} />
+              : <Feather
+                  name={shareCopied ? 'check' : previewRevoked ? 'slash' : 'link'}
+                  size={ICON.sm}
+                  color={shareCopied ? '#4ade80' : previewRevoked ? MUTED : PURPLE_LIGHT}
+                />
             }
           </TouchableOpacity>
           {/* Revoke button — only show when a link may be active */}
@@ -891,8 +899,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#4ade8022',
   },
   shareBtnRevoked: {
-    borderColor: RED,
-    backgroundColor: RED_DIM,
+    borderColor: BORDER,
+    backgroundColor: CARD,
   },
   revokeBtn: {
     width: 36,

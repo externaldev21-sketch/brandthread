@@ -452,6 +452,7 @@ export interface Storefront {
   domains: StoreDomain[];
   publishStatus: StorePublishStatus;
   publishedAt?: string;
+  sharePreviewRevokedAt?: string | null;
   generatedFrom?: StoreGenerationAnswers;
   aiSuggestions: StoreAISuggestion[];
   versions: StoreVersion[];

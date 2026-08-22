@@ -237,7 +237,12 @@ async function getOrCreateStorefront(ownerId: string) {
 router.get("/", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const sf = await getOrCreateStorefront(ownerId);
-  res.json(sf);
+  // Keep the revocation watermark explicit in the response so clients can
+  // refresh preview-link status whenever the seller returns to the screen.
+  res.json({
+    ...sf,
+    sharePreviewRevokedAt: sf.sharePreviewRevokedAt?.toISOString() ?? null,
+  });
 });
 
 // PUT /api/store — save the storefront
