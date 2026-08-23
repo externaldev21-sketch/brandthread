@@ -19,6 +19,55 @@ import {
 const STORE_KEY = 'bt:store:v1';
 const DRAFT_ANSWERS_KEY = 'bt:store:draft_answers:v1';
 
+export type StoreApplyFailure = {
+  kind: 'network' | 'server' | 'unknown';
+  message: string;
+};
+
+export class StoreApplyError extends Error {
+  readonly kind: StoreApplyFailure['kind'];
+
+  constructor(failure: StoreApplyFailure) {
+    super(failure.message);
+    this.name = 'StoreApplyError';
+    this.kind = failure.kind;
+  }
+}
+
+/**
+ * Converts transport and API errors into wording that can safely be shown in
+ * the apply-results UI. API errors include their status in the shared client;
+ * fetch failures do not, so they are identified by their standard messages.
+ */
+export function getStoreApplyFailure(error: unknown): StoreApplyFailure {
+  if (error instanceof StoreApplyError) {
+    return { kind: error.kind, message: error.message };
+  }
+
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  if (/^API\s+\d{3}:/i.test(message)) {
+    return {
+      kind: 'server',
+      message: 'Our store service could not save this design. Please try again in a moment.',
+    };
+  }
+
+  if (
+    /network request failed|failed to fetch|fetch failed|network error|offline|timed?\s*out|connection/i.test(message)
+    || (error instanceof TypeError && /fetch/i.test(message))
+  ) {
+    return {
+      kind: 'network',
+      message: 'We could not reach Brandthread. Check your connection, then try again.',
+    };
+  }
+
+  return {
+    kind: 'unknown',
+    message: 'We could not apply this design right now. Please try again.',
+  };
+}
+
 // ─── ID Generator ─────────────────────────────────────────────────────────────
 function uid(prefix = 'id'): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
@@ -1078,36 +1127,44 @@ export async function generateFromSocial(
 // ─── Apply from logo (full flow: API → map ALL config → apply → backend sync) ─
 // Throws on backend failure — callers must catch and NOT navigate on error.
 export async function applyFromLogo(logoUri: string, base64?: string | null): Promise<Storefront> {
-  const currentStore = await getStorefront();
-  const fromAnswers: StoreGenerationAnswers = {
-    primaryStyle: null, secondaryStyles: [], moods: [],
-    colors: currentStore.branding.colors, typography: 'modern' as any,
-    homepagePriority: null, additionalSections: [], brandStory: '',
-    targetCustomers: [], ageRange: null, audienceDescription: '',
-    existingContent: [], features: [],
-    logoUri: logoUri ?? undefined, moodBoardUris: [],
-  };
-  const aiData = await (base64 ? api.store.fromLogo(base64, {}) : api.store.fromLogo(logoUri, {}));
-  const cfg = (aiData?.config ?? {}) as any;
-  return applyGenerationResult(mapAiConfigToResult(cfg, currentStore, fromAnswers));
+  try {
+    const currentStore = await getStorefront();
+    const fromAnswers: StoreGenerationAnswers = {
+      primaryStyle: null, secondaryStyles: [], moods: [],
+      colors: currentStore.branding.colors, typography: 'modern' as any,
+      homepagePriority: null, additionalSections: [], brandStory: '',
+      targetCustomers: [], ageRange: null, audienceDescription: '',
+      existingContent: [], features: [],
+      logoUri: logoUri ?? undefined, moodBoardUris: [],
+    };
+    const aiData = await (base64 ? api.store.fromLogo(base64, {}) : api.store.fromLogo(logoUri, {}));
+    const cfg = (aiData?.config ?? {}) as any;
+    return await applyGenerationResult(mapAiConfigToResult(cfg, currentStore, fromAnswers));
+  } catch (error) {
+    throw new StoreApplyError(getStoreApplyFailure(error));
+  }
 }
 
 // ─── Apply from moodboard (full flow: API → map ALL config → apply → backend sync) ─
 // Throws on backend failure — callers must catch and NOT navigate on error.
 export async function applyFromMoodboard(imageUris: string[], base64List?: string[]): Promise<Storefront> {
-  const currentStore = await getStorefront();
-  const fromAnswers: StoreGenerationAnswers = {
-    primaryStyle: null, secondaryStyles: [], moods: [],
-    colors: currentStore.branding.colors, typography: 'modern' as any,
-    homepagePriority: null, additionalSections: [], brandStory: '',
-    targetCustomers: [], ageRange: null, audienceDescription: '',
-    existingContent: [], features: [], moodBoardUris: imageUris,
-  };
-  const aiData = await (base64List?.length
-    ? api.store.fromMoodboard(base64List, {})
-    : api.store.fromMoodboard(imageUris, {}));
-  const cfg = (aiData?.config ?? {}) as any;
-  return applyGenerationResult(mapAiConfigToResult(cfg, currentStore, fromAnswers));
+  try {
+    const currentStore = await getStorefront();
+    const fromAnswers: StoreGenerationAnswers = {
+      primaryStyle: null, secondaryStyles: [], moods: [],
+      colors: currentStore.branding.colors, typography: 'modern' as any,
+      homepagePriority: null, additionalSections: [], brandStory: '',
+      targetCustomers: [], ageRange: null, audienceDescription: '',
+      existingContent: [], features: [], moodBoardUris: imageUris,
+    };
+    const aiData = await (base64List?.length
+      ? api.store.fromMoodboard(base64List, {})
+      : api.store.fromMoodboard(imageUris, {}));
+    const cfg = (aiData?.config ?? {}) as any;
+    return await applyGenerationResult(mapAiConfigToResult(cfg, currentStore, fromAnswers));
+  } catch (error) {
+    throw new StoreApplyError(getStoreApplyFailure(error));
+  }
 }
 
 // ─── Generate from logo ───────────────────────────────────────────────────────

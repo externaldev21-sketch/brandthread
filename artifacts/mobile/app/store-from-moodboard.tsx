@@ -14,7 +14,9 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, StatusBadge } from '@/components/BrandthreadUI';
-import { generateFromMoodBoard, applyFromMoodboard } from '@/services/storeService';
+import {
+  generateFromMoodBoard, applyFromMoodboard, getStoreApplyFailure, StoreApplyFailure,
+} from '@/services/storeService';
 import { StoreColorPalette, StoreSectionType } from '@/services/storeTypes';
 
 const MAX_IMAGES = 8;
@@ -58,6 +60,7 @@ export default function StoreFromMoodboardScreen() {
   const [imageBase64s, setImageBase64s] = useState<string[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [applyFailure, setApplyFailure] = useState<StoreApplyFailure | null>(null);
   const [result, setResult] = useState<{
     colorPalette: StoreColorPalette;
     typographyDirection: string;
@@ -111,6 +114,22 @@ export default function StoreFromMoodboardScreen() {
       Alert.alert('Analysis failed', 'Could not analyze mood board. Please try again.');
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  const handleApply = async () => {
+    setApplying(true);
+    setApplyFailure(null);
+    try {
+      // applyFromMoodboard maps ALL AI config fields (sections, palette,
+      // typography, title, SEO, branding) and awaits backend sync.
+      // It throws on failure — we do NOT navigate until it succeeds.
+      await applyFromMoodboard(imageUris, imageBase64s.filter(Boolean));
+      router.push('/store-editor' as never);
+    } catch (error) {
+      setApplyFailure(getStoreApplyFailure(error));
+    } finally {
+      setApplying(false);
     }
   };
 
@@ -243,27 +262,43 @@ export default function StoreFromMoodboardScreen() {
               </View>
             </BrandthreadCard>
 
+            {applyFailure && (
+              <BrandthreadCard style={[mb.card, mb.applyFailureCard]}>
+                <View style={mb.bannerRow}>
+                  <Feather
+                    name={applyFailure.kind === 'network' ? 'wifi-off' : 'server'}
+                    size={ICON.sm}
+                    color={PURPLE_LIGHT}
+                  />
+                  <View style={mb.applyFailureCopy}>
+                    <Text style={mb.applyFailureTitle}>
+                      {applyFailure.kind === 'network'
+                        ? 'Connection problem'
+                        : applyFailure.kind === 'server'
+                          ? 'Store service problem'
+                          : 'Couldn’t apply design'}
+                    </Text>
+                    <Text style={mb.applyFailureText}>{applyFailure.message}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={mb.applyRetryBtn}
+                  onPress={handleApply}
+                  disabled={applying}
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry applying these store settings"
+                >
+                  <Feather name="refresh-cw" size={ICON.sm} color={PURPLE_LIGHT} />
+                  <Text style={mb.applyRetryText}>Retry apply</Text>
+                </TouchableOpacity>
+              </BrandthreadCard>
+            )}
+
             <PrimaryButton
               label={applying ? 'Applying...' : 'Apply These Settings'}
               loading={applying}
               disabled={applying}
-              onPress={async () => {
-                setApplying(true);
-                try {
-                  // applyFromMoodboard maps ALL AI config fields (sections, palette,
-                  // typography, title, SEO, branding) and awaits backend sync.
-                  // Throws on failure — we do NOT navigate until it succeeds.
-                  await applyFromMoodboard(imageUris, imageBase64s.filter(Boolean));
-                  router.push('/store-editor' as never);
-                } catch {
-                  Alert.alert(
-                    'Could not apply store design',
-                    'The generated layout could not be saved. Check your connection and try again.',
-                  );
-                } finally {
-                  setApplying(false);
-                }
-              }}
+              onPress={handleApply}
               style={mb.actionBtn}
               icon="check"
             />
@@ -325,6 +360,15 @@ const mb = StyleSheet.create({
   previewLink: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   actionBtn: { marginHorizontal: SP.md, marginBottom: SP.sm },
+  applyFailureCard: { borderColor: PURPLE_DIM, backgroundColor: SURFACE },
+  applyFailureCopy: { flex: 1, gap: 3 },
+  applyFailureTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
+  applyFailureText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 18 },
+  applyRetryBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.xs,
+    alignSelf: 'flex-start', paddingVertical: SP.xs, paddingHorizontal: SP.sm,
+  },
+  applyRetryText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
   retryBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     alignSelf: 'flex-start', marginTop: SP.xs,

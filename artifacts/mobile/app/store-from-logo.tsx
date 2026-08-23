@@ -16,7 +16,7 @@ import {
 } from '@/lib/theme';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, StatusBadge } from '@/components/BrandthreadUI';
 import {
-  generateFromLogo, applyFromLogo,
+  generateFromLogo, applyFromLogo, getStoreApplyFailure, StoreApplyFailure,
 } from '@/services/storeService';
 import { StoreColorPalette, TypographyStyle, BrandMood } from '@/services/storeTypes';
 
@@ -56,6 +56,7 @@ export default function StoreFromLogoScreen() {
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [applyFailure, setApplyFailure] = useState<StoreApplyFailure | null>(null);
   const [result, setResult] = useState<{
     dominantColors: string[];
     suggestedPalette: StoreColorPalette;
@@ -105,17 +106,15 @@ export default function StoreFromLogoScreen() {
   const handleApply = async () => {
     if (!logoUri) return;
     setApplying(true);
+    setApplyFailure(null);
     try {
       // applyFromLogo calls the vision API, maps ALL config fields (sections,
       // palette, typography, title, SEO, branding), and awaits backend sync.
       // It throws on failure so we never navigate as though it succeeded.
       await applyFromLogo(logoUri, logoBase64);
       router.push('/store-editor' as never);
-    } catch {
-      Alert.alert(
-        'Could not apply store design',
-        'The generated layout could not be saved. Check your connection and try again.',
-      );
+    } catch (error) {
+      setApplyFailure(getStoreApplyFailure(error));
     } finally {
       setApplying(false);
     }
@@ -251,6 +250,38 @@ export default function StoreFromLogoScreen() {
               </BrandthreadCard>
             )}
 
+            {applyFailure && (
+              <BrandthreadCard style={[fl.card, fl.applyFailureCard]}>
+                <View style={fl.bannerRow}>
+                  <Feather
+                    name={applyFailure.kind === 'network' ? 'wifi-off' : 'server'}
+                    size={ICON.sm}
+                    color={PURPLE_LIGHT}
+                  />
+                  <View style={fl.applyFailureCopy}>
+                    <Text style={fl.applyFailureTitle}>
+                      {applyFailure.kind === 'network'
+                        ? 'Connection problem'
+                        : applyFailure.kind === 'server'
+                          ? 'Store service problem'
+                          : 'Couldn’t apply design'}
+                    </Text>
+                    <Text style={fl.applyFailureText}>{applyFailure.message}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={fl.applyRetryBtn}
+                  onPress={handleApply}
+                  disabled={applying}
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry applying this store design"
+                >
+                  <Feather name="refresh-cw" size={ICON.sm} color={PURPLE_LIGHT} />
+                  <Text style={fl.applyRetryText}>Retry apply</Text>
+                </TouchableOpacity>
+              </BrandthreadCard>
+            )}
+
             <PrimaryButton
               label={applying ? 'Applying...' : 'Apply to Store'}
               onPress={handleApply}
@@ -315,6 +346,15 @@ const fl = StyleSheet.create({
   previewLink: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   actionBtn: { marginHorizontal: SP.md, marginBottom: SP.sm },
+  applyFailureCard: { borderColor: PURPLE_DIM, backgroundColor: SURFACE },
+  applyFailureCopy: { flex: 1, gap: 3 },
+  applyFailureTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
+  applyFailureText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 18 },
+  applyRetryBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.xs,
+    alignSelf: 'flex-start', paddingVertical: SP.xs, paddingHorizontal: SP.sm,
+  },
+  applyRetryText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
   retryBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     alignSelf: 'flex-start', marginTop: SP.xs,
