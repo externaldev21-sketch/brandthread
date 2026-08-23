@@ -112,6 +112,7 @@ export default function StoreFromMoodboardScreen() {
   const headerTopInset = useHeaderTopInset();
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [imageBase64s, setImageBase64s] = useState<string[]>([]);
+  const [preparingImages, setPreparingImages] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [applying, setApplying] = useState(false);
   const [restoringAnalysis, setRestoringAnalysis] = useState(true);
@@ -191,6 +192,7 @@ export default function StoreFromMoodboardScreen() {
   }, [cacheKey, isUserLoaded]);
 
   const addImages = async () => {
+    if (preparingImages) return;
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
       Alert.alert('Permission needed', 'Allow photo access to upload mood board images.');
@@ -208,10 +210,21 @@ export default function StoreFromMoodboardScreen() {
       const newUris = res.assets.map(a => a.uri);
       // Resize each image to ≤1024 px before base64 encoding — keeps total
       // payload under the 10 MB server limit even for 8-image moodboards.
-      const newB64s = await Promise.all(newUris.map(resizeToBase64));
-      setImageUris(prev => [...prev, ...newUris].slice(0, MAX_IMAGES));
-      setImageBase64s(prev => [...prev, ...newB64s].slice(0, MAX_IMAGES));
       setResult(null);
+      setApplyFailure(null);
+      setPreparingImages(true);
+      try {
+        const newB64s = await Promise.all(newUris.map(resizeToBase64));
+        if (newB64s.some(base64 => !base64)) {
+          throw new Error('One or more images could not be prepared.');
+        }
+        setImageUris(prev => [...prev, ...newUris].slice(0, MAX_IMAGES));
+        setImageBase64s(prev => [...prev, ...newB64s].slice(0, MAX_IMAGES));
+      } catch {
+        Alert.alert('Could not prepare images', 'Please choose the images again and try once more.');
+      } finally {
+        setPreparingImages(false);
+      }
     }
   };
 
@@ -224,7 +237,7 @@ export default function StoreFromMoodboardScreen() {
   };
 
   const handleAnalyze = async () => {
-    if (restoringAnalysis) return;
+    if (restoringAnalysis || preparingImages) return;
     if (imageUris.length < 2) {
       Alert.alert('Need at least 2 images', 'Add more images to your mood board.');
       return;
@@ -247,7 +260,7 @@ export default function StoreFromMoodboardScreen() {
   };
 
   const handleApply = async () => {
-    if (restoringAnalysis) return;
+    if (restoringAnalysis || preparingImages) return;
     setApplying(true);
     setApplyFailure(null);
     try {
@@ -300,13 +313,23 @@ export default function StoreFromMoodboardScreen() {
           {imageUris.map((uri, idx) => (
             <View key={uri + idx} style={mb.imageWrap}>
               <Image source={{ uri }} style={mb.gridImage} resizeMode="cover" />
-              <TouchableOpacity style={mb.removeBtn} onPress={() => removeImage(idx)}>
+              <TouchableOpacity
+                style={mb.removeBtn}
+                onPress={() => removeImage(idx)}
+                disabled={preparingImages}
+              >
                 <Feather name="x" size={12} color={FG} />
               </TouchableOpacity>
             </View>
           ))}
           {imageUris.length < MAX_IMAGES && (
-            <TouchableOpacity style={mb.addTile} onPress={addImages} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={[mb.addTile, preparingImages && mb.disabledTile]}
+              onPress={addImages}
+              activeOpacity={0.7}
+              disabled={preparingImages}
+              accessibilityState={{ disabled: preparingImages }}
+            >
               <Feather name="plus" size={ICON.md} color={PURPLE_LIGHT} />
               <Text style={mb.addTileLabel}>Add</Text>
             </TouchableOpacity>
@@ -317,16 +340,20 @@ export default function StoreFromMoodboardScreen() {
           label={analyzing ? 'Analyzing...' : 'Analyze Mood Board'}
           onPress={handleAnalyze}
           loading={analyzing}
-          disabled={imageUris.length < 2 || restoringAnalysis}
+          disabled={imageUris.length < 2 || restoringAnalysis || preparingImages}
           icon="zap"
           style={mb.analyzeBtn}
         />
 
-        {(analyzing || restoringAnalysis) && (
+        {(preparingImages || analyzing || restoringAnalysis) && (
           <View style={mb.loadingRow}>
             <ActivityIndicator color={PURPLE} />
             <Text style={mb.loadingText}>
-              {restoringAnalysis ? 'Restoring your latest analysis...' : 'Analyzing your mood board with AI...'}
+              {preparingImages
+                ? 'Preparing images...'
+                : restoringAnalysis
+                  ? 'Restoring your latest analysis...'
+                  : 'Analyzing your mood board with AI...'}
             </Text>
           </View>
         )}
@@ -417,7 +444,7 @@ export default function StoreFromMoodboardScreen() {
                 <TouchableOpacity
                   style={mb.applyRetryBtn}
                   onPress={handleApply}
-                  disabled={applying || restoringAnalysis}
+                  disabled={applying || restoringAnalysis || preparingImages}
                   accessibilityRole="button"
                   accessibilityLabel="Retry applying these store settings"
                 >
@@ -430,7 +457,7 @@ export default function StoreFromMoodboardScreen() {
             <PrimaryButton
               label={applying ? 'Applying...' : 'Apply These Settings'}
               loading={applying}
-              disabled={applying || restoringAnalysis}
+              disabled={applying || restoringAnalysis || preparingImages}
               onPress={handleApply}
               style={mb.actionBtn}
               icon="check"
@@ -438,6 +465,7 @@ export default function StoreFromMoodboardScreen() {
             <SecondaryButton
               label="Generate Full Store"
               onPress={() => router.push('/store-generate' as never)}
+              disabled={preparingImages}
               style={mb.actionBtn}
               icon="zap"
             />
@@ -480,6 +508,7 @@ const mb = StyleSheet.create({
     borderWidth: 2, borderColor: PURPLE_DIM, borderStyle: 'dashed',
     alignItems: 'center', justifyContent: 'center', gap: 4,
   },
+   disabledTile: { opacity: 0.5 },
   addTileLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: PURPLE_LIGHT },
   analyzeBtn: { marginHorizontal: SP.md, marginBottom: SP.sm },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, justifyContent: 'center', padding: SP.md },

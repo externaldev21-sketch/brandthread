@@ -100,6 +100,7 @@ export default function StoreFromLogoScreen() {
   const headerTopInset = useHeaderTopInset();
   const [logoUri, setLogoUri] = useState<string | null>(null);
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
+  const [preparingLogo, setPreparingLogo] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [applying, setApplying] = useState(false);
   const [restoringAnalysis, setRestoringAnalysis] = useState(true);
@@ -173,6 +174,7 @@ export default function StoreFromLogoScreen() {
   }, [cacheKey, isUserLoaded]);
 
   const pickLogo = async () => {
+    if (preparingLogo) return;
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
       Alert.alert('Permission needed', 'Allow photo access to upload your logo.');
@@ -188,17 +190,28 @@ export default function StoreFromLogoScreen() {
       inputChangedRef.current = true;
       void clearCachedAnalysis();
       const uri = res.assets[0].uri;
-      setLogoUri(uri);
       // Resize to ≤1024 px before encoding — keeps payload well under the 10 MB
       // server limit and reduces GPT-4o vision latency (detail:"low" only needs ~512 px).
-      const b64 = await resizeToBase64(uri);
-      setLogoBase64(b64);
       setResult(null);
+      setApplyFailure(null);
+      setPreparingLogo(true);
+      try {
+        const b64 = await resizeToBase64(uri);
+        if (!b64) {
+          throw new Error('The logo could not be prepared.');
+        }
+        setLogoUri(uri);
+        setLogoBase64(b64);
+      } catch {
+        Alert.alert('Could not prepare logo', 'Please choose the logo again and try once more.');
+      } finally {
+        setPreparingLogo(false);
+      }
     }
   };
 
   const handleAnalyze = async () => {
-    if (!logoUri || restoringAnalysis) return;
+    if (!logoUri || restoringAnalysis || preparingLogo) return;
     setAnalyzing(true);
     try {
       const r = await generateFromLogo(logoUri, logoBase64 ?? undefined);
@@ -217,7 +230,7 @@ export default function StoreFromLogoScreen() {
   };
 
   const handleApply = async () => {
-    if (!logoUri || restoringAnalysis) return;
+    if (!logoUri || restoringAnalysis || preparingLogo) return;
     setApplying(true);
     setApplyFailure(null);
     try {
@@ -263,8 +276,19 @@ export default function StoreFromLogoScreen() {
         </BrandthreadCard>
 
         {/* Upload Area */}
-        <TouchableOpacity style={fl.uploadArea} onPress={pickLogo} activeOpacity={0.7}>
-          {logoUri ? (
+        <TouchableOpacity
+          style={[fl.uploadArea, preparingLogo && fl.disabledUploadArea]}
+          onPress={pickLogo}
+          activeOpacity={0.7}
+          disabled={preparingLogo}
+          accessibilityState={{ disabled: preparingLogo }}
+        >
+          {preparingLogo ? (
+            <>
+              <ActivityIndicator color={PURPLE} size="large" />
+              <Text style={fl.preparingText}>Preparing logo...</Text>
+            </>
+          ) : logoUri ? (
             <>
               <Image source={{ uri: logoUri }} style={fl.logoImage} resizeMode="contain" />
               <Text style={fl.changeText}>Tap to change</Text>
@@ -278,7 +302,7 @@ export default function StoreFromLogoScreen() {
           )}
         </TouchableOpacity>
 
-        {logoUri && !result && !analyzing && !restoringAnalysis && (
+        {logoUri && !result && !preparingLogo && !analyzing && !restoringAnalysis && (
           <PrimaryButton
             label="Analyze Logo"
             onPress={handleAnalyze}
@@ -388,7 +412,7 @@ export default function StoreFromLogoScreen() {
                 <TouchableOpacity
                   style={fl.applyRetryBtn}
                   onPress={handleApply}
-                  disabled={applying || restoringAnalysis}
+                  disabled={applying || restoringAnalysis || preparingLogo}
                   accessibilityRole="button"
                   accessibilityLabel="Retry applying this store design"
                 >
@@ -402,13 +426,14 @@ export default function StoreFromLogoScreen() {
               label={applying ? 'Applying...' : 'Apply to Store'}
               onPress={handleApply}
               loading={applying}
-              disabled={!result || applying || restoringAnalysis}
+              disabled={!result || applying || restoringAnalysis || preparingLogo}
               style={fl.actionBtn}
               icon="check"
             />
             <SecondaryButton
               label="Generate Full Store with AI"
               onPress={() => router.push('/store-generate' as never)}
+              disabled={preparingLogo}
               style={fl.actionBtn}
               icon="zap"
             />
@@ -444,10 +469,12 @@ const fl = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', gap: SP.sm,
     marginBottom: SP.md,
   },
+   disabledUploadArea: { opacity: 0.75 },
   logoImage: { width: 160, height: 160, borderRadius: RADIUS.md },
   uploadLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
   uploadSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
   changeText: { fontSize: FS.xs, fontFamily: FONT.medium, color: PURPLE_LIGHT },
+   preparingText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
   analyzeBtn: { marginHorizontal: SP.md, marginBottom: SP.md },
   loadingRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md, justifyContent: 'center', padding: SP.md },
   loadingText: { fontSize: FS.base, fontFamily: FONT.medium, color: MUTED },
