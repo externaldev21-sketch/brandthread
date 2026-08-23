@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, Image, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useUser } from '@clerk/expo';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Feather } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
   BG, CARD, SURFACE, BORDER,
@@ -19,6 +21,49 @@ import {
   generateFromLogo, applyFromLogo, getStoreApplyFailure, StoreApplyFailure,
 } from '@/services/storeService';
 import { StoreColorPalette, TypographyStyle, BrandMood } from '@/services/storeTypes';
+
+const LOGO_ANALYSIS_CACHE_PREFIX = 'bt:store:logo-analysis:transient:v1';
+
+type LogoAnalysisResult = {
+  dominantColors: string[];
+  suggestedPalette: StoreColorPalette;
+  suggestedThemeId: string;
+  suggestedTypography: TypographyStyle;
+  brandMoods: BrandMood[];
+  aiSections: import('@/services/storeTypes').StoreSection[];
+  source: 'ai' | 'fallback';
+};
+
+type LogoAnalysisCache = {
+  logoUri: string;
+  result: LogoAnalysisResult;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isLogoAnalysisCache(value: unknown): value is LogoAnalysisCache {
+  if (!isRecord(value) || typeof value.logoUri !== 'string' || !isRecord(value.result)) {
+    return false;
+  }
+  const result = value.result;
+  return (
+    Array.isArray(result.dominantColors) &&
+    isRecord(result.suggestedPalette) &&
+    typeof result.suggestedThemeId === 'string' &&
+    typeof result.suggestedTypography === 'string' &&
+    Array.isArray(result.brandMoods) &&
+    Array.isArray(result.aiSections) &&
+    (result.source === 'ai' || result.source === 'fallback')
+  );
+}
+
+async function isUsableImageUri(uri: string): Promise<boolean> {
+  return new Promise(resolve => {
+    Image.getSize(uri, () => resolve(true), () => resolve(false));
+  });
+}
 
 /**
  * Resize an image so its longest edge is at most maxPx, then return the
@@ -51,21 +96,81 @@ async function resizeToBase64(uri: string, maxPx = 1024): Promise<string> {
 
 export default function StoreFromLogoScreen() {
   const router = useRouter();
+  const { user, isLoaded: isUserLoaded } = useUser();
   const headerTopInset = useHeaderTopInset();
   const [logoUri, setLogoUri] = useState<string | null>(null);
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [restoringAnalysis, setRestoringAnalysis] = useState(true);
   const [applyFailure, setApplyFailure] = useState<StoreApplyFailure | null>(null);
-  const [result, setResult] = useState<{
-    dominantColors: string[];
-    suggestedPalette: StoreColorPalette;
-    suggestedThemeId: string;
-    suggestedTypography: TypographyStyle;
-    brandMoods: BrandMood[];
-    aiSections: import('@/services/storeTypes').StoreSection[];
-    source: 'ai' | 'fallback';
-  } | null>(null);
+  const [result, setResult] = useState<LogoAnalysisResult | null>(null);
+  const inputChangedRef = useRef(false);
+  const cacheKey = user?.id ? `${LOGO_ANALYSIS_CACHE_PREFIX}:${user.id}` : null;
+
+  const clearCachedAnalysis = async () => {
+    if (cacheKey) {
+      await AsyncStorage.removeItem(cacheKey).catch(() => {});
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!isUserLoaded) {
+      setRestoringAnalysis(true);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    inputChangedRef.current = false;
+    setRestoringAnalysis(true);
+    setLogoUri(null);
+    setLogoBase64(null);
+    setResult(null);
+
+    if (!cacheKey) {
+      setRestoringAnalysis(false);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const restoreCachedAnalysis = async () => {
+      try {
+        const raw = await AsyncStorage.getItem(cacheKey);
+        if (!raw) return;
+
+        const cached: unknown = JSON.parse(raw);
+        if (!isLogoAnalysisCache(cached) || !(await isUsableImageUri(cached.logoUri))) {
+          await AsyncStorage.removeItem(cacheKey);
+          return;
+        }
+
+        const restoredBase64 = await resizeToBase64(cached.logoUri);
+        if (!restoredBase64) {
+          await AsyncStorage.removeItem(cacheKey);
+          return;
+        }
+
+        if (isMounted && !inputChangedRef.current) {
+          setLogoUri(cached.logoUri);
+          setLogoBase64(restoredBase64);
+          setResult(cached.result);
+        }
+      } catch {
+        // This cache only prevents repeat work. Ignore malformed or unavailable storage.
+      } finally {
+        if (isMounted) setRestoringAnalysis(false);
+      }
+    };
+
+    void restoreCachedAnalysis();
+    return () => {
+      isMounted = false;
+    };
+  }, [cacheKey, isUserLoaded]);
 
   const pickLogo = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -80,6 +185,8 @@ export default function StoreFromLogoScreen() {
       quality: 1,
     });
     if (!res.canceled && res.assets[0]) {
+      inputChangedRef.current = true;
+      void clearCachedAnalysis();
       const uri = res.assets[0].uri;
       setLogoUri(uri);
       // Resize to ≤1024 px before encoding — keeps payload well under the 10 MB
@@ -91,11 +198,17 @@ export default function StoreFromLogoScreen() {
   };
 
   const handleAnalyze = async () => {
-    if (!logoUri) return;
+    if (!logoUri || restoringAnalysis) return;
     setAnalyzing(true);
     try {
       const r = await generateFromLogo(logoUri, logoBase64 ?? undefined);
       setResult(r);
+      if (cacheKey) {
+        await AsyncStorage.setItem(
+          cacheKey,
+          JSON.stringify({ logoUri, result: r } satisfies LogoAnalysisCache),
+        ).catch(() => {});
+      }
     } catch {
       Alert.alert('Analysis failed', 'Could not analyze logo. Please try again.');
     } finally {
@@ -104,7 +217,7 @@ export default function StoreFromLogoScreen() {
   };
 
   const handleApply = async () => {
-    if (!logoUri) return;
+    if (!logoUri || restoringAnalysis) return;
     setApplying(true);
     setApplyFailure(null);
     try {
@@ -112,6 +225,7 @@ export default function StoreFromLogoScreen() {
       // palette, typography, title, SEO, branding), and awaits backend sync.
       // It throws on failure so we never navigate as though it succeeded.
       await applyFromLogo(logoUri, logoBase64);
+      await clearCachedAnalysis();
       router.push('/store-editor' as never);
     } catch (error) {
       setApplyFailure(getStoreApplyFailure(error));
@@ -164,7 +278,7 @@ export default function StoreFromLogoScreen() {
           )}
         </TouchableOpacity>
 
-        {logoUri && !result && !analyzing && (
+        {logoUri && !result && !analyzing && !restoringAnalysis && (
           <PrimaryButton
             label="Analyze Logo"
             onPress={handleAnalyze}
@@ -173,10 +287,12 @@ export default function StoreFromLogoScreen() {
           />
         )}
 
-        {analyzing && (
+        {(analyzing || restoringAnalysis) && (
           <View style={fl.loadingRow}>
             <ActivityIndicator color={PURPLE} />
-            <Text style={fl.loadingText}>Analyzing your logo with AI...</Text>
+            <Text style={fl.loadingText}>
+              {restoringAnalysis ? 'Restoring your latest analysis...' : 'Analyzing your logo with AI...'}
+            </Text>
           </View>
         )}
 
@@ -191,7 +307,7 @@ export default function StoreFromLogoScreen() {
                     We couldn't fully analyze your image — showing a suggested starting point.
                   </Text>
                 </View>
-                <TouchableOpacity style={fl.retryBtn} onPress={handleAnalyze} disabled={analyzing}>
+                <TouchableOpacity style={fl.retryBtn} onPress={handleAnalyze} disabled={analyzing || restoringAnalysis}>
                   <Feather name="refresh-cw" size={12} color="#fbbf24" />
                   <Text style={fl.retryText}>Retry Analysis</Text>
                 </TouchableOpacity>
@@ -272,7 +388,7 @@ export default function StoreFromLogoScreen() {
                 <TouchableOpacity
                   style={fl.applyRetryBtn}
                   onPress={handleApply}
-                  disabled={applying}
+                  disabled={applying || restoringAnalysis}
                   accessibilityRole="button"
                   accessibilityLabel="Retry applying this store design"
                 >
@@ -286,7 +402,7 @@ export default function StoreFromLogoScreen() {
               label={applying ? 'Applying...' : 'Apply to Store'}
               onPress={handleApply}
               loading={applying}
-              disabled={!result || applying}
+              disabled={!result || applying || restoringAnalysis}
               style={fl.actionBtn}
               icon="check"
             />

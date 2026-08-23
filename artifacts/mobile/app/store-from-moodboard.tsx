@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, ScrollView, Image, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useUser } from '@clerk/expo';
 import * as ImagePicker from 'expo-image-picker';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Feather } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
   BG, CARD, SURFACE,
@@ -20,6 +22,57 @@ import {
 import { StoreColorPalette, StoreSectionType } from '@/services/storeTypes';
 
 const MAX_IMAGES = 8;
+const MOODBOARD_ANALYSIS_CACHE_PREFIX = 'bt:store:moodboard-analysis:transient:v1';
+
+type MoodboardAnalysisResult = {
+  colorPalette: StoreColorPalette;
+  typographyDirection: string;
+  layoutStyle: string;
+  imageTreatment: string;
+  suggestedThemeId: string;
+  suggestedSections: StoreSectionType[];
+  aiSections: import('@/services/storeTypes').StoreSection[];
+  source: 'ai' | 'fallback';
+};
+
+type MoodboardAnalysisCache = {
+  imageUris: string[];
+  result: MoodboardAnalysisResult;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isMoodboardAnalysisCache(value: unknown): value is MoodboardAnalysisCache {
+  if (
+    !isRecord(value) ||
+    !Array.isArray(value.imageUris) ||
+    value.imageUris.length < 2 ||
+    value.imageUris.length > MAX_IMAGES ||
+    !value.imageUris.every(uri => typeof uri === 'string') ||
+    !isRecord(value.result)
+  ) {
+    return false;
+  }
+  const result = value.result;
+  return (
+    isRecord(result.colorPalette) &&
+    typeof result.typographyDirection === 'string' &&
+    typeof result.layoutStyle === 'string' &&
+    typeof result.imageTreatment === 'string' &&
+    typeof result.suggestedThemeId === 'string' &&
+    Array.isArray(result.suggestedSections) &&
+    Array.isArray(result.aiSections) &&
+    (result.source === 'ai' || result.source === 'fallback')
+  );
+}
+
+async function isUsableImageUri(uri: string): Promise<boolean> {
+  return new Promise(resolve => {
+    Image.getSize(uri, () => resolve(true), () => resolve(false));
+  });
+}
 
 /**
  * Resize an image so its longest edge is at most maxPx, then return the
@@ -55,22 +108,87 @@ async function resizeToBase64(uri: string, maxPx = 800): Promise<string> {
 
 export default function StoreFromMoodboardScreen() {
   const router = useRouter();
+  const { user, isLoaded: isUserLoaded } = useUser();
   const headerTopInset = useHeaderTopInset();
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [imageBase64s, setImageBase64s] = useState<string[]>([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [restoringAnalysis, setRestoringAnalysis] = useState(true);
   const [applyFailure, setApplyFailure] = useState<StoreApplyFailure | null>(null);
-  const [result, setResult] = useState<{
-    colorPalette: StoreColorPalette;
-    typographyDirection: string;
-    layoutStyle: string;
-    imageTreatment: string;
-    suggestedThemeId: string;
-    suggestedSections: StoreSectionType[];
-    aiSections: import('@/services/storeTypes').StoreSection[];
-    source: 'ai' | 'fallback';
-  } | null>(null);
+  const [result, setResult] = useState<MoodboardAnalysisResult | null>(null);
+  const inputChangedRef = useRef(false);
+  const cacheKey = user?.id ? `${MOODBOARD_ANALYSIS_CACHE_PREFIX}:${user.id}` : null;
+
+  const clearCachedAnalysis = async () => {
+    if (cacheKey) {
+      await AsyncStorage.removeItem(cacheKey).catch(() => {});
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (!isUserLoaded) {
+      setRestoringAnalysis(true);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    inputChangedRef.current = false;
+    setRestoringAnalysis(true);
+    setImageUris([]);
+    setImageBase64s([]);
+    setResult(null);
+
+    if (!cacheKey) {
+      setRestoringAnalysis(false);
+      return () => {
+        isMounted = false;
+      };
+    }
+
+    const restoreCachedAnalysis = async () => {
+      try {
+        const raw = await AsyncStorage.getItem(cacheKey);
+        if (!raw) return;
+
+        const cached: unknown = JSON.parse(raw);
+        if (!isMoodboardAnalysisCache(cached)) {
+          await AsyncStorage.removeItem(cacheKey);
+          return;
+        }
+
+        const allImagesAvailable = (await Promise.all(cached.imageUris.map(isUsableImageUri))).every(Boolean);
+        if (!allImagesAvailable) {
+          await AsyncStorage.removeItem(cacheKey);
+          return;
+        }
+
+        const restoredBase64s = await Promise.all(cached.imageUris.map(resizeToBase64));
+        if (restoredBase64s.some(base64 => !base64)) {
+          await AsyncStorage.removeItem(cacheKey);
+          return;
+        }
+
+        if (isMounted && !inputChangedRef.current) {
+          setImageUris(cached.imageUris);
+          setImageBase64s(restoredBase64s);
+          setResult(cached.result);
+        }
+      } catch {
+        // This cache only prevents repeat work. Ignore malformed or unavailable storage.
+      } finally {
+        if (isMounted) setRestoringAnalysis(false);
+      }
+    };
+
+    void restoreCachedAnalysis();
+    return () => {
+      isMounted = false;
+    };
+  }, [cacheKey, isUserLoaded]);
 
   const addImages = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -85,6 +203,8 @@ export default function StoreFromMoodboardScreen() {
       quality: 1,
     });
     if (!res.canceled && res.assets.length > 0) {
+      inputChangedRef.current = true;
+      void clearCachedAnalysis();
       const newUris = res.assets.map(a => a.uri);
       // Resize each image to ≤1024 px before base64 encoding — keeps total
       // payload under the 10 MB server limit even for 8-image moodboards.
@@ -96,12 +216,15 @@ export default function StoreFromMoodboardScreen() {
   };
 
   const removeImage = (idx: number) => {
+    inputChangedRef.current = true;
+    void clearCachedAnalysis();
     setImageUris(prev => prev.filter((_, i) => i !== idx));
     setImageBase64s(prev => prev.filter((_, i) => i !== idx));
     setResult(null);
   };
 
   const handleAnalyze = async () => {
+    if (restoringAnalysis) return;
     if (imageUris.length < 2) {
       Alert.alert('Need at least 2 images', 'Add more images to your mood board.');
       return;
@@ -110,6 +233,12 @@ export default function StoreFromMoodboardScreen() {
     try {
       const r = await generateFromMoodBoard(imageUris, imageBase64s.filter(Boolean));
       setResult(r);
+      if (cacheKey) {
+        await AsyncStorage.setItem(
+          cacheKey,
+          JSON.stringify({ imageUris, result: r } satisfies MoodboardAnalysisCache),
+        ).catch(() => {});
+      }
     } catch {
       Alert.alert('Analysis failed', 'Could not analyze mood board. Please try again.');
     } finally {
@@ -118,6 +247,7 @@ export default function StoreFromMoodboardScreen() {
   };
 
   const handleApply = async () => {
+    if (restoringAnalysis) return;
     setApplying(true);
     setApplyFailure(null);
     try {
@@ -125,6 +255,7 @@ export default function StoreFromMoodboardScreen() {
       // typography, title, SEO, branding) and awaits backend sync.
       // It throws on failure — we do NOT navigate until it succeeds.
       await applyFromMoodboard(imageUris, imageBase64s.filter(Boolean));
+      await clearCachedAnalysis();
       router.push('/store-editor' as never);
     } catch (error) {
       setApplyFailure(getStoreApplyFailure(error));
@@ -186,15 +317,17 @@ export default function StoreFromMoodboardScreen() {
           label={analyzing ? 'Analyzing...' : 'Analyze Mood Board'}
           onPress={handleAnalyze}
           loading={analyzing}
-          disabled={imageUris.length < 2}
+          disabled={imageUris.length < 2 || restoringAnalysis}
           icon="zap"
           style={mb.analyzeBtn}
         />
 
-        {analyzing && (
+        {(analyzing || restoringAnalysis) && (
           <View style={mb.loadingRow}>
             <ActivityIndicator color={PURPLE} />
-            <Text style={mb.loadingText}>Analyzing your mood board with AI...</Text>
+            <Text style={mb.loadingText}>
+              {restoringAnalysis ? 'Restoring your latest analysis...' : 'Analyzing your mood board with AI...'}
+            </Text>
           </View>
         )}
 
@@ -209,7 +342,7 @@ export default function StoreFromMoodboardScreen() {
                     We couldn't fully analyze your images — showing a suggested starting point.
                   </Text>
                 </View>
-                <TouchableOpacity style={mb.retryBtn} onPress={handleAnalyze} disabled={analyzing}>
+                <TouchableOpacity style={mb.retryBtn} onPress={handleAnalyze} disabled={analyzing || restoringAnalysis}>
                   <Feather name="refresh-cw" size={12} color="#fbbf24" />
                   <Text style={mb.retryText}>Retry Analysis</Text>
                 </TouchableOpacity>
@@ -284,7 +417,7 @@ export default function StoreFromMoodboardScreen() {
                 <TouchableOpacity
                   style={mb.applyRetryBtn}
                   onPress={handleApply}
-                  disabled={applying}
+                  disabled={applying || restoringAnalysis}
                   accessibilityRole="button"
                   accessibilityLabel="Retry applying these store settings"
                 >
@@ -297,7 +430,7 @@ export default function StoreFromMoodboardScreen() {
             <PrimaryButton
               label={applying ? 'Applying...' : 'Apply These Settings'}
               loading={applying}
-              disabled={applying}
+              disabled={applying || restoringAnalysis}
               onPress={handleApply}
               style={mb.actionBtn}
               icon="check"
