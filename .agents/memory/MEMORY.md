@@ -49,3 +49,4 @@
 - [Team/Roles/Permissions](team-roles-permissions.md) — teamContext rewrites clerkUserId→owner (mount inside router after requireAuth); typed middleware must be RequestHandler<any> or param inference breaks.
 - [Profile Tab + Seller Settings](profile-tab-seller-settings.md) — Profile replaces More as 5th tab; seller-settings.tsx is the stack screen for all 6 sections; dashboard hero+chart wiring.
 - [Sample image upload security](sample-image-upload-security.md) — sample images use authenticated, size-limited proxy upload with byte-signature validation before storage.
+- [Store preview links](store-preview-links.md) — public preview tokens are bearer credentials: store only the latest SHA-256 fingerprint and reject all earlier links.

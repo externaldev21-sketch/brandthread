@@ -673,6 +673,9 @@ export const storefronts = pgTable('storefronts', {
   analyticsCode: text('analytics_code'),
   publishedAt:          timestamp('published_at'),
   sharePreviewRevokedAt: timestamp('share_preview_revoked_at', { withTimezone: true }),
+  // SHA-256 fingerprint of the one currently valid public preview token.
+  // The raw bearer token is never stored in the database.
+  sharePreviewTokenHash: text('share_preview_token_hash'),
   createdAt:     timestamp('created_at').defaultNow().notNull(),
   updatedAt:     timestamp('updated_at').defaultNow().notNull(),
 });

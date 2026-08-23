@@ -26,15 +26,45 @@ const _signingKey: Buffer | null = _sessionSecret
  *
  * @param ownerId  The seller's Clerk user ID.
  * @param ttlMs    Token lifetime in milliseconds. Defaults to 24 hours.
+ * @param nonce    Optional entropy for distinct tokens issued in the same millisecond.
+ * @param purpose  Separates short-lived private previews from public share links.
  */
-function createShareToken(ownerId: string, ttlMs = 24 * 60 * 60 * 1000, issuedAt = Date.now()): string {
+function createShareToken(
+  ownerId: string,
+  ttlMs = 24 * 60 * 60 * 1000,
+  issuedAt = Date.now(),
+  nonce?: string,
+  purpose: "private" | "share" = "private",
+): string {
   if (!_signingKey) throw new Error("SESSION_SECRET not configured");
-  const payload = Buffer.from(JSON.stringify({ ownerId, issuedAt, expiresAt: issuedAt + ttlMs })).toString("base64url");
+  const payload = Buffer.from(JSON.stringify({
+    ownerId,
+    issuedAt,
+    expiresAt: issuedAt + ttlMs,
+    purpose,
+    ...(nonce ? { nonce } : {}),
+  })).toString("base64url");
   const sig = crypto.createHmac("sha256", _signingKey).update(payload).digest("base64url");
   return `${payload}.${sig}`;
 }
 
-function verifyShareToken(token: string): { ownerId: string; issuedAt: number; expiresAt: number } | null {
+function hashShareToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("base64url");
+}
+
+function isCurrentShareToken(token: string, currentHash: string | null): boolean {
+  if (!currentHash) return false;
+  const tokenHash = Buffer.from(hashShareToken(token));
+  const storedHash = Buffer.from(currentHash);
+  return tokenHash.length === storedHash.length && crypto.timingSafeEqual(tokenHash, storedHash);
+}
+
+function verifyShareToken(token: string): {
+  ownerId: string;
+  issuedAt: number;
+  expiresAt: number;
+  purpose?: "private" | "share";
+} | null {
   if (!_signingKey) return null; // feature unavailable — fail closed
   const lastDot = token.lastIndexOf(".");
   if (lastDot === -1) return null;
@@ -186,25 +216,36 @@ router.get("/preview/:token", async (req, res): Promise<void> => {
     return;
   }
 
-  // Check revocation: a token is invalid if it was issued at or before the
-  // revocation watermark (revokedAt >= issuedAt).  Using >= means a token
-  // issued in the exact same millisecond as a revocation is also rejected.
-  //
-  // Tokens that predate the issuedAt payload field fall back to the
-  // conservative estimate expiresAt − 24 h so they remain revocable.
-  const FALLBACK_TTL_MS = 24 * 60 * 60 * 1000;
-  const tokenIssuedAt = typeof entry.issuedAt === "number"
-    ? entry.issuedAt
-    : entry.expiresAt - FALLBACK_TTL_MS;
-  const [sf] = await db
-    .select({ sharePreviewRevokedAt: storefronts.sharePreviewRevokedAt })
-    .from(storefronts)
-    .where(eq(storefronts.ownerId, entry.ownerId))
-    .limit(1);
-  if (sf?.sharePreviewRevokedAt && sf.sharePreviewRevokedAt.getTime() >= tokenIssuedAt) {
+  // Public share links must be the one current link saved for this storefront.
+  // Short-lived private preview tokens are intentionally independent of that
+  // state: the authenticated WebView flow issues them for a five-minute preview.
+  // Tokens from before purpose tagging fail closed, because their kind cannot be
+  // determined safely.
+  if (entry.purpose !== "private" && entry.purpose !== "share") {
     res.set("Content-Type", "text/html");
     res.status(410).send(EXPIRED_PAGE);
     return;
+  }
+  if (entry.purpose === "share") {
+    // Check revocation: a token is invalid if it was issued at or before the
+    // revocation watermark (revokedAt >= issuedAt).  Using >= means a token
+    // issued in the exact same millisecond as a revocation is also rejected.
+    const [sf] = await db
+      .select({
+        sharePreviewRevokedAt: storefronts.sharePreviewRevokedAt,
+        sharePreviewTokenHash: storefronts.sharePreviewTokenHash,
+      })
+      .from(storefronts)
+      .where(eq(storefronts.ownerId, entry.ownerId))
+      .limit(1);
+    if (
+      !isCurrentShareToken(token, sf?.sharePreviewTokenHash ?? null)
+      || (sf?.sharePreviewRevokedAt && sf.sharePreviewRevokedAt.getTime() >= entry.issuedAt)
+    ) {
+      res.set("Content-Type", "text/html");
+      res.status(410).send(EXPIRED_PAGE);
+      return;
+    }
   }
 
   const html = await buildPreviewHtml(entry.ownerId);
@@ -534,10 +575,9 @@ router.post("/share-preview", async (req, res): Promise<void> => {
   }
   const ownerId = (req as any).clerkUserId as string;
 
-  // Read the revocation watermark so we can guarantee the new token's issuedAt
-  // is strictly AFTER it.  This prevents a same-millisecond race where revoke
-  // and re-share happen in the same clock tick: new token issuedAt is advanced
-  // to revokedAt + 1 when necessary.
+  // Read the revocation watermark so the new token is always issued strictly
+  // after it. Also replace the stored fingerprint: only this latest public
+  // link is valid, even if prior links have not expired yet.
   //
   // DO NOT clear sharePreviewRevokedAt: old (revoked) tokens must remain
   // rejected permanently, even after a fresh link is shared.
@@ -547,8 +587,21 @@ router.post("/share-preview", async (req, res): Promise<void> => {
   const TTL_MS = 24 * 60 * 60 * 1000;
   // Advance issuedAt past the watermark if necessary so new tokens always pass >= check.
   const issuedAt = Math.max(Date.now(), revokedAtMs + 1);
-  const token = createShareToken(ownerId, TTL_MS, issuedAt);
+  const token = createShareToken(
+    ownerId,
+    TTL_MS,
+    issuedAt,
+    crypto.randomBytes(16).toString("base64url"),
+    "share",
+  );
   const expiresAt = issuedAt + TTL_MS;
+  await db
+    .update(storefronts)
+    .set({
+      sharePreviewTokenHash: hashShareToken(token),
+      updatedAt: new Date(),
+    })
+    .where(eq(storefronts.id, sf.id));
   // Construct canonical HTTPS origin — same pattern as other routes in this codebase
   const origin = process.env.REPLIT_DEV_DOMAIN
     ? `https://${process.env.REPLIT_DEV_DOMAIN}`
@@ -558,13 +611,18 @@ router.post("/share-preview", async (req, res): Promise<void> => {
 });
 
 // DELETE /api/store/share-preview — revoke the seller's current preview link
-// Any outstanding token for this seller will be rejected until a fresh one is generated.
+// Clearing the stored fingerprint immediately invalidates the latest token. The
+// timestamp watermark also keeps any legacy token invalid after revocation.
 router.delete("/share-preview", async (req, res): Promise<void> => {
   const ownerId = (req as any).clerkUserId as string;
   const sf = await getOrCreateStorefront(ownerId);
   await db
     .update(storefronts)
-    .set({ sharePreviewRevokedAt: new Date(), updatedAt: new Date() } as any)
+    .set({
+      sharePreviewRevokedAt: new Date(),
+      sharePreviewTokenHash: null,
+      updatedAt: new Date(),
+    })
     .where(eq(storefronts.id, sf.id));
   res.json({ ok: true, revokedAt: new Date().toISOString() });
 });
