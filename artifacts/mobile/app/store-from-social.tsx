@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { Feather } from '@expo/vector-icons';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
@@ -29,6 +30,32 @@ const FALLBACK_POSTS: SellerPost[] = [
   { id: 'p2', title: 'Behind the Scenes', desc: 'Brand story video' },
   { id: 'p3', title: 'Customer Feature', desc: 'Community highlight' },
 ];
+
+/**
+ * Re-encode social screenshots at a bounded size before converting them to
+ * base64. This prevents a multi-image social import from exceeding the
+ * server's 10 MB store-AI request limit.
+ */
+async function resizeToBase64(uri: string, maxPx = 800): Promise<string> {
+  const { width, height } = await new Promise<{ width: number; height: number }>(
+    (resolve, reject) =>
+      Image.getSize(uri, (w, h) => resolve({ width: w, height: h }), reject),
+  );
+  const longest = Math.max(width, height);
+  const actions =
+    longest > maxPx
+      ? width >= height
+        ? [{ resize: { width: maxPx } }]
+        : [{ resize: { height: maxPx } }]
+      : [];
+
+  const result = await manipulateAsync(
+    uri,
+    actions,
+    { compress: 0.75, format: SaveFormat.JPEG, base64: true },
+  );
+  return result.base64 ?? '';
+}
 
 export default function StoreFromSocialScreen() {
   const router = useRouter();
@@ -56,19 +83,29 @@ export default function StoreFromSocialScreen() {
   }, [api]);
 
   const addScreenshots = async () => {
+    const remainingSlots = 12 - screenshots.length;
+    if (remainingSlots <= 0) return;
+
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
-      selectionLimit: 12,
-      quality: 0.7,
-      base64: true,
+      selectionLimit: remainingSlots,
     });
     if (!res.canceled && res.assets.length > 0) {
-      setScreenshots(prev => [...prev, ...res.assets.map(a => a.uri)].slice(0, 12));
-      setScreenshotBase64s(prev => [
-        ...prev,
-        ...res.assets.map(a => a.base64 ?? ''),
-      ].slice(0, 12));
+      const imageUris = res.assets.slice(0, remainingSlots).map(asset => asset.uri);
+      try {
+        const imageBase64s = await Promise.all(imageUris.map(resizeToBase64));
+        if (imageBase64s.some(base64 => !base64)) {
+          throw new Error('One or more screenshots could not be prepared.');
+        }
+        setScreenshots(prev => [...prev, ...imageUris]);
+        setScreenshotBase64s(prev => [...prev, ...imageBase64s]);
+      } catch {
+        Alert.alert(
+          'Could not prepare screenshots',
+          'Please choose the screenshots again and try once more.',
+        );
+      }
     }
   };
 

@@ -39,8 +39,9 @@ app.use(
   express.raw({ type: "application/json" }),
 );
 
-// Tighter limit for logo/moodboard AI routes — client must pre-resize images to
-// ≤1024 px before uploading. A 10 MB ceiling is generous for resized base64.
+// Tighter limit for every store AI route that can receive visual references
+// (logo, moodboard, and social screenshots). Clients pre-resize images before
+// uploading; a 10 MB ceiling keeps vision requests within a safe token budget.
 app.use("/api/store/ai", express.json({ limit: "10mb" }));
 
 // Raised from the default 100kb so requests carrying base64-encoded reference
