@@ -170,8 +170,9 @@ router.patch("/onboarding", requireAuth, async (req, res) => {
 // Update editable profile fields. Validates and enforces uniqueness on username.
 router.patch("/profile", requireAuth, async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
-  const { displayName, bio, website, name, username, accountType } = req.body as {
+  const { displayName, brandName, bio, website, name, username, accountType } = req.body as {
     displayName?: string;
+    brandName?:   string;
     bio?:         string;
     website?:     string;
     name?:        string;
@@ -181,6 +182,14 @@ router.patch("/profile", requireAuth, async (req, res) => {
 
   const updates: Record<string, any> = { updatedAt: new Date() };
   if (displayName !== undefined) updates.displayName = displayName;
+  if (brandName !== undefined) {
+    const trimmedBrandName = String(brandName).trim();
+    if (!trimmedBrandName) {
+      res.status(400).json({ error: "brandName cannot be empty" });
+      return;
+    }
+    updates.brandName = trimmedBrandName;
+  }
   if (bio         !== undefined) updates.bio         = bio;
   if (website     !== undefined) updates.website     = website;
   if (name        !== undefined) updates.name        = name;

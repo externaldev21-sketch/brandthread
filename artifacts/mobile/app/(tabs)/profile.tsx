@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image,
+  KeyboardAvoidingView, Modal, Platform, TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -116,6 +117,10 @@ export default function ProfileScreen() {
   const [myStoryIds, setMyStoryIds] = useState<string[]>([]);
   const [profile, setProfile] = useState<SellerProfileData | null>(null);
   const [socialCounts, setSocialCounts] = useState<SocialCounts>({ followers: 0, following: 0, likes: 0 });
+  const [profileEditorVisible, setProfileEditorVisible] = useState(false);
+  const [brandNameInput, setBrandNameInput] = useState('');
+  const [bioInput, setBioInput] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
 
   const loadPosts = useCallback(async () => {
     try {
@@ -183,7 +188,49 @@ export default function ProfileScreen() {
     nav('/settings');
   }
 
+  function openProfileEditor() {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setBrandNameInput(profile?.brandName ?? profile?.displayName ?? '');
+    setBioInput(profile?.bio ?? '');
+    setProfileEditorVisible(true);
+  }
+
+  function closeProfileEditor() {
+    if (!savingProfile) setProfileEditorVisible(false);
+  }
+
+  async function saveProfileDetails() {
+    const brandName = brandNameInput.trim();
+    const bio = bioInput.trim();
+    if (!brandName) {
+      Alert.alert('Add a brand name', 'Your Profile needs a brand name before you can save.');
+      return;
+    }
+    if (savingProfile) return;
+
+    setSavingProfile(true);
+    try {
+      const updated = await api.auth.updateProfile({ brandName, bio });
+      setProfile((current) => ({
+        brandName: updated.brandName ?? brandName,
+        displayName: updated.displayName ?? current?.displayName ?? null,
+        bio: updated.bio ?? bio,
+        subscriptionStatus: current?.subscriptionStatus ?? null,
+        subscriptionPlanId: current?.subscriptionPlanId ?? null,
+        totalLikes: current?.totalLikes ?? 0,
+      }));
+      setProfileEditorVisible(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      void loadProfile();
+    } catch {
+      Alert.alert('Could not save changes', 'Check your connection and try again.');
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
   return (
+    <>
     <ScrollView
       style={[s.root, { backgroundColor: BG }]}
       contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 120 }}
@@ -191,14 +238,22 @@ export default function ProfileScreen() {
     >
       {/* Header */}
       <View style={s.header}>
-        <View style={{ flex: 1 }}>
+        <TouchableOpacity
+          style={s.headerProfileTrigger}
+          onPress={openProfileEditor}
+          activeOpacity={0.75}
+          accessibilityRole="button"
+          accessibilityLabel="Edit brand name and bio"
+          accessibilityHint="Opens the quick profile editor"
+          testID="profile-edit-header"
+        >
           <Text style={s.headerTitle} numberOfLines={1}>
             {profile?.brandName || profile?.displayName || 'My Brand'}
           </Text>
           <Text style={s.headerSub} numberOfLines={2}>
             {profile?.bio || 'Manage your brand, grow your audience, and scale your empire.'}
           </Text>
-        </View>
+        </TouchableOpacity>
         <View style={s.headerIcons}>
           <TouchableOpacity style={s.headerIconBtn} onPress={() => nav('/notifications-settings')} activeOpacity={0.75}>
             <Feather name="bell" size={18} color={FG} />
@@ -282,12 +337,23 @@ export default function ProfileScreen() {
 
         {/* Name + verified + plan */}
         <View style={s.nameBlock}>
-          <View style={s.nameRow}>
+          <TouchableOpacity
+            style={s.nameRow}
+            onPress={openProfileEditor}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="Edit brand name and bio"
+            accessibilityHint="Opens the quick profile editor"
+            testID="profile-edit-details"
+          >
             <Text style={s.brandName} numberOfLines={1}>
               {profile?.brandName || profile?.displayName || 'My Brand'}
             </Text>
             <Feather name="check-circle" size={17} color={GREEN} />
-          </View>
+            <View style={s.editProfileIcon}>
+              <Feather name="edit-3" size={13} color={GREEN} />
+            </View>
+          </TouchableOpacity>
           {profile?.brandName && profile?.displayName && profile.brandName !== profile.displayName && (
             <Text style={s.brandHandle} numberOfLines={1}>
               @{profile.displayName.toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 20)}
@@ -420,6 +486,95 @@ export default function ProfileScreen() {
         )}
       </View>
     </ScrollView>
+
+      <Modal
+        visible={profileEditorVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeProfileEditor}
+      >
+        <KeyboardAvoidingView
+          style={s.sheetModal}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <TouchableOpacity
+            style={s.sheetBackdrop}
+            activeOpacity={1}
+            onPress={closeProfileEditor}
+            accessibilityLabel="Close profile editor"
+          />
+          <View style={s.sheet}>
+            <View style={s.sheetHandle} />
+            <View style={s.sheetHeader}>
+              <View>
+                <Text style={s.sheetTitle}>Edit brand</Text>
+                <Text style={s.sheetSubtitle}>Keep your Profile details up to date.</Text>
+              </View>
+              <TouchableOpacity
+                style={s.sheetClose}
+                onPress={closeProfileEditor}
+                disabled={savingProfile}
+                accessibilityLabel="Close profile editor"
+              >
+                <Feather name="x" size={18} color={FG} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={s.inputLabel}>Brand name</Text>
+            <TextInput
+              value={brandNameInput}
+              onChangeText={setBrandNameInput}
+              style={s.textInput}
+              placeholder="Your brand name"
+              placeholderTextColor={MUTED}
+              autoCapitalize="words"
+              autoCorrect={false}
+              maxLength={80}
+              returnKeyType="next"
+              editable={!savingProfile}
+              testID="profile-edit-brand-name"
+            />
+
+            <View style={s.bioLabelRow}>
+              <Text style={s.inputLabel}>Bio</Text>
+              <Text style={s.characterCount}>{bioInput.length}/280</Text>
+            </View>
+            <TextInput
+              value={bioInput}
+              onChangeText={setBioInput}
+              style={[s.textInput, s.bioInput]}
+              placeholder="Tell people about your brand"
+              placeholderTextColor={MUTED}
+              multiline
+              maxLength={280}
+              textAlignVertical="top"
+              editable={!savingProfile}
+              testID="profile-edit-bio"
+            />
+
+            <View style={s.sheetActions}>
+              <TouchableOpacity
+                style={s.cancelButton}
+                onPress={closeProfileEditor}
+                disabled={savingProfile}
+                activeOpacity={0.8}
+              >
+                <Text style={s.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[s.saveButton, savingProfile && s.saveButtonDisabled]}
+                onPress={saveProfileDetails}
+                disabled={savingProfile}
+                activeOpacity={0.8}
+                testID="profile-edit-save"
+              >
+                <Text style={s.saveButtonText}>{savingProfile ? 'Saving…' : 'Save changes'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+    </>
   );
 }
 
@@ -430,6 +585,7 @@ const s = StyleSheet.create({
 
   // Header
   header:         { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 20, gap: 12 },
+  headerProfileTrigger: { flex: 1 },
   headerTitle:    { fontSize: 22, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 4 },
   headerSub:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 17, maxWidth: 220 },
   headerIcons:    { flexDirection: 'row', gap: 8, marginTop: 2 },
@@ -451,6 +607,7 @@ const s = StyleSheet.create({
   nameBlock:      { flex: 1, paddingTop: 4 },
   nameRow:        { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 },
   brandName:      { fontSize: 18, fontFamily: 'Inter_700Bold', color: FG },
+  editProfileIcon:{ width: 24, height: 24, borderRadius: 12, backgroundColor: GREEN_DIM, alignItems: 'center', justifyContent: 'center', marginLeft: 2 },
   brandHandle:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 8 },
   planPill:       { alignSelf: 'flex-start', backgroundColor: GREEN_DIM, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 14 },
   planText:       { fontSize: 11, fontFamily: 'Inter_700Bold', color: GREEN },
@@ -513,4 +670,25 @@ const s = StyleSheet.create({
   gridStat:       { fontSize: 10, fontFamily: 'Inter_500Medium', color: '#FFFFFF99' },
   emptyState:     { width: '100%', alignItems: 'center', padding: 24, gap: 8 },
   emptyText:      { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center' },
+
+  // Quick profile editor
+  sheetModal:       { flex: 1, justifyContent: 'flex-end' },
+  sheetBackdrop:    { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.68)' },
+  sheet:            { backgroundColor: CARD, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: BORDER, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 26 },
+  sheetHandle:      { width: 38, height: 4, borderRadius: 2, backgroundColor: 'rgba(244,244,255,0.25)', alignSelf: 'center', marginBottom: 18 },
+  sheetHeader:      { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 22 },
+  sheetTitle:       { color: FG, fontFamily: 'Inter_700Bold', fontSize: 20, marginBottom: 4 },
+  sheetSubtitle:    { color: MUTED, fontFamily: 'Inter_400Regular', fontSize: 13 },
+  sheetClose:       { width: 34, height: 34, borderRadius: 17, backgroundColor: '#18182E', alignItems: 'center', justifyContent: 'center' },
+  inputLabel:       { color: FG, fontFamily: 'Inter_600SemiBold', fontSize: 13, marginBottom: 8 },
+  bioLabelRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18 },
+  characterCount:   { color: MUTED, fontFamily: 'Inter_400Regular', fontSize: 11, marginBottom: 8 },
+  textInput:        { minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: BORDER, backgroundColor: BG, color: FG, fontFamily: 'Inter_400Regular', fontSize: 15, paddingHorizontal: 14, paddingVertical: 12 },
+  bioInput:         { minHeight: 96, maxHeight: 128 },
+  sheetActions:     { flexDirection: 'row', gap: 10, marginTop: 24 },
+  cancelButton:     { flex: 1, minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  cancelButtonText: { color: FG, fontFamily: 'Inter_600SemiBold', fontSize: 14 },
+  saveButton:       { flex: 1.45, minHeight: 48, borderRadius: 12, backgroundColor: GREEN, alignItems: 'center', justifyContent: 'center' },
+  saveButtonDisabled: { opacity: 0.6 },
+  saveButtonText:   { color: FG, fontFamily: 'Inter_700Bold', fontSize: 14 },
 });

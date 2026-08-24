@@ -157,6 +157,7 @@ export function createApi(getToken: GetToken) {
       /** Update editable profile fields. username must be letters/numbers/underscores, 3-30 chars. */
       updateProfile: (body: {
         displayName?: string;
+        brandName?:   string;
         bio?:         string;
         website?:     string;
         name?:        string;
@@ -553,7 +554,14 @@ export function createApi(getToken: GetToken) {
         }>('/api/seller/connect/status'),
       },
       /** Update the current user's public profile. username must be letters/numbers/underscores, 3-30 chars. */
-      updateProfile: (body: { displayName?: string; bio?: string; website?: string; name?: string; username?: string }) =>
+      updateProfile: (body: {
+        displayName?: string;
+        brandName?: string;
+        bio?: string;
+        website?: string;
+        name?: string;
+        username?: string;
+      }) =>
         patch<any>('/api/auth/profile', body),
       /** Platform subscription — billed to the seller's own payment method (sellers only).
        *  Completely separate from Stripe Connect (buyer payouts). */
