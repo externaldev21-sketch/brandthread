@@ -21,6 +21,7 @@ interface SellerProfileData {
   bio:                string | null;
   subscriptionStatus: string | null;
   subscriptionPlanId: string | null;
+  totalLikes:         number;
 }
 
 interface SocialCounts {
@@ -143,7 +144,9 @@ export default function ProfileScreen() {
         bio:                data.bio         ?? null,
         subscriptionStatus: data.subscriptionStatus ?? null,
         subscriptionPlanId: data.subscriptionPlanId ?? null,
+        totalLikes:         data.totalLikes ?? 0,
       });
+      setSocialCounts((current) => ({ ...current, likes: data.totalLikes ?? 0 }));
     } catch {}
   }, [api]);
 
@@ -153,11 +156,11 @@ export default function ProfileScreen() {
         api.social.followers(),
         api.social.following(),
       ]);
-      setSocialCounts({
+      setSocialCounts((current) => ({
+        ...current,
         followers: Array.isArray(followersArr) ? followersArr.length : 0,
         following: Array.isArray(followingArr) ? followingArr.length : 0,
-        likes:     0,
-      });
+      }));
     } catch {}
   }, [api]);
 
@@ -309,7 +312,7 @@ export default function ProfileScreen() {
             {([
               { label: 'Following', value: socialCounts.following > 0 ? socialCounts.following.toLocaleString() : '—' },
               { label: 'Followers', value: socialCounts.followers > 0 ? socialCounts.followers.toLocaleString() : '—' },
-              { label: 'Likes',     value: socialCounts.likes     > 0 ? socialCounts.likes.toLocaleString()     : '—' },
+              { label: 'Likes',     value: socialCounts.likes.toLocaleString() },
             ] as { label: string; value: string }[]).map((st, i) => (
               <React.Fragment key={st.label}>
                 {i > 0 && <View style={s.statDivider} />}

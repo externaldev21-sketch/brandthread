@@ -4,8 +4,8 @@
  * PATCH /api/seller/policy    — update return / cancellation policy text
  */
 import { Router } from "express";
-import { db, users } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { db, interactions, posts, users } from "@workspace/db";
+import { and, count, eq, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 
 // ─── Startup migration — add tutorial flag + questionnaire columns ─────────────
@@ -25,25 +25,32 @@ router.use(requireAuth);
 // ─── GET /api/seller/profile ──────────────────────────────────────────────────
 router.get("/profile", async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
-  const [user] = await db
-    .select({
-      id:                  users.id,
-      clerkId:             users.clerkId,
-      displayName:         users.displayName,
-      brandName:           users.brandName,
-      bio:                 users.bio,
-      verified:            users.verified,
-      verificationStatus:  users.verificationStatus,
-      returnPolicy:        users.returnPolicy,
-      cancellationPolicy:  users.cancellationPolicy,
-      subscriptionStatus:  users.subscriptionStatus,
-      subscriptionPlanId:  users.subscriptionPlanId,
-    })
-    .from(users)
-    .where(eq(users.clerkId, clerkId));
+  const [[user], [likeTotal]] = await Promise.all([
+    db
+      .select({
+        id:                  users.id,
+        clerkId:             users.clerkId,
+        displayName:         users.displayName,
+        brandName:           users.brandName,
+        bio:                 users.bio,
+        verified:            users.verified,
+        verificationStatus:  users.verificationStatus,
+        returnPolicy:        users.returnPolicy,
+        cancellationPolicy:  users.cancellationPolicy,
+        subscriptionStatus:  users.subscriptionStatus,
+        subscriptionPlanId:  users.subscriptionPlanId,
+      })
+      .from(users)
+      .where(eq(users.clerkId, clerkId)),
+    db
+      .select({ totalLikes: count() })
+      .from(interactions)
+      .innerJoin(posts, eq(posts.id, interactions.postId))
+      .where(and(eq(posts.userId, clerkId), eq(interactions.type, "like"))),
+  ]);
 
   if (!user) return res.status(404).json({ error: "User not found" });
-  return res.json(user);
+  return res.json({ ...user, totalLikes: Number(likeTotal?.totalLikes ?? 0) });
 });
 
 // ─── PATCH /api/seller/policy ─────────────────────────────────────────────────

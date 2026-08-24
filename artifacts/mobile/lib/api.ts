@@ -516,6 +516,7 @@ export function createApi(getToken: GetToken) {
           cancellationPolicy: string | null;
           subscriptionStatus: string | null;
           subscriptionPlanId: string | null;
+           totalLikes: number;
         }>('/api/seller/profile'),
       /** Update return / cancellation policy text. */
       updatePolicy: (body: { returnPolicy?: string; cancellationPolicy?: string }) =>
