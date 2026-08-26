@@ -27,7 +27,7 @@ describe("loyalty purchase awards", () => {
         awardLoyaltyPointsOnce({
           buyerId,
           points: 42,
-          source: "purchase",
+          source: "order_earn",
           referenceId: orderId,
           note: `Purchase reward for order ${orderId}`,
         }),
@@ -41,7 +41,7 @@ describe("loyalty purchase awards", () => {
       .from(loyaltyPoints)
       .where(and(
         eq(loyaltyPoints.buyerId, buyerId),
-        eq(loyaltyPoints.source, "purchase"),
+        eq(loyaltyPoints.source, "order_earn"),
         eq(loyaltyPoints.referenceId, orderId),
       ));
 
@@ -57,7 +57,7 @@ describe("loyalty purchase awards", () => {
     await awardLoyaltyPointsOnce({
       buyerId,
       points: 42,
-      source: "purchase",
+      source: "order_earn",
       referenceId: orderId,
     });
 
@@ -84,7 +84,7 @@ describe("loyalty purchase awards", () => {
     const lateWebhookRetry = await awardLoyaltyPointsOnce({
       buyerId,
       points: 42,
-      source: "purchase",
+      source: "order_earn",
       referenceId: orderId,
     });
 

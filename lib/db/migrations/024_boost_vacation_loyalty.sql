@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS loyalty_points (
   id            UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   buyer_id      TEXT        NOT NULL,          -- Clerk user ID of the buyer
   points        INTEGER     NOT NULL,          -- positive = earned, negative = redeemed
-  source        TEXT        NOT NULL,          -- 'purchase' | 'referral' | 'signup' | 'redemption'
+  source        TEXT        NOT NULL,          -- 'order_earn' | legacy 'purchase' | 'referral' | 'signup' | 'redemption'
   reference_id  TEXT,                          -- order_id, referral_id, etc.
   note          TEXT,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()

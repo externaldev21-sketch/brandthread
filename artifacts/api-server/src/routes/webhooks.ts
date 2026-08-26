@@ -460,7 +460,7 @@ async function awardPurchasePoints(order: {
   await awardLoyaltyPointsOnce({
     buyerId: order.buyerId,
     points,
-    source: "purchase",
+    source: "order_earn",
     referenceId: order.id,
     note: `Purchase reward for order ${order.id}`,
   }, transaction);

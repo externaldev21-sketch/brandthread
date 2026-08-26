@@ -801,7 +801,7 @@ export const loyaltyPoints = pgTable('loyalty_points', {
   id:          uuid('id').primaryKey().defaultRandom(),
   buyerId:     text('buyer_id').notNull(),
   points:      integer('points').notNull(),                            // +earned / -redeemed
-  source:      text('source').notNull(),                               // 'purchase' | 'referral' | 'signup' | 'redemption' | 'bonus'
+  source:      text('source').notNull(),                               // 'order_earn' | legacy 'purchase' | 'referral' | 'signup' | 'redemption' | 'bonus'
   referenceId: text('reference_id'),
   note:        text('note'),
   createdAt:   timestamp('created_at').defaultNow().notNull(),

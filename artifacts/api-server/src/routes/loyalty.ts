@@ -14,7 +14,7 @@
  */
 import { Router } from "express";
 import { db, loyaltyPoints } from "@workspace/db";
-import { eq, sql, desc, and } from "drizzle-orm";
+import { eq, sql, desc, and, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router = Router();
@@ -23,7 +23,7 @@ router.use(requireAuth);
 type LoyaltyAward = {
   buyerId: string;
   points: number;
-  source: "purchase" | "referral" | "signup" | "bonus";
+  source: "purchase" | "order_earn" | "referral" | "signup" | "bonus";
   referenceId: string;
   note?: string;
 };
@@ -50,11 +50,14 @@ async function insertLoyaltyAwardOnce(
   transaction: any,
   award: LoyaltyAward,
 ): Promise<{ created: boolean; row: { id: string } | undefined }> {
-  // Serialize only attempts for this source/reference pair. This makes the
-  // lookup-and-insert sequence safe for concurrent Stripe webhook deliveries
-  // without imposing a new constraint on historical ledger rows.
+  // Serialize order awards under one key so the canonical order_earn source
+  // and legacy purchase source cannot race with a refund/cancellation.
+  const lockKey =
+    award.source === "purchase" || award.source === "order_earn"
+      ? `purchase:${award.referenceId}`
+      : `${award.source}:${award.referenceId}`;
   await transaction.execute(
-    sql`SELECT pg_advisory_xact_lock(hashtext(${`${award.source}:${award.referenceId}`}))`,
+    sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`,
   );
 
   const [existing] = await transaction
@@ -124,7 +127,7 @@ async function insertPurchaseReversalOnce(
     .from(loyaltyPoints)
     .where(and(
       eq(loyaltyPoints.buyerId, reversal.buyerId),
-      eq(loyaltyPoints.source, "purchase"),
+      inArray(loyaltyPoints.source, ["purchase", "order_earn"]),
       eq(loyaltyPoints.referenceId, reversal.orderId),
     ))
     .limit(1);
@@ -217,8 +220,8 @@ router.post("/earn", async (req, res) => {
   if (!points || points <= 0 || !Number.isInteger(points)) {
     return res.status(400).json({ error: "points must be a positive integer" });
   }
-  if (!source || !["purchase", "referral", "signup", "bonus"].includes(source)) {
-    return res.status(400).json({ error: "source required: purchase|referral|signup|bonus" });
+  if (!source || !["purchase", "order_earn", "referral", "signup", "bonus"].includes(source)) {
+    return res.status(400).json({ error: "source required: purchase|order_earn|referral|signup|bonus" });
   }
 
   const [row] = await db

@@ -29,6 +29,7 @@ type PointEntry = {
 
 const SOURCE_META: Record<string, { icon: string; label: string; color: string }> = {
   purchase:   { icon: 'shopping-bag', label: 'Purchase',  color: PURPLE_LIGHT },
+  order_earn: { icon: 'shopping-bag', label: 'Purchase',  color: PURPLE_LIGHT },
   referral:   { icon: 'users',        label: 'Referral',  color: CYAN         },
   signup:     { icon: 'gift',         label: 'Welcome',   color: GOLD         },
   bonus:      { icon: 'star',         label: 'Bonus',     color: GOLD         },
