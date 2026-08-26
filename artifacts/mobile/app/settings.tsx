@@ -38,6 +38,7 @@ const STATIC_GROUPS: SettingsGroup[] = [
     title: 'App settings',
     items: [
       { label: 'Push notifications', icon: 'bell',       route: '/push-notifications' },
+      { label: 'App Theme',          icon: 'droplet',    route: '/app-theme' },
       { label: 'App icon',           icon: 'smartphone', route: '/app-icon' },
       { label: 'Biometric unlock',   icon: 'unlock',     route: '/biometric-unlock' },
     ],

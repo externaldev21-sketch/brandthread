@@ -17,10 +17,10 @@ const PURPLE = '#8B5CF6';
 const CYAN   = '#22D3EE';
 
 const FEATURE_CARDS = [
-  { icon: '✦', label: 'Design', sub: 'AI-powered tools' },
-  { icon: '⚙', label: 'Manufacture', sub: 'Global network' },
-  { icon: '🛍', label: 'Sell', sub: 'Your storefront' },
-  { icon: '📈', label: 'Scale', sub: 'Built-in analytics' },
+  { icon: 'star' as const, label: 'Design', sub: 'AI-powered tools' },
+  { icon: 'settings' as const, label: 'Manufacture', sub: 'Global network' },
+  { icon: 'shopping-bag' as const, label: 'Sell', sub: 'Your storefront' },
+  { icon: 'trending-up' as const, label: 'Scale', sub: 'Built-in analytics' },
 ];
 
 export default function WelcomeScreen() {
@@ -79,7 +79,7 @@ export default function WelcomeScreen() {
       <Animated.View style={[styles.cardsGrid, fadeUp(cardsAnim)]}>
         {FEATURE_CARDS.map((f) => (
           <View key={f.label} style={styles.featureCard}>
-            <Text style={styles.featureIcon}>{f.icon}</Text>
+            <Feather name={f.icon} size={20} color={PURPLE} />
             <Text style={styles.featureLabel}>{f.label}</Text>
             <Text style={styles.featureSub}>{f.sub}</Text>
           </View>

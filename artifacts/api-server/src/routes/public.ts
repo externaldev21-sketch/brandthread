@@ -8,6 +8,7 @@ import { eq, and, desc, inArray, or, ilike, sql, count, gte } from "drizzle-orm"
 import { computeTrendingForToday, isCacheFresh } from "../jobs/computeTrending";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { requireAuth } from "../middlewares/requireAuth";
+import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 
 // ─── In-flight guard for synchronous cache-miss computation ──────────────────
 // Prevents concurrent requests from each triggering an independent full
@@ -155,11 +156,11 @@ router.get("/products/:id", async (req, res) => {
 router.get("/search", async (req, res): Promise<void> => {
   try {
     const { q = "", limit = "20" } = req.query as Record<string, string>;
-    const term = q.trim();
+    const term = normalizeSearchTerm(q);
     if (!term || term.length < 2) { res.json({ results: [] }); return; }
 
     const lim = Math.min(parseInt(limit, 10) || 20, 50);
-    const pattern = `%${term}%`;
+    const pattern = containsSearchPattern(term);
 
     // Parallel: search sellers + search products (with a variant join for price)
     const [sellers, prods] = await Promise.all([

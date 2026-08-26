@@ -22,23 +22,44 @@ A comprehensive clothing brand management mobile app covering 18 modules: brand 
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/mobile/` is the Expo Router buyer and seller app. Routes live in `app/`, reusable business logic lives in `services/`, and API access is centralized in `lib/api.ts`.
+- `artifacts/api-server/` is the Express API. Route modules are in `src/routes/`; authentication middleware, object storage, payments, AI, and logging helpers are in `src/lib/` and `src/middlewares/`.
+- `lib/db/src/schema/index.ts` is the live Drizzle schema imported by the API. SQL changes belong in ordered, idempotent files under `lib/db/migrations/`, run by `lib/db/scripts/migrate.mjs`.
+- `lib/api-spec/openapi.yaml` is the contract source for generated API clients and Zod schemas. Regenerate them with the codegen command after changing that contract.
+- Mobile theme tokens and shared visual constants are in `artifacts/mobile/lib/theme.ts`; the app is dark-only and should stay on the Brandthread purple-on-near-black palette.
+- `lib/integrations-openai-ai-server/` and `lib/integrations/openai_ai_integrations/` contain the Replit-managed OpenAI clients used by API AI features.
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- **Clerk is the identity authority.** Database records are scoped by Clerk user IDs, and local onboarding completion is explicitly bound to the signed-in Clerk user to prevent account leakage on shared devices.
+- **The mobile app reaches Express through the routed API domain, never localhost.** Expo gets its base URL from `EXPO_PUBLIC_API_BASE_URL` / `EXPO_PUBLIC_DOMAIN`; browser previews route `/api/*` to the API artifact.
+- **Database changes are append-only and ordered.** Drizzle creates the base schema, then the migration runner records and applies idempotent SQL migrations in filename order. Do not reset production data to apply a schema change.
+- **Money is stored as integer cents.** Convert only at the display boundary; never use floating-point values for orders, prices, fees, or payouts.
+- **Public search keeps literal substring matching.** PostgreSQL trigram GIN indexes accelerate `ILIKE '%term%'` behavior instead of replacing it with token-only full-text search.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+Brandthread is a fashion-commerce platform with role-specific buyer and seller experiences:
+
+- Buyers can discover brands and drops, browse and save products, check out with Stripe, track orders, follow friends, post and interact in Thread, and message sellers or other buyers.
+- Sellers can onboard a brand, manage products, inventory, orders, customers, shipping, promotions, storefronts, social posts, drops, analytics, team access, and finances.
+- The product includes AI-assisted brand, design, store, and support tools; Stripe subscription/Connect workflows; push notifications; reviews and trust signals; and safety controls for messages and social content.
+- The manufacturer hub supports directories, quotes, sample and bulk order progress, messaging, file/media sharing, and manufacturer payout readiness.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- Keep the Brandthread mobile experience dark-only, with the existing purple/cyan accent system.
+- Buyer and seller are separate account paths; do not reintroduce a combined “both” account type.
+- Prefer real API-backed data and explicit unsupported states over fabricated dashboard, profile, order, or social metrics.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Build `@workspace/db` with `tsc --build` before typechecking API changes that depend on new schema exports.
+- Run `pnpm --filter @workspace/db run push` followed by `pnpm --filter @workspace/db run migrate` for a clean development database; every migration must be safe to rerun.
+- If an API endpoint changes, update `lib/api-spec/openapi.yaml` and run code generation before consuming it from typed clients.
+- Expo web previews need the API base URL at the development domain root. Routing to `/api-server/*` can return SPA HTML with a successful status instead of an API response.
+- Clerk Expo v3 uses the Signals API (`password()` / `finalize()`), and the onboarding flow must retain Clerk error handling plus user-scoped AsyncStorage draft state.
+- Use `useFocusEffect` plus the existing polling patterns for order refresh, and keep database order enums distinct from mobile display labels.
 
 ## Pointers
 

@@ -53,8 +53,9 @@ function getAttachmentPreview(attachment: unknown): string | undefined {
   return typeof title === "string" && title.trim() ? title.trim() : "Attachment";
 }
 
-function getMessagePreview(body: string | null | undefined, attachment: unknown): string | undefined {
-  const attachmentPreview = getAttachmentPreview(attachment);
+function getMessagePreview(body: string | null | undefined, attachment: unknown, attachments?: unknown): string | undefined {
+  const attachmentPreview = getAttachmentPreview(attachment)
+    ?? (Array.isArray(attachments) ? getAttachmentPreview(attachments[0]) : undefined);
   if (attachmentPreview) return attachmentPreview;
   return body?.trim() || undefined;
 }
@@ -107,10 +108,14 @@ function adaptMessage(m: typeof messages.$inferSelect) {
     fromColor:      m.senderColor,
     text:           m.body,
     attachment:     (m.attachment as any) ?? undefined,
+    attachments:    (m.attachments as any[]) ?? [],
     replyToId:      m.replyToId ?? undefined,
     replyPreview:   undefined,
     reactions:      [],
     status:         m.status,
+    deliveredAt:    m.deliveredAt?.toISOString() ?? undefined,
+    readAt:         m.readAt?.toISOString() ?? undefined,
+    deletedAt:      m.deletedAt?.toISOString() ?? undefined,
     ts:             new Date(m.createdAt!).getTime(),
     deletedForMe:   false,
   };
@@ -139,6 +144,7 @@ router.get("/", async (req, res) => {
       conversationId: messages.conversationId,
       body: messages.body,
       attachment: messages.attachment,
+       attachments: messages.attachments,
     })
       .from(messages)
       .where(inArray(messages.conversationId, convIds))
@@ -154,7 +160,7 @@ router.get("/", async (req, res) => {
   const previewByConversation = new Map<string, string>();
   for (const message of allMessages) {
     if (previewByConversation.has(message.conversationId)) continue;
-    const preview = getMessagePreview(message.body, message.attachment);
+    const preview = getMessagePreview(message.body, message.attachment, message.attachments);
     if (preview) previewByConversation.set(message.conversationId, preview);
   }
 
@@ -340,14 +346,23 @@ router.get("/:id/messages", async (req, res) => {
 router.post("/:id/messages", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { id } = req.params;
-  const { text, attachment, replyToId } = req.body as {
+  const { text, attachment, attachments, replyToId } = req.body as {
     text: string;
     attachment?: any;
+    attachments?: any[];
     replyToId?: string;
   };
+  if (attachments !== undefined && !Array.isArray(attachments)) {
+    return res.status(400).json({ error: "attachments must be an array." });
+  }
+  const attachmentItems = attachments ?? (attachment != null ? [attachment] : []);
+  if (attachmentItems.length > 5) {
+    return res.status(400).json({ error: "A message can include up to 5 attachments." });
+  }
+  const primaryAttachment = attachment ?? attachmentItems[0];
 
   // Require either text or an attachment
-  if (!text?.trim() && !attachment) return res.status(400).json({ error: "text or attachment required" });
+  if (!text?.trim() && attachmentItems.length === 0) return res.status(400).json({ error: "text or attachment required" });
 
   // ── Content moderation ───────────────────────────────────────────────────
   // Casual profanity passes freely; only genuinely harmful content is blocked.
@@ -388,8 +403,15 @@ router.post("/:id/messages", async (req, res) => {
   }
 
   // ── Attachment validation ────────────────────────────────────────────────
-  if (attachment != null) {
-    const att = attachment as {
+  for (const item of attachmentItems) {
+    const type = (item as { type?: unknown } | null)?.type;
+    if (typeof type !== "string" || !["product", "order", "post", "profile"].includes(type)) {
+      return res.status(400).json({ error: "Invalid attachment type." });
+    }
+  }
+
+  if (primaryAttachment != null) {
+    const att = primaryAttachment as {
       type?: string;
       title?: string;
       subtitle?: string;
@@ -478,7 +500,7 @@ router.post("/:id/messages", async (req, res) => {
   }
 
   const bodyText = text?.trim() ?? "";
-  const previewText = getMessagePreview(bodyText, attachment) ?? "Attachment";
+  const previewText = getMessagePreview(bodyText, primaryAttachment, attachmentItems) ?? "Attachment";
 
   const [msg] = await db.insert(messages).values({
     conversationId: id,
@@ -487,9 +509,11 @@ router.post("/:id/messages", async (req, res) => {
     senderInitials: sender.initials,
     senderColor:    sender.color,
     body:           bodyText,
-    attachment:     attachment ?? null,
+    attachment:     primaryAttachment ?? null,
+    attachments:    attachmentItems,
     replyToId:      replyToId ?? null,
     status:         "sent",
+    deliveredAt:    new Date(),
   }).returning();
 
   // Update conversation preview + increment other participants' unread
@@ -537,9 +561,21 @@ router.patch("/:id/read", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   const { id } = req.params;
 
-  await db.update(conversationParticipants)
-    .set({ unreadCount: 0, lastReadAt: new Date() })
-    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)));
+  const [isMember] = await db.select({ userId: conversationParticipants.userId })
+    .from(conversationParticipants)
+    .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId)))
+    .limit(1);
+  if (!isMember) return res.status(404).json({ error: "Conversation not found" });
+
+  const readAt = new Date();
+  await Promise.all([
+    db.update(conversationParticipants)
+      .set({ unreadCount: 0, lastReadAt: readAt })
+      .where(and(eq(conversationParticipants.conversationId, id), eq(conversationParticipants.userId, userId))),
+    db.update(messages)
+      .set({ status: "read", readAt })
+      .where(and(eq(messages.conversationId, id), sql`${messages.senderId} != ${userId}`, sql`${messages.readAt} IS NULL`)),
+  ]);
 
   return res.json({ ok: true });
 });

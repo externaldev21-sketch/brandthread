@@ -1,4 +1,5 @@
-- [Brandthread theme](brandthread-theme.md) — lib/theme.ts dark tokens (PURPLE #8B5CF6 on #07070F) are the only palette; app is dark-only. Bone/green "Vault Archive" + useColors light palettes retired.
+- [Brandthread theme](brandthread-theme.md) — dark-only base surfaces remain; runtime accent selection is user-scoped and replaces the former fixed-purple-only rule. Retired light/Vault palettes stay retired.
+- [Runtime app themes](runtime-app-themes.md) — user-selected Brandthread accent applies across buyer and seller shared chrome; keep additions on the provider, never role-specific theme keys.
 - [Clerk Expo v3 Signals API](clerk-expo-v3-signals-api.md) — @clerk/expo v3 hooks return SignInFutureResource; use password()+finalize() not create()+setActive(); Metro needs _tmp_ blockList fix.
 - [Brandthread backend architecture](brandthread-backend-architecture.md) — ownerId scoping, transactional orders, lib/db build requirement, clerkClient usage, healthz double-path gotcha.
 - [Inbox structural flattening](inbox-flattening-pattern.md) — Brandthread screens (profile, inbox) use flat Instagram-style rows, no card chrome; keep new screens consistent.

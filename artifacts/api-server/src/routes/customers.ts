@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, customers, orders } from "@workspace/db";
 import { eq, desc, ilike, or, and, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 
 // ─── Startup migration — add tags + notes columns ────────────────────────────
 (async () => {
@@ -21,11 +22,13 @@ router.get("/", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { search } = req.query;
   let query = db.select().from(customers).where(eq(customers.ownerId, ownerId)).orderBy(desc(customers.createdAt)).$dynamic();
-  if (search && typeof search === "string") {
+  const term = normalizeSearchTerm(search);
+  if (term) {
+    const pattern = containsSearchPattern(term);
     query = query.where(
       and(
         eq(customers.ownerId, ownerId),
-        or(ilike(customers.name, `%${search}%`), ilike(customers.email, `%${search}%`))
+        or(ilike(customers.name, pattern), ilike(customers.email, pattern))
       )
     );
   }

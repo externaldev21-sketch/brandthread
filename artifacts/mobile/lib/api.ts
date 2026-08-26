@@ -339,6 +339,14 @@ export function createApi(getToken: GetToken) {
     },
     photography: {
       generate: (images: string[], prompt: string) => post<any>('/api/photography/generate', { images, prompt }),
+      generateOutfitSwap: (
+        heroImage: string,
+        garmentImages: string[],
+        prompt: string,
+      ) => post<{
+        results: { garmentIndex: number; b64_json: string }[];
+        errors?: { garmentIndex: number }[];
+      }>('/api/photography/outfit-swap', { heroImage, garmentImages, prompt }),
     },
     bgRemoval: {
       /**

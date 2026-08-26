@@ -19,7 +19,7 @@ const CYAN   = '#22D3EE';
 
 const CARDS: {
   type: AccountType;
-  icon: string;
+  icon: 'shopping-bag' | 'star';
   title: string;
   description: string;
   bullets: string[];
@@ -27,7 +27,7 @@ const CARDS: {
 }[] = [
   {
     type: 'buyer',
-    icon: '🛍',
+    icon: 'shopping-bag',
     title: "I'm here to shop",
     description: 'Discover brands, watch content and buy products directly from the Thread.',
     bullets: [
@@ -40,7 +40,7 @@ const CARDS: {
   },
   {
     type: 'seller',
-    icon: '✦',
+    icon: 'star',
     title: "I'm building a brand",
     description:
       'Design, manufacture, launch, sell and manage everything in one workspace.',
@@ -78,16 +78,10 @@ export default function AccountTypeScreen() {
 
       {/* Ambient glow */}
       <View style={styles.glow} />
+      <View style={styles.glowSecondary} />
 
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backBtn}
-          onPress={() => { Haptics.selectionAsync(); router.back(); }}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <Feather name="chevron-left" size={22} color="rgba(255,255,255,0.5)" />
-        </TouchableOpacity>
         <View style={styles.headerText}>
           <Text style={styles.headline}>How will you use{'\n'}Brandthread?</Text>
           <Text style={styles.subtext}>
@@ -124,6 +118,12 @@ export default function AccountTypeScreen() {
                   elevation: 10,
                 },
               ]}>
+                <LinearGradient
+                  colors={[c.accent, `${c.accent}00`]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.cardAccent}
+                />
                 {/* Check badge */}
                 {isSelected && (
                   <View style={[styles.checkBadge, { backgroundColor: c.accent }]}>
@@ -133,20 +133,30 @@ export default function AccountTypeScreen() {
 
                 {/* Icon + title */}
                 <View style={styles.cardTop}>
-                  <View style={[styles.iconWrap, { backgroundColor: c.accent + '18' }]}>
-                    <Text style={styles.cardIcon}>{c.icon}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
+                  <LinearGradient
+                    colors={[`${c.accent}38`, `${c.accent}0D`]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.iconWrap}
+                  >
+                    <Feather name={c.icon} size={23} color={c.accent} />
+                  </LinearGradient>
+                  <View style={styles.cardTitleWrap}>
+                    <Text style={[styles.cardKicker, { color: c.accent }]}>
+                      {c.type === 'buyer' ? 'EXPLORE' : 'CREATE'}
+                    </Text>
                     <Text style={styles.cardTitle}>{c.title}</Text>
                     <Text style={styles.cardDesc}>{c.description}</Text>
                   </View>
                 </View>
 
-                {/* Bullets */}
+                {/* Benefits */}
                 <View style={styles.bullets}>
                   {c.bullets.map((b) => (
                     <View key={b} style={styles.bulletRow}>
-                      <View style={[styles.bullet, { backgroundColor: isSelected ? c.accent : 'rgba(255,255,255,0.25)' }]} />
+                      <View style={[styles.bulletIcon, { borderColor: isSelected ? `${c.accent}B0` : 'rgba(255,255,255,0.2)' }]}>
+                        <Feather name="check" size={10} color={isSelected ? c.accent : 'rgba(255,255,255,0.42)'} />
+                      </View>
                       <Text style={styles.bulletText}>{b}</Text>
                     </View>
                   ))}
@@ -198,9 +208,13 @@ const styles = StyleSheet.create({
     width: '80%', height: 220, borderRadius: 150,
     backgroundColor: '#8B5CF612',
   },
+  glowSecondary: {
+    position: 'absolute', top: 260, right: -100,
+    width: 240, height: 240, borderRadius: 140,
+    backgroundColor: '#22D3EE0A',
+  },
 
   header: { paddingHorizontal: 20, paddingBottom: 16 },
-  backBtn: { width: 40, height: 40, justifyContent: 'center', marginBottom: 8 },
   headerText: { gap: 8 },
   headline: {
     fontSize: 34,
@@ -223,6 +237,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.09)',
     padding: 20,
+    overflow: 'hidden',
+  },
+  cardAccent: {
+    position: 'absolute',
+    top: 0,
+    left: 20,
+    width: 92,
+    height: 3,
+    borderBottomLeftRadius: 3,
+    borderBottomRightRadius: 3,
   },
   checkBadge: {
     position: 'absolute',
@@ -232,19 +256,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cardTop: { flexDirection: 'row', gap: 14, marginBottom: 16, alignItems: 'flex-start' },
+  cardTop: { flexDirection: 'row', gap: 14, marginBottom: 18, alignItems: 'flex-start' },
   iconWrap: {
     width: 48, height: 48, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  cardIcon:  { fontSize: 22 },
-  cardTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#FFFFFF', marginBottom: 4 },
+  cardTitleWrap: { flex: 1, paddingTop: 1 },
+  cardKicker: { fontSize: 10, fontFamily: 'Inter_700Bold', letterSpacing: 1.8, marginBottom: 4 },
+  cardTitle: { fontSize: 20, fontFamily: 'Inter_700Bold', color: '#FFFFFF', marginBottom: 5, letterSpacing: -0.3 },
   cardDesc:  { fontSize: 13, fontFamily: 'Inter_400Regular', color: 'rgba(255,255,255,0.55)', lineHeight: 18 },
 
-  bullets:   { gap: 8 },
+  bullets:   { gap: 10, paddingTop: 2 },
   bulletRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  bullet:    { width: 5, height: 5, borderRadius: 3 },
-  bulletText:{ fontSize: 13, fontFamily: 'Inter_400Regular', color: 'rgba(255,255,255,0.6)' },
+  bulletIcon: {
+    width: 19, height: 19, borderRadius: 10, borderWidth: 1,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  bulletText:{ flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium', color: 'rgba(255,255,255,0.68)' },
 
   footer: {
     position: 'absolute', bottom: 0, left: 0, right: 0,

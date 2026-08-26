@@ -18,6 +18,7 @@ import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useUser } from '@cle
 import { tokenCache } from '@/lib/tokenCache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RoleProvider } from '@/contexts/RoleContext';
+import { AppThemeProvider } from '@/contexts/AppThemeContext';
 import BootScreen from '@/components/BootScreen';
 import * as Notifications from 'expo-notifications';
 import { configureServices } from '@/lib/serviceConfig';
@@ -494,6 +495,7 @@ function RootLayoutNav() {
         <Stack.Screen name="buyer-muted"               options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-restricted"          options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-settings"        options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="app-theme"             options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-settings-detail" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-account-center"  options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-personal-details" options={{ headerShown: false, animation: 'slide_from_right' }} />
@@ -608,11 +610,13 @@ export default function RootLayout() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView style={{ flex: 1 }}>
-            <RoleProvider>
-              <KeyboardProvider>
-                <RootLayoutNav />
-              </KeyboardProvider>
-            </RoleProvider>
+            <AppThemeProvider>
+              <RoleProvider>
+                <KeyboardProvider>
+                  <RootLayoutNav />
+                </KeyboardProvider>
+              </RoleProvider>
+            </AppThemeProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>
       </ErrorBoundary>

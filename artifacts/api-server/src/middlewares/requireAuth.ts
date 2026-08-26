@@ -14,6 +14,35 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   next();
 }
 
+/**
+ * Platform moderation is distinct from seller team ownership. A store owner
+ * must not automatically gain access to reports made across the marketplace.
+ * Apply after requireAuth.
+ */
+export async function requireModerator(req: Request, res: Response, next: NextFunction) {
+  const userId = (req as any).clerkUserId as string | undefined;
+  if (!userId) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  try {
+    const [account] = await db
+      .select({ role: users.role })
+      .from(users)
+      .where(eq(users.clerkId, userId))
+      .limit(1);
+    if (account?.role !== "admin") {
+      res.status(403).json({ error: "Moderator access required" });
+      return;
+    }
+    next();
+  } catch (error) {
+    console.error("[requireModerator] DB lookup failed:", error);
+    res.status(503).json({ error: "Unable to verify moderator access" });
+  }
+}
+
 // ─── Plan hierarchy ────────────────────────────────────────────────────────────
 
 const PLAN_ORDER: Record<string, number> = {

@@ -1,9 +1,10 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Animated, Dimensions, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: W } = Dimensions.get('window');
 
@@ -13,14 +14,25 @@ const CYAN     = '#22D3EE';
 
 export default function SplashScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const logoScale   = useRef(new Animated.Value(0.5)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const textOpacity = useRef(new Animated.Value(0)).current;
+  const ctaOpacity  = useRef(new Animated.Value(0)).current;
   const glowScale   = useRef(new Animated.Value(0.2)).current;
   const glowOpacity = useRef(new Animated.Value(0)).current;
   const ringScale   = useRef(new Animated.Value(0.6)).current;
   const ringOpacity = useRef(new Animated.Value(0)).current;
+  const advancing   = useRef(false);
+
+  const continueForward = () => {
+    if (advancing.current) return;
+    advancing.current = true;
+    AsyncStorage.setItem('splash_seen', 'true')
+      .catch(() => {})
+      .finally(() => router.replace('/account-type' as never));
+  };
 
   useEffect(() => {
     // Glow + ring + logo all come in together
@@ -33,13 +45,13 @@ export default function SplashScreen() {
       Animated.timing(logoOpacity,  { toValue: 1,   duration: 400,  useNativeDriver: true }),
     ]).start(() => {
       // Tagline fades in after logo settles
-      Animated.timing(textOpacity, { toValue: 1, duration: 450, useNativeDriver: true }).start();
+      Animated.parallel([
+        Animated.timing(textOpacity, { toValue: 1, duration: 450, useNativeDriver: true }),
+        Animated.timing(ctaOpacity, { toValue: 1, duration: 500, delay: 500, useNativeDriver: true }),
+      ]).start();
     });
 
-    const timer = setTimeout(async () => {
-      await AsyncStorage.setItem('splash_seen', 'true');
-      router.replace('/welcome' as never);
-    }, 2600);
+    const timer = setTimeout(continueForward, 2600);
 
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -67,6 +79,17 @@ export default function SplashScreen() {
       <Animated.View style={[styles.textWrap, { opacity: textOpacity }]}>
         <Text style={styles.wordmark}>BRANDTHREAD</Text>
         <Text style={styles.tagline}>Build it. Wear it. Scale it.</Text>
+      </Animated.View>
+
+      {/* Optional early exit; the automatic advance keeps this moment frictionless. */}
+      <Animated.View style={[styles.ctaWrap, { bottom: insets.bottom + 28, opacity: ctaOpacity }]}>
+        <TouchableOpacity
+          style={styles.cta}
+          activeOpacity={0.86}
+          onPress={continueForward}
+        >
+          <Text style={styles.ctaText}>Get started</Text>
+        </TouchableOpacity>
       </Animated.View>
     </View>
   );
@@ -107,5 +130,24 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     color: '#FFFFFF55',
     letterSpacing: 0.3,
+  },
+  ctaWrap: {
+    position: 'absolute',
+    left: 24,
+    right: 24,
+  },
+  cta: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#FFFFFF28',
+    backgroundColor: '#FFFFFF0A',
+    paddingVertical: 15,
+    alignItems: 'center',
+  },
+  ctaText: {
+    fontSize: 15,
+    fontFamily: 'Inter_700Bold',
+    color: '#FFFFFF',
+    letterSpacing: 0.2,
   },
 });

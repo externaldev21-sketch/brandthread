@@ -7,6 +7,7 @@ import { SymbolView } from 'expo-symbols';
 
 import { BG, SURFACE, BORDER, FG, SUBTLE, PURPLE } from '@/lib/theme';
 import { getDeactivationStatus, reactivate } from '@/lib/accountService';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 // ─── Buyer tab layout ─────────────────────────────────────────────────────────
 // Tabs: Thread · Discover · Friends · Inbox · Profile
@@ -16,9 +17,10 @@ function BuyerTabLayout() {
   const isDark  = colorScheme === 'dark';
   const isIOS   = Platform.OS === 'ios';
   const insets  = useSafeAreaInsets();
+  const { theme } = useAppTheme();
 
   const pillBg       = 'rgba(12,12,23,0.96)'; // SURFACE with opacity
-  const activeTint   = FG;
+  const activeTint   = theme.accent;
   const inactiveTint = SUBTLE;
 
   const tabBarStyle = {
@@ -67,7 +69,7 @@ function BuyerTabLayout() {
             isIOS ? (
               <SymbolView name={focused ? 'play.rectangle.fill' : 'play.rectangle'} tintColor={color} size={20} />
             ) : (
-              <TabIcon name="play-circle" color={color} focused={focused} />
+              <TabIcon name="play-circle" color={color} focused={focused} accent={theme.accent} />
             ),
         }}
       />
@@ -81,7 +83,7 @@ function BuyerTabLayout() {
             isIOS ? (
               <SymbolView name={focused ? 'safari.fill' : 'safari'} tintColor={color} size={20} />
             ) : (
-              <TabIcon name="compass" color={color} focused={focused} />
+              <TabIcon name="compass" color={color} focused={focused} accent={theme.accent} />
             ),
         }}
       />
@@ -98,7 +100,7 @@ function BuyerTabLayout() {
             isIOS ? (
               <SymbolView name={focused ? 'person.2.fill' : 'person.2'} tintColor={color} size={20} />
             ) : (
-              <TabIcon name="users" color={color} focused={focused} />
+              <TabIcon name="users" color={color} focused={focused} accent={theme.accent} />
             ),
         }}
       />
@@ -112,7 +114,7 @@ function BuyerTabLayout() {
             isIOS ? (
               <SymbolView name={focused ? 'message.fill' : 'message'} tintColor={color} size={20} />
             ) : (
-              <TabIcon name="message-circle" color={color} focused={focused} />
+              <TabIcon name="message-circle" color={color} focused={focused} accent={theme.accent} />
             ),
         }}
       />
@@ -126,7 +128,7 @@ function BuyerTabLayout() {
             isIOS ? (
               <SymbolView name={focused ? 'person.fill' : 'person'} tintColor={color} size={20} />
             ) : (
-              <TabIcon name="user" color={color} focused={focused} />
+              <TabIcon name="user" color={color} focused={focused} accent={theme.accent} />
             ),
         }}
       />
@@ -146,17 +148,18 @@ function BuyerTabLayout() {
 // ─── Regular tab icon ─────────────────────────────────────────────────────────
 
 function TabIcon({
-  name, color, focused,
+  name, color, focused, accent,
 }: {
   name: keyof typeof Feather.glyphMap;
   color: string;
   focused: boolean;
+  accent: string;
 }) {
   return (
     <View style={{ alignItems: 'center', gap: 4 }}>
       <Feather name={name} size={20} color={color} />
       {focused && (
-        <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: PURPLE }} />
+        <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: accent }} />
       )}
     </View>
   );

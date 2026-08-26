@@ -22,6 +22,7 @@ import {
 } from '@/lib/theme';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   getBadgeCount,
   getLastViewedAt,
@@ -52,6 +53,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
   const api = useApi();
   const { userId } = useAuth();
+  const { theme } = useAppTheme();
 
   // Sync local state with the shared in-memory badge store so the badge
   // clears immediately when orders.tsx calls clearBadge(userId), without
@@ -129,6 +131,8 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
         {
           height: 72 + insets.bottom,
           paddingBottom: insets.bottom,
+          backgroundColor: BG,
+          borderTopColor: BORDER,
         },
       ]}
     >
@@ -139,7 +143,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
         if (!tabDef) return null;
 
         const isFocused = state.index === index;
-        const color = isFocused ? PURPLE : INACTIVE_COLOR;
+        const color = isFocused ? theme.accent : INACTIVE_COLOR;
 
         // Show new-order badge on Orders tab only when the tab is not active
         const showOrderBadge =
@@ -172,14 +176,14 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           >
             {/* Purple pill indicator above icon */}
             <View style={styles.pillWrap}>
-              {isFocused && <View style={styles.pill} />}
+              {isFocused && <View style={[styles.pill, { backgroundColor: theme.accent }]} />}
             </View>
 
             {/* Icon + optional new-order badge */}
             <View style={styles.iconWrap}>
               <Feather name={tabDef.icon} size={22} color={color} />
               {showOrderBadge && (
-                <View style={styles.badge}>
+                <View style={[styles.badge, { backgroundColor: theme.accent, borderColor: BG }]}>
                   <Text style={styles.badgeText}>
                     {newOrderCount > 99 ? '99+' : String(newOrderCount)}
                   </Text>

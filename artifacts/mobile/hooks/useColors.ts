@@ -1,5 +1,5 @@
-import { useColorScheme } from 'react-native';
 import colors from '@/constants/colors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 /**
  * Returns the design tokens for the current color scheme.
@@ -8,7 +8,14 @@ import colors from '@/constants/colors';
  * plus scheme-independent values like `radius`.
  */
 export function useColors() {
-  const scheme = useColorScheme();
-  const palette = scheme === 'dark' && 'dark' in colors ? colors.dark : colors.light;
-  return { ...palette, radius: colors.radius };
+  const { theme } = useAppTheme();
+  return {
+    ...colors.dark,
+    tint: theme.accent,
+    primary: theme.accent,
+    accent: theme.accentDim,
+    accentForeground: theme.accentLight,
+    info: theme.secondary,
+    radius: colors.radius,
+  };
 }

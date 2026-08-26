@@ -1,8 +1,8 @@
 /**
  * Brandthread Onboarding — complete buyer + seller flows
  *
- * BUYER  steps: 0=Name 1=Style 2=Auth 3=Loading 4=Notifications 5=Success
- * SELLER steps: 0=Name 1=BrandName 2=Stage 3=Model 4=Goals 5=Auth 6=Loading 7=Notifications 8=Success
+ * BUYER  steps: 0=Auth 1=Name 2=Style 3=Loading 4=Notifications 5=Success
+ * SELLER steps: 0=Auth 1=Name 2=BrandName 3=Stage 4=Goals 5=Loading 6=Notifications 7=Success
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -70,12 +70,6 @@ const BRAND_STAGES = [
   { value: 'scale',   label: 'Ready to scale',   sub: 'I need stronger systems and growth.' },
 ];
 
-const PRODUCT_MODELS = [
-  { value: 'preorder',   label: 'Pre-order',           sub: 'Collect orders first, then fund production.' },
-  { value: 'premade',    label: 'Pre-made inventory',  sub: 'Stock products before customers purchase.' },
-  { value: 'both',       label: 'Both',                sub: 'Use pre-orders and stocked drops together.' },
-];
-
 const SELLER_GOALS = [
   'Create designs', 'Find manufacturers', 'Launch my store', 'Manage production',
   'Grow sales', 'Build content', 'Manage inventory', 'Ship orders',
@@ -85,9 +79,36 @@ const SELLER_GOALS = [
 const BUYER_LOADING_STEPS  = ['Learning your style', 'Curating your Thread', 'Finding brands you\'ll love', 'Finishing your profile'];
 const SELLER_LOADING_STEPS = ['Mapping your brand workspace', 'Preparing your product pipeline', 'Connecting your growth tools', 'Finishing your dashboard'];
 
-const DRAFT_KEY = 'onboarding_draft';
+const LEGACY_DRAFT_KEY = 'onboarding_draft';
+const DRAFT_KEY_PREFIX = 'onboarding_draft:';
+const DRAFT_VERSION = 3;
+
+function draftKeyForUser(userId?: string | null): string | null {
+  return userId ? `${DRAFT_KEY_PREFIX}${userId}` : null;
+}
 
 type Flow = 'buyer' | 'seller';
+
+// Drafts from before Auth moved to the first step need a one-time translation
+// so closing the app still resumes at the equivalent screen.
+function restoreDraftStep(flow: Flow, step: number, version?: number): number {
+  if (version === DRAFT_VERSION) return step;
+  if (version === 2) {
+    if (step === 0) return 1; // name
+    if (step === 1) return 2; // style / brand name
+    if (step === 2) return 0; // account creation
+    return step;
+  }
+  if (flow !== 'seller') return step;
+  if (step <= 1) return step;
+  if (step === 2) return 3; // brand stage
+  if (step === 3 || step === 4) return 4; // skip the removed product model
+  if (step === 5) return 2; // account creation
+  if (step === 6) return 5; // loading
+  if (step === 7) return 6; // notifications
+  if (step >= 8) return 7; // success
+  return step;
+}
 
 // ─── Clerk error mapper ──────────────────────────────────────────────────────
 // Maps Clerk error objects to user-facing strings.
@@ -977,8 +998,8 @@ const sa = StyleSheet.create({
 
 // ─── Main onboarding component ────────────────────────────────────────────────
 export default function OnboardingScreen() {
-  const { isSignedIn, signOut } = useAuth();
-  const { user }                = useUser();
+  const { isSignedIn, signOut, isLoaded: authLoaded } = useAuth();
+  const { user, isLoaded: userLoaded }                = useUser();
   const { signUp }              = useSignUp();
   const { signIn }              = useSignIn();
   const { startSSOFlow } = useSSO();
@@ -1001,7 +1022,6 @@ export default function OnboardingScreen() {
   // Seller data
   const [brandName, setBrandName]         = useState('');
   const [brandStage, setBrandStage]       = useState('');
-  const [productModel, setProductModel]   = useState('');
   const [goals, setGoals]                 = useState<string[]>([]);
 
   // Shared post-questionnaire state
@@ -1009,56 +1029,103 @@ export default function OnboardingScreen() {
   const [finishing, setFinishing]         = useState(false);
 
   const slideAnim = useRef(new Animated.Value(0)).current;
+  const restoredDraft = useRef(false);
 
-  // ── Restore draft on mount ──────────────────────────────────────────────────
+  // Clerk may take longer than local storage to initialize in a web preview.
+  // Never leave a new visitor behind an indefinite spinner: the role is the
+  // only device-level hint retained here and contains no profile data.
   useEffect(() => {
+    const fallback = setTimeout(() => {
+      AsyncStorage.getItem('user_role')
+        .then((role) => {
+          if (role === 'buyer' || role === 'seller') setFlow(role);
+        })
+        .catch(() => {})
+        .finally(() => setReady(true));
+    }, 1200);
+    return () => clearTimeout(fallback);
+  }, []);
+
+  // ── Restore draft for the active account ─────────────────────────────────────
+  useEffect(() => {
+    // Wait until Clerk has resolved a signed-in identity before choosing the
+    // one-time restore key. The independent timeout above covers the web
+    // preview without letting it commit a restore for an unknown account.
+    if (!authLoaded || (isSignedIn && !userLoaded)) return;
+    if (isSignedIn && !user?.id) return;
+    if (restoredDraft.current) return;
+    restoredDraft.current = true;
+
     async function init() {
-      const [[, roleVal], [, draftVal]] = await AsyncStorage.multiGet(['user_role', DRAFT_KEY]);
-      const role = roleVal as Flow | null;
-      let restored = false;
+      try {
+        const signedInUserId = user?.id;
+        const draftKey = draftKeyForUser(signedInUserId);
+        // Discard the old global draft rather than risking restoration into a
+        // different account on a shared device. Pre-auth answers stay in memory
+        // until Clerk identifies the user, then are saved under their own key.
+        await AsyncStorage.removeItem(LEGACY_DRAFT_KEY);
+        const values = draftKey
+          ? await AsyncStorage.multiGet([draftKey, 'user_role'])
+          : await AsyncStorage.multiGet(['user_role', '__no_account_draft__']);
+        const roleVal = values.find(([key]) => key === 'user_role')?.[1];
+        const draftVal = draftKey ? values.find(([key]) => key === draftKey)?.[1] : null;
+        const role = !signedInUserId ? roleVal as Flow | null : null;
+        let restored = false;
 
-      if (draftVal) {
-        try {
-          const draft = JSON.parse(draftVal);
-          if (draft.flow) {
-            setFlow(draft.flow);
-            setStep(draft.step ?? 0);
-            setFirstName(draft.firstName ?? '');
-            setUsername(draft.username ?? '');
-            setStyleArr(draft.styleInterests ?? []);
-            setBrandName(draft.brandName ?? '');
-            setBrandStage(draft.brandStage ?? '');
-            setProductModel(draft.productModel ?? '');
-            setGoals(draft.goals ?? []);
-            restored = true;
-          }
-        } catch { /* bad json, ignore */ }
-      }
+        if (draftVal) {
+          try {
+            const draft = JSON.parse(draftVal);
+            if (draft.flow && draft.ownerId === signedInUserId) {
+              setFlow(draft.flow);
+              setStep(restoreDraftStep(draft.flow, draft.step ?? 0, draft.version));
+              setFirstName(draft.firstName ?? '');
+              setUsername(draft.username ?? '');
+              setStyleArr(draft.styleInterests ?? []);
+              setBrandName(draft.brandName ?? '');
+              setBrandStage(draft.brandStage ?? '');
+              setGoals(draft.goals ?? []);
+              restored = true;
+            }
+          } catch { /* bad json, ignore */ }
+        }
 
-      if (!restored && role) {
-        setFlow(role);
-        setStep(0);
+        if (!restored && role) {
+          setFlow(role);
+          setStep(0);
+        }
+      } catch {
+        // Local persistence is optional; a storage issue must not block signup.
+      } finally {
+        setReady(true);
       }
-      setReady(true);
     }
     init();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [authLoaded, userLoaded, isSignedIn, user?.id]);
 
   // ── Persist draft ───────────────────────────────────────────────────────────
   const saveDraft = useCallback(async (overrides?: Record<string, unknown>) => {
+    const userId = user?.id;
+    const draftKey = draftKeyForUser(userId);
+    if (!draftKey || !userId) return;
     const data = {
-      flow, step, firstName, username, styleInterests, brandName, brandStage, productModel, goals,
+      version: DRAFT_VERSION,
+      ownerId: userId,
+      flow, step, firstName, username, styleInterests, brandName, brandStage, goals,
       ...overrides,
     };
-    await AsyncStorage.setItem(DRAFT_KEY, JSON.stringify(data));
-  }, [flow, step, firstName, username, styleInterests, brandName, brandStage, productModel, goals]);
+    await AsyncStorage.setItem(draftKey, JSON.stringify(data));
+  }, [flow, step, firstName, username, styleInterests, brandName, brandStage, goals, user?.id]);
+
+  // Persist in-memory pre-auth answers as soon as Clerk identifies the user.
+  useEffect(() => {
+    if (!user?.id || !ready || !flow) return;
+    saveDraft().catch(() => {});
+  }, [user?.id, ready, flow, saveDraft]);
 
   // ── Auth completion handler (OAuth without remount) ─────────────────────────
   const handleAuthComplete = useCallback(() => {
     if (!flow) return;
-    const loadingStep = flow === 'buyer' ? 3 : 6;
-    setStep(loadingStep);
+    setStep(1);
   }, [flow]);
 
   // ── Watch for OAuth isSignedIn change ────────────────────────────────────────
@@ -1067,8 +1134,7 @@ export default function OnboardingScreen() {
     if (!ready || !flow) return;
     if (prevSignedIn.current === null) { prevSignedIn.current = isSignedIn ?? false; return; }
     if (!prevSignedIn.current && isSignedIn) {
-      const loadingStep = flow === 'buyer' ? 3 : 6;
-      setStep(loadingStep);
+      setStep(1);
     }
     prevSignedIn.current = isSignedIn ?? false;
   }, [isSignedIn, ready, flow]);
@@ -1128,7 +1194,7 @@ export default function OnboardingScreen() {
         ['onboarding_style_interests', JSON.stringify(styleInterests)],
         ['notifications_granted', notificationsGranted ? 'true' : 'false'],
       ]);
-      await AsyncStorage.removeItem(DRAFT_KEY);
+      await AsyncStorage.multiRemove([draftKeyForUser(profile.clerkId)!, LEGACY_DRAFT_KEY]);
       // Style interest preferences — non-critical for buyer
       if (styleInterests.length > 0) {
         api.seller.saveOnboardingData({ styleInterests }).catch(() => {});
@@ -1156,7 +1222,6 @@ export default function OnboardingScreen() {
       await api.auth.onboarding({
         brandName: brandName.trim(),
         brandStage,
-        sellModel: productModel,
         ...(uname ? { username: uname } : {}),
       });
       await api.auth.updateProfile({
@@ -1165,8 +1230,8 @@ export default function OnboardingScreen() {
         accountType: 'seller',
       });
       // Brand profile data — critical; surface error if it fails
-      if (goals.length > 0 || brandStage || productModel) {
-        await api.seller.saveOnboardingData({ goals, brandStage, sellModel: productModel });
+      if (goals.length > 0 || brandStage) {
+        await api.seller.saveOnboardingData({ goals, brandStage });
       }
       await AsyncStorage.multiSet([
         [ONBOARDING_KEY, 'true'],
@@ -1177,7 +1242,7 @@ export default function OnboardingScreen() {
         ['onboarding_brand_stage', brandStage],   // read by plans.tsx for tier recommendation
         ['notifications_granted', notificationsGranted ? 'true' : 'false'],
       ]);
-      await AsyncStorage.removeItem(DRAFT_KEY);
+      await AsyncStorage.multiRemove([draftKeyForUser(profile.clerkId)!, LEGACY_DRAFT_KEY]);
       // Seed the AI brand memory in the background so the assistant has real
       // context on the seller's stage/goals from day one — non-blocking
       api.ai.brandMemoryRebuild().catch(() => {});
@@ -1197,7 +1262,8 @@ export default function OnboardingScreen() {
   async function devReset() {
     try { if (isSignedIn) await signOut(); } catch {}
     await AsyncStorage.multiRemove([
-      ONBOARDING_KEY, ONBOARDING_OWNER_KEY, 'user_role', DRAFT_KEY,
+      ONBOARDING_KEY, ONBOARDING_OWNER_KEY, 'user_role', LEGACY_DRAFT_KEY,
+      ...(user?.id ? [draftKeyForUser(user.id)!] : []),
       'onboarding_first_name', 'onboarding_brand_name',
       'onboarding_style_interests', 'splash_seen',
     ]);
@@ -1208,15 +1274,16 @@ export default function OnboardingScreen() {
   function canContinue(): boolean {
     if (!flow) return false;
     if (flow === 'buyer') {
-      if (step === 0) return firstName.trim().length >= 2;
-      if (step === 1) return styleInterests.length >= 3;
+      if (step === 0) return true; // AuthStep owns its form validation.
+      if (step === 1) return firstName.trim().length >= 2;
+      if (step === 2) return true;
     }
     if (flow === 'seller') {
-      if (step === 0) return firstName.trim().length >= 2;
-      if (step === 1) return brandName.trim().length >= 1;
-      if (step === 2) return !!brandStage;
-      if (step === 3) return !!productModel;
-      if (step === 4) return goals.length >= 1;
+      if (step === 0) return true; // AuthStep owns its form validation.
+      if (step === 1) return firstName.trim().length >= 2;
+      if (step === 2) return brandName.trim().length >= 1;
+      if (step === 3) return !!brandStage;
+      if (step === 4) return true;
     }
     return true;
   }
@@ -1225,15 +1292,21 @@ export default function OnboardingScreen() {
   function showsProgressBar(): boolean {
     if (!flow) return false;
     if (flow === 'buyer')  return step <= 2;
-    if (flow === 'seller') return step <= 5;
+    if (flow === 'seller') return step <= 4;
     return false;
   }
 
   function progressFraction(): number {
     if (!flow) return 0;
-    if (flow === 'buyer')  return (step + 1) / 3;
-    if (flow === 'seller') return (step + 1) / 6;
+     if (flow === 'buyer')  return (step + 1) / 6;
+     if (flow === 'seller') return (step + 1) / 8;
     return 0;
+  }
+
+  function progressLabel(): string {
+    if (!flow) return '';
+    const total = flow === 'buyer' ? 6 : 8;
+    return `Step ${step + 1} of ${total}`;
   }
 
   // ── Step rendering ──────────────────────────────────────────────────────────
@@ -1242,8 +1315,25 @@ export default function OnboardingScreen() {
 
     /* ─── BUYER STEPS ─── */
     if (flow === 'buyer') {
-      // Step 0: Name
+      // Step 0: Auth
       if (step === 0) return (
+        <AuthStep
+          flow={flow}
+          firstName={firstName}
+          brandName=""
+          signUp={signUp}
+          signIn={signIn}
+          startGoogleOAuth={startGoogleOAuth}
+          startAppleOAuth={startAppleOAuth}
+          onAuthComplete={handleAuthComplete}
+          onDevClear={devReset}
+          username={username}
+          onUsernameChange={setUsername}
+        />
+      );
+
+      // Step 1: Name
+      if (step === 1) return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={sm.scroll} keyboardShouldPersistTaps="handled">
             <Text style={sm.stepHeadline}>What should{'\n'}we call you?</Text>
@@ -1265,11 +1355,11 @@ export default function OnboardingScreen() {
         </KeyboardAvoidingView>
       );
 
-      // Step 1: Style interests
-      if (step === 1) return (
+      // Step 2: Style interests
+      if (step === 2) return (
         <ScrollView contentContainerStyle={sm.scroll} showsVerticalScrollIndicator={false}>
           <Text style={sm.stepHeadline}>What do you{'\n'}want to see?</Text>
-          <Text style={sm.stepSub}>Choose at least three. Your Thread will keep learning.</Text>
+          <Text style={sm.stepSub}>Pick a few for better recommendations. You can skip this for now.</Text>
           <View style={sm.chipGrid}>
             {STYLE_INTERESTS.map((item) => (
               <Chip
@@ -1280,27 +1370,7 @@ export default function OnboardingScreen() {
               />
             ))}
           </View>
-          {styleInterests.length > 0 && styleInterests.length < 3 && (
-            <Text style={sm.selectionHint}>Select {3 - styleInterests.length} more</Text>
-          )}
         </ScrollView>
-      );
-
-      // Step 2: Auth
-      if (step === 2) return (
-        <AuthStep
-          flow={flow}
-          firstName={firstName}
-          brandName=""
-          signUp={signUp}
-          signIn={signIn}
-          startGoogleOAuth={startGoogleOAuth}
-          startAppleOAuth={startAppleOAuth}
-          onAuthComplete={handleAuthComplete}
-          onDevClear={devReset}
-          username={username}
-          onUsernameChange={setUsername}
-        />
       );
 
       // Step 3: Loading
@@ -1325,8 +1395,25 @@ export default function OnboardingScreen() {
 
     /* ─── SELLER STEPS ─── */
     if (flow === 'seller') {
-      // Step 0: Name
+      // Step 0: Auth
       if (step === 0) return (
+        <AuthStep
+          flow={flow}
+          firstName={firstName}
+          brandName={brandName}
+          signUp={signUp}
+          signIn={signIn}
+          startGoogleOAuth={startGoogleOAuth}
+          startAppleOAuth={startAppleOAuth}
+          onAuthComplete={handleAuthComplete}
+          onDevClear={devReset}
+          username={username}
+          onUsernameChange={setUsername}
+        />
+      );
+
+      // Step 1: Name
+      if (step === 1) return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={sm.scroll} keyboardShouldPersistTaps="handled">
             <Text style={sm.stepHeadline}>What should{'\n'}we call you?</Text>
@@ -1348,8 +1435,8 @@ export default function OnboardingScreen() {
         </KeyboardAvoidingView>
       );
 
-      // Step 1: Brand name
-      if (step === 1) return (
+      // Step 2: Brand name
+      if (step === 2) return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={sm.scroll} keyboardShouldPersistTaps="handled">
             <Text style={sm.stepHeadline}>What are you{'\n'}building?</Text>
@@ -1372,8 +1459,8 @@ export default function OnboardingScreen() {
         </KeyboardAvoidingView>
       );
 
-      // Step 2: Brand stage
-      if (step === 2) return (
+      // Step 3: Brand stage
+      if (step === 3) return (
         <ScrollView contentContainerStyle={sm.scroll} showsVerticalScrollIndicator={false}>
           <Text style={sm.stepHeadline}>Where is your{'\n'}brand today?</Text>
           <Text style={sm.stepSub}>We'll tailor your workspace to your stage.</Text>
@@ -1391,30 +1478,11 @@ export default function OnboardingScreen() {
         </ScrollView>
       );
 
-      // Step 3: Product model
-      if (step === 3) return (
-        <ScrollView contentContainerStyle={sm.scroll} showsVerticalScrollIndicator={false}>
-          <Text style={sm.stepHeadline}>How will you{'\n'}sell products?</Text>
-          <Text style={sm.stepSub}>You can use multiple models as you grow.</Text>
-          <View style={sm.radioList}>
-            {PRODUCT_MODELS.map((m) => (
-              <RadioRow
-                key={m.value}
-                label={m.label}
-                sub={m.sub}
-                selected={productModel === m.value}
-                onPress={() => setProductModel(m.value)}
-              />
-            ))}
-          </View>
-        </ScrollView>
-      );
-
       // Step 4: Goals
       if (step === 4) return (
         <ScrollView contentContainerStyle={sm.scroll} showsVerticalScrollIndicator={false}>
           <Text style={sm.stepHeadline}>What do you{'\n'}need help with?</Text>
-          <Text style={sm.stepSub}>Choose everything that matters right now.</Text>
+          <Text style={sm.stepSub}>Choose what matters right now, or skip and personalize later.</Text>
           <View style={sm.chipGrid}>
             {SELLER_GOALS.map((g) => (
               <Chip
@@ -1425,18 +1493,16 @@ export default function OnboardingScreen() {
               />
             ))}
           </View>
-          {goals.length === 0 && <Text style={sm.selectionHint}>Select at least one</Text>}
           <TouchableOpacity
-            style={[sm.buildBtn, goals.length === 0 && sm.buildBtnDisabled]}
-            disabled={goals.length === 0}
-            onPress={() => { if (goals.length > 0) goNext(); }}
+            style={sm.buildBtn}
+            onPress={() => goNext()}
           >
             <LinearGradient
-              colors={goals.length > 0 ? [PURPLE, CYAN] : ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.06)']}
+              colors={[PURPLE, CYAN]}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={sm.buildBtnInner}
             >
-              <Text style={[sm.buildBtnText, goals.length === 0 && sm.buildBtnTextDisabled]}>
+              <Text style={sm.buildBtnText}>
                 Build my workspace
               </Text>
             </LinearGradient>
@@ -1444,39 +1510,22 @@ export default function OnboardingScreen() {
         </ScrollView>
       );
 
-      // Step 5: Auth
+      // Step 5: Loading
       if (step === 5) return (
-        <AuthStep
-          flow={flow}
-          firstName={firstName}
-          brandName={brandName}
-          signUp={signUp}
-          signIn={signIn}
-          startGoogleOAuth={startGoogleOAuth}
-          startAppleOAuth={startAppleOAuth}
-          onAuthComplete={handleAuthComplete}
-          onDevClear={devReset}
-          username={username}
-          onUsernameChange={setUsername}
-        />
+        <LoadingAnimation steps={SELLER_LOADING_STEPS} onDone={() => setStep(6)} />
       );
 
-      // Step 6: Loading
+      // Step 6: Notifications
       if (step === 6) return (
-        <LoadingAnimation steps={SELLER_LOADING_STEPS} onDone={() => setStep(7)} />
-      );
-
-      // Step 7: Notifications
-      if (step === 7) return (
         <NotificationsStep
           flow="seller"
-          onEnable={(granted) => { setNotificationsGranted(granted); setStep(8); }}
-          onSkip={() => setStep(8)}
+          onEnable={(granted) => { setNotificationsGranted(granted); setStep(7); }}
+          onSkip={() => setStep(7)}
         />
       );
 
-      // Step 8: Success
-      if (step === 8) return (
+      // Step 7: Success
+      if (step === 7) return (
         <SuccessScreen flow="seller" firstName={firstName} brandName={brandName} onFinish={finishSeller} finishing={finishing} />
       );
     }
@@ -1487,9 +1536,9 @@ export default function OnboardingScreen() {
   // ── Which steps get the standard header wrapper ─────────────────────────────
   // Steps at or after loading are full-screen (no header/progress bar)
   const isFullScreen = (flow === 'buyer'  && step >= 3)
-                    || (flow === 'seller' && step >= 6);
+                     || (flow === 'seller' && step >= 5);
 
-  const isAuthStep = (flow === 'buyer' && step === 2) || (flow === 'seller' && step === 5);
+  const isAuthStep = step === 0;
 
   // ── Show Continue button in footer (not auth, not goals, not full-screen) ───
   const showFooter = !isFullScreen && !isAuthStep && !(flow === 'seller' && step === 4);
@@ -1519,9 +1568,12 @@ export default function OnboardingScreen() {
           </TouchableOpacity>
 
           {showsProgressBar() && (
-            <View style={{ flex: 1, marginRight: 8 }}>
+            <View style={{ flex: 1, marginRight: 10 }}>
               <GradientBar fraction={progressFraction()} />
             </View>
+          )}
+          {showsProgressBar() && (
+            <Text style={sm.progressLabel}>{progressLabel()}</Text>
           )}
         </View>
       )}
@@ -1538,7 +1590,7 @@ export default function OnboardingScreen() {
             label={
               flow === 'buyer' && step === 1 ? 'Continue' :
               flow === 'seller' && step === 4 ? 'Build my workspace' :
-              step === (flow === 'buyer' ? 2 : 5) ? 'Create account' :
+              step === 0 ? 'Create account' :
               'Continue'
             }
             onPress={() => goNext()}
@@ -1555,6 +1607,7 @@ export default function OnboardingScreen() {
 const sm = StyleSheet.create({
   header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 12, gap: 8 },
   backBtn:   { width: 36, height: 36, justifyContent: 'center' },
+  progressLabel: { width: 64, fontSize: 11, fontFamily: 'Inter_500Medium', color: MUTED, textAlign: 'right' },
   stepWrap:  { flex: 1, paddingHorizontal: 24 },
   footer:    { paddingHorizontal: 24, paddingTop: 12 },
 

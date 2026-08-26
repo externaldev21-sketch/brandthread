@@ -27,6 +27,7 @@ import {
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM,
   SHADOW_PURPLE, SHADOW_SM,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 // ─── BrandthreadScreen ────────────────────────────────────────────────────────
 
@@ -77,6 +78,7 @@ interface BrandthreadHeaderProps {
 export function BrandthreadHeader({
   title, subtitle, onBack, rightElement, gradient = false,
 }: BrandthreadHeaderProps) {
+  const { theme } = useAppTheme();
   return (
     <View style={hdrS.root}>
       <View style={hdrS.left}>
@@ -91,8 +93,8 @@ export function BrandthreadHeader({
         )}
         <View>
           {gradient ? (
-            <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={hdrS.gradTitleWrap}>
-              <Text style={hdrS.gradTitle}>{title}</Text>
+            <LinearGradient colors={[theme.accent, theme.secondary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={hdrS.gradTitleWrap}>
+              <Text style={[hdrS.gradTitle, { color: theme.accent }]}>{title}</Text>
             </LinearGradient>
           ) : (
             <Text style={hdrS.title}>{title}</Text>
@@ -129,13 +131,14 @@ interface BrandthreadCardProps {
 }
 
 export function BrandthreadCard({ children, style, onPress, glow = false, elevated = false }: BrandthreadCardProps) {
+  const { theme } = useAppTheme();
   const s: ViewStyle = {
     backgroundColor: elevated ? CARD_ELEVATED : CARD,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: BORDER,
     padding: SP.md,
-    ...(glow ? SHADOW_PURPLE : {}),
+    ...(glow ? { ...SHADOW_PURPLE, shadowColor: theme.accent } : {}),
   };
   if (onPress) {
     return (
@@ -157,13 +160,15 @@ interface GradientCardProps {
   glow?: boolean;
 }
 
-export function GradientCard({ children, style, onPress, colors = GRAD_CARD_GLOW, glow = false }: GradientCardProps) {
+export function GradientCard({ children, style, onPress, colors, glow = false }: GradientCardProps) {
+  const { theme } = useAppTheme();
+  const cardColors = colors ?? [theme.accentDim, theme.secondaryDim] as const;
   const inner = (
     <LinearGradient
-      colors={colors}
+      colors={cardColors}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      style={[gcS.card, glow && SHADOW_PURPLE as ViewStyle, style]}
+      style={[gcS.card, { borderColor: theme.accent + '66' }, glow && { ...SHADOW_PURPLE, shadowColor: theme.accent } as ViewStyle, style]}
     >
       {children}
     </LinearGradient>
@@ -196,8 +201,10 @@ interface PrimaryButtonProps {
 }
 
 export function PrimaryButton({
-  label, onPress, icon, loading, disabled, small, style, colors = GRAD_PRIMARY,
+  label, onPress, icon, loading, disabled, small, style, colors,
 }: PrimaryButtonProps) {
+  const { theme } = useAppTheme();
+  const buttonColors = colors ?? [theme.accent, theme.secondary] as const;
   const h = small ? COMP.buttonHSm : COMP.buttonH;
   return (
     <TouchableOpacity
@@ -210,7 +217,7 @@ export function PrimaryButton({
       style={[{ borderRadius: RADIUS.md, overflow: 'hidden' }, style]}
     >
       <LinearGradient
-        colors={disabled ? ['#3A3A4E', '#3A3A4E'] : colors}
+        colors={disabled ? ['#3A3A4E', '#3A3A4E'] : buttonColors}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={[pbS.inner, { height: h }]}
@@ -245,7 +252,9 @@ interface SecondaryButtonProps {
   accent?: string;
 }
 
-export function SecondaryButton({ label, onPress, icon, disabled, small, style, accent = PURPLE }: SecondaryButtonProps) {
+export function SecondaryButton({ label, onPress, icon, disabled, small, style, accent }: SecondaryButtonProps) {
+  const { theme } = useAppTheme();
+  const resolvedAccent = accent ?? theme.accent;
   const h = small ? COMP.buttonHSm : COMP.buttonH;
   return (
     <TouchableOpacity
@@ -255,10 +264,10 @@ export function SecondaryButton({ label, onPress, icon, disabled, small, style, 
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
       }}
-      style={[sbS.root, { height: h, borderColor: accent + '55', opacity: disabled ? 0.5 : 1 }, style]}
+      style={[sbS.root, { height: h, borderColor: resolvedAccent + '55', backgroundColor: resolvedAccent + '14', opacity: disabled ? 0.5 : 1 }, style]}
     >
-      {icon && <Feather name={icon} size={ICON.sm} color={accent} />}
-      <Text style={[sbS.label, { fontSize: small ? FS.sm : FS.base, color: accent }]}>{label}</Text>
+      {icon && <Feather name={icon} size={ICON.sm} color={resolvedAccent} />}
+      <Text style={[sbS.label, { fontSize: small ? FS.sm : FS.base, color: resolvedAccent }]}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -281,7 +290,9 @@ interface TertiaryButtonProps {
   accent?: string;
 }
 
-export function TertiaryButton({ label, onPress, icon, disabled, small, style, accent = PURPLE_LIGHT }: TertiaryButtonProps) {
+export function TertiaryButton({ label, onPress, icon, disabled, small, style, accent }: TertiaryButtonProps) {
+  const { theme } = useAppTheme();
+  const resolvedAccent = accent ?? theme.accentLight;
   const h = small ? COMP.buttonHSm : COMP.buttonH;
   return (
     <TouchableOpacity
@@ -293,8 +304,8 @@ export function TertiaryButton({ label, onPress, icon, disabled, small, style, a
       }}
       style={[{ height: h, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, opacity: disabled ? 0.4 : 1 }, style]}
     >
-      {icon && <Feather name={icon} size={ICON.sm} color={accent} />}
-      <Text style={{ fontFamily: FONT.semibold, fontSize: small ? FS.sm : FS.base, color: accent }}>{label}</Text>
+      {icon && <Feather name={icon} size={ICON.sm} color={resolvedAccent} />}
+      <Text style={{ fontFamily: FONT.semibold, fontSize: small ? FS.sm : FS.base, color: resolvedAccent }}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -312,6 +323,7 @@ interface IconButtonProps {
 }
 
 export function IconButton({ name, onPress, color = FG, size = ICON.md, badge, badgeCount, style }: IconButtonProps) {
+  const { theme } = useAppTheme();
   return (
     <TouchableOpacity
       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
@@ -320,7 +332,7 @@ export function IconButton({ name, onPress, color = FG, size = ICON.md, badge, b
     >
       <Feather name={name} size={size} color={color} />
       {badge && (
-        <View style={ibS.badge}>
+        <View style={[ibS.badge, { backgroundColor: theme.accent }]}>
           {badgeCount !== undefined && badgeCount > 0
             ? <Text style={ibS.badgeText}>{badgeCount > 9 ? '9+' : badgeCount}</Text>
             : null}
@@ -350,9 +362,10 @@ interface SearchBarProps {
 
 export function SearchBar({ value, onChange, placeholder = 'Search…', style, onFocus, onBlur }: SearchBarProps) {
   const [focused, setFocused] = useState(false);
+  const { theme } = useAppTheme();
   return (
-    <View style={[srS.root, focused && srS.focused, style]}>
-      <Feather name="search" size={ICON.sm} color={focused ? PURPLE_LIGHT : MUTED} />
+    <View style={[srS.root, focused && [srS.focused, { borderColor: theme.secondary }], style]}>
+      <Feather name="search" size={ICON.sm} color={focused ? theme.accentLight : MUTED} />
       <TextInput
         style={srS.input}
         value={value}
@@ -390,16 +403,17 @@ interface FilterChipProps {
 }
 
 export function FilterChip({ label, active, onPress, count }: FilterChipProps) {
+  const { theme } = useAppTheme();
   return (
     <TouchableOpacity
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
-      style={[fcS.chip, active && fcS.active]}
+      style={[fcS.chip, active && [fcS.active, { backgroundColor: theme.accentDim, borderColor: theme.accent + '88' }]]}
       activeOpacity={0.8}
     >
-      <Text style={[fcS.label, active && fcS.activeLabel]}>{label}</Text>
+      <Text style={[fcS.label, active && [fcS.activeLabel, { color: theme.accentLight }]]}>{label}</Text>
       {count !== undefined && (
-        <View style={[fcS.count, active && fcS.activeCount]}>
-          <Text style={[fcS.countText, active && fcS.activeCountText]}>{count}</Text>
+        <View style={[fcS.count, active && [fcS.activeCount, { backgroundColor: theme.accentDim }]]}>
+          <Text style={[fcS.countText, active && [fcS.activeCountText, { color: theme.accentLight }]]}>{count}</Text>
         </View>
       )}
     </TouchableOpacity>
@@ -438,7 +452,8 @@ const STATUS_COLORS: Record<StatusVariant, { bg: string; fg: string }> = {
 };
 
 export function StatusBadge({ label, variant = 'neutral', small = false }: StatusBadgeProps) {
-  const c = STATUS_COLORS[variant];
+  const { theme } = useAppTheme();
+  const c = variant === 'purple' ? { bg: theme.accentDim, fg: theme.accentLight } : STATUS_COLORS[variant];
   return (
     <View style={[stS.root, { backgroundColor: c.bg, paddingHorizontal: small ? 6 : 9, paddingVertical: small ? 2 : 4 }]}>
       <Text style={[stS.label, { color: c.fg, fontSize: small ? 9 : FS.xs }]}>{label}</Text>
@@ -463,11 +478,12 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({ icon, title, description, action, secondaryAction, style }: EmptyStateProps) {
+  const { theme } = useAppTheme();
   return (
     <View style={[esS.root, style]}>
       <View style={esS.iconWrap}>
-        <LinearGradient colors={GRAD_CARD_GLOW} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={esS.iconBg}>
-          <Feather name={icon} size={ICON.xl} color={PURPLE_LIGHT} />
+        <LinearGradient colors={[theme.accentDim, theme.secondaryDim]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[esS.iconBg, { borderColor: theme.accent + '66' }]}>
+          <Feather name={icon} size={ICON.xl} color={theme.accentLight} />
         </LinearGradient>
       </View>
       <Text style={esS.title}>{title}</Text>
@@ -504,12 +520,13 @@ interface SectionHeaderProps {
 }
 
 export function SectionHeader({ title, action, style }: SectionHeaderProps) {
+  const { theme } = useAppTheme();
   return (
     <View style={[shS.root, style]}>
       <Text style={shS.title}>{title}</Text>
       {action && (
         <TouchableOpacity onPress={action.onPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <Text style={shS.action}>{action.label}</Text>
+          <Text style={[shS.action, { color: theme.accentLight }]}>{action.label}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -535,11 +552,13 @@ interface StatCardProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function StatCard({ label, value, icon, change, positive, accent = PURPLE, style }: StatCardProps) {
+export function StatCard({ label, value, icon, change, positive, accent, style }: StatCardProps) {
+  const { theme } = useAppTheme();
+  const resolvedAccent = accent ?? theme.accent;
   return (
     <BrandthreadCard style={[scS.root, style]}>
-      <View style={[scS.iconWrap, { backgroundColor: accent + '18' }]}>
-        <Feather name={icon} size={ICON.sm} color={accent} />
+      <View style={[scS.iconWrap, { backgroundColor: resolvedAccent + '18' }]}>
+        <Feather name={icon} size={ICON.sm} color={resolvedAccent} />
       </View>
       <Text style={scS.value}>{value}</Text>
       <Text style={scS.label}>{label}</Text>
@@ -573,16 +592,18 @@ interface QuickActionCardProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function QuickActionCard({ icon, label, onPress, accent = PURPLE, badge, style }: QuickActionCardProps) {
+export function QuickActionCard({ icon, label, onPress, accent, badge, style }: QuickActionCardProps) {
+  const { theme } = useAppTheme();
+  const resolvedAccent = accent ?? theme.accent;
   return (
     <TouchableOpacity
       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
       style={[qaS.root, style]}
       activeOpacity={0.8}
     >
-      <View style={[qaS.iconWrap, { backgroundColor: accent + '18' }]}>
-        <Feather name={icon} size={ICON.md} color={accent} />
-        {badge && <View style={qaS.dot} />}
+      <View style={[qaS.iconWrap, { backgroundColor: resolvedAccent + '18' }]}>
+        <Feather name={icon} size={ICON.md} color={resolvedAccent} />
+        {badge && <View style={[qaS.dot, { backgroundColor: theme.accent }]} />}
       </View>
       <Text style={qaS.label} numberOfLines={1}>{label}</Text>
     </TouchableOpacity>
@@ -608,10 +629,11 @@ interface GuidedTipProps {
 }
 
 export function GuidedTip({ id, text, dismissedIds, onDismiss, style }: GuidedTipProps) {
+  const { theme } = useAppTheme();
   if (dismissedIds.includes(id)) return null;
   return (
-    <View style={[gtS.root, style]}>
-      <Feather name="zap" size={ICON.xs} color={CYAN} style={{ marginTop: 1 }} />
+    <View style={[gtS.root, { backgroundColor: theme.secondaryDim, borderColor: theme.secondary + '33' }, style]}>
+      <Feather name="zap" size={ICON.xs} color={theme.secondary} style={{ marginTop: 1 }} />
       <Text style={gtS.text}>{text}</Text>
       <TouchableOpacity
         onPress={() => onDismiss(id)}
@@ -639,9 +661,10 @@ interface NewFeatureBadgeProps {
 }
 
 export function NewFeatureBadge({ featureId, openedIds, style }: NewFeatureBadgeProps) {
+  const { theme } = useAppTheme();
   if (openedIds.includes(featureId)) return null;
   return (
-    <View style={[nfS.root, style]}>
+    <View style={[nfS.root, { backgroundColor: theme.accent }, style]}>
       <Text style={nfS.text}>NEW</Text>
     </View>
   );
@@ -662,9 +685,10 @@ interface LockBadgeProps {
 }
 
 export function LockBadge({ locked, style }: LockBadgeProps) {
+  const { theme } = useAppTheme();
   if (!locked) return null;
   return (
-    <View style={[lbS.root, style]}>
+    <View style={[lbS.root, { backgroundColor: theme.accent }, style]}>
       <Feather name="lock" size={9} color={ON_DARK} />
       <Text style={lbS.text}>PRO</Text>
     </View>
@@ -705,10 +729,11 @@ export function FormInput({
   returnKeyType, onSubmitEditing, style, rightElement,
 }: FormInputProps) {
   const [focused, setFocused] = useState(false);
+  const { theme } = useAppTheme();
   return (
     <View style={[fiS.wrap, style]}>
       {label && <Text style={fiS.label}>{label}</Text>}
-      <View style={[fiS.inputRow, focused && fiS.focusedRow, multiline && fiS.multilineRow]}>
+      <View style={[fiS.inputRow, focused && [fiS.focusedRow, { borderColor: theme.secondary }], multiline && fiS.multilineRow]}>
         <TextInput
           style={[fiS.input, multiline && fiS.multilineInput]}
           value={value}
@@ -753,11 +778,12 @@ interface ProgressCardProps {
 
 export function ProgressCard({ percent, label, nextLabel, onContinue, style }: ProgressCardProps) {
   const width = useRef(new Animated.Value(0)).current;
+  const { theme } = useAppTheme();
   useEffect(() => {
     Animated.timing(width, { toValue: percent / 100, duration: ANIM.slow, useNativeDriver: false }).start();
   }, [percent]);
   return (
-    <GradientCard colors={GRAD_CARD_GLOW} style={[pcS.root, style]} glow>
+    <GradientCard colors={[theme.accentDim, theme.secondaryDim]} style={[pcS.root, style]} glow>
       <View style={pcS.top}>
         <View>
           <Text style={pcS.pct}>{percent}% complete</Text>
@@ -768,7 +794,7 @@ export function ProgressCard({ percent, label, nextLabel, onContinue, style }: P
         )}
       </View>
       <View style={pcS.track}>
-        <Animated.View style={[pcS.fill, { width: width.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} />
+        <Animated.View style={[pcS.fill, { backgroundColor: theme.accent, width: width.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }) }]} />
       </View>
       {nextLabel && <Text style={pcS.next}>Next: {nextLabel}</Text>}
     </GradientCard>
@@ -798,23 +824,25 @@ interface NavigationCardProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function NavigationCard({ icon, label, description, onPress, accent = PURPLE, badge, right, style }: NavigationCardProps) {
+export function NavigationCard({ icon, label, description, onPress, accent, badge, right, style }: NavigationCardProps) {
+  const { theme } = useAppTheme();
+  const resolvedAccent = accent ?? theme.accent;
   return (
     <TouchableOpacity
       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
       style={[ncS.root, style]}
       activeOpacity={0.8}
     >
-      <View style={[ncS.iconWrap, { backgroundColor: accent + '18' }]}>
-        <Feather name={icon} size={ICON.md} color={accent} />
+      <View style={[ncS.iconWrap, { backgroundColor: resolvedAccent + '18' }]}>
+        <Feather name={icon} size={ICON.md} color={resolvedAccent} />
       </View>
       <View style={ncS.body}>
         <View style={ncS.labelRow}>
           <Text style={ncS.label}>{label}</Text>
           {badge !== undefined && badge !== false && (
             typeof badge === 'number'
-              ? <View style={ncS.badgeCount}><Text style={ncS.badgeText}>{badge}</Text></View>
-              : <View style={ncS.dot} />
+              ? <View style={[ncS.badgeCount, { backgroundColor: theme.accent }]}><Text style={ncS.badgeText}>{badge}</Text></View>
+              : <View style={[ncS.dot, { backgroundColor: theme.accent }]} />
           )}
         </View>
         {description && <Text style={ncS.desc} numberOfLines={1}>{description}</Text>}

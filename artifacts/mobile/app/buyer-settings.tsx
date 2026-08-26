@@ -54,6 +54,7 @@ const GROUPS: Group[] = [
   ]},
   { title: 'Notifications and app', rows: [
     { label: 'Notifications', icon: 'bell', section: 'notifications' },
+    { label: 'App Theme', subtitle: 'Choose your Brandthread color finish', icon: 'droplet', route: '/app-theme' },
     { label: 'Accessibility', icon: 'eye', section: 'accessibility' },
     { label: 'Language', icon: 'globe', section: 'language' },
     { label: 'Media quality and data usage', icon: 'wifi', section: 'media' },

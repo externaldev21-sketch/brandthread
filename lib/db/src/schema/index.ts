@@ -398,9 +398,19 @@ export const conversations = pgTable('conversations', {
   contextProductId:   text('context_product_id'),
   contextProductName: text('context_product_name'),
   contextSellerName:  text('context_seller_name'),
+  moderationStatus:   text('moderation_status').notNull().default('clear'),
+  moderationReason:   text('moderation_reason'),
+  reportedAt:         timestamp('reported_at', { withTimezone: true }),
+  reportCount:        integer('report_count').notNull().default(0),
+  deletedAt:          timestamp('deleted_at', { withTimezone: true }),
+  retentionUntil:     timestamp('retention_until', { withTimezone: true }),
   createdAt:          timestamp('created_at').defaultNow().notNull(),
   updatedAt:          timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  updatedAtIdx:  index('conversations_updated_at_idx').on(table.updatedAt),
+  moderationIdx: index('conversations_moderation_review_idx').on(table.moderationStatus, table.reportedAt),
+  retentionIdx: index('conversations_retention_idx').on(table.retentionUntil),
+}));
 
 export const conversationParticipants = pgTable('conversation_participants', {
   conversationId: uuid('conversation_id').notNull().references(() => conversations.id, { onDelete: 'cascade' }),
@@ -415,6 +425,7 @@ export const conversationParticipants = pgTable('conversation_participants', {
   joinedAt:       timestamp('joined_at').defaultNow().notNull(),
 }, (table) => ({
   pk: primaryKey({ columns: [table.conversationId, table.userId] }),
+  userUnreadIdx: index('conversation_participants_unread_idx').on(table.userId, table.unreadCount, table.lastReadAt),
 }));
 
 export const messages = pgTable('messages', {
@@ -426,10 +437,39 @@ export const messages = pgTable('messages', {
   senderColor:    text('sender_color').notNull().default('#8B5CF6'),
   body:           text('body').notNull(),
   attachment:     json('attachment'),
+  attachments:    json('attachments').$type<unknown[]>().notNull().default([]),
   replyToId:      uuid('reply_to_id'),
   status:         text('status').notNull().default('sent'),
+  deliveredAt:    timestamp('delivered_at', { withTimezone: true }),
+  readAt:         timestamp('read_at', { withTimezone: true }),
+  moderationStatus: text('moderation_status').notNull().default('clear'),
+  moderationReason: text('moderation_reason'),
+  reportedAt:     timestamp('reported_at', { withTimezone: true }),
+  deletedAt:      timestamp('deleted_at', { withTimezone: true }),
+  deletedBy:      text('deleted_by'),
+  retentionUntil: timestamp('retention_until', { withTimezone: true }),
   createdAt:      timestamp('created_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  conversationOrderIdx: index('messages_conversation_order_idx').on(table.conversationId, table.createdAt),
+  readWorkIdx:          index('messages_read_work_idx').on(table.conversationId, table.readAt, table.createdAt),
+  moderationIdx:        index('messages_moderation_review_idx').on(table.moderationStatus, table.reportedAt),
+  retentionIdx:         index('messages_retention_idx').on(table.retentionUntil),
+}));
+
+export const messageReports = pgTable('message_reports', {
+  id:          uuid('id').primaryKey().defaultRandom(),
+  messageId:   uuid('message_id').notNull().references(() => messages.id, { onDelete: 'cascade' }),
+  reporterId:  text('reporter_id').notNull(),
+  reason:      text('reason').notNull(),
+  description: text('description'),
+  status:      text('status').notNull().default('pending'),
+  reviewedAt:  timestamp('reviewed_at', { withTimezone: true }),
+  createdAt:   timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  reporterUnique: unique('message_reports_message_reporter_unique').on(table.messageId, table.reporterId),
+  reviewIdx:  index('message_reports_review_idx').on(table.status, table.createdAt),
+  messageIdx: index('message_reports_message_idx').on(table.messageId, table.createdAt),
+}));
 
 // ─── Saved / wishlisted items ─────────────────────────────────────────────────
 

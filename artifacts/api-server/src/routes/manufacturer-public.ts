@@ -11,6 +11,7 @@ import { db } from "@workspace/db";
 import { manufacturers } from "@workspace/db";
 import { eq, and, ilike, sql, or } from "drizzle-orm";
 import crypto from "crypto";
+import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 
 const router = Router();
 
@@ -50,18 +51,21 @@ function serializePublicManufacturer(mfr: typeof publicManufacturerFields extend
 router.get("/", async (req, res) => {
   try {
     const { q, country, specialty } = req.query as Record<string, string>;
+    const searchTerm = normalizeSearchTerm(q);
+    const countryTerm = normalizeSearchTerm(country, 80);
+    const specialtyTerm = normalizeSearchTerm(specialty, 100);
 
     const conditions = [
       eq(manufacturers.isPublicDirectory, true),
       eq(manufacturers.status, "active"),
     ];
 
-    if (country) {
-      conditions.push(eq(manufacturers.country, country));
+    if (countryTerm) {
+      conditions.push(eq(manufacturers.country, countryTerm));
     }
 
-    if (q) {
-      const like = `%${q}%`;
+    if (searchTerm) {
+      const like = containsSearchPattern(searchTerm);
       conditions.push(
         or(
           ilike(manufacturers.businessName, like),
@@ -72,8 +76,8 @@ router.get("/", async (req, res) => {
       );
     }
 
-    if (specialty) {
-      conditions.push(ilike(manufacturers.specialty, `%${specialty}%`));
+    if (specialtyTerm) {
+      conditions.push(ilike(manufacturers.specialty, containsSearchPattern(specialtyTerm)));
     }
 
     const rows = await db

@@ -9,7 +9,7 @@ import { editImages } from "@workspace/integrations-openai-ai-server/image";
 const router = Router();
 router.use(requireAuth);
 
-// Simple in-process rate limiter: max 5 generations per user per minute.
+// Simple in-process rate limiter: max 5 provider image edits per user per minute.
 const userHits = new Map<string, { count: number; resetAt: number }>();
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 5;
@@ -17,28 +17,46 @@ const MAX_IMAGES = 4;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB per photo
 const MAX_TOTAL_BYTES = 20 * 1024 * 1024; // 20MB across all photos
 
-function checkRateLimit(userId: string): boolean {
+function checkRateLimit(userId: string, cost = 1): boolean {
   const now = Date.now();
   const rec = userHits.get(userId);
   if (!rec || now >= rec.resetAt) {
-    userHits.set(userId, { count: 1, resetAt: now + WINDOW_MS });
+    if (cost > MAX_PER_WINDOW) return false;
+    userHits.set(userId, { count: cost, resetAt: now + WINDOW_MS });
     return true;
   }
-  if (rec.count >= MAX_PER_WINDOW) return false;
-  rec.count += 1;
+  if (rec.count + cost > MAX_PER_WINDOW) return false;
+  rec.count += cost;
   return true;
 }
 
 const BASE64_RE = /^[A-Za-z0-9+/]+=*$/;
+const ALLOWED_IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 function decodeDataUrl(input: string): Buffer | null {
-  const match = /^data:image\/[a-zA-Z0-9+.-]+;base64,([A-Za-z0-9+/]+=*)$/.exec(input);
+  const match = /^data:(image\/[a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/]+=*)$/.exec(input);
   if (!match) return null;
-  const base64 = match[1];
+  const mime = match[1].toLowerCase();
+  const base64 = match[2];
+  if (!ALLOWED_IMAGE_MIMES.has(mime)) return null;
   if (!base64 || !BASE64_RE.test(base64)) return null;
   try {
     const buffer = Buffer.from(base64, "base64");
-    return buffer.length > 0 ? buffer : null;
+    if (buffer.length === 0) return null;
+    const hasValidSignature =
+      (mime === "image/png" &&
+        buffer.length >= 8 &&
+        buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) ||
+      (mime === "image/jpeg" &&
+        buffer.length >= 3 &&
+        buffer[0] === 0xff &&
+        buffer[1] === 0xd8 &&
+        buffer[2] === 0xff) ||
+      (mime === "image/webp" &&
+        buffer.length >= 12 &&
+        buffer.subarray(0, 4).toString("ascii") === "RIFF" &&
+        buffer.subarray(8, 12).toString("ascii") === "WEBP");
+    return hasValidSignature ? buffer : null;
   } catch {
     return null;
   }
@@ -112,6 +130,104 @@ router.post("/generate", async (req, res) => {
   } catch (_err) {
     // Do not leak upstream provider error details to the client.
     res.status(502).json({ error: "Photo generation failed. Please try again." });
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+// POST /api/photography/outfit-swap
+// { heroImage: string (base64/data-url), garmentImages: string[], prompt?: string }
+// The hero is deliberately kept as the first image for every edit call. This
+// is what makes the model, pose, framing, and background consistent across a
+// batch instead of treating each garment as a new free-form generation.
+router.post("/outfit-swap", async (req, res) => {
+  const userId = (req as any).auth?.userId ?? (req as any).auth?.sub ?? "anon";
+
+  const { heroImage, garmentImages, prompt } = req.body ?? {};
+  if (typeof heroImage !== "string") {
+    res.status(400).json({ error: "One hero photo is required for Outfit Swap." });
+    return;
+  }
+  if (!Array.isArray(garmentImages) || garmentImages.length === 0) {
+    res.status(400).json({ error: "At least one garment design is required for Outfit Swap." });
+    return;
+  }
+  if (garmentImages.length > MAX_IMAGES) {
+    res.status(400).json({ error: `Please upload at most ${MAX_IMAGES} garment designs.` });
+    return;
+  }
+  // An Outfit Swap with N garments invokes the provider N times, so it must
+  // consume N quota slots rather than bypassing the per-image generation cap.
+  if (!checkRateLimit(userId, garmentImages.length)) {
+    res.status(429).json({ error: "Too many generations. Please wait a minute and try again." });
+    return;
+  }
+
+  const safeDescription =
+    typeof prompt === "string" && prompt.trim().length > 0
+      ? prompt.trim().slice(0, 500)
+      : "";
+
+  const decoded: Buffer[] = [];
+  let totalBytes = 0;
+  for (const image of [heroImage, ...garmentImages]) {
+    if (typeof image !== "string") {
+      res.status(400).json({ error: "Each Outfit Swap image must be a base64-encoded image." });
+      return;
+    }
+    const buffer = decodeDataUrl(image);
+    if (!buffer) {
+      res.status(400).json({ error: "One or more Outfit Swap images are not valid. Please re-upload." });
+      return;
+    }
+    if (buffer.length > MAX_IMAGE_BYTES) {
+      res.status(400).json({ error: "Each photo must be under 8MB." });
+      return;
+    }
+    totalBytes += buffer.length;
+    if (totalBytes > MAX_TOTAL_BYTES) {
+      res.status(400).json({ error: "Total photo size is too large. Please upload smaller or fewer images." });
+      return;
+    }
+    decoded.push(buffer);
+  }
+
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "outfit-swap-"));
+  const tmpFiles: string[] = [];
+  const results: { garmentIndex: number; b64_json: string }[] = [];
+  const errors: { garmentIndex: number }[] = [];
+
+  try {
+    const heroFile = path.join(tmpDir, `${randomUUID()}-hero.png`);
+    await fs.writeFile(heroFile, decoded[0]);
+    tmpFiles.push(heroFile);
+
+    for (let i = 0; i < garmentImages.length; i += 1) {
+      const garmentFile = path.join(tmpDir, `${randomUUID()}-garment-${i + 1}.png`);
+      await fs.writeFile(garmentFile, decoded[i + 1]);
+      tmpFiles.push(garmentFile);
+
+      const editPrompt = `This is an Outfit Swap edit. Image 1 is the locked base hero photo and Image 2 is the new garment design. Create one photorealistic fashion photo by replacing only the clothing on the model in Image 1 with the garment design from Image 2. Preserve the exact same model identity, face, hair, body proportions, pose, hand position, camera angle, crop, framing, lighting, shadows, location, background, and composition from Image 1. Do not change the model, pose, scene, background, or camera. Make the garment fit naturally on the existing model with realistic fabric texture, drape, seams, and shadows. Do not add logos or design details that are not present in Image 2. ${
+        safeDescription ? `Additional direction from the brand owner: "${safeDescription}".` : ""
+      }`;
+
+      try {
+        const buffer = await editImages([heroFile, garmentFile], editPrompt);
+        results.push({ garmentIndex: i + 1, b64_json: buffer.toString("base64") });
+      } catch {
+        // Keep successful garment results when one provider call fails.
+        errors.push({ garmentIndex: i + 1 });
+      }
+    }
+
+    if (results.length === 0) {
+      res.status(502).json({ error: "Outfit Swap generation failed. Please try again." });
+      return;
+    }
+    res.json({ results, ...(errors.length > 0 ? { errors } : {}) });
+  } catch (_err) {
+    // Do not leak upstream provider error details to the client.
+    res.status(502).json({ error: "Outfit Swap generation failed. Please try again." });
   } finally {
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }
