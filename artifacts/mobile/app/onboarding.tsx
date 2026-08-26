@@ -1,8 +1,8 @@
 /**
  * Brandthread Onboarding — complete buyer + seller flows
  *
- * BUYER  steps: 0=Auth 1=Name 2=Style 3=Loading 4=Notifications 5=Success
- * SELLER steps: 0=Auth 1=Name 2=BrandName 3=Stage 4=Goals 5=Loading 6=Notifications 7=Success
+ * BUYER  steps: 0=Name 1=Style 2=Auth 3=Loading 4=Notifications 5=Success
+ * SELLER steps: 0=Name 1=BrandName 2=Auth 3=Stage 4=Goals 5=Loading 6=Notifications 7=Success
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -81,7 +81,7 @@ const SELLER_LOADING_STEPS = ['Mapping your brand workspace', 'Preparing your pr
 
 const LEGACY_DRAFT_KEY = 'onboarding_draft';
 const DRAFT_KEY_PREFIX = 'onboarding_draft:';
-const DRAFT_VERSION = 3;
+const DRAFT_VERSION = 2;
 
 function draftKeyForUser(userId?: string | null): string | null {
   return userId ? `${DRAFT_KEY_PREFIX}${userId}` : null;
@@ -89,17 +89,10 @@ function draftKeyForUser(userId?: string | null): string | null {
 
 type Flow = 'buyer' | 'seller';
 
-// Drafts from before Auth moved to the first step need a one-time translation
-// so closing the app still resumes at the equivalent screen.
+// Seller drafts from before the account step moved forward need a one-time
+// step translation so closing the app still resumes at the equivalent screen.
 function restoreDraftStep(flow: Flow, step: number, version?: number): number {
-  if (version === DRAFT_VERSION) return step;
-  if (version === 2) {
-    if (step === 0) return 1; // name
-    if (step === 1) return 2; // style / brand name
-    if (step === 2) return 0; // account creation
-    return step;
-  }
-  if (flow !== 'seller') return step;
+  if (flow !== 'seller' || version === DRAFT_VERSION) return step;
   if (step <= 1) return step;
   if (step === 2) return 3; // brand stage
   if (step === 3 || step === 4) return 4; // skip the removed product model
@@ -1125,7 +1118,7 @@ export default function OnboardingScreen() {
   // ── Auth completion handler (OAuth without remount) ─────────────────────────
   const handleAuthComplete = useCallback(() => {
     if (!flow) return;
-    setStep(1);
+    setStep(3);
   }, [flow]);
 
   // ── Watch for OAuth isSignedIn change ────────────────────────────────────────
@@ -1134,7 +1127,7 @@ export default function OnboardingScreen() {
     if (!ready || !flow) return;
     if (prevSignedIn.current === null) { prevSignedIn.current = isSignedIn ?? false; return; }
     if (!prevSignedIn.current && isSignedIn) {
-      setStep(1);
+      setStep(3);
     }
     prevSignedIn.current = isSignedIn ?? false;
   }, [isSignedIn, ready, flow]);
@@ -1274,14 +1267,13 @@ export default function OnboardingScreen() {
   function canContinue(): boolean {
     if (!flow) return false;
     if (flow === 'buyer') {
-      if (step === 0) return true; // AuthStep owns its form validation.
-      if (step === 1) return firstName.trim().length >= 2;
-      if (step === 2) return true;
+      if (step === 0) return firstName.trim().length >= 2;
+       if (step === 1) return true;
     }
     if (flow === 'seller') {
-      if (step === 0) return true; // AuthStep owns its form validation.
-      if (step === 1) return firstName.trim().length >= 2;
-      if (step === 2) return brandName.trim().length >= 1;
+      if (step === 0) return firstName.trim().length >= 2;
+      if (step === 1) return brandName.trim().length >= 1;
+      if (step === 2) return true; // AuthStep owns its form validation.
       if (step === 3) return !!brandStage;
       if (step === 4) return true;
     }
@@ -1315,25 +1307,8 @@ export default function OnboardingScreen() {
 
     /* ─── BUYER STEPS ─── */
     if (flow === 'buyer') {
-      // Step 0: Auth
+      // Step 0: Name
       if (step === 0) return (
-        <AuthStep
-          flow={flow}
-          firstName={firstName}
-          brandName=""
-          signUp={signUp}
-          signIn={signIn}
-          startGoogleOAuth={startGoogleOAuth}
-          startAppleOAuth={startAppleOAuth}
-          onAuthComplete={handleAuthComplete}
-          onDevClear={devReset}
-          username={username}
-          onUsernameChange={setUsername}
-        />
-      );
-
-      // Step 1: Name
-      if (step === 1) return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={sm.scroll} keyboardShouldPersistTaps="handled">
             <Text style={sm.stepHeadline}>What should{'\n'}we call you?</Text>
@@ -1355,8 +1330,8 @@ export default function OnboardingScreen() {
         </KeyboardAvoidingView>
       );
 
-      // Step 2: Style interests
-      if (step === 2) return (
+      // Step 1: Style interests
+      if (step === 1) return (
         <ScrollView contentContainerStyle={sm.scroll} showsVerticalScrollIndicator={false}>
           <Text style={sm.stepHeadline}>What do you{'\n'}want to see?</Text>
           <Text style={sm.stepSub}>Pick a few for better recommendations. You can skip this for now.</Text>
@@ -1371,6 +1346,23 @@ export default function OnboardingScreen() {
             ))}
           </View>
         </ScrollView>
+      );
+
+      // Step 2: Auth
+      if (step === 2) return (
+        <AuthStep
+          flow={flow}
+          firstName={firstName}
+          brandName=""
+          signUp={signUp}
+          signIn={signIn}
+          startGoogleOAuth={startGoogleOAuth}
+          startAppleOAuth={startAppleOAuth}
+          onAuthComplete={handleAuthComplete}
+          onDevClear={devReset}
+          username={username}
+          onUsernameChange={setUsername}
+        />
       );
 
       // Step 3: Loading
@@ -1395,25 +1387,8 @@ export default function OnboardingScreen() {
 
     /* ─── SELLER STEPS ─── */
     if (flow === 'seller') {
-      // Step 0: Auth
+      // Step 0: Name
       if (step === 0) return (
-        <AuthStep
-          flow={flow}
-          firstName={firstName}
-          brandName={brandName}
-          signUp={signUp}
-          signIn={signIn}
-          startGoogleOAuth={startGoogleOAuth}
-          startAppleOAuth={startAppleOAuth}
-          onAuthComplete={handleAuthComplete}
-          onDevClear={devReset}
-          username={username}
-          onUsernameChange={setUsername}
-        />
-      );
-
-      // Step 1: Name
-      if (step === 1) return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={sm.scroll} keyboardShouldPersistTaps="handled">
             <Text style={sm.stepHeadline}>What should{'\n'}we call you?</Text>
@@ -1435,8 +1410,8 @@ export default function OnboardingScreen() {
         </KeyboardAvoidingView>
       );
 
-      // Step 2: Brand name
-      if (step === 2) return (
+      // Step 1: Brand name
+      if (step === 1) return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={sm.scroll} keyboardShouldPersistTaps="handled">
             <Text style={sm.stepHeadline}>What are you{'\n'}building?</Text>
@@ -1510,6 +1485,23 @@ export default function OnboardingScreen() {
         </ScrollView>
       );
 
+      // Step 2: Auth
+      if (step === 2) return (
+        <AuthStep
+          flow={flow}
+          firstName={firstName}
+          brandName={brandName}
+          signUp={signUp}
+          signIn={signIn}
+          startGoogleOAuth={startGoogleOAuth}
+          startAppleOAuth={startAppleOAuth}
+          onAuthComplete={handleAuthComplete}
+          onDevClear={devReset}
+          username={username}
+          onUsernameChange={setUsername}
+        />
+      );
+
       // Step 5: Loading
       if (step === 5) return (
         <LoadingAnimation steps={SELLER_LOADING_STEPS} onDone={() => setStep(6)} />
@@ -1538,7 +1530,7 @@ export default function OnboardingScreen() {
   const isFullScreen = (flow === 'buyer'  && step >= 3)
                      || (flow === 'seller' && step >= 5);
 
-  const isAuthStep = step === 0;
+  const isAuthStep = (flow === 'buyer' && step === 2) || (flow === 'seller' && step === 2);
 
   // ── Show Continue button in footer (not auth, not goals, not full-screen) ───
   const showFooter = !isFullScreen && !isAuthStep && !(flow === 'seller' && step === 4);
@@ -1590,7 +1582,7 @@ export default function OnboardingScreen() {
             label={
               flow === 'buyer' && step === 1 ? 'Continue' :
               flow === 'seller' && step === 4 ? 'Build my workspace' :
-              step === 0 ? 'Create account' :
+              step === (flow === 'buyer' ? 2 : 2) ? 'Create account' :
               'Continue'
             }
             onPress={() => goNext()}
