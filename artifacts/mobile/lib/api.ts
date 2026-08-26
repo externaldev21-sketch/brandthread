@@ -242,7 +242,7 @@ export function createApi(getToken: GetToken) {
       /** Top customers by spend + repeat-buyer stats — derived from real orders */
       customers:  (limit = 10) => get<{
         topCustomers: Array<{
-          buyerId: string; name: string; email: string;
+          buyerId: string | null; customerId: string | null; name: string; email: string;
           orderCount: number; totalCents: number;
           lastOrderAt: string | null; firstOrderAt: string | null;
         }>;

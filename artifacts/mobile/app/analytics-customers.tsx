@@ -11,8 +11,21 @@ import {
   PURPLE, PURPLE_DIM, PURPLE_LIGHT, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, BLUE, BLUE_DIM, GOLD,
   FONT, FS,
 } from '@/lib/theme';
+import { useApi } from '@/lib/api';
+import { fmtCurrency, fmtDate } from '@/lib/format';
 import { getCustomerAnalytics, getFilterState } from '@/services/analyticsService';
 import { CustomerAnalytics, AnalyticsMetric, CustomerCohort, AnalyticsFilterState } from '@/services/analyticsTypes';
+
+type TopCustomer = {
+  buyerId: string | null;
+  customerId: string | null;
+  name: string;
+  email: string;
+  orderCount: number;
+  totalCents: number;
+  lastOrderAt: string | null;
+  firstOrderAt: string | null;
+};
 
 function KpiRow({ m, iconName, iconColor }: { m: AnalyticsMetric; iconName: keyof typeof Feather.glyphMap; iconColor: string }) {
   const upColor = m.trend === 'up' ? SUCCESS : RED;
@@ -37,9 +50,12 @@ function KpiRow({ m, iconName, iconColor }: { m: AnalyticsMetric; iconName: keyo
 export default function AnalyticsCustomersScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const api = useApi();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   const [data,       setData]       = useState<CustomerAnalytics | null>(null);
+  const [topCustomers, setTopCustomers] = useState<TopCustomer[]>([]);
+  const [topCustomersError, setTopCustomersError] = useState<string | null>(null);
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -48,9 +64,20 @@ export default function AnalyticsCustomersScreen() {
     if (isRefresh) setRefreshing(true); else setLoading(true);
     const f = filter ?? await getFilterState();
     if (!filter) setFilter(f);
-    setData(await getCustomerAnalytics(f));
+    const [analytics, customerResponse] = await Promise.all([
+      getCustomerAnalytics(f),
+      api.analytics.customers(10).catch(() => null),
+    ]);
+    setData(analytics);
+    if (customerResponse) {
+      setTopCustomers(customerResponse.topCustomers ?? []);
+      setTopCustomersError(null);
+    } else {
+      setTopCustomers([]);
+      setTopCustomersError('Could not load top customers. Pull to refresh to try again.');
+    }
     setLoading(false); setRefreshing(false);
-  }, [filter]);
+  }, [api, filter]);
 
   useEffect(() => { load(); }, []); // eslint-disable-line
 
@@ -95,6 +122,59 @@ export default function AnalyticsCustomersScreen() {
           <View style={s.divider} />
           <KpiRow m={data.avgDaysBetweenOrders} iconName="clock"    iconColor={MUTED} />
         </>}
+      </View>
+
+      {/* Top customers */}
+      <Text style={s.sectionTitle}>Top Customers</Text>
+      <View style={s.card}>
+        {topCustomersError ? (
+          <View style={s.customerEmpty}>
+            <Feather name="alert-circle" size={22} color={MUTED} />
+            <Text style={s.customerEmptyText}>{topCustomersError}</Text>
+          </View>
+        ) : topCustomers.length === 0 ? (
+          <View style={s.customerEmpty}>
+            <Feather name="users" size={22} color={MUTED} />
+            <Text style={s.customerEmptyText}>No customer orders yet</Text>
+          </View>
+        ) : (
+          topCustomers.map((customer, i) => {
+            const rowStyle = [s.customerRow, i > 0 && s.divider];
+            const rowKey = customer.customerId ?? customer.buyerId ?? (customer.email || String(i));
+            const rowContent = (
+              <>
+              <View style={s.customerRank}>
+                <Text style={s.customerRankText}>{i + 1}</Text>
+              </View>
+              <View style={s.customerInfo}>
+                <Text style={s.customerName} numberOfLines={1}>{customer.name}</Text>
+                <Text style={s.customerMeta}>
+                  {customer.orderCount} {customer.orderCount === 1 ? 'order' : 'orders'} · Last order {customer.lastOrderAt ? fmtDate(customer.lastOrderAt) : '—'}
+                </Text>
+              </View>
+              <View style={s.customerSpend}>
+                <Text style={s.customerSpendValue}>{fmtCurrency(customer.totalCents / 100)}</Text>
+                {customer.customerId ? <Feather name="chevron-right" size={16} color={MUTED} /> : null}
+              </View>
+              </>
+            );
+            return customer.customerId ? (
+              <TouchableOpacity
+                key={rowKey}
+                style={rowStyle}
+                onPress={() => router.push(`/customer-orders?customerId=${encodeURIComponent(customer.customerId!)}` as never)}
+                accessibilityRole="button"
+                accessibilityLabel={`View order history for ${customer.name}`}
+              >
+                {rowContent}
+              </TouchableOpacity>
+            ) : (
+              <View key={rowKey} style={rowStyle}>
+                {rowContent}
+              </View>
+            );
+          })
+        )}
       </View>
 
       {/* Risk */}
@@ -209,4 +289,14 @@ const s = StyleSheet.create({
   locFill:  { height: '100%', backgroundColor: PURPLE, borderRadius: 2 },
   locCount: { fontSize: 13, fontFamily: FONT.semibold, color: FG },
   locShare: { fontSize: 11, fontFamily: FONT.regular, color: MUTED },
+  customerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 13, gap: 10 },
+  customerRank: { width: 28, height: 28, borderRadius: 14, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
+  customerRankText: { fontSize: 12, fontFamily: FONT.bold, color: PURPLE_LIGHT },
+  customerInfo: { flex: 1, minWidth: 0, gap: 3 },
+  customerName: { fontSize: 13, fontFamily: FONT.semibold, color: FG },
+  customerMeta: { fontSize: 11, fontFamily: FONT.regular, color: MUTED },
+  customerSpend: { alignItems: 'flex-end', gap: 3 },
+  customerSpendValue: { fontSize: 14, fontFamily: FONT.semibold, color: FG },
+  customerEmpty: { minHeight: 90, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20, gap: 8 },
+  customerEmptyText: { fontSize: 12, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' },
 });

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { db, orders, customers, productVariants, drops, products, orderItems, users } from "@workspace/db";
 import { sql, gte, and, eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { buildCustomerAnalyticsResponse } from "./analyticsCustomers";
 
 const router = Router();
 router.use(requireAuth);
@@ -240,6 +241,7 @@ router.get("/customers", async (req, res) => {
     const topRows = await db.execute(sql`
       SELECT
         o.buyer_id,
+        c.id                                           AS customer_id,
         COALESCE(u.display_name, c.name, 'Customer')  AS name,
         COALESCE(c.email, '')                           AS email,
         COUNT(o.id)::int                               AS order_count,
@@ -251,7 +253,7 @@ router.get("/customers", async (req, res) => {
       LEFT JOIN customers  c ON c.id        = o.customer_id
       WHERE o.owner_id = ${ownerId}
         AND o.status != 'cancelled'
-      GROUP BY o.buyer_id, u.display_name, c.name, c.email
+      GROUP BY o.buyer_id, c.id, u.display_name, c.name, c.email
       ORDER BY total_cents DESC
       LIMIT ${limit}
     `);
@@ -270,30 +272,7 @@ router.get("/customers", async (req, res) => {
       ) sub
     `);
 
-    const stats         = (statsRows as any[])[0] ?? {};
-    const totalCustomers  = Number(stats.total_customers  ?? 0);
-    const repeatCustomers = Number(stats.repeat_customers ?? 0);
-    const repeatRate      = totalCustomers > 0
-      ? Math.round((repeatCustomers / totalCustomers) * 100)
-      : 0;
-
-    res.json({
-      topCustomers: (topRows as any[]).map((r: any) => ({
-        buyerId:      r.buyer_id,
-        name:         r.name         ?? "Customer",
-        email:        r.email        ?? "",
-        orderCount:   Number(r.order_count),
-        totalCents:   Number(r.total_cents),
-        lastOrderAt:  r.last_order_at  ?? null,
-        firstOrderAt: r.first_order_at ?? null,
-      })),
-      stats: {
-        totalCustomers,
-        repeatCustomers,
-        repeatRate,
-        avgOrdersPerCustomer: parseFloat(stats.avg_orders_per_customer ?? "0"),
-      },
-    });
+    res.json(buildCustomerAnalyticsResponse(topRows.rows, statsRows.rows));
   } catch (err) {
     console.error("GET /analytics/customers error:", err);
     res.status(500).json({ error: "Failed to fetch customer analytics" });
