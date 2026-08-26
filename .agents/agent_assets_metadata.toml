@@ -34,3 +34,10 @@ uri = "file://brandthread-mobile.zip"
 type = "unspecified"
 title = "Brandthread Mobile — source code"
 description = "All app files, excluding node_modules and build artifacts. 3.8 MB."
+
+[[outputs]]
+id = "pgbyJEr9-JB7lHFyQEa9x"
+uri = "file://exports/brandthread-full-source.tar.gz"
+type = "unspecified"
+title = "Brandthread full source archive"
+description = "Complete Brandthread source workspace for sharing with Claude. Includes app artifacts, API server, shared libraries, scripts, assets, package manifests, and project configuration. Excludes dependencies, build output, Git history, logs, screenshots, agent metadata, and secret/env files."
