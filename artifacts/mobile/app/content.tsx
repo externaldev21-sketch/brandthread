@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import {
   ScrollView, View, Text, TouchableOpacity, StyleSheet,
-  Alert, Platform, TextInput,
+  ActivityIndicator, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { DEMO_CONTENT } from '@/services/data';
 import type { ContentPost, ContentType, ContentStatus } from '@/services/types';
+import { getSellerPosts } from '@/services/socialService';
 
 const BG     = '#07070F';
 const CARD   = '#12121F';
@@ -58,16 +58,48 @@ export default function ContentScreen() {
   const topPad  = Platform.OS === 'web' ? 20 : insets.top;
 
   const [tab, setTab] = useState<FilterTab>('all');
+  const [content, setContent] = useState<ContentPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   function back() { router.back(); }
 
-  const posts = DEMO_CONTENT.filter(p => tab === 'all' || p.status === tab);
+  const loadContent = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const posts = await getSellerPosts();
+      setContent(posts.map((post): ContentPost => ({
+        id: post.id,
+        type: post.contentType as ContentType,
+        status: post.postStatus === 'scheduled' ? 'scheduled' : post.isDraft ? 'draft' : 'published',
+        caption: post.caption,
+        hashtags: post.hashtags,
+        scheduledFor: post.scheduledAt ?? undefined,
+        publishedAt: post.publishedAt,
+        views: 0,
+        likes: post.likesCount,
+        comments: post.commentsCount,
+        saves: post.savedCount,
+        shares: post.repostsCount,
+        productTags: post.productTags.map(tag => tag.productName),
+      })));
+    } catch {
+      setContent([]);
+      setLoadError('We couldn’t load your content. Check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadContent(); }, [loadContent]);
+
+  const posts = content.filter(p => tab === 'all' || p.status === tab);
 
   const stats = {
-    published: DEMO_CONTENT.filter(p => p.status === 'published').length,
-    scheduled:  DEMO_CONTENT.filter(p => p.status === 'scheduled').length,
-    drafts:     DEMO_CONTENT.filter(p => p.status === 'draft').length,
-    totalViews: DEMO_CONTENT.reduce((s, p) => s + p.views, 0),
+    published: content.filter(p => p.status === 'published').length,
+    scheduled: content.filter(p => p.status === 'scheduled').length,
+    drafts:    content.filter(p => p.status === 'draft').length,
   };
 
   function createPost(type: ContentType) {
@@ -110,7 +142,6 @@ export default function ContentScreen() {
               { label: 'Published',  value: stats.published,                             color: GREEN  },
               { label: 'Scheduled',  value: stats.scheduled,                             color: BLUE   },
               { label: 'Drafts',     value: stats.drafts,                                color: ORANGE },
-              { label: 'Total Views',value: (stats.totalViews / 1000).toFixed(1) + 'K', color: PURPLE, isStr: true },
             ].map(item => (
               <View key={item.label} style={s.statCard}>
                 <Text style={[s.statValue, { color: item.color }]}>{item.value}</Text>
@@ -161,7 +192,22 @@ export default function ContentScreen() {
         {/* Content library */}
         <View style={s.section}>
           <Text style={s.sectionTitle}>Content library</Text>
-          {posts.length === 0 ? (
+          {loading ? (
+            <View style={s.loading}>
+              <ActivityIndicator color={PURPLE} />
+              <Text style={s.loadingText}>Loading your content…</Text>
+            </View>
+          ) : loadError ? (
+            <View style={s.empty}>
+              <Feather name="wifi-off" size={32} color={ORANGE} />
+              <Text style={s.emptyTitle}>Couldn’t load content</Text>
+              <Text style={s.emptyDesc}>{loadError}</Text>
+              <TouchableOpacity style={s.retryBtn} onPress={loadContent}>
+                <Feather name="refresh-cw" size={14} color="#FFFFFF" />
+                <Text style={s.retryText}>Try again</Text>
+              </TouchableOpacity>
+            </View>
+          ) : posts.length === 0 ? (
             <View style={s.empty}>
               <Feather name="video" size={32} color={MUTED} />
               <Text style={s.emptyTitle}>No {tab === 'all' ? '' : tab} posts yet</Text>
@@ -169,7 +215,12 @@ export default function ContentScreen() {
             </View>
           ) : (
             posts.map(post => (
-              <TouchableOpacity key={post.id} style={s.postCard} activeOpacity={0.82}>
+              <TouchableOpacity
+                key={post.id}
+                style={s.postCard}
+                activeOpacity={0.82}
+                onPress={() => router.push(('/post-analytics?id=' + encodeURIComponent(post.id)) as never)}
+              >
                 <View style={s.postThumb}>
                   <Feather name={typeIcon(post.type)} size={20} color={MUTED} />
                 </View>
@@ -186,20 +237,12 @@ export default function ContentScreen() {
                   {post.status === 'published' && (
                     <View style={s.postMetrics}>
                       <View style={s.metric}>
-                        <Feather name="eye"    size={11} color={MUTED} />
-                        <Text style={s.metricText}>{(post.views / 1000).toFixed(1)}K</Text>
-                      </View>
-                      <View style={s.metric}>
                         <Feather name="heart"  size={11} color={MUTED} />
                         <Text style={s.metricText}>{post.likes.toLocaleString()}</Text>
                       </View>
                       <View style={s.metric}>
                         <Feather name="message-circle" size={11} color={MUTED} />
                         <Text style={s.metricText}>{post.comments}</Text>
-                      </View>
-                      <View style={s.metric}>
-                        <Feather name="bookmark" size={11} color={MUTED} />
-                        <Text style={s.metricText}>{post.saves}</Text>
                       </View>
                     </View>
                   )}
@@ -252,8 +295,12 @@ const s = StyleSheet.create({
   metric:    { flexDirection: 'row', alignItems: 'center', gap: 3 },
   metricText:{ fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
   scheduledText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: BLUE },
+  loading: { alignItems: 'center', paddingVertical: 36, gap: 10 },
+  loadingText: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
   empty:     { alignItems: 'center', paddingVertical: 36, gap: 8 },
   emptyTitle:{ fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
   emptyDesc: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
+  retryBtn: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 8, backgroundColor: PURPLE, borderRadius: 9, paddingHorizontal: 13, paddingVertical: 9 },
+  retryText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
 });
 

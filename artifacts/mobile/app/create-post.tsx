@@ -19,7 +19,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { FONT, FS } from '@/lib/theme';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import { DEMO_SOUNDS, SUGGESTED_HASHTAGS } from '@/services/sellerContent';
 import { getTaggableProducts } from '@/services/productService';
 import { createSellerPost } from '@/services/socialService';
 import StyleTagsPicker from '@/components/StyleTagsPicker';
@@ -559,20 +558,7 @@ export default function CreatePostScreen() {
               onSubmitEditing={() => { if (hashtagInput.trim().length > 1) addHashtag(hashtagInput); }}
               blurOnSubmit={false}
             />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
-              <View style={{ flexDirection: 'row', gap: 6 }}>
-                {SUGGESTED_HASHTAGS.map((h) => (
-                  <TouchableOpacity
-                    key={h.tag}
-                    style={s.suggestedChip}
-                    onPress={() => { if (!hashtags.find(hh => hh.tag === h.tag)) setHashtags(prev => [...prev, h]); }}
-                  >
-                    {h.trending && <Feather name="trending-up" size={10} color={PURPLE} style={{ marginRight: 3 }} />}
-                    <Text style={s.suggestedChipText}>{h.tag}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
+            <Text style={s.helperText}>Add your own hashtags to help shoppers discover this post.</Text>
             {hashtags.length > 0 && (
               <View style={s.tagWrap}>
                 {hashtags.map((h) => (
@@ -734,8 +720,8 @@ export default function CreatePostScreen() {
                     isDraft: true,
                   });
                   Alert.alert('Draft saved', 'Your draft has been saved.', [{ text: 'OK', onPress: () => router.back() }]);
-                } catch {
-                  Alert.alert('Error', 'Could not save draft. Please try again.');
+                 } catch (error) {
+                   Alert.alert('Draft not saved', error instanceof Error ? error.message : 'Could not save draft. Please try again.');
                 }
               }}
             >
@@ -767,9 +753,9 @@ export default function CreatePostScreen() {
                     scheduledAt: scheduleMode === 'schedule' ? scheduledAt : null,
                   });
                   setStep('done');
-                } catch {
+                 } catch (error) {
                   setStep('post-details');
-                  Alert.alert('Publish failed', 'Something went wrong. Please try again.');
+                   Alert.alert('Publish failed', error instanceof Error ? error.message : 'Something went wrong. Please try again.');
                 } finally {
                   setIsPublishing(false);
                 }
@@ -865,10 +851,7 @@ function SoundModal({ visible, onClose, soundTab, setSoundTab, soundSearch, setS
     { id: 'recent' as const, label: 'Recent' }, { id: 'original' as const, label: 'Original' },
     { id: 'royalty_free' as const, label: 'Free' },
   ];
-  const filtered = DEMO_SOUNDS.filter(s =>
-    (soundTab === 'trending' ? s.isTrending || s.category === 'trending' : s.category === soundTab) &&
-    (soundSearch === '' || s.title.toLowerCase().includes(soundSearch.toLowerCase()) || s.artist.toLowerCase().includes(soundSearch.toLowerCase()))
-  );
+  const filtered: Sound[] = [];
   return (
     <Modal visible={visible} animationType="slide" presentationStyle={Platform.OS === 'android' ? 'fullScreen' : 'pageSheet'} onRequestClose={onClose}>
       <View style={[sm.root, { paddingBottom: insets.bottom + 16 }]}>
@@ -895,7 +878,7 @@ function SoundModal({ visible, onClose, soundTab, setSoundTab, soundSearch, setS
           {filtered.length === 0 ? (
             <View style={{ alignItems: 'center', paddingTop: 40 }}>
               <Feather name="music" size={28} color={MUTED} />
-              <Text style={{ color: MUTED, marginTop: 10, fontFamily: FONT.regular }}>No sounds found</Text>
+              <Text style={{ color: MUTED, marginTop: 10, fontFamily: FONT.regular, textAlign: 'center' }}>The sound library is not available yet.</Text>
             </View>
           ) : filtered.map((sound) => (
             <View key={sound.id} style={sm.soundRow}>
@@ -1135,6 +1118,7 @@ const s = StyleSheet.create({
   sectionLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 8 },
   captionInput: { backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, fontSize: FS.sm, padding: 12, minHeight: 100, textAlignVertical: 'top' },
   charCount:    { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, textAlign: 'right', marginTop: 4 },
+  helperText:   { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 8 },
   inlineInput:  { backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, fontSize: FS.sm, paddingHorizontal: 12, paddingVertical: 10 },
 
   suggestedChip:    { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 10, paddingVertical: 5 },

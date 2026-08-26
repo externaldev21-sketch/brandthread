@@ -20,14 +20,7 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import {
-  DEMO_SELLER_PROFILE,
-  DEMO_SELLER_POSTS,
-  DEMO_PRODUCTS,
-  getPublishedPosts,
-} from '@/services/sellerContent';
 import type { SellerPost } from '@/services/types';
-import { getProducts } from '@/services/productService';
 import type { Product } from '@/services/productTypes';
 import { useApi } from '@/hooks/useApi';
 
@@ -77,6 +70,75 @@ function statusBadgeColor(status: string): string {
   return MUTED;
 }
 
+function mapApiPost(post: any): SellerPost {
+  const authorName = post.seller?.brandName ?? post.seller?.displayName ?? 'Seller';
+  return {
+    id: post.id,
+    sellerId: post.userId ?? '',
+    brandId: post.userId ?? '',
+    type: post.mediaType ?? 'image',
+    status: 'published',
+    caption: post.caption ?? '',
+    hashtags: post.styleTags ?? [],
+    aspectRatio: '9:16',
+    mediaUrls: post.mediaUrl ? [post.mediaUrl] : [],
+    overlays: [],
+    productTags: (post.taggedProducts ?? []).map((tag: any) => ({
+      productId: tag.productId,
+      productName: tag.name ?? 'Product',
+      price: 0,
+    })),
+    visibility: { isPublic: true, allowComments: true, allowReposts: true, showLikeCount: true },
+    isPinned: false,
+    isSellerContent: true,
+    createdAt: post.createdAt ?? new Date().toISOString(),
+    publishedAt: post.createdAt ?? new Date().toISOString(),
+    analytics: {
+      postId: post.id,
+      views: 0,
+      uniqueViewers: 0,
+      likes: Number(post.likesCount ?? post.likeCount ?? 0),
+      comments: Number(post.commentsCount ?? 0),
+      reposts: Number(post.repostsCount ?? post.repostCount ?? 0),
+      saves: 0,
+      shares: 0,
+      profileVisits: 0,
+      productClicks: 0,
+      addToCartActions: 0,
+      purchases: 0,
+      revenue: 0,
+      avgWatchTime: 0,
+      completionRate: 0,
+      retentionData: [],
+      topCountries: [],
+      peakHour: 0,
+    },
+    __analyticsUnavailable: true,
+  } as unknown as SellerPost;
+}
+
+function mapApiProfile(profile: any, postsCount = 0, productsCount = 0): import('@/services/types').SellerProfile {
+  const brandName = profile.brandName ?? profile.displayName ?? 'Seller';
+  return {
+    id: profile.clerkId ?? profile.id ?? '',
+    sellerId: profile.clerkId ?? profile.id ?? '',
+    brandName,
+    username: profile.username ?? brandName.toLowerCase().replace(/[^a-z0-9]/g, ''),
+    bio: profile.bio ?? '',
+    website: profile.website ?? undefined,
+    avatarColor: '#8B5CF6',
+    initials: brandName.slice(0, 2).toUpperCase(),
+    verified: Boolean(profile.verified),
+    isPublic: true,
+    followers: Number(profile.followersCount ?? 0),
+    following: Number(profile.followingCount ?? 0),
+    totalLikes: Number(profile.totalLikes ?? 0),
+    productCount: productsCount,
+    postCount: postsCount,
+    createdAt: new Date().toISOString(),
+  };
+}
+
 // ─── Post Tile ─────────────────────────────────────────────────────────────────
 
 interface PostTileProps {
@@ -89,7 +151,7 @@ interface PostTileProps {
 function PostTile({ post, index, isOwner, onPress }: PostTileProps) {
   const colors = GRADIENT_PAIRS[index % GRADIENT_PAIRS.length];
   const icon = typeIcon(post.type);
-  const views = post.analytics?.views ?? 0;
+  const views = post.analytics?.views;
 
   return (
     <TouchableOpacity
@@ -114,10 +176,12 @@ function PostTile({ post, index, isOwner, onPress }: PostTileProps) {
         <Feather name={icon} size={11} color="rgba(255,255,255,0.85)" />
       </View>
       {/* Views bottom-left */}
-      <View style={styles.tileViews}>
-        <Feather name="eye" size={8} color="white" />
-        <Text style={styles.tileViewsText}>{formatCount(views)}</Text>
-      </View>
+      {views != null && !(post as any).__analyticsUnavailable && (
+        <View style={styles.tileViews}>
+          <Feather name="eye" size={8} color="white" />
+          <Text style={styles.tileViewsText}>{formatCount(views)}</Text>
+        </View>
+      )}
       {/* Status badge for owner non-published */}
       {isOwner && post.status !== 'published' && (
         <View style={[styles.tileStatusBadge, { backgroundColor: statusBadgeColor(post.status) + '33', borderColor: statusBadgeColor(post.status) }]}>
@@ -243,98 +307,64 @@ export default function SellerProfileScreen() {
 
   const api = useApi();
 
-  const [profile, setProfile] = useState(DEMO_SELLER_PROFILE);
+  const [profile, setProfile] = useState(() => mapApiProfile({}));
   const [activeTab, setActiveTab] = useState(0);
   const [isFollowing, setIsFollowing] = useState(false);
-  const [followers, setFollowers] = useState(DEMO_SELLER_PROFILE.followers);
+  const [followers, setFollowers] = useState(0);
   const [selectedPost, setSelectedPost] = useState<SellerPost | null>(null);
   const [showActionSheet, setShowActionSheet] = useState(false);
   const [bioExpanded, setBioExpanded] = useState(false);
   const [liveProducts, setLiveProducts] = useState<Product[]>([]);
   const [productsLoading, setProductsLoading] = useState(true);
   const [apiRating, setApiRating] = useState<{ avgRating: number; totalCount: number } | null>(null);
-  const [posts, setPosts] = useState<SellerPost[]>(isOwner ? DEMO_SELLER_POSTS : getPublishedPosts());
+  const [posts, setPosts] = useState<SellerPost[]>([]);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
-  // Load seller data from real API; fall back to demo data on failure
+  // Load seller data from the real API. Never fill a signed-in view with demo data.
   useEffect(() => {
     const sellerId = params.id as string | undefined;
-    if (!sellerId && isOwner) {
-      (async () => {
-        try {
-          const p = await api.seller.getProfile();
-          setProfile((prev) => ({
-            ...prev,
-            sellerId: p.clerkId,
-            brandName: p.brandName ?? p.displayName ?? prev.brandName,
-            username: p.username ?? prev.username,
-            bio: p.bio ?? prev.bio,
-            website: p.website ?? prev.website,
-            verified: p.verified ?? prev.verified,
-          }));
-          setProfileImageUrl(p.profileImageUrl ?? null);
-        } catch {
-          // Retain the existing offline profile shell when the authenticated read fails.
-        } finally {
-          getProducts({ filter: 'active' })
-            .then(setLiveProducts)
-            .catch(() => {})
-            .finally(() => setProductsLoading(false));
-        }
-      })();
-      return;
-    }
-    if (!sellerId) {
-      // No sellerId — stay on demo data, still load products locally
-      getProducts({ filter: 'active' })
-        .then(setLiveProducts)
-        .catch(() => {})
-        .finally(() => setProductsLoading(false));
-      return;
-    }
-
-    // Fire-and-forget: the API records at most one signed-in visit per seller/day.
-    api.publicSellers.recordVisit(sellerId).catch(() => { /* non-fatal */ });
-
     (async () => {
+      setProfileLoading(true);
+      setProductsLoading(true);
+      setProfileError(null);
       try {
-        const data = await api.publicSellers.get(sellerId);
-        const p = data.profile ?? {};
-        // Map API profile fields onto SellerProfile shape
-        setProfile((prev) => ({
-          ...prev,
-          sellerId:     p.clerkId ?? sellerId,
-          brandName:    p.brandName ?? p.displayName ?? prev.brandName,
-          username:     p.displayName ?? prev.username,
-          bio:          p.bio ?? prev.bio,
-          website:      p.website ?? prev.website,
-          verified:     p.verified ?? prev.verified,
-          category:     p.brandType ?? prev.category,
-        }));
-        setProfileImageUrl(typeof p.profileImageUrl === 'string' ? p.profileImageUrl : null);
-        setFollowers((prev) => prev); // keep local follow state
-        // Wire products from API
-        if (Array.isArray(data.products) && data.products.length > 0) {
-          setLiveProducts(data.products as Product[]);
+        if (!sellerId && isOwner) {
+          const [p, postRows] = await Promise.all([
+            api.seller.getProfile(),
+            api.posts.publicList(),
+          ]);
+          const ownPosts = postRows.filter((post: any) => post.userId === p.clerkId).map(mapApiPost);
+          setProfile(mapApiProfile(p, ownPosts.length));
+          setPosts(ownPosts);
+          setProfileImageUrl(p.profileImageUrl ?? null);
+          setLiveProducts([]);
         } else {
-          // fall back to local products
-          const localProducts = await getProducts({ filter: 'active' }).catch(() => []);
-          setLiveProducts(localProducts);
-        }
-        // Wire posts from API
-        if (Array.isArray(data.posts) && data.posts.length > 0) {
-          setPosts(data.posts as SellerPost[]);
+          if (!sellerId) throw new Error('Seller not found.');
+          api.publicSellers.recordVisit(sellerId).catch(() => {});
+          const [data, postRows] = await Promise.all([
+            api.publicSellers.get(sellerId),
+            api.posts.publicList(sellerId),
+          ]);
+          const sellerPosts = postRows.map(mapApiPost);
+          const products = Array.isArray(data.products) ? data.products as Product[] : [];
+          setProfile(mapApiProfile(data.profile ?? {}, sellerPosts.length, products.length));
+          setFollowers(Number(data.profile?.followersCount ?? 0));
+          setProfileImageUrl(typeof data.profile?.profileImageUrl === 'string' ? data.profile.profileImageUrl : null);
+          setLiveProducts(products);
+          setPosts(sellerPosts);
         }
       } catch {
-        // Fall back: load local products, keep demo posts
-        getProducts({ filter: 'active' })
-          .then(setLiveProducts)
-          .catch(() => {});
+        setPosts([]);
+        setLiveProducts([]);
+        setProfileError('We couldn’t load this seller profile. Check your connection and try again.');
       } finally {
+        setProfileLoading(false);
         setProductsLoading(false);
       }
     })();
-  }, [params.id]);
+  }, [api, isOwner, params.id]);
 
   // Load reviews separately (keep as-is)
   useEffect(() => {
@@ -419,7 +449,32 @@ export default function SellerProfileScreen() {
   // We need tabBarIndex:
   const tabBarIndex = isOwner ? 3 : 4;
 
-  const displayProducts = liveProducts.length > 0 ? liveProducts : DEMO_PRODUCTS;
+  if (profileLoading) {
+    return (
+      <View style={[styles.root, { alignItems: 'center', justifyContent: 'center', gap: 12 }]}>
+        <ActivityIndicator color={GREEN} />
+        <Text style={{ color: MUTED }}>Loading seller profile…</Text>
+      </View>
+    );
+  }
+
+  if (profileError) {
+    return (
+      <View style={[styles.root, { alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 28 }]}>
+        <Feather name="alert-circle" size={32} color={ERR} />
+        <Text style={{ color: FG, fontSize: 16, fontFamily: 'Inter_600SemiBold' }}>Couldn’t load profile</Text>
+        <Text style={{ color: MUTED, textAlign: 'center' }}>{profileError}</Text>
+        <TouchableOpacity
+          style={styles.followBtn}
+          onPress={() => router.replace((params.id ? '/seller-profile?id=' + params.id : '/seller-profile?isOwner=true') as never)}
+        >
+          <Text style={styles.followBtnText}>Try again</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const displayProducts = liveProducts;
 
   return (
     <View style={styles.root}>
@@ -691,6 +746,8 @@ export default function SellerProfileScreen() {
             <View style={styles.productsGrid}>
               {productsLoading ? (
                 <ActivityIndicator color={GREEN} style={{ marginTop: 40, alignSelf: 'center' }} />
+              ) : displayProducts.length === 0 ? (
+                <EmptyState icon="shopping-bag" title="No products available" />
               ) : (
                 displayProducts.map((product, i) => (
                   <ProductCard

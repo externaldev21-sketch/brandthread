@@ -270,7 +270,7 @@ function SpotlightPage({
             activeOpacity={0.8}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push(('/seller-profile?id=' + item.id) as never);
+              router.push(('/seller-profile?id=' + encodeURIComponent(item.sellerId ?? item.id)) as never);
             }}
           >
             <View style={[styles.railAvatar, { backgroundColor: item.avatarColor }]}>
@@ -383,7 +383,7 @@ function SpotlightPage({
           activeOpacity={0.8}
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push(('/seller-profile?id=' + item.id) as never);
+              router.push(('/seller-profile?id=' + encodeURIComponent(item.sellerId ?? item.id)) as never);
           }}
         >
           <View style={styles.creatorRow}>
@@ -460,6 +460,7 @@ export default function FeedScreen() {
   const [hasUnread, setHasUnread] = useState(true);
   const [sellerFeedPosts, setSellerFeedPosts] = useState<SpotlightItem[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
+  const [feedError, setFeedError] = useState<string | null>(null);
   const [activeLiveStreams, setActiveLiveStreams] = useState<LiveStreamFeedItem[]>([]);
   const api = useApi();
 
@@ -467,6 +468,7 @@ export default function FeedScreen() {
   useEffect(() => {
     async function loadFeed() {
       setFeedLoading(true);
+      setFeedError(null);
       try {
         const rows = await getThreadPosts();
         const mapped = (Array.isArray(rows) ? rows : [])
@@ -475,6 +477,7 @@ export default function FeedScreen() {
         setSellerFeedPosts(mapped);
       } catch {
         setSellerFeedPosts([]);
+        setFeedError('We couldn’t load Thread. Check your connection and try again.');
       } finally {
         setFeedLoading(false);
       }
@@ -611,11 +614,6 @@ export default function FeedScreen() {
 
   function handleShop(item: SpotlightItem) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    // Track shop click for post analytics (fire-and-forget)
-    try {
-      const { api } = require('@/lib/api');
-      api.posts.interact(item.id, { type: 'shop_click' }).catch(() => {/* non-critical */});
-    } catch { /* non-critical */ }
     const productId = (item as any).productId ?? item.id;
     const productName = (item as any).productName ?? '';
     router.push(('/buyer-product-detail?productId=' + productId + '&productName=' + encodeURIComponent(productName ?? '') + '&sourcePostId=' + item.id) as never);

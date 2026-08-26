@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,13 @@ import {
   ScrollView,
   Dimensions,
   Animated,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { getPostById, getPostAnalytics } from '@/services/sellerContent';
-import type { SellerPost, PostAnalytics } from '@/services/types';
+import { useApi } from '@/lib/api';
 
 // ─── Design Tokens ─────────────────────────────────────────────────────────────
 const BG        = '#07070F';
@@ -136,9 +136,29 @@ export default function PostAnalyticsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
 
-  const postId = params.id ?? 'post-1';
-  const post = getPostById(postId);
-  const analytics = getPostAnalytics(postId);
+  const api = useApi();
+  const postId = typeof params.id === 'string' ? params.id : '';
+  const [post, setPost] = useState<any | null>(null);
+  const [loading, setLoading] = useState(Boolean(postId));
+  const [loadError, setLoadError] = useState<string | null>(
+    postId ? null : 'Choose a post from your content library first.',
+  );
+
+  const loadPost = useCallback(async () => {
+    if (!postId) return;
+    setLoading(true);
+    setLoadError(null);
+    try {
+      setPost(await api.posts.get(postId));
+    } catch {
+      setPost(null);
+      setLoadError('We couldn’t load this post. It may have been removed, or your connection may be offline.');
+    } finally {
+      setLoading(false);
+    }
+  }, [api, postId]);
+
+  useEffect(() => { loadPost(); }, [loadPost]);
 
   const [activeRange, setActiveRange] = useState<DateRange>('7d');
 
@@ -149,41 +169,100 @@ export default function PostAnalyticsScreen() {
     });
   }, []);
 
-  const engMaxValue = useMemo(() => {
-    if (!analytics) return 1;
-    return Math.max(
-      analytics.comments,
-      analytics.reposts,
-      analytics.profileVisits,
-      analytics.productClicks,
-      analytics.addToCartActions,
-      1,
-    );
-  }, [analytics]);
-
-  const hasRetention =
-    analytics != null &&
-    analytics.retentionData.length > 0 &&
-    (post?.type === 'video' || post?.type === 'behind_scenes');
-
-  const conversionPct =
-    analytics && analytics.views > 0
-      ? ((analytics.purchases / analytics.views) * 100).toFixed(2)
-      : '0.00';
-
-  if (!post || !analytics) {
+  if (loading) {
     return (
       <View style={styles.notFound}>
-        <Text style={styles.notFoundText}>Post not found</Text>
+        <ActivityIndicator color={GREEN} />
+        <Text style={styles.notFoundText}>Loading post…</Text>
       </View>
     );
   }
 
-  const gradColors = postTypeGradient(post.type);
+  if (!post || loadError) {
+    return (
+      <View style={styles.notFound}>
+        <Feather name="alert-circle" size={30} color={ERR} />
+        <Text style={styles.notFoundText}>{loadError ?? 'Post not found'}</Text>
+        <TouchableOpacity style={styles.quickActionShare} onPress={postId ? loadPost : () => router.back()}>
+          <Text style={styles.quickActionText}>{postId ? 'Try again' : 'Back to content'}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
+  const analytics: any = null;
+  const gradColors = postTypeGradient(post.mediaType ?? 'image');
+
+  // The live post API currently reports only durable like and repost counts.
+  // Keep this screen honest rather than deriving views, revenue, or retention.
   return (
     <View style={styles.root}>
-      {/* ─── Fixed Header ──────────────────────────────────────────────────── */}
+      <View style={[styles.header, { paddingTop: insets.top }]}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <Feather name="arrow-left" size={20} color={FG} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Post Analytics</Text>
+        <View style={styles.rangePill}>
+          <Text style={styles.rangePillText}>Live</Text>
+        </View>
+      </View>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.previewCard}>
+          <LinearGradient colors={gradColors} style={styles.previewThumb} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} />
+          <View style={styles.previewMeta}>
+            <Text style={styles.previewCaption} numberOfLines={2}>{post.caption ?? ''}</Text>
+            <View style={styles.previewBadgeRow}>
+              <View style={styles.typeBadge}>
+                <Text style={styles.typeBadgeText}>{String(post.mediaType ?? 'post').replace('_', ' ')}</Text>
+              </View>
+              <View style={[styles.statusBadge, { backgroundColor: GREEN }]}>
+                <Text style={styles.statusBadgeText}>Published</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.heroGrid}>
+          <HeroCard icon="heart" iconColor={PURPLE} label="Likes" value={formatNumber(Number(post.likeCount ?? post.likesCount ?? 0))} />
+          <HeroCard icon="repeat" iconColor={ORANGE} label="Reposts" value={formatNumber(Number(post.repostCount ?? post.repostsCount ?? 0))} />
+        </View>
+
+        <SectionTitle title="Performance data" />
+        <View style={styles.card}>
+          <Feather name="bar-chart-2" size={26} color={PURPLE} />
+          <Text style={styles.unavailableTitle}>More post analytics are coming soon</Text>
+          <Text style={styles.unavailableText}>
+            Views, saves, product clicks, conversions, and audience insights are not available from the live API yet. We only show verified counts above.
+          </Text>
+        </View>
+
+        <View style={styles.quickActionsRow}>
+          <TouchableOpacity
+            style={styles.quickActionBoostWrap}
+            activeOpacity={0.85}
+            onPress={() => router.push(('/boost?targetType=post&targetId=' + encodeURIComponent(post.id)) as never)}
+          >
+            <LinearGradient colors={[PURPLE, BLUE]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.quickActionGradient}>
+              <Feather name="zap" size={18} color={FG} />
+              <Text style={styles.quickActionText}>Boost Post</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionShare} activeOpacity={0.85} onPress={() => router.back()}>
+            <Feather name="arrow-left" size={18} color={FG} />
+            <Text style={styles.quickActionText}>Back</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
+  );
+
+  /* Retired demo analytics layout retained only as a source reference.
+  const engMaxValue = 1;
+  const hasRetention = false;
+  const conversionPct = '0.00';
+  return (
+    <View style={styles.root}>
+      {/* ─── Fixed Header ──────────────────────────────────────────────────── * /}
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Feather name="arrow-left" size={20} color={FG} />
@@ -195,13 +274,13 @@ export default function PostAnalyticsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ─── Scrollable Content ─────────────────────────────────────────────── */}
+      {/* ─── Scrollable Content ─────────────────────────────────────────────── * /}
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* 1. Post Preview Card */}
+        {/* 1. Post Preview Card * /}
         <View style={styles.previewCard}>
           <LinearGradient
             colors={gradColors}
@@ -232,7 +311,7 @@ export default function PostAnalyticsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* 2. Hero Metrics 2x2 */}
+        {/* 2. Hero Metrics 2x2 * /}
         <View style={styles.heroGrid}>
           <HeroCard
             icon="eye"
@@ -260,7 +339,7 @@ export default function PostAnalyticsScreen() {
           />
         </View>
 
-        {/* 3. Engagement Breakdown */}
+        {/* 3. Engagement Breakdown * /}
         <SectionTitle title="Engagement" />
         <View style={styles.card}>
           <EngagementBar label="Comments" value={analytics.comments} maxValue={engMaxValue} />
@@ -270,7 +349,7 @@ export default function PostAnalyticsScreen() {
           <EngagementBar label="Add to Cart" value={analytics.addToCartActions} maxValue={engMaxValue} />
         </View>
 
-        {/* 4. Video Retention Chart */}
+        {/* 4. Video Retention Chart * /}
         {hasRetention && (
           <>
             <SectionTitle title="Audience Retention" />
@@ -293,7 +372,7 @@ export default function PostAnalyticsScreen() {
           </>
         )}
 
-        {/* 5. Revenue & Conversions */}
+        {/* 5. Revenue & Conversions * /}
         <SectionTitle title="Revenue" />
         <View style={styles.revenueRow}>
           <View style={[styles.revenueCard, { flex: 1 }]}>
@@ -310,7 +389,7 @@ export default function PostAnalyticsScreen() {
           </View>
         </View>
 
-        {/* 6. Audience Breakdown */}
+        {/* 6. Audience Breakdown * /}
         <SectionTitle title="Top Audience" />
         <View style={styles.card}>
           {analytics.topCountries.map((item) => (
@@ -318,7 +397,7 @@ export default function PostAnalyticsScreen() {
           ))}
         </View>
 
-        {/* 7. Peak Hour */}
+        {/* 7. Peak Hour * /}
         <SectionTitle title="Peak Engagement Hour" />
         <View style={[styles.card, styles.peakHourCard]}>
           <View style={styles.peakHourLeft}>
@@ -328,7 +407,7 @@ export default function PostAnalyticsScreen() {
           <Text style={styles.peakHourSub}>Most viewers are active at this hour</Text>
         </View>
 
-        {/* 8. Quick Actions */}
+        {/* 8. Quick Actions * /}
         <View style={styles.quickActionsRow}>
           <TouchableOpacity style={styles.quickActionBoostWrap} activeOpacity={0.85}>
             <LinearGradient
@@ -349,6 +428,7 @@ export default function PostAnalyticsScreen() {
       </ScrollView>
     </View>
   );
+  */
 }
 
 // ─── Hero Card ─────────────────────────────────────────────────────────────────
@@ -366,7 +446,6 @@ function HeroCard({ icon, iconColor, label, value }: HeroCardProps) {
       <Feather name={icon} size={16} color={iconColor} />
       <Text style={styles.heroValue}>{value}</Text>
       <Text style={styles.heroLabel}>{label}</Text>
-      <Text style={styles.heroChange}>+12.4% vs avg</Text>
     </View>
   );
 }
@@ -418,10 +497,13 @@ const styles = StyleSheet.create({
     backgroundColor: BG,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 28,
+    gap: 12,
   },
   notFoundText: {
     color: FG,
     fontSize: 16,
+    textAlign: 'center',
   },
 
   // ── Header ──
@@ -586,6 +668,16 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 14,
     gap: 12,
+  },
+  unavailableTitle: {
+    color: FG,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  unavailableText: {
+    color: MUTED,
+    fontSize: 13,
+    lineHeight: 19,
   },
 
   // ── Engagement Bars ──
