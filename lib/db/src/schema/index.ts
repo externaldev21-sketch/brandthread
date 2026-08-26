@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp, json, boolean, primaryKey, index, numeric, unique } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, timestamp, date, json, boolean, primaryKey, index, numeric, unique, uniqueIndex } from 'drizzle-orm/pg-core';
 export * from './manufacturers';
 export * from './freelancers';
 import { manufacturers } from './manufacturers';
@@ -62,6 +62,21 @@ export const users = pgTable('users', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
+
+// ─── Storefront Visits ─────────────────────────────────────────────────────────
+// A signed-in viewer is counted once per seller per UTC day. This makes seller
+// conversion meaningful without treating arbitrary public POST requests as traffic.
+export const storefrontVisits = pgTable('storefront_visits', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  sellerId:  text('seller_id').notNull(),
+  visitorId: text('visitor_id').notNull(),
+  visitDate: date('visit_date').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  sellerVisitDayUnique: uniqueIndex('storefront_visits_seller_visitor_day_unique')
+    .on(table.sellerId, table.visitorId, table.visitDate),
+  sellerVisitsIndex: index('storefront_visits_seller_id_idx').on(table.sellerId),
+}));
 
 // ─── Products ─────────────────────────────────────────────────────────────────
 

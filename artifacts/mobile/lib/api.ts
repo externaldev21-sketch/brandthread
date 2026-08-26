@@ -70,6 +70,33 @@ async function request<T = any>(
   return res.json() as Promise<T>;
 }
 
+async function uploadImage<T = any>(
+  path: string,
+  image: { uri: string; mimeType?: string | null },
+  getToken: GetToken,
+): Promise<T> {
+  const source = await fetch(image.uri);
+  if (!source.ok) {
+    throw new Error("Could not read the selected image.");
+  }
+  const imageBlob = await source.blob();
+  const contentType = image.mimeType || imageBlob.type || "image/jpeg";
+  const token = await getToken();
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": contentType,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(_storeContext === "own" ? { "X-Store-Context": "own" } : {}),
+    },
+    body: imageBlob,
+  });
+  if (!res.ok) {
+    throw new Error(`API ${res.status}: ${await res.text()}`);
+  }
+  return res.json() as Promise<T>;
+}
+
 // ─── Freelancer marketplace types ────────────────────────────────────────────
 export interface Freelancer {
   id: string;
@@ -512,13 +539,25 @@ export function createApi(getToken: GetToken) {
           displayName: string | null;
           brandName:   string | null;
           bio:         string | null;
+          website:     string | null;
+          username:    string | null;
+          profileImageUrl: string | null;
           verified:    boolean;
           returnPolicy:       string | null;
           cancellationPolicy: string | null;
           subscriptionStatus: string | null;
           subscriptionPlanId: string | null;
-           totalLikes: number;
+          totalLikes: number;
+          metrics: {
+            revenueCents: number;
+            visitors: number;
+            orders: number;
+            conversionRate: number;
+          };
         }>('/api/seller/profile'),
+      /** Upload a seller-owned brand avatar after the server validates its bytes. */
+      uploadAvatar: (image: { uri: string; mimeType?: string | null }) =>
+        uploadImage<{ profileImageUrl: string }>('/api/seller/profile/avatar/upload', image, getToken),
       /** Update return / cancellation policy text. */
       updatePolicy: (body: { returnPolicy?: string; cancellationPolicy?: string }) =>
         patch<{ returnPolicy: string | null; cancellationPolicy: string | null }>(
@@ -792,6 +831,8 @@ export function createApi(getToken: GetToken) {
         get<{ profile: any; products: any[]; posts: any[] }>(
           `/api/public/sellers/${encodeURIComponent(sellerId)}`
         ),
+      recordVisit: (sellerId: string) =>
+        post<void>(`/api/public/sellers/${encodeURIComponent(sellerId)}/visit`, {}),
     },
     /** Buyer-facing drops listing (active, with countdown releaseAt) */
     publicDrops: {

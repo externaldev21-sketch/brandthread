@@ -6,11 +6,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Path, Circle } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { getSellerPosts, subscribeSocial, type SellerThreadPost } from '@/services/socialService';
 import { useApi } from '@/lib/api';
 
@@ -23,6 +21,13 @@ interface SellerProfileData {
   subscriptionStatus: string | null;
   subscriptionPlanId: string | null;
   totalLikes:         number;
+  profileImageUrl:    string | null;
+  metrics: {
+    revenueCents: number;
+    visitors: number;
+    orders: number;
+    conversionRate: number;
+  };
 }
 
 interface SocialCounts {
@@ -41,8 +46,6 @@ const MUTED  = 'rgba(244,244,255,0.50)';
 const GREEN  = '#8B5CF6';
 const GREEN_DIM = 'rgba(139,92,246,0.18)';
 
-// ─── Mock data ──────────────────────────────────────────────────────────────
-
 const QUICK_ACTIONS: { icon: keyof typeof Feather.glyphMap; label: string; route: string }[] = [
   { icon: 'video',      label: 'Create Post',   route: '/create-post' },
   { icon: 'tag',        label: 'Add Product',   route: '/add-product' },
@@ -52,59 +55,6 @@ const QUICK_ACTIONS: { icon: keyof typeof Feather.glyphMap; label: string; route
 ];
 
 const CONTENT_TABS = ['Posts', 'Drafts', 'Scheduled', 'Analytics'];
-
-const SPARK_A = [30, 42, 38, 55, 48, 65, 58, 72, 66, 80, 74, 100];
-const SPARK_B = [55, 62, 50, 70, 60, 78, 68, 85, 75, 90, 82, 98];
-const SPARK_C = [40, 50, 44, 60, 52, 70, 60, 76, 68, 84, 76, 95];
-const SPARK_D = [28, 38, 32, 48, 42, 58, 50, 66, 60, 76, 68, 90];
-
-const PERF_STATS = [
-  { label: 'Total Revenue',   value: '$83,491', change: '37.5%', spark: SPARK_A },
-  { label: 'Visitors',        value: '98,241',  change: '19.6%', spark: SPARK_B },
-  { label: 'Orders',          value: '1,892',   change: '24.1%', spark: SPARK_C },
-  { label: 'Conversion Rate', value: '5.21%',   change: '8.3%',  spark: SPARK_D },
-];
-
-type GridTile =
-  | { id: 'create' }
-  | { id: string; caption: string; likes: string; comments: string; views: string; colors: [string, string] };
-
-const GRID: GridTile[] = [
-  { id: 'create' },
-  { id: 'g1', caption: 'New drop this Friday. Are you ready?',    likes: '2.1k', comments: '243', views: '5.3k', colors: ['#4A3B7A', '#1E1540'] },
-  { id: 'g2', caption: 'Vintage Wash Tee now available.',         likes: '1.8k', comments: '187', views: '4.2k', colors: ['#1F3A5F', '#0A1828'] },
-  { id: 'g3', caption: 'Grind now, shine later.',                 likes: '1.2k', comments: '98',  views: '3.1k', colors: ['#3D1F0F', '#1A0A05'] },
-  { id: 'g4', caption: 'Disrupt the industry.',                   likes: '2.4k', comments: '312', views: '6.8k', colors: ['#1A1A1A', '#0A0A0A'] },
-  { id: 'g5', caption: 'Details matter.',                         likes: '900',  comments: '74',  views: '2.2k', colors: ['#1A1A1A', '#0D0D0D'] },
-];
-
-// ─── Mini sparkline ─────────────────────────────────────────────────────────
-
-function MiniSparkline({ data, color, width, height = 36 }: { data: number[]; color: string; width: number; height?: number }) {
-  if (data.length < 2) return null;
-  const padY = 3;
-  const plotH = height - padY * 2;
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
-  const stepX = width / (data.length - 1);
-  const pts = data.map((v, i) => ({ x: i * stepX, y: padY + plotH - ((v - min) / range) * plotH }));
-  const line = pts.reduce((a, p, i) => {
-    if (i === 0) return `M ${p.x} ${p.y}`;
-    const prev = pts[i - 1];
-    const mx = (prev.x + p.x) / 2;
-    return `${a} C ${mx} ${prev.y}, ${mx} ${p.y}, ${p.x} ${p.y}`;
-  }, '');
-  const area = `${line} L ${width} ${height} L 0 ${height} Z`;
-  const last = pts[pts.length - 1];
-  return (
-    <Svg width={width} height={height}>
-      <Path d={area} fill={color} fillOpacity={0.15} />
-      <Path d={line} stroke={color} strokeWidth={1.5} fill="none" strokeLinecap="round" />
-      <Circle cx={last.x} cy={last.y} r={2.5} fill={color} />
-    </Svg>
-  );
-}
 
 // ─── Screen ─────────────────────────────────────────────────────────────────
 
@@ -121,6 +71,7 @@ export default function ProfileScreen() {
   const [brandNameInput, setBrandNameInput] = useState('');
   const [bioInput, setBioInput] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   const loadPosts = useCallback(async () => {
     try {
@@ -150,6 +101,13 @@ export default function ProfileScreen() {
         subscriptionStatus: data.subscriptionStatus ?? null,
         subscriptionPlanId: data.subscriptionPlanId ?? null,
         totalLikes:         data.totalLikes ?? 0,
+        profileImageUrl:    data.profileImageUrl ?? null,
+        metrics: data.metrics ?? {
+          revenueCents: 0,
+          visitors: 0,
+          orders: 0,
+          conversionRate: 0,
+        },
       });
       setSocialCounts((current) => ({ ...current, likes: data.totalLikes ?? 0 }));
     } catch {}
@@ -218,6 +176,13 @@ export default function ProfileScreen() {
         subscriptionStatus: current?.subscriptionStatus ?? null,
         subscriptionPlanId: current?.subscriptionPlanId ?? null,
         totalLikes: current?.totalLikes ?? 0,
+        profileImageUrl: current?.profileImageUrl ?? null,
+        metrics: current?.metrics ?? {
+          revenueCents: 0,
+          visitors: 0,
+          orders: 0,
+          conversionRate: 0,
+        },
       }));
       setProfileEditorVisible(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -228,6 +193,22 @@ export default function ProfileScreen() {
       setSavingProfile(false);
     }
   }
+
+  const avatarInitials = (profile?.brandName || profile?.displayName || 'My Brand')
+    .split(/\s+/)
+    .map((part) => part[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+  const metrics = profile?.metrics ?? null;
+  const hasNoActivity = !!metrics && metrics.orders === 0 && metrics.visitors === 0;
+  const performanceStats = [
+    { label: 'Total Revenue', value: metrics ? `$${(metrics.revenueCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—' },
+    { label: 'Visitors', value: metrics ? metrics.visitors.toLocaleString() : '—' },
+    { label: 'Orders', value: metrics ? metrics.orders.toLocaleString() : '—' },
+    { label: 'Conversion Rate', value: metrics ? `${metrics.conversionRate.toFixed(2)}%` : '—' },
+  ];
 
   return (
     <>
@@ -293,7 +274,11 @@ export default function ProfileScreen() {
               >
                 <View style={s.avatarRing}>
                   <View style={s.avatar}>
-                    <BrandthreadLogo size={48} />
+                    {profile?.profileImageUrl ? (
+                      <Image source={{ uri: profile.profileImageUrl }} style={s.avatarImage} accessibilityLabel="Brand avatar" />
+                    ) : (
+                      <Text style={s.avatarText}>{avatarInitials}</Text>
+                    )}
                   </View>
                 </View>
               </LinearGradient>
@@ -301,7 +286,11 @@ export default function ProfileScreen() {
               <View style={s.avatarGlow}>
                 <View style={s.avatarRing}>
                   <View style={s.avatar}>
-                    <BrandthreadLogo size={48} />
+                    {profile?.profileImageUrl ? (
+                      <Image source={{ uri: profile.profileImageUrl }} style={s.avatarImage} accessibilityLabel="Brand avatar" />
+                    ) : (
+                      <Text style={s.avatarText}>{avatarInitials}</Text>
+                    )}
                   </View>
                 </View>
               </View>
@@ -312,14 +301,30 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={s.cameraBtn}
             activeOpacity={0.8}
+            disabled={uploadingAvatar}
             onPress={async () => {
               const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
               if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo access to update your brand avatar.'); return; }
-              await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.85 });
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              const result = await ImagePicker.launchImageLibraryAsync({
+                allowsEditing: true,
+                aspect: [1, 1],
+                quality: 0.85,
+                mediaTypes: ['images'],
+              });
+              if (result.canceled || !result.assets[0]) return;
+              setUploadingAvatar(true);
+              try {
+                const updated = await api.seller.uploadAvatar(result.assets[0]);
+                setProfile((current) => current ? { ...current, profileImageUrl: updated.profileImageUrl } : current);
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              } catch {
+                Alert.alert('Could not update photo', 'Check your connection and try again.');
+              } finally {
+                setUploadingAvatar(false);
+              }
             }}
           >
-            <Feather name="camera" size={12} color={FG} />
+            <Feather name={uploadingAvatar ? "loader" : "camera"} size={12} color={FG} />
           </TouchableOpacity>
 
           {/* Add Story "+" badge */}
@@ -423,7 +428,27 @@ export default function ProfileScreen() {
         })}
       </View>
 
-      {/* Content grid */}
+      {activeTab === 3 ? (
+        <View style={s.analyticsSection}>
+          <Text style={s.analyticsTitle}>Store performance</Text>
+          <Text style={s.analyticsSubtitle}>Paid orders and storefront visits, all time.</Text>
+          <View style={s.perfGrid}>
+            {performanceStats.map((stat) => (
+              <View key={stat.label} style={s.perfCard}>
+                <Text style={s.perfLabel}>{stat.label}</Text>
+                <Text style={s.perfValue}>{stat.value}</Text>
+              </View>
+            ))}
+          </View>
+          {hasNoActivity && (
+            <View style={s.neutralAnalyticsState}>
+              <Feather name="bar-chart-2" size={22} color={MUTED} />
+              <Text style={s.neutralAnalyticsTitle}>No storefront activity yet</Text>
+              <Text style={s.neutralAnalyticsText}>Your real revenue, orders, and conversion rate will appear here as shoppers visit and place paid orders.</Text>
+            </View>
+          )}
+        </View>
+      ) : (
       <View style={s.grid}>
         {/* Create Post tile — always first */}
         <TouchableOpacity
@@ -485,6 +510,7 @@ export default function ProfileScreen() {
           </View>
         )}
       </View>
+      )}
     </ScrollView>
 
       <Modal
@@ -600,6 +626,7 @@ const s = StyleSheet.create({
   avatarRing:     { flex: 1, borderRadius: 42, overflow: 'hidden', backgroundColor: BG, padding: 3 },
   avatar:         { flex: 1, borderRadius: 39, backgroundColor: '#18182E', alignItems: 'center', justifyContent: 'center' },
   avatarText:     { fontSize: 30, fontFamily: 'Inter_700Bold', color: GREEN },
+   avatarImage:    { width: '100%', height: '100%', borderRadius: 39 },
   cameraBtn:      { position: 'absolute', bottom: 0, right: -2, width: 26, height: 26, borderRadius: 13, backgroundColor: '#333', borderWidth: 2, borderColor: BG, alignItems: 'center', justifyContent: 'center' },
   addStoryBtn:    { position: 'absolute', bottom: 0, left: -2, width: 26, height: 26, borderRadius: 13, backgroundColor: '#8B5CF6', borderWidth: 2, borderColor: BG, alignItems: 'center', justifyContent: 'center' },
 
@@ -625,29 +652,17 @@ const s = StyleSheet.create({
   quickIconBox:   { width: 44, height: 44, borderRadius: 12, backgroundColor: GREEN_DIM, alignItems: 'center', justifyContent: 'center' },
   quickLabel:     { fontSize: 11, fontFamily: 'Inter_500Medium', color: FG, textAlign: 'center' },
 
-  // Section
-  section:        { paddingHorizontal: 20, marginBottom: 20 },
-  sectionHead:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  sectionTitle:   { fontSize: 17, fontFamily: 'Inter_700Bold', color: FG },
-  weekPill:       { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
-  weekPillText:   { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: FG },
-  viewReport:     { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: GREEN },
-
   // Performance grid
+  analyticsSection: { padding: 20, gap: 8 },
+  analyticsTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: FG },
+  analyticsSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 8 },
   perfGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   perfCard:       { width: '48.5%', backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, padding: 14 },
   perfLabel:      { fontSize: 11, fontFamily: 'Inter_500Medium', color: MUTED, marginBottom: 6 },
-  perfValueRow:   { flexDirection: 'row', alignItems: 'baseline', marginBottom: 8 },
   perfValue:      { fontSize: 18, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.3 },
-  perfChange:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: GREEN },
-
-  // Brand Health
-  healthCard:     { borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(139,92,246,0.45)' },
-  healthGradient: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16 },
-  healthCircle:   { width: 52, height: 52, position: 'relative', alignItems: 'center', justifyContent: 'center' },
-  healthScore:    { position: 'absolute', fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
-  healthTitle:    { fontSize: 17, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 4 },
-  healthDesc:     { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
+  neutralAnalyticsState: { alignItems: 'center', borderWidth: 1, borderColor: BORDER, borderRadius: 14, backgroundColor: CARD, padding: 20, marginTop: 8, gap: 7 },
+  neutralAnalyticsTitle: { color: FG, fontFamily: 'Inter_600SemiBold', fontSize: 14 },
+  neutralAnalyticsText: { color: MUTED, fontFamily: 'Inter_400Regular', fontSize: 12, textAlign: 'center', lineHeight: 17 },
 
   // Content tabs
   tabsBar:        { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, marginBottom: 1 },

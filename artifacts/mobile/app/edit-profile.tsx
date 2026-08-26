@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, Platform, TextInput, Image,
@@ -50,12 +50,43 @@ export default function EditProfileScreen() {
   const [order, setOrder] = useState(DRAG_ROWS.map((r) => r.label));
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  useEffect(() => {
+    api.seller.getProfile()
+      .then((profile) => {
+        setAvatarUri(profile.profileImageUrl ?? null);
+        setFields((current) => ({
+          ...current,
+          name: profile.brandName ?? profile.displayName ?? current.name,
+          username: profile.username ? `@${profile.username}` : current.username,
+          bio: profile.bio ?? '',
+          website: profile.website ?? '',
+        }));
+      })
+      .catch(() => {});
+  }, [api]);
 
   async function pickAvatar() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo access to update your brand avatar.'); return; }
-    const res = await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.85 });
-    if (!res.canceled) { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setAvatarUri(res.assets[0].uri); }
+    const res = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.85,
+      mediaTypes: ['images'],
+    });
+    if (res.canceled || !res.assets[0]) return;
+    setUploadingAvatar(true);
+    try {
+      const updated = await api.seller.uploadAvatar(res.assets[0]);
+      setAvatarUri(updated.profileImageUrl);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      Alert.alert('Could not update photo', 'Check your connection and try again.');
+    } finally {
+      setUploadingAvatar(false);
+    }
   }
 
   function set(key: string, val: string) {
@@ -63,12 +94,13 @@ export default function EditProfileScreen() {
   }
 
   async function handleSave() {
-    if (saving) return;
+    if (saving || uploadingAvatar) return;
     setSaving(true);
     try {
       await api.seller.updateProfile({
         name:        fields.name,
-        displayName: fields.username,
+        brandName:   fields.name,
+        username:    fields.username.replace(/^@/, ''),
         bio:         fields.bio,
         website:     fields.website,
       });
@@ -110,7 +142,7 @@ export default function EditProfileScreen() {
       >
         {/* Avatar */}
         <View style={styles.avatarSection}>
-          <TouchableOpacity activeOpacity={0.8} onPress={pickAvatar}>
+          <TouchableOpacity activeOpacity={0.8} onPress={pickAvatar} disabled={uploadingAvatar}>
             <View style={styles.avatarWrap}>
               {avatarUri ? (
                 <Image source={{ uri: avatarUri }} style={styles.avatar} />
@@ -125,7 +157,7 @@ export default function EditProfileScreen() {
             </View>
           </TouchableOpacity>
           <TouchableOpacity activeOpacity={0.7} onPress={pickAvatar}>
-            <Text style={styles.editPhotoLink}>Edit photo or avatar</Text>
+            <Text style={styles.editPhotoLink}>{uploadingAvatar ? 'Uploading photo…' : 'Edit photo or avatar'}</Text>
           </TouchableOpacity>
         </View>
 

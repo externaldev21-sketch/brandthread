@@ -254,12 +254,38 @@ export default function SellerProfileScreen() {
   const [productsLoading, setProductsLoading] = useState(true);
   const [apiRating, setApiRating] = useState<{ avgRating: number; totalCount: number } | null>(null);
   const [posts, setPosts] = useState<SellerPost[]>(isOwner ? DEMO_SELLER_POSTS : getPublishedPosts());
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
 
   // Load seller data from real API; fall back to demo data on failure
   useEffect(() => {
     const sellerId = params.id as string | undefined;
+    if (!sellerId && isOwner) {
+      (async () => {
+        try {
+          const p = await api.seller.getProfile();
+          setProfile((prev) => ({
+            ...prev,
+            sellerId: p.clerkId,
+            brandName: p.brandName ?? p.displayName ?? prev.brandName,
+            username: p.username ?? prev.username,
+            bio: p.bio ?? prev.bio,
+            website: p.website ?? prev.website,
+            verified: p.verified ?? prev.verified,
+          }));
+          setProfileImageUrl(p.profileImageUrl ?? null);
+        } catch {
+          // Retain the existing offline profile shell when the authenticated read fails.
+        } finally {
+          getProducts({ filter: 'active' })
+            .then(setLiveProducts)
+            .catch(() => {})
+            .finally(() => setProductsLoading(false));
+        }
+      })();
+      return;
+    }
     if (!sellerId) {
-      // No sellerId — stay on demo/owner data, still load products locally
+      // No sellerId — stay on demo data, still load products locally
       getProducts({ filter: 'active' })
         .then(setLiveProducts)
         .catch(() => {})
@@ -267,12 +293,8 @@ export default function SellerProfileScreen() {
       return;
     }
 
-    // Fire-and-forget: increment the seller's storefront visit counter so the
-    // dashboard conversion rate stat reflects real buyer traffic.
-    const apiBase = process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
-    fetch(`${apiBase}/api/public/sellers/${encodeURIComponent(sellerId)}/visit`, {
-      method: 'POST',
-    }).catch(() => { /* non-fatal */ });
+    // Fire-and-forget: the API records at most one signed-in visit per seller/day.
+    api.publicSellers.recordVisit(sellerId).catch(() => { /* non-fatal */ });
 
     (async () => {
       try {
@@ -289,6 +311,7 @@ export default function SellerProfileScreen() {
           verified:     p.verified ?? prev.verified,
           category:     p.brandType ?? prev.category,
         }));
+        setProfileImageUrl(typeof p.profileImageUrl === 'string' ? p.profileImageUrl : null);
         setFollowers((prev) => prev); // keep local follow state
         // Wire products from API
         if (Array.isArray(data.products) && data.products.length > 0) {
@@ -437,12 +460,20 @@ export default function SellerProfileScreen() {
             {profile.verified ? (
               <View style={styles.verifiedRing}>
                 <View style={[styles.avatar, { backgroundColor: profile.avatarColor }]}>
-                  <Text style={styles.avatarInitials}>{profile.initials}</Text>
+                  {profileImageUrl ? (
+                    <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} accessibilityLabel={`${profile.brandName} avatar`} />
+                  ) : (
+                    <Text style={styles.avatarInitials}>{profile.initials}</Text>
+                  )}
                 </View>
               </View>
             ) : (
               <View style={[styles.avatar, { backgroundColor: profile.avatarColor }]}>
-                <Text style={styles.avatarInitials}>{profile.initials}</Text>
+                {profileImageUrl ? (
+                  <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} accessibilityLabel={`${profile.brandName} avatar`} />
+                ) : (
+                  <Text style={styles.avatarInitials}>{profile.initials}</Text>
+                )}
               </View>
             )}
 
@@ -902,6 +933,11 @@ const styles = StyleSheet.create({
     borderColor: BG,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 33,
   },
   avatarInitials: {
     color: BG,

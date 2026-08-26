@@ -3,9 +3,11 @@
  * Mounted at /api/public — no requireAuth middleware.
  */
 import { Router } from "express";
-import { db, products, productVariants, users, drops, posts, postTaggedProducts, interactions, trendingCache, boosts } from "@workspace/db";
+import { db, products, productVariants, users, drops, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, boosts } from "@workspace/db";
 import { eq, and, desc, inArray, or, ilike, sql, count, gte } from "drizzle-orm";
 import { computeTrendingForToday, isCacheFresh } from "../jobs/computeTrending";
+import { ObjectStorageService } from "../lib/objectStorage";
+import { requireAuth } from "../middlewares/requireAuth";
 
 // ─── In-flight guard for synchronous cache-miss computation ──────────────────
 // Prevents concurrent requests from each triggering an independent full
@@ -15,6 +17,7 @@ import { computeTrendingForToday, isCacheFresh } from "../jobs/computeTrending";
 let trendingInflight: Promise<void> | null = null;
 
 const router = Router();
+const objectStorage = new ObjectStorageService();
 
 // GET /api/public/products
 // Optional query params: ?category=apparel&tag=streetwear&ownerId=user_xxx&limit=50&offset=0
@@ -269,6 +272,8 @@ router.get("/sellers/:sellerId", async (req, res) => {
       brandName:       users.brandName,
       bio:             users.bio,
       website:         users.website,
+      profileImageUrl: users.profileImageUrl,
+      avatarUrl:        users.avatarUrl,
       verified:        users.verified,
       brandType:       users.brandType,
       accountType:     users.accountType,
@@ -318,8 +323,18 @@ router.get("/sellers/:sellerId", async (req, res) => {
     }
   }
 
+  let profileImageUrl: string | null = seller.profileImageUrl ?? seller.avatarUrl ?? null;
+  if (seller.profileImageUrl?.startsWith("/objects/")) {
+    try {
+      profileImageUrl = await objectStorage.getObjectEntityDownloadURL(seller.profileImageUrl);
+    } catch (err) {
+      req.log.warn({ err }, "Could not sign public seller profile image");
+      profileImageUrl = seller.avatarUrl ?? null;
+    }
+  }
+
   return res.json({
-    profile: seller,
+    profile: { ...seller, profileImageUrl },
     products: sellerProducts,
     posts: sellerPosts.map((p) => ({
       ...p,
@@ -396,21 +411,53 @@ router.get("/drops/:id", async (req, res) => {
 });
 
 // POST /api/public/sellers/:sellerId/visit
-// Unauthenticated. Increments the seller's storefront visit counter by 1.
-// Called fire-and-forget from the buyer-facing seller profile screen.
-router.post("/sellers/:sellerId/visit", async (req, res) => {
+// A signed-in shopper is recorded once per seller per UTC day. A separate table
+// prevents arbitrary public traffic from inflating a seller's conversion inputs.
+router.post("/sellers/:sellerId/visit", requireAuth, async (req, res): Promise<void> => {
   const { sellerId } = req.params;
+  const visitorId = (req as any).clerkUserId as string;
   if (!sellerId || typeof sellerId !== "string") {
-    return res.status(400).json({ error: "sellerId required" });
+    res.status(400).json({ error: "sellerId required" });
+    return;
+  }
+  if (sellerId === visitorId) {
+    res.status(204).end();
+    return;
   }
   try {
-    await db.execute(
-      sql`UPDATE users SET storefront_visit_count = storefront_visit_count + 1 WHERE clerk_id = ${sellerId}`
-    );
-    return res.status(204).end();
+    const [seller] = await db
+      .select({ clerkId: users.clerkId })
+      .from(users)
+      .where(eq(users.clerkId, sellerId))
+      .limit(1);
+    if (!seller) {
+      res.status(404).json({ error: "Seller not found" });
+      return;
+    }
+
+    const [newVisit] = await db
+      .insert(storefrontVisits)
+      .values({
+        sellerId,
+        visitorId,
+        visitDate: new Date().toISOString().slice(0, 10),
+      })
+      .onConflictDoNothing()
+      .returning({ id: storefrontVisits.id });
+
+    if (newVisit) {
+      await db
+        .update(users)
+        .set({
+          storefrontVisitCount: sql`${users.storefrontVisitCount} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.clerkId, sellerId));
+    }
+    res.status(204).end();
   } catch (err) {
-    console.error("visit increment error:", err);
-    return res.status(500).json({ error: "failed" });
+    req.log.error({ err, sellerId, visitorId }, "Storefront visit recording failed");
+    res.status(500).json({ error: "failed" });
   }
 });
 
