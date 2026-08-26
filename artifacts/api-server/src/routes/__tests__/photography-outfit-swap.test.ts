@@ -6,20 +6,28 @@ import fs from "node:fs/promises";
 
 const state = vi.hoisted(() => ({
   calls: [] as string[][],
+  prompts: [] as string[],
   failGarment: "",
+  authEnabled: true,
+  userId: "outfit-swap-test-user",
 }));
 
 vi.mock("../../middlewares/requireAuth", () => ({
-  requireAuth: (req: any, _res: unknown, next: () => void) => {
-    req.auth = { userId: "outfit-swap-test-user" };
+  requireAuth: (req: any, res: any, next: () => void) => {
+    if (!state.authEnabled) {
+      res.status(401).json({ error: "Authentication required" });
+      return;
+    }
+    req.auth = { userId: state.userId };
     next();
   },
 }));
 
 vi.mock("@workspace/integrations-openai-ai-server/image", () => ({
-  editImages: async (files: string[]) => {
+  editImages: async (files: string[], prompt: string) => {
     const contents = await Promise.all(files.map(async (file) => (await fs.readFile(file)).subarray(8).toString("utf8")));
     state.calls.push(contents);
+    state.prompts.push(prompt);
     if (state.failGarment && contents[1] === state.failGarment) {
       throw new Error("provider failure");
     }
@@ -64,6 +72,22 @@ describe("Outfit Swap batch generation", () => {
     expect(state.calls).toEqual([]);
   });
 
+  it("requires authentication before accepting an Outfit Swap request", async () => {
+    state.authEnabled = false;
+    try {
+      const response = await fetch(`${base}/api/photography/outfit-swap`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ heroImage: dataUrl("locked-hero"), garmentImages: [dataUrl("shirt")] }),
+      });
+
+      expect(response.status).toBe(401);
+      expect(state.calls).toEqual([]);
+    } finally {
+      state.authEnabled = true;
+    }
+  });
+
   it("rejects a declared image that does not contain valid image bytes", async () => {
     state.calls = [];
     const response = await fetch(`${base}/api/photography/outfit-swap`, {
@@ -81,6 +105,7 @@ describe("Outfit Swap batch generation", () => {
 
   it("reuses the same hero photo for each garment and preserves input order", async () => {
     state.calls = [];
+    state.prompts = [];
     state.failGarment = "";
     const response = await fetch(`${base}/api/photography/outfit-swap`, {
       method: "POST",
@@ -102,6 +127,37 @@ describe("Outfit Swap batch generation", () => {
       { garmentIndex: 1, b64_json: Buffer.from("swap:first-garment").toString("base64") },
       { garmentIndex: 2, b64_json: Buffer.from("swap:second-garment").toString("base64") },
     ]);
+    expect(state.prompts).toHaveLength(2);
+    expect(state.prompts.every((prompt) =>
+      prompt.includes("locked base hero photo") &&
+      prompt.includes("Preserve the exact same model identity") &&
+      prompt.includes("Do not change the model, pose, scene, background, or camera") &&
+      prompt.includes("Keep the scene editorial."),
+    )).toBe(true);
+  });
+
+  it("charges every garment against the per-user generation limit", async () => {
+    state.calls = [];
+    state.failGarment = "";
+    state.userId = "outfit-swap-rate-limit-user";
+
+    const firstBatch = await fetch(`${base}/api/photography/outfit-swap`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        heroImage: dataUrl("locked-hero"),
+        garmentImages: [dataUrl("one"), dataUrl("two"), dataUrl("three"), dataUrl("four")],
+      }),
+    });
+    const secondBatch = await fetch(`${base}/api/photography/outfit-swap`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ heroImage: dataUrl("locked-hero"), garmentImages: [dataUrl("five"), dataUrl("six")] }),
+    });
+
+    expect(firstBatch.status).toBe(200);
+    expect(secondBatch.status).toBe(429);
+    state.userId = "outfit-swap-test-user";
   });
 
   it("returns successful garments alongside safe partial-failure metadata", async () => {
