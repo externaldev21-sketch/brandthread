@@ -14,7 +14,7 @@
  */
 import { Router } from "express";
 import { db, loyaltyPoints } from "@workspace/db";
-import { eq, sql, desc, and, inArray } from "drizzle-orm";
+import { eq, sql, desc, and, inArray, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router = Router();
@@ -27,6 +27,171 @@ type LoyaltyAward = {
   referenceId: string;
   note?: string;
 };
+
+export class LoyaltyRedemptionError extends Error {
+  constructor(
+    message: string,
+    public readonly status = 400,
+    public readonly code = "LOYALTY_TOKEN_INVALID",
+  ) {
+    super(message);
+  }
+}
+
+type LoyaltyRedemption = {
+  token: string;
+  discountCents: number;
+  pointsUsed: number;
+};
+
+/**
+ * Validate and reserve a previously redeemed token for exactly one checkout.
+ * The points were deducted when the buyer created the token; this reservation
+ * stops that value being attached to multiple open Checkout Sessions.
+ */
+export async function reserveLoyaltyRedemption(
+  buyerId: string,
+  token: string,
+  checkoutReservationId: string,
+  orderTotalBeforeDiscountCents: number,
+): Promise<LoyaltyRedemption> {
+  const normalizedToken = String(token ?? "").trim().toUpperCase();
+  if (!normalizedToken || normalizedToken.length > 160) {
+    throw new LoyaltyRedemptionError("Enter a valid rewards token.");
+  }
+  if (!Number.isInteger(orderTotalBeforeDiscountCents) || orderTotalBeforeDiscountCents < 1) {
+    throw new LoyaltyRedemptionError("This order is not eligible for a rewards discount.");
+  }
+
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${`loyalty-redemption:${normalizedToken}`}))`,
+    );
+    const [redemption] = await tx
+      .select({
+        points: loyaltyPoints.points,
+        checkoutSessionId: loyaltyPoints.checkoutSessionId,
+        usedAt: loyaltyPoints.usedAt,
+      })
+      .from(loyaltyPoints)
+      .where(and(
+        eq(loyaltyPoints.buyerId, buyerId),
+        eq(loyaltyPoints.source, "redemption"),
+        eq(loyaltyPoints.referenceId, normalizedToken),
+      ))
+      .limit(1);
+
+    if (!redemption || redemption.points >= 0) {
+      throw new LoyaltyRedemptionError("This rewards token is not valid for your account.");
+    }
+    if (redemption.usedAt) {
+      throw new LoyaltyRedemptionError("This rewards token has already been used.", 409, "LOYALTY_TOKEN_USED");
+    }
+    if (
+      redemption.checkoutSessionId &&
+      redemption.checkoutSessionId !== checkoutReservationId
+    ) {
+      throw new LoyaltyRedemptionError(
+        "This rewards token is already being used for another checkout.",
+        409,
+        "LOYALTY_TOKEN_RESERVED",
+      );
+    }
+
+    const discountCents = -redemption.points;
+    if (discountCents >= orderTotalBeforeDiscountCents) {
+      throw new LoyaltyRedemptionError(
+        "Choose fewer points so your order still has a balance to pay.",
+        400,
+        "LOYALTY_DISCOUNT_TOO_LARGE",
+      );
+    }
+
+    await tx
+      .update(loyaltyPoints)
+      .set({ checkoutSessionId: checkoutReservationId })
+      .where(and(
+        eq(loyaltyPoints.buyerId, buyerId),
+        eq(loyaltyPoints.source, "redemption"),
+        eq(loyaltyPoints.referenceId, normalizedToken),
+        isNull(loyaltyPoints.usedAt),
+      ));
+
+    return { token: normalizedToken, discountCents, pointsUsed: discountCents };
+  });
+}
+
+/** Bind a reservation to the durable server-side checkout record. */
+export async function bindLoyaltyRedemptionToCheckout(
+  buyerId: string,
+  token: string,
+  reservationId: string,
+  checkoutRecordId: string,
+): Promise<void> {
+  const [updated] = await db
+    .update(loyaltyPoints)
+    .set({ checkoutSessionId: checkoutRecordId })
+    .where(and(
+      eq(loyaltyPoints.buyerId, buyerId),
+      eq(loyaltyPoints.source, "redemption"),
+      eq(loyaltyPoints.referenceId, token),
+      eq(loyaltyPoints.checkoutSessionId, reservationId),
+      isNull(loyaltyPoints.usedAt),
+    ))
+    .returning({ id: loyaltyPoints.id });
+
+  if (!updated) {
+    throw new LoyaltyRedemptionError("This rewards token could not be attached to checkout.", 409);
+  }
+}
+
+/** Mark a redemption used in the same transaction that creates its paid order. */
+export async function consumeLoyaltyRedemption(
+  transaction: any,
+  buyerId: string,
+  token: string,
+  checkoutRecordId: string,
+  orderId: string,
+): Promise<void> {
+  const [consumed] = await transaction
+    .update(loyaltyPoints)
+    .set({ usedAt: new Date(), usedOrderId: orderId })
+    .where(and(
+      eq(loyaltyPoints.buyerId, buyerId),
+      eq(loyaltyPoints.source, "redemption"),
+      eq(loyaltyPoints.referenceId, token),
+      eq(loyaltyPoints.checkoutSessionId, checkoutRecordId),
+      isNull(loyaltyPoints.usedAt),
+    ))
+    .returning({ id: loyaltyPoints.id });
+
+  if (!consumed) {
+    throw new LoyaltyRedemptionError(
+      "The rewards discount could not be finalized for this order.",
+      409,
+      "LOYALTY_TOKEN_NOT_RESERVED",
+    );
+  }
+}
+
+/** A refunded oversold order leaves the buyer's existing token usable. */
+export async function releaseLoyaltyRedemption(
+  transaction: any,
+  buyerId: string,
+  token: string,
+  checkoutRecordId: string,
+): Promise<void> {
+  await transaction
+    .update(loyaltyPoints)
+    .set({ checkoutSessionId: null })
+    .where(and(
+      eq(loyaltyPoints.buyerId, buyerId),
+      eq(loyaltyPoints.source, "redemption"),
+      eq(loyaltyPoints.referenceId, token),
+      eq(loyaltyPoints.checkoutSessionId, checkoutRecordId),
+      isNull(loyaltyPoints.usedAt),
+    ));
+}
 
 /**
  * Add a one-time loyalty ledger entry.
@@ -202,34 +367,11 @@ router.get("/", async (req, res) => {
 });
 
 // ─── POST /api/loyalty/earn ───────────────────────────────────────────────────
-// Internal endpoint — called by orders completion, referrals, and signup.
-// Also accessible externally for awarding points programmatically.
+// Point awards are written by trusted server-side helpers, never by a buyer.
 router.post("/earn", async (req, res) => {
-  const clerkId = (req as any).clerkUserId as string;
-  const { buyerId, points, source, referenceId, note } = req.body as {
-    buyerId?:     string;
-    points?:      number;
-    source?:      string;
-    referenceId?: string;
-    note?:        string;
-  };
-
-  // Allow awarding to a different buyerId (e.g. inviter credit during referral apply)
-  const targetId = buyerId ?? clerkId;
-
-  if (!points || points <= 0 || !Number.isInteger(points)) {
-    return res.status(400).json({ error: "points must be a positive integer" });
-  }
-  if (!source || !["purchase", "order_earn", "referral", "signup", "bonus"].includes(source)) {
-    return res.status(400).json({ error: "source required: purchase|order_earn|referral|signup|bonus" });
-  }
-
-  const [row] = await db
-    .insert(loyaltyPoints)
-    .values({ buyerId: targetId, points, source, referenceId: referenceId ?? null, note: note ?? null })
-    .returning();
-
-  return res.status(201).json(row);
+  return res.status(403).json({
+    error: "Points are awarded only by verified server-side events.",
+  });
 });
 
 // ─── POST /api/loyalty/redeem ─────────────────────────────────────────────────
@@ -244,32 +386,41 @@ router.post("/redeem", async (req, res) => {
     return res.status(400).json({ error: "Minimum redemption is 100 points" });
   }
 
-  // Check balance
-  const [balanceRow] = await db
-    .select({ total: sql<number>`COALESCE(SUM(${loyaltyPoints.points}), 0)` })
-    .from(loyaltyPoints)
-    .where(eq(loyaltyPoints.buyerId, clerkId));
-
-  const balance = Number(balanceRow?.total ?? 0);
-
-  if (points > balance) {
-    return res.status(400).json({
-      error: `Insufficient points. You have ${balance} pts.`,
-      code: "INSUFFICIENT_POINTS",
-    });
-  }
-
-  // Deduct points (negative ledger entry)
   const discountCents = points;  // 100 pts = $1.00 = 100 cents
   const token = `LOYAL-${clerkId.slice(-6).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
-
-  await db.insert(loyaltyPoints).values({
-    buyerId:     clerkId,
-    points:      -points,
-    source:      "redemption",
-    referenceId: token,
-    note:        `Redeemed ${points} pts for $${(discountCents / 100).toFixed(2)} off`,
-  });
+  try {
+    await db.transaction(async (tx) => {
+      // Serializing on buyer ID prevents concurrent requests from observing the
+      // same balance and creating more token value than the buyer owns.
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext(${`loyalty-balance:${clerkId}`}))`,
+      );
+      const [balanceRow] = await tx
+        .select({ total: sql<number>`COALESCE(SUM(${loyaltyPoints.points}), 0)` })
+        .from(loyaltyPoints)
+        .where(eq(loyaltyPoints.buyerId, clerkId));
+      const balance = Number(balanceRow?.total ?? 0);
+      if (points > balance) {
+        throw new LoyaltyRedemptionError(
+          `Insufficient points. You have ${balance} pts.`,
+          400,
+          "INSUFFICIENT_POINTS",
+        );
+      }
+      await tx.insert(loyaltyPoints).values({
+        buyerId:     clerkId,
+        points:      -points,
+        source:      "redemption",
+        referenceId: token,
+        note:        `Redeemed ${points} pts for $${(discountCents / 100).toFixed(2)} off`,
+      });
+    });
+  } catch (error) {
+    if (error instanceof LoyaltyRedemptionError) {
+      return res.status(error.status).json({ error: error.message, code: error.code });
+    }
+    throw error;
+  }
 
   return res.json({
     ok:           true,

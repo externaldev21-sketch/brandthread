@@ -10,6 +10,7 @@ import {
   CheckoutSession, CheckoutContact, CheckoutAddress,
   CheckoutDeliveryGroup, CheckoutShippingMethod, CheckoutDiscount,
   CheckoutTax, CheckoutSummary,
+  CheckoutLoyaltyRedemption,
   CheckoutAcknowledgment, CheckoutAttribution,
   CartValidationResult, CartValidationIssue,
   BuyerProduct, BuyerProductOption, BuyerProductVariant,
@@ -502,7 +503,12 @@ async function saveCheckout(session: CheckoutSession, k: CartKeys = keys()): Pro
   await AsyncStorage.setItem(k.checkout, JSON.stringify(session));
 }
 
-export async function createCheckoutSession(cart: Cart, isBuyNow = false, buyNowItems?: CartItem[]): Promise<CheckoutSession> {
+export async function createCheckoutSession(
+  cart: Cart,
+  isBuyNow = false,
+  buyNowItems?: CartItem[],
+  loyaltyRedemption?: CheckoutLoyaltyRedemption,
+): Promise<CheckoutSession> {
   const items = isBuyNow && buyNowItems ? buyNowItems : cart.items;
   const groups = groupCartBySeller(items);
 
@@ -533,7 +539,11 @@ export async function createCheckoutSession(cart: Cart, isBuyNow = false, buyNow
     const selected = group.availableMethods.find(method => method.id === group.selectedMethodId);
     return total + (selected?.price ?? 0);
   }, 0);
-  const summary = calculateCartSummary(items, 0, shippingTotal);
+  const loyaltyDiscount = Math.min(
+    loyaltyRedemption?.discountCents ?? 0,
+    Math.round((items.reduce((total, item) => total + item.price * item.quantity, 0) + shippingTotal) * 100),
+  ) / 100;
+  const summary = calculateCartSummary(items, loyaltyDiscount, shippingTotal);
 
   const acks: CheckoutAcknowledgment[] = [];
   const hasPreOrder = items.some(i => i.isPreOrder);
@@ -565,6 +575,7 @@ export async function createCheckoutSession(cart: Cart, isBuyNow = false, buyNow
     savedAddresses: [],
     deliveryGroups,
     discounts: [],
+    loyaltyRedemption,
     summary,
     acknowledgments: acks,
     isBuyNow,

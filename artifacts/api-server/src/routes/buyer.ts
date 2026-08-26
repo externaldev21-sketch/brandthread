@@ -9,7 +9,13 @@ import {
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireStripe, computeApplicationFeeCents, PLATFORM_COMMISSION_RATE, mapStripeError } from "../lib/stripe";
-import { reversePurchasePointsOnce } from "./loyalty";
+import {
+  bindLoyaltyRedemptionToCheckout,
+  LoyaltyRedemptionError,
+  releaseLoyaltyRedemption,
+  reserveLoyaltyRedemption,
+  reversePurchasePointsOnce,
+} from "./loyalty";
 
 const router = Router();
 router.use(requireAuth);
@@ -123,7 +129,7 @@ router.post("/cart/validate", async (req, res) => {
 
 /**
  * POST /api/buyer/checkout/session
- * Body: { items: [{ variantId, productId, quantity }], successUrl, cancelUrl, contactEmail }
+ * Body: { items: [{ variantId, productId, quantity }], successUrl, cancelUrl, contactEmail, loyaltyToken? }
  * Returns: { sessionId, url }
  *
  * INVARIANTS:
@@ -134,10 +140,18 @@ router.post("/cart/validate", async (req, res) => {
  *     is passed to Stripe, avoiding the 50-key metadata limit.
  */
 router.post("/checkout/session", async (req, res) => {
+  let loyaltyReservation: { buyerId: string; token: string; reservationId: string } | null = null;
+  let checkoutRecordId: string | null = null;
+  let checkoutIdempotencyKey: string | null = null;
+  let stripeCreationStarted = false;
+  let stripeSessionCreated = false;
   try {
     const stripe = requireStripe();
     const buyerId = (req as any).clerkUserId as string;
-    const { items, successUrl, cancelUrl, contactEmail, shippingAddress, clientIdempotencyKey, dropId } = req.body;
+    const {
+      items, successUrl, cancelUrl, contactEmail, shippingAddress,
+      clientIdempotencyKey, dropId, loyaltyToken,
+    } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
       res.status(400).json({ error: "items required" });
@@ -276,6 +290,7 @@ router.post("/checkout/session", async (req, res) => {
     }
 
     const hasKey = !!clientIdempotencyKey && typeof clientIdempotencyKey === "string";
+    checkoutIdempotencyKey = hasKey ? clientIdempotencyKey : null;
 
     // Validated shipping DTO (set once, used below)
     const validatedShipping = shippingAddress && typeof shippingAddress === "object"
@@ -302,21 +317,18 @@ router.post("/checkout/session", async (req, res) => {
     //     • DB record exists but stripeSessionId is null → Stripe creation never
     //       completed; treat the same as expired: return 410.
     //     • No DB record → proceed to create one.
-    //  2. Call Stripe BEFORE inserting the DB record.
-    //     → A Stripe failure leaves no poisoned DB row; the same key can be
-    //       retried immediately and Stripe's own idempotency key returns the
-    //       same result if the network had already accepted the request.
-    //  3. Upsert the DB record with stripeSessionId already set.
-    //     → Concurrent requests that both passed step 1 both call Stripe with
-    //       the same idempotency key (identical Stripe session returned).
-    //       The ON CONFLICT DO UPDATE merges them into one DB row; both callers
-    //       get the same session URL.
+    //  2. Persist the cart row before creating a Stripe session and put its ID
+    //     in Stripe metadata. A paid session can therefore always be recovered
+    //     by the webhook even if the later session-ID update is interrupted.
+    //  3. If Stripe creation itself fails, remove that pending row so the buyer
+    //     can retry with the same idempotency key.
 
     if (hasKey) {
       const [existingCS] = await db
         .select({
           id:              checkoutSessions.id,
           stripeSessionId: checkoutSessions.stripeSessionId,
+          loyaltyToken:    checkoutSessions.loyaltyToken,
         })
         .from(checkoutSessions)
         .where(eq(checkoutSessions.clientIdempotencyKey, clientIdempotencyKey))
@@ -324,10 +336,33 @@ router.post("/checkout/session", async (req, res) => {
 
       if (existingCS) {
         if (!existingCS.stripeSessionId) {
-          // DB record exists but Stripe never finished — treat as expired.
-          res.status(410).json({
-            error: "Your previous checkout attempt did not complete. Please retry — your cart is intact.",
-            code: "SESSION_INCOMPLETE",
+          // Stripe may have accepted the request just before a process/network
+          // interruption. Find its durable csRef before deciding the pending
+          // row can be safely released.
+          let startingAfter: string | undefined;
+          let recovered: any;
+          do {
+            const page = await stripe.checkout.sessions.list({
+              limit: 100,
+              ...(startingAfter ? { starting_after: startingAfter } : {}),
+            });
+            recovered = page.data.find(session => session.metadata?.["csRef"] === existingCS.id);
+            startingAfter = page.has_more ? page.data.at(-1)?.id : undefined;
+          } while (!recovered && startingAfter);
+          if (recovered) {
+            await db
+              .update(checkoutSessions)
+              .set({ stripeSessionId: recovered.id })
+              .where(eq(checkoutSessions.id, existingCS.id));
+            res.json({ sessionId: recovered.id, url: recovered.url });
+            return;
+          }
+          // Preserve ambiguous requests and their reward reservation. A lost
+          // Stripe response must never turn a live discounted payment into an
+          // unrecoverable order.
+          res.status(409).json({
+            error: "Your checkout is still being reconciled. Please try again shortly.",
+            code: "SESSION_PENDING",
           });
           return;
         }
@@ -364,6 +399,14 @@ router.post("/checkout/session", async (req, res) => {
         }
 
         // Expired or cancelled — buyer must restart checkout with a new key
+        if (existingCS.loyaltyToken) {
+          await db.transaction((tx) => releaseLoyaltyRedemption(
+            tx,
+            buyerId,
+            existingCS.loyaltyToken!,
+            existingCS.id,
+          ));
+        }
         res.status(410).json({
           error: "Your checkout session expired. Please review your cart and try again.",
           code: "SESSION_EXPIRED",
@@ -398,13 +441,118 @@ router.post("/checkout/session", async (req, res) => {
         quantity: 1,
       });
     }
-    const applicationFeeCents = computeApplicationFeeCents(subtotalCents);
+    const totalBeforeLoyaltyDiscountCents = subtotalCents + shippingCents;
+    const normalizedLoyaltyToken =
+      typeof loyaltyToken === "string" && loyaltyToken.trim()
+        ? loyaltyToken.trim().toUpperCase()
+        : null;
+    let loyaltyRedemption: { token: string; discountCents: number } | null = null;
+
+    if (normalizedLoyaltyToken) {
+      const reservationId = `checkout:${crypto.randomUUID()}`;
+      const reserved = await reserveLoyaltyRedemption(
+        buyerId,
+        normalizedLoyaltyToken,
+        reservationId,
+        totalBeforeLoyaltyDiscountCents,
+      );
+      loyaltyReservation = { buyerId, token: reserved.token, reservationId };
+      loyaltyRedemption = {
+        token: reserved.token,
+        discountCents: reserved.discountCents,
+      };
+    }
+
+    // Persist the checkout before Stripe is contacted. Its ID is included in
+    // the initial Stripe metadata, so a paid session is always reconstructable
+    // by the webhook even if the later session-ID write is interrupted.
+    const insertValues = {
+      buyerId,
+      sellerId,
+      items: cartItems,
+      ...(loyaltyRedemption ? {
+        loyaltyToken: loyaltyRedemption.token,
+        loyaltyDiscountCents: loyaltyRedemption.discountCents,
+      } : {}),
+      ...(validatedShipping ? { shippingAddress: validatedShipping } : {}),
+      ...(hasKey ? { clientIdempotencyKey } : {}),
+    };
+    let checkoutRecord: { id: string } | undefined;
+    try {
+      [checkoutRecord] = await db
+        .insert(checkoutSessions)
+        .values(insertValues)
+        .returning({ id: checkoutSessions.id });
+    } catch (insertError: any) {
+      // Another identical request won the unique idempotency key while this one
+      // was preparing checkout. Wait briefly for its Stripe session and reuse it.
+      if (hasKey && insertError?.code === "23505") {
+        if (loyaltyReservation) {
+          await db.transaction((tx) => releaseLoyaltyRedemption(
+            tx,
+            loyaltyReservation!.buyerId,
+            loyaltyReservation!.token,
+            loyaltyReservation!.reservationId,
+          ));
+          loyaltyReservation = null;
+        }
+        for (let attempt = 0; attempt < 30; attempt++) {
+          const [winner] = await db
+            .select({ stripeSessionId: checkoutSessions.stripeSessionId })
+            .from(checkoutSessions)
+            .where(eq(checkoutSessions.clientIdempotencyKey, clientIdempotencyKey))
+            .limit(1);
+          if (winner?.stripeSessionId) {
+            const winnerSession = await stripe.checkout.sessions.retrieve(winner.stripeSessionId);
+            res.json({ sessionId: winner.stripeSessionId, url: winnerSession.url });
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+        res.status(409).json({ error: "Checkout is still being prepared. Please try again." });
+        return;
+      }
+      throw insertError;
+    }
+    if (!checkoutRecord) throw new Error("Could not create checkout record");
+    const csId = checkoutRecord.id;
+    checkoutRecordId = csId;
+
+    if (loyaltyReservation) {
+      await bindLoyaltyRedemptionToCheckout(
+        loyaltyReservation.buyerId,
+        loyaltyReservation.token,
+        loyaltyReservation.reservationId,
+        csId,
+      );
+      loyaltyReservation.reservationId = csId;
+    }
+
+    // Loyalty points are represented as a Stripe once-off coupon. This keeps
+    // tax and the buyer-facing Stripe total authoritative, unlike attempting to
+    // rewrite individual line-item prices or accepting a client-provided total.
+    let loyaltyCouponId: string | undefined;
+    if (loyaltyRedemption) {
+      const coupon = await stripe.coupons.create({
+        amount_off: loyaltyRedemption.discountCents,
+        currency: "usd",
+        duration: "once",
+        max_redemptions: 1,
+        name: "Brandthread rewards",
+      });
+      loyaltyCouponId = coupon.id;
+    }
+
+    const applicationFeeCents = Math.min(
+      computeApplicationFeeCents(Math.max(0, subtotalCents - (loyaltyRedemption?.discountCents ?? 0))),
+      Math.max(0, totalBeforeLoyaltyDiscountCents - (loyaltyRedemption?.discountCents ?? 0)),
+    );
 
     // Validate dropId if provided — must be a non-empty string
     const validDropId: string | null =
       dropId && typeof dropId === "string" && dropId.trim() ? dropId.trim() : null;
 
-    // ── Call Stripe FIRST (idempotent via key) — no DB record yet ─────────
+    // ── Create Stripe Session after durable cart persistence ─────────────────
     // Drop orders use the "separate charges + transfers" model:
     //   • No transfer_data.destination — charge lands on platform account
     //   • Funds are released to seller via stripe.transfers.create at ship time
@@ -412,6 +560,7 @@ router.post("/checkout/session", async (req, res) => {
     // Regular orders use destination charges:
     //   • transfer_data.destination sends funds directly to seller Connect account
     //   • application_fee_amount keeps the platform commission
+    stripeCreationStarted = true;
     const session = await stripe.checkout.sessions.create(
       {
         mode: "payment",
@@ -420,11 +569,12 @@ router.post("/checkout/session", async (req, res) => {
         // client-side state-rate table and keeps the charged tax aligned with
         // the seller's Stripe Tax configuration.
         automatic_tax: { enabled: true },
+        ...(loyaltyCouponId ? { discounts: [{ coupon: loyaltyCouponId }] } : {}),
         success_url: successUrl,
         cancel_url: cancelUrl,
         client_reference_id: buyerId,
-        // metadata.csRef is back-filled after the DB upsert below
         metadata: {
+          csRef: csId,
           ...(validDropId ? { dropId: validDropId } : {}),
         },
         payment_intent_data: {
@@ -443,55 +593,68 @@ router.post("/checkout/session", async (req, res) => {
       },
       hasKey ? { idempotencyKey: `cs_${clientIdempotencyKey}` } : {},
     );
+    stripeSessionCreated = true;
 
-    // ── Upsert DB record (cart + stripeSessionId in one shot) ─────────────
-    // ON CONFLICT on clientIdempotencyKey covers concurrent requests that both
-    // cleared the lookup above and both called Stripe (same session returned).
-    // The DO UPDATE just re-applies the same stripeSessionId — safe no-op.
-    const insertValues = {
-      buyerId,
-      sellerId,
-      items: cartItems,
-      stripeSessionId: session.id,
-      ...(validatedShipping ? { shippingAddress: validatedShipping } : {}),
-      ...(hasKey ? { clientIdempotencyKey } : {}),
-    };
-
-    let csId: string;
-    if (hasKey) {
-      const [csRecord] = await db
-        .insert(checkoutSessions)
-        .values(insertValues)
-        .onConflictDoUpdate({
-          target: checkoutSessions.clientIdempotencyKey,
-          set: { stripeSessionId: session.id },
-        })
-        .returning({ id: checkoutSessions.id });
-      csId = csRecord.id;
-    } else {
-      const [csRecord] = await db
-        .insert(checkoutSessions)
-        .values(insertValues)
-        .returning({ id: checkoutSessions.id });
-      csId = csRecord.id;
-    }
-
-    // Back-fill csRef in Stripe metadata so the webhook can find the cart row.
-    // Best-effort: failure here is non-fatal because the webhook also falls back
-    // to looking up by stripe_session_id.
-    try {
-      await stripe.checkout.sessions.update(session.id, {
-        metadata: {
-          csRef: csId,
-          ...(validDropId ? { dropId: validDropId } : {}),
-        },
-      });
-    } catch (metaErr) {
-      console.warn("Could not back-fill csRef metadata on Stripe session:", metaErr);
-    }
+    await db
+      .update(checkoutSessions)
+      .set({ stripeSessionId: session.id })
+      .where(eq(checkoutSessions.id, csId));
 
     res.json({ sessionId: session.id, url: session.url });
   } catch (err: any) {
+    // A Stripe creation failure must not strand the token in a reservation. Once
+    // Stripe has returned a session we deliberately retain it: that session is a
+    // live discounted payment path and may still complete.
+    if (!stripeCreationStarted) {
+      try {
+        await db.transaction(async (tx) => {
+          if (loyaltyReservation) {
+            await releaseLoyaltyRedemption(
+              tx,
+              loyaltyReservation.buyerId,
+              loyaltyReservation.token,
+              loyaltyReservation.reservationId,
+            );
+          }
+          if (checkoutRecordId) {
+            await tx.delete(checkoutSessions).where(eq(checkoutSessions.id, checkoutRecordId));
+          }
+        });
+      } catch (releaseErr) {
+        console.error("Could not clean up failed checkout reservation:", releaseErr);
+      }
+    }
+    // A concurrent request with the same checkout key may encounter the
+    // winner's loyalty reservation before its Stripe session is persisted.
+    // Reuse that session once available instead of surfacing a token conflict.
+    if (
+      err instanceof LoyaltyRedemptionError &&
+      err.code === "LOYALTY_TOKEN_RESERVED" &&
+      checkoutIdempotencyKey
+    ) {
+      try {
+        const stripe = requireStripe();
+        for (let attempt = 0; attempt < 30; attempt++) {
+          const [winner] = await db
+            .select({ stripeSessionId: checkoutSessions.stripeSessionId })
+            .from(checkoutSessions)
+            .where(eq(checkoutSessions.clientIdempotencyKey, checkoutIdempotencyKey))
+            .limit(1);
+          if (winner?.stripeSessionId) {
+            const winnerSession = await stripe.checkout.sessions.retrieve(winner.stripeSessionId);
+            res.json({ sessionId: winner.stripeSessionId, url: winnerSession.url });
+            return;
+          }
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      } catch (recoveryError) {
+        console.error("Could not recover concurrent checkout request:", recoveryError);
+      }
+    }
+    if (err instanceof LoyaltyRedemptionError) {
+      res.status(err.status).json({ error: err.message, code: err.code });
+      return;
+    }
     // Stripe card errors (e.g. card_declined) → 402 with a buyer-friendly message.
     // Raw Stripe strings must never reach the buyer UI.
     const isStripeCardError =

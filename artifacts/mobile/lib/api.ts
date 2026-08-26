@@ -396,6 +396,8 @@ export function createApi(getToken: GetToken) {
              *  (e.g. after a component remount) without creating a duplicate Stripe charge.
              *  A UNIQUE DB index makes this race-condition-safe server-side. */
             clientIdempotencyKey?: string;
+            /** One-time rewards token created by /api/loyalty/redeem. */
+            loyaltyToken?: string;
           } = {},
         ) =>
           post<{ sessionId: string; url: string }>('/api/buyer/checkout/session', {
@@ -405,6 +407,7 @@ export function createApi(getToken: GetToken) {
             ...(opts.contactEmail          ? { contactEmail:          opts.contactEmail          } : {}),
             ...(opts.shippingAddress       ? { shippingAddress:       opts.shippingAddress       } : {}),
             ...(opts.clientIdempotencyKey  ? { clientIdempotencyKey:  opts.clientIdempotencyKey  } : {}),
+            ...(opts.loyaltyToken          ? { loyaltyToken:          opts.loyaltyToken          } : {}),
           }),
         /** Verify payment status after Stripe redirect.
          *  Returns { status, paymentStatus, amountTotal, orderId?, orderNumber?, declineReason? }. */

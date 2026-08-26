@@ -5,7 +5,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Image,
-  ActivityIndicator, Alert,
+  ActivityIndicator, Alert, TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -14,9 +14,11 @@ import * as Haptics from 'expo-haptics';
 import {
   getCart, updateCartItemQuantity, removeCartItem,
   saveForLater, moveToCart, removeSavedItem,
-  groupCartBySeller, calculateCartSummary, validateCart,
+  groupCartBySeller, calculateCartSummary, createCheckoutSession, getCheckoutSession, validateCart,
 } from '@/services/cartService';
-import { Cart, CartItem, SavedCartItem, CartSellerGroup } from '@/services/cartTypes';
+import {
+  Cart, CartItem, SavedCartItem, CartSellerGroup, CheckoutLoyaltyRedemption,
+} from '@/services/cartTypes';
 import { useApi } from '@/hooks/useApi';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
@@ -358,17 +360,53 @@ export default function CartScreen() {
   const [cart, setCart] = useState<Cart>({ id: '', items: [], savedItems: [], updatedAt: '' });
   const [loading, setLoading] = useState(true);
   const [validating, setValidating] = useState(false);
+  const [loyaltyBalance, setLoyaltyBalance] = useState(0);
+  const [pointsInput, setPointsInput] = useState('');
+  const [redeemingPoints, setRedeemingPoints] = useState(false);
+  const [loyaltyRedemption, setLoyaltyRedemption] = useState<CheckoutLoyaltyRedemption | null>(null);
 
   const load = useCallback(async () => {
-    try { setCart(await getCart()); } catch {}
+    try {
+      const nextCart = await getCart();
+      setCart(nextCart);
+      const pendingCheckout = await getCheckoutSession();
+      if (
+        pendingCheckout?.loyaltyRedemption &&
+        pendingCheckout.cartId === nextCart.id &&
+        pendingCheckout.deliveryGroups.length === 1 &&
+        pendingCheckout.deliveryGroups[0]?.items.every(
+          item => nextCart.items.some(cartItem => cartItem.id === item.id),
+        )
+      ) {
+        setLoyaltyRedemption(pendingCheckout.loyaltyRedemption);
+      }
+    } catch {}
     setLoading(false);
   }, []);
 
-  useFocusEffect(useCallback(() => { setLoading(true); load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    setLoading(true);
+    void load();
+    void api.loyalty.get()
+      .then(result => { if (active) setLoyaltyBalance(Math.max(0, Number(result.balance ?? 0))); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [api, load]));
 
   const groups = groupCartBySeller(cart.items);
   const hasPreOrder = cart.items.some(i => i.isPreOrder);
   const summary = calculateCartSummary(cart.items);
+  const requestedPoints = Math.floor(Number(pointsInput));
+  const maxRedeemablePoints = Math.min(
+    loyaltyBalance,
+    Math.max(0, Math.floor(summary.subtotal * 100) - 1),
+  );
+  const loyaltyPreviewCents = Number.isFinite(requestedPoints) && requestedPoints >= 100
+    ? Math.min(requestedPoints, maxRedeemablePoints)
+    : 0;
+  const displayedDiscount = summary.discountTotal + (loyaltyRedemption?.discountCents ?? 0) / 100;
+  const displayedTotal = Math.max(0, summary.total - (loyaltyRedemption?.discountCents ?? 0) / 100);
 
   async function handleQtyDec(itemId: string) {
     Haptics.selectionAsync();
@@ -413,6 +451,53 @@ export default function CartScreen() {
     router.push(('/buyer-product-detail?productId=' + item.productId + '&editVariantId=' + item.variantId + '&editCartItemId=' + item.id) as never);
   }
 
+  async function handleApplyPoints() {
+    if (groups.length !== 1) {
+      Alert.alert(
+        'One store at a time',
+        'Rewards can be used when your cart has items from one seller. Check out each seller separately to use points.',
+      );
+      return;
+    }
+    if (!Number.isInteger(requestedPoints) || requestedPoints < 100) {
+      Alert.alert('Minimum 100 points', 'Use at least 100 points for $1.00 off.');
+      return;
+    }
+    if (requestedPoints > loyaltyBalance) {
+      Alert.alert('Not enough points', `You have ${loyaltyBalance.toLocaleString()} points available.`);
+      return;
+    }
+    if (requestedPoints > maxRedeemablePoints) {
+      Alert.alert(
+        'Choose fewer points',
+        `You can use up to ${maxRedeemablePoints.toLocaleString()} points on this order.`,
+      );
+      return;
+    }
+
+    setRedeemingPoints(true);
+    try {
+      const result = await api.loyalty.redeem({ points: requestedPoints });
+      setLoyaltyRedemption({
+        token: result.token,
+        pointsUsed: result.pointsUsed,
+        discountCents: result.discountCents,
+      });
+      await createCheckoutSession(cart, false, undefined, {
+        token: result.token,
+        pointsUsed: result.pointsUsed,
+        discountCents: result.discountCents,
+      });
+      setLoyaltyBalance(current => Math.max(0, current - result.pointsUsed));
+      setPointsInput('');
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error: any) {
+      Alert.alert('Could not apply points', error?.message ?? 'Please try again.');
+    } finally {
+      setRedeemingPoints(false);
+    }
+  }
+
   async function handleCheckout() {
     if (cart.items.length === 0) return;
     setValidating(true);
@@ -427,6 +512,11 @@ export default function CartScreen() {
 
       // Check each seller's payment account before entering checkout
       const currentGroups = groupCartBySeller(cart.items);
+      if (loyaltyRedemption && currentGroups.length !== 1) {
+        Alert.alert('Rewards need one store', 'Remove items from other sellers before continuing with this rewards discount.');
+        setValidating(false);
+        return;
+      }
       for (const group of currentGroups) {
         try {
           const status = await api.buyer.sellerPaymentStatus(group.sellerId);
@@ -447,6 +537,12 @@ export default function CartScreen() {
         }
       }
 
+      await createCheckoutSession(
+        cart,
+        false,
+        undefined,
+        loyaltyRedemption ?? undefined,
+      );
       router.push(('/buyer-checkout?source=cart') as never);
     } catch {
       Alert.alert('Error', 'Something went wrong. Please try again.');
@@ -521,12 +617,68 @@ export default function CartScreen() {
                   <Text style={s.multiSellerText}>Items from {groups.length} sellers require a separate secure Stripe payment for each seller.</Text>
                 </View>
               )}
+              <View style={s.loyaltyCard}>
+                <View style={s.loyaltyHeading}>
+                  <View style={s.loyaltyIcon}>
+                    <Feather name="gift" size={15} color={PURPLE_LIGHT} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.loyaltyTitle}>Use points</Text>
+                    <Text style={s.loyaltySub}>
+                      {loyaltyBalance.toLocaleString()} points available · 100 points = $1.00
+                    </Text>
+                  </View>
+                </View>
+                {loyaltyRedemption ? (
+                  <View style={s.appliedPoints}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.appliedPointsTitle}>
+                        {loyaltyRedemption.pointsUsed.toLocaleString()} points applied
+                      </Text>
+                      <Text style={s.appliedPointsSub}>
+                        −{fmtPrice(loyaltyRedemption.discountCents / 100)} at secure checkout
+                      </Text>
+                    </View>
+                    <Feather name="check-circle" size={19} color={SUCCESS} />
+                  </View>
+                ) : (
+                  <>
+                    <View style={s.pointsRow}>
+                      <TextInput
+                        value={pointsInput}
+                        onChangeText={setPointsInput}
+                        keyboardType="number-pad"
+                        placeholder="Points to use"
+                        placeholderTextColor={SUBTLE}
+                        style={s.pointsInput}
+                      />
+                      <TouchableOpacity
+                        style={[s.pointsApply, (redeemingPoints || groups.length !== 1) && s.pointsApplyDisabled]}
+                        onPress={handleApplyPoints}
+                        disabled={redeemingPoints || groups.length !== 1}
+                        activeOpacity={0.75}
+                      >
+                        {redeemingPoints
+                          ? <ActivityIndicator color={PURPLE_LIGHT} size="small" />
+                          : <Text style={s.pointsApplyText}>Apply</Text>}
+                      </TouchableOpacity>
+                    </View>
+                    <Text style={s.pointsPreview}>
+                      {groups.length !== 1
+                        ? 'Rewards apply to one seller checkout at a time.'
+                        : loyaltyPreviewCents > 0
+                          ? `You’ll save ${fmtPrice(loyaltyPreviewCents / 100)} at checkout.`
+                          : `Use up to ${maxRedeemablePoints.toLocaleString()} points on this order.`}
+                    </Text>
+                  </>
+                )}
+              </View>
               <SummaryCard
                 subtotal={summary.subtotal}
-                discountTotal={summary.discountTotal}
+                discountTotal={displayedDiscount}
                 shipping={summary.shippingTotal}
                 tax={summary.taxTotal}
-                total={summary.total}
+                total={displayedTotal}
                 hasPreOrder={hasPreOrder}
               />
               </>
@@ -576,7 +728,7 @@ export default function CartScreen() {
                   ) : (
                     <>
                       <Feather name="lock" size={16} color="#fff" />
-                      <Text style={s.checkoutText}>Checkout · {fmtPrice(summary.total)}</Text>
+                      <Text style={s.checkoutText}>Checkout · {fmtPrice(displayedTotal)}</Text>
                     </>
                   )}
                 </LinearGradient>
@@ -618,6 +770,20 @@ const s = StyleSheet.create({
   divider: { height: 1, backgroundColor: BORDER, marginVertical: SP.xs },
   multiSellerNotice: { flexDirection: 'row', gap: SP.sm, backgroundColor: CYAN_DIM, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md },
   multiSellerText: { flex: 1, color: CYAN, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
+  loyaltyCard: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER_ACTIVE, padding: SP.md, marginBottom: SP.md },
+  loyaltyHeading: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
+  loyaltyIcon: { width: 30, height: 30, borderRadius: RADIUS.sm, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
+  loyaltyTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
+  loyaltySub: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  pointsRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'center' },
+  pointsInput: { flex: 1, height: COMP.inputH, borderRadius: RADIUS.md, backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, paddingHorizontal: SP.md },
+  pointsApply: { minWidth: 76, height: COMP.inputH, borderRadius: RADIUS.md, backgroundColor: PURPLE_DIM, borderWidth: 1, borderColor: BORDER_ACTIVE, alignItems: 'center', justifyContent: 'center' },
+  pointsApplyDisabled: { opacity: 0.5 },
+  pointsApplyText: { fontSize: FS.sm, fontFamily: FONT.bold, color: PURPLE_LIGHT },
+  pointsPreview: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: SP.xs, lineHeight: 17 },
+  appliedPoints: { flexDirection: 'row', alignItems: 'center', backgroundColor: SUCCESS_DIM, borderRadius: RADIUS.md, padding: SP.sm, gap: SP.sm },
+  appliedPointsTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: SUCCESS },
+  appliedPointsSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
   savedHint: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', marginBottom: SP.lg },
   checkoutBar: {
     position: 'absolute',

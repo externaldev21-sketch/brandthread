@@ -11,7 +11,11 @@ import {
 import { eq, and, ne, sql } from "drizzle-orm";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe";
 import { refundJobPayment } from "../lib/freelancerEscrow";
-import { awardLoyaltyPointsOnce } from "./loyalty";
+import {
+  awardLoyaltyPointsOnce,
+  consumeLoyaltyRedemption,
+  releaseLoyaltyRedemption,
+} from "./loyalty";
 
 const router = Router();
 
@@ -52,12 +56,10 @@ router.post("/stripe", async (req: Request, res: Response) => {
         await handleCheckoutPaid(event.data.object);
         break;
 
-      // Delayed payment failed — log; no order was created, nothing to clean up
+      // Delayed payment failed — release any unused rewards reservation.
       case "checkout.session.async_payment_failed":
-        console.warn(
-          `Async payment failed for session ${event.data.object.id}`,
-          event.data.object.payment_status,
-        );
+      case "checkout.session.expired":
+        await releaseCheckoutLoyaltyRedemption(event.data.object);
         break;
 
       case "account.updated":
@@ -112,6 +114,30 @@ router.post("/stripe", async (req: Request, res: Response) => {
     res.status(500).json({ error: "Webhook handler failed" });
   }
 });
+
+/** Allow an unused rewards token to be attached to a replacement checkout. */
+async function releaseCheckoutLoyaltyRedemption(session: any) {
+  const csRef = session.metadata?.["csRef"];
+  const [checkout] = await db
+    .select({
+      id: checkoutSessions.id,
+      buyerId: checkoutSessions.buyerId,
+      loyaltyToken: checkoutSessions.loyaltyToken,
+    })
+    .from(checkoutSessions)
+    .where(csRef
+      ? eq(checkoutSessions.id, csRef)
+      : eq(checkoutSessions.stripeSessionId, session.id))
+    .limit(1);
+
+  if (!checkout?.loyaltyToken) return;
+  await db.transaction((tx) => releaseLoyaltyRedemption(
+    tx,
+    checkout.buyerId,
+    checkout.loyaltyToken!,
+    checkout.id,
+  ));
+}
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
 
@@ -233,8 +259,10 @@ export async function handleCheckoutPaid(session: any) {
   // Use Stripe's authoritative charged total; fall back to computed subtotal if absent.
   // This ensures the stored order total always matches the amount Stripe captured.
   const totalCents    = typeof session.amount_total === "number" ? session.amount_total : subtotalCents;
-  // Derive shipping as the difference between what Stripe charged and item subtotal
-  const shippingCents = Math.max(0, totalCents - subtotalCents);
+  // Derive shipping from the pre-discount total. A loyalty discount otherwise
+  // makes shipping look like zero (or negative) in the persisted order.
+  const loyaltyDiscountCents = Math.max(0, csRecord.loyaltyDiscountCents ?? 0);
+  const shippingCents = Math.max(0, totalCents + loyaltyDiscountCents - subtotalCents);
 
   // Prefer the buyer-provided address stored in the server-side checkout record
   // (captured before Stripe was opened, so it always has the address).
@@ -317,6 +345,30 @@ export async function handleCheckoutPaid(session: any) {
       })
       .returning();
     createdOrderId = order.id;
+
+    // A redemption is consumed only once a paid session has produced a valid
+    // order. This transaction boundary means a webhook retry cannot spend the
+    // same token twice.
+    if (csRecord.loyaltyToken) {
+      if (oversoldItems.length === 0) {
+        await consumeLoyaltyRedemption(
+          tx,
+          buyerId,
+          csRecord.loyaltyToken,
+          csRecord.id,
+          order.id,
+        );
+      } else {
+        // The payment is refunded below; keep the buyer's existing redemption
+        // token available for a replacement order.
+        await releaseLoyaltyRedemption(
+          tx,
+          buyerId,
+          csRecord.loyaltyToken,
+          csRecord.id,
+        );
+      }
+    }
 
     // Record the purchase reward in the same transaction as the confirmed
     // order. A cancellation cannot land between the order commit and award.

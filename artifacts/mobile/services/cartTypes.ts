@@ -146,6 +146,13 @@ export interface CheckoutSummary {
   currency: string;
 }
 
+/** A points redemption created by /api/loyalty/redeem and attached to one checkout. */
+export interface CheckoutLoyaltyRedemption {
+  token: string;
+  pointsUsed: number;
+  discountCents: number;
+}
+
 export interface CheckoutSession {
   id: string;
   cartId: string;
@@ -155,6 +162,7 @@ export interface CheckoutSession {
   savedAddresses: CheckoutAddress[];
   deliveryGroups: CheckoutDeliveryGroup[];
   discounts: CheckoutDiscount[];
+  loyaltyRedemption?: CheckoutLoyaltyRedemption;
   tax?: CheckoutTax;
   paymentMethod?: CheckoutPaymentMethod;
   summary: CheckoutSummary;

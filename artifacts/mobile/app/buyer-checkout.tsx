@@ -269,6 +269,9 @@ export default function BuyerCheckoutScreen() {
           contactEmail: contact.email,
           shippingAddress: { name: `${address.firstName} ${address.lastName}`.trim(), street: address.line1!, city: address.city!, state: address.state!, zip: address.postalCode!, country: address.country || 'US' },
           clientIdempotencyKey: `${current.idempotencyKey}_${group.sellerId}`,
+          ...(current.loyaltyRedemption && current.deliveryGroups.length === 1
+            ? { loyaltyToken: current.loyaltyRedemption.token }
+            : {}),
         });
         const browser = await WebBrowser.openBrowserAsync(result.url);
         if (browser.type === 'cancel' || browser.type === 'dismiss') { setError('Payment was cancelled. Your cart is still saved.'); setPlacing(false); return; }

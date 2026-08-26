@@ -74,27 +74,10 @@ export default function LoyaltyScreen() {
       Alert.alert('Insufficient Points', `You only have ${balance.toLocaleString()} points.`); return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setRedeeming(true);
-    try {
-      const result = await (api as any).loyalty?.redeem?.({ points: pts });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setBalance(prev => prev - pts);
-      setRedeemPts('');
-      setHistory(prev => [{
-        id: Date.now().toString(), points: -pts, source: 'redemption',
-        referenceId: result?.token, note: result?.token ? `Discount code: ${result.token}` : null,
-        createdAt: new Date().toISOString(),
-      } as any, ...prev]);
-      Alert.alert(
-        '🎉 Points Redeemed!',
-        `You got $${(result.discountCents / 100).toFixed(2)} off your next order.\n\nDiscount code: ${result.token}\n\nApply this at checkout.`,
-        [{ text: 'Got it!' }],
-      );
-    } catch (e: any) {
-      Alert.alert('Could not redeem', e?.message ?? 'Please try again.');
-    } finally {
-      setRedeeming(false);
-    }
+    // Redemptions are deliberately created in the cart, where they are
+    // persisted with the checkout session and applied to Stripe immediately.
+    // Never mint a detached code here: it could be lost before checkout.
+    router.push('/(buyer)/cart' as never);
   }
 
   const previewDiscount = parseInt(redeemPts, 10) || 0;
@@ -178,9 +161,10 @@ export default function LoyaltyScreen() {
           >
             {redeeming
               ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={s.redeemBtnText}>Redeem at Checkout</Text>
+              : <Text style={s.redeemBtnText}>Use points in Cart</Text>
             }
           </TouchableOpacity>
+          <Text style={s.redeemDisabledNote}>Choose your points in Cart when you’re ready to check out.</Text>
           {balance < 100 && (
             <Text style={s.redeemDisabledNote}>You need at least 100 points to redeem.</Text>
           )}

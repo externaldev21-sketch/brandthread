@@ -267,6 +267,10 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   // The UNIQUE index on this column guarantees that concurrent duplicate submissions
   // hit a DB constraint rather than creating two Stripe sessions.
   clientIdempotencyKey: text('client_idempotency_key').unique(),
+  // Optional loyalty redemption reserved for this Stripe Checkout Session.
+  // The paid-order webhook consumes it atomically with order creation.
+  loyaltyToken: text('loyalty_token'),
+  loyaltyDiscountCents: integer('loyalty_discount_cents').notNull().default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
 
@@ -804,6 +808,11 @@ export const loyaltyPoints = pgTable('loyalty_points', {
   source:      text('source').notNull(),                               // 'order_earn' | legacy 'purchase' | 'referral' | 'signup' | 'redemption' | 'bonus'
   referenceId: text('reference_id'),
   note:        text('note'),
+  // Redemption rows are first attached to one checkout, then marked used only
+  // after the corresponding order has been successfully created.
+  checkoutSessionId: text('checkout_session_id'),
+  usedAt:      timestamp('used_at'),
+  usedOrderId: uuid('used_order_id'),
   createdAt:   timestamp('created_at').defaultNow().notNull(),
 });
 
