@@ -20,7 +20,7 @@ function getStripe() {
 
 // ─── GET /api/buyer/payment-methods ─────────────────────────────────────────
 router.get("/", async (req, res) => {
-  const clerkId = (req as any).userId as string;
+  const clerkId = (req as any).clerkUserId as string;
   try {
     const [user] = await db.select({ stripeCustomerId: users.stripeCustomerId })
       .from(users).where(eq(users.clerkId, clerkId)).limit(1);
@@ -65,7 +65,7 @@ router.get("/", async (req, res) => {
 
 // ─── DELETE /api/buyer/payment-methods/:pmId ─────────────────────────────────
 router.delete("/:pmId", async (req, res) => {
-  const clerkId = (req as any).userId as string;
+  const clerkId = (req as any).clerkUserId as string;
   const { pmId } = req.params;
 
   try {

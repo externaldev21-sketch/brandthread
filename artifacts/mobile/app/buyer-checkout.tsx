@@ -165,6 +165,7 @@ function Review({ session, onAck }: { session: CheckoutSession; onAck: (key: str
       )}
       <Card>
         <View style={styles.row}><Feather name="lock" size={17} color={PURPLE_LIGHT} /><View style={{ flex: 1 }}><Text style={styles.sectionTitle}>Pay securely with Stripe</Text><Text style={styles.muted}>You’ll enter your payment details in Stripe Checkout. Brandthread never collects card numbers.</Text></View></View>
+        <Text style={[styles.muted, { marginTop: SP.sm }]}>Cards saved from earlier purchases will appear automatically in Stripe Checkout.</Text>
       </Card>
       {session.acknowledgments.map(ack => (
         <TouchableOpacity key={ack.key} style={styles.ack} onPress={() => onAck(ack.key, !ack.acknowledged)}>

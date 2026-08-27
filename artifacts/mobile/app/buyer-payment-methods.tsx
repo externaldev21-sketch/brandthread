@@ -65,7 +65,7 @@ export default function BuyerPaymentMethodsScreen() {
     setLoading(true);
     setError(null);
     try {
-      const data = await api.buyer.paymentMethods() as any;
+      const data = await api.reviews.paymentMethods() as any;
       setPaymentMethods(data.paymentMethods ?? []);
     } catch {
       setError('Could not load your payment methods. Please try again.');
@@ -88,7 +88,7 @@ export default function BuyerPaymentMethodsScreen() {
           onPress: async () => {
             setRemoving(pm.id);
             try {
-              await api.buyer.removePaymentMethod(pm.id) as any;
+              await api.reviews.removePaymentMethod(pm.id) as any;
               setPaymentMethods(prev => prev.filter(p => p.id !== pm.id));
             } catch {
               Alert.alert('Error', 'Could not remove this card. Please try again.');

@@ -1,4 +1,6 @@
 import Stripe from "stripe";
+import { db, users } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 // Stripe is optional at startup — the server runs without it but Stripe-dependent
 // endpoints will return 503 if the key is missing.
@@ -16,6 +18,58 @@ export function requireStripe(): Stripe {
     );
   }
   return stripe;
+}
+
+/**
+ * Find or create the platform Stripe Customer associated with one authenticated
+ * Brandthread user. Buyers use this customer for saved payment methods, while
+ * sellers also use the same field for platform subscription billing.
+ *
+ * The row lock keeps two checkout requests for a new user from creating two
+ * Stripe Customers at the same time.
+ */
+export async function ensureStripeCustomer(
+  stripeClient: Pick<Stripe, "customers">,
+  clerkUserId: string,
+  preferredEmail?: string,
+): Promise<string> {
+  return db.transaction(async (tx) => {
+    const [user] = await tx
+      .select({
+        stripeCustomerId: users.stripeCustomerId,
+        email: users.email,
+        name: users.name,
+      })
+      .from(users)
+      .where(eq(users.clerkId, clerkUserId))
+      .for("update")
+      .limit(1);
+
+    if (!user) {
+      throw Object.assign(new Error("User not found"), { status: 404 });
+    }
+    if (user.stripeCustomerId) {
+      if (preferredEmail) {
+        await stripeClient.customers.update(user.stripeCustomerId, {
+          email: preferredEmail,
+        });
+      }
+      return user.stripeCustomerId;
+    }
+
+    const customer = await stripeClient.customers.create({
+      email: preferredEmail ?? user.email,
+      name: user.name,
+      metadata: { clerkUserId },
+    });
+
+    await tx
+      .update(users)
+      .set({ stripeCustomerId: customer.id, updatedAt: new Date() })
+      .where(eq(users.clerkId, clerkUserId));
+
+    return customer.id;
+  });
 }
 
 export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "";

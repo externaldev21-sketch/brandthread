@@ -15,6 +15,7 @@ import { eq } from "drizzle-orm";
 
 const TEST_SUFFIX = crypto.randomBytes(6).toString("hex");
 const BUYER_ID = `checkout-session-test-buyer-${TEST_SUFFIX}`;
+const BUYER_EMAIL = `${BUYER_ID}@test.local`;
 const SELLER_ID = `checkout-session-test-seller-${TEST_SUFFIX}`;
 const SELLER_EMAIL = `${SELLER_ID}@test.local`;
 const SELLER_ACCOUNT_ID = `acct_checkout_test_${TEST_SUFFIX}`;
@@ -31,6 +32,8 @@ type FakeSession = {
 const fakeStripe = vi.hoisted(() => {
   const sessions = new Map<string, FakeSession>();
   const sessionCreates: Array<{ params: any; options: any }> = [];
+  const customerCreates: Array<{ params: any }> = [];
+  const customerUpdates: Array<{ id: string; params: any }> = [];
 
   const fake = {
     checkout: {
@@ -57,14 +60,28 @@ const fakeStripe = vi.hoisted(() => {
         },
       },
     },
+    customers: {
+      create: async (params: any) => {
+        customerCreates.push({ params });
+        return { id: `cus_checkout_test_${customerCreates.length}` };
+      },
+      update: async (id: string, params: any) => {
+        customerUpdates.push({ id, params });
+        return { id, ...params };
+      },
+    },
   };
 
   return {
     stripe: fake,
     sessionCreates,
+    customerCreates,
+    customerUpdates,
     reset: () => {
       sessions.clear();
       sessionCreates.length = 0;
+      customerCreates.length = 0;
+      customerUpdates.length = 0;
     },
   };
 });
@@ -163,6 +180,13 @@ beforeAll(async () => {
 beforeEach(async () => {
   fakeStripe.reset();
   await db.insert(users).values({
+    clerkId: BUYER_ID,
+    email: BUYER_EMAIL,
+    name: "Checkout Integration Buyer",
+    role: "buyer",
+    accountType: "buyer",
+  });
+  await db.insert(users).values({
     clerkId: SELLER_ID,
     email: SELLER_EMAIL,
     name: "Checkout Integration Seller",
@@ -184,6 +208,7 @@ afterEach(async () => {
   variantId = "";
 
   await db.delete(users).where(eq(users.clerkId, SELLER_ID));
+  await db.delete(users).where(eq(users.clerkId, BUYER_ID));
 });
 
 afterAll(async () => {
@@ -204,6 +229,13 @@ describe("POST /api/buyer/checkout/session", () => {
       url: "https://checkout.stripe.test/pay/1",
     });
     expect(fakeStripe.sessionCreates).toHaveLength(1);
+    expect(fakeStripe.customerCreates).toHaveLength(1);
+    expect(fakeStripe.customerCreates[0].params).toMatchObject({
+      email: "buyer@test.local",
+      name: "Checkout Integration Buyer",
+    });
+    expect(fakeStripe.sessionCreates[0].params.customer).toBe("cus_checkout_test_1");
+    expect(fakeStripe.sessionCreates[0].params.payment_intent_data.setup_future_usage).toBe("off_session");
 
     const [savedCheckout] = await db
       .select()
@@ -294,5 +326,40 @@ describe("POST /api/buyer/checkout/session", () => {
       .from(checkoutSessions)
       .where(eq(checkoutSessions.clientIdempotencyKey, idempotencyKey));
     expect(savedCheckouts).toHaveLength(1);
+  });
+
+  it("reuses the buyer customer across separate checkout sessions", async () => {
+    const first = await postCheckout(checkoutBody());
+    const second = await postCheckout(checkoutBody());
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(fakeStripe.customerCreates).toHaveLength(1);
+    expect(fakeStripe.sessionCreates).toHaveLength(2);
+    expect(fakeStripe.sessionCreates[0].params.customer).toBe("cus_checkout_test_1");
+    expect(fakeStripe.sessionCreates[1].params.customer).toBe("cus_checkout_test_1");
+  });
+
+  it("keeps the checkout contact email on an existing Stripe customer", async () => {
+    await db
+      .update(users)
+      .set({ stripeCustomerId: `cus_existing_${TEST_SUFFIX}` })
+      .where(eq(users.clerkId, BUYER_ID));
+
+    const result = await postCheckout(checkoutBody({
+      contactEmail: "orders+delivery@test.local",
+    }));
+
+    expect(result.status).toBe(200);
+    expect(fakeStripe.customerCreates).toHaveLength(0);
+    expect(fakeStripe.customerUpdates).toEqual([
+      {
+        id: `cus_existing_${TEST_SUFFIX}`,
+        params: { email: "orders+delivery@test.local" },
+      },
+    ]);
+    expect(fakeStripe.sessionCreates[0].params.customer).toBe(
+      `cus_existing_${TEST_SUFFIX}`,
+    );
   });
 });

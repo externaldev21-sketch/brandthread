@@ -8,7 +8,13 @@ import {
 } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { requireStripe, computeApplicationFeeCents, PLATFORM_COMMISSION_RATE, mapStripeError } from "../lib/stripe";
+import {
+  requireStripe,
+  ensureStripeCustomer,
+  computeApplicationFeeCents,
+  PLATFORM_COMMISSION_RATE,
+  mapStripeError,
+} from "../lib/stripe";
 import {
   bindLoyaltyRedemptionToCheckout,
   LoyaltyRedemptionError,
@@ -159,6 +165,15 @@ router.post("/checkout/session", async (req, res) => {
     }
     if (!successUrl || !cancelUrl) {
       res.status(400).json({ error: "successUrl and cancelUrl required" });
+      return;
+    }
+    const normalizedContactEmail =
+      typeof contactEmail === "string" ? contactEmail.trim() : "";
+    if (
+      normalizedContactEmail &&
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedContactEmail)
+    ) {
+      res.status(400).json({ error: "A valid contactEmail is required" });
       return;
     }
 
@@ -415,6 +430,14 @@ router.post("/checkout/session", async (req, res) => {
       }
     }
 
+    // Use one Stripe Customer per authenticated buyer so Checkout can show
+    // cards saved from earlier purchases and attach the next card for reuse.
+    const stripeCustomerId = await ensureStripeCustomer(
+      stripe,
+      buyerId,
+      normalizedContactEmail || undefined,
+    );
+
     // ── Compute platform application fee (5% of order subtotal) ──────────
     // For destination charges (regular orders): fee withheld automatically.
     // For escrow/drop orders: fee deducted at transfer time (release-order).
@@ -572,6 +595,7 @@ router.post("/checkout/session", async (req, res) => {
         ...(loyaltyCouponId ? { discounts: [{ coupon: loyaltyCouponId }] } : {}),
         success_url: successUrl,
         cancel_url: cancelUrl,
+        customer: stripeCustomerId,
         client_reference_id: buyerId,
         metadata: {
           csRef: csId,
@@ -579,6 +603,9 @@ router.post("/checkout/session", async (req, res) => {
         },
         payment_intent_data: {
           metadata: { buyerId, ...(validDropId ? { dropId: validDropId } : {}) },
+          // Save the payment method to the buyer's Customer for future
+          // off-session Checkout payments.
+          setup_future_usage: "off_session",
           ...(validDropId
             ? {
                 // Escrow model: platform holds the charge until release-order is triggered
@@ -589,7 +616,6 @@ router.post("/checkout/session", async (req, res) => {
                 application_fee_amount: applicationFeeCents,
               }),
         },
-        ...(contactEmail ? { customer_email: contactEmail } : {}),
       },
       hasKey ? { idempotencyKey: `cs_${clientIdempotencyKey}` } : {},
     );
