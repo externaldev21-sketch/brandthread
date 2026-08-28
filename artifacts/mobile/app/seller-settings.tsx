@@ -28,6 +28,7 @@ import {
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { NavigationCard } from '@/components/BrandthreadUI';
 import { SecondaryButton } from '@/components/BrandthreadUI';
+import StripeConnectWarning from '@/components/StripeConnectWarning';
 
 // ─── Enable LayoutAnimation on Android ────────────────────────────────────────
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -210,19 +211,22 @@ export default function SellerSettingsScreen() {
               </TouchableOpacity>
 
               {isOpen && (
-                <View style={s.sectionItems}>
-                  {items.map((item) => (
-                    <NavigationCard
-                      key={item.label}
-                      icon={item.icon}
-                      label={item.label}
-                      description={item.desc}
-                      accent={item.accent}
-                      badge={item.badge}
-                      onPress={() => handleNavPress(item)}
-                    />
-                  ))}
-                </View>
+                <>
+                  {key === 'account' && <StripeConnectWarning />}
+                  <View style={s.sectionItems}>
+                    {items.map((item) => (
+                      <NavigationCard
+                        key={item.label}
+                        icon={item.icon}
+                        label={item.label}
+                        description={item.desc}
+                        accent={item.accent}
+                        badge={item.badge}
+                        onPress={() => handleNavPress(item)}
+                      />
+                    ))}
+                  </View>
+                </>
               )}
             </View>
           );

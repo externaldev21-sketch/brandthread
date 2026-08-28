@@ -12,6 +12,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { isManagerRole } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
+import StripeConnectWarning from '@/components/StripeConnectWarning';
 import { useTeamRole } from '@/hooks/useTeamRole';
 
 type PayoutStatus = 'paid' | 'pending' | 'in_transit' | 'failed';
@@ -151,6 +152,8 @@ export default function PayoutsScreen() {
           <Text style={styles.balanceSub}>Processing 2–3 days</Text>
         </View>
       </View>
+
+      <StripeConnectWarning />
 
       {/* Tabs */}
       <View style={styles.tabRow}>
