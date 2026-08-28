@@ -56,6 +56,7 @@ export interface BuyerPost {
   caption: string;
   hashtags: string[];
   mediaColors: string[];             // Demo gradient colors (real URIs in production)
+  mediaUrl?: string;
   likesCount: number;
   commentsCount: number;
   repostsCount: number;

@@ -115,6 +115,7 @@ router.use("/manufacturers",   tc, requirePlan("growth"), manufacturersRouter);
 router.use("/inventory",       tc, inventoryRouter);
 router.use("/seller-hub",      tc, sellerHubRouter);
 router.use("/push",            pushRouter);
+router.use("/notification-prefs", notificationPrefsRouter);
 router.use("/ai",              tc, aiRouter);
 
 // ─── Buyer & Seller Connect / Subscription routes ─────────────────────────────

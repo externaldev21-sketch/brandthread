@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, Alert,
+  View, Text, ScrollView, TouchableOpacity, Alert, Image,
   StyleSheet, Dimensions, Modal, ActivityIndicator,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -25,21 +25,14 @@ const { width } = Dimensions.get('window');
 const GRID_GAP  = 2;
 const CELL_SIZE = (width - GRID_GAP * 2) / 3;
 
-// Demo post grid shown until real post API is wired
-const DEMO_OTHER_POSTS = [
-  { id: 'op1', mediaColors: ['#1a1a2e', '#0d0d1a'], type: 'photo'    },
-  { id: 'op2', mediaColors: ['#0d1a0d', '#0a140a'], type: 'slideshow' },
-  { id: 'op3', mediaColors: ['#1a0d00', '#140a00'], type: 'video'     },
-  { id: 'op4', mediaColors: ['#1a1a2e', '#161630'], type: 'photo'     },
-  { id: 'op5', mediaColors: ['#0d1a1a', '#0a1414'], type: 'photo'     },
-  { id: 'op6', mediaColors: ['#1a0d1a', '#140a14'], type: 'slideshow' },
-];
+type ProfilePost = { id: string; mediaUrl?: string; mediaColors: string[]; type: string };
 
 type RemoteProfile = {
   name: string; username: string | null; displayName: string | null;
   bio: string | null; followersCount: number; followingCount: number;
   isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean;
   iBlockedThem: boolean;
+  postsCount: number;
 };
 
 export default function BuyerOtherProfileScreen() {
@@ -47,7 +40,7 @@ export default function BuyerOtherProfileScreen() {
   const { theme } = useAppTheme();
   const PURPLE = colors.primary, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = colors.accent, CYAN = theme.secondary, CYAN_DIM = theme.secondaryDim;
   const BORDER_ACTIVE = `${theme.accent}73`;
-  const GRAD_PRIMARY = [theme.accent, theme.secondary] as const;
+  const GRAD_PRIMARY = theme.primaryGradient;
   const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router  = useRouter();
@@ -70,6 +63,7 @@ export default function BuyerOtherProfileScreen() {
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   // Story ring — active stories for this user, visible to any viewer
   const [storyIds, setStoryIds]         = useState<string[]>([]);
+  const [posts, setPosts]               = useState<ProfilePost[]>([]);
 
   // Derived display values — prefer API data, fall back to route params
   const displayName = profile ? (profile.displayName || profile.name || name) : name;
@@ -85,14 +79,16 @@ export default function BuyerOtherProfileScreen() {
     // Only try real API if userId looks like a Clerk ID
     if (!userId || userId.startsWith('u_')) { setApiLoaded(true); return; }
     try {
-      const [profileData, storiesData] = await Promise.allSettled([
+      const [profileData, storiesData, postsData] = await Promise.allSettled([
         api.social.profile(userId),
         api.social.storiesForUser(userId),
+        api.social.profilePosts(userId),
       ]);
       if (profileData.status === 'fulfilled') setProfile(profileData.value as RemoteProfile);
       if (storiesData.status === 'fulfilled') {
         setStoryIds((storiesData.value as any[]).map((s: any) => s.id));
       }
+      if (postsData.status === 'fulfilled') setPosts(Array.isArray(postsData.value) ? postsData.value : []);
     } catch {
       // Non-existent user or network error — degrade gracefully
     } finally {
@@ -285,7 +281,7 @@ export default function BuyerOtherProfileScreen() {
         {/* Stats row */}
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
-            <Text style={styles.statNum}>{DEMO_OTHER_POSTS.length}</Text>
+             <Text style={styles.statNum}>{profile?.postsCount ?? posts.length}</Text>
             <Text style={styles.statLabel}>Posts</Text>
           </View>
           <View style={styles.statDivider} />
@@ -302,18 +298,21 @@ export default function BuyerOtherProfileScreen() {
 
         {/* Content grid */}
         <View style={styles.postsSection}>
-          {DEMO_OTHER_POSTS.length === 0 ? (
+          {posts.length === 0 ? (
             <View style={styles.emptyState}>
               <Feather name="image" size={32} color={MUTED} />
               <Text style={styles.emptyTitle}>No posts yet.</Text>
             </View>
           ) : (
             <View style={styles.grid}>
-              {DEMO_OTHER_POSTS.map(post => (
+              {posts.map(post => (
                 <View key={post.id} style={styles.gridCell}>
-                  <LinearGradient colors={post.mediaColors as [string, string]} style={styles.gridCellInner}>
-                    <Feather name={postTypeIcon(post.type) as any} size={ICON.md} color={MUTED} />
-                  </LinearGradient>
+                  {post.mediaUrl
+                    ? <Image source={{ uri: post.mediaUrl }} style={styles.gridCellInner} resizeMode="cover" />
+                    : <LinearGradient colors={post.mediaColors as [string, string]} style={styles.gridCellInner}>
+                        <Feather name={postTypeIcon(post.type) as any} size={ICON.md} color={MUTED} />
+                      </LinearGradient>
+                  }
                 </View>
               ))}
             </View>

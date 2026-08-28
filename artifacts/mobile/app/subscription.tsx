@@ -28,6 +28,7 @@ import { useApi } from '@/hooks/useApi';
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { isManagerRole, parseRoleError } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
+import { formatCents } from '@/lib/money';
 import { useTeamRole } from '@/hooks/useTeamRole';
 
 // ─── Static plan catalogue ────────────────────────────────────────────────────
@@ -149,7 +150,7 @@ export default function SubscriptionScreen() {
           : '$29';
         setCurrentPlan({
           name:               planName,
-          price:              data.amountCents > 0 ? `$${data.amountCents / 100}` : planPrice,
+          price:              data.amountCents > 0 ? formatCents(data.amountCents) : planPrice,
           period:             'month',
           renewsOn:           data.renewsOn ?? '—',
           trialEnd:           data.trialEnd ?? null,
@@ -307,7 +308,7 @@ export default function SubscriptionScreen() {
         {activeTab === 'plan' && (
           <>
             {/* Current plan summary card */}
-            <LinearGradient colors={['#3B1FA3', '#6D28D9']} style={styles.currentPlanCard}>
+            <LinearGradient colors={theme.primaryGradient as any} style={styles.currentPlanCard}>
               {statusLoading ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (

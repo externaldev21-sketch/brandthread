@@ -7,6 +7,12 @@
  * If called before configureServices(), throws so callers can fall back to demo data.
  */
 
+import {
+  ApiError,
+  dismissNetworkNotice,
+  reportNetworkError,
+} from '@/lib/networkNotice';
+
 type GetToken = () => Promise<string | null>;
 
 let _getToken: GetToken | null = null;
@@ -30,17 +36,32 @@ export async function serviceRequest<T = unknown>(
   if (!_getToken) throw new Error("Services not configured");
   const token = await _getToken();
   const base = process.env.EXPO_PUBLIC_API_BASE_URL ?? "";
-  const res = await fetch(`${base}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers ?? {}),
-    },
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${base}${path}`, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(options.headers ?? {}),
+      },
+    });
+  } catch (error) {
+    const retry = !options.method || options.method === 'GET'
+      ? () => serviceRequest<T>(path, options)
+      : undefined;
+    reportNetworkError(error, retry);
+    throw error;
+  }
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`API ${res.status}: ${body}`);
+    const error = new ApiError(res.status, body);
+    const retry = !options.method || options.method === 'GET'
+      ? () => serviceRequest<T>(path, options)
+      : undefined;
+    reportNetworkError(error, retry);
+    throw error;
   }
+  dismissNetworkNotice();
   return res.json() as Promise<T>;
 }

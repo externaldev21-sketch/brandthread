@@ -5,6 +5,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '@/lib/serviceConfig';
+import { centsAtPercent, formatCents } from '@/lib/money';
 import {
   Order, OrderLineItem, OrderCustomer, OrderAddress, PaymentSummary,
   HeldFundsRecord, PayoutMilestone, Fulfillment, FulfillmentGroup,
@@ -54,44 +55,45 @@ function makeAddress(name: string): OrderAddress {
   return { name, line1: '123 Main St', city: 'Los Angeles', state: 'CA', zip: '90001', country: 'US', phone: '+13105550001' };
 }
 
-function makeCustomer(id: string, name: string, email: string, orders: number, ltv: number): OrderCustomer {
+function makeCustomer(id: string, name: string, email: string, orders: number, lifetimeValueCents: number): OrderCustomer {
   const initials = name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
   return {
     id, name, email, phone: '+13105550001', initials,
-    totalOrders: orders, lifetimeValue: ltv, tags: [],
+    totalOrders: orders, lifetimeValueCents, tags: [],
     shippingAddress: makeAddress(name),
     billingAddress: makeAddress(name),
   };
 }
 
-function makePayment(total: number, held = true): PaymentSummary {
-  const subtotal = +(total * 0.9).toFixed(2);
-  const shipping = +(total * 0.1).toFixed(2);
-  const fee = +(total * 0.03).toFixed(2);
-  const sellerGet = +(total - fee - (held ? total * 0.2 : 0)).toFixed(2);
+function makePayment(totalCents: number, held = true): PaymentSummary {
+  const subtotalCents = centsAtPercent(totalCents, 90);
+  const shippingTotalCents = totalCents - subtotalCents;
+  const platformFeeCents = centsAtPercent(totalCents, 3);
+  const amountHeldCents = held ? centsAtPercent(totalCents, 20) : 0;
+  const sellerAllocationCents = totalCents - platformFeeCents - amountHeldCents;
   return {
-    subtotal, discountTotal: 0, shippingTotal: shipping, taxTotal: 0,
-    total, amountPaid: total, amountRefunded: 0,
-    amountHeld: held ? +(total * 0.2).toFixed(2) : 0,
-    amountPending: held ? sellerGet : 0,
-    sellerAllocation: sellerGet, manufacturerAllocation: 0,
-    shippingLabelAllocation: shipping, platformFee: fee,
+    subtotalCents, discountTotalCents: 0, shippingTotalCents, taxTotalCents: 0,
+    totalCents, amountPaidCents: totalCents, amountRefundedCents: 0,
+    amountHeldCents,
+    amountPendingCents: held ? sellerAllocationCents : 0,
+    sellerAllocationCents, manufacturerAllocationCents: 0,
+    shippingLabelAllocationCents: shippingTotalCents, platformFeeCents,
     payoutStatus: held ? 'held' : 'available',
   };
 }
 
-function makeHeld(orderId: string, total: number, completedKeys: string[]): HeldFundsRecord {
-  const held = +(total * 0.2).toFixed(2);
+function makeHeld(orderId: string, totalReceivedCents: number, completedKeys: string[]): HeldFundsRecord {
+  const currentlyHeldCents = centsAtPercent(totalReceivedCents, 20);
   return {
     id: 'hf_' + uid(), orderId,
     status: completedKeys.includes('delivered') ? 'partially_released' : 'held',
-    totalReceived: total,
-    currentlyHeld: held,
-    manufacturerReserved: 0,
-    shippingReserved: +(total * 0.05).toFixed(2),
-    platformFee: +(total * 0.03).toFixed(2),
-    sellerPending: +(total * 0.72).toFixed(2),
-    sellerReleased: completedKeys.includes('delivered') ? +(total * 0.5).toFixed(2) : 0,
+    totalReceivedCents,
+    currentlyHeldCents,
+    manufacturerReservedCents: 0,
+    shippingReservedCents: centsAtPercent(totalReceivedCents, 5),
+    platformFeeCents: centsAtPercent(totalReceivedCents, 3),
+    sellerPendingCents: centsAtPercent(totalReceivedCents, 72),
+    sellerReleasedCents: completedKeys.includes('delivered') ? centsAtPercent(totalReceivedCents, 50) : 0,
     milestones: makeMilestones(completedKeys),
     expectedReleaseDate: daysFromNow(7),
     createdAt: daysAgo(3), updatedAt: now(),
@@ -126,20 +128,20 @@ function makeFulfillment(orderId: string, lineItemIds: string[], type: Fulfillme
 const DEMO_ORDERS_DATA: Order[] = [
   // 1. New order, seller fulfilled
   (() => {
-    const id = 'ord_001'; const num = '#1042'; const total = 148.00;
+    const id = 'ord_001'; const num = '#1042'; const totalCents = 14800;
     const items: OrderLineItem[] = [
-      { id: 'li_001a', productId: 'p1', productName: 'Oversized Hoodie', variant: 'Black / L', sku: 'HOD-BLK-L', quantity: 1, unitPrice: 98, discountAmount: 0, taxAmount: 0, total: 98, fulfillmentSource: 'seller', isPreOrder: false },
-      { id: 'li_001b', productId: 'p2', productName: 'Logo Tee', variant: 'White / M', sku: 'TEE-WHT-M', quantity: 2, unitPrice: 25, discountAmount: 0, taxAmount: 0, total: 50, fulfillmentSource: 'seller', isPreOrder: false },
+      { id: 'li_001a', productId: 'p1', productName: 'Oversized Hoodie', variant: 'Black / L', sku: 'HOD-BLK-L', quantity: 1, unitPriceCents: 9800, discountAmountCents: 0, taxAmountCents: 0, totalCents: 9800, fulfillmentSource: 'seller', isPreOrder: false },
+      { id: 'li_001b', productId: 'p2', productName: 'Logo Tee', variant: 'White / M', sku: 'TEE-WHT-M', quantity: 2, unitPriceCents: 2500, discountAmountCents: 0, taxAmountCents: 0, totalCents: 5000, fulfillmentSource: 'seller', isPreOrder: false },
     ];
     return {
       id, orderNumber: num, source: 'Thread', salesChannel: 'Brandthread',
       status: 'new' as OrderStatus, paymentStatus: 'paid' as PaymentStatus,
       fulfillmentStatus: 'unfulfilled' as FulfillmentStatus, fulfillmentType: 'seller' as FulfillmentType,
       riskLevel: 'low' as const, riskFlags: [],
-      customer: makeCustomer('cust_001', 'Jordan Kim', 'jordan.kim@brandthread-mail.com', 3, 412),
+      customer: makeCustomer('cust_001', 'Jordan Kim', 'jordan.kim@brandthread-mail.com', 3, 41200),
       lineItems: items,
       fulfillment: makeFulfillment(id, items.map(i => i.id), 'seller', 'unfulfilled'),
-      payment: makePayment(total), heldFunds: makeHeld(id, total, ['payment_confirmed']),
+      payment: makePayment(totalCents), heldFunds: makeHeld(id, totalCents, ['payment_confirmed']),
       shipments: [], labels: [], returns: [], refunds: [], disputes: [],
       timeline: makeTimeline([
         { type: 'order_created', message: `Order ${num} placed`, customerVisible: true },
@@ -153,20 +155,20 @@ const DEMO_ORDERS_DATA: Order[] = [
 
   // 2. Processing, ready to ship
   (() => {
-    const id = 'ord_002'; const num = '#1041'; const total = 265.00;
+    const id = 'ord_002'; const num = '#1041'; const totalCents = 26500;
     const items: OrderLineItem[] = [
-      { id: 'li_002a', productId: 'p1', productName: 'Track Jacket', variant: 'Navy / XL', sku: 'TRK-NVY-XL', quantity: 1, unitPrice: 145, discountAmount: 0, taxAmount: 0, total: 145, fulfillmentSource: 'seller', isPreOrder: false },
-      { id: 'li_002b', productId: 'p3', productName: 'Cargo Shorts', variant: 'Olive / 32', sku: 'CRG-OLV-32', quantity: 2, unitPrice: 60, discountAmount: 0, taxAmount: 0, total: 120, fulfillmentSource: 'seller', isPreOrder: false },
+      { id: 'li_002a', productId: 'p1', productName: 'Track Jacket', variant: 'Navy / XL', sku: 'TRK-NVY-XL', quantity: 1, unitPriceCents: 14500, discountAmountCents: 0, taxAmountCents: 0, totalCents: 14500, fulfillmentSource: 'seller', isPreOrder: false },
+      { id: 'li_002b', productId: 'p3', productName: 'Cargo Shorts', variant: 'Olive / 32', sku: 'CRG-OLV-32', quantity: 2, unitPriceCents: 6000, discountAmountCents: 0, taxAmountCents: 0, totalCents: 12000, fulfillmentSource: 'seller', isPreOrder: false },
     ];
     return {
       id, orderNumber: num, source: 'Discover', salesChannel: 'Brandthread',
       status: 'ready_to_ship' as OrderStatus, paymentStatus: 'paid' as PaymentStatus,
       fulfillmentStatus: 'partially_fulfilled' as FulfillmentStatus, fulfillmentType: 'seller' as FulfillmentType,
       riskLevel: 'low' as const, riskFlags: [],
-      customer: makeCustomer('cust_002', 'Alex Rivera', 'alex.rivera@brandthread-mail.com', 7, 1240),
+      customer: makeCustomer('cust_002', 'Alex Rivera', 'alex.rivera@brandthread-mail.com', 7, 124000),
       lineItems: items,
       fulfillment: makeFulfillment(id, items.map(i => i.id), 'seller', 'partially_fulfilled'),
-      payment: makePayment(total), heldFunds: makeHeld(id, total, ['payment_confirmed', 'manufacturer_deposit']),
+      payment: makePayment(totalCents), heldFunds: makeHeld(id, totalCents, ['payment_confirmed', 'manufacturer_deposit']),
       shipments: [], labels: [], returns: [], refunds: [], disputes: [],
       timeline: makeTimeline([
         { type: 'order_created', message: `Order ${num} placed`, customerVisible: true },
@@ -181,10 +183,10 @@ const DEMO_ORDERS_DATA: Order[] = [
 
   // 3. Shipped with tracking
   (() => {
-    const id = 'ord_003'; const num = '#1038'; const total = 89.00;
+    const id = 'ord_003'; const num = '#1038'; const totalCents = 8900;
     const items: OrderLineItem[] = [
-      { id: 'li_003a', productId: 'p4', productName: 'Vintage Cap', variant: 'Washed Black / One Size', sku: 'CAP-BLK-OS', quantity: 1, unitPrice: 45, discountAmount: 0, taxAmount: 0, total: 45, fulfillmentSource: 'seller', isPreOrder: false },
-      { id: 'li_003b', productId: 'p5', productName: 'Logo Socks 3-Pack', variant: 'White / One Size', sku: 'SOC-WHT-OS', quantity: 1, unitPrice: 44, discountAmount: 0, taxAmount: 0, total: 44, fulfillmentSource: 'seller', isPreOrder: false },
+      { id: 'li_003a', productId: 'p4', productName: 'Vintage Cap', variant: 'Washed Black / One Size', sku: 'CAP-BLK-OS', quantity: 1, unitPriceCents: 4500, discountAmountCents: 0, taxAmountCents: 0, totalCents: 4500, fulfillmentSource: 'seller', isPreOrder: false },
+      { id: 'li_003b', productId: 'p5', productName: 'Logo Socks 3-Pack', variant: 'White / One Size', sku: 'SOC-WHT-OS', quantity: 1, unitPriceCents: 4400, discountAmountCents: 0, taxAmountCents: 0, totalCents: 4400, fulfillmentSource: 'seller', isPreOrder: false },
     ];
     const shipment: Shipment = {
       id: 'shp_001', orderId: id, fulfillmentGroupId: 'fg_001',
@@ -199,7 +201,7 @@ const DEMO_ORDERS_DATA: Order[] = [
     };
     const label: ShippingLabel = {
       id: 'lbl_001', orderId: id, carrier: 'USPS', service: 'Priority Mail',
-      trackingNumber: '9400111899223512345671', price: 12.40,
+      trackingNumber: '9400111899223512345671', priceCents: 1240,
       status: 'active', isDemo: true, purchasedAt: daysAgo(2),
     };
     return {
@@ -207,10 +209,10 @@ const DEMO_ORDERS_DATA: Order[] = [
       status: 'shipped' as OrderStatus, paymentStatus: 'paid' as PaymentStatus,
       fulfillmentStatus: 'fulfilled' as FulfillmentStatus, fulfillmentType: 'seller' as FulfillmentType,
       riskLevel: 'low' as const, riskFlags: [],
-      customer: makeCustomer('cust_003', 'Sam Chen', 'sam.chen@brandthread-mail.com', 2, 245),
+      customer: makeCustomer('cust_003', 'Sam Chen', 'sam.chen@brandthread-mail.com', 2, 24500),
       lineItems: items,
       fulfillment: makeFulfillment(id, items.map(i => i.id), 'seller', 'fulfilled'),
-      payment: makePayment(total, false), heldFunds: makeHeld(id, total, ['payment_confirmed', 'product_shipped', 'tracking_verified']),
+      payment: makePayment(totalCents, false), heldFunds: makeHeld(id, totalCents, ['payment_confirmed', 'product_shipped', 'tracking_verified']),
       shipments: [shipment], labels: [label], returns: [], refunds: [], disputes: [],
       timeline: makeTimeline([
         { type: 'order_created', message: `Order ${num} placed`, customerVisible: true },
@@ -226,23 +228,23 @@ const DEMO_ORDERS_DATA: Order[] = [
 
   // 4. Pre-order
   (() => {
-    const id = 'ord_004'; const num = '#1035'; const total = 320.00;
+    const id = 'ord_004'; const num = '#1035'; const totalCents = 32000;
     const items: OrderLineItem[] = [
-      { id: 'li_004a', productId: 'p6', productName: 'Limited Drop Hoodie', variant: 'Forest Green / L', sku: 'LTD-GRN-L', quantity: 2, unitPrice: 160, discountAmount: 0, taxAmount: 0, total: 320, fulfillmentSource: 'manufacturer', isPreOrder: true, productionStatus: 'In production' },
+      { id: 'li_004a', productId: 'p6', productName: 'Limited Drop Hoodie', variant: 'Forest Green / L', sku: 'LTD-GRN-L', quantity: 2, unitPriceCents: 16000, discountAmountCents: 0, taxAmountCents: 0, totalCents: 32000, fulfillmentSource: 'manufacturer', isPreOrder: true, productionStatus: 'In production' },
     ];
     return {
       id, orderNumber: num, source: 'Thread', salesChannel: 'Brandthread',
       status: 'processing' as OrderStatus, paymentStatus: 'paid' as PaymentStatus,
       fulfillmentStatus: 'manufacturer_pending' as FulfillmentStatus, fulfillmentType: 'manufacturer' as FulfillmentType,
       riskLevel: 'low' as const, riskFlags: [],
-      customer: makeCustomer('cust_004', 'Morgan Davis', 'morgan.davis@brandthread-mail.com', 1, 320),
+      customer: makeCustomer('cust_004', 'Morgan Davis', 'morgan.davis@brandthread-mail.com', 1, 32000),
       lineItems: items,
       fulfillment: makeFulfillment(id, items.map(i => i.id), 'manufacturer', 'manufacturer_pending'),
-      payment: makePayment(total), heldFunds: makeHeld(id, total, ['payment_confirmed', 'manufacturer_deposit', 'production_started']),
+      payment: makePayment(totalCents), heldFunds: makeHeld(id, totalCents, ['payment_confirmed', 'manufacturer_deposit', 'production_started']),
       shipments: [], labels: [], returns: [], refunds: [], disputes: [],
       preOrder: {
         manufacturerId: 'mfg_001', manufacturerName: 'Apex Apparel Co.',
-        fundingGoal: 5000, unitsOrdered: 2,
+        fundingGoalCents: 500000, unitsOrdered: 2,
         estimatedProductionDate: daysFromNow(14),
         estimatedShipDate: daysFromNow(30),
         productionStatus: 'started',
@@ -262,16 +264,16 @@ const DEMO_ORDERS_DATA: Order[] = [
 
   // 5. Return requested
   (() => {
-    const id = 'ord_005'; const num = '#1030'; const total = 112.00;
+    const id = 'ord_005'; const num = '#1030'; const totalCents = 11200;
     const items: OrderLineItem[] = [
-      { id: 'li_005a', productId: 'p1', productName: 'Oversized Hoodie', variant: 'Grey / M', sku: 'HOD-GRY-M', quantity: 1, unitPrice: 98, discountAmount: 0, taxAmount: 0, total: 98, fulfillmentSource: 'seller', isPreOrder: false },
-      { id: 'li_005b', productId: 'p2', productName: 'Logo Tee', variant: 'Black / S', sku: 'TEE-BLK-S', quantity: 1, unitPrice: 14, discountAmount: 0, taxAmount: 0, total: 14, fulfillmentSource: 'seller', isPreOrder: false },
+      { id: 'li_005a', productId: 'p1', productName: 'Oversized Hoodie', variant: 'Grey / M', sku: 'HOD-GRY-M', quantity: 1, unitPriceCents: 9800, discountAmountCents: 0, taxAmountCents: 0, totalCents: 9800, fulfillmentSource: 'seller', isPreOrder: false },
+      { id: 'li_005b', productId: 'p2', productName: 'Logo Tee', variant: 'Black / S', sku: 'TEE-BLK-S', quantity: 1, unitPriceCents: 1400, discountAmountCents: 0, taxAmountCents: 0, totalCents: 1400, fulfillmentSource: 'seller', isPreOrder: false },
     ];
     const returnReq: ReturnRequest = {
       id: 'ret_001', orderId: id, orderNumber: num,
       customerId: 'cust_005', customerName: 'Taylor Nguyen',
       status: 'requested', items: [
-        { lineItemId: 'li_005a', productName: 'Oversized Hoodie', variant: 'Grey / M', quantity: 1, unitPrice: 98, reason: 'wrong_size' },
+        { lineItemId: 'li_005a', productName: 'Oversized Hoodie', variant: 'Grey / M', quantity: 1, unitPriceCents: 9800, reason: 'wrong_size' },
       ],
       customerExplanation: 'Ordered Medium but it runs large — too big for me.',
       imageUris: [], requestedResolution: 'refund',
@@ -283,10 +285,10 @@ const DEMO_ORDERS_DATA: Order[] = [
       status: 'delivered' as OrderStatus, paymentStatus: 'paid' as PaymentStatus,
       fulfillmentStatus: 'fulfilled' as FulfillmentStatus, fulfillmentType: 'seller' as FulfillmentType,
       riskLevel: 'low' as const, riskFlags: [],
-      customer: makeCustomer('cust_005', 'Taylor Nguyen', 'taylor.nguyen@brandthread-mail.com', 4, 560),
+      customer: makeCustomer('cust_005', 'Taylor Nguyen', 'taylor.nguyen@brandthread-mail.com', 4, 56000),
       lineItems: items,
       fulfillment: makeFulfillment(id, items.map(i => i.id), 'seller', 'fulfilled'),
-      payment: makePayment(total, false), heldFunds: makeHeld(id, total, ['payment_confirmed', 'product_shipped', 'tracking_verified', 'delivered']),
+      payment: makePayment(totalCents, false), heldFunds: makeHeld(id, totalCents, ['payment_confirmed', 'product_shipped', 'tracking_verified', 'delivered']),
       shipments: [], labels: [], returns: [returnReq], refunds: [], disputes: [],
       timeline: makeTimeline([
         { type: 'order_created', message: `Order ${num} placed`, customerVisible: true },
@@ -303,15 +305,15 @@ const DEMO_ORDERS_DATA: Order[] = [
 
   // 6. Disputed / high risk
   (() => {
-    const id = 'ord_006'; const num = '#1028'; const total = 198.00;
+    const id = 'ord_006'; const num = '#1028'; const totalCents = 19800;
     const items: OrderLineItem[] = [
-      { id: 'li_006a', productId: 'p7', productName: 'Denim Jacket', variant: 'Indigo / L', sku: 'DNM-IND-L', quantity: 1, unitPrice: 198, discountAmount: 0, taxAmount: 0, total: 198, fulfillmentSource: 'seller', isPreOrder: false },
+      { id: 'li_006a', productId: 'p7', productName: 'Denim Jacket', variant: 'Indigo / L', sku: 'DNM-IND-L', quantity: 1, unitPriceCents: 19800, discountAmountCents: 0, taxAmountCents: 0, totalCents: 19800, fulfillmentSource: 'seller', isPreOrder: false },
     ];
     const dispute: Dispute = {
       id: 'disp_001', orderId: id, type: 'not_received', status: 'evidence_needed',
       customerClaim: 'I never received my order. Tracking says delivered but nothing arrived.',
-      amount: 198, evidenceDeadline: daysFromNow(5),
-      evidence: [], internalNotes: [], potentialHold: 198,
+      amountCents: 19800, evidenceDeadline: daysFromNow(5),
+      evidence: [], internalNotes: [], potentialHoldCents: 19800,
       createdAt: daysAgo(3), updatedAt: now(),
     };
     return {
@@ -323,10 +325,10 @@ const DEMO_ORDERS_DATA: Order[] = [
         { id: 'rf_001', type: 'billing_mismatch', label: 'Billing & shipping address mismatch', severity: 'medium' },
         { id: 'rf_002', type: 'new_customer', label: 'New customer, high value order', severity: 'low' },
       ],
-      customer: makeCustomer('cust_006', 'Casey Park', 'casey.park@brandthread-mail.com', 1, 198),
+      customer: makeCustomer('cust_006', 'Casey Park', 'casey.park@brandthread-mail.com', 1, 19800),
       lineItems: items,
       fulfillment: makeFulfillment(id, items.map(i => i.id), 'seller', 'fulfilled'),
-      payment: makePayment(total, true), heldFunds: makeHeld(id, total, ['payment_confirmed', 'product_shipped']),
+      payment: makePayment(totalCents, true), heldFunds: makeHeld(id, totalCents, ['payment_confirmed', 'product_shipped']),
       shipments: [], labels: [], returns: [], refunds: [], disputes: [dispute],
       timeline: makeTimeline([
         { type: 'order_created', message: `Order ${num} placed`, customerVisible: true },
@@ -352,9 +354,9 @@ const DEMO_BUYER_ORDERS: BuyerOrderView[] = DEMO_ORDERS_DATA.map(o => ({
   status: o.status,
   paymentStatus: o.paymentStatus,
   fulfillmentStatus: o.fulfillmentStatus,
-  lineItems: o.lineItems.map(li => ({ productName: li.productName, variant: li.variant, quantity: li.quantity, unitPrice: li.unitPrice })),
+  lineItems: o.lineItems.map(li => ({ productName: li.productName, variant: li.variant, quantity: li.quantity, unitPriceCents: li.unitPriceCents })),
   shippingAddress: o.customer.shippingAddress,
-  payment: { subtotal: o.payment.subtotal, shippingTotal: o.payment.shippingTotal, taxTotal: o.payment.taxTotal, total: o.payment.total },
+  payment: { subtotalCents: o.payment.subtotalCents, shippingTotalCents: o.payment.shippingTotalCents, taxTotalCents: o.payment.taxTotalCents, totalCents: o.payment.totalCents },
   trackingNumber: o.shipments[0]?.trackingNumber,
   trackingCarrier: o.shipments[0]?.carrier,
   trackingStatus: o.shipments[0]?.trackingStatus,
@@ -453,8 +455,8 @@ export function sortOrders(orders: Order[], sort: OrderSortKey): Order[] {
   switch (sort) {
     case 'newest': return arr.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     case 'oldest': return arr.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
-    case 'highest_value': return arr.sort((a, b) => b.payment.total - a.payment.total);
-    case 'lowest_value': return arr.sort((a, b) => a.payment.total - b.payment.total);
+    case 'highest_value': return arr.sort((a, b) => b.payment.totalCents - a.payment.totalCents);
+    case 'lowest_value': return arr.sort((a, b) => a.payment.totalCents - b.payment.totalCents);
     case 'customer_name': return arr.sort((a, b) => a.customer.name.localeCompare(b.customer.name));
     case 'fulfillment_status': return arr.sort((a, b) => a.fulfillmentStatus.localeCompare(b.fulfillmentStatus));
     case 'payment_status': return arr.sort((a, b) => a.paymentStatus.localeCompare(b.paymentStatus));
@@ -560,7 +562,7 @@ export async function buyDemoLabel(orderId: string, rateId: string): Promise<Shi
   const label: ShippingLabel = {
     id: 'lbl_' + uid(), orderId,
     carrier: rate.carrier, service: rate.service,
-    trackingNumber: tracking, price: rate.price,
+    trackingNumber: tracking, priceCents: rate.priceCents,
     status: 'active', isDemo: true, purchasedAt: now(),
   };
   o.labels.push(label);
@@ -575,7 +577,7 @@ export async function buyDemoLabel(orderId: string, rateId: string): Promise<Shi
     labelId: label.id, isDemo: true,
   };
   o.shipments.push(shipment);
-  addTimeline(o, 'label_purchased', `${rate.carrier} ${rate.service} label purchased — $${rate.price.toFixed(2)}`);
+  addTimeline(o, 'label_purchased', `${rate.carrier} ${rate.service} label purchased — ${formatCents(rate.priceCents)}`);
   o.updatedAt = now();
   await persistOrders();
   return label;
@@ -594,8 +596,8 @@ export async function cancelOrder(orderId: string, reason: CancellationReason, n
   await ensureInitialized();
   const o = _orders.find(x => x.id === orderId);
   if (!o) return undefined;
-  const refundAmount = o.payment.amountPaid - o.payment.amountRefunded;
-  o.cancellation = { id: 'can_' + uid(), orderId, reason, notes, refundAmount, notifyCustomer: true, cancelledAt: now() };
+  const refundAmountCents = o.payment.amountPaidCents - o.payment.amountRefundedCents;
+  o.cancellation = { id: 'can_' + uid(), orderId, reason, notes, refundAmountCents, notifyCustomer: true, cancelledAt: now() };
   o.status = 'cancelled';
   addTimeline(o, 'cancelled', `Order cancelled — ${reason.replace(/_/g, ' ')}`, true);
   o.updatedAt = now();
@@ -661,8 +663,8 @@ export async function updateReturnStatus(orderId: string, returnId: string, stat
 export async function createRefund(orderId: string, data: {
   type: RefundType;
   lineItems: RefundLineItem[];
-  shippingAmount: number;
-  taxAmount: number;
+  shippingAmountCents: number;
+  taxAmountCents: number;
   reason?: string;
   restockInventory: boolean;
   returnId?: string;
@@ -670,18 +672,18 @@ export async function createRefund(orderId: string, data: {
   await ensureInitialized();
   const o = _orders.find(x => x.id === orderId);
   if (!o) return undefined;
-  const total = data.lineItems.reduce((s, i) => s + i.amount, 0) + data.shippingAmount + data.taxAmount;
+  const totalAmountCents = data.lineItems.reduce((sum, item) => sum + item.amountCents, 0) + data.shippingAmountCents + data.taxAmountCents;
   const refund: Refund = {
     id: 'ref_' + uid(), orderId, returnId: data.returnId,
     type: data.type, status: 'processing',
-    lineItems: data.lineItems, shippingAmount: data.shippingAmount,
-    taxAmount: data.taxAmount, totalAmount: total,
+    lineItems: data.lineItems, shippingAmountCents: data.shippingAmountCents,
+    taxAmountCents: data.taxAmountCents, totalAmountCents,
     reason: data.reason, restockInventory: data.restockInventory,
     notifyCustomer: true, isDemo: true,
     createdAt: now(),
   };
   o.refunds.push(refund);
-  o.payment.amountRefunded += total;
+  o.payment.amountRefundedCents += totalAmountCents;
   // simulate completion
   setTimeout(async () => {
     const freshO = _orders.find(x => x.id === orderId);
@@ -690,7 +692,7 @@ export async function createRefund(orderId: string, data: {
     if (freshO) freshO.updatedAt = now();
     await persistOrders();
   }, 1500);
-  addTimeline(o, 'refund_issued', `Refund of $${total.toFixed(2)} initiated (demo)`, true);
+  addTimeline(o, 'refund_issued', `Refund of ${formatCents(totalAmountCents)} initiated (demo)`, true);
   o.updatedAt = now();
   await persistOrders();
   return refund;
@@ -701,7 +703,7 @@ export async function createRefund(orderId: string, data: {
 export async function createDispute(orderId: string, data: {
   type: DisputeType;
   customerClaim: string;
-  amount: number;
+  amountCents: number;
 }): Promise<Dispute | undefined> {
   await ensureInitialized();
   const o = _orders.find(x => x.id === orderId);
@@ -709,8 +711,8 @@ export async function createDispute(orderId: string, data: {
   const dispute: Dispute = {
     id: 'disp_' + uid(), orderId, type: data.type,
     status: 'evidence_needed', customerClaim: data.customerClaim,
-    amount: data.amount, evidenceDeadline: daysFromNow(7),
-    evidence: [], internalNotes: [], potentialHold: data.amount,
+    amountCents: data.amountCents, evidenceDeadline: daysFromNow(7),
+    evidence: [], internalNotes: [], potentialHoldCents: data.amountCents,
     createdAt: now(), updatedAt: now(),
   };
   o.disputes.push(dispute);
@@ -814,15 +816,15 @@ function mapApiBuyerOrder(o: any): BuyerOrderView {
       productName: item.productName ?? item.name ?? '',
       variant:     item.variantLabel ?? '',
       quantity:    item.quantity     ?? 1,
-      unitPrice:   (item.priceCents  ?? 0) / 100,
+      unitPriceCents: item.priceCents ?? 0,
       imageUri:    item.imageUri     ?? undefined,
     })),
     shippingAddress: o.shippingAddress ?? { street: '', city: '', state: '', zip: '', country: 'US' },
     payment: {
-      subtotal:      (o.subtotalCents  ?? 0) / 100,
-      shippingTotal: (o.shippingCents  ?? 0) / 100,
-      taxTotal:      0,
-      total:         (o.totalCents     ?? 0) / 100,
+      subtotalCents: o.subtotalCents ?? 0,
+      shippingTotalCents: o.shippingCents ?? 0,
+      taxTotalCents: 0,
+      totalCents: o.totalCents ?? 0,
     },
     trackingNumber:    o.trackingNumber    ?? undefined,
     trackingCarrier:   o.carrier           ?? undefined,
@@ -872,7 +874,7 @@ export async function getBuyerOrder(id: string): Promise<BuyerOrderView | undefi
 export async function exportOrdersCsv(orders: Order[]): Promise<string> {
   const header = 'Order #,Customer,Date,Total,Payment,Fulfillment';
   const rows = orders.map(o =>
-    [o.orderNumber, o.customer.name, o.createdAt.slice(0, 10), `$${o.payment.total.toFixed(2)}`, o.paymentStatus, o.fulfillmentStatus].join(',')
+    [o.orderNumber, o.customer.name, o.createdAt.slice(0, 10), formatCents(o.payment.totalCents), o.paymentStatus, o.fulfillmentStatus].join(',')
   );
   return [header, ...rows].join('\n');
 }

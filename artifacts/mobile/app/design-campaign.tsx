@@ -3,7 +3,7 @@
  * Route: /design-campaign
  */
 import React, { useState } from 'react';
-import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, ActivityIndicator, TextInput,
@@ -15,9 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE, BORDER_SUBTLE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM,
-  GRAD_PRIMARY, GRAD_CARD_GLOW,
+  FG, MUTED, SUBTLE,
   FONT, FS, SP, RADIUS, ICON, OVERLAY,
 } from '@/lib/theme';
 import {
@@ -49,7 +47,9 @@ const FORMAT_GRAD: Record<string, readonly [string, string]> = {
 };
 
 export default function DesignCampaignScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
+  const s = createStyles(theme);
   const router = useRouter();
   const [productName, setProductName] = useState('');
   const [style, setStyle] = useState<AIStyleKind>('streetwear');
@@ -186,7 +186,7 @@ export default function DesignCampaignScreen() {
 
         {/* Generate */}
         <View style={s.ph}>
-          <GradientCard colors={GRAD_PRIMARY} onPress={handleGenerate} glow style={s.generateBtn}>
+          <GradientCard colors={theme.primaryGradient} onPress={handleGenerate} glow style={[s.generateBtn, { shadowColor: theme.shadowColor }]}>
             <View style={s.generateInner}>
               <Feather name="zap" size={ICON.md} color="#FFF" />
               <Text style={s.generateText}>Generate campaign</Text>
@@ -222,7 +222,7 @@ export default function DesignCampaignScreen() {
       {isGenerating && (
         <View style={s.overlay}>
           <BrandthreadCard style={s.overlayCard}>
-            <LinearGradient colors={GRAD_CARD_GLOW} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.overlayGrad}>
+            <LinearGradient colors={theme.glowGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.overlayGrad}>
               <ActivityIndicator size="large" color={PURPLE} />
               <Text style={s.overlayTitle}>Generating campaign…</Text>
               <Text style={s.overlaySub}>AI is creating your assets</Text>
@@ -239,6 +239,9 @@ function AssetCard({ asset, router, formatGrad }: {
   router: ReturnType<typeof useRouter>;
   formatGrad: Record<string, readonly [string, string]>;
 }) {
+  const { theme } = useAppTheme();
+  const { accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
+  const s = createStyles(theme);
   const fmt = CAMPAIGN_FORMATS.find((f) => f.value === asset.format);
   const gradColors = formatGrad[asset.format] ?? (['#8B5CF6', '#22D3EE'] as const);
   return (
@@ -268,7 +271,9 @@ function AssetCard({ asset, router, formatGrad }: {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
+  return StyleSheet.create({
   scroll:              { paddingBottom: 40 },
   ph:                  { paddingHorizontal: SP.md },
   sectionHdr:          { marginTop: SP.lg, marginBottom: SP.sm },
@@ -321,4 +326,5 @@ const s = StyleSheet.create({
   overlayTitle:        { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
   overlaySub:          { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
   bottomPad:           { height: 40 },
-});
+  });
+};

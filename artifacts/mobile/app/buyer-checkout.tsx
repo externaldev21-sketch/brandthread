@@ -6,7 +6,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView,
-  StyleSheet, Switch, Text, TextInput, TouchableOpacity, View,
+  StyleSheet, Switch, Text, TextInput, TouchableOpacity, View, Animated, Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -28,11 +28,12 @@ import { useAuth } from '@clerk/expo';
 import {
   BG, BORDER, CARD, CARD_ELEVATED, FG, FONT, FS,
   MUTED, ON_DARK, RADIUS, RED, RED_DIM,
-  SP, SUCCESS, SUCCESS_DIM, SUBTLE, COMP, ICON, PURPLE
+  SP, SUCCESS, SUCCESS_DIM, SUBTLE, COMP, ICON
 } from '@/lib/theme';
+import { formatCents } from '@/lib/money';
 
 const STEPS: CheckoutStep[] = ['information', 'delivery', 'review', 'confirmation'];
-const money = (value: number) => `$${value.toFixed(2)}`;
+const money = formatCents;
 
 function Card({ children }: { children: React.ReactNode }) {
   const { theme } = useAppTheme();
@@ -206,7 +207,7 @@ function Delivery({ session, onSelect, onApply, onRemove }: {
               onPress={() => onSelect(group.sellerId, method.id)}>
               <View style={[styles.radio, group.selectedMethodId === method.id && styles.radioActive]} />
               <View style={{ flex: 1 }}><Text style={styles.methodTitle}>{method.service}</Text><Text style={styles.muted}>{method.estimatedDelivery}</Text></View>
-              <Text style={styles.methodTitle}>{money(method.price)}</Text>
+              <Text style={styles.methodTitle}>{money(method.priceCents)}</Text>
             </TouchableOpacity>
           ))}
         </Card>
@@ -249,15 +250,15 @@ function Review({ session, onAck }: { session: CheckoutSession; onAck: (key: str
         <Text style={styles.sectionTitle}>Review your order</Text>
         <Text style={styles.address}>{address?.firstName} {address?.lastName}{'\n'}{address?.line1}{'\n'}{address?.city}, {address?.state} {address?.postalCode}</Text>
         {session.deliveryGroups.flatMap(group => group.items).map(item => (
-          <View key={item.id} style={styles.line}><View style={{ flex: 1 }}><Text style={styles.lineName}>{item.productName}</Text><Text style={styles.muted}>{item.variantTitle} · Qty {item.quantity}</Text></View><Text style={styles.lineName}>{money(item.price * item.quantity)}</Text></View>
+          <View key={item.id} style={styles.line}><View style={{ flex: 1 }}><Text style={styles.lineName}>{item.productName}</Text><Text style={styles.muted}>{item.variantTitle} · Qty {item.quantity}</Text></View><Text style={styles.lineName}>{money(item.priceCents * item.quantity)}</Text></View>
         ))}
         <View style={styles.divider} />
-        <View style={styles.line}><Text style={styles.muted}>Subtotal</Text><Text style={styles.lineName}>{money(session.summary.subtotal)}</Text></View>
-        {session.summary.discountTotal > 0 && <View style={styles.line}><Text style={styles.muted}>Discount</Text><Text style={[styles.lineName, { color: SUCCESS }]}>−{money(session.summary.discountTotal)}</Text></View>}
-        <View style={styles.line}><Text style={styles.muted}>Shipping</Text><Text style={styles.lineName}>{money(session.summary.shippingTotal)}</Text></View>
-        <View style={styles.line}><Text style={styles.muted}>Tax</Text><Text style={styles.lineName}>{money(session.summary.taxTotal)}</Text></View>
+        <View style={styles.line}><Text style={styles.muted}>Subtotal</Text><Text style={styles.lineName}>{money(session.summary.subtotalCents)}</Text></View>
+        {session.summary.discountTotalCents > 0 && <View style={styles.line}><Text style={styles.muted}>Discount</Text><Text style={[styles.lineName, { color: SUCCESS }]}>−{money(session.summary.discountTotalCents)}</Text></View>}
+        <View style={styles.line}><Text style={styles.muted}>Shipping</Text><Text style={styles.lineName}>{money(session.summary.shippingTotalCents)}</Text></View>
+        <View style={styles.line}><Text style={styles.muted}>Tax</Text><Text style={styles.lineName}>{money(session.summary.taxTotalCents)}</Text></View>
         <View style={styles.divider} />
-        <View style={styles.line}><Text style={styles.total}>Total</Text><Text style={styles.total}>{money(session.summary.total)}</Text></View>
+        <View style={styles.line}><Text style={styles.total}>Total</Text><Text style={styles.total}>{money(session.summary.totalCents)}</Text></View>
       </Card>
       {session.deliveryGroups.length > 1 && (
         <View style={styles.multiSeller}><Feather name="layers" size={16} color={CYAN} /><Text style={styles.multiSellerText}>Your cart contains items from {session.deliveryGroups.length} sellers. You will complete a separate secure Stripe payment for each seller.</Text></View>
@@ -280,8 +281,21 @@ function Review({ session, onAck }: { session: CheckoutSession; onAck: (key: str
   );
 }
 
-function Confirmation({ orderNumbers, finalizing, onRefresh, refreshing }: {
-  orderNumbers: string[]; finalizing: boolean; onRefresh: () => void; refreshing: boolean;
+const CONFETTI = [
+  { left: '5%', color: SUCCESS, delay: 0, x: -14 },
+  { left: '13%', color: 'accent', delay: 90, x: 18 },
+  { left: '22%', color: 'secondary', delay: 180, x: -8 },
+  { left: '31%', color: '#F59E0B', delay: 50, x: 14 },
+  { left: '42%', color: '#F87171', delay: 230, x: -18 },
+  { left: '53%', color: SUCCESS, delay: 110, x: 10 },
+  { left: '64%', color: 'accent', delay: 20, x: -12 },
+  { left: '73%', color: 'secondary', delay: 260, x: 17 },
+  { left: '82%', color: '#F59E0B', delay: 140, x: -10 },
+  { left: '92%', color: '#F87171', delay: 70, x: 13 },
+] as const;
+
+function Confirmation({ session, orderNumbers, finalizing, onRefresh, refreshing }: {
+  session: CheckoutSession; orderNumbers: string[]; finalizing: boolean; onRefresh: () => void; refreshing: boolean;
 }) {
   const colors = useColors();
   const { theme } = useAppTheme();
@@ -289,12 +303,95 @@ function Confirmation({ orderNumbers, finalizing, onRefresh, refreshing }: {
   const router = useRouter();
   const PURPLE = colors.primary, PURPLE_LIGHT = theme.accentLight;
   const styles = makeStyles(theme);
+  const checkScale = useRef(new Animated.Value(0)).current;
+  const confettiProgress = useRef(new Animated.Value(0)).current;
+  const orderItems = session.deliveryGroups.flatMap(group => group.items);
+  const deliveryEstimates = session.deliveryGroups
+    .map(group => group.availableMethods.find(method => method.id === group.selectedMethodId)?.estimatedDelivery)
+    .filter((value): value is string => !!value);
+  const preOrderEstimates = orderItems.map(item => item.preOrderEstShipDate).filter((value): value is string => !!value);
+  const estimateLabels = [...new Set([...deliveryEstimates, ...preOrderEstimates])];
+  const primaryEstimate = estimateLabels[0] ?? 'Tracking updates coming soon';
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.spring(checkScale, { toValue: 1, useNativeDriver: true, tension: 62, friction: 6 }),
+      Animated.timing(confettiProgress, { toValue: 1, duration: 1250, useNativeDriver: true }),
+    ]).start();
+  }, []);
+
   return (
     <View style={styles.confirmation}>
-      <View style={[styles.confirmIcon, finalizing && { backgroundColor: PURPLE }]}><Feather name={finalizing ? 'clock' : 'check'} size={34} color={ON_DARK} /></View>
-      <Text style={styles.headline}>{finalizing ? 'Payment received' : 'Order confirmed'}</Text>
-      <Text style={styles.confirmText}>{finalizing ? 'We’re finalizing your order with the seller. This can take a moment after payment.' : 'Your order is in. We’ll keep you updated by email.'}</Text>
-      {orderNumbers.map(number => <Text style={styles.orderNumber} key={number}>{number}</Text>)}
+      {!finalizing && (
+        <View style={styles.confettiLayer} pointerEvents="none">
+          {CONFETTI.map((particle, index) => (
+            <Animated.View
+              key={index}
+              style={[
+                styles.confetti,
+                {
+                  left: particle.left,
+                  backgroundColor: particle.color === 'accent'
+                    ? theme.accent
+                    : particle.color === 'secondary'
+                      ? theme.secondary
+                      : particle.color,
+                  opacity: confettiProgress.interpolate({ inputRange: [0, 0.82, 1], outputRange: [1, 1, 0] }),
+                  transform: [
+                    { translateX: confettiProgress.interpolate({ inputRange: [0, 1], outputRange: [0, particle.x] }) },
+                    { translateY: confettiProgress.interpolate({ inputRange: [0, 1], outputRange: [-40 - particle.delay / 8, 190] }) },
+                    { rotate: confettiProgress.interpolate({ inputRange: [0, 1], outputRange: ['0deg', `${180 + index * 48}deg`] }) },
+                  ],
+                },
+              ]}
+            />
+          ))}
+        </View>
+      )}
+
+      <View style={styles.successHalo}>
+        <Animated.View style={[styles.confirmIcon, finalizing && { backgroundColor: PURPLE }, { transform: [{ scale: checkScale }] }]}>
+          <Feather name={finalizing ? 'clock' : 'check'} size={38} color={ON_DARK} />
+        </Animated.View>
+      </View>
+      <Text style={styles.confirmEyebrow}>{finalizing ? 'PAYMENT RECEIVED' : 'PURCHASE COMPLETE'}</Text>
+      <Text style={styles.headline}>{finalizing ? 'Almost there' : 'It’s yours.'}</Text>
+      <Text style={styles.confirmText}>{finalizing ? 'We’re finalizing your order with the seller. This can take a moment after payment.' : 'Your order is confirmed. We’ll keep you updated every step of the way.'}</Text>
+
+      {!finalizing && (
+        <View style={styles.deliveryHero}>
+          <View style={[styles.deliveryIcon, { backgroundColor: theme.accentDim }]}>
+            <Feather name="truck" size={22} color={theme.accentLight} />
+          </View>
+          <Text style={styles.deliveryLabel}>ESTIMATED DELIVERY</Text>
+          <Text style={styles.deliveryDate}>{primaryEstimate}</Text>
+          {estimateLabels.length > 1 && <Text style={styles.deliverySub}>Your items will arrive in {estimateLabels.length} shipments</Text>}
+        </View>
+      )}
+
+      {!!orderItems.length && (
+        <View style={styles.confirmItems}>
+          <Text style={styles.confirmItemsLabel}>{orderItems.length} {orderItems.length === 1 ? 'ITEM' : 'ITEMS'} IN YOUR ORDER</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.confirmItemsRow}>
+            {orderItems.map(item => (
+              <View style={styles.confirmProduct} key={item.id}>
+                {item.imageUri ? (
+                  <Image source={{ uri: item.imageUri }} style={styles.confirmProductImage} resizeMode="cover" />
+                ) : (
+                  <View style={[styles.confirmProductImage, styles.confirmProductFallback]}><Feather name="image" size={20} color={SUBTLE} /></View>
+                )}
+                {item.quantity > 1 && <View style={styles.confirmQty}><Text style={styles.confirmQtyText}>{item.quantity}</Text></View>}
+                <Text style={styles.confirmProductName} numberOfLines={2}>{item.productName}</Text>
+                <Text style={styles.confirmProductVariant} numberOfLines={1}>{item.variantTitle}</Text>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
+      <View style={styles.orderNumbers}>
+        {orderNumbers.map(number => <Text style={styles.orderNumber} key={number}>{number}</Text>)}
+      </View>
 
       {finalizing ? (
         <TouchableOpacity style={styles.refreshButton} onPress={onRefresh} disabled={refreshing}>
@@ -320,8 +417,8 @@ export default function BuyerCheckoutScreen() {
   const colors = useColors();
   const { theme } = useAppTheme();
   const PURPLE = colors.primary, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = colors.accent, CYAN = theme.secondary, CYAN_DIM = theme.secondaryDim;
-  const GRAD_PRIMARY = [theme.accent, theme.secondary] as const;
-  const SHADOW_PURPLE = { shadowColor: theme.accent, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 };
+  const GRAD_PRIMARY = theme.primaryGradient;
+  const SHADOW_PURPLE = { shadowColor: theme.shadowColor, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 };
   const styles = makeStyles(theme);
   const { source } = useLocalSearchParams<{ source?: string }>();
   const router = useRouter();
@@ -569,16 +666,16 @@ export default function BuyerCheckoutScreen() {
   }, [api, current, orders, pendingSessionIds]);
   if (loading || !session) return <View style={styles.loading}><ActivityIndicator color={PURPLE} size="large" /></View>;
   const label = current.step === 'review'
-    ? canRetryPayment ? 'Try a different card' : `Continue to Stripe · ${money(current.summary.total)}`
+    ? canRetryPayment ? 'Try a different card' : `Continue to Stripe · ${money(current.summary.totalCents)}`
     : 'Continue';
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       {current.step !== 'confirmation' && <View style={[styles.header, { paddingTop: insets.top + SP.xs }]}><TouchableOpacity style={styles.back} onPress={() => { const index = STEPS.indexOf(current.step); if (index <= 0) router.back(); else void persist({ ...current, step: STEPS[index - 1] }); }}><Feather name="chevron-left" size={ICON.md} color={FG} /></TouchableOpacity><View style={{ flex: 1, alignItems: 'center' }}><Text style={styles.stepLabel}>{current.step === 'information' ? 'Information' : current.step === 'delivery' ? 'Delivery' : 'Review & Pay'}</Text><Progress step={current.step} /></View><View style={styles.back} /></View>}
       <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + (current.step === 'confirmation' ? 30 : 105) }} keyboardShouldPersistTaps="handled">
         {current.step === 'information' && <Information contact={contact} address={address} onContact={setContact} onAddress={setAddress} savedAddresses={savedAddresses} onSelectAddress={handleSelectAddress} />}
-        {current.step === 'delivery' && <Delivery session={current} onSelect={(sellerId, methodId) => void persist({ ...current, deliveryGroups: current.deliveryGroups.map(group => group.sellerId === sellerId ? { ...group, selectedMethodId: methodId } : group) })} onApply={async code => { const discount = await applyDiscount(code, current.summary.subtotal, current.discounts); await persist({ ...current, discounts: [...current.discounts.filter(item => item.code !== discount.code), discount] }); }} onRemove={code => void removeDiscount(code, current.discounts).then(discounts => persist({ ...current, discounts }))} />}
+        {current.step === 'delivery' && <Delivery session={current} onSelect={(sellerId, methodId) => void persist({ ...current, deliveryGroups: current.deliveryGroups.map(group => group.sellerId === sellerId ? { ...group, selectedMethodId: methodId } : group) })} onApply={async code => { const discount = await applyDiscount(code, current.summary.subtotalCents, current.discounts); await persist({ ...current, discounts: [...current.discounts.filter(item => item.code !== discount.code), discount] }); }} onRemove={code => void removeDiscount(code, current.discounts).then(discounts => persist({ ...current, discounts }))} />}
         {current.step === 'review' && <Review session={current} onAck={(key, checked) => void persist({ ...current, acknowledgments: current.acknowledgments.map(ack => ack.key === key ? { ...ack, acknowledged: checked } : ack) })} />}
-        {current.step === 'confirmation' && <Confirmation orderNumbers={orders} finalizing={pendingSessionIds.length > 0} onRefresh={refreshOrders} refreshing={placing} />}
+        {current.step === 'confirmation' && <Confirmation session={current} orderNumbers={orders} finalizing={pendingSessionIds.length > 0} onRefresh={refreshOrders} refreshing={placing} />}
          {!!error && <View style={styles.error}>
            <Feather name="alert-circle" size={16} color={RED} style={{ marginTop: 2 }} />
            <View style={{ flex: 1 }}>
@@ -597,7 +694,7 @@ export default function BuyerCheckoutScreen() {
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE = theme.accent, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = theme.accentDim, CYAN = theme.secondary, CYAN_DIM = theme.secondaryDim;
-  const SHADOW_PURPLE = { shadowColor: theme.accent, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 };
+  const SHADOW_PURPLE = { shadowColor: theme.shadowColor, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 };
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG }, loading: { flex: 1, backgroundColor: BG, justifyContent: 'center', alignItems: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingBottom: SP.sm }, back: { width: 42, height: 42, justifyContent: 'center', alignItems: 'center' }, stepLabel: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, marginBottom: 5 }, progress: { flexDirection: 'row', gap: 4, width: 120 }, progressSegment: { height: 4, flex: 1, borderRadius: 2, backgroundColor: CARD_ELEVATED }, progressSegmentActive: { backgroundColor: PURPLE },
@@ -605,7 +702,33 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   method: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.sm, borderRadius: RADIUS.md, marginBottom: 6 }, methodActive: { backgroundColor: PURPLE_DIM }, radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: MUTED }, radioActive: { borderColor: PURPLE, backgroundColor: PURPLE }, methodTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm }, promoToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm }, promoRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'center' }, applyButton: { backgroundColor: PURPLE_DIM, borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: 13 }, applyText: { color: PURPLE_LIGHT, fontFamily: FONT.bold, fontSize: FS.sm }, discountRow: { flexDirection: 'row', justifyContent: 'space-between', gap: SP.sm, marginTop: SP.sm }, discountText: { flex: 1, color: SUCCESS, fontFamily: FONT.regular, fontSize: FS.sm }, removeText: { color: PURPLE_LIGHT, fontFamily: FONT.semibold, fontSize: FS.sm },
   address: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, marginBottom: SP.md }, line: { flexDirection: 'row', justifyContent: 'space-between', gap: SP.sm, paddingVertical: 5 }, lineName: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm }, divider: { height: 1, backgroundColor: BORDER, marginVertical: SP.sm }, total: { color: FG, fontFamily: FONT.bold, fontSize: FS.lg }, multiSeller: { flexDirection: 'row', gap: SP.sm, backgroundColor: CYAN_DIM, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md }, multiSellerText: { flex: 1, color: CYAN, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 }, ack: { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', marginBottom: SP.sm }, checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1, borderColor: MUTED, alignItems: 'center', justifyContent: 'center', marginTop: 1 }, checkboxActive: { backgroundColor: PURPLE, borderColor: PURPLE }, ackText: { flex: 1, color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
   bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: SP.md, backgroundColor: BG, borderTopWidth: 1, borderColor: BORDER }, continue: { overflow: 'hidden', borderRadius: RADIUS.lg, ...SHADOW_PURPLE }, continueGradient: { height: COMP.buttonH, alignItems: 'center', justifyContent: 'center' }, continueText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.base }, error: { flexDirection: 'row', gap: SP.sm, backgroundColor: RED_DIM, padding: SP.md, borderRadius: RADIUS.md }, errorText: { color: RED, flex: 1, fontFamily: FONT.medium, fontSize: FS.sm, lineHeight: 20 }, retryButton: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: SP.sm, paddingVertical: 7, paddingHorizontal: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: RED }, retryText: { color: RED, fontFamily: FONT.semibold, fontSize: FS.sm },
-  confirmation: { alignItems: 'center', paddingTop: SP.xxl }, confirmIcon: { width: 78, height: 78, borderRadius: 39, alignItems: 'center', justifyContent: 'center', backgroundColor: SUCCESS, marginBottom: SP.md }, headline: { color: FG, fontFamily: FONT.bold, fontSize: FS.xxl, marginBottom: SP.sm }, confirmText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 22, textAlign: 'center', maxWidth: 320 }, orderNumber: { color: FG, fontFamily: FONT.bold, fontSize: FS.base, marginTop: SP.md }, refreshButton: { borderWidth: 1, borderColor: PURPLE, borderRadius: RADIUS.md, paddingHorizontal: SP.lg, paddingVertical: SP.sm, marginTop: SP.lg }, refreshText: { color: PURPLE_LIGHT, fontFamily: FONT.bold, fontSize: FS.sm },
+  confirmation: { alignItems: 'center', paddingTop: SP.xl, position: 'relative', overflow: 'hidden' },
+  confettiLayer: { position: 'absolute', top: 0, left: 0, right: 0, height: 220 },
+  confetti: { position: 'absolute', top: 0, width: 8, height: 14, borderRadius: 2 },
+  successHalo: { width: 112, height: 112, borderRadius: 56, backgroundColor: SUCCESS_DIM, alignItems: 'center', justifyContent: 'center', marginBottom: SP.md },
+  confirmIcon: { width: 78, height: 78, borderRadius: 39, alignItems: 'center', justifyContent: 'center', backgroundColor: SUCCESS },
+  confirmEyebrow: { color: SUCCESS, fontFamily: FONT.bold, fontSize: 10, letterSpacing: 1.8, marginBottom: 7 },
+  headline: { color: FG, fontFamily: FONT.extrabold, fontSize: FS.h1, letterSpacing: -1.2, marginBottom: SP.sm },
+  confirmText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 22, textAlign: 'center', maxWidth: 330 },
+  deliveryHero: { width: '100%', alignItems: 'center', backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.xl, padding: SP.lg, marginTop: SP.xl },
+  deliveryIcon: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm },
+  deliveryLabel: { color: SUBTLE, fontFamily: FONT.bold, fontSize: 9, letterSpacing: 1.5, marginBottom: 5 },
+  deliveryDate: { color: FG, fontFamily: FONT.extrabold, fontSize: FS.xl, textAlign: 'center', letterSpacing: -0.35 },
+  deliverySub: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 6, textAlign: 'center' },
+  confirmItems: { width: '100%', marginTop: SP.xl },
+  confirmItemsLabel: { color: SUBTLE, fontFamily: FONT.bold, fontSize: 9, letterSpacing: 1.35, marginBottom: SP.sm },
+  confirmItemsRow: { gap: 10, paddingRight: SP.md },
+  confirmProduct: { width: 112 },
+  confirmProductImage: { width: 112, height: 126, borderRadius: RADIUS.md, backgroundColor: CARD },
+  confirmProductFallback: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER },
+  confirmQty: { position: 'absolute', top: 7, right: 7, minWidth: 23, height: 23, paddingHorizontal: 5, borderRadius: 12, backgroundColor: 'rgba(0,0,0,0.72)', alignItems: 'center', justifyContent: 'center' },
+  confirmQtyText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 10 },
+  confirmProductName: { color: FG, fontFamily: FONT.semibold, fontSize: FS.xs, lineHeight: 16, marginTop: 7 },
+  confirmProductVariant: { color: MUTED, fontFamily: FONT.regular, fontSize: 10, marginTop: 2 },
+  orderNumbers: { width: '100%', marginTop: SP.lg, backgroundColor: CARD, borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  orderNumber: { color: FG, fontFamily: FONT.bold, fontSize: FS.sm, textAlign: 'center', paddingVertical: 3 },
+  refreshButton: { borderWidth: 1, borderColor: PURPLE, borderRadius: RADIUS.md, paddingHorizontal: SP.lg, paddingVertical: SP.sm, marginTop: SP.lg },
+  refreshText: { color: PURPLE_LIGHT, fontFamily: FONT.bold, fontSize: FS.sm },
   createAccountBtn: { backgroundColor: PURPLE, height: COMP.buttonH, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' }, createAccountText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.base },
   continueShopBtn: { borderWidth: 1, borderColor: BORDER, height: COMP.buttonH, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' }, continueShopText: { color: FG, fontFamily: FONT.bold, fontSize: FS.base },
   savedAddressCard: { padding: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm }, savedAddressCardActive: { borderColor: PURPLE, backgroundColor: PURPLE_DIM },

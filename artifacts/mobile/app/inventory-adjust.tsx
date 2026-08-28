@@ -1,28 +1,16 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import {
-  View, Text, TextInput, ScrollView, TouchableOpacity,
-  StyleSheet, Modal, FlatList, Alert, KeyboardAvoidingView, Platform,
-} from 'react-native';
+import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, Modal, FlatList, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN, SUCCESS, SUCCESS_DIM,
-  BLUE, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import {
-  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  IconButton, StatusBadge, SectionHeader, EmptyState,
-} from '@/components/BrandthreadUI';
+import { formatCents } from '@/lib/money';
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
 import { getInventoryItems, getLocations, adjustStock } from '@/services/inventoryService';
-import {
-  InventoryItem, InventoryLocation, AdjustmentType, ADJUSTMENT_TYPES,
-} from '@/services/inventoryTypes';
+import { InventoryItem, InventoryLocation, AdjustmentType, ADJUSTMENT_TYPES } from '@/services/inventoryTypes';
 
 export default function InventoryAdjustScreen() {
   const { theme } = useAppTheme();
@@ -83,7 +71,7 @@ export default function InventoryAdjustScreen() {
   const parsedQty = parseInt(quantityChange, 10) || 0;
   const actualChange = delta === 0 ? parsedQty : delta * Math.abs(parsedQty);
   const newQty = selectedItem ? Math.max(0, selectedItem.onHand + actualChange) : 0;
-  const valueImpact = selectedItem ? actualChange * selectedItem.cost : 0;
+  const valueImpactCents = selectedItem ? actualChange * selectedItem.costCents : 0;
 
   const canSubmit =
     selectedItem !== null &&
@@ -430,9 +418,9 @@ export default function InventoryAdjustScreen() {
                         <Text style={styles.previewLabel}>Inventory value impact</Text>
                         <Text style={[
                           styles.previewValue,
-                          { color: valueImpact >= 0 ? SUCCESS : RED },
+                          { color: valueImpactCents >= 0 ? SUCCESS : RED },
                         ]}>
-                          {valueImpact >= 0 ? '+' : ''}${Math.abs(valueImpact).toFixed(2)}
+                          {valueImpactCents >= 0 ? '+' : ''}{formatCents(Math.abs(valueImpactCents))}
                         </Text>
                       </View>
                       {newQty < 0 && (

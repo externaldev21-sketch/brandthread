@@ -10,7 +10,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
-import { PURPLE, FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 const DEFINITIONS: { key: string; icon: keyof typeof Feather.glyphMap; label: string }[] = [
   { key: 'products',          icon: 'tag',      label: 'Products' },
@@ -65,7 +65,7 @@ export default function MetafieldsScreen() {
           </Text>
 
           {loading ? (
-            <View style={s.loadingRow}><ActivityIndicator size="small" color={PURPLE} /></View>
+            <View style={s.loadingRow}><ActivityIndicator size="small" color={colors.primary} /></View>
           ) : (
             <View style={[s.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {DEFINITIONS.map((def, i) => {
@@ -80,8 +80,8 @@ export default function MetafieldsScreen() {
                     <Feather name={def.icon} size={17} color={colors.foreground} style={s.rowIcon} />
                     <Text style={[s.rowLabel, { color: colors.foreground, flex: 1 }]}>{def.label}</Text>
                     {count > 0 ? (
-                      <View style={[s.countBadge, { backgroundColor: `${PURPLE}20`, borderColor: `${PURPLE}40` }]}>
-                        <Text style={[s.countBadgeText, { color: PURPLE }]}>{count}</Text>
+                      <View style={[s.countBadge, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
+                        <Text style={[s.countBadgeText, { color: colors.primary }]}>{count}</Text>
                       </View>
                     ) : (
                       <Text style={[s.countText, { color: colors.mutedForeground }]}>0</Text>
@@ -107,10 +107,10 @@ export default function MetafieldsScreen() {
           <TouchableOpacity
             onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
             activeOpacity={0.7}
-            style={[s.addMetaBtn, { borderColor: PURPLE, backgroundColor: `${PURPLE}12` }]}
+            style={[s.addMetaBtn, { borderColor: colors.primary, backgroundColor: colors.accent }]}
           >
-            <Feather name="plus" size={16} color={PURPLE} />
-            <Text style={[s.addMetaBtnText, { color: PURPLE }]}>Add definition</Text>
+            <Feather name="plus" size={16} color={colors.primary} />
+            <Text style={[s.addMetaBtnText, { color: colors.primary }]}>Add definition</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>

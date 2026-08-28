@@ -334,7 +334,7 @@ export default function InventoryScreen() {
       { label: 'Pre-order',     value: String(overview.totalCommitted),                color: BLUE,    filter: 'pre_order' as InventoryFilterKey },
       { label: 'Low Stock',     value: String(overview.lowStockCount),                 color: overview.lowStockCount > 0 ? ORANGE : MUTED, filter: 'low_stock' as InventoryFilterKey },
       { label: 'Out of Stock',  value: String(overview.outOfStockCount),               color: overview.outOfStockCount > 0 ? RED : MUTED, filter: 'out_of_stock' as InventoryFilterKey },
-      { label: 'Inv. Value',    value: fmtMoney(overview.inventoryValue),              color: GOLD,    filter: null },
+      { label: 'Inv. Value',    value: fmtMoney(overview.inventoryValueCents),         color: GOLD,    filter: null },
     ];
 
     return (
@@ -499,7 +499,7 @@ export default function InventoryScreen() {
         </View>
 
         <Text style={s.itemCardMeta}>
-          Value: {fmtMoney(item.inventoryValue)} · Threshold: {item.lowStockThreshold}
+          Value: {fmtMoney(item.inventoryValueCents)} · Threshold: {item.lowStockThreshold}
         </Text>
 
         <View style={s.itemCardDivider} />

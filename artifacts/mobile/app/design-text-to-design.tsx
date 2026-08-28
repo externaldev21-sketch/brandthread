@@ -3,7 +3,7 @@
  * Route: /design-text-to-design
  */
 import React, { useState } from 'react';
-import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert, Image, Dimensions,
@@ -20,9 +20,6 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE, BORDER_SUBTLE,
   FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM,
-  GRAD_PRIMARY, GRAD_CARD_GLOW,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
@@ -46,7 +43,9 @@ const GRAD_PALETTES: Record<number, readonly [string, string]> = {
 };
 
 export default function TextToDesignScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const s = createStyles(theme);
   const router = useRouter();
 
   // Form state
@@ -353,7 +352,7 @@ export default function TextToDesignScreen() {
         </View>
 
         {/* Generate button */}
-        <GradientCard style={s.generateCard} onPress={handleGenerate}>
+        <GradientCard colors={theme.primaryGradient} style={[s.generateCard, { shadowColor: theme.shadowColor }]} onPress={handleGenerate}>
           <View style={s.generateInner}>
             <Feather name="zap" size={ICON.md} color="#fff" />
             <Text style={s.generateText}>Generate {count} design{count !== 1 ? 's' : ''}</Text>
@@ -364,7 +363,9 @@ export default function TextToDesignScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
+  return StyleSheet.create({
   formContent: {
     padding: SP.lg,
     paddingBottom: SP.xxl,
@@ -624,4 +625,5 @@ const s = StyleSheet.create({
     fontSize: FS.sm,
     color: FG,
   },
-});
+  });
+};

@@ -22,6 +22,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 export default function VacationModeScreen() {
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentLight: PURPLE_LIGHT } = theme;
+  const s = React.useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api    = useApi();
@@ -184,7 +185,9 @@ export default function VacationModeScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (theme: { accent: string }) => {
+  const { accent: PURPLE } = theme;
+  return StyleSheet.create({
   root:       { flex: 1, backgroundColor: BG },
   header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
   headerBack: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
@@ -212,4 +215,5 @@ const s = StyleSheet.create({
 
   saveBtn:    { backgroundColor: PURPLE, borderRadius: RADIUS.md, alignItems: 'center', paddingVertical: 16 },
   saveBtnText:{ fontSize: FS.base, fontFamily: FONT.bold, color: '#fff' },
-});
+  });
+};

@@ -14,6 +14,7 @@ import {
   SalesModel, ProductStatus,
 } from '@/services/productTypes';
 import { calcTotalInventory } from '@/lib/productUtils';
+import { centsAtBasisPoints } from '@/lib/money';
 
 // ─── Storage Keys ─────────────────────────────────────────────────────────────
 
@@ -124,7 +125,7 @@ export async function getProducts(query?: ProductSearchQuery): Promise<Product[]
     list.sort((a, b) => {
       let av: number | string = 0, bv: number | string = 0;
       if (query.sortBy === 'name')         { av = a.name; bv = b.name; }
-      else if (query.sortBy === 'price')   { av = a.pricing.price; bv = b.pricing.price; }
+       else if (query.sortBy === 'price')   { av = a.pricing.priceCents; bv = b.pricing.priceCents; }
       else if (query.sortBy === 'sales')   { av = a.totalSales; bv = b.totalSales; }
       else if (query.sortBy === 'createdAt') { av = a.createdAt; bv = b.createdAt; }
       else if (query.sortBy === 'updatedAt') { av = a.updatedAt; bv = b.updatedAt; }
@@ -172,7 +173,7 @@ export async function createProduct(data: Partial<Product>): Promise<Product> {
     category: data.category ?? 'Other',
     tags: data.tags ?? [],
     media: data.media ?? [],
-    pricing: data.pricing ?? { price: 0, currency: 'USD' },
+    pricing: data.pricing ?? { priceCents: 0, currency: 'USD' },
     options: data.options ?? [],
     variants: data.variants ?? [],
     inventory: data.inventory
@@ -183,7 +184,7 @@ export async function createProduct(data: Partial<Product>): Promise<Product> {
     manufacturing: data.manufacturing ?? { stage: 'none' },
     storeSettings: data.storeSettings ?? { status: 'draft', collectionIds: [], featuredOnHomepage: false, relatedProductIds: [], seo: { searchVisible: false } },
     totalSales: data.totalSales ?? 0,
-    totalRevenue: data.totalRevenue ?? 0,
+    totalRevenueCents: data.totalRevenueCents ?? 0,
     status: data.status ?? 'draft',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -242,7 +243,7 @@ export async function duplicateProduct(id: string): Promise<Product | undefined>
     name: src.name + ' (Copy)',
     status: 'draft',
     totalSales: 0,
-    totalRevenue: 0,
+    totalRevenueCents: 0,
     publishedAt: undefined,
     storeSettings: { ...src.storeSettings, status: 'draft' },
   };
@@ -286,12 +287,12 @@ export async function adjustInventory(
 
 export async function getProductAnalytics(productId: string): Promise<ProductAnalytics> {
   const p = await getProduct(productId);
-  const totalRevenue = p?.totalRevenue ?? 0;
+  const totalRevenueCents = p?.totalRevenueCents ?? 0;
   const unitsSold = p?.totalSales ?? 0;
 
   return {
     productId,
-    revenue: totalRevenue,
+    revenueCents: totalRevenueCents,
     unitsSold,
     pageViews: unitsSold * 18,
     addToCartCount: Math.round(unitsSold * 2.4),
@@ -308,7 +309,7 @@ export async function getProductAnalytics(productId: string): Promise<ProductAna
       const seed = ((productId ?? 'p').charCodeAt(0) * 31 + i * 17) % 100;
       return {
         date: new Date(Date.now() - (13 - i) * 86400000).toISOString().slice(0, 10),
-        revenue: Math.round(totalRevenue * (0.04 + (seed / 100) * 0.12)),
+        revenueCents: centsAtBasisPoints(totalRevenueCents, 400 + seed * 12),
       };
     }),
   };
@@ -378,6 +379,6 @@ export async function getProductStats() {
     preOrder: list.filter(p => p.salesModel === 'pre-order').length,
     lowStock: list.filter(p => p.inventory.totalStock > 0 && p.inventory.totalStock <= p.inventory.lowStockThreshold).length,
     outOfStock: list.filter(p => p.inventory.totalStock === 0 && p.inventory.policy === 'deny' && p.status === 'active').length,
-    totalInventoryValue: list.reduce((s, p) => s + (p.pricing.cost ?? 0) * p.inventory.totalStock, 0),
+    totalInventoryValueCents: list.reduce((s, p) => s + (p.pricing.costCents ?? 0) * p.inventory.totalStock, 0),
   };
 }

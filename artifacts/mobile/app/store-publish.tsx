@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
@@ -11,7 +12,6 @@ import {
   BG, CARD, SURFACE, BORDER,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM,
-  GRAD_PRIMARY,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, StatusBadge } from '@/components/BrandthreadUI';
@@ -26,6 +26,7 @@ const ERROR_ROUTES: Record<string, string> = {
 };
 
 export default function StorePublishScreen() {
+  const { theme } = useAppTheme();
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const headerTopInset = useHeaderTopInset();
@@ -205,8 +206,8 @@ export default function StorePublishScreen() {
             </View>
           </BrandthreadCard>
         ) : validation?.canPublish ? (
-          <GradientCard colors={GRAD_PRIMARY} style={pub.card} glow>
-            <Text style={pub.publishReadyTitle}>Ready to go live.</Text>
+          <GradientCard colors={theme.primaryGradient} style={pub.card} glow>
+            <Text style={[pub.publishReadyTitle, { color: theme.onAccent }]}>Ready to go live.</Text>
             <Text style={pub.publishStoreName}>{store?.settings.storeName || 'Your Store'}</Text>
             <Text style={pub.publishUrl}>https://{storeUrl}.brandthread.co</Text>
             <PrimaryButton

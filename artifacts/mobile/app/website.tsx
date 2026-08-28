@@ -94,7 +94,7 @@ function LayoutPreview({ layout, colors }: { layout: StoreLayout; colors: Return
     <View style={styles.layoutPreviewOuter}>
       <View style={styles.previewBar}>
         {[...Array(3)].map((_, i) => (
-          <View key={i} style={[styles.previewDot, { backgroundColor: i === 0 ? '#EF4444' : i === 1 ? '#B98A2E' : '#22D3EE' }]} />
+          <View key={i} style={[styles.previewDot, { backgroundColor: i === 0 ? '#EF4444' : i === 1 ? '#B98A2E' : colors.primary }]} />
         ))}
       </View>
       <View style={styles.previewContent}>

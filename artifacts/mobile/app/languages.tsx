@@ -10,7 +10,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
-import { PURPLE, SUCCESS, SUCCESS_DIM, FONT, FS, RADIUS } from '@/lib/theme';
+import { SUCCESS, SUCCESS_DIM, FONT, FS, RADIUS } from '@/lib/theme';
 
 interface LanguageOption {
   code: string;
@@ -73,18 +73,18 @@ export default function LanguagesScreen() {
     <View style={[s.container, { backgroundColor: colors.background }]}>
       <ScreenHeader title="Languages" />
       {loading ? (
-        <View style={s.center}><ActivityIndicator color={PURPLE} /></View>
+        <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
           {/* Current language banner */}
           <View style={s.section}>
-            <View style={[s.currentCard, { backgroundColor: `${PURPLE}12`, borderColor: `${PURPLE}30` }]}>
-              <View style={[s.currentIcon, { backgroundColor: `${PURPLE}20` }]}>
-                <Feather name="globe" size={20} color={PURPLE} />
+            <View style={[s.currentCard, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
+              <View style={[s.currentIcon, { backgroundColor: colors.accent }]}>
+                <Feather name="globe" size={20} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={[s.currentLabel, { color: PURPLE }]}>Store language</Text>
-                <Text style={[s.currentValue, { color: PURPLE }]}>
+                <Text style={[s.currentLabel, { color: colors.primary }]}>Store language</Text>
+                <Text style={[s.currentValue, { color: colors.primary }]}>
                   {currentLang?.name ?? 'English'} — {currentLang?.nativeName ?? 'English'}
                 </Text>
               </View>
@@ -110,7 +110,7 @@ export default function LanguagesScreen() {
                     style={[
                       s.langRow,
                       i !== LANGUAGES.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
-                      isSelected && { backgroundColor: `${PURPLE}08` },
+                      isSelected && { backgroundColor: colors.accent },
                     ]}
                   >
                     <View style={{ flex: 1 }}>
@@ -128,9 +128,9 @@ export default function LanguagesScreen() {
                       </Text>
                     </View>
                     {isSaving ? (
-                      <ActivityIndicator size="small" color={PURPLE} />
+                      <ActivityIndicator size="small" color={colors.primary} />
                     ) : isSelected ? (
-                      <Feather name="check" size={20} color={PURPLE} />
+                      <Feather name="check" size={20} color={colors.primary} />
                     ) : (
                       <Feather name="circle" size={18} color={colors.mutedForeground} />
                     )}

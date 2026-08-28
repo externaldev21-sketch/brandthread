@@ -7,13 +7,14 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
-  BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, ON_DARK,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK,
 
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getSavedItems, removeSavedItem, subscribeSocial } from '@/services/socialService';
 import { SavedItem, SavedItemType } from '@/services/socialTypes';
+import { reportNetworkError } from '@/lib/networkNotice';
 
 const { width: W } = Dimensions.get('window');
 const TILE_SIZE = (W - SP.md * 2 - SP.sm) / 2;
@@ -29,16 +30,25 @@ export default function BuyerSaved() {
   const { theme } = useAppTheme();
   const PURPLE = theme.accent;
   const PURPLE_DIM = theme.accentDim;
-  const GRAD_PRIMARY = [theme.accent, theme.accentLight] as const;
+  const GRAD_PRIMARY = theme.primaryGradient;
   const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [items, setItems] = useState<SavedItem[]>([]);
   const [activeTab, setActiveTab] = useState<SavedItemType>('post');
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   async function loadData() {
-    const data = await getSavedItems();
-    setItems(data);
+    setLoadError(false);
+    try {
+      setItems(await getSavedItems());
+    } catch (error) {
+      setLoadError(true);
+      reportNetworkError(error, loadData);
+    } finally {
+      setLoading(false);
+    }
   }
 
   useFocusEffect(useCallback(() => { loadData(); }, []));
@@ -79,8 +89,12 @@ export default function BuyerSaved() {
           text: 'Remove from saved',
           style: 'destructive',
           onPress: async () => {
-            await removeSavedItem(item.targetId);
-            loadData();
+            try {
+              await removeSavedItem(item.targetId);
+              await loadData();
+            } catch {
+              Alert.alert('Could not remove saved item', 'Try again.');
+            }
           },
         },
         { text: 'Cancel', style: 'cancel' },
@@ -184,7 +198,7 @@ export default function BuyerSaved() {
       </View>
 
       {/* CONTENT */}
-      {filtered.length === 0 ? (
+       {loading ? <View style={styles.emptyContainer}><Text style={styles.emptyDesc}>Loading saved items…</Text></View> : loadError ? <View style={styles.emptyContainer}><Text style={styles.emptyTitle}>Couldn't load saved items</Text><TouchableOpacity onPress={loadData}><Text style={[styles.emptyDesc, { color: PURPLE }]}>Try again</Text></TouchableOpacity></View> : filtered.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Feather name={activeTabDef.icon as any} size={48} color={MUTED} />
           <Text style={styles.emptyTitle}>{emptyTitle()}</Text>
@@ -266,7 +280,7 @@ const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.
   },
   tabActive: {
     backgroundColor: theme.accentDim,
-    borderColor: BORDER_ACTIVE,
+    borderColor: theme.accent,
   },
   tabText: {
     color: MUTED,

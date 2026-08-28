@@ -10,7 +10,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, RED, OVERLAY,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE, RED, OVERLAY,
   BORDER_SUBTLE, ON_DARK,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
@@ -137,8 +137,8 @@ export default function BuyerAccountControl() {
         </View>
 
         {/* Account deletion — requires contacting support */}
-        <View style={s.infoNote}>
-          <Feather name="info" size={16} color={PURPLE} />
+        <View style={[s.infoNote, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
+          <Feather name="info" size={16} color={theme.accent} />
           <View style={{ flex: 1 }}>
             <Text style={s.infoTitle}>Want to delete your account?</Text>
             <Text style={s.infoDesc}>
@@ -148,14 +148,14 @@ export default function BuyerAccountControl() {
         </View>
 
         {/* Download data first */}
-        <View style={s.downloadNote}>
-          <Feather name="download" size={16} color={PURPLE} />
+        <View style={[s.downloadNote, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
+          <Feather name="download" size={16} color={theme.accent} />
           <View style={{ flex: 1 }}>
             <Text style={s.downloadTitle}>Download your data first</Text>
             <Text style={s.downloadDesc}>Get a copy of everything before you go.</Text>
           </View>
           <TouchableOpacity onPress={() => router.push('/buyer-download-data' as never)}>
-            <Text style={s.downloadLink}>Download</Text>
+            <Text style={[s.downloadLink, { color: theme.accent }]}>Download</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -182,13 +182,13 @@ const s = StyleSheet.create({
   bulletText: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
   actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: SP.md, paddingVertical: 14, borderTopWidth: 1, borderTopColor: BORDER },
   actionBtnText: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
-  infoNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SP.md, backgroundColor: 'rgba(139,92,246,0.08)', borderRadius: RADIUS.md, borderWidth: 1, borderColor: 'rgba(139,92,246,0.2)', marginTop: SP.sm, marginBottom: SP.sm },
+  infoNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SP.md, borderRadius: RADIUS.md, borderWidth: 1, marginTop: SP.sm, marginBottom: SP.sm },
   infoTitle: { fontFamily: FONT.medium, fontSize: FS.sm, color: FG, marginBottom: 2 },
   infoDesc: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, lineHeight: 17 },
-  downloadNote: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SP.md, backgroundColor: 'rgba(139,92,246,0.08)', borderRadius: RADIUS.md, borderWidth: 1, borderColor: 'rgba(139,92,246,0.2)', marginTop: SP.sm },
+  downloadNote: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SP.md, borderRadius: RADIUS.md, borderWidth: 1, marginTop: SP.sm },
   downloadTitle: { fontFamily: FONT.medium, fontSize: FS.sm, color: FG },
   downloadDesc: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
-  downloadLink: { fontFamily: FONT.semibold, fontSize: FS.sm, color: PURPLE },
+  downloadLink: { fontFamily: FONT.semibold, fontSize: FS.sm },
 });
 
 const m = StyleSheet.create({

@@ -22,6 +22,7 @@ import {
   reserveLoyaltyRedemption,
   reversePurchasePointsOnce,
 } from "./loyalty";
+import { getSellerVacationStatus } from "../lib/sellerAvailability";
 
 const router = Router();
 router.use(requireAuth);
@@ -252,6 +253,18 @@ router.post("/cart/validate", async (req, res) => {
     }
     subtotalCents += row.priceCents * quantity;
   }
+  for (const sellerId of sellerIds) {
+    const vacation = await getSellerVacationStatus(sellerId);
+    if (vacation.active) {
+      issues.push({
+        itemId: `seller:${sellerId}`,
+        productName: "Seller availability",
+        type: "unavailable",
+        message: vacation.message,
+        canContinue: false,
+      });
+    }
+  }
   if (issues.length === 0 && sellerIds.size === 1) {
     const sellerId = [...sellerIds][0];
     for (const codeValue of discountCodeValues) {
@@ -433,6 +446,16 @@ router.post("/checkout/session", async (req, res) => {
       .from(users)
       .where(eq(users.clerkId, sellerId))
       .limit(1);
+
+    const vacation = await getSellerVacationStatus(sellerId);
+    if (vacation.active) {
+      res.status(409).json({
+        error: vacation.message,
+        code: "SELLER_ON_VACATION",
+        vacationUntil: vacation.until?.toISOString() ?? null,
+      });
+      return;
+    }
 
     if (!seller?.stripeAccountId) {
       res.status(400).json({

@@ -14,7 +14,7 @@ import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerPr
 import { updateMyProfile, getMyProfile } from '@/services/socialService';
 import { api } from '@/lib/api';
 import {
-  BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN, GRAD_PRIMARY,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE,
   RED, ORANGE, SUCCESS,
   FONT, FS, SP, RADIUS, OVERLAY,
 } from '@/lib/theme';
@@ -272,7 +272,7 @@ export default function BuyerEditProfileScreen() {
               {avatarUri ? (
                 <Image source={{ uri: avatarUri }} style={styles.avatar} />
               ) : (
-                <LinearGradient colors={GRAD_PRIMARY} style={styles.avatar}>
+                <LinearGradient colors={[...theme.primaryGradient]} style={styles.avatar}>
                   <Text style={styles.avatarText}>
                     {fields.name ? fields.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2) : '😎'}
                   </Text>
@@ -483,7 +483,7 @@ const styles = StyleSheet.create({
   avatarOutline: { width: 84, height: 84, borderRadius: 42, borderWidth: 1.5, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   editPhotoLink: { fontSize: 14, fontFamily: FONT.medium },
   previewLabel: { fontSize: 12, fontFamily: FONT.medium, color: MUTED, marginBottom: 8 },
-  previewBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', borderRadius: 20, borderWidth: 1, borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM, paddingHorizontal: 12, paddingVertical: 6 },
+  previewBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', borderRadius: 20, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 6 },
   previewEmoji: { fontSize: 14 },
   previewText: { fontSize: 12, fontFamily: FONT.semibold },
 
@@ -503,6 +503,6 @@ const styles = StyleSheet.create({
   pickerHandle: { width: 36, height: 4, backgroundColor: BORDER, borderRadius: 2, alignSelf: 'center', marginBottom: SP.md },
   pickerTitle: { fontFamily: FONT.semibold, fontSize: FS.base, color: MUTED, paddingVertical: SP.sm, marginBottom: SP.xs },
   pickerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: SP.xs, borderRadius: RADIUS.md },
-  pickerRowActive: { backgroundColor: PURPLE_DIM },
+  pickerRowActive: {},
   pickerRowText: { fontFamily: FONT.medium, fontSize: FS.base, color: FG },
 });

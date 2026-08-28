@@ -3,35 +3,18 @@
  */
 
 import React, { useState, useCallback } from 'react';
-import {
-  View, Text, ScrollView, TouchableOpacity,
-  TextInput, StyleSheet, ActivityIndicator, Alert, Switch,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, ActivityIndicator, Alert, Switch } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { formatCents } from '@/lib/money';
 import { LinearGradient } from 'expo-linear-gradient';
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
-  ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import {
-  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  IconButton, StatusBadge, SectionHeader, EmptyState,
-} from '@/components/BrandthreadUI';
-import {
-  getInventoryItem, getAdjustments, getEvents, getRestockRecommendations,
-  updateThreshold, updateOversellPolicy,
-} from '@/services/inventoryService';
-import {
-  InventoryItem, InventoryAdjustment, InventoryEvent,
-  RestockRecommendation, OversellPolicy,
-} from '@/services/inventoryTypes';
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
+import { getInventoryItem, getAdjustments, getEvents, getRestockRecommendations, updateThreshold, updateOversellPolicy } from '@/services/inventoryService';
+import { InventoryItem, InventoryAdjustment, InventoryEvent, RestockRecommendation, OversellPolicy } from '@/services/inventoryTypes';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -40,9 +23,7 @@ function fmtDate(iso?: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-function fmtMoney(n: number): string {
-  return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+function fmtMoney(cents: number): string { return formatCents(cents); }
 
 function statusVariant(status: string): 'success' | 'warning' | 'error' | 'info' | 'purple' | 'neutral' {
   switch (status) {
@@ -245,9 +226,9 @@ export default function InventoryDetailScreen() {
         <View style={d.summaryDivider} />
         <View style={d.inventoryValueRow}>
           <Text style={d.inventoryValueLabel}>Inventory Value</Text>
-          <Text style={[d.inventoryValueAmount, { color: GOLD }]}>{fmtMoney(item.inventoryValue)}</Text>
+          <Text style={[d.inventoryValueAmount, { color: GOLD }]}>{fmtMoney(item.inventoryValueCents)}</Text>
         </View>
-        <Text style={d.inventoryValueNote}>Uses cost price (${item.cost}/unit), not retail.</Text>
+        <Text style={d.inventoryValueNote}>Uses cost price ({formatCents(item.costCents)}/unit), not retail.</Text>
       </BrandthreadCard>
     );
   };
@@ -363,7 +344,7 @@ export default function InventoryDetailScreen() {
       recommendation.urgency === 'urgent'   ? 'warning' : 'info';
     return (
       <GradientCard
-        colors={['rgba(34,211,238,0.12)', 'rgba(34,211,238,0.04)']}
+        colors={[theme.secondaryDim, theme.accentDim]}
         style={d.sectionCard}
       >
         <View style={d.recHeader}>
@@ -481,7 +462,7 @@ export default function InventoryDetailScreen() {
       />
       <SecondaryButton
         label="Orders"
-        onPress={() => router.push(('/(tabs)/orders?productId=' + (item?.productId ?? id)) as never)}
+        onPress={() => router.push(('/(tabs)/orders?productId=' + (item?.productId ?? item?.id ?? '')) as never)}
         icon="shopping-bag"
         small
         style={d.actionBtn}

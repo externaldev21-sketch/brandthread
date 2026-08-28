@@ -258,7 +258,7 @@ export default function PlansScreen() {
   if (awaitingReturn) {
     return (
       <View style={styles.awaitRoot}>
-        <LinearGradient colors={['#1a0a2e', '#07070F']} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={theme.heroGradient as any} style={StyleSheet.absoluteFill} />
         <ActivityIndicator color={PURPLE} size="large" />
         <Text style={styles.awaitTitle}>Confirming your trial…</Text>
         <Text style={styles.awaitSub}>Syncing with Stripe — this takes a moment.</Text>
@@ -329,7 +329,7 @@ export default function PlansScreen() {
         {/* Trial callout */}
         <View style={styles.trialCallout}>
           <LinearGradient
-            colors={[`${PURPLE}33`, `${CYAN}22`]}
+            colors={theme.glowGradient as any}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={styles.trialCalloutInner}
           >

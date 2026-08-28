@@ -48,7 +48,9 @@ export const manufacturerPayments = pgTable('manufacturer_payments', {
   wiseEmail:     text('wise_email'),
   createdAt:     timestamp('created_at').defaultNow().notNull(),
   updatedAt:     timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  manufacturerIdx: index('manufacturer_payments_manufacturer_id_idx').on(table.manufacturerId),
+}));
 
 // ─── Manufacturer Invite Tokens (seller → private manufacturer onboarding) ─────
 
@@ -65,6 +67,7 @@ export const manufacturerInviteTokens = pgTable('manufacturer_invite_tokens', {
   createdAt:      timestamp('created_at').defaultNow().notNull(),
 }, (t) => ({
   sellerIdx: index('mfg_invite_tokens_seller_idx').on(t.sellerId),
+  manufacturerIdx: index('manufacturer_invite_tokens_manufacturer_id_idx').on(t.manufacturerId),
 }));
 
 // ─── Manufacturer Message Threads ─────────────────────────────────────────────
@@ -81,7 +84,9 @@ export const manufacturerThreads = pgTable('manufacturer_threads', {
   lastMessage:    text('last_message').notNull().default(''),
   lastMessageAt:  timestamp('last_message_at').defaultNow().notNull(),
   createdAt:      timestamp('created_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  manufacturerIdx: index('manufacturer_threads_manufacturer_id_idx').on(table.manufacturerId),
+}));
 
 // ─── Messages ─────────────────────────────────────────────────────────────────
 
@@ -97,7 +102,9 @@ export const manufacturerMessages = pgTable('manufacturer_messages', {
   // For sample_card / bulk_card messages
   cardData:    json('card_data').$type<Record<string, unknown> | null>(),
   sentAt:      timestamp('sent_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  threadIdx: index('manufacturer_messages_thread_id_idx').on(table.threadId),
+}));
 
 // ─── Manufacturer Orders ──────────────────────────────────────────────────────
 
@@ -118,7 +125,9 @@ export const manufacturerOrders = pgTable('manufacturer_orders', {
   trackingNumber: text('tracking_number'),
   createdAt:      timestamp('created_at').defaultNow().notNull(),
   updatedAt:      timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  manufacturerIdx: index('manufacturer_orders_manufacturer_id_idx').on(table.manufacturerId),
+}));
 
 // ─── Sample Orders (6-stage tracker — sample + bulk) ─────────────────────────
 
@@ -151,6 +160,8 @@ export const sampleOrders = pgTable('sample_orders', {
 }, (t) => ({
   sellerIdx: index('sample_orders_seller_idx').on(t.sellerId),
   mfgIdx:    index('sample_orders_mfg_idx').on(t.manufacturerId),
+  threadIdx: index('sample_orders_thread_idx').on(t.threadId),
+  walletIdx: index('sample_orders_wallet_id_idx').on(t.walletId),
 }));
 
 // ─── Drop Wallets ─────────────────────────────────────────────────────────────
@@ -185,4 +196,5 @@ export const dropWalletTransactions = pgTable('drop_wallet_transactions', {
 }, (t) => ({
   walletIdx: index('dwt_wallet_idx').on(t.walletId),
   orderIdx:  index('dwt_order_idx').on(t.orderId),
+  sampleOrderIdx: index('dwt_sample_order_id_idx').on(t.sampleOrderId),
 }));

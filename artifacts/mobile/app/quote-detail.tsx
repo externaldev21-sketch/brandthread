@@ -24,6 +24,7 @@ import {
   submitCounteroffer, getOrCreateConversation, createSample, getManufacturer,
 } from '@/services/manufacturerService';
 import { Quote, Counteroffer } from '@/services/manufacturerTypes';
+import { formatCents, parseDecimalToCents } from '@/lib/money';
 
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
@@ -105,7 +106,7 @@ function CounterOfferForm({
     setSubmitting(true);
     try {
       await submitCounteroffer(quoteId, {
-        desiredUnitPrice: form.desiredUnitPrice ? parseFloat(form.desiredUnitPrice) : undefined,
+        desiredUnitPriceCents: form.desiredUnitPrice ? parseDecimalToCents(form.desiredUnitPrice) ?? undefined : undefined,
         desiredMoq: form.desiredMoq ? parseInt(form.desiredMoq) : undefined,
         desiredProductionDays: form.desiredProductionDays ? parseInt(form.desiredProductionDays) : undefined,
         desiredPaymentTerms: form.desiredPaymentTerms || undefined,
@@ -270,7 +271,7 @@ export default function QuoteDetailScreen() {
         quoteId: quote.id,
         productName: quote.productName,
         type: 'proto',
-        cost: quote.sampleCost,
+        costCents: quote.sampleCostCents,
       });
       router.push({ pathname: '/sample-detail', params: { id: sample.id } } as any);
     } catch (err: any) {
@@ -350,15 +351,15 @@ export default function QuoteDetailScreen() {
           {/* ── PRICING BREAKDOWN ────────────────────────────────── */}
           <SectionHeader title="Pricing Breakdown" style={s.sectionHeader} />
           <BrandthreadCard style={s.section}>
-            <InfoRow label="Unit Price" value={`$${quote.unitPrice.toFixed(2)}`} />
-            <InfoRow label="Sample Cost" value={`$${quote.sampleCost.toFixed(2)}`} />
-            <InfoRow label="Setup / Tooling" value={`$${quote.setupCost.toFixed(2)}`} />
-            <InfoRow label="Packaging" value={`$${quote.packagingCost.toFixed(2)}`} />
-            <InfoRow label="Shipping Estimate" value={`$${quote.shippingEstimate.toFixed(2)}`} />
+            <InfoRow label="Unit Price" value={formatCents(quote.unitPriceCents)} />
+            <InfoRow label="Sample Cost" value={formatCents(quote.sampleCostCents)} />
+            <InfoRow label="Setup / Tooling" value={formatCents(quote.setupCostCents)} />
+            <InfoRow label="Packaging" value={formatCents(quote.packagingCostCents)} />
+            <InfoRow label="Shipping Estimate" value={formatCents(quote.shippingEstimateCents)} />
             <View style={s.separator} />
             <View style={s.totalRow}>
               <Text style={s.totalLabel}>Total Estimate</Text>
-              <Text style={s.totalValue}>${quote.totalEstimate.toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+              <Text style={s.totalValue}>{formatCents(quote.totalEstimateCents)}</Text>
             </View>
           </BrandthreadCard>
 
@@ -392,8 +393,8 @@ export default function QuoteDetailScreen() {
                       small
                     />
                   </View>
-                  {co.desiredUnitPrice !== undefined && (
-                    <InfoRow label="Desired Unit Price" value={`$${co.desiredUnitPrice.toFixed(2)}`} />
+                  {co.desiredUnitPriceCents !== undefined && (
+                    <InfoRow label="Desired Unit Price" value={formatCents(co.desiredUnitPriceCents)} />
                   )}
                   {co.desiredMoq !== undefined && (
                     <InfoRow label="Desired MOQ" value={`${co.desiredMoq} units`} />

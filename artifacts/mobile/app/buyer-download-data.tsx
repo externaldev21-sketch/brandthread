@@ -26,7 +26,7 @@ const DEFAULT_CATEGORIES: DataCategory[] = [
 export default function BuyerDownloadData() {
   const { theme } = useAppTheme();
   const PURPLE = theme.accent;
-  const GRAD_PRIMARY = [theme.accent, theme.accentLight] as const;
+  const GRAD_PRIMARY = theme.primaryGradient;
   const s = makeStyles();
   const insets = useSafeAreaInsets();
   const router = useRouter();

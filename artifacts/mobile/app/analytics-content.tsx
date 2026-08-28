@@ -17,19 +17,23 @@ import { getContentAnalytics, getFilterState } from '@/services/analyticsService
 import { ContentAnalytics, ContentPostRow, VideoRetentionPoint, AnalyticsMetric, AnalyticsFilterState } from '@/services/analyticsTypes';
 
 function MetricTile({ m }: { m: AnalyticsMetric }) {
+  const colors = useColors();
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const upColor = m.trend === 'up' ? SUCCESS : RED;
   return (
     <View style={s.tile}>
       <Text style={s.tileValue}>{m.formatted}</Text>
       <Text style={s.tileLabel} numberOfLines={1}>{m.label}</Text>
       <Text style={[s.tileChange, { color: m.trend === 'flat' ? MUTED : upColor }]}>
-        {m.changePct > 0 ? '+' : ''}{m.changePct.toFixed(1)}%
+        {(m.changePct ?? 0) > 0 ? '+' : ''}{m.changePct?.toFixed(1) ?? '—'}%
       </Text>
     </View>
   );
 }
 
 function PostCard({ p }: { p: ContentPostRow }) {
+  const colors = useColors();
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   return (
     <TouchableOpacity
@@ -38,7 +42,7 @@ function PostCard({ p }: { p: ContentPostRow }) {
       activeOpacity={0.8}
     >
       <View style={s.postThumb}>
-        <Feather name={p.type === 'video' ? 'play-circle' : 'image'} size={22} color={PURPLE} />
+        <Feather name={p.type === 'video' ? 'play-circle' : 'image'} size={22} color={colors.primary} />
         <View style={s.postTypeBadge}>
           <Text style={s.postTypeText}>{p.type === 'video' ? 'Vid' : p.type === 'slideshow' ? 'SS' : 'Img'}</Text>
         </View>
@@ -64,6 +68,8 @@ function PostCard({ p }: { p: ContentPostRow }) {
 }
 
 function RetentionGraph({ points }: { points: VideoRetentionPoint[] }) {
+  const colors = useColors();
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const max = 100;
   return (
     <View>
@@ -89,7 +95,9 @@ function RetentionGraph({ points }: { points: VideoRetentionPoint[] }) {
 }
 
 export default function AnalyticsContentScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const colors = useColors();
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = colors;
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -99,13 +107,17 @@ export default function AnalyticsContentScreen() {
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [tab,        setTab]        = useState<'videos' | 'slideshows' | 'top_revenue'>('videos');
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
-    const f = filter ?? await getFilterState();
-    if (!filter) setFilter(f);
-    setData(await getContentAnalytics(f));
-    setLoading(false); setRefreshing(false);
+    try {
+      const f = filter ?? await getFilterState();
+      if (!filter) setFilter(f);
+      setData(await getContentAnalytics(f)); setError(null);
+    } catch (err) {
+      setData(null); setError(err instanceof Error ? err.message : 'Content analytics are unavailable.');
+    } finally { setLoading(false); setRefreshing(false); }
   }, [filter]);
 
   useEffect(() => { load(); }, []); // eslint-disable-line
@@ -117,6 +129,7 @@ export default function AnalyticsContentScreen() {
   if (loading) {
     return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><ActivityIndicator size="large" color={PURPLE} /></View>;
   }
+  if (error) return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><Text style={{ color: MUTED }}>{error}</Text><TouchableOpacity onPress={() => load()}><Text style={{ color: PURPLE }}>Retry</Text></TouchableOpacity></View>;
 
   return (
     <ScrollView
@@ -198,7 +211,9 @@ export default function AnalyticsContentScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT } = colors;
+  return StyleSheet.create({
   scroll:   { flex: 1, backgroundColor: BG },
   content:  { paddingHorizontal: 16 },
   loadWrap: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
@@ -248,4 +263,5 @@ const s = StyleSheet.create({
   emptyState:{ alignItems: 'center', paddingVertical: 48, gap: 12 },
   emptyTitle:{ fontSize: 16, fontFamily: FONT.semibold, color: FG },
   emptyBody:{ fontSize: 13, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', paddingHorizontal: 24 },
-});
+  });
+};

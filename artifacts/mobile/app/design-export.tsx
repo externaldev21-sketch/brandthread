@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Alert, ActivityIndicator, Dimensions,
@@ -15,8 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, BLUE, ORANGE, GOLD,
+  FG, MUTED, SUBTLE, BLUE, ORANGE, GOLD,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
@@ -59,7 +58,9 @@ const SIZES: SizeOption[] = [
 ];
 
 export default function DesignExportScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
+  const styles = createStyles(theme);
   const router   = useRouter();
   const insets   = useSafeAreaInsets();
   const { projectId } = useLocalSearchParams<{ projectId?: string }>();
@@ -124,7 +125,7 @@ export default function DesignExportScreen() {
         {/* Preview thumbnail */}
         <View style={styles.thumbWrap}>
           <LinearGradient
-            colors={['#8B5CF6', '#22D3EE']}
+            colors={theme.primaryGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.thumb}
@@ -214,7 +215,9 @@ export default function DesignExportScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   scrollContent: { paddingBottom: 120, paddingHorizontal: SP.md },
 
@@ -264,4 +267,5 @@ const styles = StyleSheet.create({
 
   exportWrap: { marginTop: SP.lg },
   exportBtn: {},
-});
+  });
+};

@@ -5,14 +5,15 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
-import {
-  FRIENDS, Message,
-  getMessages, getUnread, isTyping, markRead, sendMessage, subscribe,
-} from '@/lib/chatStore';
+import { useApi } from '@/lib/api';
+import type { Conversation, Message } from '@/services/socialTypes';
+
+type ChatMessage = Omit<Message, 'status'> & { status: 'sent' | 'delivered' | 'read' | 'failed' };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -34,11 +35,11 @@ function formatDay(ts: number) {
 
 // ─── Message bubble ───────────────────────────────────────────────────────────
 
-function Bubble({ msg, prevMsg, isDark, friendColor }: {
-  msg: Message;
-  prevMsg: Message | null;
+function Bubble({ msg, prevMsg, isDark, currentUserId }: {
+  msg: ChatMessage;
+  prevMsg: ChatMessage | null;
   isDark: boolean;
-  friendColor: string;
+  currentUserId: string | null | undefined;
 }) {
   const colors = useColors();
   const fg       = isDark ? '#F4F4FF' : '#07070F';
@@ -51,7 +52,7 @@ function Bubble({ msg, prevMsg, isDark, friendColor }: {
     || (new Date(msg.ts).toDateString() !== new Date(prevMsg.ts).toDateString());
 
   // Show time under bubble if last in a run from same sender
-  const isMe = msg.fromMe;
+  const isMe = msg.fromId === currentUserId;
 
   return (
     <>
@@ -108,27 +109,6 @@ const bub = StyleSheet.create({
   dividerText: { fontSize: 11, fontFamily: 'Inter_500Medium' },
 });
 
-// ─── Typing indicator ─────────────────────────────────────────────────────────
-
-function TypingIndicator({ isDark }: { isDark: boolean }) {
-  const colors = useColors();
-  const [dots, setDots] = useState('•');
-  useEffect(() => {
-    const id = setInterval(() => setDots(d => d.length >= 3 ? '•' : d + '•'), 400);
-    return () => clearInterval(id);
-  }, []);
-  return (
-    <View style={[ty.wrap, { backgroundColor: isDark ? '#1D1A15' : '#EDE7D9' }]}>
-      <Text style={[ty.dots, { color: colors.accentForeground }]}>{dots}</Text>
-    </View>
-  );
-}
-
-const ty = StyleSheet.create({
-  wrap: { alignSelf: 'flex-start', marginLeft: 24, marginTop: 6, marginBottom: 4, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, borderBottomLeftRadius: 5 },
-  dots: { fontSize: 18, fontFamily: 'Inter_700Bold', letterSpacing: 3 },
-});
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function ChatScreen() {
@@ -138,13 +118,17 @@ export default function ChatScreen() {
   const insets  = useSafeAreaInsets();
   const router  = useRouter();
   const colors = useColors();
+  const api = useApi();
+  const { userId } = useAuth();
 
-  const friend = FRIENDS[id ?? ''];
-
-  const [messages, setMessages] = useState<Message[]>(() => getMessages(id ?? ''));
-  const [typing,   setTyping]   = useState(false);
+  const [conversation, setConversation] = useState<Conversation | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text,     setText]     = useState('');
-  const listRef = useRef<FlatList>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [isSending, setIsSending] = useState(false);
+  const listRef = useRef<FlatList<ChatMessage>>(null);
 
   const bg      = isDark ? '#121110' : '#F4F3FA';
   const headerBg = isDark ? '#1B1917' : '#FFFFFF';
@@ -153,37 +137,92 @@ export default function ChatScreen() {
   const muted   = isDark ? '#8C8577' : '#8080A0';
   const inputBg = isDark ? '#1D1A15' : '#FFFFFF';
 
-  // Subscribe to store updates
   useEffect(() => {
-    const unsub = subscribe(() => {
-      setMessages([...getMessages(id ?? '')]);
-      setTyping(isTyping(id ?? ''));
-    });
-    markRead(id ?? '');
-    return () => { unsub(); };
-  }, [id]);
+    let active = true;
+    if (!id) {
+      setConversation(null);
+      setMessages([]);
+      setLoadError('This conversation is unavailable.');
+      setIsLoading(false);
+      return;
+    }
+    setIsLoading(true);
+    setLoadError(null);
+    setSendError(null);
+    (async () => {
+      try {
+        const [loadedConversation, loadedMessages] = await Promise.all([
+          api.conversations.get(id),
+          api.conversations.messages(id),
+        ]);
+        if (!active) return;
+        setConversation(loadedConversation as Conversation);
+        setMessages((Array.isArray(loadedMessages) ? loadedMessages : []) as ChatMessage[]);
+        try {
+          await api.conversations.markRead(id);
+        } catch (error) {
+          if (active) setSendError(error instanceof Error ? `Could not mark messages as read: ${error.message}` : 'Could not mark messages as read.');
+        }
+      } catch (error) {
+        if (active) {
+          setConversation(null);
+          setMessages([]);
+          setLoadError(error instanceof Error ? `Conversation unavailable: ${error.message}` : 'Conversation unavailable.');
+        }
+      } finally {
+        if (active) setIsLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, [api, id]);
 
   // Scroll to bottom when messages change
   useEffect(() => {
     if (messages.length > 0) {
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
     }
-  }, [messages.length, typing]);
+  }, [messages.length]);
 
-  const handleSend = useCallback(() => {
+  const handleSend = useCallback(async () => {
     const trimmed = text.trim();
-    if (!trimmed || !id) return;
+    if (!trimmed || !id || !conversation || isSending) return;
     setText('');
+    setSendError(null);
+    setIsSending(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    sendMessage(id, trimmed);
-  }, [text, id]);
+    try {
+      const canonicalMessage = await api.conversations.send(id, { text: trimmed });
+      setMessages((current) => [
+        ...current.filter((message) => message.id !== canonicalMessage.id),
+        canonicalMessage as ChatMessage,
+      ]);
+    } catch (error) {
+      setText(trimmed);
+      setSendError(error instanceof Error ? `Message was not sent: ${error.message}` : 'Message was not sent. Please try again.');
+    } finally {
+      setIsSending(false);
+    }
+  }, [api, conversation, id, isSending, text]);
 
-  if (!friend) return null;
+  const participant = conversation?.participants.find((item) => item.userId !== userId)
+    ?? conversation?.participants[0];
 
-  const data: Array<Message | { _typing: true }> = [
-    ...messages,
-    ...(typing ? [{ _typing: true as const }] : []),
-  ];
+  if (isLoading) {
+    return <View style={[s.state, { backgroundColor: bg }]}><Text style={[s.stateText, { color: muted }]}>Loading conversation…</Text></View>;
+  }
+
+  if (!conversation || !participant) {
+    return (
+      <View style={[s.state, { backgroundColor: bg }]}>
+        <Feather name="message-circle" size={30} color={muted} />
+        <Text style={[s.stateTitle, { color: fg }]}>Conversation unavailable</Text>
+        <Text style={[s.stateText, { color: muted }]}>{loadError ?? 'This conversation could not be found.'}</Text>
+        <TouchableOpacity onPress={() => router.back()} style={[s.stateButton, { borderColor: border }]}>
+          <Text style={[s.stateButtonText, { color: colors.primary }]}>Go back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -199,15 +238,14 @@ export default function ChatScreen() {
 
         <TouchableOpacity style={s.headerCenter} activeOpacity={0.85}>
           <View style={{ position: 'relative' }}>
-            <View style={[s.headerAvatar, { backgroundColor: friend.color }]}>
-              <Text style={s.headerInitials}>{friend.initials}</Text>
+             <View style={[s.headerAvatar, { backgroundColor: participant.color }]}>
+               <Text style={s.headerInitials}>{participant.initials}</Text>
             </View>
-            {friend.online && <View style={[s.onlineDot, { borderColor: headerBg }]} />}
           </View>
           <View>
-            <Text style={[s.headerName, { color: fg }]}>{friend.name}</Text>
+             <Text style={[s.headerName, { color: fg }]}>{participant.name}</Text>
             <Text style={[s.headerStatus, { color: muted }]}>
-              {friend.online ? 'Active now' : 'Offline'}
+               {conversation.isRequest ? 'Message request' : 'Conversation'}
             </Text>
           </View>
         </TouchableOpacity>
@@ -225,23 +263,29 @@ export default function ChatScreen() {
       {/* Messages */}
       <FlatList
         ref={listRef}
-        data={data}
-        keyExtractor={(item, i) => ('_typing' in item ? 'typing' : item.id)}
+         data={messages}
+         keyExtractor={(item) => item.id}
         style={{ flex: 1, backgroundColor: bg }}
         contentContainerStyle={{ paddingVertical: 12 }}
         keyboardDismissMode="interactive"
+         ListHeaderComponent={sendError ? (
+           <View style={[s.errorBanner, { backgroundColor: isDark ? '#3A1F20' : '#FDE8E8' }]}>
+             <Text style={[s.errorText, { color: isDark ? '#FCA5A5' : '#B91C1C' }]}>{sendError}</Text>
+           </View>
+         ) : null}
+         ListEmptyComponent={
+           <View style={s.emptyMessages}>
+             <Text style={[s.emptyMessagesText, { color: muted }]}>No messages yet.</Text>
+           </View>
+         }
         renderItem={({ item, index }) => {
-          if ('_typing' in item) {
-            return <TypingIndicator isDark={isDark} />;
-          }
-          const prev = index > 0 && !('_typing' in data[index - 1])
-            ? (data[index - 1] as Message) : null;
+           const prev = index > 0 ? messages[index - 1] : null;
           return (
             <Bubble
               msg={item}
               prevMsg={prev}
               isDark={isDark}
-              friendColor={friend.color}
+               currentUserId={userId}
             />
           );
         }}
@@ -254,7 +298,7 @@ export default function ChatScreen() {
             style={[s.input, { color: fg }]}
             value={text}
             onChangeText={setText}
-            placeholder={`Message ${friend.name.split(' ')[0]}…`}
+             placeholder={`Message ${participant.name.split(' ')[0]}…`}
             placeholderTextColor={muted}
             multiline
             maxLength={500}
@@ -264,7 +308,7 @@ export default function ChatScreen() {
         <TouchableOpacity
           onPress={handleSend}
           activeOpacity={text.trim() ? 0.8 : 0.4}
-          disabled={!text.trim()}
+           disabled={!text.trim() || isSending}
         >
           <LinearGradient
             colors={text.trim() ? [colors.accent, colors.primary] : [isDark ? '#2A261E' : '#E8E1CF', isDark ? '#2A261E' : '#E8E1CF']}
@@ -298,4 +342,13 @@ const s = StyleSheet.create({
   inputWrap: { flex: 1, borderRadius: 22, borderWidth: 1, paddingHorizontal: 14, paddingVertical: Platform.OS === 'ios' ? 10 : 6, maxHeight: 110 },
   input:     { fontSize: 15, fontFamily: 'Inter_400Regular', lineHeight: 21 },
   sendBtn:   { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  errorBanner: { marginHorizontal: 14, marginBottom: 8, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 9 },
+  errorText: { fontSize: 12, fontFamily: 'Inter_500Medium', lineHeight: 17 },
+  emptyMessages: { alignItems: 'center', paddingTop: 40 },
+  emptyMessagesText: { fontSize: 14, fontFamily: 'Inter_400Regular' },
+  state: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 28, gap: 10 },
+  stateTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', marginTop: 4 },
+  stateText: { fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 20 },
+  stateButton: { marginTop: 8, borderWidth: 1, borderRadius: 18, paddingHorizontal: 16, paddingVertical: 9 },
+  stateButtonText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
 });

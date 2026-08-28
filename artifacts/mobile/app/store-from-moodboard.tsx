@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, Image, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
@@ -108,6 +109,8 @@ async function resizeToBase64(uri: string, maxPx = 800): Promise<string> {
 }
 
 export default function StoreFromMoodboardScreen() {
+  const { theme } = useAppTheme();
+  const mb = makeStyles(theme);
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const { user, isLoaded: isUserLoaded } = useUser();
@@ -298,7 +301,7 @@ export default function StoreFromMoodboardScreen() {
         </Text>
 
         {/* AI badge */}
-        <BrandthreadCard style={[mb.card, { borderColor: PURPLE_DIM, backgroundColor: 'rgba(124,58,237,0.08)' }]}>
+        <BrandthreadCard style={[mb.card, { borderColor: PURPLE_DIM, backgroundColor: theme.accentDim }]}>
           <View style={mb.bannerRow}>
             <Feather name="zap" size={ICON.sm} color={PURPLE_LIGHT} />
             <Text style={[mb.bannerText, { color: PURPLE_LIGHT }]}>
@@ -478,7 +481,10 @@ export default function StoreFromMoodboardScreen() {
   );
 }
 
-const mb = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE_DIM = theme.accentDim;
+  const PURPLE_LIGHT = theme.accentLight;
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
@@ -540,4 +546,5 @@ const mb = StyleSheet.create({
     borderRadius: RADIUS.xs, borderWidth: 1, borderColor: 'rgba(251,191,36,0.35)',
   },
   retryText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: '#fbbf24' },
-});
+  });
+};

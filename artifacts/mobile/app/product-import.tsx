@@ -6,29 +6,13 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
-import {
-  BG, CARD, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, SUCCESS, ORANGE, RED, GOLD,
-  GRAD_PRIMARY, GRAD_CARD_GLOW,
-  ON_DARK, FONT, FS, SP, RADIUS, COMP, ICON,
-} from '@/lib/theme';
+import { BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE, SUCCESS, RED, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 
-import {
-  BrandthreadCard,
-  GradientCard,
-  PrimaryButton,
-  SecondaryButton,
-  IconButton,
-  SectionHeader,
-  StatusBadge,
-  EmptyState,
-  FormInput,
-} from '@/components/BrandthreadUI';
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SectionHeader, StatusBadge, EmptyState, FormInput } from '@/components/BrandthreadUI';
 
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 // ─── Import History Demo Data ─────────────────────────────────────────────────
 
@@ -47,6 +31,8 @@ function methodIcon(method: string): keyof typeof Feather.glyphMap {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function ProductImportScreen() {
+  const { theme } = useAppTheme();
+  const s = makeStyles(theme);
   const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -156,8 +142,8 @@ export default function ProductImportScreen() {
           glow={selectedMethod === 'csv'}
         >
           <View style={s.methodRow}>
-            <View style={[s.methodIconWrap, { backgroundColor: PURPLE + '22' }]}>
-              <Feather name="file-text" size={ICON.md} color={PURPLE} />
+            <View style={[s.methodIconWrap, { backgroundColor: theme.accentDim }]}>
+              <Feather name="file-text" size={ICON.md} color={theme.accent} />
             </View>
             <View style={s.methodInfo}>
               <Text style={s.methodTitle}>CSV File</Text>
@@ -227,8 +213,8 @@ export default function ProductImportScreen() {
           glow={selectedMethod === 'manual'}
         >
           <View style={s.methodRow}>
-            <View style={[s.methodIconWrap, { backgroundColor: CYAN + '22' }]}>
-              <Feather name="list" size={ICON.md} color={CYAN} />
+            <View style={[s.methodIconWrap, { backgroundColor: theme.secondaryDim }]}>
+              <Feather name="list" size={ICON.md} color={theme.secondary} />
             </View>
             <View style={s.methodInfo}>
               <Text style={s.methodTitle}>Manual bulk entry</Text>
@@ -326,12 +312,12 @@ export default function ProductImportScreen() {
             autoCorrect={false}
           />
           <TouchableOpacity
-            style={{ marginTop: 16, backgroundColor: PURPLE_LIGHT, borderRadius: 12, paddingVertical: 14, alignItems: 'center', opacity: !csvText.trim() ? 0.5 : 1 }}
+            style={{ marginTop: 16, backgroundColor: theme.accent, borderRadius: 12, paddingVertical: 14, alignItems: 'center', opacity: !csvText.trim() ? 0.5 : 1, shadowColor: theme.shadowColor }}
             disabled={!csvText.trim() || csvUploading}
             activeOpacity={0.85}
             onPress={importCsv}
           >
-            <Text style={{ fontSize: 15, fontFamily: FONT.bold, color: '#fff' }}>
+            <Text style={{ fontSize: 15, fontFamily: FONT.bold, color: theme.onAccent }}>
               {csvUploading ? 'Importing…' : 'Import Products'}
             </Text>
           </TouchableOpacity>
@@ -343,7 +329,7 @@ export default function ProductImportScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: BG,

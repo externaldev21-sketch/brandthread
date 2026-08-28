@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   Alert, ActivityIndicator,
@@ -14,8 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
   BG, CARD, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, ORANGE,
+  FG, MUTED, SUBTLE, ORANGE,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
@@ -36,7 +35,9 @@ function formatDate(iso: string): string {
 }
 
 export default function DesignVersionsScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
+  const styles = createStyles(theme);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { projectId } = useLocalSearchParams<{ projectId?: string }>();
@@ -183,7 +184,9 @@ export default function DesignVersionsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { paddingHorizontal: SP.md, paddingBottom: 120 },
@@ -211,4 +214,5 @@ const styles = StyleSheet.create({
     marginTop: SP.md, paddingHorizontal: SP.sm,
   },
   autosaveText: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
-});
+  });
+};

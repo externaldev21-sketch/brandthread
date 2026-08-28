@@ -10,8 +10,8 @@
  * GET    /api/social/search?q=&limit=    — search buyers by name / username
  */
 import { Router } from "express";
-import { db, users, follows, stories, storyLikes, storyViews, blocks } from "@workspace/db";
-import { eq, and, or, ilike, ne, inArray, sql, gt } from "drizzle-orm";
+import { db, users, follows, stories, storyLikes, storyViews, blocks, posts, interactions } from "@workspace/db";
+import { eq, and, or, ilike, ne, inArray, sql, gt, desc, count } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { publishNotification } from "./notifications-feed";
 
@@ -55,6 +55,91 @@ function formatUser(u: UserRow) {
 
 function countOne(arr: { n: number }[] | undefined) {
   return arr?.[0]?.n ?? 0;
+}
+
+async function buildBuyerPosts(viewerId: string, authorIds: string[], limit: number, offset: number) {
+  if (authorIds.length === 0) return [];
+  const rows = await db.select({
+    id: posts.id,
+    userId: posts.userId,
+    mediaUrl: posts.mediaUrl,
+    mediaType: posts.mediaType,
+    caption: posts.caption,
+    styleTags: posts.styleTags,
+    createdAt: posts.createdAt,
+    name: users.name,
+    displayName: users.displayName,
+    username: users.username,
+  }).from(posts)
+    .innerJoin(users, and(
+      eq(users.clerkId, posts.userId),
+      eq(users.accountType, "buyer"),
+      inArray(posts.userId, authorIds),
+    ))
+    .orderBy(desc(posts.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  if (rows.length === 0) return [];
+  const postIds = rows.map((row) => row.id);
+  const [likeRows, repostRows, commentRows, myRows] = await Promise.all([
+    db.select({ postId: interactions.postId, n: count() }).from(interactions)
+      .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "like")))
+      .groupBy(interactions.postId),
+    db.select({ postId: interactions.postId, n: count() }).from(interactions)
+      .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "repost")))
+      .groupBy(interactions.postId),
+    db.select({ postId: interactions.postId, n: count() }).from(interactions)
+      .where(and(inArray(interactions.postId, postIds), eq(interactions.type, "comment")))
+      .groupBy(interactions.postId),
+    db.select({ postId: interactions.postId, type: interactions.type }).from(interactions)
+      .where(and(
+        inArray(interactions.postId, postIds),
+        eq(interactions.userId, viewerId),
+        inArray(interactions.type, ["like", "repost"]),
+      )),
+  ]);
+  const counts = (rows: Array<{ postId: string | null; n: number }>) =>
+    new Map(rows.filter((row) => row.postId).map((row) => [row.postId as string, Number(row.n)]));
+  const likes = counts(likeRows);
+  const reposts = counts(repostRows);
+  const comments = counts(commentRows);
+  const mine = new Map<string, Set<string>>();
+  for (const row of myRows) {
+    if (!row.postId) continue;
+    if (!mine.has(row.postId)) mine.set(row.postId, new Set());
+    mine.get(row.postId)!.add(row.type);
+  }
+
+  return rows.map((row) => {
+    const name = row.displayName || row.name || "Buyer";
+    return {
+      id: row.id,
+      authorId: row.userId,
+      authorName: name,
+      authorHandle: row.username ? `@${row.username}` : `@${name.toLowerCase().replace(/\s+/g, "")}`,
+      authorInitials: initials(name),
+      authorColor: avatarColor(row.userId),
+      authorAccountType: "buyer",
+      feedEligibility: "profile_only",
+      profileVisibility: "friends_only",
+      type: row.mediaType,
+      mediaUrl: row.mediaUrl,
+      caption: row.caption ?? "",
+      hashtags: row.styleTags ?? [],
+      mediaColors: [avatarColor(row.userId), "#07070f"],
+      likesCount: likes.get(row.id) ?? 0,
+      commentsCount: comments.get(row.id) ?? 0,
+      repostsCount: reposts.get(row.id) ?? 0,
+      likedByMe: mine.get(row.id)?.has("like") ?? false,
+      repostedByMe: mine.get(row.id)?.has("repost") ?? false,
+      savedByMe: false,
+      isArchived: false,
+      isDraft: false,
+      createdAt: row.createdAt,
+      updatedAt: row.createdAt,
+    };
+  });
 }
 
 // ─── POST /api/social/follow ──────────────────────────────────────────────────
@@ -148,7 +233,10 @@ router.get("/profile/:userId", async (req, res) => {
 
   // If the target has blocked the viewer, return 404 (profile invisible)
   const [blockedRow] = await db.select({ blockerId: blocks.blockerId }).from(blocks)
-    .where(and(eq(blocks.blockerId, other), eq(blocks.blockedId, myId))).limit(1);
+    .where(or(
+      and(eq(blocks.blockerId, other), eq(blocks.blockedId, myId)),
+      and(eq(blocks.blockerId, myId), eq(blocks.blockedId, other)),
+    )).limit(1);
   if (blockedRow) { res.status(404).json({ error: "User not found" }); return; }
 
   // Check if I have blocked them (viewer can still see profile, but flag is set)
@@ -172,16 +260,65 @@ router.get("/profile/:userId", async (req, res) => {
   const isFollowing  = (iFollowRow?.n   ?? 0) > 0;
   const isFollowedBy = (theyFollowRow?.n ?? 0) > 0;
 
+  const [postsRow] = await db.select({ n: sql<number>`cast(count(*) as int)` })
+    .from(posts)
+    .innerJoin(users, and(eq(users.clerkId, posts.userId), eq(users.accountType, "buyer")))
+    .where(eq(posts.userId, other));
+
   res.json({
     ...formatUser(user),
     followersCount: follsRow?.n ?? 0,
     followingCount: fingRow?.n  ?? 0,
-    postsCount:     0,
+    postsCount:     postsRow?.n ?? 0,
     isFollowing,
     isFollowedBy,
     isMutual: isFollowing && isFollowedBy,
     iBlockedThem,
   });
+});
+
+router.get("/profile/:userId/posts", async (req, res) => {
+  const myId = (req as any).clerkUserId as string;
+  const other = req.params.userId;
+  const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? "30"), 10) || 30, 1), 50);
+  const offset = Math.max(parseInt(String(req.query.offset ?? "0"), 10) || 0, 0);
+  const [blockedRow] = await db.select({ blockerId: blocks.blockerId }).from(blocks)
+    .where(and(eq(blocks.blockerId, other), eq(blocks.blockedId, myId))).limit(1);
+  if (blockedRow) { res.status(404).json({ error: "User not found" }); return; }
+  if (other !== myId) {
+    const mutual = await db.execute(sql`
+      SELECT 1
+      FROM follows mine
+      JOIN follows theirs
+        ON theirs.follower_id = mine.following_id
+       AND theirs.following_id = ${myId}
+      WHERE mine.follower_id = ${myId}
+        AND mine.following_id = ${other}
+      LIMIT 1
+    `);
+    if ((((mutual as any).rows ?? []) as any[]).length === 0) {
+      res.status(403).json({ error: "Posts are available to friends only" }); return;
+    }
+  }
+  res.json(await buildBuyerPosts(myId, [other], limit, offset));
+});
+
+router.get("/friends/activity", async (req, res) => {
+  const myId = (req as any).clerkUserId as string;
+  const limit = Math.min(Math.max(parseInt(String(req.query.limit ?? "30"), 10) || 30, 1), 50);
+  const offset = Math.max(parseInt(String(req.query.offset ?? "0"), 10) || 0, 0);
+  const mutualRows = await db.execute(sql`
+    SELECT f1.following_id
+    FROM follows f1
+    JOIN follows f2
+      ON f2.follower_id = f1.following_id
+     AND f2.following_id = ${myId}
+    JOIN users u ON u.clerk_id = f1.following_id AND u.account_type = 'buyer'
+    WHERE f1.follower_id = ${myId}
+  `);
+  const authorIds = (((mutualRows as any).rows ?? []) as any[])
+    .map((row: any) => String(row.following_id));
+  res.json(await buildBuyerPosts(myId, authorIds, limit, offset));
 });
 
 // ─── GET /api/social/following ────────────────────────────────────────────────

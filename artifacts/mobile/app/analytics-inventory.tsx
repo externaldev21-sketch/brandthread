@@ -24,6 +24,8 @@ function statusLabel(status: InventoryProductRow['status']): string {
 }
 
 function InventoryProductRow2({ p }: { p: InventoryProductRow }) {
+  const colors = useColors();
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const color = statusColor(p.status);
   const urgent = p.status === 'out' || (p.status === 'low' && p.daysOfStockLeft <= 7);
@@ -56,7 +58,9 @@ function InventoryProductRow2({ p }: { p: InventoryProductRow }) {
 }
 
 export default function AnalyticsInventoryScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const colors = useColors();
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = colors;
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -66,13 +70,17 @@ export default function AnalyticsInventoryScreen() {
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeList, setActiveList] = useState<'fastest' | 'slowest' | 'overstock' | 'runout'>('runout');
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
-    const f = filter ?? await getFilterState();
-    if (!filter) setFilter(f);
-    setData(await getInventoryAnalytics(f));
-    setLoading(false); setRefreshing(false);
+    try {
+      const f = filter ?? await getFilterState();
+      if (!filter) setFilter(f);
+      setData(await getInventoryAnalytics(f)); setError(null);
+    } catch (err) {
+      setData(null); setError(err instanceof Error ? err.message : 'Inventory analytics are unavailable.');
+    } finally { setLoading(false); setRefreshing(false); }
   }, [filter]);
 
   useEffect(() => { load(); }, []); // eslint-disable-line
@@ -84,6 +92,7 @@ export default function AnalyticsInventoryScreen() {
   if (loading) {
     return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><ActivityIndicator size="large" color={PURPLE} /></View>;
   }
+  if (error) return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><Text style={{ color: MUTED }}>{error}</Text><TouchableOpacity onPress={() => load()}><Text style={{ color: PURPLE }}>Retry</Text></TouchableOpacity></View>;
 
   return (
     <ScrollView
@@ -100,8 +109,8 @@ export default function AnalyticsInventoryScreen() {
           <Text style={s.pageTitle}>Inventory Analytics</Text>
           <Text style={s.subtitle}>{filter?.dateRange.label ?? '30 days'}</Text>
         </View>
-        <TouchableOpacity onPress={() => router.push('/inventory' as never)} style={s.invBtn}>
-          <Text style={s.invBtnText}>Inventory</Text>
+        <TouchableOpacity onPress={() => router.push('/inventory' as never)} style={[s.invBtn, { backgroundColor: PURPLE_DIM, borderColor: PURPLE }]}>
+          <Text style={[s.invBtnText, { color: PURPLE_LIGHT }]}>Inventory</Text>
         </TouchableOpacity>
       </View>
 
@@ -164,8 +173,8 @@ export default function AnalyticsInventoryScreen() {
       {/* Product lists */}
       <View style={s.tabRow}>
         {([['runout','Likely Run Out'],['fastest','Fastest'],['slowest','Slowest'],['overstock','Overstock']] as const).map(([k, l]) => (
-          <TouchableOpacity key={k} onPress={() => { Haptics.selectionAsync(); setActiveList(k); }} style={[s.tabBtn, activeList === k && s.tabBtnActive]}>
-            <Text style={[s.tabBtnText, activeList === k && s.tabBtnTextActive]}>{l}</Text>
+          <TouchableOpacity key={k} onPress={() => { Haptics.selectionAsync(); setActiveList(k); }} style={[s.tabBtn, activeList === k && s.tabBtnActive, activeList === k && { backgroundColor: PURPLE_DIM, borderColor: PURPLE }]}>
+            <Text style={[s.tabBtnText, activeList === k && s.tabBtnTextActive, activeList === k && { color: PURPLE_LIGHT }]}>{l}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -192,7 +201,9 @@ export default function AnalyticsInventoryScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT } = colors;
+  return StyleSheet.create({
   scroll:   { flex: 1, backgroundColor: BG },
   content:  { paddingHorizontal: 16 },
   loadWrap: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
@@ -200,8 +211,8 @@ const s = StyleSheet.create({
   backBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   pageTitle:{ fontSize: 22, fontFamily: FONT.bold, color: FG },
   subtitle: { fontSize: 12, fontFamily: FONT.regular, color: MUTED },
-  invBtn:   { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: PURPLE_DIM, borderWidth: 1, borderColor: PURPLE },
-  invBtnText:{ fontSize: 12, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
+  invBtn:   { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  invBtnText:{ fontSize: 12, fontFamily: FONT.semibold },
   alertRow: { flexDirection: 'row', gap: 10, marginBottom: 20, flexWrap: 'wrap' },
   alertCard:{ flex: 1, minWidth: 90, backgroundColor: CARD, borderRadius: 14, padding: 14, borderWidth: 1, alignItems: 'center', gap: 4 },
   alertValue:{ fontSize: 20, fontFamily: FONT.bold },
@@ -215,9 +226,9 @@ const s = StyleSheet.create({
   divider:  { height: 1, backgroundColor: BORDER, marginHorizontal: 16 },
   tabRow:   { flexDirection: 'row', gap: 6, marginBottom: 12, flexWrap: 'wrap' },
   tabBtn:   { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
-  tabBtnActive:{ backgroundColor: PURPLE_DIM, borderColor: PURPLE },
+  tabBtnActive:{},
   tabBtnText:{ fontSize: 12, fontFamily: FONT.medium, color: MUTED },
-  tabBtnTextActive:{ color: PURPLE_LIGHT },
+  tabBtnTextActive:{},
   prodRow:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, gap: 10 },
   prodIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   prodName: { fontSize: 13, fontFamily: FONT.semibold, color: FG, marginBottom: 3 },
@@ -229,4 +240,5 @@ const s = StyleSheet.create({
   emptyState:{ alignItems: 'center', paddingVertical: 48, gap: 12 },
   emptyTitle:{ fontSize: 16, fontFamily: FONT.semibold, color: FG },
   emptyBody:{ fontSize: 13, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', paddingHorizontal: 24 },
-});
+  });
+};

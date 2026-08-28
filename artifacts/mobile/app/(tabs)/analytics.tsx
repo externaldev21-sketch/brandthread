@@ -21,6 +21,7 @@ import {
   FONT, FS,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
+import { formatCents } from '@/lib/money';
 import {
   getOverview, getFilterState, saveFilterState,
   dismissInsight, completeInsight, exportAnalytics,
@@ -36,9 +37,7 @@ type ChartMetric = 'revenue' | 'orders' | 'profit' | 'visitors' | 'conversion';
 const CHART_METRICS: { key: ChartMetric; label: string }[] = [
   { key: 'revenue',    label: 'Revenue'    },
   { key: 'orders',     label: 'Orders'     },
-  { key: 'profit',     label: 'Profit'     },
   { key: 'visitors',   label: 'Visitors'   },
-  { key: 'conversion', label: 'Conversion' },
 ];
 
 const DATE_PILLS: DateRangeKey[] = ['7d', '30d', '90d', 'this_month', 'this_year'];
@@ -103,25 +102,10 @@ function Sparkline({ points, color }: { points: AnalyticsPoint[]; color?: string
 }
 
 function MetricCard({ m, width }: { m: AnalyticsMetric; width: number }) {
-  const isGoodDown = m.key === 'refundRate' || m.key === 'refunds';
-  const realUp = isGoodDown ? m.trend === 'down' : m.trend === 'up';
-  const changeColor = m.trend === 'flat' ? MUTED : realUp ? SUCCESS : RED;
-  const arrowIcon: keyof typeof Feather.glyphMap = m.trend === 'flat' ? 'minus' : m.trend === 'up' ? 'trending-up' : 'trending-down';
-
   return (
     <View style={[styles.metricCard, { width }]}>
       <Text style={styles.metricLabel} numberOfLines={1}>{m.label}</Text>
       <Text style={styles.metricValue}>{m.formatted}</Text>
-      <View style={styles.metricChangeRow}>
-        <Feather name={arrowIcon} size={10} color={changeColor} />
-        <Text style={[styles.metricChangePct, { color: changeColor }]}>
-          {m.changePct > 0 ? '+' : ''}{m.changePct.toFixed(1)}%
-        </Text>
-        <Text style={styles.metricVs} numberOfLines={1}>vs prev</Text>
-      </View>
-      <View style={{ marginTop: 6 }}>
-        <Sparkline points={m.sparkline} color={realUp ? SUCCESS : RED} />
-      </View>
     </View>
   );
 }
@@ -142,19 +126,22 @@ export default function AnalyticsScreen() {
   const [groupBy,        setGroupBy]        = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [tappedBar,      setTappedBar]      = useState<number | null>(null);
   const [insights,       setInsights]       = useState<AnalyticsInsight[]>([]);
+  const [error,          setError]          = useState<string | null>(null);
 
-  const load = useCallback(async (isRefresh = false) => {
+  const load = useCallback(async (isRefresh = false, filterOverride?: AnalyticsFilterState) => {
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     try {
-      const f = filter ?? await getFilterState();
+      const f = filterOverride ?? filter ?? await getFilterState();
       if (!filter) setFilter(f);
       const ov = await getOverview(f);
       setOverview(ov);
+      setError(null);
       setInsights((Array.isArray(ov.insights) ? ov.insights : []).filter(i => !i.dismissed).slice(0, 3));
-    } catch {
+    } catch (err) {
       setOverview(null);
       setInsights([]);
+      setError(err instanceof Error ? err.message : 'Analytics are unavailable.');
     }
     setLoading(false);
     setRefreshing(false);
@@ -168,7 +155,7 @@ export default function AnalyticsScreen() {
     const newFilter: AnalyticsFilterState = { ...filter!, dateRange: dr };
     setFilter(newFilter);
     await saveFilterState(newFilter);
-    load();
+    load(false, newFilter);
   };
 
   const handleDismiss = async (id: string) => {
@@ -194,7 +181,7 @@ export default function AnalyticsScreen() {
       case 'revenue':    return safe(overview.revenueChart);
       case 'orders':     return safe(overview.ordersChart);
       case 'visitors':   return safe(overview.visitorsChart);
-      case 'profit':     return safe(overview.grossRevenue?.sparkline);
+      case 'profit':     return safe(overview.profitEstimate?.sparkline);
       case 'conversion': return safe(overview.conversionRate?.sparkline);
       default:           return safe(overview.revenueChart);
     }
@@ -208,21 +195,9 @@ export default function AnalyticsScreen() {
       case 'revenue':    return overview.grossRevenue.formatted;
       case 'orders':     return overview.orders.formatted;
       case 'visitors':   return overview.storeVisitors.formatted;
-      case 'profit':     return overview.profitEstimate.formatted;
-      case 'conversion': return overview.conversionRate.formatted;
+      case 'profit':     return overview.profitEstimate?.formatted ?? '—';
+      case 'conversion': return overview.conversionRate?.formatted ?? '—';
     }
-  };
-
-  const chartMetricChange = (): { pct: string; up: boolean } => {
-    if (!overview) return { pct: '—', up: true };
-    let m = overview.grossRevenue;
-    switch (chartMetric) {
-      case 'orders':     m = overview.orders; break;
-      case 'visitors':   m = overview.storeVisitors; break;
-      case 'profit':     m = overview.profitEstimate; break;
-      case 'conversion': m = overview.conversionRate; break;
-    }
-    return { pct: `${m.changePct > 0 ? '+' : ''}${m.changePct.toFixed(1)}%`, up: m.trend === 'up' };
   };
 
   const tappedPoint = tappedBar !== null ? chartPoints()[tappedBar] : null;
@@ -241,8 +216,9 @@ export default function AnalyticsScreen() {
       </View>
     );
   }
-
-  const chg = chartMetricChange();
+  if (error) {
+    return <View style={[styles.loadWrap, { paddingTop: topPad + 48 }]}><Feather name="alert-circle" size={32} color={MUTED} /><Text style={styles.loadText}>{error}</Text><TouchableOpacity onPress={() => load()}><Text style={{ color: colors.primary, fontFamily: FONT.semibold }}>Retry</Text></TouchableOpacity></View>;
+  }
 
   return (
     <View style={{ flex: 1 }}>
@@ -258,7 +234,7 @@ export default function AnalyticsScreen() {
       <View style={styles.headerRow}>
         <View>
           <Text style={styles.pageTitle}>Analytics</Text>
-          <Text style={styles.updatedText}>Updated recently · {filter?.dateRange.label ?? '30 days'}</Text>
+          <Text style={styles.updatedText}>Updated recently · All time</Text>
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity onPress={handleExport} style={styles.iconBtn}>
@@ -270,43 +246,9 @@ export default function AnalyticsScreen() {
         </View>
       </View>
 
-      {/* ── Date range pills ── */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }} contentContainerStyle={{ paddingRight: 16, gap: 8, flexDirection: 'row' }}>
-        {DATE_PILLS.map(key => {
-          const opt = DATE_RANGE_OPTIONS.find(d => d.key === key)!;
-          const active = filter?.dateRange.key === key;
-          return (
-            <TouchableOpacity
-              key={key}
-              onPress={() => setDateRange(key)}
-              style={[styles.pill, active && { backgroundColor: colors.primary, borderColor: colors.primary }]}
-            >
-              <Text style={[styles.pillText, active && { color: colors.primaryForeground }]}>{opt.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
-      {/* ── Comparison pills ── */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }} contentContainerStyle={{ paddingRight: 16, gap: 8, flexDirection: 'row' }}>
-        {COMPARISON_OPTIONS.map(opt => {
-          const active = filter?.comparison.key === opt.key;
-          return (
-            <TouchableOpacity
-              key={opt.key}
-              onPress={() => {
-                Haptics.selectionAsync();
-                const newFilter: AnalyticsFilterState = { ...filter!, comparison: opt };
-                setFilter(newFilter);
-                saveFilterState(newFilter);
-              }}
-              style={[styles.pillSm, active && { backgroundColor: colors.primary, borderColor: colors.primary }]}
-            >
-              <Text style={[styles.pillSmText, active && { color: colors.primaryForeground }]}>{opt.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      <Text style={[styles.updatedText, { marginBottom: 16 }]}>
+        Date-range comparison is unavailable until the API can return period-scoped totals.
+      </Text>
 
       {/* ── Section nav ── */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }} contentContainerStyle={{ paddingRight: 16, gap: 8, flexDirection: 'row' }}>
@@ -331,7 +273,7 @@ export default function AnalyticsScreen() {
       </ScrollView>
 
       {/* ── Revenue chart ── */}
-      <View style={styles.chartCard}>
+      {chartPoints().length > 0 ? <View style={styles.chartCard}>
         {/* metric selector */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }} contentContainerStyle={{ gap: 6, flexDirection: 'row' }}>
           {CHART_METRICS.map(cm => (
@@ -354,10 +296,6 @@ export default function AnalyticsScreen() {
         {/* big number */}
         <View style={styles.chartAmountRow}>
           <Text style={styles.chartAmount}>{chartMetricValue()}</Text>
-          <View style={[styles.changeBadge, { backgroundColor: chg.up ? SUCCESS_DIM : RED_DIM }]}>
-            <Feather name={chg.up ? 'trending-up' : 'trending-down'} size={11} color={chg.up ? SUCCESS : RED} />
-            <Text style={[styles.changeBadgeText, { color: chg.up ? SUCCESS : RED }]}>{chg.pct}</Text>
-          </View>
         </View>
 
         {/* bars */}
@@ -384,7 +322,7 @@ export default function AnalyticsScreen() {
             <Text style={styles.tooltipDate}>{tappedPoint.date}</Text>
             <Text style={styles.tooltipValue}>
               {chartMetric === 'revenue' || chartMetric === 'profit'
-                ? `$${tappedPoint.value.toLocaleString()}`
+                ? formatCents(tappedPoint.value)
                 : chartMetric === 'conversion'
                   ? `${tappedPoint.value}%`
                   : tappedPoint.value.toLocaleString()}
@@ -396,7 +334,7 @@ export default function AnalyticsScreen() {
           <Text style={styles.xLabel}>30 days ago</Text>
           <Text style={styles.xLabel}>Today</Text>
         </View>
-      </View>
+      </View> : null}
 
       {/* ── Metric cards ── */}
       <Text style={styles.sectionTitle}>Overview Metrics</Text>

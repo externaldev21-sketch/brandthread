@@ -8,7 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
-  BG, CARD, BORDER, BORDER_ACTIVE,
+  BG, CARD, BORDER,
   FG, MUTED, SUBTLE,
   RED, ON_DARK,
   FONT, FS, SP, RADIUS, ICON,
@@ -35,7 +35,7 @@ type FollowRow = {
 export default function BuyerFriendRequestsScreen() {
   const { theme } = useAppTheme();
   const PURPLE = theme.accent;
-  const GRAD_PRIMARY = [theme.accent, theme.accentLight] as const;
+  const GRAD_PRIMARY = theme.primaryGradient;
   const s = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -397,7 +397,7 @@ const makeStyles = (theme: { accent: string }) => StyleSheet.create({
   acceptBtnText:   { fontFamily: FONT.semibold, fontSize: FS.sm, color: ON_DARK },
   declineBtn:      { height: 32, paddingHorizontal: SP.sm, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   declineBtnText:  { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
-  requestedPill:   { paddingHorizontal: SP.sm, paddingVertical: 4, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER_ACTIVE, borderRadius: RADIUS.pill },
+  requestedPill:   { paddingHorizontal: SP.sm, paddingVertical: 4, backgroundColor: CARD, borderWidth: 1, borderColor: theme.accent, borderRadius: RADIUS.pill },
   requestedPillText: { fontFamily: FONT.medium, fontSize: FS.xs, color: theme.accent },
   cancelBtn:       { height: 32, paddingHorizontal: SP.sm, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
   cancelBtnText:   { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },

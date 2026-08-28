@@ -4,6 +4,7 @@ import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 const CHECKOUT_MODES = ['Checkout only', 'Accounts optional', 'Accounts required'];
 
@@ -11,6 +12,7 @@ type PostPurchaseApp = 'none' | 'smart';
 
 export default function CheckoutScreen() {
   const colors = useColors();
+  const { theme } = useAppTheme();
   const [modeIndex, setModeIndex] = useState(0);
   const [tipping, setTipping] = useState(false);
   const [postPurchaseApp, setPostPurchaseApp] = useState<PostPurchaseApp>('smart');
@@ -110,8 +112,8 @@ export default function CheckoutScreen() {
             <View style={[styles.radioOuter, { borderColor: postPurchaseApp === 'smart' ? colors.primary : colors.border }]}>
               {postPurchaseApp === 'smart' && <View style={[styles.radioInner, { backgroundColor: colors.primary }]} />}
             </View>
-            <View style={[styles.appIcon, { backgroundColor: '#7C3AED' }]}>
-              <Feather name="shopping-bag" size={12} color="#FFFFFF" />
+            <View style={[styles.appIcon, { backgroundColor: theme.accent }]}>
+              <Feather name="shopping-bag" size={12} color={theme.onAccent} />
             </View>
             <Text style={[styles.radioLabel, { color: colors.foreground }]}>SMART Checkout Rules</Text>
           </TouchableOpacity>

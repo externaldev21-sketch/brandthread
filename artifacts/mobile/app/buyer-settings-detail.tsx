@@ -7,6 +7,8 @@ import * as Haptics from 'expo-haptics';
 import { BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, ON_DARK, FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BuyerSettingsState, loadBuyerSettings, patchBuyerSettings } from '@/lib/buyerSettings';
+import { reportNetworkError } from '@/lib/networkNotice';
+import { useApi } from '@/hooks/useApi';
 
 type ToggleKey = keyof { [K in keyof BuyerSettingsState as BuyerSettingsState[K] extends boolean ? K : never]: true };
 type Item = { label: string; sub?: string; icon?: keyof typeof Feather.glyphMap; toggle?: ToggleKey; value?: string; action?: () => void };
@@ -32,7 +34,12 @@ const CONFIG: Record<string, Config> = {
   content: { title: 'Content preferences', items: s => [{ label: 'Hide like and share counts', toggle: 'hideLikeCounts' }, { label: 'Sensitive content', value: s.sensitiveContent }, { label: 'Personalized recommendations', toggle: 'personalizedRecommendations' }, { label: 'Reset suggested content', icon: 'refresh-cw' }] },
   suggested: { title: 'Suggested content', items: s => [{ label: 'Personalized recommendations', toggle: 'personalizedRecommendations' }, { label: 'Snooze suggested posts', value: 'Off' }, { label: 'Specific words and phrases', value: 'Manage' }, { label: 'Reset recommendations', icon: 'refresh-cw' }] },
   payments: { title: 'Addresses and payments', items: () => [{ label: 'Shipping addresses', icon: 'map-pin', value: '1 saved' }, { label: 'Payment methods', icon: 'credit-card', value: 'Manage' }, { label: 'Autofill checkout info', icon: 'zap', value: 'On' }, { label: 'Purchase protection', icon: 'shield', value: 'Brandthread protected' }] },
-  notifications: { title: 'Notifications', items: s => [{ label: 'Messages', toggle: 'messageNotifications' }, { label: 'Friends and activity', toggle: 'friendActivity' }, { label: 'Stories', toggle: 'storyNotifications' }, { label: 'Order updates', toggle: 'orderUpdates' }, { label: 'Drops', toggle: 'dropAlerts' }, { label: 'Restocks', toggle: 'restockAlerts' }, { label: 'Price drops', toggle: 'priceDropAlerts' }, { label: 'Marketing', toggle: 'marketingNotifications' }, { label: 'Quiet mode', value: 'Off' }] },
+  notifications: { title: 'Push notifications', intro: 'Choose which updates Brandthread may send to this device.', items: s => [
+    { label: 'New drops', sub: 'Drops from sellers you follow', toggle: 'dropAlerts' },
+    { label: 'Messages', sub: 'New direct messages and replies', toggle: 'messageNotifications' },
+    { label: 'Order updates', sub: 'Shipping, delivery, returns, and refunds', toggle: 'orderUpdates' },
+    { label: 'Friend activity', sub: 'Requests, follows, and social activity', toggle: 'friendActivity' },
+  ] },
   accessibility: { title: 'Accessibility', items: s => [{ label: 'Reduce motion', toggle: 'reduceMotion' }, { label: 'Always show captions', toggle: 'captions' }, { label: 'Text size', value: 'Default' }, { label: 'High contrast icons', value: 'Off' }] },
   language: { title: 'Language', items: s => [{ label: 'App language', value: s.language }, { label: 'Translation language', value: 'English' }, { label: 'Auto-translate captions', value: 'On' }] },
   media: { title: 'Media quality and data usage', items: s => [{ label: 'Use less cellular data', toggle: 'dataSaver' }, { label: 'Upload at highest quality', toggle: 'highQualityUploads' }, { label: 'Autoplay videos', toggle: 'autoplayVideos' }] },
@@ -47,21 +54,64 @@ export default function BuyerSettingsDetail() {
   const styles = makeStyles();
   const { section = 'content' } = useLocalSearchParams<{ section?: string }>();
   const router = useRouter(); const insets = useSafeAreaInsets();
+  const api = useApi();
   const [settings, setSettings] = useState<BuyerSettingsState | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [loading, setLoading] = useState(true);
   const cfg = CONFIG[section] ?? CONFIG.content;
-  useEffect(() => { loadBuyerSettings().then(setSettings); }, []);
-  const toggle = useCallback(async (key: ToggleKey, value: boolean) => { Haptics.selectionAsync(); const next = await patchBuyerSettings({ [key]: value } as Partial<BuyerSettingsState>); setSettings(next); }, []);
+  const load = useCallback(async () => {
+    setLoadError(false);
+    try {
+      const local = await loadBuyerSettings();
+      if (section === 'notifications') {
+        const remote = await api.notificationPrefs.get();
+        local.dropAlerts = remote.categories.new_drops ?? true;
+        local.messageNotifications = remote.categories.messages ?? true;
+        local.orderUpdates = remote.categories.order_updates ?? true;
+        local.friendActivity = remote.categories.friend_activity ?? true;
+        await patchBuyerSettings(local);
+      }
+      setSettings(local);
+    } catch (error) {
+      setLoadError(true);
+      reportNetworkError(error, () => load());
+    } finally {
+      setLoading(false);
+    }
+  }, [api, section]);
+  useEffect(() => { load(); }, [load]);
+  const toggle = useCallback(async (key: ToggleKey, value: boolean) => {
+    Haptics.selectionAsync();
+    const prior = settings;
+    if (prior) setSettings({ ...prior, [key]: value });
+    try {
+      if (section === 'notifications') {
+        const category = {
+          dropAlerts: 'new_drops',
+          messageNotifications: 'messages',
+          orderUpdates: 'order_updates',
+          friendActivity: 'friend_activity',
+        }[key as string];
+        if (category) await api.notificationPrefs.update({ categories: { [category]: value } });
+      }
+      const next = await patchBuyerSettings({ [key]: value } as Partial<BuyerSettingsState>);
+      setSettings(next);
+    } catch {
+      setSettings(prior);
+      Alert.alert('Could not update setting', 'Try again.');
+    }
+  }, [api, section, settings]);
   const items = useMemo(() => settings ? cfg.items(settings) : [], [cfg, settings]);
 
   return <View style={[styles.page, { paddingTop: insets.top }]}>
     <View style={styles.header}><TouchableOpacity style={styles.back} onPress={() => router.back()}><Feather name="arrow-left" size={21} color={FG}/></TouchableOpacity><Text style={styles.title}>{cfg.title}</Text><View style={styles.back}/></View>
     <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}>
       {cfg.intro ? <Text style={styles.intro}>{cfg.intro}</Text> : null}
-      <View style={styles.card}>{items.map((item, i) => <TouchableOpacity key={`${item.label}-${i}`} activeOpacity={item.toggle ? 1 : 0.7} style={[styles.row, i < items.length - 1 && styles.divider]} onPress={() => { if (!item.toggle) { Haptics.selectionAsync(); item.action?.(); if (!item.action && !item.value?.toLowerCase().includes('off')) Alert.alert(item.label, 'This control is ready for backend wiring.'); } }}>
+      {loadError ? <View style={styles.card}><Text style={[styles.label, { padding: SP.md }]}>Couldn't load settings</Text><TouchableOpacity onPress={load}><Text style={[styles.value, { padding: SP.md, color: PURPLE }]}>Try again</Text></TouchableOpacity></View> : loading || !settings ? <Text style={styles.intro}>Loading settings…</Text> : <View style={styles.card}>{items.map((item, i) => <TouchableOpacity key={`${item.label}-${i}`} activeOpacity={item.toggle ? 1 : 0.7} style={[styles.row, i < items.length - 1 && styles.divider]} onPress={() => { if (!item.toggle) { Haptics.selectionAsync(); item.action?.(); if (!item.action && !item.value?.toLowerCase().includes('off')) Alert.alert(item.label, 'This control is ready for backend wiring.'); } }}>
         {item.icon ? <View style={styles.itemIcon}><Feather name={item.icon} size={19} color={FG}/></View> : null}
         <View style={{ flex: 1 }}><Text style={styles.label}>{item.label}</Text>{item.sub ? <Text style={styles.sub}>{item.sub}</Text> : null}</View>
         {item.toggle && settings ? <Switch value={Boolean(settings[item.toggle])} onValueChange={(v) => toggle(item.toggle!, v)} trackColor={{ false: CARD_ELEVATED, true: PURPLE }} thumbColor={ON_DARK} /> : <><Text style={styles.value}>{item.value}</Text><Feather name="chevron-right" size={18} color={SUBTLE}/></>}
-      </TouchableOpacity>)}</View>
+      </TouchableOpacity>)}</View>}
     </ScrollView>
   </View>;
 }

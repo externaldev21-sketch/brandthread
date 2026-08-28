@@ -38,7 +38,7 @@ export default function BuyerStoryCreate() {
   const { theme } = useAppTheme();
   const PURPLE = colors.primary, PURPLE_DIM = colors.accent, CYAN = theme.secondary;
   const BORDER_ACTIVE = `${theme.accent}73`;
-  const GRAD_PRIMARY = [theme.accent, theme.secondary] as const;
+  const GRAD_PRIMARY = theme.primaryGradient;
   const TEXT_COLORS = ['#FFFFFF', '#000000', PURPLE, CYAN, '#F59E0B', '#10B981'];
   const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();

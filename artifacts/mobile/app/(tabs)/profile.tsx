@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image,
   KeyboardAvoidingView, Modal, Platform, TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -13,6 +14,8 @@ import { getSellerPosts, subscribeSocial, type SellerThreadPost } from '@/servic
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { formatCents } from '@/lib/money';
+import { reportNetworkError } from '@/lib/networkNotice';
 
 // ─── Profile data shape ──────────────────────────────────────────────────────
 
@@ -74,12 +77,17 @@ export default function ProfileScreen() {
   const [bioInput, setBioInput] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const loadPosts = useCallback(async () => {
     try {
       const posts = await getSellerPosts();
       setSellerPosts(posts);
-    } catch {}
+    } catch (error) {
+      setLoadError(true);
+      reportNetworkError(error, loadPosts);
+    }
   }, []);
 
   const loadMyStories = useCallback(async () => {
@@ -90,7 +98,10 @@ export default function ProfileScreen() {
         .filter((s: any) => s.expiresAt > now)
         .map((s: any) => s.id as string);
       setMyStoryIds(active);
-    } catch {}
+    } catch (error) {
+      setLoadError(true);
+      reportNetworkError(error, loadMyStories);
+    }
   }, [api]);
 
   const loadProfile = useCallback(async () => {
@@ -112,7 +123,10 @@ export default function ProfileScreen() {
         },
       });
       setSocialCounts((current) => ({ ...current, likes: data.totalLikes ?? 0 }));
-    } catch {}
+    } catch (error) {
+      setLoadError(true);
+      reportNetworkError(error, loadProfile);
+    }
   }, [api]);
 
   const loadSocialCounts = useCallback(async () => {
@@ -126,17 +140,24 @@ export default function ProfileScreen() {
         followers: Array.isArray(followersArr) ? followersArr.length : 0,
         following: Array.isArray(followingArr) ? followingArr.length : 0,
       }));
-    } catch {}
+    } catch (error) {
+      setLoadError(true);
+      reportNetworkError(error, loadSocialCounts);
+    }
   }, [api]);
 
+  const loadPage = useCallback(async () => {
+    setLoadError(false);
+    setInitialLoading(true);
+    await Promise.all([loadPosts(), loadMyStories(), loadProfile(), loadSocialCounts()]);
+    setInitialLoading(false);
+  }, [loadPosts, loadMyStories, loadProfile, loadSocialCounts]);
+
   useEffect(() => {
-    loadPosts();
-    loadMyStories();
-    loadProfile();
-    loadSocialCounts();
+    void loadPage();
     const unsub = subscribeSocial(() => { loadPosts(); loadMyStories(); });
     return unsub;
-  }, [loadPosts, loadMyStories, loadProfile, loadSocialCounts]);
+  }, [loadPage, loadPosts, loadMyStories]);
 
   function nav(route: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -189,7 +210,8 @@ export default function ProfileScreen() {
       setProfileEditorVisible(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       void loadProfile();
-    } catch {
+    } catch (error) {
+      reportNetworkError(error, saveProfileDetails);
       Alert.alert('Could not save changes', 'Check your connection and try again.');
     } finally {
       setSavingProfile(false);
@@ -206,7 +228,7 @@ export default function ProfileScreen() {
   const metrics = profile?.metrics ?? null;
   const hasNoActivity = !!metrics && metrics.orders === 0 && metrics.visitors === 0;
   const performanceStats = [
-    { label: 'Total Revenue', value: metrics ? `$${(metrics.revenueCents / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—' },
+    { label: 'Total Revenue', value: metrics ? formatCents(metrics.revenueCents) : '—' },
     { label: 'Visitors', value: metrics ? metrics.visitors.toLocaleString() : '—' },
     { label: 'Orders', value: metrics ? metrics.orders.toLocaleString() : '—' },
     { label: 'Conversion Rate', value: metrics ? `${metrics.conversionRate.toFixed(2)}%` : '—' },
@@ -214,6 +236,12 @@ export default function ProfileScreen() {
 
   return (
     <>
+    {initialLoading ? (
+      <View style={[s.loadingScreen, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={theme.accent} />
+        <Text style={s.loadingText}>Loading your brand…</Text>
+      </View>
+    ) : (
     <ScrollView
       style={[s.root, { backgroundColor: colors.background }]}
       contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 120 }}
@@ -246,6 +274,19 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {loadError && (
+        <View style={s.loadError}>
+          <Feather name="wifi-off" size={16} color={theme.accentLight} />
+          <View style={{ flex: 1 }}>
+            <Text style={s.loadErrorTitle}>Some profile details couldn't load</Text>
+            <Text style={s.loadErrorText}>Your available information is still shown.</Text>
+          </View>
+          <TouchableOpacity onPress={() => void loadPage()} accessibilityRole="button">
+            <Text style={[s.loadRetry, { color: theme.accentLight }]}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Profile card */}
       <View style={s.profileCard}>
@@ -319,7 +360,8 @@ export default function ProfileScreen() {
                 const updated = await api.seller.uploadAvatar(result.assets[0]);
                 setProfile((current) => current ? { ...current, profileImageUrl: updated.profileImageUrl } : current);
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-              } catch {
+              } catch (error) {
+                reportNetworkError(error);
                 Alert.alert('Could not update photo', 'Check your connection and try again.');
               } finally {
                 setUploadingAvatar(false);
@@ -514,6 +556,7 @@ export default function ProfileScreen() {
       </View>
       )}
     </ScrollView>
+    )}
 
       <Modal
         visible={profileEditorVisible}
@@ -610,6 +653,12 @@ export default function ProfileScreen() {
 
 const s = StyleSheet.create({
   root: { flex: 1 },
+   loadingScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+   loadingText: { color: MUTED, fontSize: 13, fontFamily: 'Inter_500Medium' },
+   loadError: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 20, marginBottom: 16, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
+   loadErrorTitle: { color: FG, fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+   loadErrorText: { color: MUTED, fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
+   loadRetry: { fontSize: 12, fontFamily: 'Inter_700Bold' },
 
   // Header
   header:         { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 20, gap: 12 },

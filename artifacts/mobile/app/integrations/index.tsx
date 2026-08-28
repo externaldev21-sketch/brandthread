@@ -108,7 +108,7 @@ export default function IntegrationsScreen() {
           </Text>
 
           {loading ? (
-            <View style={s.loadingRow}><ActivityIndicator color={PURPLE} /></View>
+            <View style={s.loadingRow}><ActivityIndicator color={colors.primary} /></View>
           ) : (
             <View style={[s.listCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {INTEGRATION_DEFS.map((item, i) => {
@@ -129,7 +129,7 @@ export default function IntegrationsScreen() {
                       <Text style={[s.rowDesc, { color: colors.mutedForeground }]} numberOfLines={1}>{item.description}</Text>
                     </View>
                     {isToggling ? (
-                      <ActivityIndicator size="small" color={PURPLE} />
+                      <ActivityIndicator size="small" color={colors.primary} />
                     ) : connected ? (
                       <View style={[s.connectedPill, { backgroundColor: SUCCESS_DIM }]}>
                         <View style={[s.dot, { backgroundColor: SUCCESS }]} />

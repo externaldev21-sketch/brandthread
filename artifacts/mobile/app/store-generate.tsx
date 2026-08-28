@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
   KeyboardAvoidingView, Platform, Alert, Switch } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -12,7 +13,7 @@ import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
   ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+  GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader,
   EmptyState, StatCard } from '@/components/BrandthreadUI';
@@ -94,6 +95,8 @@ function contrastRatio(hex1: string, hex2: string): number {
 }
 
 export default function StoreGenerateScreen() {
+  const { theme } = useAppTheme();
+  const st = makeStyles(theme);
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -192,7 +195,7 @@ export default function StoreGenerateScreen() {
               style={st.chipWrapper}
             >
               {isPrimary ? (
-                <LinearGradient colors={[...GRAD_PRIMARY]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.chipGrad}>
+                <LinearGradient colors={[...theme.primaryGradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.chipGrad}>
                   <Text style={st.chipTextActive}>{label}</Text>
                 </LinearGradient>
               ) : (
@@ -259,7 +262,7 @@ export default function StoreGenerateScreen() {
               style={st.chipWrapper}
             >
               {isSelected ? (
-                <LinearGradient colors={[...GRAD_PRIMARY]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.chipGrad}>
+                <LinearGradient colors={[...theme.primaryGradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.chipGrad}>
                   <Text style={st.chipTextActive}>{label}</Text>
                 </LinearGradient>
               ) : (
@@ -431,8 +434,8 @@ export default function StoreGenerateScreen() {
               style={st.priorityCardWrapper}
             >
               {isSelected ? (
-                <LinearGradient colors={[...GRAD_PRIMARY]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.priorityCardGrad}>
-                  <Feather name={icon as any} size={ICON.md} color="#FFFFFF" />
+                <LinearGradient colors={[...theme.primaryGradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.priorityCardGrad}>
+                  <Feather name={icon as any} size={ICON.md} color={theme.onAccent} />
                   <Text style={st.priorityCardTextActive}>{label}</Text>
                 </LinearGradient>
               ) : (
@@ -550,7 +553,7 @@ export default function StoreGenerateScreen() {
               style={st.chipWrapper}
             >
               {isSelected ? (
-                <LinearGradient colors={[...GRAD_PRIMARY]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.chipGrad}>
+                <LinearGradient colors={[...theme.primaryGradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.chipGrad}>
                   <Text style={st.chipTextActive}>{label}</Text>
                 </LinearGradient>
               ) : (
@@ -833,7 +836,7 @@ export default function StoreGenerateScreen() {
         {/* Progress bar */}
         <View style={st.progressTrack}>
           <LinearGradient
-            colors={[...GRAD_PRIMARY]}
+            colors={[...theme.primaryGradient]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={[st.progressFill, { width: progressWidth as any }]}
@@ -902,13 +905,13 @@ export default function StoreGenerateScreen() {
             activeOpacity={continueEnabled ? 0.8 : 1}
           >
             <LinearGradient
-              colors={continueEnabled ? [...GRAD_PRIMARY] : ['#3A3A4E', '#3A3A4E']}
+              colors={continueEnabled ? [...theme.primaryGradient] : ['#3A3A4E', '#3A3A4E']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={st.navContinueGrad}
             >
               <Text style={st.navContinueText}>Continue</Text>
-              <Feather name="arrow-right" size={ICON.sm} color="#FFFFFF" />
+              <Feather name="arrow-right" size={ICON.sm} color={theme.onAccent} />
             </LinearGradient>
           </TouchableOpacity>
         ) : (
@@ -918,7 +921,7 @@ export default function StoreGenerateScreen() {
             activeOpacity={0.8}
           >
             <LinearGradient
-              colors={[...GRAD_PRIMARY]}
+              colors={[...theme.primaryGradient]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={st.navContinueGrad}
@@ -932,7 +935,14 @@ export default function StoreGenerateScreen() {
   );
 }
 
-const st = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE = theme.accent;
+  const PURPLE_LIGHT = theme.accentLight;
+  const PURPLE_DIM = theme.accentDim;
+  const CYAN = theme.secondary;
+  const CYAN_DIM = theme.secondaryDim;
+  const BORDER_ACTIVE = theme.accentLight;
+  return StyleSheet.create({
   root: { flex: 1 },
   header: {
     paddingHorizontal: SP.md,
@@ -984,7 +994,7 @@ const st = StyleSheet.create({
     paddingHorizontal: SP.md,
     paddingVertical: SP.xs,
   },
-  draftYesText: { fontSize: FS.sm, fontFamily: FONT.bold, color: '#FFFFFF' },
+  draftYesText: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.onAccent },
   draftNoBtn: {
     borderWidth: 1,
     borderColor: BORDER,
@@ -1020,7 +1030,7 @@ const st = StyleSheet.create({
     borderRadius: RADIUS.pill,
   },
   chipText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-  chipTextActive: { fontSize: FS.sm, fontFamily: FONT.bold, color: '#FFFFFF' },
+  chipTextActive: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.onAccent },
   chipSecondarySelected: { borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM },
   chipTextSecondary: { color: PURPLE_LIGHT, fontFamily: FONT.semibold },
   // Color presets
@@ -1107,7 +1117,7 @@ const st = StyleSheet.create({
     alignItems: 'center',
   },
   priorityCardText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, textAlign: 'center' },
-  priorityCardTextActive: { fontSize: FS.xs, fontFamily: FONT.bold, color: '#FFFFFF', textAlign: 'center' },
+  priorityCardTextActive: { fontSize: FS.xs, fontFamily: FONT.bold, color: theme.onAccent, textAlign: 'center' },
   // Brand story
   storyInput: {
     backgroundColor: CARD,
@@ -1244,5 +1254,6 @@ const st = StyleSheet.create({
     paddingHorizontal: SP.md,
     paddingVertical: SP.sm,
   },
-  navContinueText: { fontSize: FS.sm, fontFamily: FONT.bold, color: '#FFFFFF' },
-});
+  navContinueText: { fontSize: FS.sm, fontFamily: FONT.bold, color: theme.onAccent },
+  });
+};

@@ -5,7 +5,8 @@
  * Every Seller screen must import from here — no local color redefinitions.
  *
  * Design language: premium fashion operating system — dark, precise, alive.
- * Matches the onboarding flow (purple/cyan gradients, deep black, glassmorphism).
+ * Default finish is chrome on deep black. Runtime themes override these
+ * fallback accents through AppThemeContext/useColors.
  */
 
 // ─── Backgrounds ─────────────────────────────────────────────────────────────
@@ -18,8 +19,8 @@ export const OVERLAY       = 'rgba(0,0,0,0.72)'; // modal overlay
 // ─── Borders ─────────────────────────────────────────────────────────────────
 export const BORDER          = 'rgba(255,255,255,0.07)';
 export const BORDER_SUBTLE   = 'rgba(255,255,255,0.04)';
-export const BORDER_ACTIVE   = 'rgba(139,92,246,0.45)';
-export const BORDER_FOCUS    = 'rgba(34,211,238,0.5)';
+export const BORDER_ACTIVE   = 'rgba(199,205,213,0.48)';
+export const BORDER_FOCUS    = 'rgba(248,250,252,0.58)';
 
 // ─── Text ─────────────────────────────────────────────────────────────────────
 export const FG      = '#F4F4FF';                       // primary foreground
@@ -29,12 +30,12 @@ export const ON_DARK = '#FFFFFF';                        // on gradient/colored 
 export const ON_DARK_MUTED = 'rgba(255,255,255,0.72)';   // secondary text on gradient/colored bg
 
 // ─── Brand Accents ────────────────────────────────────────────────────────────
-export const PURPLE        = '#8B5CF6';   // primary brand
-export const PURPLE_LIGHT  = '#A78BFA';   // lighter purple (hover, tint)
-export const PURPLE_DIM    = 'rgba(139,92,246,0.18)';
-export const CYAN          = '#22D3EE';   // secondary brand
-export const CYAN_LIGHT    = '#67E8F9';
-export const CYAN_DIM      = 'rgba(34,211,238,0.15)';
+export const PURPLE        = '#C7CDD5';   // legacy primary fallback: chrome
+export const PURPLE_LIGHT  = '#F8FAFC';   // legacy highlight fallback
+export const PURPLE_DIM    = 'rgba(199,205,213,0.18)';
+export const CYAN          = '#7D8793';   // legacy tonal companion fallback
+export const CYAN_LIGHT    = '#E7EBEF';
+export const CYAN_DIM      = 'rgba(125,135,147,0.16)';
 
 // ─── Semantic Colors ──────────────────────────────────────────────────────────
 export const SUCCESS        = '#10B981';   // completion, available, shipped
@@ -49,9 +50,9 @@ export const RED_DIM        = 'rgba(248,113,113,0.15)';
 export const GOLD           = '#F59E0B';   // premium, pro
 
 // ─── Gradients ────────────────────────────────────────────────────────────────
-export const GRAD_PRIMARY   = ['#8B5CF6', '#22D3EE'] as const;  // purple → cyan
-export const GRAD_HERO      = ['#8B5CF6', '#3B82F6', '#22D3EE'] as const;
-export const GRAD_CARD_GLOW = ['rgba(139,92,246,0.12)', 'rgba(34,211,238,0.04)'] as const;
+export const GRAD_PRIMARY   = ['#17191D', '#727A84', '#F8FAFC', '#AAB1BA', '#34383E'] as const;
+export const GRAD_HERO      = ['#090A0C', '#545B64', '#F3F5F7', '#777F89', '#111317'] as const;
+export const GRAD_CARD_GLOW = ['rgba(248,250,252,0.16)', 'rgba(125,135,147,0.04)'] as const;
 export const GRAD_SUCCESS_G = ['#10B981', '#34D399'] as const;
 export const GRAD_REVENUE   = ['#39FF88', '#10B981'] as const;
 export const GRAD_DARK_FADE = ['rgba(7,7,15,0)', 'rgba(7,7,15,1)'] as const;
@@ -103,7 +104,7 @@ export const RADIUS = {
 
 // ─── Shadows ──────────────────────────────────────────────────────────────────
 export const SHADOW_PURPLE = {
-  shadowColor: '#8B5CF6',
+  shadowColor: '#DDE2E8',
   shadowOffset: { width: 0, height: 4 },
   shadowOpacity: 0.35,
   shadowRadius: 16,

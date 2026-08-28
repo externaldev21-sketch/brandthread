@@ -13,7 +13,7 @@ interface IconOption {
 }
 
 const ICONS: IconOption[] = [
-  { id: 'default', label: 'Default', colors: ['#9333EA', '#7C3AED'] },
+  { id: 'default', label: 'Default', colors: ['#727A84', '#F8FAFC'] },
   { id: 'spring26', label: "Spring '26", colors: ['#38BDF8', '#7C3AED'] },
   { id: 'winter26', label: "Winter '26", colors: ['#C9A96E', '#9333EA'] },
   { id: 'summer25', label: "Summer '25", colors: ['#A855F7', '#EC4899'] },

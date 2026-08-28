@@ -9,7 +9,7 @@
  * active boosted posts are surfaced before un-boosted content of the same epoch.
  */
 import { Router } from "express";
-import { db, boosts, users } from "@workspace/db";
+import { db, boosts, posts, products, users } from "@workspace/db";
 import { and, desc, eq, inArray, or, gte, sum, count } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireStripe } from "../lib/stripe";
@@ -17,12 +17,36 @@ import { requireStripe } from "../lib/stripe";
 const router = Router();
 router.use(requireAuth);
 
+const BOOST_OBJECTIVES = ["views", "likes", "followers", "profile_visits"] as const;
+type BoostObjective = typeof BOOST_OBJECTIVES[number];
+
+// ─── GET /api/boosts/targets ──────────────────────────────────────────────────
+// Seller-owned posts eligible for the direct Promote flow.
+router.get("/targets", async (req, res) => {
+  const sellerId = (req as any).clerkUserId as string;
+  const rows = await db
+    .select({
+      id: posts.id,
+      mediaUrl: posts.mediaUrl,
+      mediaType: posts.mediaType,
+      caption: posts.caption,
+      createdAt: posts.createdAt,
+    })
+    .from(posts)
+    .where(eq(posts.userId, sellerId))
+    .orderBy(desc(posts.createdAt))
+    .limit(60);
+
+  return res.json(rows);
+});
+
 // ─── POST /api/boosts ─────────────────────────────────────────────────────────
 router.post("/", async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
-  const { targetType, targetId, budgetCents, durationDays } = req.body as {
+  const { targetType, targetId, objective, budgetCents, durationDays } = req.body as {
     targetType?: string;
     targetId?:   string;
+    objective?: string;
     budgetCents?: number;
     durationDays?: number;
   };
@@ -33,10 +57,32 @@ router.post("/", async (req, res) => {
   if (!targetId || typeof targetId !== "string") {
     return res.status(400).json({ error: "targetId required" });
   }
-  if (!budgetCents || budgetCents < 500 || budgetCents > 100_000) {
-    return res.status(400).json({ error: "budgetCents must be between 500 and 100000" });
+  if (!objective || !BOOST_OBJECTIVES.includes(objective as BoostObjective)) {
+    return res.status(400).json({ error: "objective must be views, likes, followers, or profile_visits" });
   }
-  const days = Math.max(1, Math.min(Number(durationDays) || 7, 90));
+  if (!Number.isInteger(budgetCents) || !budgetCents || budgetCents < 500 || budgetCents > 100_000) {
+    return res.status(400).json({ error: "budgetCents must be a whole number of cents between 500 and 100000" });
+  }
+  if (durationDays !== undefined && (!Number.isInteger(durationDays) || durationDays < 1 || durationDays > 90)) {
+    return res.status(400).json({ error: "durationDays must be a whole number between 1 and 90" });
+  }
+  const days = durationDays ?? 7;
+
+  // Never let a seller pay to promote content owned by another account.
+  const ownershipRows = targetType === "post"
+    ? await db
+        .select({ id: posts.id })
+        .from(posts)
+        .where(and(eq(posts.id, targetId), eq(posts.userId, sellerId)))
+        .limit(1)
+    : await db
+        .select({ id: products.id })
+        .from(products)
+        .where(and(eq(products.id, targetId), eq(products.ownerId, sellerId)))
+        .limit(1);
+  if (ownershipRows.length === 0) {
+    return res.status(404).json({ error: "Boost target not found" });
+  }
 
   // Fetch seller to get stripeCustomerId
   const [seller] = await db
@@ -68,7 +114,7 @@ router.post("/", async (req, res) => {
           confirm:              true,
           off_session:          true,
           description:          `Brandthread boost — ${targetType} ${targetId}`,
-          metadata:             { sellerId, targetType, targetId },
+          metadata:             { sellerId, targetType, targetId, objective },
         });
         stripePaymentIntentId = pi.id;
       }
@@ -95,6 +141,7 @@ router.post("/", async (req, res) => {
       sellerId,
       targetType,
       targetId,
+      objective,
       budgetCents,
       // Record spend immediately: if Stripe charged the seller, the full budget
       // is committed at boost creation. Unpaid / no-payment-method boosts stay at 0.

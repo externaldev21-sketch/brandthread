@@ -20,8 +20,6 @@ const CARD   = '#12121F';
 const BORDER = 'rgba(255,255,255,0.07)';
 const FG     = '#F4F4FF';
 const MUTED  = 'rgba(244,244,255,0.50)';
-const GREEN  = '#8B5CF6';
-const GREEN_D = 'rgba(139,92,246,0.18)';
 const ERR    = '#EF4444';
 
 const STEPS = ['Account', 'Company', 'Specialties', 'Photos & Pricing', 'Review'];
@@ -74,6 +72,7 @@ const INITIAL: FormData = {
 
 export default function ManufacturerOnboardScreen() {
   const colors = useColors();
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router  = useRouter();
   const { token: inviteToken } = useLocalSearchParams<{ token?: string }>();
@@ -389,6 +388,8 @@ function Field({ label, value, onChange, placeholder, keyboardType, secure }: {
   label: string; value: string; onChange: (v: string) => void;
   placeholder?: string; keyboardType?: any; secure?: boolean;
 }) {
+  const colors = useColors();
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={s.fieldWrap}>
       <Text style={s.fieldLabel}>{label}</Text>
@@ -407,6 +408,8 @@ function Field({ label, value, onChange, placeholder, keyboardType, secure }: {
 }
 
 function Row({ label, value, last }: { label: string; value: string; last?: boolean }) {
+  const colors = useColors();
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={[s.reviewRow, !last && { borderBottomWidth: 1, borderBottomColor: BORDER }]}>
       <Text style={s.reviewLabel}>{label}</Text>
@@ -416,14 +419,14 @@ function Row({ label, value, last }: { label: string; value: string; last?: bool
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const s = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   root:        { flex: 1, backgroundColor: BG },
   header:      { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
   backBtn:     { width: 36, height: 36, borderRadius: 10, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
   headerSub:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 1 },
   progressTrack: { height: 3, backgroundColor: BORDER },
-  progressFill:  { height: 3, backgroundColor: GREEN, borderRadius: 2 },
+  progressFill:  { height: 3, backgroundColor: colors.primary, borderRadius: 2 },
 
   stepWrap:  { gap: 0 },
   stepTitle: { fontSize: 20, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 6 },
@@ -432,9 +435,9 @@ const s = StyleSheet.create({
   groupLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 },
   chipGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip:       { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
-  chipActive: { backgroundColor: GREEN_D, borderColor: GREEN },
+  chipActive: { backgroundColor: colors.accent, borderColor: colors.primary },
   chipText:   { fontSize: 12, fontFamily: 'Inter_500Medium', color: MUTED },
-  chipTextActive: { color: GREEN },
+  chipTextActive: { color: colors.primary },
 
   row: { flexDirection: 'row', gap: 12 },
 
@@ -452,11 +455,11 @@ const s = StyleSheet.create({
   photoThumb:  { width: 88, height: 88, borderRadius: 12, backgroundColor: CARD, overflow: 'hidden' },
   photoRemove: { position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(0,0,0,0.6)', alignItems: 'center', justifyContent: 'center' },
   photoAdd:    { width: 88, height: 88, borderRadius: 12, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  photoAddText: { fontSize: 10, fontFamily: 'Inter_500Medium', color: GREEN },
+  photoAddText: { fontSize: 10, fontFamily: 'Inter_500Medium', color: colors.primary },
 
   // Escrow notice
-  escrowNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, backgroundColor: GREEN_D, borderRadius: 14, borderWidth: 1, borderColor: GREEN + '44', padding: 14, marginTop: 8 },
-  escrowTitle:  { fontSize: 13, fontFamily: 'Inter_700Bold', color: GREEN, marginBottom: 4 },
+  escrowNotice: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, backgroundColor: colors.accent, borderRadius: 14, borderWidth: 1, borderColor: colors.primary, padding: 14, marginTop: 8 },
+  escrowTitle:  { fontSize: 13, fontFamily: 'Inter_700Bold', color: colors.primary, marginBottom: 4 },
   escrowDesc:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: FG, lineHeight: 18 },
 
   // Review
@@ -469,11 +472,11 @@ const s = StyleSheet.create({
   // Terms
   termsRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginTop: 20 },
   checkbox:     { width: 20, height: 20, borderRadius: 6, borderWidth: 1.5, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  checkboxActive: { backgroundColor: GREEN, borderColor: GREEN },
+  checkboxActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   termsText:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, flex: 1, lineHeight: 19 },
 
   // Bottom
   bottomBar: { paddingHorizontal: 20, paddingTop: 12, borderTopWidth: 1, borderTopColor: BORDER, backgroundColor: BG },
-  nextBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: GREEN, borderRadius: 16, paddingVertical: 16 },
+  nextBtn:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.primary, borderRadius: 16, paddingVertical: 16 },
   nextBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: BG },
 });

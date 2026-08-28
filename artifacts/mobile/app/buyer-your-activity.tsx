@@ -15,6 +15,7 @@ import {
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getMyPosts, getSavedItems, getMyReposts } from '@/services/socialService';
+import { reportNetworkError } from '@/lib/networkNotice';
 
 // Simple inline bar chart using plain Views — no chart library
 function BarChart({ data, maxVal }: { data: number[]; maxVal: number }) {
@@ -57,15 +58,23 @@ export default function BuyerYourActivity() {
   const [savedCount, setSavedCount] = useState(0);
   const [repostCount, setRepostCount] = useState(0);
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
-  useFocusEffect(useCallback(() => {
-    Promise.all([getMyPosts(), getSavedItems(), getMyReposts()]).then(([posts, saved, reposts]) => {
+  const loadData = useCallback(async () => {
+    setLoadError(false);
+    try {
+      const [posts, saved, reposts] = await Promise.all([getMyPosts(), getSavedItems(), getMyReposts()]);
       setPostCount(posts.filter(p => !p.isDraft && !p.isArchived).length);
       setSavedCount(saved.length);
       setRepostCount(reposts.length);
+    } catch (error) {
+      setLoadError(true);
+      reportNetworkError(error, loadData);
+    } finally {
       setLoaded(true);
-    });
-  }, []));
+    }
+  }, []);
+  useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
   // Time-spent data is device-local (no time-tracking integration yet); show zeros
   // until a backend integration can supply accurate per-day minutes.
@@ -91,6 +100,7 @@ export default function BuyerYourActivity() {
         contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}
         showsVerticalScrollIndicator={false}
       >
+        {!loaded ? <Text style={s.loadingText}>Loading activity…</Text> : loadError ? <View style={s.errorState}><Text style={s.loadingText}>Couldn't load activity</Text><TouchableOpacity onPress={loadData}><Text style={[s.loadingText, { color: PURPLE }]}>Try again</Text></TouchableOpacity></View> : <>
         {/* Interaction stats grid */}
         <Text style={s.groupLabel}>Content</Text>
         <View style={s.statsGrid}>
@@ -120,6 +130,7 @@ export default function BuyerYourActivity() {
             <Feather name="chevron-right" size={18} color={SUBTLE} />
           </TouchableOpacity>
         </View>
+        </>}
       </ScrollView>
     </View>
   );
@@ -140,4 +151,6 @@ const makeStyles = () => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: 14, gap: 12 },
   rowLabel: { fontFamily: FONT.medium, fontSize: FS.base, color: FG },
   rowSub: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
+  loadingText: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', padding: SP.lg },
+  errorState: { alignItems: 'center' },
 });

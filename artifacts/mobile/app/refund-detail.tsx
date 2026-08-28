@@ -18,6 +18,7 @@ import {
 } from '@/components/BrandthreadUI';
 import { getOrder, createRefund } from '@/services/orderService';
 import { Order, RefundType, Refund, RefundLineItem } from '@/services/orderTypes';
+import { formatCents } from '@/lib/money';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -86,7 +87,7 @@ export default function RefundDetailScreen() {
       const init: Record<string, number> = {};
       o.lineItems.forEach(li => { init[li.id] = li.quantity; });
       setSelectedItems(init);
-      setShippingAmount(o.payment.shippingTotal);
+      setShippingAmount(o.payment.shippingTotalCents);
     }
     setLoading(false);
   }, [orderId]);
@@ -101,35 +102,35 @@ export default function RefundDetailScreen() {
     );
   }
 
-  const maxRefundable = order.payment.amountPaid - order.payment.amountRefunded;
-  const alreadyRefunded = order.payment.amountRefunded;
+  const maxRefundable = order.payment.amountPaidCents - order.payment.amountRefundedCents;
+  const alreadyRefunded = order.payment.amountRefundedCents;
 
   // Compute item total from selections
   const itemTotal = (() => {
     if (refundType === 'shipping') return 0;
     if (refundType === 'full') {
-      return order.lineItems.reduce((s, li) => s + li.unitPrice * li.quantity, 0);
+      return order.lineItems.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0);
     }
     return order.lineItems.reduce((s, li) => {
       const qty = selectedItems[li.id] ?? 0;
-      return s + li.unitPrice * qty;
+      return s + li.unitPriceCents * qty;
     }, 0);
   })();
 
   const shippingRefund = includeShipping || refundType === 'shipping' || refundType === 'full'
-    ? (refundType === 'shipping' ? order.payment.shippingTotal : shippingAmount)
+    ? (refundType === 'shipping' ? order.payment.shippingTotalCents : shippingAmount)
     : 0;
 
-  const refundTotal = itemTotal + (includeShipping ? order.payment.shippingTotal : 0) +
-    (refundType === 'shipping' ? order.payment.shippingTotal : 0) +
-    (refundType === 'full' ? order.payment.shippingTotal : 0);
+  const refundTotal = itemTotal + (includeShipping ? order.payment.shippingTotalCents : 0) +
+    (refundType === 'shipping' ? order.payment.shippingTotalCents : 0) +
+    (refundType === 'full' ? order.payment.shippingTotalCents : 0);
 
   // Avoid double counting — simpler: just compute directly
   const computedTotal = (() => {
-    if (refundType === 'full') return order.payment.subtotal + order.payment.shippingTotal;
-    if (refundType === 'shipping') return order.payment.shippingTotal;
-    const items = order.lineItems.reduce((s, li) => s + li.unitPrice * (selectedItems[li.id] ?? 0), 0);
-    const shipping = includeShipping ? order.payment.shippingTotal : 0;
+    if (refundType === 'full') return order.payment.subtotalCents + order.payment.shippingTotalCents;
+    if (refundType === 'shipping') return order.payment.shippingTotalCents;
+    const items = order.lineItems.reduce((sum, item) => sum + item.unitPriceCents * (selectedItems[item.id] ?? 0), 0);
+    const shipping = includeShipping ? order.payment.shippingTotalCents : 0;
     return items + shipping;
   })();
 
@@ -148,16 +149,16 @@ export default function RefundDetailScreen() {
               productName: li.productName,
               variant: li.variant,
               quantity: refundType === 'full' ? li.quantity : (selectedItems[li.id] ?? 0),
-              amount: li.unitPrice * (refundType === 'full' ? li.quantity : (selectedItems[li.id] ?? 0)),
+              amountCents: li.unitPriceCents * (refundType === 'full' ? li.quantity : (selectedItems[li.id] ?? 0)),
             }));
 
       const refund = await createRefund(order.id, {
         type: refundType,
         lineItems,
-        shippingAmount: refundType === 'full' || refundType === 'shipping'
-          ? order.payment.shippingTotal
-          : includeShipping ? order.payment.shippingTotal : 0,
-        taxAmount: 0,
+        shippingAmountCents: refundType === 'full' || refundType === 'shipping'
+          ? order.payment.shippingTotalCents
+          : includeShipping ? order.payment.shippingTotalCents : 0,
+        taxAmountCents: 0,
         reason: refundReason || undefined,
         restockInventory,
         returnId: returnId || undefined,
@@ -185,7 +186,7 @@ export default function RefundDetailScreen() {
             </View>
             <Text style={styles.successTitle}>Refund Initiated</Text>
             <Text style={styles.successSub}>
-              Refund of ${result.totalAmount.toFixed(2)} submitted.{'\n'}
+              Refund of {formatCents(result.totalAmountCents)} submitted.{'\n'}
               Processing time: 3–5 business days.
             </Text>
             <PrimaryButton
@@ -222,17 +223,17 @@ export default function RefundDetailScreen() {
           <Text style={styles.sectionTitle}>Original Payment</Text>
           <View style={styles.payRow}>
             <Text style={styles.payLabel}>Paid</Text>
-            <Text style={styles.payValue}>${order.payment.amountPaid.toFixed(2)}</Text>
+            <Text style={styles.payValue}>{formatCents(order.payment.amountPaidCents)}</Text>
           </View>
           <View style={styles.payRow}>
             <Text style={styles.payLabel}>Already refunded</Text>
             <Text style={[styles.payValue, { color: RED }]}>
-              {alreadyRefunded > 0 ? `-$${alreadyRefunded.toFixed(2)}` : '$0.00'}
+              {alreadyRefunded > 0 ? `-${formatCents(alreadyRefunded)}` : formatCents(0)}
             </Text>
           </View>
           <View style={[styles.payRow, styles.payRowTotal]}>
             <Text style={styles.payLabelBold}>Max refundable</Text>
-            <Text style={styles.payValueBold}>${maxRefundable.toFixed(2)}</Text>
+            <Text style={styles.payValueBold}>{formatCents(maxRefundable)}</Text>
           </View>
         </BrandthreadCard>
 
@@ -262,14 +263,14 @@ export default function RefundDetailScreen() {
             <Text style={styles.sectionHeader}>Items</Text>
             {order.lineItems.map(li => {
               const qty = refundType === 'full' ? li.quantity : (selectedItems[li.id] ?? 0);
-              const subtotal = li.unitPrice * qty;
+              const subtotalCents = li.unitPriceCents * qty;
               return (
                 <BrandthreadCard key={li.id} style={[styles.section, styles.itemCard]}>
                   <View style={styles.itemRow}>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.itemName}>{li.productName}</Text>
                       <Text style={styles.itemVariant}>{li.variant}</Text>
-                      <Text style={styles.itemUnitPrice}>${li.unitPrice.toFixed(2)} each · max {li.quantity}</Text>
+                      <Text style={styles.itemUnitPrice}>{formatCents(li.unitPriceCents)} each · max {li.quantity}</Text>
                     </View>
                     {refundType !== 'full' && (
                       <QtySelector
@@ -279,8 +280,8 @@ export default function RefundDetailScreen() {
                       />
                     )}
                   </View>
-                  {subtotal > 0 && (
-                    <Text style={styles.itemSubtotal}>Subtotal: ${subtotal.toFixed(2)}</Text>
+                  {subtotalCents > 0 && (
+                    <Text style={styles.itemSubtotal}>Subtotal: {formatCents(subtotalCents)}</Text>
                   )}
                 </BrandthreadCard>
               );
@@ -292,7 +293,7 @@ export default function RefundDetailScreen() {
         {refundType !== 'shipping' && refundType !== 'full' && (
           <BrandthreadCard style={styles.section}>
             <View style={styles.switchRow}>
-              <Text style={styles.switchLabel}>Include shipping (${order.payment.shippingTotal.toFixed(2)})</Text>
+              <Text style={styles.switchLabel}>Include shipping ({formatCents(order.payment.shippingTotalCents)})</Text>
               <Switch
                 value={includeShipping}
                 onValueChange={setIncludeShipping}
@@ -338,14 +339,14 @@ export default function RefundDetailScreen() {
           <Text style={styles.sectionTitle}>Refund Summary</Text>
           <View style={styles.payRow}>
             <Text style={styles.payLabel}>Item total</Text>
-            <Text style={styles.payValue}>${itemTotal.toFixed(2)}</Text>
+            <Text style={styles.payValue}>{formatCents(itemTotal)}</Text>
           </View>
           <View style={styles.payRow}>
             <Text style={styles.payLabel}>Shipping</Text>
             <Text style={styles.payValue}>
-              ${(refundType === 'full' || refundType === 'shipping'
-                ? order.payment.shippingTotal
-                : includeShipping ? order.payment.shippingTotal : 0).toFixed(2)}
+              {formatCents(refundType === 'full' || refundType === 'shipping'
+                ? order.payment.shippingTotalCents
+                : includeShipping ? order.payment.shippingTotalCents : 0)}
             </Text>
           </View>
           <View style={styles.payRow}>
@@ -356,14 +357,14 @@ export default function RefundDetailScreen() {
           <View style={[styles.payRow, styles.payRowTotal]}>
             <Text style={styles.payLabelBold}>Refund total</Text>
             <Text style={[styles.payValueBold, overMax && { color: RED }]}>
-              ${computedTotal.toFixed(2)}
+              {formatCents(computedTotal)}
             </Text>
           </View>
           {overMax && (
             <View style={styles.warningRow}>
               <Feather name="alert-triangle" size={ICON.xs} color={RED} />
               <Text style={styles.warningText}>
-                Amount exceeds max refundable (${maxRefundable.toFixed(2)})
+                Amount exceeds max refundable ({formatCents(maxRefundable)})
               </Text>
             </View>
           )}

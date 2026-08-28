@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, returns, orders } from "@workspace/db";
+import { db, returns, orders, users } from "@workspace/db";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireStripe } from "../lib/stripe";
@@ -15,16 +15,24 @@ router.use(requireAuth);
 router.post("/", async (req, res) => {
   try {
     const clerkUserId = (req as any).clerkUserId as string;
-    const { orderId, reason, notes, resolutionRequested } = req.body as {
+    const { orderId, reason, notes, resolutionRequested, evidenceUrls, requestedItems } = req.body as {
       orderId?: string;
       reason?: string;
       notes?: string;
       resolutionRequested?: "refund" | "exchange" | "store_credit" | "replacement";
+      evidenceUrls?: unknown;
+      requestedItems?: unknown;
     };
 
     // 1. Validate required fields
     if (!orderId || !reason) {
       return res.status(400).json({ error: "orderId and reason are required" });
+    }
+    if (evidenceUrls !== undefined && (!Array.isArray(evidenceUrls) || evidenceUrls.some((url) => typeof url !== "string"))) {
+      return res.status(400).json({ error: "evidenceUrls must be an array of strings" });
+    }
+    if (requestedItems !== undefined && !Array.isArray(requestedItems)) {
+      return res.status(400).json({ error: "requestedItems must be an array" });
     }
 
     // 2. Look up the order
@@ -86,6 +94,8 @@ router.post("/", async (req, res) => {
         notes: notes ?? null,
         resolutionRequested: resolutionRequested ?? "refund",
         status: "pending",
+        evidenceUrls: (evidenceUrls as string[] | undefined)?.slice(0, 5) ?? [],
+        requestedItems: (requestedItems as any[] | undefined)?.slice(0, 100) ?? [],
       })
       .returning();
 
@@ -115,13 +125,17 @@ router.get("/buyer", async (req, res) => {
         stripeRefundId: returns.stripeRefundId,
         refundAmountCents: returns.refundAmountCents,
         sellerResponse: returns.sellerResponse,
+        evidenceUrls: returns.evidenceUrls,
+        requestedItems: returns.requestedItems,
         createdAt: returns.createdAt,
         updatedAt: returns.updatedAt,
         orderNumber: orders.orderNumber,
         totalCents: orders.totalCents,
+        sellerName: sql<string>`COALESCE(${users.brandName}, ${users.displayName}, 'Seller')`,
       })
       .from(returns)
       .innerJoin(orders, eq(orders.id, returns.orderId))
+      .leftJoin(users, eq(users.clerkId, returns.sellerId))
       .where(eq(returns.buyerId, clerkUserId))
       .orderBy(sql`${returns.createdAt} DESC`);
 
@@ -152,6 +166,8 @@ router.get("/", async (req, res) => {
         stripeRefundId: returns.stripeRefundId,
         refundAmountCents: returns.refundAmountCents,
         sellerResponse: returns.sellerResponse,
+        evidenceUrls: returns.evidenceUrls,
+        requestedItems: returns.requestedItems,
         createdAt: returns.createdAt,
         updatedAt: returns.updatedAt,
         orderNumber: orders.orderNumber,
@@ -188,6 +204,8 @@ router.get("/:id", async (req, res) => {
         stripeRefundId: returns.stripeRefundId,
         refundAmountCents: returns.refundAmountCents,
         sellerResponse: returns.sellerResponse,
+        evidenceUrls: returns.evidenceUrls,
+        requestedItems: returns.requestedItems,
         createdAt: returns.createdAt,
         updatedAt: returns.updatedAt,
         orderNumber: orders.orderNumber,

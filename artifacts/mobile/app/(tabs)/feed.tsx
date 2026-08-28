@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
-  Dimensions, Animated, Alert, Share, TextInput, Modal,
+  Dimensions, Animated, Alert, Share, TextInput, Modal, Image,
   KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,11 +17,12 @@ import {
   BG, SURFACE, CARD, OVERLAY,
   BORDER, BORDER_SUBTLE,
   FG, MUTED, SUBTLE, ON_DARK,
-  PURPLE, PURPLE_LIGHT, CYAN, SUCCESS, RED,
+  SUCCESS, RED,
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandedLoadingState } from '@/components/BrandthreadUI';
+import { formatCents } from '@/lib/money';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -34,7 +35,8 @@ interface SpotlightItem {
   avatarColor: string;
   initials: string;
   verified: boolean;
-  videoUri: string;
+  mediaUris: string[];
+  contentType: 'photo' | 'slideshow' | 'video';
   caption: string;
   sound: string;
   productName: string;
@@ -48,7 +50,7 @@ interface SpotlightItem {
   // Optional fields present on real seller posts
   productId?: string;
   sellerId?: string;
-  productTags?: { productId: string; productName: string; price: number }[];
+  productTags?: { productId: string; productName: string; priceCents: number }[];
 }
 
 // ─── Live Stream feed item ────────────────────────────────────────────────────
@@ -61,10 +63,11 @@ interface LiveStreamFeedItem {
   thumbnailUrl: string | null;
   title: string;
   viewerCount: number;
-  productTags: { productName: string; price: number }[];
+  productTags: { productName: string; priceCents: number }[];
 }
 
 function LiveStreamPage({ stream, onJoin }: { stream: LiveStreamFeedItem; onJoin: () => void }) {
+  const { theme } = useAppTheme();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     const loop = Animated.loop(
@@ -82,7 +85,7 @@ function LiveStreamPage({ stream, onJoin }: { stream: LiveStreamFeedItem; onJoin
       {/* Gradient background */}
       <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(80,20,100,0.18)' }} />
       {/* Centre glow */}
-      <View style={{ position: 'absolute', top: SCREEN_H * 0.25, alignSelf: 'center', width: 280, height: 280, borderRadius: 140, backgroundColor: 'rgba(139,92,246,0.08)' }} />
+      <View style={{ position: 'absolute', top: SCREEN_H * 0.25, alignSelf: 'center', width: 280, height: 280, borderRadius: 140, backgroundColor: theme.accentDim }} />
 
       {/* Top bar */}
       <View style={{ position: 'absolute', top: 52, left: 16, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -101,7 +104,7 @@ function LiveStreamPage({ stream, onJoin }: { stream: LiveStreamFeedItem; onJoin
       {/* Centre content */}
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
         {/* Avatar circle */}
-        <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center', marginBottom: 20, borderWidth: 3, borderColor: '#fff' }}>
+        <View style={{ width: 88, height: 88, borderRadius: 44, backgroundColor: theme.accent, alignItems: 'center', justifyContent: 'center', marginBottom: 20, borderWidth: 3, borderColor: '#fff' }}>
           <Text style={{ color: '#fff', fontFamily: FONT.bold, fontSize: 32 }}>
             {(stream.brandName ?? stream.sellerName).slice(0, 1).toUpperCase()}
           </Text>
@@ -172,10 +175,54 @@ function formatCount(n: number) {
   return String(n);
 }
 
-// ─── Single video page ────────────────────────────────────────────────────────
+// ─── Full-screen media page ───────────────────────────────────────────────────
+
+function VideoVisual({ uri, isActive, paused }: { uri: string; isActive: boolean; paused: boolean }) {
+  const player = useVideoPlayer(uri, p => { p.loop = true; p.muted = false; });
+  React.useEffect(() => {
+    if (isActive && !paused) player.play();
+    else player.pause();
+  }, [isActive, paused, player]);
+  return (
+    <>
+      <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
+      {paused && (
+        <View style={styles.pauseOverlay}>
+          <Feather name="play" size={56} color="#FFFFFFCC" />
+        </View>
+      )}
+    </>
+  );
+}
+
+function PhotoVisual({ uris }: { uris: string[] }) {
+  const pages = uris.length > 0 ? uris : [''];
+  return (
+    <FlatList
+      data={pages}
+      style={StyleSheet.absoluteFill}
+      keyExtractor={(uri, index) => `${uri}-${index}`}
+      horizontal
+      pagingEnabled
+      showsHorizontalScrollIndicator={false}
+      directionalLockEnabled
+      nestedScrollEnabled
+      renderItem={({ item: uri }) => (
+        <View style={{ width: SCREEN_W, height: SCREEN_H }}>
+          {uri ? <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : (
+            <View style={[StyleSheet.absoluteFill, styles.mediaPlaceholder]}>
+              <Feather name="image" size={42} color="#FFFFFF99" />
+            </View>
+          )}
+        </View>
+      )}
+      getItemLayout={(_, index) => ({ length: SCREEN_W, offset: SCREEN_W * index, index })}
+    />
+  );
+}
 
 function SpotlightPage({
-  item, isActive, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShop,
+  item, isActive, engagement, onLike, onDoubleTapLike, onSave, onRepost, onFollow, onOpenComments, onShop, onShopTag,
 }: {
   item: SpotlightItem;
   isActive: boolean;
@@ -187,12 +234,13 @@ function SpotlightPage({
   onFollow: (id: string) => void;
   onOpenComments: (id: string) => void;
   onShop: (item: SpotlightItem) => void;
+  onShopTag: (item: SpotlightItem, tag: { productId: string; productName: string; priceCents: number }) => void;
 }) {
+  const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   // Clear the floating pill tab bar (see (tabs)/_layout.tsx: bottomOffset + height 72 + margin).
   const tabBarClearance = Math.max(insets.bottom, 8) + 12 + 72 + 14;
-  const player = useVideoPlayer(item.videoUri, p => { p.loop = true; p.muted = false; });
   const [paused, setPaused] = useState(false);
   const heartBurst = useRef(new Animated.Value(0)).current;
   const heartScale = useRef(new Animated.Value(1)).current;
@@ -200,11 +248,6 @@ function SpotlightPage({
   const pauseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   React.useEffect(() => () => { if (pauseTimer.current) clearTimeout(pauseTimer.current); }, []);
-
-  React.useEffect(() => {
-    if (isActive && !paused) player.play();
-    else player.pause();
-  }, [isActive, paused, player]);
 
   function burstHeart() {
     heartBurst.setValue(1);
@@ -241,15 +284,12 @@ function SpotlightPage({
     <View style={{ width: SCREEN_W, height: SCREEN_H, backgroundColor: '#000' }}>
       <TouchableWithoutFeedback onPress={handlePress}>
         <View style={StyleSheet.absoluteFill}>
-          <VideoView
-            player={player}
-            style={StyleSheet.absoluteFill}
-            contentFit="cover"
-            nativeControls={false}
-          />
-          {paused && (
-            <View style={styles.pauseOverlay}>
-              <Feather name="play" size={56} color="#FFFFFFCC" />
+          {item.contentType === 'video'
+            ? <VideoVisual uri={item.mediaUris[0]} isActive={isActive} paused={paused} />
+            : <PhotoVisual uris={item.mediaUris} />}
+          {item.contentType !== 'video' && item.mediaUris.length > 1 && (
+            <View style={styles.mediaDots} pointerEvents="none">
+              {item.mediaUris.slice(0, 5).map((_, index) => <View key={index} style={[styles.mediaDot, index === 0 && styles.mediaDotActive]} />)}
             </View>
           )}
           <Animated.View
@@ -263,6 +303,27 @@ function SpotlightPage({
           </Animated.View>
         </View>
       </TouchableWithoutFeedback>
+
+      {/* ─ Product tags live on the media surface ─ */}
+      {!!item.productTags?.length && (
+        <View style={[styles.mediaTags, { top: insets.top + 84 }]} pointerEvents="box-none">
+          {item.productTags.slice(0, 3).map(tag => (
+            <TouchableOpacity
+              key={tag.productId}
+              style={[styles.mediaTag, { borderColor: `${item.accentColor}99` }]}
+              activeOpacity={0.82}
+              onPress={() => onShopTag(item, tag)}
+            >
+              <Feather name="shopping-bag" size={13} color="#FFFFFF" />
+              <View style={styles.mediaTagCopy}>
+                <Text style={styles.mediaTagName} numberOfLines={1}>{tag.productName}</Text>
+                <Text style={styles.mediaTagPrice}>{formatCents(tag.priceCents)}</Text>
+              </View>
+              <Feather name="chevron-right" size={14} color="#FFFFFFBB" />
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       {/* ─ Right action rail ─ */}
       <View style={[styles.rail, { bottom: tabBarClearance }]}>
@@ -320,7 +381,7 @@ function SpotlightPage({
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           }}
         >
-          <Feather name="repeat" size={28} color={engagement?.reposted ? PURPLE : '#FFFFFF'} />
+          <Feather name="repeat" size={28} color={engagement?.reposted ? theme.accent : '#FFFFFF'} />
           <Text style={styles.railCount}>{formatCount(engagement?.reposts ?? 0)}</Text>
         </TouchableOpacity>
 
@@ -330,7 +391,7 @@ function SpotlightPage({
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
           onPress={() => { onSave(item.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
         >
-          <Feather name="bookmark" size={27} color={engagement?.saved ? PURPLE : '#FFFFFF'} />
+          <Feather name="bookmark" size={27} color={engagement?.saved ? theme.accent : '#FFFFFF'} />
           <Text style={styles.railCount}>Save</Text>
         </TouchableOpacity>
 
@@ -354,7 +415,7 @@ function SpotlightPage({
             hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              const tags = (item as any).productTags as Array<{ productId: string; productName: string; price: number }>;
+               const tags = (item as any).productTags as Array<{ productId: string; productName: string; priceCents: number }>;
               if (tags.length === 1) {
                 router.push(('/buyer-product-detail?productId=' + tags[0].productId) as never);
               } else {
@@ -371,7 +432,7 @@ function SpotlightPage({
       {/* ─ Bottom-left overlay: shop CTA, creator, caption, sound ─ */}
       <View style={[styles.bottomInfo, { bottom: tabBarClearance }]} pointerEvents="box-none">
         <TouchableOpacity
-          style={[styles.shopBtn, { backgroundColor: PURPLE }]}
+          style={[styles.shopBtn, { backgroundColor: theme.accent }]}
           activeOpacity={0.85}
           hitSlop={{ top: 6, bottom: 6, left: 10, right: 10 }}
           onPress={() => onShop(item)}
@@ -388,6 +449,9 @@ function SpotlightPage({
           }}
         >
           <View style={styles.creatorRow}>
+            <View style={[styles.creatorAvatar, { backgroundColor: item.avatarColor }]}>
+              <Text style={styles.creatorAvatarText}>{item.initials}</Text>
+            </View>
             <Text style={styles.creatorName}>{item.creator}</Text>
             {item.verified && <Feather name="check-circle" size={13} color="#4FA8FF" style={{ marginLeft: 4 }} />}
           </View>
@@ -413,14 +477,12 @@ function isLiveStreamItem(item: SpotlightItem | LiveStreamFeedItem): item is Liv
 }
 
 // ─── Map a service SellerThreadPost to the feed display format ────────────────
-// Returns null for non-video posts or posts without a media URI — those are
-// skipped from the video feed so a real image URI is never passed to VideoView.
+// Returns null only when a post has no displayable media. Photo, slideshow, and
+// video posts all share the same full-screen Thread surface.
 
 function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
-  if (post.contentType !== 'video') return null; // photo/slideshow posts excluded from video feed
-  const videoUri = post.mediaUris[0];
-  if (!videoUri) return null;
-  const tag = post.productTags[0];
+  if (!post.mediaUris?.length) return null;
+  const tag = post.productTags?.[0];
   return {
     id: post.id,
     creator: post.authorName,
@@ -428,13 +490,14 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     avatarColor: post.authorColor,
     initials: post.authorInitials,
     verified: false,
-    videoUri,
+    mediaUris: post.mediaUris,
+    contentType: post.contentType === 'video' || post.contentType === 'slideshow' ? post.contentType : 'photo',
     caption: post.caption,
     sound: post.sound
       ? `${post.sound.soundTitle} · ${post.sound.artist}`
       : `Original Sound · ${post.authorHandle.slice(1)}`,
     productName: tag?.productName ?? 'Shop Now',
-    productPrice: tag ? `${Number(tag.price).toFixed(0)}` : '',
+    productPrice: tag ? formatCents(tag.priceCents) : '',
     productOriginalPrice: null,
     accentColor: post.authorColor,
     likes: post.likesCount,
@@ -443,7 +506,7 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     shares: 0,
     productId: tag?.productId,
     sellerId: post.authorId,
-    productTags: post.productTags,
+    productTags: post.productTags ?? [],
   };
 }
 
@@ -622,6 +685,12 @@ export default function FeedScreen() {
     router.push(('/buyer-product-detail?productId=' + productId + '&productName=' + encodeURIComponent(productName ?? '') + '&sourcePostId=' + item.id) as never);
   }
 
+  function handleShopTag(item: SpotlightItem, tag: { productId: string; productName: string; priceCents: number }) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push(('/buyer-product-detail?productId=' + encodeURIComponent(tag.productId) +
+      '&productName=' + encodeURIComponent(tag.productName) + '&sourcePostId=' + encodeURIComponent(item.id)) as never);
+  }
+
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
     if (viewableItems.length > 0 && viewableItems[0].index != null) {
       setActiveIndex(viewableItems[0].index);
@@ -693,6 +762,7 @@ export default function FeedScreen() {
               onFollow={handleFollow}
               onOpenComments={handleOpenComments}
               onShop={handleShop}
+              onShopTag={handleShopTag}
             />
           );
         }}
@@ -743,7 +813,7 @@ export default function FeedScreen() {
               <Feather name="search" size={21} color={ON_DARK} />
             </TouchableOpacity>
 
-            <Text style={styles.topTitle}>Spotlight</Text>
+            <Text style={styles.topTitle}>Thread</Text>
 
             <TouchableOpacity
               style={styles.topIconBtn}
@@ -797,7 +867,20 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000000' },
 
   pauseOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  mediaPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#17131D' },
   heartBurst: { position: 'absolute', top: '38%', left: '50%', marginLeft: -55, marginTop: -55 },
+  mediaDots: { position: 'absolute', top: '50%', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 5 },
+  mediaDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: '#FFFFFF80' },
+  mediaDotActive: { width: 18, backgroundColor: '#FFFFFF' },
+  mediaTags: { position: 'absolute', left: 14, right: 76, gap: 8 },
+  mediaTag: {
+    alignSelf: 'flex-start', maxWidth: '100%', flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderWidth: 1, borderRadius: 15, paddingVertical: 8, paddingHorizontal: 10,
+    backgroundColor: '#120F18CC',
+  },
+  mediaTagCopy: { flexShrink: 1 },
+  mediaTagName: { color: '#FFFFFF', fontFamily: FONT.semibold, fontSize: FS.xs },
+  mediaTagPrice: { color: '#FFFFFFCC', fontFamily: FONT.bold, fontSize: 12, marginTop: 1 },
 
   rail: {
     position: 'absolute', right: 10, bottom: 116, alignItems: 'center', gap: 18,
@@ -823,7 +906,9 @@ const styles = StyleSheet.create({
 
 
   caption: { fontSize: 14, fontFamily: FONT.regular, color: '#FFFFFF', lineHeight: 19 },
-  creatorRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  creatorRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 8 },
+  creatorAvatar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#FFFFFF' },
+  creatorAvatarText: { fontSize: 10, fontFamily: FONT.bold, color: '#FFFFFF' },
   creatorName: { fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
   soundRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   soundText: { fontSize: FS.xs, fontFamily: FONT.regular, color: '#FFFFFFCC', flexShrink: 1 },
@@ -851,14 +936,14 @@ const styles = StyleSheet.create({
   commentsTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG, marginBottom: 6 },
   commentsEmpty: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, paddingVertical: 20, textAlign: 'center' },
   commentRow: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: BORDER },
-  commentUser: { fontSize: FS.sm, fontFamily: FONT.bold, color: PURPLE_LIGHT, marginBottom: 3 },
+  commentUser: { fontSize: FS.sm, fontFamily: FONT.bold, color: FG, marginBottom: 3 },
   commentText: { fontSize: 14, fontFamily: FONT.regular, color: FG },
   commentInputRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingTop: 14, paddingBottom: 4 },
   commentInput: {
     flex: 1, height: 44, borderRadius: 22, backgroundColor: SURFACE,
     paddingHorizontal: 16, fontSize: FS.sm, fontFamily: FONT.regular, color: FG,
   },
-  commentSendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center' },
+  commentSendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
 
   notifRow: { fontSize: 13.5, fontFamily: FONT.regular, color: FG, paddingBottom: 14 },
 });

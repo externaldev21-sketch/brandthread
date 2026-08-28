@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -9,7 +10,7 @@ import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
   ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+  GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { loadDraftAnswers, generateStoreFromAnswers, applyGenerationResult, clearDraftAnswers } from '@/services/storeService';
 import { StoreGenerationAnswers } from '@/services/storeTypes';
 
@@ -50,6 +51,8 @@ const DEFAULT_ANSWERS: StoreGenerationAnswers = {
 };
 
 export default function StoreGeneratingScreen() {
+  const { theme } = useAppTheme();
+  const gen = makeStyles(theme);
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -254,7 +257,12 @@ export default function StoreGeneratingScreen() {
   );
 }
 
-const gen = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE = theme.accent;
+  const PURPLE_LIGHT = theme.accentLight;
+  const PURPLE_DIM = theme.accentDim;
+  const BORDER_ACTIVE = theme.accentLight;
+  return StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: BG,
@@ -403,4 +411,5 @@ const gen = StyleSheet.create({
     fontFamily: FONT.bold,
     color: RED,
   },
-});
+  });
+};

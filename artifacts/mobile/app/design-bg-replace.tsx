@@ -4,7 +4,7 @@
  * Params: sourceUri?
  */
 import React, { useState } from 'react';
-import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, ActivityIndicator, Image, TextInput,
@@ -17,9 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE, BORDER_SUBTLE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM,
-  GRAD_PRIMARY, GRAD_CARD_GLOW,
+  FG, MUTED, SUBTLE,
   FONT, FS, SP, RADIUS, ICON, OVERLAY,
 } from '@/lib/theme';
 import {
@@ -62,7 +60,9 @@ const BG_TABS: { key: BgTab; label: string }[] = [
 ];
 
 export default function DesignBgReplaceScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const s = createStyles(theme);
   const router = useRouter();
   const params = useLocalSearchParams<{ sourceUri?: string }>();
   const [imageUri, setImageUri] = useState<string | null>(params.sourceUri ?? null);
@@ -90,6 +90,10 @@ export default function DesignBgReplaceScreen() {
 
   async function handleGenerate() {
     if (!imageUri) { Alert.alert('No source image', 'Please upload a source image first.'); return; }
+    if (bgTab === 'upload' && !uploadedBgUri) {
+      Alert.alert('No background image', 'Upload the background image you want to use.');
+      return;
+    }
     let prompt = '';
     let color: string | undefined;
     if (bgTab === 'color') {
@@ -105,7 +109,13 @@ export default function DesignBgReplaceScreen() {
     }
     setIsGenerating(true);
     try {
-      const res = await replaceBackground({ imageUri, bgType: bgTab, color, prompt });
+      const res = await replaceBackground({
+        imageUri,
+        bgType: bgTab,
+        color,
+        prompt,
+        backgroundImageUri: bgTab === 'upload' ? uploadedBgUri ?? undefined : undefined,
+      });
       setResultUri(res.resultUri);
     } catch {
       Alert.alert('Error', 'Generation failed. Please try again.');
@@ -124,7 +134,7 @@ export default function DesignBgReplaceScreen() {
         <View style={s.ph}>
           <TouchableOpacity onPress={pickSourceImage} activeOpacity={0.85}>
             {imageUri ? (
-              <LinearGradient colors={GRAD_CARD_GLOW} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.sourcePreview}>
+              <LinearGradient colors={theme.glowGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.sourcePreview}>
                 <Feather name="image" size={ICON.xl} color={PURPLE_LIGHT} />
                 <Text style={s.sourceLoaded}>Source image loaded — tap to change</Text>
               </LinearGradient>
@@ -236,7 +246,7 @@ export default function DesignBgReplaceScreen() {
 
         {/* Generate */}
         <View style={s.ph}>
-          <GradientCard colors={GRAD_PRIMARY} onPress={handleGenerate} glow style={s.generateBtn}>
+          <GradientCard colors={theme.primaryGradient} onPress={handleGenerate} glow style={[s.generateBtn, { shadowColor: theme.shadowColor }]}>
             <View style={s.generateInner}>
               <Feather name="zap" size={ICON.md} color="#FFF" />
               <Text style={s.generateText}>Generate</Text>
@@ -249,10 +259,7 @@ export default function DesignBgReplaceScreen() {
           <>
             <SectionHeader title="Result" style={s.sectionHdr} />
             <View style={s.ph}>
-              <LinearGradient colors={['rgba(139,92,246,0.18)', 'rgba(34,211,238,0.10)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.resultPlaceholder}>
-                <Feather name="image" size={ICON.xxl} color={PURPLE_LIGHT} />
-                <Text style={s.resultLabel}>Background replaced</Text>
-              </LinearGradient>
+              <Image source={{ uri: resultUri }} style={s.resultPlaceholder} resizeMode="cover" />
             </View>
             <View style={s.resultActions}>
               <PrimaryButton label="Save" onPress={() => Alert.alert('Saved', 'Result saved.')} icon="save" style={s.actionBtn} />
@@ -269,7 +276,7 @@ export default function DesignBgReplaceScreen() {
       {isGenerating && (
         <View style={s.overlay}>
           <BrandthreadCard style={s.overlayCard}>
-            <LinearGradient colors={GRAD_CARD_GLOW} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.overlayGrad}>
+            <LinearGradient colors={theme.glowGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.overlayGrad}>
               <ActivityIndicator size="large" color={PURPLE} />
               <Text style={s.overlayTitle}>Replacing background…</Text>
               <Text style={s.overlaySub}>AI is compositing your image</Text>
@@ -281,7 +288,9 @@ export default function DesignBgReplaceScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  return StyleSheet.create({
   scroll:             { paddingBottom: 40 },
   ph:                 { paddingHorizontal: SP.md },
   sectionHdr:         { marginTop: SP.lg, marginBottom: SP.sm },
@@ -331,4 +340,5 @@ const s = StyleSheet.create({
   overlayTitle:       { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
   overlaySub:         { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
   bottomPad:          { height: 40 },
-});
+  });
+};

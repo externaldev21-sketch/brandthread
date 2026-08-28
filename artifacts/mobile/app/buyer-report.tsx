@@ -8,7 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
-  BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, ON_DARK,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK,
   SUCCESS, SUCCESS_DIM,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
@@ -37,7 +37,7 @@ export default function BuyerReport() {
   const { theme } = useAppTheme();
   const PURPLE = theme.accent;
   const PURPLE_DIM = theme.accentDim;
-  const GRAD_PRIMARY = [theme.accent, theme.accentLight] as const;
+  const GRAD_PRIMARY = theme.primaryGradient;
   const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -314,7 +314,7 @@ const makeStyles = (theme: { accent: string; accentLight: string; accentDim: str
   },
   reasonChipActive: {
     backgroundColor: theme.accentDim,
-    borderColor: BORDER_ACTIVE,
+    borderColor: theme.accent,
   },
   reasonLabel: {
     color: MUTED,

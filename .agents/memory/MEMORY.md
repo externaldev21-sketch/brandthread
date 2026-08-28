@@ -5,7 +5,7 @@
 - [Inbox structural flattening](inbox-flattening-pattern.md) — Brandthread screens (profile, inbox) use flat Instagram-style rows, no card chrome; keep new screens consistent.
 - [Buyer/Seller only — no Both](buyer-seller-nav.md) — "Both" account type fully removed; buyer home is Thread (video feed at index); buyer tabs are Thread·Discover·Friends·Inbox·Profile.
 - [User-scoped onboarding state](user-scoped-onboarding-state.md) — auth-gated local completion and identity writes must be owned by a Clerk user, never a shared device-global key.
-- [Onboarding architecture](onboarding-architecture.md) — embedded Clerk auth mid-flow; AsyncStorage draft persistence; dev reset via 1.5s long-press on success checkmark.
+- [Onboarding architecture](onboarding-architecture.md) — Clerk account creation is the literal first step for buyer and seller; user-scoped draft migration preserves equivalent screens across reorderings.
 - [Seller Dashboard Architecture](seller-dashboard-architecture.md) — tabs (Home·Studio·Products·Orders·More), services layer at @/services/, screen inventory, color system, navigation gotchas.
 - [Manufacturer Hub Architecture](manufacturer-hub-architecture.md) — 9 screens, types+service files, route list, no-local-const rule, null-safety-in-handlers rule, demo behavior.
 - [Manufacturer Hub Full System](manufacturer-hub-full-system.md) — migration 017, public directory, invite tokens, Stripe Connect for mfg payouts, 6-stage sample/bulk orders, drop wallet ledger, real messaging.
@@ -32,6 +32,7 @@
 - [Messaging/Cart/Search/Notifications Architecture](messaging-cart-search-notifications-architecture.md) — migration 007; 6 new tables; conversations+saved+cart+notifications API routes; socialService+cartService+search.tsx wired to real API.
 - [Storefront/Drops/Shoppable/Reports Architecture](storefront-drops-shoppable-reports-architecture.md) — migration 008; website+releaseAt cols, post_tagged_products+reports tables; 10 new API routes; seller-profile/feed/edit-profile/customers/buyer-report wired.
 - [Buyer-to-buyer social graph](buyer-buyer-social.md) — migration 010 follows table; /api/social/* routes; buyer-other-profile+friends+connections+search wired to real DB; Message always open to any buyer.
+- [Buyer post privacy](buyer-post-privacy.md) — buyer profile posts are friend-only until the database has an enforceable per-post visibility field; never infer public visibility.
 - [useApi hook and api singleton](use-api-exports.md) — api.ts exports useApi() (Clerk hook) + configureApi/api singleton; ServiceConfigurer calls configureApi; screens must use useApi(), not singleton, unless non-component context.
 - [Messaging safety architecture](messaging-safety-architecture.md) — contentModerator.ts (rule-based, no profanity filter); blocks DB table (migration 012); is_request on conversations; block/follow/profile routes enforce blocks; users table has no initials/color columns.
 - [Ecommerce features architecture](ecommerce-features-architecture.md) — migration 014: discount_codes, returns, shipping_rates tables + orders fulfillment timestamps; 3 new API route files; cartService/orderService wired to real endpoints.
@@ -42,7 +43,8 @@
 - [AI Brain system wiring](ai-brain-wiring.md) — ai-brain.tsx already live; ai-assistant.tsx now real (uses aiService.sendMessage); brand memory rebuild calls /api/ai/brand-memory/rebuild (GPT-4o-mini derives voice from products/posts/store); suggestions calls /api/ai/suggestions (real DB: low-stock variants, unfulfilled orders, caption-less posts).
 - [Account Security wiring](account-security-wiring.md) — biometric-unlock.tsx uses expo-local-authentication + SecureStore; login-methods.tsx adds Clerk TOTP 2FA (createTOTP/verifyTOTP/disableTOTP); security.tsx "View" → login-activity.tsx; /api/ai/sessions returns Clerk session list.
 - [Drops & Repost wiring](drops-repost-wiring.md) — releaseAt+dropId already in DB; following.tsx wired to /api/public/drops with live countdown; buyer-drop-detail.tsx new screen; feed.tsx like/repost/save fire-and-forget to real API; repost uses 'repost' interaction type (free-text column).
-- [Live Shopping Architecture](live-shopping-architecture.md) — Agora RTC live streams; 3 screens; 2 DB tables; Metro web shim for react-native-agora; live items woven into Thread feed.
+- [Live Shopping Architecture](live-shopping-architecture.md) — Agora streams support seller-featured products and an in-stream Stripe Checkout overlay that keeps the broadcast mounted.
+- [Seller vacation enforcement](seller-vacation-enforcement.md) — vacation mode is a server-side commerce and buyer-to-seller messaging boundary; public surfaces expose its effective status and message.
 - [Support Chatbot Architecture](support-chatbot-architecture.md) — teal SupportChatBubble (Modal, bottom-left) separate from purple AIBrainFAB; /api/support-chat fetches real seller/buyer data; no new API key needed.
 - [Stories Architecture](stories-architecture.md) — what existed vs. built; StoryOverlay type; multi-slide reel; link/gif/text overlays; seller story ring; non-follower visibility already enforced in backend.
 - [Freelancer marketplace payments](freelancer-marketplace.md) — escrow transfer-on-complete; live payout-readiness gate; source_transaction mandatory; claim-then-pay idempotency; 5% fee pending.
@@ -53,3 +55,7 @@
 - [Store preview links](store-preview-links.md) — public preview tokens are bearer credentials: store only the latest SHA-256 fingerprint and reject all earlier links.
 - [Truthful seller profile metrics](truthful-seller-profile-metrics.md) — count settled paid orders and deduplicated signed-in storefront visits; never fabricate growth.
 - [Guest commerce boundaries](guest-commerce-boundaries.md) — guest shopping stays public-route-only; order lookup uses a hashed capability, with no loyalty or saved payment identity.
+- [Integer-cents money contracts](integer-cents-money-contracts.md) — mobile money stays in explicit *Cents fields; parse decimal strings strictly and format only at the UI boundary.
+- [Mobile API resilience](mobile-api-resilience.md) — classify transport/server failures centrally; only read requests get global retry actions, while mutations require explicit screen-level retries.
+- [Promote objective boundary](promote-objectives.md) — Boost objectives are persisted and reported now; true objective-aware delivery requires separate event attribution and ranking work.
+- [Returns and push preferences](returns-push-preferences.md) — return/refund submissions are server-authoritative; granular category switches gate push delivery, not the in-app feed.

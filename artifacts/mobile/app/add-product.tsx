@@ -10,11 +10,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert,
-  TextInput, KeyboardAvoidingView, Platform, Switch, Image,
-  LayoutAnimation, UIManager,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, TextInput, KeyboardAvoidingView, Platform, Switch, Image, LayoutAnimation, UIManager } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
@@ -22,36 +18,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, SUCCESS, BLUE, ORANGE, RED, GOLD, ON_DARK,
-  GRAD_PRIMARY, GRAD_CARD_GLOW,
-  FONT, FS, SP, RADIUS, COMP, ICON, ANIM,
-} from '@/lib/theme';
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, BLUE, ORANGE, RED, GOLD, ON_DARK, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
-import {
-  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  IconButton, FilterChip, StatusBadge, SectionHeader, FormInput,
-  ProgressCard, EmptyState, GuidedTip,
-} from '@/components/BrandthreadUI';
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, FilterChip, StatusBadge, SectionHeader, FormInput, ProgressCard, EmptyState, GuidedTip } from '@/components/BrandthreadUI';
 import StyleTagsPicker from '@/components/StyleTagsPicker';
 
-import {
-  getProduct, saveDraft, loadDraft, deleteDraft,
-  getCollections,
-} from '@/services/productService';
+import { getProduct, saveDraft, loadDraft, deleteDraft, getCollections } from '@/services/productService';
 import { useApi } from '@/hooks/useApi';
 
-import {
-  Product, ProductDraft, ProductCategory, PRODUCT_CATEGORIES,
-  SIZE_PRESETS, COLOR_PRESETS, SalesModel, OptionType,
-  ProductOption, OptionValue, ProductVariant, ProductMedia, ProductCollection,
-} from '@/services/productTypes';
+import { Product, ProductDraft, ProductCategory, PRODUCT_CATEGORIES, SIZE_PRESETS, COLOR_PRESETS, SalesModel, OptionType, ProductOption, OptionValue, ProductVariant, ProductMedia, ProductCollection } from '@/services/productTypes';
 
-import {
-  calcPricing, generateVariantCombinations, buildVariantTitle, validateForPublish,
-} from '@/lib/productUtils';
+import { calcPricing, generateVariantCombinations, buildVariantTitle, validateForPublish } from '@/lib/productUtils';
+import { formatCents, parseDecimalToCents } from '@/lib/money';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -129,6 +108,10 @@ interface LocalVariant {
 }
 
 function uid() { return Math.random().toString(36).slice(2, 11); }
+function centsToInput(cents: number | undefined): string {
+  if (cents === undefined) return '';
+  return `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, '0')}`;
+}
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -147,7 +130,7 @@ export default function AddProductScreen() {
     tags: [],
     styleTags: [],
     media: [],
-    pricing: { price: 0, currency: 'USD' },
+    pricing: { priceCents: 0, currency: 'USD' },
     options: [],
     variants: [],
     inventory: {
@@ -246,11 +229,11 @@ export default function AddProductScreen() {
   // ── Restore helper ──
   function restoreFormState(source: Partial<Product>) {
     if (source.pricing) {
-      setPriceStr(source.pricing.price?.toString() ?? '');
-      setCompareAtStr(source.pricing.compareAtPrice?.toString() ?? '');
-      setCostStr(source.pricing.cost?.toString() ?? '');
-      setShippingStr(source.pricing.estimatedShippingCost?.toString() ?? '');
-      setFeesStr(source.pricing.estimatedFees?.toString() ?? '');
+      setPriceStr(centsToInput(source.pricing.priceCents));
+      setCompareAtStr(centsToInput(source.pricing.compareAtPriceCents));
+      setCostStr(centsToInput(source.pricing.costCents));
+      setShippingStr(centsToInput(source.pricing.estimatedShippingCostCents));
+      setFeesStr(centsToInput(source.pricing.estimatedFeesCents));
     }
     if (source.tags) setTagsInput(source.tags.join(', '));
     if (source.storeSettings?.featuredOnHomepage) setFeaturedHome(source.storeSettings.featuredOnHomepage);
@@ -275,7 +258,7 @@ export default function AddProductScreen() {
         title: v.title,
         optionValues: v.optionValues,
         sku: v.sku ?? '',
-        price: v.price?.toString() ?? '',
+        price: centsToInput(v.priceCents),
         qty: v.inventoryQuantity.toString(),
       })));
       const qtys: Record<string, string> = {};
@@ -287,7 +270,7 @@ export default function AddProductScreen() {
         setMfgMode('existing');
         setMfgName(source.manufacturing.manufacturerName);
       }
-      setTargetCost(source.manufacturing.targetCostPerUnit?.toString() ?? '');
+      setTargetCost(centsToInput(source.manufacturing.targetCostPerUnitCents));
       setReqQty(source.manufacturing.requiredQuantity?.toString() ?? '');
       setProdDeadline(source.manufacturing.productionDeadline ?? '');
     }
@@ -373,7 +356,7 @@ export default function AddProductScreen() {
     const productVariants: ProductVariant[] = localVariants.map(v => ({
       id: v.id, productId: '',
       title: v.title, optionValues: v.optionValues,
-      sku: v.sku, price: parseFloat(v.price) || undefined,
+       sku: v.sku, priceCents: parseDecimalToCents(v.price) ?? undefined,
       inventoryQuantity: parseInt(variantQtys[v.id] ?? v.qty) || 0,
       reservedQuantity: 0, incomingQuantity: 0,
       status: 'active' as const,
@@ -386,11 +369,11 @@ export default function AddProductScreen() {
       variants: productVariants,
       pricing: {
         ...(draftData.pricing ?? { currency: 'USD' }),
-        price: parseFloat(priceStr) || 0,
-        compareAtPrice: parseFloat(compareAtStr) || undefined,
-        cost: parseFloat(costStr) || undefined,
-        estimatedShippingCost: parseFloat(shippingStr) || 0,
-        estimatedFees: parseFloat(feesStr) || 0,
+        priceCents: parseDecimalToCents(priceStr) ?? 0,
+        compareAtPriceCents: parseDecimalToCents(compareAtStr) ?? undefined,
+        costCents: parseDecimalToCents(costStr) ?? undefined,
+        estimatedShippingCostCents: parseDecimalToCents(shippingStr) ?? 0,
+        estimatedFeesCents: parseDecimalToCents(feesStr) ?? 0,
         currency: 'USD',
       },
       inventory: {
@@ -409,7 +392,7 @@ export default function AddProductScreen() {
         ...(draftData.manufacturing ?? {}),
         stage: mfgMode === 'quote' ? 'quote_requested' : 'none',
         manufacturerName: mfgName || undefined,
-        targetCostPerUnit: parseFloat(targetCost) || undefined,
+        targetCostPerUnitCents: parseDecimalToCents(targetCost) ?? undefined,
         requiredQuantity: parseInt(reqQty) || undefined,
         productionDeadline: prodDeadline || undefined,
       },
@@ -474,11 +457,11 @@ export default function AddProductScreen() {
   // ── Pricing helpers ──
   function getPricing() {
     return calcPricing({
-      price: parseFloat(priceStr) || 0,
-      compareAtPrice: parseFloat(compareAtStr) || undefined,
-      cost: parseFloat(costStr) || undefined,
-      estimatedShippingCost: parseFloat(shippingStr) || 0,
-      estimatedFees: parseFloat(feesStr) || 0,
+       priceCents: parseDecimalToCents(priceStr) ?? 0,
+       compareAtPriceCents: parseDecimalToCents(compareAtStr) ?? undefined,
+       costCents: parseDecimalToCents(costStr) ?? undefined,
+       estimatedShippingCostCents: parseDecimalToCents(shippingStr) ?? 0,
+       estimatedFeesCents: parseDecimalToCents(feesStr) ?? 0,
       currency: 'USD',
     });
   }
@@ -503,12 +486,27 @@ export default function AddProductScreen() {
 
   // ── Publish ──
   async function handlePublish() {
+    const decimalFields: Array<[string, string]> = [
+      ['Price', priceStr],
+      ['Compare-at price', compareAtStr],
+      ['Cost', costStr],
+      ['Shipping cost', shippingStr],
+      ['Fees', feesStr],
+      ['Target unit cost', targetCost],
+      ...localVariants.map((variant) => [`Price for ${variant.title || 'variant'}`, variant.price] as [string, string]),
+    ];
+    const invalidField = decimalFields.find(([, value]) => value.trim() !== '' && parseDecimalToCents(value) === null);
+    if (invalidField) {
+      Alert.alert('Invalid price', `${invalidField[0]} must be a non-negative amount with up to two decimal places.`);
+      return;
+    }
+
     const pricing = {
-      price: parseFloat(priceStr) || 0,
-      compareAtPrice: parseFloat(compareAtStr) || undefined,
-      cost: parseFloat(costStr) || undefined,
-      estimatedShippingCost: parseFloat(shippingStr) || 0,
-      estimatedFees: parseFloat(feesStr) || 0,
+      priceCents: parseDecimalToCents(priceStr) ?? 0,
+      compareAtPriceCents: parseDecimalToCents(compareAtStr) ?? undefined,
+      costCents: parseDecimalToCents(costStr) ?? undefined,
+      estimatedShippingCostCents: parseDecimalToCents(shippingStr) ?? 0,
+      estimatedFeesCents: parseDecimalToCents(feesStr) ?? 0,
       currency: 'USD',
     };
     const productOptions: ProductOption[] = localOptions.map((o, i) => ({
@@ -519,7 +517,7 @@ export default function AddProductScreen() {
     const productVariants: ProductVariant[] = localVariants.map(v => ({
       id: v.id, productId: '',
       title: v.title, optionValues: v.optionValues,
-      sku: v.sku, price: parseFloat(v.price) || undefined,
+      sku: v.sku, priceCents: parseDecimalToCents(v.price) ?? undefined,
       inventoryQuantity: parseInt(variantQtys[v.id] || v.qty) || 0,
       reservedQuantity: 0, incomingQuantity: 0,
       status: 'active' as const,
@@ -546,14 +544,14 @@ export default function AddProductScreen() {
     if (publishing) return;
     setPublishing(true);
 
-    const retailPrice = parseFloat(priceStr) || 0;
-    if (retailPrice < 0) {
-      Alert.alert('Invalid price', 'Price cannot be negative.');
+    const retailPriceCents = parseDecimalToCents(priceStr);
+    if (retailPriceCents === null || retailPriceCents <= 0) {
+      Alert.alert('Invalid price', 'Enter a valid price with up to two decimal places.');
       setPublishing(false);
       return;
     }
-    const compareAt = parseFloat(compareAtStr);
-    if (compareAtStr && !isNaN(compareAt) && compareAt <= retailPrice) {
+    const compareAtCents = compareAtStr ? parseDecimalToCents(compareAtStr) : undefined;
+    if (compareAtStr && (compareAtCents === null || compareAtCents === undefined || compareAtCents <= retailPriceCents)) {
       Alert.alert('Compare-at price', 'Compare-at price should be higher than the retail price.');
       setPublishing(false);
       return;
@@ -601,7 +599,7 @@ export default function AddProductScreen() {
       manufacturing: {
         stage: mfgMode === 'quote' ? 'quote_requested' : 'none',
         manufacturerName: mfgName || undefined,
-        targetCostPerUnit: parseFloat(targetCost) || undefined,
+        targetCostPerUnitCents: parseDecimalToCents(targetCost) ?? undefined,
         requiredQuantity: parseInt(reqQty) || undefined,
         productionDeadline: prodDeadline || undefined,
       },
@@ -611,7 +609,7 @@ export default function AddProductScreen() {
       size:              v.size,
       color:             v.color,
       sku:               v.sku || ((productPayload.name ?? 'SKU').replace(/\s+/g, '-').toUpperCase() + '-' + (v.id ?? 'DEFAULT')),
-      priceCents:        Math.round(((v.price ?? productPayload.pricing?.price ?? 0) as number) * 100),
+       priceCents:        (v.priceCents ?? productPayload.pricing?.priceCents ?? 0) as number,
       stock:             typeof v.inventoryQuantity === 'number' ? v.inventoryQuantity : 0,
       lowStockThreshold: (productPayload.inventory as any)?.lowStockThreshold ?? 10,
     })).filter((v: any) => v.priceCents > 0);
@@ -834,7 +832,7 @@ export default function AddProductScreen() {
 
   function renderPricing() {
     const pricing = getPricing();
-    const fmt = (v: number | undefined) => v !== undefined ? `$${v.toFixed(2)}` : '—';
+    const fmt = (v: number | undefined) => v !== undefined ? formatCents(v) : '—';
 
     return (
       <>
@@ -877,14 +875,14 @@ export default function AddProductScreen() {
           <Text style={s.pricingTitle}>Pricing Summary</Text>
           <View style={s.pricingRow}>
             <Text style={s.pricingLabel}>Gross profit</Text>
-            <Text style={[s.pricingValue, { color: pricing.grossProfit !== undefined && pricing.grossProfit >= 0 ? SUCCESS : RED }]}>
-              {fmt(pricing.grossProfit)}
+            <Text style={[s.pricingValue, { color: pricing.grossProfitCents !== undefined && pricing.grossProfitCents >= 0 ? SUCCESS : RED }]}>
+              {fmt(pricing.grossProfitCents)}
             </Text>
           </View>
           <View style={s.pricingRow}>
             <Text style={s.pricingLabel}>Net profit</Text>
-            <Text style={[s.pricingValue, { color: pricing.netProfit !== undefined && pricing.netProfit >= 0 ? SUCCESS : RED }]}>
-              {fmt(pricing.netProfit)}
+            <Text style={[s.pricingValue, { color: pricing.netProfitCents !== undefined && pricing.netProfitCents >= 0 ? SUCCESS : RED }]}>
+              {fmt(pricing.netProfitCents)}
             </Text>
           </View>
           <View style={s.pricingRow}>
@@ -895,7 +893,7 @@ export default function AddProductScreen() {
           </View>
           <View style={s.pricingRow}>
             <Text style={s.pricingLabel}>Break-even</Text>
-            <Text style={s.pricingValue}>{fmt(pricing.breakEvenPrice)}</Text>
+            <Text style={s.pricingValue}>{fmt(pricing.breakEvenPriceCents)}</Text>
           </View>
         </GradientCard>
       </>
@@ -1303,7 +1301,7 @@ export default function AddProductScreen() {
   const liveWarnings = validateForPublish({
     name: draftData.name ?? '',
     description: draftData.description ?? '',
-    pricing: { price: parseFloat(priceStr) || 0 },
+    pricing: { priceCents: parseDecimalToCents(priceStr) ?? 0 },
     media: draftData.media ?? [],
     variants: localVariants,
   });

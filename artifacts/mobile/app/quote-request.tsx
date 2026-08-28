@@ -12,6 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { formatCents, parseDecimalToCents } from '@/lib/money';
 
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
@@ -169,7 +170,7 @@ export default function QuoteRequestScreen() {
         draftId.current = qr.id;
         setProductName(qr.productName);
         setQuantity(qr.quantity.toString());
-        setTargetUnitPrice(qr.targetUnitPrice?.toString() ?? '');
+        setTargetUnitPrice(qr.targetUnitPriceCents === undefined ? '' : formatCents(qr.targetUnitPriceCents).slice(1));
         setNeededByDate(qr.neededByDate ?? '');
         setProductionType(qr.productionType ?? 'Standard');
         setSampleRequired(qr.sampleRequired);
@@ -202,7 +203,7 @@ export default function QuoteRequestScreen() {
         productName: name,
         productId,
         quantity: parseInt(quantity) || 100,
-        targetUnitPrice: parseFloat(targetUnitPrice) || undefined,
+        targetUnitPriceCents: targetUnitPrice ? parseDecimalToCents(targetUnitPrice) ?? undefined : undefined,
         neededByDate: neededByDate || undefined,
         productionType,
         sampleRequired,
@@ -573,7 +574,7 @@ export default function QuoteRequestScreen() {
           {targetUnitPrice ? (
             <View style={sc.summaryRow}>
               <Text style={sc.summaryLabel}>Target price</Text>
-              <Text style={sc.summaryValue}>${targetUnitPrice}/unit</Text>
+              <Text style={sc.summaryValue}>{formatCents(parseDecimalToCents(targetUnitPrice) ?? 0)}/unit</Text>
             </View>
           ) : null}
           {neededByDate ? (

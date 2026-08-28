@@ -1,10 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Animated, Modal, TextInput, FlatList, Alert, Pressable,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Modal, TextInput, FlatList, Alert, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -12,29 +9,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApi } from '@/hooks/useApi';
-import {
-  getSetupState, markSetupStarted, dismissWelcome,
-  completionPercent, nextTask, nextBestAction, dismissTip,
-  markFeatureOpened, type SetupState,
-} from '@/lib/setupStore';
-import { DEMO_ORDERS, DEMO_PRODUCTS } from '@/services/data';
+import { getSetupState, markSetupStarted, dismissWelcome, completionPercent, nextTask, nextBestAction, dismissTip, markFeatureOpened, type SetupState } from '@/lib/setupStore';
 import { getHubStats } from '@/services/manufacturerService';
 import { getOrderStats } from '@/services/orderService';
 import { getInventoryStats } from '@/services/inventoryService';
-import {
-  BrandthreadScreen, BrandthreadCard, GradientCard,
-  PrimaryButton, SecondaryButton, IconButton, SearchBar,
-  StatCard, QuickActionCard, SectionHeader, ProgressCard,
-  NavigationCard, GuidedTip, NewFeatureBadge, LoadingSkeleton,
-  EmptyState, StatusBadge,
-} from '@/components/BrandthreadUI';
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, SUCCESS, GREEN_BRIGHT, BLUE, ORANGE, RED, GOLD,
-  FONT, FS, SP, RADIUS, COMP, ICON, ANIM, SHADOW_PURPLE,
-} from '@/lib/theme';
+import { BrandthreadScreen, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SearchBar, StatCard, QuickActionCard, SectionHeader, ProgressCard, NavigationCard, GuidedTip, NewFeatureBadge, LoadingSkeleton, EmptyState, StatusBadge } from '@/components/BrandthreadUI';
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, GREEN_BRIGHT, BLUE, ORANGE, RED, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { formatCents } from '@/lib/money';
+import { reportNetworkError } from '@/lib/networkNotice';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -122,6 +105,7 @@ export default function SellerHomeScreen() {
   const api = useApi();
   const [loading, setLoading] = useState(true);
   const [statsError, setStatsError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
   const [setupState, setSetupState] = useState<SetupState>(DEFAULT_SETUP);
   // Real per-seller dashboard stats — null while loading or on error.
   // No fake/seed fallback: chips show '—' until real data arrives.
@@ -155,6 +139,8 @@ export default function SellerHomeScreen() {
   } | null>(null);
   // ── Dashboard visual upgrade state ────────────────────────────────────────
   const [recentOrders, setRecentOrders] = useState<any[] | null>(null);
+  const [searchProducts, setSearchProducts] = useState<any[]>([]);
+  const [searchOrders, setSearchOrders] = useState<any[]>([]);
   const [payoutInfo,   setPayoutInfo]   = useState<any | null>(null);
   const [salesTrend,   setSalesTrend]   = useState<Array<{ day: string; totalCents: number }> | null>(null);
   const progressAnim = useRef(new Animated.Value(0)).current;
@@ -188,9 +174,11 @@ export default function SellerHomeScreen() {
         storefrontVisits: typeof data.storefrontVisits     === 'number' ? data.storefrontVisits     : 0,
         completedOrders:  typeof data.completedOrders      === 'number' ? data.completedOrders      : 0,
       });
-    }).catch(() => {
+    }).catch((error) => {
       // Leave dashStats as null — chips show '—' rather than a fabricated number
       setDashStats(null);
+      setStatsError(true);
+      reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
     // Load hub stats
     getHubStats().then(stats => setHubStats({
@@ -198,7 +186,7 @@ export default function SellerHomeScreen() {
       samplesNeedingReview: stats.samplesNeedingReview,
       activeProduction: stats.activeProduction,
       unreadMessages: stats.unreadMessages,
-    })).catch(() => { setStatsError(true); });
+    })).catch((error) => { setStatsError(true); reportNetworkError(error, () => setRetryKey(key => key + 1)); });
     // Load order stats
     getOrderStats().then(s => setOrderStats({
       newOrders: s.newOrders,
@@ -206,30 +194,54 @@ export default function SellerHomeScreen() {
       readyToShip: s.readyToShip,
       returnRequests: s.returnRequests,
       disputes: s.disputes,
-    })).catch(() => { setStatsError(true); });
+    })).catch((error) => { setStatsError(true); reportNetworkError(error, () => setRetryKey(key => key + 1)); });
     // Load inventory stats
     getInventoryStats().then(s => setInvStats({
       lowStockCount: s.lowStockCount,
       outOfStockCount: s.outOfStockCount,
       incomingCount: s.incomingCount,
       delayedCount: s.delayedCount,
-    })).catch(() => { setStatsError(true); });
+    })).catch((error) => { setStatsError(true); reportNetworkError(error, () => setRetryKey(key => key + 1)); });
     // ── Dashboard visual upgrade: hero card + trend chart + real orders ──
     api.finance.balance().then((data: any) => {
       setPayoutInfo(data && typeof data === 'object' ? data : null);
-    }).catch(() => setPayoutInfo(null));
+    }).catch((error) => {
+      setPayoutInfo(null);
+      setStatsError(true);
+      reportNetworkError(error, () => setRetryKey(key => key + 1));
+    });
     api.orders.list().then((rows: any) => {
-      setRecentOrders(Array.isArray(rows) ? rows.slice(0, 3) : []);
-    }).catch(() => setRecentOrders([]));
+      const list = Array.isArray(rows) ? rows : [];
+      setRecentOrders(list.slice(0, 3));
+      setSearchOrders(list);
+    }).catch((error) => {
+      setRecentOrders(null);
+      setStatsError(true);
+      reportNetworkError(error, () => setRetryKey(key => key + 1));
+    });
+    api.products.list().then((rows: any) => {
+      setSearchProducts(Array.isArray(rows) ? rows : []);
+    }).catch((error) => {
+      setSearchProducts([]);
+      setStatsError(true);
+      reportNetworkError(error, () => setRetryKey(key => key + 1));
+    });
     api.analytics.revenue('last7').then((data: any) => {
       const daily = Array.isArray(data?.daily) ? data.daily : [];
       setSalesTrend(daily.map((d: any) => ({
         day: String(d.day ?? d.date ?? ''),
         totalCents: typeof d.total_cents === 'number' ? d.total_cents : 0,
       })));
-    }).catch(() => setSalesTrend([]));
+    }).catch((error) => {
+      setSalesTrend(null);
+      setStatsError(true);
+      reportNetworkError(error, () => setRetryKey(key => key + 1));
+    });
     return () => { clearTimeout(timer); clearTimeout(minLoad); };
-  }, []);
+  // The Clerk getToken function can be re-instantiated by the Expo web preview.
+  // retryKey is the only intentional reload trigger for this page-wide fetch.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [retryKey]);
 
   // ── Derived values ────────────────────────────────────────────────────────
   const pct = completionPercent(setupState);
@@ -241,12 +253,12 @@ export default function SellerHomeScreen() {
   // ── Search results ────────────────────────────────────────────────────────
   const q = searchQuery.toLowerCase().trim();
   const productResults = q
-    ? DEMO_PRODUCTS.filter(p => p.name.toLowerCase().includes(q))
+    ? searchProducts.filter(p => String(p.name ?? '').toLowerCase().includes(q))
     : [];
   const orderResults = q
-    ? DEMO_ORDERS.filter(o =>
-        o.orderNumber.toLowerCase().includes(q) ||
-        o.customer.name.toLowerCase().includes(q)
+    ? searchOrders.filter(o =>
+        String(o.orderNumber ?? '').toLowerCase().includes(q) ||
+        String(o.customer?.name ?? o.customerName ?? '').toLowerCase().includes(q)
       )
     : [];
 
@@ -400,11 +412,11 @@ export default function SellerHomeScreen() {
         {statsError && (
           <TouchableOpacity
             style={{ marginHorizontal: SP.md, marginBottom: SP.sm, flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: 'rgba(249,115,22,0.1)', borderRadius: RADIUS.md, padding: SP.sm, borderWidth: 1, borderColor: 'rgba(249,115,22,0.25)' }}
-            onPress={() => { setStatsError(false); }}
+            onPress={() => { setRetryKey(key => key + 1); }}
             activeOpacity={0.8}
           >
             <Feather name="alert-triangle" size={14} color={ORANGE} />
-            <Text style={{ flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: ORANGE }}>Live stats unavailable — tap to dismiss</Text>
+            <Text style={{ flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: ORANGE }}>Some live data is unavailable — tap to retry</Text>
           </TouchableOpacity>
         )}
 
@@ -506,7 +518,7 @@ export default function SellerHomeScreen() {
             <Text style={s.statChipVal}>
               {dashStats === null
                 ? '—'
-                : '$' + (dashStats.revenueCents / 100).toLocaleString('en-US', { maximumFractionDigits: 0 })}
+                : formatCents(dashStats.revenueCents)}
             </Text>
             <Text style={s.statChipLbl}>Revenue</Text>
           </View>
@@ -535,8 +547,7 @@ export default function SellerHomeScreen() {
             <Text style={s.trendTitle}>7-day revenue</Text>
             {salesTrend !== null && salesTrend.length > 0 && (
               <Text style={s.trendWeekTotal}>
-                {'$' + (salesTrend.reduce((sum, d) => sum + d.totalCents, 0) / 100)
-                  .toLocaleString('en-US', { maximumFractionDigits: 0 })} this week
+                {formatCents(salesTrend.reduce((sum, d) => sum + d.totalCents, 0))} this week
               </Text>
             )}
           </View>
@@ -683,9 +694,8 @@ export default function SellerHomeScreen() {
               </GradientCard>
             ) : recentOrders.map((order: any) => {
               const customerName = order.customerName ?? order.customer?.name ?? order.buyerName ?? 'Unknown';
-              const totalCents   = typeof order.totalCents   === 'number' ? order.totalCents
-                                 : typeof order.total_cents  === 'number' ? order.total_cents
-                                 : typeof order.total        === 'number' ? Math.round(order.total * 100) : 0;
+               const totalCents   = typeof order.totalCents   === 'number' ? order.totalCents
+                                  : typeof order.total_cents  === 'number' ? order.total_cents : 0;
               const orderNum     = order.orderNumber ?? order.order_number
                                  ?? `#${String(order.id ?? '').slice(-6).toUpperCase()}`;
               const rawDate      = order.createdAt ?? order.created_at ?? '';
@@ -714,7 +724,7 @@ export default function SellerHomeScreen() {
                       </View>
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
                         <Text style={s.orderCustomer}>{customerName}</Text>
-                        <Text style={s.orderTotal}>${(totalCents / 100).toFixed(2)}</Text>
+                        <Text style={s.orderTotal}>{formatCents(totalCents)}</Text>
                       </View>
                     </View>
                   </View>
@@ -885,7 +895,7 @@ export default function SellerHomeScreen() {
                         key={p.id}
                         label={p.name}
                         icon="package"
-                        description={`${p.status} · $${p.price}`}
+                        description={`${p.status}${typeof p.priceCents === 'number' ? ` · ${formatCents(p.priceCents)}` : ''}`}
                         accent={CYAN}
                         onPress={() => { setSearchModal(false); nav('/(tabs)/products'); }}
                       />
@@ -900,7 +910,7 @@ export default function SellerHomeScreen() {
                         key={o.id}
                         label={o.orderNumber}
                         icon="shopping-bag"
-                        description={`${o.customer.name} · $${o.total.toFixed(2)}`}
+                        description={`${o.customer.name} · ${formatCents(o.totalCents)}`}
                         accent={PURPLE}
                         onPress={() => { setSearchModal(false); nav('/(tabs)/orders'); }}
                       />

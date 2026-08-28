@@ -3,7 +3,7 @@
  * Route: /design-canvas?id=<projectId>
  */
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, StyleSheet, TouchableOpacity, PanResponder,
   Alert, ScrollView, TextInput, Modal, Dimensions, Image, Share,
@@ -18,12 +18,9 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM,
   SUCCESS,
   RED,
   FONT, FS, SP, RADIUS, ICON,
-  GRAD_PRIMARY,
 } from '@/lib/theme';
 import {
   getProject, autosaveProject, updateProject, addLayer, updateLayer,
@@ -69,7 +66,9 @@ function uid(): string { return `uid_${Date.now()}_${++_uid}`; }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export default function DesignCanvasScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const ss = createStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
@@ -552,7 +551,7 @@ export default function DesignCanvasScreen() {
               width={canvasSize.w * 0.9}
               height={canvasSize.h * 0.9}
               fill="none"
-              stroke="rgba(34,211,238,0.3)"
+              stroke={theme.secondaryDim}
               strokeWidth={1}
               strokeDasharray="6,4"
             />
@@ -985,7 +984,9 @@ function SheetHandle() {
   );
 }
 
-const ss = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  return StyleSheet.create({
   root:        { flex: 1, backgroundColor: BG },
   topBar:      { flexDirection: 'row', alignItems: 'center', backgroundColor: SURFACE, borderBottomWidth: 1, borderBottomColor: BORDER, paddingHorizontal: SP.sm, paddingBottom: SP.sm, gap: SP.xs },
   topBtn:      { width: 34, height: 34, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
@@ -1062,4 +1063,5 @@ const ss = StyleSheet.create({
   layerName:   { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   layerSub:    { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   layerIconBtn:{ padding: 4 },
-});
+  });
+};

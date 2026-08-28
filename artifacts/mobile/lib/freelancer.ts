@@ -2,6 +2,7 @@
  * Freelancer marketplace shared constants + helpers (Community tab).
  */
 import type { Feather } from '@expo/vector-icons';
+import { formatCents } from './money';
 
 export const FREELANCER_SERVICE_TYPES: {
   value: string;
@@ -28,13 +29,12 @@ export function serviceIcon(value: string | undefined | null): keyof typeof Feat
 
 /** 8000 → "$80/hr", 5550 → "$55.50/hr" */
 export function formatHourlyRate(cents: number): string {
-  const dollars = cents / 100;
-  return `$${dollars % 1 === 0 ? dollars.toFixed(0) : dollars.toFixed(2)}/hr`;
+  return `${formatCents(cents)}/hr`;
 }
 
 /** 25000 → "$250.00" */
 export function formatPrice(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
+  return formatCents(cents);
 }
 
 /** avgRatingTenths 48 → "4.8"; 0/null → null (no reviews yet) */

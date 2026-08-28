@@ -17,6 +17,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { createRefundRequest } from '@/services/cartService';
 import { getBuyerOrder } from '@/services/orderService';
 import { BuyerOrderView } from '@/services/orderTypes';
+import { formatCents } from '@/lib/money';
 import {
   BG, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE,
@@ -40,7 +41,7 @@ export default function BuyerRefundRequestScreen() {
   const { theme } = useAppTheme();
   const PURPLE = colors.primary, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = colors.accent;
   const BORDER_ACTIVE = `${theme.accent}73`;
-  const GRAD_PRIMARY = [theme.accent, theme.secondary] as const;
+  const GRAD_PRIMARY = theme.primaryGradient;
   const s = makeStyles(theme);
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const router = useRouter();
@@ -75,7 +76,7 @@ export default function BuyerRefundRequestScreen() {
     }).catch(() => setLoading(false));
   }, [orderId]);
 
-  const total = order?.payment.total ?? 0;
+  const totalCents = order?.payment.totalCents ?? 0;
 
   async function handleSubmit() {
     if (!reason) { Alert.alert('Select Reason', 'Please select a refund reason.'); return; }
@@ -90,8 +91,8 @@ export default function BuyerRefundRequestScreen() {
         sellerName: order.sellerName,
         reason,
         description: description.trim(),
-        evidenceUris: [],
-        maxRefundAmount: total,
+        evidenceUris: evidencePhotos,
+        maxRefundAmount: totalCents,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setSubmitted(true);
@@ -137,7 +138,7 @@ export default function BuyerRefundRequestScreen() {
         {/* Max refund */}
         <View style={s.maxCard}>
           <Text style={s.maxLabel}>Maximum possible refund</Text>
-          <Text style={s.maxAmount}>${total.toFixed(2)}</Text>
+          <Text style={s.maxAmount}>{formatCents(totalCents)}</Text>
           <Text style={s.maxNote}>Actual refund amount is subject to seller and payment provider review. Refunds are not guaranteed until confirmed.</Text>
         </View>
 
@@ -152,7 +153,7 @@ export default function BuyerRefundRequestScreen() {
                   <Text style={s.itemName}>{item.productName}</Text>
                   <Text style={s.itemVariant}>{item.variant} · ×{item.quantity}</Text>
                 </View>
-                <Text style={s.itemPrice}>${(item.unitPrice * item.quantity).toFixed(2)}</Text>
+                <Text style={s.itemPrice}>{formatCents(item.unitPriceCents * item.quantity)}</Text>
               </View>
             ))}
           </View>

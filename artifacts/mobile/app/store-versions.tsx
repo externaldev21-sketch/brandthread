@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, Alert,
@@ -33,6 +34,8 @@ function formatDate(iso: string): string {
 }
 
 export default function StoreVersionsScreen() {
+  const { theme } = useAppTheme();
+  const vs = makeStyles(theme);
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const headerTopInset = useHeaderTopInset();
@@ -157,7 +160,9 @@ export default function StoreVersionsScreen() {
   );
 }
 
-const vs = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE_LIGHT = theme.accentLight;
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
@@ -186,4 +191,5 @@ const vs = StyleSheet.create({
   verRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: SP.sm },
   verLabel: { fontSize: FS.base, fontFamily: FONT.bold, color: FG, flex: 1 },
   verDate: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-});
+  });
+};

@@ -3,7 +3,7 @@
  * Sends push messages via the Expo Push Service (no APNs/FCM credentials needed in dev).
  * In production, upgrade to direct APNs/FCM for higher throughput.
  */
-import { db, pushTokens } from "@workspace/db";
+import { db, pushTokens, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 export interface PushPayload {
@@ -17,8 +17,53 @@ export interface PushPayload {
  * Send a push notification to all devices registered for a given Clerk user ID.
  * Fire-and-forget — errors are logged but not thrown.
  */
-export async function sendPushToUser(userId: string, payload: PushPayload): Promise<void> {
+export type PushEventCategory =
+  | "drop"
+  | "message"
+  | "order"
+  | "social"
+  | "production"
+  | "payout"
+  | "dispute";
+
+function preferenceKey(accountType: string | null, category: PushEventCategory): string | null {
+  if (accountType === "seller") {
+    const sellerPreferences: Partial<Record<PushEventCategory, string>> = {
+      order: "new_orders",
+      production: "production_milestones",
+      payout: "payout_confirmations",
+      message: "customer_messages",
+      dispute: "disputes",
+    };
+    return sellerPreferences[category] ?? null;
+  }
+  const buyerPreferences: Partial<Record<PushEventCategory, string>> = {
+    drop: "new_drops",
+    message: "messages",
+    order: "order_updates",
+    social: "friend_activity",
+  };
+  return buyerPreferences[category] ?? null;
+}
+
+export async function sendPushToUser(
+  userId: string,
+  payload: PushPayload,
+  category?: PushEventCategory,
+): Promise<void> {
   try {
+    if (category) {
+      const [recipient] = await db
+        .select({
+          accountType: users.accountType,
+          preferences: users.notificationPreferences,
+        })
+        .from(users)
+        .where(eq(users.clerkId, userId))
+        .limit(1);
+      const key = preferenceKey(recipient?.accountType ?? null, category);
+      if (key && recipient?.preferences?.[key] === false) return;
+    }
     const tokens = await db
       .select({ token: pushTokens.token })
       .from(pushTokens)

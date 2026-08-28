@@ -5,6 +5,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '../lib/serviceConfig';
+import { centsAtPercent } from '../lib/money';
 import {
   Manufacturer, ManufacturerRelationship, ManufacturerInvitation,
   QuoteRequest, Quote, Counteroffer,
@@ -49,6 +50,21 @@ function futureDate(days: number): string {
   return d.toISOString();
 }
 
+function multiplyCents(quantity: number, unitCents: number): number {
+  if (!Number.isSafeInteger(quantity) || !Number.isSafeInteger(unitCents)) {
+    throw new Error('Quote quantities and monetary amounts must be safe integers.');
+  }
+  const total = quantity * unitCents;
+  if (!Number.isSafeInteger(total)) throw new Error('Quote total exceeds the safe integer range.');
+  return total;
+}
+
+function sumCents(...amounts: number[]): number {
+  const total = amounts.reduce((sum, amount) => sum + amount, 0);
+  if (!Number.isSafeInteger(total)) throw new Error('Quote total exceeds the safe integer range.');
+  return total;
+}
+
 // ─── Demo data ────────────────────────────────────────────────────────────────
 
 export const DEMO_MANUFACTURERS: Manufacturer[] = [
@@ -74,10 +90,7 @@ export const DEMO_MANUFACTURERS: Manufacturer[] = [
     ],
     materials: ['100% Cotton', 'French terry', 'Heavyweight fleece', 'Recycled cotton'],
     moq: 50,
-    samplePriceMin: 45,
-    samplePriceMax: 90,
-    unitPriceMin: 18,
-    unitPriceMax: 35,
+    samplePriceMinCents: 4500, samplePriceMaxCents: 9000, unitPriceMinCents: 1800, unitPriceMaxCents: 3500,
     leadTimeDays: 35,
     responseTimeHours: 12,
     rating: 4.8,
@@ -109,10 +122,7 @@ export const DEMO_MANUFACTURERS: Manufacturer[] = [
     ],
     materials: ['100% Cotton', 'Cotton/poly blend', 'Polyester', 'Spandex', 'Nylon'],
     moq: 100,
-    samplePriceMin: 25,
-    samplePriceMax: 60,
-    unitPriceMin: 8,
-    unitPriceMax: 22,
+    samplePriceMinCents: 2500, samplePriceMaxCents: 6000, unitPriceMinCents: 800, unitPriceMaxCents: 2200,
     leadTimeDays: 25,
     responseTimeHours: 6,
     rating: 4.6,
@@ -145,10 +155,7 @@ export const DEMO_MANUFACTURERS: Manufacturer[] = [
     ],
     materials: ['Organic cotton', 'Linen', 'Tencel', 'Merino wool'],
     moq: 25,
-    samplePriceMin: 60,
-    samplePriceMax: 120,
-    unitPriceMin: 25,
-    unitPriceMax: 55,
+    samplePriceMinCents: 6000, samplePriceMaxCents: 12000, unitPriceMinCents: 2500, unitPriceMaxCents: 5500,
     leadTimeDays: 45,
     responseTimeHours: 24,
     rating: 4.9,
@@ -178,10 +185,7 @@ export const DEMO_MANUFACTURERS: Manufacturer[] = [
     certifications: [],
     materials: ['100% Cotton', 'Cotton fleece', 'French terry'],
     moq: 24,
-    samplePriceMin: 85,
-    samplePriceMax: 150,
-    unitPriceMin: 22,
-    unitPriceMax: 48,
+    samplePriceMinCents: 8500, samplePriceMaxCents: 15000, unitPriceMinCents: 2200, unitPriceMaxCents: 4800,
     leadTimeDays: 14,
     responseTimeHours: 4,
     rating: 4.7,
@@ -213,10 +217,7 @@ export const DEMO_MANUFACTURERS: Manufacturer[] = [
     ],
     materials: ['Denim', 'Twill', 'Chambray', 'Corduroy', 'Canvas'],
     moq: 200,
-    samplePriceMin: 35,
-    samplePriceMax: 80,
-    unitPriceMin: 12,
-    unitPriceMax: 32,
+    samplePriceMinCents: 3500, samplePriceMaxCents: 8000, unitPriceMinCents: 1200, unitPriceMaxCents: 3200,
     leadTimeDays: 30,
     responseTimeHours: 18,
     rating: 4.5,
@@ -342,10 +343,8 @@ function apiRowToManufacturer(row: any): Manufacturer {
     specialty:          row.specialty ?? '',
     description:        row.description ?? '',
     moq:                row.moq ?? 100,
-    samplePriceMin:     0,
-    samplePriceMax:     0,
-    unitPriceMin:       0,
-    unitPriceMax:       0,
+    samplePriceMinCents: 0, samplePriceMaxCents: 0,
+    unitPriceMinCents: 0, unitPriceMaxCents: 0,
     leadTimeDays:       Number(String(row.bulkTurnaround ?? '').match(/\d+/)?.[0] ?? 0),
     responseTimeHours:  0,
     rating:             0,
@@ -400,7 +399,7 @@ export async function searchManufacturers(opts: {
   country?: string;
   category?: string;
   moqMax?: number;
-  unitPriceMax?: number;
+  unitPriceMaxCents?: number;
   leadTimeDaysMax?: number;
   verifiedOnly?: boolean;
   ratingMin?: number;
@@ -431,7 +430,7 @@ export async function searchManufacturers(opts: {
   if (opts.country) results = results.filter(m => m.country === opts.country);
   if (opts.category) results = results.filter(m => m.categories.some(c => c.toLowerCase().includes(opts.category!.toLowerCase())));
   if (opts.moqMax !== undefined) results = results.filter(m => m.moq <= opts.moqMax!);
-  if (opts.unitPriceMax !== undefined) results = results.filter(m => m.unitPriceMin <= opts.unitPriceMax!);
+  if (opts.unitPriceMaxCents !== undefined) results = results.filter(m => m.unitPriceMinCents <= opts.unitPriceMaxCents!);
   if (opts.leadTimeDaysMax !== undefined) results = results.filter(m => m.leadTimeDays <= opts.leadTimeDaysMax!);
   if (opts.verifiedOnly) results = results.filter(m => m.isVerified);
   if (opts.ratingMin !== undefined) results = results.filter(m => m.rating >= opts.ratingMin!);
@@ -631,7 +630,7 @@ export async function submitQuoteRequest(id: string): Promise<QuoteRequest | und
   setTimeout(async () => {
     const mfg = _manufacturers.find(m => m.id === qr.manufacturerId);
     if (!mfg) return;
-    const unitPrice = +(mfg.unitPriceMin + Math.random() * (mfg.unitPriceMax - mfg.unitPriceMin)).toFixed(2);
+    const unitPriceCents = mfg.unitPriceMinCents + Math.floor(Math.random() * (mfg.unitPriceMaxCents - mfg.unitPriceMinCents + 1));
     const quote: Quote = {
       id: 'q_' + uid(),
       quoteRequestId: id,
@@ -639,12 +638,18 @@ export async function submitQuoteRequest(id: string): Promise<QuoteRequest | und
       sellerId: qr.sellerId,
       productName: qr.productName,
       quantity: qr.quantity,
-      unitPrice,
-      sampleCost: mfg.samplePriceMin,
-      setupCost: 150,
-      packagingCost: +(unitPrice * 0.05).toFixed(2),
-      shippingEstimate: 380,
-      totalEstimate: +(qr.quantity * unitPrice + mfg.samplePriceMin + 150 + 380).toFixed(2),
+      unitPriceCents,
+      sampleCostCents: mfg.samplePriceMinCents,
+      setupCostCents: 15000,
+      packagingCostCents: centsAtPercent(unitPriceCents, 5),
+      shippingEstimateCents: 38000,
+      totalEstimateCents: sumCents(
+        multiplyCents(qr.quantity, unitPriceCents),
+        mfg.samplePriceMinCents,
+        15000,
+        centsAtPercent(unitPriceCents, 5),
+        38000,
+      ),
       moq: mfg.moq,
       leadTimeDays: mfg.leadTimeDays,
       productionDays: Math.round(mfg.leadTimeDays * 0.7),
@@ -787,7 +792,7 @@ function mapSampleOrder(row: any, imageUris: string[] = []): Sample {
     productName:    row.title ?? '',
     type:           'proto',
     status:         statusMap[row.status] ?? row.status ?? 'requested',
-    cost:           (row.priceCents ?? 0) / 100,
+    costCents:      Number(row.priceCents ?? 0),
     paymentStatus:  row.status === 'payment_received' ? 'paid' : 'pending',
     imageUris,
     fileIds:        [],
@@ -805,7 +810,7 @@ export async function createSample(data: {
   productId?: string;
   productName: string;
   type?: Sample['type'];
-  cost: number;
+  costCents: number;
 }): Promise<Sample> {
   const row = await serviceRequest<any>('/api/sample-orders', {
     method: 'POST',
@@ -814,7 +819,7 @@ export async function createSample(data: {
       orderType: 'sample',
       title: data.productName,
       quantity: 1,
-      priceCents: Math.max(1, Math.round(data.cost * 100)),
+      priceCents: Math.max(1, data.costCents),
       notes: JSON.stringify({ quoteId: data.quoteId }),
     }),
   });
@@ -865,8 +870,8 @@ export async function createProductionOrder(data: {
   productName: string;
   quantity: number;
   variants?: Record<string, number>;
-  totalCost: number;
-  depositAmount: number;
+  totalCostCents: number;
+  depositAmountCents: number;
 }): Promise<ProductionOrder> {
   await ensureInitialized();
   const stages: ProductionStage[] = PRODUCTION_STAGES.map(s => ({ key: s.key, label: s.label }));
@@ -880,8 +885,8 @@ export async function createProductionOrder(data: {
   }));
 
   const payments: ManufacturerPaymentRecord[] = [
-    { id: 'pay_' + uid(), productionOrderId: '', type: 'deposit', amount: data.depositAmount, currency: 'USD', status: 'due', dueDate: futureDate(7), createdAt: now() },
-    { id: 'pay_' + uid(), productionOrderId: '', type: 'final', amount: data.totalCost - data.depositAmount, currency: 'USD', status: 'pending', dueDate: futureDate(data.quantity > 100 ? 60 : 45), createdAt: now() },
+    { id: 'pay_' + uid(), productionOrderId: '', type: 'deposit', amountCents: data.depositAmountCents, currency: 'USD', status: 'due', dueDate: futureDate(7), createdAt: now() },
+    { id: 'pay_' + uid(), productionOrderId: '', type: 'final', amountCents: data.totalCostCents - data.depositAmountCents, currency: 'USD', status: 'pending', dueDate: futureDate(data.quantity > 100 ? 60 : 45), createdAt: now() },
   ];
 
   const order: ProductionOrder = {
@@ -895,9 +900,9 @@ export async function createProductionOrder(data: {
     status: 'active',
     quantity: data.quantity,
     variants: data.variants ?? {},
-    totalCost: data.totalCost,
-    depositAmount: data.depositAmount,
-    remainingBalance: data.totalCost - data.depositAmount,
+    totalCostCents: data.totalCostCents,
+    depositAmountCents: data.depositAmountCents,
+    remainingBalanceCents: data.totalCostCents - data.depositAmountCents,
     startDate: now(),
     estimatedCompletionDate: futureDate(45),
     currentStage: 'deposit_pending',

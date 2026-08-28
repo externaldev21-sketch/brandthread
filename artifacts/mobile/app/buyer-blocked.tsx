@@ -7,7 +7,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import {
-  BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE,
   ON_DARK,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
@@ -27,7 +27,7 @@ export default function BuyerBlocked() {
   const { theme } = useAppTheme();
   const PURPLE = theme.accent;
   const PURPLE_DIM = theme.accentDim;
-  const GRAD_PRIMARY = [theme.accent, theme.accentLight] as const;
+  const GRAD_PRIMARY = theme.primaryGradient;
   const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -239,7 +239,7 @@ const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.
   },
   tabActive: {
     backgroundColor: theme.accentDim,
-    borderColor: BORDER_ACTIVE,
+    borderColor: theme.accent,
   },
   tabText: {
     color: MUTED,
@@ -287,7 +287,7 @@ const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.
   actionBtn: {
     backgroundColor: CARD,
     borderWidth: 1,
-    borderColor: BORDER_ACTIVE,
+    borderColor: theme.accent,
     borderRadius: RADIUS.md,
     paddingHorizontal: SP.md,
     height: 36,

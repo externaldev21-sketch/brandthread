@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 interface Automation {
   id: string;
@@ -31,8 +32,6 @@ const AUTOMATIONS: Automation[] = [
 const CATEGORY_COLORS: Record<string, string> = {
   Inventory: '#B98A2E',
   Orders: '#4A6FA5',
-  Marketing: '#8B5CF6',
-  Fulfillment: '#22D3EE',
   CRM: '#6D28D9',
 };
 
@@ -45,6 +44,7 @@ const TEMPLATES = [
 
 export default function AutomationScreen() {
   const colors = useColors();
+  const { theme } = useAppTheme();
   const [enabled, setEnabled] = useState<Record<string, boolean>>(
     Object.fromEntries(AUTOMATIONS.map((a) => [a.id, a.enabled]))
   );
@@ -87,7 +87,11 @@ export default function AutomationScreen() {
       </View>
 
       {AUTOMATIONS.map((automation) => {
-        const catColor = CATEGORY_COLORS[automation.category] ?? colors.mutedForeground;
+        const catColor = automation.category === 'Marketing'
+          ? theme.accent
+          : automation.category === 'Fulfillment'
+            ? theme.secondary
+            : CATEGORY_COLORS[automation.category] ?? colors.mutedForeground;
         return (
           <View key={automation.id} style={[styles.autoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={styles.autoHeader}>

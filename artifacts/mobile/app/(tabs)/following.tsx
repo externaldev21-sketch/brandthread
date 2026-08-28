@@ -16,7 +16,7 @@ import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE,
   SUCCESS, RED, RED_DIM,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
@@ -246,7 +246,7 @@ export default function FollowingScreen() {
             {avatarBrands.map(brand => (
               <TouchableOpacity key={brand.id} style={s.avatarItem} activeOpacity={0.8}
                 onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}>
-                <LinearGradient colors={[PURPLE, '#6D28D9', PURPLE]} style={s.avatarRing}>
+                <LinearGradient colors={[...theme.primaryGradient]} style={s.avatarRing}>
                   <View style={[s.avatarRingInner, { backgroundColor: BG }]}>
                     <View style={[s.avatarCircle, { backgroundColor: brand.color }]}>
                       <Text style={s.avatarInitials}>{brand.initials}</Text>
@@ -272,7 +272,7 @@ export default function FollowingScreen() {
             <Text style={s.errorTitle}>Couldn't load drops</Text>
             <Text style={s.errorBody}>{error}</Text>
             <TouchableOpacity
-              style={s.retryBtn}
+              style={[s.retryBtn, { backgroundColor: PURPLE_DIM, borderColor: PURPLE }]}
               activeOpacity={0.8}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -280,7 +280,7 @@ export default function FollowingScreen() {
               }}
             >
               <Feather name="refresh-cw" size={14} color={PURPLE} style={{ marginRight: 6 }} />
-              <Text style={s.retryBtnText}>Try again</Text>
+              <Text style={[s.retryBtnText, { color: PURPLE }]}>Try again</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -346,10 +346,10 @@ const s = StyleSheet.create({
   errorBody:  { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 18 },
   retryBtn: {
     flexDirection: 'row', alignItems: 'center', marginTop: SP.md,
-    backgroundColor: PURPLE_DIM, borderRadius: RADIUS.sm, borderWidth: 1,
-    borderColor: PURPLE + '44', paddingHorizontal: SP.md, paddingVertical: SP.sm,
+    borderRadius: RADIUS.sm, borderWidth: 1,
+    paddingHorizontal: SP.md, paddingVertical: SP.sm,
   },
-  retryBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE },
+  retryBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold },
 
   // Empty state
   emptyTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG, marginBottom: 8, textAlign: 'center' },

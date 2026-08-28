@@ -10,6 +10,7 @@ import { Router } from "express";
 import { db, notificationsFeed } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { sendPushToUser, type PushEventCategory } from "../lib/push";
 
 export const router = Router();
 
@@ -82,6 +83,7 @@ export async function publishNotification(n: {
   targetId?:    string;
   targetType?:  string;
   cta?:         string;
+  pushCategory?: PushEventCategory;
 }): Promise<void> {
   await db.insert(notificationsFeed).values({
     userId:       n.userId,
@@ -97,6 +99,27 @@ export async function publishNotification(n: {
     targetType:   n.targetType   ?? null,
     cta:          n.cta          ?? null,
   });
+  const inferredCategory: PushEventCategory | undefined = n.pushCategory
+    ?? (n.category === "social" ? "social"
+      : n.category === "message" || n.category === "messages" ? "message"
+      : n.category === "order" ? "order"
+      : n.category === "drop" || n.category === "drops" ? "drop"
+      : n.category === "production" ? "production"
+      : n.category === "payout" || n.category === "finance" ? "payout"
+      : n.category === "dispute" || n.category === "disputes" ? "dispute"
+      : undefined);
+  if (inferredCategory) {
+    await sendPushToUser(n.userId, {
+      title: n.title,
+      body: n.body ?? "",
+      data: {
+        type: n.type,
+        targetId: n.targetId,
+        targetType: n.targetType,
+        cta: n.cta,
+      },
+    }, inferredCategory);
+  }
 }
 
 export default buyerRouter;

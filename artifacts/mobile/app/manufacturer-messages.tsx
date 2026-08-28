@@ -31,6 +31,7 @@ import {
   CYAN, CYAN_DIM, ORANGE, ORANGE_DIM, SUCCESS, SUCCESS_DIM,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { formatCents, parseDecimalToCents } from '@/lib/money';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,7 +52,7 @@ function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
-function fmtCents(c: number) { return `$${(c / 100).toFixed(2)}`; }
+function fmtCents(c: number) { return formatCents(c); }
 
 // ─── Message Bubble ───────────────────────────────────────────────────────────
 
@@ -254,10 +255,14 @@ function SampleCardDialog({
     if (!title.trim() || !price.trim()) {
       Alert.alert('Required', 'Title and price are required.'); return;
     }
+    const priceCents = parseDecimalToCents(price);
+    if (priceCents === null || priceCents <= 0) {
+      Alert.alert('Invalid price', 'Enter a valid amount with up to two decimal places.'); return;
+    }
     onSend({
       title:      title.trim(),
       quantity:   parseInt(qty) || 1,
-      priceCents: Math.round(parseFloat(price) * 100),
+      priceCents,
       orderType:  isBulk ? 'bulk' : 'sample',
       description: desc.trim() || undefined,
     });

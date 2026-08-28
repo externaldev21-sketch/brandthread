@@ -45,6 +45,13 @@ All screens: try-catch the `require('react-native-agora')` at top; show placehol
 ## Seller Entry Point
 `artifacts/mobile/app/(tabs)/studio.tsx` — "Go Live" tool card added before "Create Content"
 
+## In-stream purchasing
+Product tags may mark one product as highlighted. Seller highlighting updates the existing product-tags JSON contract; buyers see a purchase sheet over the active stream, fetch authoritative variants, and reuse the standard buyer Stripe Checkout session plus verification flow.
+
+**Why:** Navigating to product detail or implementing a second payment path would either discard the live viewing context or bypass the checkout system's stock, payout, idempotency, and order-creation safeguards.
+
+**How to apply:** Keep the live screen mounted while checkout opens as an overlay/browser modal. Always resolve price and stock from the public product endpoint and create payment through the normal buyer checkout API.
+
 ## Environment Secrets Needed
 - `AGORA_APP_ID` — required for any live streaming (from console.agora.io)
 - `AGORA_APP_CERTIFICATE` — for secure token generation (from same console)

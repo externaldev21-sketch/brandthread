@@ -2,15 +2,17 @@
  * Brandthread Buyer Product Detail
  * Variant selection, add to cart, buy now.
  */
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image, RefreshControl,
+  Animated, Dimensions, PanResponder,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { formatCents } from '@/lib/money';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
@@ -39,8 +41,8 @@ function useChrome() {
     theme, PURPLE: colors.primary, PURPLE_LIGHT: theme.accentLight, PURPLE_DIM: colors.accent,
     CYAN: theme.secondary, CYAN_DIM: theme.secondaryDim,
     BORDER_ACTIVE: `${theme.accent}73`, BORDER_FOCUS: `${theme.secondary}80`,
-    GRAD_PRIMARY: [theme.accent, theme.secondary] as const,
-    SHADOW_PURPLE: { shadowColor: theme.accent, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
+    GRAD_PRIMARY: theme.primaryGradient,
+    SHADOW_PURPLE: { shadowColor: theme.shadowColor, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   };
 }
 
@@ -70,14 +72,14 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
       id:                v.id,
       title:             [v.size, v.color].filter(Boolean).join(' / ') || 'Default',
       optionValues:      ovs,
-      price:             (v.priceCents ?? 0) / 100,
+      priceCents:        v.priceCents ?? 0,
       inventoryQuantity: v.stock ?? 0,
       isAvailable:       (v.stock ?? 0) > 0,
       imageUri:          firstImage,
     };
   });
 
-  const lowestPrice = variants.length > 0 ? Math.min(...variants.map(v => v.price)) : 0;
+  const lowestPrice = variants.length > 0 ? Math.min(...variants.map(v => v.priceCents)) : 0;
 
   return {
     id:                 row.id,
@@ -86,7 +88,7 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
     sellerHandle:       '',
     name:               row.name,
     description:        row.description ?? '',
-    price:              lowestPrice,
+    priceCents:         lowestPrice,
     imageUris:          row.images ?? [],
     category:           row.category ?? 'apparel',
     isPreOrder:           row.isPreOrder           ?? false,
@@ -103,7 +105,9 @@ function adaptApiProductToBuyerProduct(row: any): BuyerProduct {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmtPrice(n: number) { return '$' + n.toFixed(2); }
+const fmtPrice = formatCents;
+const GALLERY_WIDTH = Dimensions.get('window').width;
+const GALLERY_HEIGHT = Math.min(520, Math.max(430, GALLERY_WIDTH * 1.22));
 
 function renderStars(rating: number): string {
   const full = Math.round(Math.max(0, Math.min(5, rating)));
@@ -132,6 +136,141 @@ function isVariantComboAvailable(
   return product.variants.some(v =>
     v.isAvailable &&
     filledOptionIds.every(oid => v.optionValues.some(ov => ov.optionId === oid && ov.valueId === candidate[oid]))
+  );
+}
+
+function ZoomableGalleryImage({ uri }: { uri: string }) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const currentScale = useRef(1);
+  const pinchStartDistance = useRef(0);
+  const pinchStartScale = useRef(1);
+  const [zoomed, setZoomed] = useState(false);
+
+  const distance = (touches: readonly any[]) => {
+    if (touches.length < 2) return 0;
+    const dx = touches[0].pageX - touches[1].pageX;
+    const dy = touches[0].pageY - touches[1].pageY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const resetZoom = () => {
+    currentScale.current = 1;
+    setZoomed(false);
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 4 }).start();
+  };
+
+  const responder = useRef(PanResponder.create({
+    onMoveShouldSetPanResponder: event => event.nativeEvent.touches.length === 2,
+    onMoveShouldSetPanResponderCapture: event => event.nativeEvent.touches.length === 2,
+    onPanResponderGrant: event => {
+      pinchStartDistance.current = distance(event.nativeEvent.touches);
+      pinchStartScale.current = currentScale.current;
+    },
+    onPanResponderMove: event => {
+      const nextDistance = distance(event.nativeEvent.touches);
+      if (!pinchStartDistance.current || !nextDistance) return;
+      const nextScale = Math.max(1, Math.min(3.5, pinchStartScale.current * nextDistance / pinchStartDistance.current));
+      currentScale.current = nextScale;
+      scale.setValue(nextScale);
+    },
+    onPanResponderRelease: () => {
+      if (currentScale.current < 1.06) resetZoom();
+      else setZoomed(true);
+    },
+    onPanResponderTerminate: () => {
+      if (currentScale.current < 1.06) resetZoom();
+    },
+  })).current;
+
+  return (
+    <View style={{ width: GALLERY_WIDTH, height: GALLERY_HEIGHT, overflow: 'hidden' }} {...responder.panHandlers}>
+      <Animated.Image
+        source={{ uri }}
+        style={[StyleSheet.absoluteFill, { transform: [{ scale }] }]}
+        resizeMode="cover"
+        accessibilityLabel="Product photo. Pinch with two fingers to zoom."
+      />
+      {zoomed && (
+        <TouchableOpacity style={galleryStyles.resetZoom} onPress={resetZoom} accessibilityRole="button">
+          <Feather name="minimize-2" size={14} color={ON_DARK} />
+          <Text style={galleryStyles.resetZoomText}>Reset</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+const galleryStyles = StyleSheet.create({
+  gallery: { width: GALLERY_WIDTH, height: GALLERY_HEIGHT, backgroundColor: CARD, position: 'relative' },
+  galleryEmpty: { alignItems: 'center', justifyContent: 'center', gap: SP.sm },
+  emptyText: { color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.sm },
+  galleryShade: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, height: 96,
+    backgroundColor: 'rgba(0,0,0,0.17)',
+  },
+  galleryMeta: {
+    position: 'absolute', left: SP.md, bottom: SP.md, flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 10, paddingVertical: 7, borderRadius: RADIUS.pill, backgroundColor: 'rgba(0,0,0,0.58)',
+  },
+  galleryMetaText: { color: ON_DARK, fontFamily: FONT.medium, fontSize: FS.xs },
+  dots: { position: 'absolute', bottom: 21, left: 0, right: 0, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  dot: { height: 6, borderRadius: 3, backgroundColor: ON_DARK },
+  resetZoom: {
+    position: 'absolute', right: SP.md, bottom: 56, flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 10, paddingVertical: 7, borderRadius: RADIUS.pill, backgroundColor: 'rgba(0,0,0,0.65)',
+  },
+  resetZoomText: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.xs },
+});
+
+function ProductGallery({ imageUris }: { imageUris: string[] }) {
+  const images = imageUris.filter(Boolean);
+  const scrollX = useRef(new Animated.Value(0)).current;
+
+  if (!images.length) {
+    return (
+      <View style={[galleryStyles.gallery, galleryStyles.galleryEmpty]}>
+        <Feather name="image" size={ICON.xxl} color={MUTED} />
+        <Text style={galleryStyles.emptyText}>Product image unavailable</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={galleryStyles.gallery}>
+      <Animated.FlatList
+        data={images}
+        keyExtractor={(uri, index) => `${uri}-${index}`}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        renderItem={({ item }) => <ZoomableGalleryImage uri={item} />}
+        getItemLayout={(_, index) => ({ length: GALLERY_WIDTH, offset: GALLERY_WIDTH * index, index })}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], { useNativeDriver: false })}
+        scrollEventThrottle={16}
+      />
+      <View style={galleryStyles.galleryShade} pointerEvents="none" />
+      <View style={galleryStyles.galleryMeta} pointerEvents="none">
+        <Feather name="maximize-2" size={13} color={ON_DARK} />
+        <Text style={galleryStyles.galleryMetaText}>Pinch to zoom</Text>
+      </View>
+      {images.length > 1 && (
+        <View style={galleryStyles.dots} pointerEvents="none">
+          {images.map((_, index) => {
+            const width = scrollX.interpolate({
+              inputRange: [(index - 1) * GALLERY_WIDTH, index * GALLERY_WIDTH, (index + 1) * GALLERY_WIDTH],
+              outputRange: [6, 22, 6],
+              extrapolate: 'clamp',
+            });
+            const opacity = scrollX.interpolate({
+              inputRange: [(index - 1) * GALLERY_WIDTH, index * GALLERY_WIDTH, (index + 1) * GALLERY_WIDTH],
+              outputRange: [0.45, 1, 0.45],
+              extrapolate: 'clamp',
+            });
+            return <Animated.View key={index} style={[galleryStyles.dot, { width, opacity }]} />;
+          })}
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -292,6 +431,7 @@ export default function BuyerProductDetailScreen() {
   const [addedToCart, setAddedToCart] = useState(false);
   const [sellerPaymentReady, setSellerPaymentReady] = useState<boolean | null>(null);
   const [sellerPaymentReason, setSellerPaymentReason] = useState<string | null>(null);
+  const [sellerVacationMessage, setSellerVacationMessage] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [productReviews, setProductReviews] = useState<any[]>([]);
   const [avgRating, setAvgRating] = useState(0);
@@ -323,6 +463,11 @@ export default function BuyerProductDetailScreen() {
           try {
             const row = await api.publicProducts.get(productId);
             if (row && !row.error) {
+              setSellerVacationMessage(
+                row.sellerVacationMode
+                  ? row.sellerVacationMessage ?? 'This seller is currently away and is not accepting purchases.'
+                  : null,
+              );
               // Adapt the product and check payment readiness together as soon
               // as the product supplies the seller ID. A payment-status failure
               // is non-fatal: Buy Now performs its own safety check on tap.
@@ -430,8 +575,8 @@ export default function BuyerProductDetailScreen() {
   }
 
   const variant = findVariant(product, selections);
-  const variantPrice = variant?.price ?? product.price;
-  const variantCompare = variant?.compareAtPrice ?? product.compareAtPrice;
+  const variantPrice = variant?.priceCents ?? product.priceCents;
+  const variantCompare = variant?.compareAtPriceCents ?? product.compareAtPriceCents;
   const hasDiscount = variantCompare && variantCompare > variantPrice;
   const savingsAmt = hasDiscount ? variantCompare! - variantPrice : 0;
   const allSelected = product.options.length > 0 && Object.keys(selections).length === product.options.length;
@@ -509,6 +654,10 @@ export default function BuyerProductDetailScreen() {
   }
 
   async function handleBuyNow() {
+    if (sellerVacationMessage) {
+      Alert.alert('Seller is away', sellerVacationMessage);
+      return;
+    }
     if (!allSelected) {
       Alert.alert('Select Options', 'Please select all options before continuing.');
       return;
@@ -560,16 +709,9 @@ export default function BuyerProductDetailScreen() {
         }
         contentContainerStyle={{ paddingBottom: insets.bottom + 130 }}
       >
-        {/* Image area */}
+        {/* Immersive product gallery */}
         <View style={s.imageArea}>
-          {product.imageUris[0] ? (
-            <Image source={{ uri: product.imageUris[0] }} style={s.productImage} resizeMode="cover" />
-          ) : (
-            <View style={s.imagePlaceholder}>
-              <Feather name="image" size={ICON.xxl} color={MUTED} />
-              <Text style={s.imagePlaceholderText}>Product image unavailable</Text>
-            </View>
-          )}
+          <ProductGallery imageUris={product.imageUris} />
           {/* Back button */}
           <TouchableOpacity style={[s.backBtn, { top: insets.top + SP.sm }]} onPress={() => router.back()} activeOpacity={0.8}>
             <Feather name="chevron-left" size={ICON.md} color={FG} />
@@ -619,10 +761,19 @@ export default function BuyerProductDetailScreen() {
                </View>
              </View>
            )}
+          {sellerVacationMessage && (
+            <View style={s.vacationBanner} accessibilityRole="alert">
+              <Feather name="sun" size={ICON.sm} color={ORANGE} />
+              <View style={{ flex: 1 }}>
+                <Text style={s.vacationTitle}>Seller is away</Text>
+                <Text style={s.vacationText}>{sellerVacationMessage}</Text>
+              </View>
+            </View>
+          )}
 
           {/* Price */}
           <View style={s.priceRow}>
-            <Text style={[s.price, hasDiscount ? s.priceSale : undefined]}>{fmtPrice(variantPrice)}</Text>
+            <Text style={[s.price, hasDiscount ? s.priceSale : undefined]}>{formatCents(variantPrice)}</Text>
             {hasDiscount && <Text style={s.comparePrice}>{fmtPrice(variantCompare!)}</Text>}
             {hasDiscount && <Text style={s.savings}>Save {fmtPrice(savingsAmt)}</Text>}
           </View>
@@ -941,11 +1092,11 @@ function RelatedProducts({ productId }: { productId: string }) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -SP.md }} contentContainerStyle={{ paddingHorizontal: SP.md, gap: SP.md }}>
       {products.map((p) => {
-        let lowestPrice = 0;
+        let lowestPriceCents = 0;
         if (p.variants && p.variants.length > 0) {
-          lowestPrice = p.variants.reduce((min: number, v: any) => Math.min(min, (v.priceCents ?? 0) / 100), (p.variants[0].priceCents ?? 0) / 100);
+          lowestPriceCents = p.variants.reduce((min: number, v: any) => Math.min(min, v.priceCents ?? 0), p.variants[0].priceCents ?? 0);
         } else if (p.priceCents) {
-          lowestPrice = p.priceCents / 100;
+          lowestPriceCents = p.priceCents;
         }
 
         return (
@@ -971,7 +1122,7 @@ function RelatedProducts({ productId }: { productId: string }) {
             <Text style={{ fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 }} numberOfLines={1}>
               {p.sellerDisplayName || 'Independent Seller'}
             </Text>
-            <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: FG, marginTop: 4 }}>${lowestPrice.toFixed(2)}</Text>
+            <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: FG, marginTop: 4 }}>{formatCents(lowestPriceCents)}</Text>
           </TouchableOpacity>
         );
       })}
@@ -1017,11 +1168,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const { PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM, BORDER_ACTIVE, BORDER_FOCUS, SHADOW_PURPLE } = {
     PURPLE: theme.accent, PURPLE_LIGHT: theme.accentLight, PURPLE_DIM: theme.accentDim, CYAN: theme.secondary, CYAN_DIM: theme.secondaryDim,
     BORDER_ACTIVE: `${theme.accent}73`, BORDER_FOCUS: `${theme.secondary}80`,
-    SHADOW_PURPLE: { shadowColor: theme.accent, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
+    SHADOW_PURPLE: { shadowColor: theme.shadowColor, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   };
   return StyleSheet.create({
-  imageArea: { height: 360, backgroundColor: CARD, position: 'relative' },
-  productImage: { width: '100%', height: '100%' },
+  imageArea: { height: GALLERY_HEIGHT, backgroundColor: CARD, position: 'relative' },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.sm },
   imagePlaceholderText: { fontSize: FS.sm, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', paddingHorizontal: SP.lg },
   backBtn: {
@@ -1061,6 +1211,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   paymentWarningCopy: { flex: 1, gap: 2 },
   paymentWarningTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: ORANGE },
   paymentWarningText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, lineHeight: 17 },
+  vacationBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm,
+    borderWidth: 1, borderColor: `${ORANGE}66`, backgroundColor: `${ORANGE}12`,
+    borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md,
+  },
+  vacationTitle: { color: ORANGE, fontFamily: FONT.bold, fontSize: FS.sm, marginBottom: 3 },
+  vacationText: { color: FG, fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 18 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
   price: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
   priceSale: { color: SUCCESS },

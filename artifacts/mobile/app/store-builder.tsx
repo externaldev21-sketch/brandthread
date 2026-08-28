@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet,
   RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -11,12 +12,15 @@ import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
   ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+  GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader,
   EmptyState, StatCard } from '@/components/BrandthreadUI';
-import { getStorefront, saveDraft, generateAISuggestions } from '@/services/storeService';
-import { Storefront, StorePublishStatus } from '@/services/storeTypes';
+import { getStorefront, applyTheme, generateAISuggestions } from '@/services/storeService';
+import {
+  Storefront, StorePublishStatus, THREAD_THEME_ID, THREAD_THEME_NAME,
+  THREAD_THEME_LIGHT_PALETTE,
+} from '@/services/storeTypes';
 
 function getStatusVariant(status: StorePublishStatus): 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple' {
   switch (status) {
@@ -53,18 +57,27 @@ function timeAgo(dateStr: string): string {
 }
 
 export default function StoreBuilderScreen() {
+  const { theme } = useAppTheme();
+  const s = makeStyles(theme);
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [store, setStore] = useState<Storefront | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [startingTheme, setStartingTheme] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
-      const s = await getStorefront();
-      const updated = await generateAISuggestions();
-      setStore(updated);
+      const localStore = await getStorefront();
+      setStore(localStore);
+      setLoading(false);
+
+      // Suggestions are secondary content. Do not keep the entire builder on a
+      // spinner while they refresh or when the authenticated API is unavailable.
+      generateAISuggestions()
+        .then(setStore)
+        .catch(() => {});
     } catch {
       setStore(null);
     } finally {
@@ -81,6 +94,20 @@ export default function StoreBuilderScreen() {
   const onRefresh = () => {
     setRefreshing(true);
     loadData();
+  };
+
+  const openThreadTheme = async () => {
+    if (startingTheme) return;
+    setStartingTheme(true);
+    try {
+      await applyTheme(THREAD_THEME_ID, 'light');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      router.push('/store-editor' as never);
+    } catch {
+      Alert.alert('Could not open Thread Theme', 'Please try again.');
+    } finally {
+      setStartingTheme(false);
+    }
   };
 
   const hasStore = store !== null && store.publishStatus !== 'not_started';
@@ -122,7 +149,7 @@ export default function StoreBuilderScreen() {
       >
         {/* HEADER */}
         <LinearGradient
-          colors={[...GRAD_PRIMARY]}
+          colors={[...theme.primaryGradient]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[s.header, { paddingTop: insets.top + SP.md }]}
@@ -133,12 +160,12 @@ export default function StoreBuilderScreen() {
             activeOpacity={0.75}
             style={{ width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center' as const, justifyContent: 'center' as const, marginBottom: SP.sm }}
           >
-            <Feather name="arrow-left" size={ICON.sm} color="#fff" />
+            <Feather name="arrow-left" size={ICON.sm} color={theme.onAccent} />
           </TouchableOpacity>
           <Text style={s.headerSubtitle}>Store Builder</Text>
           <Text style={s.headerHeading}>Build your brand's home.</Text>
           <Text style={s.headerDesc}>
-            Create a complete storefront with Brandthread AI or start with a professionally designed theme.
+            Every Brandthread store begins with one focused, fashion-first storefront system.
           </Text>
         </LinearGradient>
 
@@ -191,120 +218,65 @@ export default function StoreBuilderScreen() {
             </GradientCard>
           )}
 
-          {/* PRIMARY OPTIONS */}
+          {/* THREAD THEME — THE SINGLE STARTING POINT */}
           <View style={s.section}>
-            {/* Option 1: Build with AI — full width hero */}
-            <GradientCard
-              colors={[...GRAD_PRIMARY]}
-              glow
-              style={s.heroCard}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                router.push('/store-generate' as never);
-              }}
+            <BrandthreadCard
+              style={s.threadThemeCard}
+              onPress={openThreadTheme}
             >
-              <View style={s.heroCardBadgeRow}>
-                <View style={s.popularBadge}>
-                  <Text style={s.popularBadgeText}>Most popular</Text>
+              <View style={s.threadPreview}>
+                <View style={s.threadPreviewNav}>
+                  <Text style={s.threadPreviewWordmark}>THREAD</Text>
+                  <View style={s.threadPreviewNavLines}>
+                    <View style={s.threadPreviewNavLine} />
+                    <View style={s.threadPreviewNavLineShort} />
+                  </View>
+                </View>
+                <View style={s.threadPreviewHero}>
+                  <Text style={s.threadPreviewKicker}>BRANDTHREAD / 001</Text>
+                  <Text style={s.threadPreviewHeadline}>The new{'\n'}uniform.</Text>
+                  <View style={s.threadPreviewRule} />
+                </View>
+                <View style={s.threadPreviewGrid}>
+                  <View style={s.threadPreviewProduct} />
+                  <View style={s.threadPreviewProduct} />
                 </View>
               </View>
-              <View style={s.heroCardRow}>
-                <Feather name="zap" size={ICON.xl} color={GOLD} />
-                <View style={s.heroCardText}>
-                  <Text style={s.heroCardTitle}>Build with AI</Text>
-                  <Text style={s.heroCardDesc}>
-                    Describe your brand and we'll generate a complete storefront.
-                  </Text>
+
+              <View style={s.threadThemeCopy}>
+                <View style={s.threadThemeTitleRow}>
+                  <Text style={s.threadThemeTitle}>{THREAD_THEME_NAME}</Text>
+                  <View style={s.brandthreadBadge}>
+                    <Text style={s.brandthreadBadgeText}>BY BRANDTHREAD</Text>
+                  </View>
                 </View>
+                <Text style={s.threadThemeDesc}>
+                  Editorial type, generous space, monochrome imagery, and a quiet product grid built for fashion.
+                </Text>
+                <View style={s.threadThemeFeatures}>
+                  {['Black, white & grayscale', 'Full-bleed campaigns', 'Minimal product cards'].map(feature => (
+                    <View key={feature} style={s.threadThemeFeature}>
+                      <Feather name="check" size={13} color={FG} />
+                      <Text style={s.threadThemeFeatureText}>{feature}</Text>
+                    </View>
+                  ))}
+                </View>
+                <TouchableOpacity
+                  style={s.threadThemeButton}
+                  onPress={openThreadTheme}
+                  activeOpacity={0.8}
+                  disabled={startingTheme}
+                >
+                  {startingTheme ? (
+                    <ActivityIndicator size="small" color={BG} />
+                  ) : (
+                    <Text style={s.threadThemeButtonText}>
+                      {hasStore ? 'Customize Thread Theme' : 'Start with Thread Theme'} →
+                    </Text>
+                  )}
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                style={s.heroCardButton}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  router.push('/store-generate' as never);
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={s.heroCardButtonText}>Start AI Build →</Text>
-              </TouchableOpacity>
-            </GradientCard>
-
-            {/* 2-column grid options */}
-            <View style={s.optionsGrid}>
-              {/* Option 2: Choose a Theme */}
-              <BrandthreadCard
-                style={s.halfCard}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push('/store-theme-picker' as never);
-                }}
-              >
-                <Feather name="layout" size={ICON.md} color={PURPLE} />
-                <Text style={s.halfCardTitle}>Choose a Theme</Text>
-                <Text style={s.halfCardDesc}>Browse professionally designed themes.</Text>
-              </BrandthreadCard>
-
-              {/* Option 3: From Logo */}
-              <BrandthreadCard
-                style={s.halfCard}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push('/store-from-logo' as never);
-                }}
-              >
-                <Feather name="image" size={ICON.md} color={CYAN} />
-                <Text style={s.halfCardTitle}>From Logo</Text>
-                <Text style={s.halfCardDesc}>Upload your logo to generate a storefront.</Text>
-              </BrandthreadCard>
-
-              {/* Option 4: From Mood Board */}
-              <BrandthreadCard
-                style={s.halfCard}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push('/store-from-moodboard' as never);
-                }}
-              >
-                <Feather name="grid" size={ICON.md} color={BLUE} />
-                <Text style={s.halfCardTitle}>From Mood Board</Text>
-                <Text style={s.halfCardDesc}>Upload images that inspire your brand.</Text>
-              </BrandthreadCard>
-
-              {/* Option 5: From Social */}
-              <BrandthreadCard
-                style={s.halfCard}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push('/store-from-social' as never);
-                }}
-              >
-                <Feather name="share-2" size={ICON.md} color={ORANGE} />
-                <Text style={s.halfCardTitle}>From Social</Text>
-                <Text style={s.halfCardDesc}>Use your existing social content.</Text>
-                <View style={s.demoBadge}>
-                  <Text style={s.demoBadgeText}>Upload only — no scraping</Text>
-                </View>
-              </BrandthreadCard>
-
-              {/* Option 6: Continue Editing / Start fresh */}
-              <BrandthreadCard
-                style={s.halfCard}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push('/store-editor' as never);
-                }}
-              >
-                <Feather name="edit-2" size={ICON.md} color={SUCCESS} />
-                <Text style={s.halfCardTitle}>
-                  {store && store.publishStatus !== 'not_started' ? 'Continue Editing' : 'Start Fresh'}
-                </Text>
-                <Text style={s.halfCardDesc}>
-                  {store && store.publishStatus !== 'not_started'
-                    ? 'Pick up where you left off.'
-                    : 'Build from a blank canvas.'}
-                </Text>
-              </BrandthreadCard>
-            </View>
+            </BrandthreadCard>
           </View>
 
           {/* STORE MANAGEMENT */}
@@ -401,7 +373,13 @@ export default function StoreBuilderScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE = theme.accent;
+  const PURPLE_DIM = theme.accentDim;
+  const CYAN = theme.secondary;
+  const CYAN_DIM = theme.secondaryDim;
+  const BORDER_ACTIVE = theme.accentLight;
+  return StyleSheet.create({
   root: { flex: 1 },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: BG },
   header: {
@@ -418,7 +396,7 @@ const s = StyleSheet.create({
   headerHeading: {
     fontSize: FS.h2,
     fontFamily: FONT.bold,
-    color: '#FFFFFF',
+    color: theme.onAccent,
     letterSpacing: -0.5,
     marginBottom: SP.sm,
   },
@@ -461,6 +439,142 @@ const s = StyleSheet.create({
     borderColor: BORDER_ACTIVE,
   },
   quickActionText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
+  // Thread Theme
+  threadThemeCard: {
+    padding: 0,
+    overflow: 'hidden',
+    borderRadius: RADIUS.lg,
+  },
+  threadPreview: {
+    backgroundColor: THREAD_THEME_LIGHT_PALETTE.background,
+    minHeight: 280,
+  },
+  threadPreviewNav: {
+    minHeight: 46,
+    paddingHorizontal: SP.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: THREAD_THEME_LIGHT_PALETTE.secondary,
+  },
+  threadPreviewWordmark: {
+    color: THREAD_THEME_LIGHT_PALETTE.text,
+    fontSize: 12,
+    fontFamily: FONT.bold,
+    letterSpacing: 2.4,
+  },
+  threadPreviewNavLines: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
+  },
+  threadPreviewNavLine: {
+    width: 32,
+    height: 2,
+    backgroundColor: THREAD_THEME_LIGHT_PALETTE.text,
+  },
+  threadPreviewNavLineShort: {
+    width: 18,
+    height: 2,
+    backgroundColor: THREAD_THEME_LIGHT_PALETTE.secondary,
+  },
+  threadPreviewHero: {
+    minHeight: 170,
+    paddingHorizontal: SP.lg,
+    paddingVertical: SP.lg,
+    justifyContent: 'space-between',
+  },
+  threadPreviewKicker: {
+    color: THREAD_THEME_LIGHT_PALETTE.secondary,
+    fontSize: 9,
+    fontFamily: FONT.medium,
+    letterSpacing: 1.7,
+  },
+  threadPreviewHeadline: {
+    color: THREAD_THEME_LIGHT_PALETTE.text,
+    fontSize: 40,
+    lineHeight: 38,
+    fontFamily: FONT.regular,
+    letterSpacing: -1.4,
+  },
+  threadPreviewRule: {
+    width: 72,
+    height: 1,
+    backgroundColor: THREAD_THEME_LIGHT_PALETTE.text,
+  },
+  threadPreviewGrid: {
+    flexDirection: 'row',
+    gap: StyleSheet.hairlineWidth,
+    backgroundColor: THREAD_THEME_LIGHT_PALETTE.secondary,
+  },
+  threadPreviewProduct: {
+    flex: 1,
+    height: 82,
+    backgroundColor: THREAD_THEME_LIGHT_PALETTE.accent,
+    opacity: 0.82,
+  },
+  threadThemeCopy: {
+    padding: SP.md,
+    gap: SP.sm,
+  },
+  threadThemeTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: SP.sm,
+  },
+  threadThemeTitle: {
+    color: FG,
+    fontSize: FS.lg,
+    fontFamily: FONT.bold,
+  },
+  brandthreadBadge: {
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: SP.sm,
+    paddingVertical: 3,
+  },
+  brandthreadBadgeText: {
+    color: MUTED,
+    fontSize: 9,
+    fontFamily: FONT.bold,
+    letterSpacing: 0.9,
+  },
+  threadThemeDesc: {
+    color: MUTED,
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    lineHeight: 20,
+  },
+  threadThemeFeatures: {
+    gap: SP.xs,
+  },
+  threadThemeFeature: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+  },
+  threadThemeFeatureText: {
+    color: FG,
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+  },
+  threadThemeButton: {
+    minHeight: 46,
+    marginTop: SP.xs,
+    backgroundColor: FG,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SP.md,
+  },
+  threadThemeButtonText: {
+    color: BG,
+    fontSize: FS.sm,
+    fontFamily: FONT.bold,
+    letterSpacing: 0.2,
+  },
   // Hero card
   heroCard: { marginBottom: SP.sm },
   heroCardBadgeRow: { flexDirection: 'row', marginBottom: SP.sm },
@@ -475,7 +589,7 @@ const s = StyleSheet.create({
   popularBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: GOLD },
   heroCardRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.md, marginBottom: SP.md },
   heroCardText: { flex: 1, gap: SP.xs },
-  heroCardTitle: { fontSize: 18, fontFamily: FONT.bold, color: '#FFFFFF' },
+  heroCardTitle: { fontSize: 18, fontFamily: FONT.bold, color: theme.onAccent },
   heroCardDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: 'rgba(255,255,255,0.8)' },
   heroCardButton: {
     backgroundColor: 'rgba(255,255,255,0.2)',
@@ -485,7 +599,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.35)',
   },
-  heroCardButtonText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
+  heroCardButtonText: { fontSize: FS.base, fontFamily: FONT.bold, color: theme.onAccent },
   // Options grid
   optionsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   halfCard: {
@@ -547,9 +661,10 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  suggestionBadgeText: { fontSize: 9, fontFamily: FONT.bold, color: '#FFFFFF' },
+  suggestionBadgeText: { fontSize: 9, fontFamily: FONT.bold, color: theme.onAccent },
   aiImproveText: { flex: 1, gap: SP.xs },
   aiImproveTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
   aiImproveDesc: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
   aiImproveBtn: {},
-});
+  });
+};

@@ -111,7 +111,7 @@ export default function CustomersScreen() {
       </View>
 
       {/* Loyalty Card */}
-      <View style={[styles.loyaltyCard, { backgroundColor: '#12121F', borderColor: 'rgba(139,92,246,0.26)' }]}>
+      <View style={[styles.loyaltyCard, { backgroundColor: colors.card, borderColor: colors.primary }]}>
         <View style={styles.loyaltyLeft}>
           <Feather name="star" size={20} color={colors.primary} />
           <View>

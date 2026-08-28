@@ -16,6 +16,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Badge } from '@/components/Badge';
 import { useApi } from '@/hooks/useApi';
+import { parseDecimalToCents } from '@/lib/money';
 
 const CHANNELS = 'Online Store, Point of Sale, Shop, Faire: Sell Wholesale';
 
@@ -92,15 +93,19 @@ export default function ProductEditorScreen() {
       return;
     }
     setSaving(true);
-    const priceDollars = parseFloat(price);
+    const priceCents = price.trim() ? parseDecimalToCents(price) : null;
+    if (price.trim() && (priceCents === null || priceCents <= 0)) {
+      Alert.alert('Invalid price', 'Enter a whole-dollar amount with up to two decimal places.');
+      return;
+    }
     try {
       await api.products.create({
         name:     title.trim(),
         status:   'active',
-        ...(priceDollars > 0 ? {
+        ...(priceCents && priceCents > 0 ? {
           variants: [{
             sku:        title.trim().replace(/\s+/g, '-').toUpperCase() + '-DEFAULT',
-            priceCents: Math.round(priceDollars * 100),
+            priceCents,
             stock:      available,
           }],
         } : {}),

@@ -23,12 +23,11 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
+import { formatCents } from '@/lib/money';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmt(val: number, prefix = '$') {
-  return `${prefix}${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+function fmt(cents: number) { return formatCents(cents); }
 
 function fmtDays(d: number) {
   return `${d} days`;
@@ -37,8 +36,8 @@ function fmtDays(d: number) {
 // ─── Row data ──────────────────────────────────────────────────────────────────
 
 type RowKey =
-  | 'unitPrice' | 'moq' | 'sampleCost' | 'setupCost'
-  | 'packagingCost' | 'shippingEstimate' | 'totalEstimate'
+  | 'unitPriceCents' | 'moq' | 'sampleCostCents' | 'setupCostCents'
+  | 'packagingCostCents' | 'shippingEstimateCents' | 'totalEstimateCents'
   | 'leadTimeDays' | 'productionDays' | 'paymentTerms'
   | 'rating' | 'verified';
 
@@ -51,13 +50,13 @@ interface RowDef {
 }
 
 const ROWS: RowDef[] = [
-  { key: 'unitPrice',        label: 'Unit Price',       format: (q) => fmt(q.unitPrice),          lowerIsBetter: true,  numeric: true },
+  { key: 'unitPriceCents',   label: 'Unit Price',       format: (q) => fmt(q.unitPriceCents),     lowerIsBetter: true,  numeric: true },
   { key: 'moq',              label: 'MOQ',              format: (q) => `${q.moq} units`,           lowerIsBetter: true,  numeric: true },
-  { key: 'sampleCost',       label: 'Sample Cost',      format: (q) => fmt(q.sampleCost),          lowerIsBetter: true,  numeric: true },
-  { key: 'setupCost',        label: 'Setup / Tooling',  format: (q) => fmt(q.setupCost),           lowerIsBetter: true,  numeric: true },
-  { key: 'packagingCost',    label: 'Packaging',        format: (q) => fmt(q.packagingCost),       lowerIsBetter: true,  numeric: true },
-  { key: 'shippingEstimate', label: 'Shipping Est.',    format: (q) => fmt(q.shippingEstimate),    lowerIsBetter: true,  numeric: true },
-  { key: 'totalEstimate',    label: 'Total Estimate',   format: (q) => fmt(q.totalEstimate),       lowerIsBetter: true,  numeric: true },
+  { key: 'sampleCostCents', label: 'Sample Cost', format: (q) => fmt(q.sampleCostCents), lowerIsBetter: true, numeric: true },
+  { key: 'setupCostCents', label: 'Setup / Tooling', format: (q) => fmt(q.setupCostCents), lowerIsBetter: true, numeric: true },
+  { key: 'packagingCostCents', label: 'Packaging', format: (q) => fmt(q.packagingCostCents), lowerIsBetter: true, numeric: true },
+  { key: 'shippingEstimateCents', label: 'Shipping Est.', format: (q) => fmt(q.shippingEstimateCents), lowerIsBetter: true, numeric: true },
+  { key: 'totalEstimateCents', label: 'Total Estimate', format: (q) => fmt(q.totalEstimateCents), lowerIsBetter: true, numeric: true },
   { key: 'leadTimeDays',     label: 'Lead Time',        format: (q) => fmtDays(q.leadTimeDays),    lowerIsBetter: true,  numeric: true },
   { key: 'productionDays',   label: 'Production Days',  format: (q) => fmtDays(q.productionDays), lowerIsBetter: true,  numeric: true },
   { key: 'paymentTerms',     label: 'Payment Terms',    format: (q) => q.paymentTerms,             lowerIsBetter: false, numeric: false },
@@ -79,13 +78,13 @@ const ROWS: RowDef[] = [
 
 function getNumericValue(row: RowDef, q: Quote, mfg?: Manufacturer): number {
   switch (row.key) {
-    case 'unitPrice':        return q.unitPrice;
+    case 'unitPriceCents':   return q.unitPriceCents;
     case 'moq':              return q.moq;
-    case 'sampleCost':       return q.sampleCost;
-    case 'setupCost':        return q.setupCost;
-    case 'packagingCost':    return q.packagingCost;
-    case 'shippingEstimate': return q.shippingEstimate;
-    case 'totalEstimate':    return q.totalEstimate;
+    case 'sampleCostCents': return q.sampleCostCents;
+    case 'setupCostCents': return q.setupCostCents;
+    case 'packagingCostCents': return q.packagingCostCents;
+    case 'shippingEstimateCents': return q.shippingEstimateCents;
+    case 'totalEstimateCents': return q.totalEstimateCents;
     case 'leadTimeDays':     return q.leadTimeDays;
     case 'productionDays':   return q.productionDays;
     case 'rating':           return mfg?.rating ?? 0;

@@ -1,8 +1,5 @@
 import React, { useState } from 'react';
-import {
-  View, Text, TouchableOpacity, StyleSheet,
-  ScrollView, StatusBar,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,21 +7,19 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ONBOARDING_KEY } from './_layout';
+import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 
 type AccountType = 'buyer' | 'seller';
 
 const BG     = '#07070F';
-const PURPLE = '#8B5CF6';
-const CYAN   = '#22D3EE';
-
-const CARDS: {
+const getCards = (theme: AppThemePreset): {
   type: AccountType;
   icon: 'shopping-bag' | 'star';
   title: string;
   description: string;
   bullets: string[];
   accent: string;
-}[] = [
+}[] => [
   {
     type: 'buyer',
     icon: 'shopping-bag',
@@ -36,7 +31,7 @@ const CARDS: {
       'Save & follow collections',
       'Track your orders',
     ],
-    accent: PURPLE,
+    accent: theme.accent,
   },
   {
     type: 'seller',
@@ -50,11 +45,14 @@ const CARDS: {
       'Launch your storefront',
       'Analytics & growth tools',
     ],
-    accent: CYAN,
+    accent: theme.secondary,
   },
 ];
 
 export default function AccountTypeScreen() {
+  const { theme } = useAppTheme();
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
+  const cards = React.useMemo(() => getCards(theme), [theme]);
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
 
@@ -95,7 +93,7 @@ export default function AccountTypeScreen() {
         contentContainerStyle={[styles.cards, { paddingBottom: insets.bottom + 140 }]}
         showsVerticalScrollIndicator={false}
       >
-        {CARDS.map((c) => {
+        {cards.map((c) => {
           const isSelected = selected === c.type;
           return (
             <TouchableOpacity
@@ -179,7 +177,7 @@ export default function AccountTypeScreen() {
         >
           {selected ? (
             <LinearGradient
-              colors={[PURPLE, CYAN]}
+              colors={theme.primaryGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.continueBtn}
@@ -201,17 +199,17 @@ export default function AccountTypeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   root:  { flex: 1, backgroundColor: BG },
   glow: {
     position: 'absolute', top: -60, left: '10%',
     width: '80%', height: 220, borderRadius: 150,
-    backgroundColor: '#8B5CF612',
+    backgroundColor: theme.accentDim,
   },
   glowSecondary: {
     position: 'absolute', top: 260, right: -100,
     width: 240, height: 240, borderRadius: 140,
-    backgroundColor: '#22D3EE0A',
+    backgroundColor: theme.secondaryDim,
   },
 
   header: { paddingHorizontal: 20, paddingBottom: 16 },

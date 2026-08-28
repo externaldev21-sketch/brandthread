@@ -1,37 +1,20 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
-import {
-  View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
-  StyleSheet, Alert, RefreshControl, Modal, Share,
-} from 'react-native';
+import { View, Text, ScrollView, FlatList, TouchableOpacity, TextInput, StyleSheet, Alert, RefreshControl, Modal, Share } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
-  ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_PRIMARY, GRAD_CARD_GLOW, GRAD_DARK_FADE,
-  FONT, FS, SP, RADIUS, COMP, ICON, ANIM,
-} from '@/lib/theme';
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, GRAD_DARK_FADE, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import {
-  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState,
-  StatCard, SearchBar,
-} from '@/components/BrandthreadUI';
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState, StatCard, SearchBar, BrandedLoader } from '@/components/BrandthreadUI';
 import { filterOrders, sortOrders } from '@/services/orderService';
-import {
-  Order, OrderFilterKey, OrderSortKey,
-  OrderAddress, OrderCustomer, FulfillmentStatus, FulfillmentType,
-  OrderStatus, PaymentStatus,
-} from '@/services/orderTypes';
+import { Order, OrderFilterKey, OrderSortKey, OrderAddress, OrderCustomer, FulfillmentStatus, FulfillmentType, OrderStatus, PaymentStatus } from '@/services/orderTypes';
 import { useApi } from '@/hooks/useApi';
 import { useAuth } from '@clerk/expo';
 import { clearBadge } from '@/lib/orderBadgeStore';
+import { formatCents } from '@/lib/money';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,8 +33,8 @@ function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function fmtMoney(n: number): string {
-  return '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+function fmtMoney(cents: number): string {
+  return formatCents(cents);
 }
 
 function getPaymentColor(status: string): string {
@@ -143,10 +126,10 @@ function apiRowToOrder(row: any): Order {
   const emptyAddr: OrderAddress = { name: '', line1: '', city: '', state: '', zip: '', country: 'US' };
   const customer: OrderCustomer = {
     id: '', name: row.customerName ?? 'Customer', email: row.customerEmail ?? '',
-    initials, totalOrders: 1, lifetimeValue: (row.totalCents ?? 0) / 100,
+    initials, totalOrders: 1, lifetimeValueCents: row.totalCents ?? 0,
     tags: [], shippingAddress: emptyAddr, billingAddress: emptyAddr,
   };
-  const totalDollars = (row.totalCents ?? 0) / 100;
+  const totalCents = row.totalCents ?? 0;
 
   return {
     id: row.id, orderNumber: row.orderNumber ?? '',
@@ -162,10 +145,10 @@ function apiRowToOrder(row: any): Order {
       isPacked: ['ready_to_ship', 'shipped', 'delivered'].includes(ordStatus),
     },
     payment: {
-      subtotal: totalDollars, discountTotal: 0, shippingTotal: 0, taxTotal: 0,
-      total: totalDollars, amountPaid: totalDollars, amountRefunded: 0,
-      amountHeld: 0, amountPending: 0, sellerAllocation: totalDollars,
-      manufacturerAllocation: 0, shippingLabelAllocation: 0, platformFee: 0,
+      subtotalCents: totalCents, discountTotalCents: 0, shippingTotalCents: 0, taxTotalCents: 0,
+      totalCents, amountPaidCents: totalCents, amountRefundedCents: 0,
+      amountHeldCents: 0, amountPendingCents: 0, sellerAllocationCents: totalCents,
+      manufacturerAllocationCents: 0, shippingLabelAllocationCents: 0, platformFeeCents: 0,
       payoutStatus: 'available',
     },
     shipments: row.trackingNumber ? [{
@@ -226,6 +209,7 @@ function OrderCard({
   order, selected, selectionMode, onPress, onLongPress,
   onMarkProcessing, onMarkReady, onShip,
 }: OrderCardProps) {
+  const { theme } = useAppTheme();
   const isHighRisk = order.riskLevel === 'high';
   const hasReturn = order.returns.length > 0;
   const hasDispute = order.disputes.length > 0;
@@ -316,7 +300,7 @@ function OrderCard({
             </Text>
           </View>
         </View>
-        <Text style={s.totalAmount}>{fmtMoney(order.payment.total)}</Text>
+        <Text style={s.totalAmount}>{fmtMoney(order.payment.totalCents)}</Text>
       </View>
 
       {/* Row 5: Tags */}
@@ -346,7 +330,7 @@ function OrderCard({
             onPress={e => { e.stopPropagation(); onMarkProcessing(); }}
             activeOpacity={0.8}
           >
-            <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.actionBtnGrad}>
+            <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.actionBtnGrad}>
               <Feather name="check-circle" size={12} color="#fff" />
               <Text style={s.actionBtnText}>Accept</Text>
             </LinearGradient>
@@ -415,6 +399,7 @@ function SortModal({
   onSelect: (k: OrderSortKey) => void;
   onClose: () => void;
 }) {
+  const { theme } = useAppTheme();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableOpacity style={s.modalOverlay} activeOpacity={1} onPress={onClose} />
@@ -633,7 +618,7 @@ export default function OrdersScreen() {
       const rows = orders.map(o => {
         const customer = o.customer?.name ?? o.customer?.email ?? 'Unknown';
         const date = new Date(o.createdAt).toLocaleDateString('en-US');
-        const total = o.payment.total.toFixed(2);
+        const total = formatCents(o.payment.totalCents);
         const itemCount = o.lineItems.length;
         return [
           o.orderNumber ?? o.id.slice(0, 8),
@@ -643,7 +628,7 @@ export default function OrdersScreen() {
           o.paymentStatus,
           o.fulfillmentStatus ?? 'unfulfilled',
           itemCount,
-          `$${total}`,
+          total,
         ].join(',');
       });
       const csv = ['Order #,Customer,Date,Status,Payment,Fulfillment,Items,Total', ...rows].join('\n');
@@ -875,6 +860,11 @@ export default function OrdersScreen() {
           />
         }
       />
+      {loading && !refreshing && (
+        <View style={s.loadingOverlay} pointerEvents="none">
+          <BrandedLoader label="Lining up your orders…" />
+        </View>
+      )}
 
       {/* Bulk action bar */}
       {selectedIds.length > 0 && (
@@ -921,6 +911,12 @@ const s = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: BG,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    top: 72,
+    backgroundColor: BG,
+    zIndex: 10,
   },
 
   // Header

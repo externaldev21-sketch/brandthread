@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { db, drops, orders, customers, follows, pushTokens, dropBroadcasts } from "@workspace/db";
-import { eq, desc, and, inArray } from "drizzle-orm";
+import { db, drops, orders, customers, follows, dropAlertSubscriptions, dropBroadcasts } from "@workspace/db";
+import { eq, desc, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { sendPushNotifications } from "../lib/sendPush";
+import { sendPushToUser } from "../lib/push";
 
 const router = Router();
 router.use(requireAuth);
@@ -116,33 +116,27 @@ router.post("/:id/broadcast", async (req, res) => {
     return res.status(409).json({ error: "This drop has already been broadcast to your followers.", code: "ALREADY_BROADCAST" });
   }
 
-  // Get all followers of this seller
-  const followerRows = await db
-    .select({ followerId: follows.followerId })
-    .from(follows)
-    .where(eq(follows.followingId, sellerId));
+  // Notify both followers and buyers who explicitly requested this drop alert.
+  const [followerRows, alertRows] = await Promise.all([
+    db.select({ userId: follows.followerId }).from(follows).where(eq(follows.followingId, sellerId)),
+    db.select({ userId: dropAlertSubscriptions.userId }).from(dropAlertSubscriptions)
+      .where(eq(dropAlertSubscriptions.dropId, drop.id)),
+  ]);
+  const followerIds = [...new Set([...followerRows, ...alertRows].map((row) => row.userId))];
 
-  if (followerRows.length === 0) {
+  if (followerIds.length === 0) {
     return res.json({ ok: true, sent: 0, errors: 0, followers: 0, message: "No followers to notify yet." });
   }
 
-  const followerIds = followerRows.map((r) => r.followerId);
-
-  // Get push tokens for all followers
-  const tokenRows = await db
-    .select({ token: pushTokens.token })
-    .from(pushTokens)
-    .where(inArray(pushTokens.userId, followerIds));
-
-  const messages = tokenRows.map((t) => ({
-    to:    t.token,
-    title: `🔥 Drop is live!`,
-    body:  `${drop.name} is available now — limited stock. Tap to shop.`,
-    data:  { dropId: drop.id, sellerId, type: "drop_live" },
-    sound: "default" as const,
-  }));
-
-  const { sent, errors } = await sendPushNotifications(messages);
+  const results = await Promise.allSettled(followerIds.map((followerId) =>
+    sendPushToUser(followerId, {
+      title: "Drop is live!",
+      body: `${drop.name} is available now — limited stock. Tap to shop.`,
+      data: { dropId: drop.id, sellerId, type: "drop_live" },
+    }, "drop")
+  ));
+  const sent = results.filter((result) => result.status === "fulfilled").length;
+  const errors = results.length - sent;
 
   // Record the broadcast (idempotency key)
   await db.insert(dropBroadcasts).values({

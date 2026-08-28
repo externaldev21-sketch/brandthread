@@ -172,17 +172,17 @@ export default function AIBrainFAB({
 
             {/* Main gradient circle */}
             <LinearGradient
-              colors={[theme.accent, theme.accentLight]}
+              colors={[...theme.primaryGradient]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={[styles.gradient, { shadowColor: theme.accent }]}
+              style={[styles.gradient, { shadowColor: theme.shadowColor }]}
             >
               <BrandthreadLogo size={22} opacity={1} />
             </LinearGradient>
           </>
         ) : (
           <LinearGradient
-            colors={[theme.accent, theme.accentLight]}
+            colors={[...theme.primaryGradient]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.tab}

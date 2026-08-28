@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
@@ -14,7 +15,7 @@ import {
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
   ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
+  GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
@@ -22,24 +23,15 @@ import {
   EmptyState, StatCard,
 } from '@/components/BrandthreadUI';
 import { getThemes, getStorefront, applyTheme } from '@/services/storeService';
-import { StoreTheme, ThemeCategory, BUILTIN_THEMES } from '@/services/storeTypes';
-
-const CATEGORIES: { value: ThemeCategory | 'all'; label: string }[] = [
-  { value: 'all', label: 'All' },
-  { value: 'streetwear', label: 'Streetwear' },
-  { value: 'luxury', label: 'Luxury' },
-  { value: 'minimal', label: 'Minimal' },
-  { value: 'editorial', label: 'Editorial' },
-  { value: 'modern', label: 'Modern' },
-  { value: 'experimental', label: 'Experimental' },
-];
+import { StoreTheme, THREAD_THEME_NAME } from '@/services/storeTypes';
 
 export default function StoreThemePicker() {
+  const { theme } = useAppTheme();
+  const styles = makeStyles(theme);
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [themes, setThemes] = useState<StoreTheme[]>([]);
-  const [activeCategory, setActiveCategory] = useState<ThemeCategory | 'all'>('all');
   const [currentThemeId, setCurrentThemeId] = useState<string | null>(null);
   const [previewingThemeId, setPreviewingThemeId] = useState<string | null>(null);
   const [applying, setApplying] = useState<string | null>(null);
@@ -55,10 +47,6 @@ export default function StoreThemePicker() {
     }, [])
   );
 
-  const filteredThemes = activeCategory === 'all'
-    ? themes
-    : themes.filter(t => t.category === activeCategory);
-
   const previewingTheme = previewingThemeId
     ? themes.find(t => t.id === previewingThemeId) ?? null
     : null;
@@ -67,8 +55,8 @@ export default function StoreThemePicker() {
     const theme = themes.find(t => t.id === themeId);
     if (!theme) return;
     Alert.alert(
-      'Apply Theme',
-      `Apply the ${theme.name} theme? This will update your colors and typography.`,
+      `Apply ${THREAD_THEME_NAME}`,
+      'Use Brandthread’s monochrome editorial system for this storefront?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -189,33 +177,16 @@ export default function StoreThemePicker() {
           <Feather name="arrow-left" size={ICON.md} color={FG} />
         </TouchableOpacity>
         <View style={styles.headerTitles}>
-          <Text style={styles.headerTitle}>Theme Library</Text>
-          <Text style={styles.headerSubtitle}>Choose a starting point for your storefront.</Text>
+          <Text style={styles.headerTitle}>{THREAD_THEME_NAME}</Text>
+          <Text style={styles.headerSubtitle}>The original storefront theme by Brandthread.</Text>
         </View>
       </View>
 
-      {/* Category Filter */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoryRow}
-      >
-        {CATEGORIES.map(cat => (
-          <FilterChip
-            key={cat.value}
-            label={cat.label}
-            active={activeCategory === cat.value}
-            onPress={() => setActiveCategory(cat.value)}
-          />
-        ))}
-      </ScrollView>
-
-      {/* Theme Grid */}
+      {/* Thread Theme */}
       <FlatList
-        data={filteredThemes}
+        data={themes}
         keyExtractor={item => item.id}
-        numColumns={2}
-        columnWrapperStyle={styles.gridRow}
+        numColumns={1}
         contentContainerStyle={[
           styles.gridContent,
           { paddingBottom: insets.bottom + (previewingTheme ? 380 : 24) },
@@ -290,7 +261,7 @@ export default function StoreThemePicker() {
           {/* Action Buttons */}
           <View style={styles.detailButtons}>
             <PrimaryButton
-              label="Use This Theme"
+              label={`Use ${THREAD_THEME_NAME}`}
               onPress={() => handleApply(previewingTheme.id, selectedPresetId ?? undefined)}
               style={{ flex: 1 }}
             />
@@ -306,7 +277,13 @@ export default function StoreThemePicker() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE = theme.accent;
+  const PURPLE_LIGHT = theme.accentLight;
+  const PURPLE_DIM = theme.accentDim;
+  const CYAN = theme.secondary;
+  const BORDER_ACTIVE = theme.accentLight;
+  return StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: BG,
@@ -471,7 +448,7 @@ const styles = StyleSheet.create({
   useBtnText: {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: '#fff',
+    color: theme.onAccent,
   },
   // Detail Panel
   detailPanel: {
@@ -598,4 +575,5 @@ const styles = StyleSheet.create({
     gap: SP.sm,
     marginTop: SP.xs,
   },
-});
+  });
+};

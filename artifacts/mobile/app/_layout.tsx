@@ -27,6 +27,8 @@ import { clearSocialCache, hydrateMyProfileFromAccount, initSocialService, socia
 import { clearCartCache, initCartService } from '@/services/cartService';
 import { initBuyerProfile } from '@/lib/buyerProfile';
 import StoreContextBanner from '@/components/StoreContextBanner';
+import NetworkNoticeBanner from '@/components/NetworkNoticeBanner';
+import { dismissNetworkNotice } from '@/lib/networkNotice';
 
 // ─── Push notification handler (show alerts while app is foregrounded) ────────
 Notifications.setNotificationHandler({
@@ -40,7 +42,7 @@ if (Platform.OS === 'android') {
     name:       'Brandthread',
     importance: Notifications.AndroidImportance.MAX,
     vibrationPattern: [0, 250, 250, 250],
-    lightColor: '#8B5CF6',
+    lightColor: '#DDE2E8',
   });
 }
 
@@ -281,6 +283,10 @@ function ServiceConfigurer() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (isLoaded && !isSignedIn) dismissNetworkNotice();
+  }, [isLoaded, isSignedIn]);
+
   // Scope social and cart AsyncStorage keys by Clerk user ID so two accounts
   // on the same device never share data — even without a full sign-out cycle.
   // Clears the OLD user's cache first (before resetting the service userId) so
@@ -369,6 +375,7 @@ function RootLayoutNav() {
   return (
     <View style={{ flex: 1 }}>
       <StoreContextBanner />
+      <NetworkNoticeBanner />
       <Stack screenOptions={{ headerShown: false }}>
         {/* Boot: "/" renders BootScreen until AuthGate redirects */}
         <Stack.Screen name="index"          options={{ headerShown: false, animation: 'fade' }} />

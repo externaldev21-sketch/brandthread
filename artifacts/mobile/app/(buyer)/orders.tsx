@@ -10,11 +10,10 @@ import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { BuyerOrderView, TrackingStatus, OrderStatus } from '@/services/orderTypes';
 import { useApi } from '@/hooks/useApi';
+import { formatCents } from '@/lib/money';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
+  BG, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM,
   SUCCESS, SUCCESS_DIM,
   BLUE, BLUE_DIM,
   ORANGE, ORANGE_DIM,
@@ -23,7 +22,7 @@ import {
 } from '@/lib/theme';
 import {
   BrandthreadScreen, BrandthreadHeader, FilterChip,
-  StatusBadge, EmptyState, PrimaryButton,
+  StatusBadge, EmptyState, PrimaryButton, BrandedLoader,
 } from '@/components/BrandthreadUI';
 
 // ─── API → BuyerOrderView adapter ─────────────────────────────────────────────
@@ -55,10 +54,10 @@ function adaptOrder(row: any): BuyerOrderView {
     lineItems:         [],
     shippingAddress,
     payment: {
-      subtotal:      (row.subtotalCents ?? 0) / 100,
-      shippingTotal: (row.shippingCents  ?? 0) / 100,
-      taxTotal:      0,
-      total:         (row.totalCents     ?? 0) / 100,
+      subtotalCents:      row.subtotalCents ?? 0,
+      shippingTotalCents: row.shippingCents ?? 0,
+      taxTotalCents:      0,
+      totalCents:         row.totalCents ?? 0,
     },
     trackingNumber:  row.trackingNumber ?? undefined,
     trackingCarrier: row.carrier ?? undefined,
@@ -77,7 +76,7 @@ function adaptOrderDetail(row: any): BuyerOrderView {
       productName: item.productName,
       variant:     item.variantLabel ?? '',
       quantity:    item.quantity,
-      unitPrice:   item.priceCents / 100,
+      unitPriceCents: item.priceCents ?? 0,
     })),
   };
 }
@@ -155,6 +154,7 @@ function applyFilter(orders: BuyerOrderView[], filter: BuyerFilterKey): BuyerOrd
 // ─── Order Card ───────────────────────────────────────────────────────────────
 
 function BuyerOrderCard({ order, onPress }: { order: BuyerOrderView; onPress: () => void }) {
+  const { theme } = useAppTheme();
   const firstItem = order.lineItems[0];
   const extraCount = order.lineItems.length - 1;
   const sellerInitial = order.sellerName.charAt(0).toUpperCase();
@@ -163,8 +163,8 @@ function BuyerOrderCard({ order, onPress }: { order: BuyerOrderView; onPress: ()
     <TouchableOpacity style={styles.card} activeOpacity={0.82} onPress={onPress}>
       {/* Top row */}
       <View style={styles.cardTopRow}>
-        <View style={styles.avatarCircle}>
-          <Text style={styles.avatarText}>{sellerInitial}</Text>
+        <View style={[styles.avatarCircle, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
+          <Text style={[styles.avatarText, { color: theme.accentLight }]}>{sellerInitial}</Text>
         </View>
         <View style={{ flex: 1 }}>
           <Text style={styles.sellerName}>{order.sellerName}</Text>
@@ -195,13 +195,13 @@ function BuyerOrderCard({ order, onPress }: { order: BuyerOrderView; onPress: ()
             <Text style={styles.preOrderText}>PRE-ORDER</Text>
           </View>
         )}
-        <Text style={styles.totalText}>${order.payment.total.toFixed(2)}</Text>
+        <Text style={styles.totalText}>{formatCents(order.payment.totalCents)}</Text>
       </View>
 
       {/* Tracking info */}
       {order.trackingStatus && (
         <View style={styles.trackingRow}>
-          <Feather name="truck" size={ICON.xs} color={CYAN} />
+          <Feather name="truck" size={ICON.xs} color={BLUE} />
           <Text style={styles.trackingText}>
             {trackingLabel(order.trackingStatus)}
             {order.estimatedDelivery ? ` → Est. ${fmtDate(order.estimatedDelivery)}` : ''}
@@ -211,17 +211,17 @@ function BuyerOrderCard({ order, onPress }: { order: BuyerOrderView; onPress: ()
 
       {/* Actions */}
       <View style={styles.actionsRow}>
-        <TouchableOpacity style={styles.actionBtn} onPress={onPress} activeOpacity={0.8}>
-          <Text style={styles.actionBtnText}>View Order Details</Text>
+        <TouchableOpacity style={[styles.actionBtn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]} onPress={onPress} activeOpacity={0.8}>
+          <Text style={[styles.actionBtnText, { color: theme.accentLight }]}>View Order Details</Text>
         </TouchableOpacity>
         {order.trackingNumber && (
           <TouchableOpacity
-            style={[styles.actionBtn, styles.actionBtnSecondary]}
+             style={[styles.actionBtn, styles.actionBtnSecondary, { backgroundColor: theme.secondaryDim, borderColor: theme.secondary }]}
             activeOpacity={0.8}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
           >
-            <Feather name="map-pin" size={12} color={CYAN} />
-            <Text style={[styles.actionBtnText, { color: CYAN }]}>Track Shipment</Text>
+            <Feather name="map-pin" size={12} color={BLUE} />
+            <Text style={[styles.actionBtnText, { color: BLUE }]}>Track Shipment</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -315,9 +315,7 @@ export default function BuyerOrdersScreen() {
       />
 
       {loading ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={theme.accent} size="large" />
-        </View>
+        <BrandedLoader label="Checking in with your orders…" />
       ) : loadError ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
           <Feather name="wifi-off" size={ICON.xxl} color={MUTED} />
@@ -335,8 +333,8 @@ export default function BuyerOrdersScreen() {
       ) : filtered.length === 0 ? (
         <EmptyState
           icon="shopping-bag"
-          title="No orders yet"
-          description="Your orders will appear here once you make a purchase."
+          title="Your first find is still out there."
+          description="When something catches your eye, every update from checkout to doorstep will live here."
           action={{
             label: 'Discover Products',
             icon: 'compass',
@@ -386,16 +384,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: RADIUS.pill,
-    backgroundColor: PURPLE_DIM,
     borderWidth: 1,
-    borderColor: BORDER_ACTIVE,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
     fontSize: FS.base,
     fontFamily: FONT.bold,
-    color: PURPLE_LIGHT,
   },
   sellerName: {
     fontSize: FS.base,
@@ -431,7 +426,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   preOrderBadge: {
-    backgroundColor: CYAN_DIM,
+    backgroundColor: BLUE_DIM,
     borderRadius: RADIUS.pill,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -439,7 +434,7 @@ const styles = StyleSheet.create({
   preOrderText: {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: CYAN,
+    color: BLUE,
     letterSpacing: 0.4,
   },
   totalText: {
@@ -457,7 +452,7 @@ const styles = StyleSheet.create({
   trackingText: {
     fontSize: FS.xs,
     fontFamily: FONT.medium,
-    color: CYAN,
+    color: BLUE,
   },
   actionsRow: {
     flexDirection: 'row',
@@ -471,19 +466,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 10,
     borderRadius: RADIUS.sm,
-    backgroundColor: PURPLE_DIM,
+    backgroundColor: CARD_ELEVATED,
     borderWidth: 1,
-    borderColor: BORDER_ACTIVE,
+    borderColor: BORDER,
     flexDirection: 'row',
     gap: 4,
   },
   actionBtnSecondary: {
-    backgroundColor: CYAN_DIM,
-    borderColor: 'rgba(34,211,238,0.35)',
+    backgroundColor: BLUE_DIM,
+    borderColor: BORDER,
   },
   actionBtnText: {
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
-    color: PURPLE_LIGHT,
+    color: FG,
   },
 });

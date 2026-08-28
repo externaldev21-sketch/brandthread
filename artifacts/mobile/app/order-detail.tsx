@@ -4,34 +4,18 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, ActivityIndicator, Modal,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, ActivityIndicator, Modal } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN, SUCCESS, SUCCESS_DIM,
-  BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import {
-  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  IconButton, StatusBadge, SectionHeader, EmptyState,
-} from '@/components/BrandthreadUI';
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
-import {
-  Order, PAYOUT_MILESTONES, CANCELLATION_REASONS,
-  CancellationReason, ReturnStatus, RETURN_REASONS,
-  OrderStatus, FulfillmentType, FulfillmentStatus,
-  OrderAddress, OrderLineItem, Fulfillment, Shipment,
-  OrderTimelineEvent, PaymentSummary,
-} from '@/services/orderTypes';
+import { formatCents } from '@/lib/money';
+import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, ReturnStatus, RETURN_REASONS, OrderStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent, PaymentSummary } from '@/services/orderTypes';
 
 // ─── API → Order adapter ──────────────────────────────────────────────────────
 
@@ -101,17 +85,17 @@ function adaptApiOrder(raw: any): Order {
     variant:          item.variantLabel ?? '',
     sku:              undefined,
     quantity:         item.quantity,
-    unitPrice:        (item.priceCents ?? 0) / 100,
-    discountAmount:   0,
-    taxAmount:        0,
-    total:            ((item.priceCents ?? 0) * item.quantity) / 100,
+    unitPriceCents:   item.priceCents ?? 0,
+    discountAmountCents: 0,
+    taxAmountCents:   0,
+    totalCents:       (item.priceCents ?? 0) * item.quantity,
     fulfillmentSource: 'seller' as FulfillmentType,
     isPreOrder:       false,
   }));
 
-  const totalDollars    = (raw.totalCents    ?? 0) / 100;
-  const subtotalDollars = (raw.subtotalCents ?? 0) / 100;
-  const shippingDollars = (raw.shippingCents ?? 0) / 100;
+  const totalCents    = raw.totalCents ?? 0;
+  const subtotalCents = raw.subtotalCents ?? 0;
+  const shippingCents = raw.shippingCents ?? 0;
 
   const groupId = `group-${raw.id}`;
   const groupStatus: FulfillmentStatus =
@@ -183,7 +167,7 @@ function adaptApiOrder(raw: any): Order {
       orderId:        raw.id,
       reason:         cancellationReasonKey as import('@/services/orderTypes').CancellationReason,
       notes:          cancellationNotes || undefined,
-      refundAmount:   totalDollars,
+       refundAmountCents: totalCents,
       notifyCustomer: true,
       cancelledAt:    raw.updatedAt ?? raw.createdAt,
     };
@@ -226,7 +210,7 @@ function adaptApiOrder(raw: any): Order {
       phone:         customer?.phone ?? undefined,
       initials,
       totalOrders:   customer?.orderCount ?? 1,
-      lifetimeValue: (customer?.totalSpentCents ?? 0) / 100,
+       lifetimeValueCents: customer?.totalSpentCents ?? 0,
       tags:          customer?.tags ?? [],
       shippingAddress: shippingAddr,
       billingAddress:  shippingAddr,
@@ -234,20 +218,20 @@ function adaptApiOrder(raw: any): Order {
     lineItems,
     fulfillment,
     payment: {
-      subtotal:                subtotalDollars,
-      discountTotal:           0,
-      shippingTotal:           shippingDollars,
-      taxTotal:                0,
-      total:                   totalDollars,
+       subtotalCents,
+       discountTotalCents:      0,
+       shippingTotalCents:      shippingCents,
+       taxTotalCents:           0,
+       totalCents,
       // Payment was received for active/shipped/delivered; held in limbo for refund_pending
-      amountPaid:              isRefundPending ? 0 : (uiStatus === 'cancelled' || uiStatus === 'refunded') ? 0 : totalDollars,
-      amountRefunded:          uiStatus === 'refunded' ? totalDollars : 0,
-      amountHeld:              isRefundPending ? totalDollars : 0,
-      amountPending:           0,
-      sellerAllocation:        subtotalDollars,
-      manufacturerAllocation:  0,
-      shippingLabelAllocation: shippingDollars,
-      platformFee:             0,
+       amountPaidCents:         isRefundPending ? 0 : (uiStatus === 'cancelled' || uiStatus === 'refunded') ? 0 : totalCents,
+       amountRefundedCents:     uiStatus === 'refunded' ? totalCents : 0,
+       amountHeldCents:         isRefundPending ? totalCents : 0,
+       amountPendingCents:      0,
+       sellerAllocationCents:   subtotalCents,
+       manufacturerAllocationCents: 0,
+       shippingLabelAllocationCents: shippingCents,
+       platformFeeCents:        0,
       payoutStatus:            isRefundPending ? 'held' : uiStatus === 'refunded' ? 'paid' : 'pending',
     },
     shipments,
@@ -305,8 +289,8 @@ function fmtShort(iso: string) {
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
-function usd(n: number) {
-  return `$${n.toFixed(2)}`;
+function usd(cents: number) {
+  return formatCents(cents);
 }
 
 function orderStatusVariant(status: string): 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple' {
@@ -906,7 +890,7 @@ function OverviewTab({ order, onMarkProcessing, onMarkReadyToShip, onMarkShipped
               </View>
               <View style={s.lineItemRight}>
                 <Text style={s.lineItemQty}>×{li.quantity}</Text>
-                <Text style={s.lineItemTotal}>{usd(li.total)}</Text>
+                <Text style={s.lineItemTotal}>{usd(li.totalCents)}</Text>
               </View>
             </View>
           </BrandthreadCard>
@@ -935,7 +919,7 @@ function CustomerTab({ order }: { order: Order }) {
 
       <BrandthreadCard style={s.customerStatsCard}>
         <InfoRow label="Total Orders" value={String(c.totalOrders)} />
-        <InfoRow label="Lifetime Value" value={usd(c.lifetimeValue)} bold />
+        <InfoRow label="Lifetime Value" value={usd(c.lifetimeValueCents)} bold />
       </BrandthreadCard>
 
       {c.tags.length > 0 && (
@@ -974,15 +958,15 @@ function PaymentTab({ order }: { order: Order }) {
     <View style={s.tabContent}>
       <SectionHeader title="Payment Breakdown" />
       <BrandthreadCard>
-        <InfoRow label="Subtotal" value={usd(p.subtotal)} />
-        {p.discountTotal > 0 && <InfoRow label="Discounts" value={`-${usd(p.discountTotal)}`} valueColor={SUCCESS} />}
-        <InfoRow label="Shipping" value={usd(p.shippingTotal)} />
-        <InfoRow label="Tax" value={usd(p.taxTotal)} />
+        <InfoRow label="Subtotal" value={usd(p.subtotalCents)} />
+        {p.discountTotalCents > 0 && <InfoRow label="Discounts" value={`-${usd(p.discountTotalCents)}`} valueColor={SUCCESS} />}
+        <InfoRow label="Shipping" value={usd(p.shippingTotalCents)} />
+        <InfoRow label="Tax" value={usd(p.taxTotalCents)} />
         <View style={s.divider} />
-        <InfoRow label="Total" value={usd(p.total)} bold />
-        <InfoRow label="Amount Paid" value={usd(p.amountPaid)} valueColor={SUCCESS} />
-        {p.amountRefunded > 0 && <InfoRow label="Amount Refunded" value={`-${usd(p.amountRefunded)}`} valueColor={RED} />}
-        <InfoRow label="Amount Held" value={usd(p.amountHeld)} valueColor={ORANGE} />
+        <InfoRow label="Total" value={usd(p.totalCents)} bold />
+        <InfoRow label="Amount Paid" value={usd(p.amountPaidCents)} valueColor={SUCCESS} />
+        {p.amountRefundedCents > 0 && <InfoRow label="Amount Refunded" value={`-${usd(p.amountRefundedCents)}`} valueColor={RED} />}
+        <InfoRow label="Amount Held" value={usd(p.amountHeldCents)} valueColor={ORANGE} />
       </BrandthreadCard>
 
       {order.heldFunds && (
@@ -998,15 +982,15 @@ function PaymentTab({ order }: { order: Order }) {
             <View style={s.heldFundsGrid}>
               <View style={s.heldFundStat}>
                 <Text style={s.heldFundLabel}>Currently Held</Text>
-                <Text style={[s.heldFundValue, { color: ORANGE }]}>{usd(order.heldFunds.currentlyHeld)}</Text>
+                <Text style={[s.heldFundValue, { color: ORANGE }]}>{usd(order.heldFunds.currentlyHeldCents)}</Text>
               </View>
               <View style={s.heldFundStat}>
                 <Text style={s.heldFundLabel}>Seller Pending</Text>
-                <Text style={[s.heldFundValue, { color: SUCCESS }]}>{usd(order.heldFunds.sellerPending)}</Text>
+                <Text style={[s.heldFundValue, { color: SUCCESS }]}>{usd(order.heldFunds.sellerPendingCents)}</Text>
               </View>
               <View style={s.heldFundStat}>
                 <Text style={s.heldFundLabel}>Platform Fee</Text>
-                <Text style={s.heldFundValue}>{usd(order.heldFunds.platformFee)}</Text>
+                <Text style={s.heldFundValue}>{usd(order.heldFunds.platformFeeCents)}</Text>
               </View>
             </View>
             <Text style={s.milestoneTitle}>Payout Milestones</Text>
@@ -1032,7 +1016,7 @@ function PaymentTab({ order }: { order: Order }) {
               <View style={s.refundHeader}>
                 <StatusBadge label={r.status.toUpperCase()} variant={r.status === 'completed' ? 'success' : r.status === 'failed' ? 'error' : 'warning'} />
                 <StatusBadge label={r.type.replace(/_/g, ' ')} variant="neutral" />
-                <Text style={s.refundAmount}>{usd(r.totalAmount)}</Text>
+                <Text style={s.refundAmount}>{usd(r.totalAmountCents)}</Text>
               </View>
               <Text style={s.refundDate}>{fmt(r.createdAt)}</Text>
               {r.isDemo && <Text style={s.demoTag}>Test refund</Text>}
@@ -1318,7 +1302,7 @@ function DisputesTab({ order, router }: { order: Order; router: ReturnType<typeo
             <View style={s.disputeHeader}>
               <StatusBadge label={d.status.replace(/_/g, ' ').toUpperCase()} variant={d.status === 'won' ? 'success' : d.status === 'lost' ? 'error' : 'warning'} />
               <Text style={s.disputeType}>{d.type.replace(/_/g, ' ')}</Text>
-              <Text style={s.disputeAmount}>{usd(d.amount)}</Text>
+              <Text style={s.disputeAmount}>{usd(d.amountCents)}</Text>
             </View>
 
             <Text style={s.disputeClaim}>{d.customerClaim}</Text>

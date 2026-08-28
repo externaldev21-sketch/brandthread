@@ -14,14 +14,14 @@ import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED,
-  BORDER, BORDER_ACTIVE,
+  BORDER,
   FG, MUTED, SUBTLE, ON_DARK, ON_DARK_MUTED,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, SUCCESS, RED,
+  SUCCESS, RED,
   FONT, FS, SP, RADIUS
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useAuth } from '@clerk/expo';
+import { formatCents } from '@/lib/money';
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
@@ -29,7 +29,7 @@ const HERO_DROP = {
   brand: 'Vault Studio',
   handle: '@vaultstudio',
   initials: 'VS',
-  brandColor: PURPLE,
+  brandColor: '#8B5CF6',
   name: 'Canvas Cargo Jacket',
   tag: 'DROPPING TODAY',
   price: '$189',
@@ -485,13 +485,13 @@ export default function DiscoverScreen() {
         const safeRows = Array.isArray(rows) ? rows : [];
         const items: ForYouItem[] = safeRows.map((row: any, i: number) => {
           const firstVariant = (row.variants ?? [])[0];
-          const priceDollars = firstVariant ? (firstVariant.priceCents / 100).toFixed(0) : '0';
+          const price = firstVariant ? formatCents(firstVariant.priceCents) : '$0.00';
           return {
             id:            `live_${i}`,
             productId:     row.id,   // real DB UUID — used for navigation + checkout
             brand:         row.sellerDisplayName ?? 'Seller',
             name:          row.name,
-            price:         `$${priceDollars}`,
+            price,
             originalPrice: null,
             color:         theme.accent,
             initials:      (row.name ?? 'P')[0].toUpperCase(),

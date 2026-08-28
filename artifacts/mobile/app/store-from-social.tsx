@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, Image, TouchableOpacity,
   StyleSheet, Alert, TextInput, ActivityIndicator,
@@ -59,6 +60,8 @@ async function resizeToBase64(uri: string, maxPx = 800): Promise<string> {
 }
 
 export default function StoreFromSocialScreen() {
+  const { theme } = useAppTheme();
+  const ss = makeStyles(theme);
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const headerTopInset = useHeaderTopInset();
@@ -202,7 +205,7 @@ export default function StoreFromSocialScreen() {
         </Text>
 
         {/* AI badge */}
-        <BrandthreadCard style={[ss.card, { borderColor: PURPLE_DIM, backgroundColor: 'rgba(124,58,237,0.08)' }]}>
+        <BrandthreadCard style={[ss.card, { borderColor: PURPLE_DIM, backgroundColor: theme.accentDim }]}>
           <View style={ss.bannerRow}>
             <Feather name="zap" size={ICON.sm} color={PURPLE_LIGHT} />
             <Text style={[ss.bannerText, { color: PURPLE_LIGHT }]}>
@@ -327,7 +330,10 @@ export default function StoreFromSocialScreen() {
   );
 }
 
-const ss = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE_DIM = theme.accentDim;
+  const PURPLE_LIGHT = theme.accentLight;
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
@@ -368,7 +374,7 @@ const ss = StyleSheet.create({
     backgroundColor: CARD, borderRadius: RADIUS.md,
     borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
   },
-  postRowSelected: { borderColor: PURPLE_LIGHT, backgroundColor: 'rgba(139,92,246,0.08)' },
+  postRowSelected: { borderColor: PURPLE_LIGHT, backgroundColor: PURPLE_DIM },
   postCheck: {
     width: 22, height: 22, borderRadius: RADIUS.xs,
     borderWidth: 1.5, borderColor: MUTED,
@@ -390,4 +396,5 @@ const ss = StyleSheet.create({
   loadingText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   actionBtn: { marginHorizontal: SP.md, marginBottom: SP.sm },
   altBtn: { marginHorizontal: SP.md, marginTop: SP.md },
-});
+  });
+};

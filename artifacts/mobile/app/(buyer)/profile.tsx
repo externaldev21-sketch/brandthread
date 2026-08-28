@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Dimensions, Modal, Animated, Share,
-  RefreshControl, Image, Linking,
+  RefreshControl, Image, Linking, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -11,9 +11,9 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuth, useUser } from '@clerk/expo';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN,
-  GRAD_PRIMARY, FONT, FS, SP, RADIUS, COMP, ICON, OVERLAY,
+  BG, CARD, CARD_ELEVATED, BORDER,
+  FG, MUTED, SUBTLE,
+  FONT, FS, SP, RADIUS, COMP, ICON, OVERLAY,
   RED, RED_DIM,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -25,6 +25,7 @@ import {
 import { useApi } from '@/lib/api';
 import { loadBuyerProfile } from '@/lib/buyerProfile';
 import { loadHighlights, type Highlight } from '@/lib/highlightsService';
+import { reportNetworkError } from '@/lib/networkNotice';
 import type {
   BuyerSocialProfile, BuyerPost, RepostRecord, SavedItem, PrivacySettings,
 } from '@/services/socialTypes';
@@ -114,12 +115,16 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [avatarUri, setAvatarUri] = useState<string | null>(null);
   const [highlights, setHighlights] = useState<Highlight[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   // Sheets
   const [menuOpen, setMenuOpen] = useState(false);
   const [postSheet, setPostSheet] = useState<BuyerPost | null>(null);
 
   const loadData = useCallback(async () => {
+    setLoadError(false);
+    try {
     const [p, po, rp, sv, pr, bp, hl, myStories] = await Promise.all([
       getMyProfile(),
       getMyPosts(),
@@ -138,12 +143,17 @@ export default function ProfileScreen() {
     setAvatarUri(bp.avatarUri || null);
     setHighlights(hl);
     setHasActiveStory(Array.isArray(myStories) && myStories.length > 0);
+    } catch (error) {
+      setLoadError(true);
+      reportNetworkError(error, () => loadData());
+    } finally {
+      setLoading(false);
+    }
   }, [api]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadData();
-    setRefreshing(false);
+    try { await loadData(); } finally { setRefreshing(false); }
   }, [loadData]);
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
@@ -183,16 +193,18 @@ export default function ProfileScreen() {
 
   const handleArchivePost = async () => {
     if (!postSheet) return;
+    const post = postSheet;
     setPostSheet(null);
-    await archivePost(postSheet.id);
-    await loadData();
+    setPosts(prev => prev.filter(item => item.id !== post.id));
+    try { await archivePost(post.id); await loadData(); } catch { setPosts(prev => [...prev, post]); Alert.alert('Could not archive post', 'Try again.'); }
   };
 
   const handleDeletePost = async () => {
     if (!postSheet) return;
+    const post = postSheet;
     setPostSheet(null);
-    await deletePost(postSheet.id);
-    await loadData();
+    setPosts(prev => prev.filter(item => item.id !== post.id));
+    try { await deletePost(post.id); await loadData(); } catch { setPosts(prev => [...prev, post]); Alert.alert('Could not delete post', 'Try again.'); }
   };
 
   const handleShareCurrentPost = async () => {
@@ -273,20 +285,21 @@ export default function ProfileScreen() {
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} />}
       >
+        {loading ? <View style={styles.emptyState}><Text style={styles.emptyDesc}>Loading profile…</Text></View> : loadError ? <View style={styles.emptyState}><Text style={styles.emptyTitle}>Couldn't load profile</Text><TouchableOpacity style={[styles.emptyAction, { borderColor: theme.accent }]} onPress={loadData}><Text style={[styles.emptyActionText, { color: theme.accent }]}>Try again</Text></TouchableOpacity></View> : <>
         {/* Hero Row */}
         <View style={styles.heroRow}>
           <TouchableOpacity onPress={() => router.push('/buyer-story-create' as any)} style={styles.avatarWrap}>
             {/* Purple ring when user has an active story */}
             {hasActiveStory ? (
               <LinearGradient
-                colors={[theme.accent, theme.secondary] as [string, string]}
+                colors={[...theme.primaryGradient]}
                 start={{ x: 0, y: 1 }} end={{ x: 1, y: 0 }}
                 style={styles.storyRing}
               >
                 {avatarUri ? (
                   <Image source={{ uri: avatarUri }} style={[styles.avatar, { resizeMode: 'cover', margin: 3 }]} />
                 ) : (
-                  <LinearGradient colors={[theme.accent, theme.secondary] as [string, string]} style={[styles.avatar, { margin: 3 }]}>
+                  <LinearGradient colors={[...theme.primaryGradient]} style={[styles.avatar, { margin: 3 }]}>
                     <Text style={styles.avatarText}>{avatarInitials}</Text>
                   </LinearGradient>
                 )}
@@ -294,7 +307,7 @@ export default function ProfileScreen() {
             ) : avatarUri ? (
               <Image source={{ uri: avatarUri }} style={[styles.avatar, { resizeMode: 'cover' }]} />
             ) : (
-              <LinearGradient colors={[theme.accent, theme.secondary] as [string, string]} style={styles.avatar}>
+              <LinearGradient colors={[...theme.primaryGradient]} style={styles.avatar}>
                 <Text style={styles.avatarText}>{avatarInitials}</Text>
               </LinearGradient>
             )}
@@ -331,7 +344,7 @@ export default function ProfileScreen() {
           {profile?.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
           {profile?.website ? (
             <TouchableOpacity onPress={() => { const url = profile.website.startsWith('http') ? profile.website : 'https://' + profile.website; Linking.openURL(url); }}>
-              <Text style={styles.website}>{profile.website}</Text>
+              <Text style={[styles.website, { color: theme.secondary }]}>{profile.website}</Text>
             </TouchableOpacity>
           ) : null}
           {profile?.location ? (
@@ -499,6 +512,7 @@ export default function ProfileScreen() {
             )}
           </View>
         )}
+        </>}
       </ScrollView>
 
       {/* ── Profile Menu Sheet ── */}
@@ -558,11 +572,11 @@ const styles = StyleSheet.create({
   pronouns: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED },
   handleYear: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE },
   bio: { fontFamily: FONT.regular, fontSize: FS.base, color: FG, marginTop: 4 },
-  website: { fontFamily: FONT.regular, fontSize: FS.sm, color: CYAN },
+  website: { fontFamily: FONT.regular, fontSize: FS.sm },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   locationText: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
-  privacyBadge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', backgroundColor: PURPLE_DIM, borderWidth: 1, borderColor: BORDER_ACTIVE, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 4, marginTop: SP.xs, gap: 4 },
-  privacyBadgeText: { fontFamily: FONT.medium, fontSize: FS.xs, color: PURPLE },
+  privacyBadge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', borderWidth: 1, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 4, marginTop: SP.xs, gap: 4 },
+  privacyBadgeText: { fontFamily: FONT.medium, fontSize: FS.xs },
 
   actionRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, marginTop: SP.md, gap: SP.sm },
   actionBtn: { flex: 1, height: 40, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
@@ -579,9 +593,9 @@ const styles = StyleSheet.create({
 
   tabBar: { flexDirection: 'row', paddingHorizontal: SP.md, marginTop: SP.sm, gap: SP.xs },
   tabPill: { flex: 1, paddingVertical: SP.xs + 2, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.pill, alignItems: 'center' },
-  tabPillActive: { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
+  tabPillActive: {},
   tabText: { fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED },
-  tabTextActive: { color: PURPLE },
+  tabTextActive: {},
 
   gridContainer: { marginTop: SP.md },
   grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: SP.md, gap: GRID_GAP },
@@ -604,8 +618,8 @@ const styles = StyleSheet.create({
   emptyState: { alignItems: 'center', paddingHorizontal: SP.lg, paddingVertical: SP.xl },
   emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: FG, marginTop: SP.md },
   emptyDesc: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', marginTop: SP.sm },
-  emptyAction: { backgroundColor: CARD, borderWidth: 1, borderColor: BORDER_ACTIVE, borderRadius: RADIUS.md, paddingHorizontal: SP.lg, paddingVertical: SP.sm, marginTop: SP.md },
-  emptyActionText: { fontFamily: FONT.medium, fontSize: FS.sm, color: PURPLE },
+  emptyAction: { backgroundColor: CARD, borderWidth: 1, borderRadius: RADIUS.md, paddingHorizontal: SP.lg, paddingVertical: SP.sm, marginTop: SP.md },
+  emptyActionText: { fontFamily: FONT.medium, fontSize: FS.sm },
 
   // Bottom sheet
   backdrop: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },

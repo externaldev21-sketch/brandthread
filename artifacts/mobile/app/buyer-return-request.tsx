@@ -19,6 +19,7 @@ import { createReturnRequest } from '@/services/cartService';
 import { RETURN_REASON_OPTIONS, BuyerReturnReason, BuyerReturnResolution } from '@/services/cartTypes';
 import { getBuyerOrder } from '@/services/orderService';
 import { BuyerOrderView } from '@/services/orderTypes';
+import { formatCents } from '@/lib/money';
 import {
   BG, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE, ON_DARK,
@@ -41,7 +42,7 @@ export default function BuyerReturnRequestScreen() {
   const { theme } = useAppTheme();
   const PURPLE = colors.primary, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = colors.accent, CYAN = theme.secondary, CYAN_DIM = theme.secondaryDim;
   const BORDER_ACTIVE = `${theme.accent}73`;
-  const GRAD_PRIMARY = [theme.accent, theme.secondary] as const;
+  const GRAD_PRIMARY = theme.primaryGradient;
   const s = makeStyles(theme);
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const router = useRouter();
@@ -60,7 +61,7 @@ export default function BuyerReturnRequestScreen() {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { Alert.alert('Permission required', 'Allow photo library access to add evidence.'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaType.IMAGE,
+      mediaTypes: ['images'],
       allowsMultipleSelection: true,
       quality: 0.7,
       selectionLimit: 5,
@@ -95,7 +96,7 @@ export default function BuyerReturnRequestScreen() {
           productName: item.productName,
           variantTitle: item.variant,
           quantity: item.quantity,
-          unitPrice: item.unitPrice,
+          unitPriceCents: item.unitPriceCents,
           reason: reason as BuyerReturnReason,
         })),
         reason: reason as BuyerReturnReason,
@@ -133,7 +134,7 @@ export default function BuyerReturnRequestScreen() {
     );
   }
 
-  const refundEstimate = order?.lineItems.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0) ?? 0;
+  const refundEstimateCents = order?.lineItems.reduce((sum, i) => sum + i.unitPriceCents * i.quantity, 0) ?? 0;
   const returnDeadline = order?.createdAt ? new Date(new Date(order.createdAt).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString() : '';
 
   return (
@@ -153,7 +154,7 @@ export default function BuyerReturnRequestScreen() {
         {/* Policy info */}
         <View style={s.policyCard}>
           <View style={s.policyRow}><Feather name="refresh-ccw" size={13} color={PURPLE_LIGHT} /><Text style={s.policyText}>30-day return window · Return deadline: {returnDeadline ? fmtDate(returnDeadline) : '30 days from purchase'}</Text></View>
-          <View style={s.policyRow}><Feather name="dollar-sign" size={13} color={SUCCESS} /><Text style={s.policyText}>Estimated refund: ${refundEstimate.toFixed(2)}</Text></View>
+          <View style={s.policyRow}><Feather name="dollar-sign" size={13} color={SUCCESS} /><Text style={s.policyText}>Estimated refund: {formatCents(refundEstimateCents)}</Text></View>
           <Text style={s.policyNote}>Refunds are subject to seller review. Approved amounts may differ from estimates.</Text>
         </View>
 
@@ -168,7 +169,7 @@ export default function BuyerReturnRequestScreen() {
                   <Text style={s.itemName}>{item.productName}</Text>
                   <Text style={s.itemVariant}>{item.variant} · ×{item.quantity}</Text>
                 </View>
-                <Text style={s.itemPrice}>${(item.unitPrice * item.quantity).toFixed(2)}</Text>
+                <Text style={s.itemPrice}>{formatCents(item.unitPriceCents * item.quantity)}</Text>
               </View>
             ))}
           </View>

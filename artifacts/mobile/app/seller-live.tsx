@@ -4,22 +4,16 @@
  * Agora SDK is unavailable (Expo Go / web preview).
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import {
-  View, Text, TouchableOpacity, StyleSheet, Alert, TextInput,
-  ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator,
-  Dimensions,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, TextInput, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator, Dimensions } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
-import {
-  BG, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM,
-  FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
+import { BG, BORDER, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { formatCents } from '@/lib/money';
 
 const LIVE_RED = '#FF3B30';
 const { width: W, height: H } = Dimensions.get('window');
@@ -161,12 +155,26 @@ export default function SellerLiveScreen() {
       : [...productTags, {
           productId: product.id,
           productName: product.name,
-          price: product.priceCents ? product.priceCents / 100 : 0,
+          priceCents: product.priceCents ?? 0,
         }];
     setProductTags(updated);
     try {
       await (api as any).live.updateProducts(params.streamId, updated);
     } catch {}
+  }
+
+  async function highlightProduct(productId: string) {
+    Haptics.selectionAsync();
+    const updated = productTags.map(tag => ({
+      ...tag,
+      highlighted: tag.productId === productId,
+    }));
+    setProductTags(updated);
+    try {
+      await (api as any).live.updateProducts(params.streamId, updated);
+    } catch {
+      Alert.alert('Could not feature product', 'The product highlight did not reach viewers. Please try again.');
+    }
   }
 
   async function handleEnd() {
@@ -256,11 +264,20 @@ export default function SellerLiveScreen() {
         <View style={s.productStrip}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.productStripContent}>
             {productTags.map(tag => (
-              <View key={tag.productId} style={[s.productChip, { backgroundColor: 'rgba(0,0,0,0.65)' }]}>
+              <TouchableOpacity
+                key={tag.productId}
+                onPress={() => highlightProduct(tag.productId)}
+                activeOpacity={0.8}
+                style={[
+                  s.productChip,
+                  { backgroundColor: tag.highlighted ? LIVE_RED : 'rgba(0,0,0,0.65)' },
+                ]}
+              >
                 <Feather name="shopping-bag" size={12} color={LIVE_RED} />
                 <Text style={s.productChipText} numberOfLines={1}>{tag.productName}</Text>
-                <Text style={s.productChipPrice}>${Number(tag.price).toFixed(0)}</Text>
-              </View>
+                <Text style={s.productChipPrice}>{formatCents(tag.priceCents ?? 0)}</Text>
+                {tag.highlighted && <Text style={s.featuredLabel}>FEATURED</Text>}
+              </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
@@ -326,7 +343,7 @@ export default function SellerLiveScreen() {
                   >
                     <View style={{ flex: 1 }}>
                       <Text style={[s.pickerRowName, { color: FG }]} numberOfLines={1}>{p.name}</Text>
-                      <Text style={[s.pickerRowPrice, { color: MUTED }]}>${((p.priceCents ?? 0)/100).toFixed(2)}</Text>
+                       <Text style={[s.pickerRowPrice, { color: MUTED }]}>{formatCents(p.priceCents ?? 0)}</Text>
                     </View>
                     <View style={[s.checkbox, tagged && { backgroundColor: PURPLE, borderColor: PURPLE }]}>
                       {tagged && <Feather name="check" size={13} color="#fff" />}
@@ -370,6 +387,7 @@ const s = StyleSheet.create({
   productChip:      { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 7 },
   productChipText:  { color: '#fff', fontFamily: FONT.semibold, fontSize: 12, maxWidth: 100 },
   productChipPrice: { color: 'rgba(255,255,255,0.7)', fontFamily: FONT.regular, fontSize: 11 },
+  featuredLabel: { color: '#fff', fontFamily: FONT.bold, fontSize: 8, letterSpacing: 0.8 },
   bottomSection:    { position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 10 },
   commentScroll:    { maxHeight: 200, marginHorizontal: 12 },
   commentContent:   { gap: 4, paddingBottom: 8 },

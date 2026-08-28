@@ -15,8 +15,8 @@ export interface CartItem {
   sellerId: string;
   sellerName: string;
   sellerHandle: string;
-  price: number;
-  compareAtPrice?: number;
+  priceCents: number;
+  compareAtPriceCents?: number;
   quantity: number;
   maxQuantity: number;       // inventory cap
   isPreOrder: boolean;
@@ -40,9 +40,9 @@ export interface CartSellerGroup {
   sellerHandle: string;
   sellerInitial: string;
   items: CartItem[];
-  subtotal: number;
+  subtotalCents: number;
   hasPreOrder: boolean;
-  estimatedShipping: number;
+  estimatedShippingCents: number;
   fulfillmentEstimate: string;
 }
 
@@ -88,7 +88,7 @@ export interface CheckoutShippingMethod {
   id: string;
   carrier: string;
   service: string;
-  price: number;
+  priceCents: number;
   estimatedDays: number;
   estimatedDelivery: string;
   trackingIncluded: boolean;
@@ -108,8 +108,9 @@ export interface CheckoutDeliveryGroup {
 export interface CheckoutDiscount {
   code: string;
   type: 'percentage' | 'fixed' | 'free_shipping' | 'store_credit';
+  /** Percentage points for percentage discounts; cents for fixed discounts. */
   value: number;
-  appliedAmount: number;
+  appliedAmountCents: number;
   description: string;
   isValid: boolean;
   errorMessage?: string;
@@ -117,7 +118,7 @@ export interface CheckoutDiscount {
 
 export interface CheckoutTax {
   jurisdiction: string;
-  rate: number;
+  rateBasisPoints: number;
   amount: number;
   isEstimate: boolean;
   note: string;
@@ -138,11 +139,11 @@ export interface CheckoutPaymentMethod {
 }
 
 export interface CheckoutSummary {
-  subtotal: number;
-  discountTotal: number;
-  shippingTotal: number;
-  taxTotal: number;
-  total: number;
+  subtotalCents: number;
+  discountTotalCents: number;
+  shippingTotalCents: number;
+  taxTotalCents: number;
+  totalCents: number;
   currency: string;
 }
 
@@ -221,7 +222,7 @@ export interface PaymentAttempt {
   checkoutId: string;
   status: PaymentAttemptStatus;
   method: PaymentMethodType;
-  amount: number;
+  amountCents: number;
   currency: string;
   failureCode?: PaymentFailureCode;
   failureMessage?: string;
@@ -238,9 +239,9 @@ export interface BuyerOrderLineItem {
   variantTitle: string;
   imageUri?: string;
   quantity: number;
-  unitPrice: number;
-  discountAmount: number;
-  total: number;
+  unitPriceCents: number;
+  discountAmountCents: number;
+  totalCents: number;
   isPreOrder: boolean;
   preOrderEstShipDate?: string;
 }
@@ -280,8 +281,7 @@ export interface BuyerPreOrderTimeline {
 }
 
 export type BuyerReturnStatus =
-  | 'requested' | 'under_review' | 'approved' | 'denied'
-  | 'label_issued' | 'in_transit' | 'received' | 'completed';
+  | 'pending' | 'approved' | 'denied' | 'refunded';
 
 export type BuyerReturnReason =
   | 'wrong_size' | 'wrong_item' | 'damaged' | 'defective'
@@ -301,18 +301,20 @@ export interface BuyerReturnRequest {
     productName: string;
     variantTitle: string;
     quantity: number;
-    unitPrice: number;
+    unitPriceCents: number;
     reason: BuyerReturnReason;
   }[];
   reason: BuyerReturnReason;
   description: string;
   imageUris: string[];
   preferredResolution: BuyerReturnResolution;
-  refundEstimate: number;
+  refundEstimateCents: number;
   returnDeadline: string;
   returnPolicy: string;
   submittedAt: string;
   updatedAt: string;
+  sellerResponse?: string;
+  refundAmountCents?: number;
 }
 
 export interface BuyerRefundRequest {
@@ -324,8 +326,10 @@ export interface BuyerRefundRequest {
   description: string;
   evidenceUris: string[];
   maxRefundAmount: number;
-  status: 'pending' | 'under_review' | 'approved' | 'denied' | 'completed';
+  status: 'pending' | 'approved' | 'denied' | 'refunded';
   submittedAt: string;
+  sellerResponse?: string;
+  refundAmountCents?: number;
 }
 
 export type BuyerProblemType =
@@ -386,8 +390,8 @@ export interface BuyerProduct {
   sellerHandle: string;
   name: string;
   description: string;
-  price: number;
-  compareAtPrice?: number;
+  priceCents: number;
+  compareAtPriceCents?: number;
   imageUris: string[];
   category: string;
   isPreOrder: boolean;
@@ -411,8 +415,8 @@ export interface BuyerProductVariant {
   id: string;
   title: string;
   optionValues: { optionId: string; valueId: string }[];
-  price: number;
-  compareAtPrice?: number;
+  priceCents: number;
+  compareAtPriceCents?: number;
   inventoryQuantity: number;
   isAvailable: boolean;
   imageUri?: string;

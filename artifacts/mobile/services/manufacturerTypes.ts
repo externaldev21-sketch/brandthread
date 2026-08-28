@@ -90,10 +90,10 @@ export interface Manufacturer {
   certifications: ManufacturerCertification[];
   materials: string[];
   moq: number;
-  samplePriceMin: number;
-  samplePriceMax: number;
-  unitPriceMin: number;
-  unitPriceMax: number;
+  samplePriceMinCents: number;
+  samplePriceMaxCents: number;
+  unitPriceMinCents: number;
+  unitPriceMaxCents: number;
   leadTimeDays: number;
   responseTimeHours: number;
   rating: number;
@@ -151,7 +151,7 @@ export interface QuoteRequest {
   status: QuoteRequestStatus;
   // Step 2: production details
   quantity: number;
-  targetUnitPrice?: number;
+  targetUnitPriceCents?: number;
   neededByDate?: string;
   sampleRequired: boolean;
   productionType?: string;
@@ -186,8 +186,8 @@ export interface QuoteLineItem {
   id: string;
   description: string;
   quantity: number;
-  unitPrice: number;
-  total: number;
+  unitPriceCents: number;
+  totalCents: number;
 }
 
 export interface Quote {
@@ -197,12 +197,12 @@ export interface Quote {
   sellerId: string;
   productName: string;
   quantity: number;
-  unitPrice: number;
-  sampleCost: number;
-  setupCost: number;
-  packagingCost: number;
-  shippingEstimate: number;
-  totalEstimate: number;
+  unitPriceCents: number;
+  sampleCostCents: number;
+  setupCostCents: number;
+  packagingCostCents: number;
+  shippingEstimateCents: number;
+  totalEstimateCents: number;
   moq: number;
   leadTimeDays: number;
   productionDays: number;
@@ -219,7 +219,7 @@ export interface Counteroffer {
   id: string;
   quoteId: string;
   sellerId: string;
-  desiredUnitPrice?: number;
+  desiredUnitPriceCents?: number;
   desiredMoq?: number;
   desiredProductionDays?: number;
   desiredPaymentTerms?: string;
@@ -270,7 +270,7 @@ export interface Sample {
   productName: string;
   type: 'proto' | 'size_set' | 'pre_production' | 'production';
   status: SampleStatus;
-  cost: number;
+  costCents: number;
   paymentStatus: PaymentStatus;
   estimatedCompletionDate?: string;
   shippedDate?: string;
@@ -339,7 +339,7 @@ export interface ManufacturerPaymentRecord {
   id: string;
   productionOrderId: string;
   type: PaymentType;
-  amount: number;
+  amountCents: number;
   currency: string;
   status: PaymentStatus;
   dueDate?: string;
@@ -359,9 +359,9 @@ export interface ProductionOrder {
   status: ProductionStatus;
   quantity: number;
   variants: Record<string, number>;
-  totalCost: number;
-  depositAmount: number;
-  remainingBalance: number;
+  totalCostCents: number;
+  depositAmountCents: number;
+  remainingBalanceCents: number;
   startDate?: string;
   estimatedCompletionDate?: string;
   actualCompletionDate?: string;
@@ -444,11 +444,11 @@ export interface ManufacturerPriceCard {
   quoteId?: string;
   productName: string;
   quantityBreak: number;
-  unitPrice: number;
-  samplePrice: number;
-  setupCost: number;
-  packagingCost: number;
-  shippingEstimate: number;
+  unitPriceCents: number;
+  samplePriceCents: number;
+  setupCostCents: number;
+  packagingCostCents: number;
+  shippingEstimateCents: number;
   leadTimeDays: number;
   validUntil?: string;
   createdAt: string;

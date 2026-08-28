@@ -1,33 +1,16 @@
 import React, { useState, useCallback, useRef } from 'react';
-import {
-  View, Text, TouchableOpacity, TextInput, ScrollView,
-  StyleSheet, FlatList, ActivityIndicator, Animated,
-} from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, FlatList, ActivityIndicator, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN, SUCCESS, SUCCESS_DIM,
-  BLUE, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import {
-  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  IconButton, StatusBadge, SectionHeader, EmptyState,
-} from '@/components/BrandthreadUI';
-import {
-  getCounts, createCount, updateCountItem, completeCount,
-  getInventoryItems, getLocations,
-} from '@/services/inventoryService';
-import {
-  InventoryCount, InventoryCountItem, CountType, CountStatus,
-  InventoryItem, InventoryLocation,
-} from '@/services/inventoryTypes';
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
+import { getCounts, createCount, updateCountItem, completeCount, getInventoryItems, getLocations } from '@/services/inventoryService';
+import { InventoryCount, InventoryCountItem, CountType, CountStatus, InventoryItem, InventoryLocation } from '@/services/inventoryTypes';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -261,7 +244,7 @@ export default function InventoryCountScreen() {
             style={s.addBtn}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setMode('new'); }}
           >
-            <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.addBtnGrad}>
+            <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.addBtnGrad}>
               <Feather name="plus" size={ICON.sm} color="#fff" />
               <Text style={s.addBtnText}>New</Text>
             </LinearGradient>

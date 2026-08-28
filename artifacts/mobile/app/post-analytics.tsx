@@ -22,9 +22,7 @@ const CARD      = '#12121F';
 const BORDER    = 'rgba(255,255,255,0.07)';
 const FG        = '#F4F4FF';
 const MUTED     = 'rgba(244,244,255,0.50)';
-const GREEN     = '#8B5CF6';
-const GREEN_DIM = 'rgba(139,92,246,0.18)';
-const PURPLE    = '#8B5CF6';
+const GREEN     = '#10B981';
 const BLUE      = '#3B82F6';
 const ORANGE    = '#F97316';
 const ERR       = '#F87171';
@@ -52,10 +50,10 @@ function formatPeakHour(hour: number): string {
   return `${h}:00 ${period}`;
 }
 
-function postTypeGradient(type: string): [string, string] {
-  if (type === 'video' || type === 'behind_scenes') return [PURPLE, '#1E1540'];
+function postTypeGradient(type: string, primary: string): [string, string] {
+  if (type === 'video' || type === 'behind_scenes') return [primary, '#1E1540'];
   if (type === 'slideshow') return [BLUE, '#0A1828'];
-  if (type === 'announcement') return [GREEN, 'rgba(139,92,246,0.18)'];
+  if (type === 'announcement') return [GREEN, 'rgba(16,185,129,0.18)'];
   return ['#3D1F0F', '#1A0A05'];
 }
 
@@ -176,7 +174,7 @@ export default function PostAnalyticsScreen() {
   if (loading) {
     return (
       <View style={styles.notFound}>
-        <ActivityIndicator color={GREEN} />
+        <ActivityIndicator color={colors.primary} />
         <Text style={styles.notFoundText}>Loading post…</Text>
       </View>
     );
@@ -195,7 +193,7 @@ export default function PostAnalyticsScreen() {
   }
 
   const analytics: any = null;
-  const gradColors = postTypeGradient(post.mediaType ?? 'image');
+  const gradColors = postTypeGradient(post.mediaType ?? 'image', colors.primary);
 
   // The live post API currently reports only durable like and repost counts.
   // Keep this screen honest rather than deriving views, revenue, or retention.
@@ -219,7 +217,7 @@ export default function PostAnalyticsScreen() {
               <View style={styles.typeBadge}>
                 <Text style={styles.typeBadgeText}>{String(post.mediaType ?? 'post').replace('_', ' ')}</Text>
               </View>
-              <View style={[styles.statusBadge, { backgroundColor: colors.primary }]}>
+              <View style={[styles.statusBadge, { backgroundColor: colors.success }]}>
                 <Text style={styles.statusBadgeText}>Published</Text>
               </View>
             </View>
@@ -227,13 +225,13 @@ export default function PostAnalyticsScreen() {
         </View>
 
         <View style={styles.heroGrid}>
-          <HeroCard icon="heart" iconColor={PURPLE} label="Likes" value={formatNumber(Number(post.likeCount ?? post.likesCount ?? 0))} />
+          <HeroCard icon="heart" iconColor={colors.primary} label="Likes" value={formatNumber(Number(post.likeCount ?? post.likesCount ?? 0))} />
           <HeroCard icon="repeat" iconColor={ORANGE} label="Reposts" value={formatNumber(Number(post.repostCount ?? post.repostsCount ?? 0))} />
         </View>
 
         <SectionTitle title="Performance data" />
         <View style={styles.card}>
-          <Feather name="bar-chart-2" size={26} color={PURPLE} />
+          <Feather name="bar-chart-2" size={26} color={colors.primary} />
           <Text style={styles.unavailableTitle}>More post analytics are coming soon</Text>
           <Text style={styles.unavailableText}>
             Views, saves, product clicks, conversions, and audience insights are not available from the live API yet. We only show verified counts above.
@@ -246,7 +244,7 @@ export default function PostAnalyticsScreen() {
             activeOpacity={0.85}
             onPress={() => router.push(('/boost?targetType=post&targetId=' + encodeURIComponent(post.id)) as never)}
           >
-            <LinearGradient colors={[colors.primary, colors.info]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.quickActionGradient}>
+            <LinearGradient colors={colors.gradient as any} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.quickActionGradient}>
               <Feather name="zap" size={18} color={FG} />
               <Text style={styles.quickActionText}>Boost Post</Text>
             </LinearGradient>
@@ -325,7 +323,7 @@ export default function PostAnalyticsScreen() {
           />
           <HeroCard
             icon="heart"
-            iconColor={PURPLE}
+            iconColor={colors.primary}
             label="Likes"
             value={formatNumber(analytics.likes)}
           />

@@ -1,16 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Platform, TextInput, ActivityIndicator,
+  Platform, TextInput, Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { searchCatalogue, SEARCH_BRANDS, type SearchResult } from '@/lib/searchData';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '@clerk/expo';
+import { type SearchResult } from '@/lib/searchData';
 import { BG, CARD, BORDER, FG, MUTED } from '@/lib/theme';
 import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { formatCents, parseDecimalToCents } from '@/lib/money';
+import { reportNetworkError } from '@/lib/networkNotice';
+import { BrandedLoader, EmptyState } from '@/components/BrandthreadUI';
 
 type PersonResult = {
   userId: string; name: string; username: string | null;
@@ -18,7 +23,46 @@ type PersonResult = {
   bio: string | null; isFollowing: boolean;
 };
 
-const RECENT_SEARCHES = ['Vault Studio', 'Archive Hoodie', 'Coldform'];
+type ProductResult = Extract<SearchResult, { kind: 'product' }>;
+
+function MasonryCard({ item, accent, onPress }: {
+  item: ProductResult;
+  accent: string;
+  onPress: () => void;
+}) {
+  const [aspectRatio, setAspectRatio] = useState(0.82);
+
+  useEffect(() => {
+    if (!item.imageUri) return;
+    Image.getSize(item.imageUri, (width, height) => {
+      if (width > 0 && height > 0) setAspectRatio(Math.max(0.62, Math.min(1.24, width / height)));
+    });
+  }, [item.imageUri]);
+
+  return (
+    <TouchableOpacity style={styles.masonryCard} onPress={onPress} activeOpacity={0.88}>
+      <View style={[styles.masonryMedia, { aspectRatio, backgroundColor: item.color }]}>
+        {item.imageUri ? (
+          <Image source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : (
+          <View style={styles.masonryFallback}>
+            <Text style={styles.masonryInitials}>{item.initials}</Text>
+            <View style={styles.masonryFallbackLine} />
+          </View>
+        )}
+        <View style={styles.masonryPrice}>
+          <Text style={styles.masonryPriceText}>{formatCents(item.priceCents)}</Text>
+        </View>
+      </View>
+      <Text style={styles.masonryName} numberOfLines={2}>{item.name}</Text>
+      <View style={styles.masonryBrandRow}>
+        <View style={[styles.masonryBrandDot, { backgroundColor: item.color }]} />
+        <Text style={styles.masonryBrand} numberOfLines={1}>{item.brand}</Text>
+        <Feather name="bookmark" size={13} color={accent} />
+      </View>
+    </TouchableOpacity>
+  );
+}
 
 export default function SearchScreen() {
   const insets = useSafeAreaInsets();
@@ -33,6 +77,7 @@ export default function SearchScreen() {
   const primaryDim = theme.accentDim;
 
   const api    = useApi();
+  const { userId } = useAuth();
   const [query,   setQuery]   = useState('');
   const [sort, setSort] = useState<string>(''); // '', 'relevance', 'price_asc', 'price_desc', 'newest'
   const [minPrice, setMinPrice] = useState<string>('');
@@ -43,9 +88,20 @@ export default function SearchScreen() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [people,  setPeople]  = useState<PersonResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [searchFocused, setSearchFocused] = useState(true);
+  const [retryNonce, setRetryNonce] = useState(0);
   const topPad = Platform.OS === 'web' ? 24 : insets.top;
+  const recentKey = `bt:buyer-search-recent:${userId ?? 'anon'}`;
 
   const hasActiveFilters = sort !== '' || minPrice !== '' || maxPrice !== '' || category !== '';
+  const productResults = useMemo(() => results.filter((result): result is ProductResult => result.kind === 'product'), [results]);
+  const brandResults = useMemo(() => results.filter(result => result.kind === 'brand'), [results]);
+  const productColumns = useMemo(() => [
+    productResults.filter((_, index) => index % 2 === 0),
+    productResults.filter((_, index) => index % 2 === 1),
+  ], [productResults]);
 
   const clearFilters = () => {
     setSort('');
@@ -55,53 +111,89 @@ export default function SearchScreen() {
   };
 
   useEffect(() => {
+    let cancelled = false;
+    AsyncStorage.getItem(recentKey)
+      .then((raw) => {
+        if (cancelled || !raw) return;
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          setRecentSearches(parsed.filter((item): item is string => typeof item === 'string').slice(0, 5));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setRecentSearches([]);
+      });
+    return () => { cancelled = true; };
+  }, [recentKey]);
+
+  function rememberSearch(value: string) {
+    const term = value.trim();
+    if (!term) return;
+    setRecentSearches((current) => {
+      const next = [term, ...current.filter((item) => item.toLowerCase() !== term.toLowerCase())].slice(0, 5);
+      AsyncStorage.setItem(recentKey, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }
+
+  useEffect(() => {
     const q = query.trim();
-    if (q.length < 2 && !hasActiveFilters) { setResults([]); setPeople([]); setSearching(false); return; }
+    if (q.length < 1 && !hasActiveFilters) {
+      setResults([]);
+      setPeople([]);
+      setSearchError(null);
+      setSearching(false);
+      return;
+    }
     let cancelled = false;
     setSearching(true);
+    setSearchError(null);
     const timer = setTimeout(async () => {
-      try {
-        const minPriceCents = minPrice ? Math.floor(parseFloat(minPrice) * 100) : undefined;
-        const maxPriceCents = maxPrice ? Math.floor(parseFloat(maxPrice) * 100) : undefined;
-
-        const [brandRes, peopleData] = await Promise.allSettled([
-          api.public.search({
-            q,
-            sort: sort || undefined,
-            minPriceCents: !isNaN(minPriceCents as number) ? minPriceCents : undefined,
-            maxPriceCents: !isNaN(maxPriceCents as number) ? maxPriceCents : undefined,
-            category: category || undefined,
-            limit: 20
-          }),
-          api.social.search(q, 10),
-        ]);
-        if (!cancelled) {
-          if (brandRes.status === 'fulfilled') {
-            setResults(brandRes.value.results ?? []);
-          } else {
-            let fallback = searchCatalogue(q);
-            if (sort === 'price_asc' || sort === 'price_desc') {
-               fallback.sort((a, b) => {
-                 const pa = a.kind === 'product' ? parseFloat(a.price.replace(/[^0-9.]/g, '')) : 0;
-                 const pb = b.kind === 'product' ? parseFloat(b.price.replace(/[^0-9.]/g, '')) : 0;
-                 return sort === 'price_asc' ? pa - pb : pb - pa;
-               });
-            }
-            setResults(fallback);
-          }
-          if (peopleData.status === 'fulfilled') {
-            setPeople(peopleData.value as PersonResult[]);
-          } else {
-            setPeople([]);
-          }
-          setSearching(false);
+      const minPriceCents = minPrice ? parseDecimalToCents(minPrice) : undefined;
+      const maxPriceCents = maxPrice ? parseDecimalToCents(maxPrice) : undefined;
+      const [brandRes, peopleData] = await Promise.allSettled([
+        api.public.search({
+          q,
+          sort: sort || undefined,
+          minPriceCents: minPriceCents ?? undefined,
+          maxPriceCents: maxPriceCents ?? undefined,
+          category: category || undefined,
+          limit: 20,
+        }),
+        api.social.search(q, 10),
+      ]);
+      if (!cancelled) {
+        setResults(brandRes.status === 'fulfilled' ? brandRes.value.results ?? [] : []);
+        setPeople(peopleData.status === 'fulfilled' ? peopleData.value as PersonResult[] : []);
+        if (brandRes.status === 'rejected' && peopleData.status === 'rejected') {
+          const error = brandRes.reason ?? peopleData.reason;
+          setSearchError('Search could not load. Check your connection and try again.');
+          reportNetworkError(error, () => setRetryNonce((value) => value + 1));
         }
-      } catch {
-        if (!cancelled) { setResults(searchCatalogue(q)); setPeople([]); setSearching(false); }
+        setSearching(false);
       }
-    }, 300);
+    }, 350);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [query, sort, minPrice, maxPrice, category]);
+  // Query/filter changes and explicit retries are the only search triggers.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query, sort, minPrice, maxPrice, category, retryNonce, hasActiveFilters]);
+
+  const suggestions = useMemo(() => {
+    const seen = new Set<string>();
+    const values: string[] = [];
+    for (const value of [
+      ...people.flatMap((person) => [person.name, person.handle]),
+      ...results.map((result) => result.name),
+    ]) {
+      const term = value?.trim();
+      const key = term?.toLowerCase();
+      if (!term || !key || seen.has(key)) continue;
+      seen.add(key);
+      values.push(term);
+      if (values.length === 6) break;
+    }
+    return values;
+  }, [people, results]);
 
   function goToBrand() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -110,6 +202,7 @@ export default function SearchScreen() {
 
   function handleResultPress(r: SearchResult) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    rememberSearch(query || r.name);
     if (r.kind === 'brand' && (r as any).sellerId) {
       router.push({ pathname: '/seller-profile' as any, params: { sellerId: (r as any).sellerId } });
     } else if (r.kind === 'product' && (r as any).productId) {
@@ -150,6 +243,9 @@ export default function SearchScreen() {
             autoFocus
             autoCorrect={false}
             returnKeyType="search"
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => setSearchFocused(false)}
+            onSubmitEditing={() => rememberSearch(query)}
           />
           {query.length > 0 && (
             <TouchableOpacity
@@ -219,121 +315,167 @@ export default function SearchScreen() {
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
         {query.trim().length === 0 ? (
           <>
-            <Text style={[styles.sectionLabel, { color: muted }]}>RECENT</Text>
-            {RECENT_SEARCHES.map((term) => (
+            {searchFocused && recentSearches.length > 0 ? (
+              <Text style={[styles.sectionLabel, { color: muted }]}>RECENT</Text>
+            ) : null}
+            {searchFocused && recentSearches.map((term) => (
               <TouchableOpacity
                 key={term}
                 style={styles.row}
                 activeOpacity={0.7}
-                onPress={() => setQuery(term)}
+                onPress={() => {
+                  rememberSearch(term);
+                  setQuery(term);
+                }}
               >
                 <Feather name="clock" size={16} color={muted} />
                 <Text style={[styles.rowText, { color: fg }]}>{term}</Text>
               </TouchableOpacity>
             ))}
 
-            <Text style={[styles.sectionLabel, { color: muted, marginTop: 8 }]}>SUGGESTED BRANDS</Text>
-            {SEARCH_BRANDS.slice(0, 5).map((b) => (
-              <TouchableOpacity
-                key={b.id}
-                style={styles.row}
-                activeOpacity={0.7}
-                onPress={goToBrand}
-                accessibilityRole="button"
-                accessibilityLabel={`Open ${b.name}`}
-              >
-                <View style={[styles.avatar, { backgroundColor: b.color }]}>
-                  <Text style={styles.avatarText}>{b.initials}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.rowText, { color: fg }]}>{b.name}</Text>
-                  <Text style={[styles.rowSub, { color: muted }]}>{b.handle}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+            <Text style={[styles.sectionLabel, { color: muted, marginTop: 8 }]}>DISCOVER</Text>
+            <TouchableOpacity
+              style={styles.row}
+              activeOpacity={0.7}
+              onPress={goToBrand}
+            >
+              <Feather name="compass" size={17} color={primary} />
+              <Text style={[styles.rowText, { color: fg }]}>Browse trending brands and drops</Text>
+              <Feather name="chevron-right" size={17} color={muted} />
+            </TouchableOpacity>
           </>
-        ) : searching ? (
-          <ActivityIndicator style={{ marginTop: 40 }} color={primary} />
-        ) : results.length === 0 && people.length === 0 ? (
-          <View style={styles.emptyState}>
-            <View style={[styles.emptyIconRing, { borderColor: border }]}>
-              <Feather name="search" size={28} color={muted} />
-            </View>
-            <Text style={[styles.emptyLabel, { color: muted }]}>No results for "{query}"</Text>
-          </View>
+        ) : searchError ? (
+          <EmptyState
+            icon="wifi-off"
+            title="The thread slipped."
+            description={searchError}
+            action={{ label: 'Try search again', icon: 'refresh-cw', onPress: () => setRetryNonce((value) => value + 1) }}
+          />
         ) : (
           <>
-            {/* ── People section ─────────────────────────────────── */}
-            {people.length > 0 && (
+            {suggestions.length > 0 ? (
               <>
-                <Text style={[styles.sectionLabel, { color: muted }]}>PEOPLE</Text>
-                {people.map((p: PersonResult) => (
+                <Text style={[styles.sectionLabel, { color: muted }]}>SUGGESTIONS</Text>
+                {suggestions.map((term) => (
                   <TouchableOpacity
-                    key={p.userId}
+                    key={term}
                     style={styles.row}
                     activeOpacity={0.7}
                     onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      router.push({
-                        pathname: '/buyer-other-profile' as any,
-                        params: {
-                          userId:   p.userId,
-                          name:     p.name,
-                          handle:   p.handle,
-                          initials: p.initials,
-                          color:    p.color,
-                        },
-                      });
+                      rememberSearch(term);
+                      setQuery(term);
                     }}
                   >
-                    <View style={[styles.avatar, { backgroundColor: p.color }]}>
-                      <Text style={styles.avatarText}>{p.initials}</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.rowText, { color: fg }]}>{p.name}</Text>
-                      <Text style={[styles.rowSub, { color: muted }]}>
-                        {p.handle}{p.bio ? `  ·  ${p.bio.slice(0, 40)}` : ''}
-                      </Text>
-                    </View>
-                    {p.isFollowing && (
-                      <View style={styles.followingBadge}>
-                        <Text style={[styles.followingBadge, { borderColor: primary }, styles.followingBadgeText, { color: primary }]}>Following</Text>
-                      </View>
-                    )}
+                    <Feather name="search" size={16} color={muted} />
+                    <Text style={[styles.rowText, { color: fg }]}>{term}</Text>
+                    <Feather name="arrow-up-left" size={15} color={muted} />
                   </TouchableOpacity>
                 ))}
               </>
-            )}
-
-            {/* ── Brands & products ──────────────────────────────── */}
-            {results.length > 0 && (
+            ) : null}
+            {searching && results.length === 0 && people.length === 0 ? (
+              <BrandedLoader label="Finding something you’ll love…" style={{ minHeight: 300 }} />
+            ) : !searching && results.length === 0 && people.length === 0 ? (
+              <EmptyState
+                icon="search"
+                title="No exact match — yet."
+                description={`We couldn’t find “${query}”. Try a broader phrase or clear a filter to uncover more.`}
+                action={hasActiveFilters ? { label: 'Clear filters', icon: 'x', onPress: clearFilters } : undefined}
+              />
+            ) : (
               <>
-                <Text style={[styles.sectionLabel, { color: muted, marginTop: people.length > 0 ? 8 : 0 }]}>
-                  BRANDS & DROPS
-                </Text>
-                {results.map((r: SearchResult) => (
-                  <TouchableOpacity
-                    key={r.id}
-                    style={styles.row}
-                    activeOpacity={0.7}
-                    onPress={() => handleResultPress(r)}
-                    accessibilityRole="button"
-                    accessibilityLabel={r.kind === 'brand' ? `Open ${r.name}` : `Open ${r.name} by ${r.brand}`}
-                  >
-                    <View style={[styles.avatar, { backgroundColor: r.color }]}>
-                      <Text style={styles.avatarText}>{r.initials}</Text>
+                {/* ── People section ─────────────────────────────────── */}
+                {people.length > 0 && (
+                  <>
+                    <Text style={[styles.sectionLabel, { color: muted }]}>PEOPLE</Text>
+                    {people.map((p: PersonResult) => (
+                      <TouchableOpacity
+                        key={p.userId}
+                        style={styles.row}
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          rememberSearch(query || p.name);
+                          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                          router.push({
+                            pathname: '/buyer-other-profile' as any,
+                            params: {
+                              userId: p.userId,
+                              name: p.name,
+                              handle: p.handle,
+                              initials: p.initials,
+                              color: p.color,
+                            },
+                          });
+                        }}
+                      >
+                        <View style={[styles.avatar, { backgroundColor: p.color }]}>
+                          <Text style={styles.avatarText}>{p.initials}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.rowText, { color: fg }]}>{p.name}</Text>
+                          <Text style={[styles.rowSub, { color: muted }]}>
+                            {p.handle}{p.bio ? `  ·  ${p.bio.slice(0, 40)}` : ''}
+                          </Text>
+                        </View>
+                        {p.isFollowing && (
+                          <View style={styles.followingBadge}>
+                            <Text style={[styles.followingBadge, { borderColor: primary }, styles.followingBadgeText, { color: primary }]}>Following</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </>
+                )}
+                {brandResults.length > 0 && (
+                  <>
+                    <Text style={[styles.sectionLabel, { color: muted, marginTop: people.length > 0 ? 8 : 0 }]}>
+                      BRANDS
+                    </Text>
+                    {brandResults.map((r) => (
+                      <TouchableOpacity
+                        key={r.id}
+                        style={styles.row}
+                        activeOpacity={0.7}
+                        onPress={() => handleResultPress(r)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Open ${r.name}`}
+                      >
+                        <View style={[styles.avatar, { backgroundColor: r.color }]}>
+                          <Text style={styles.avatarText}>{r.initials}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.rowText, { color: fg }]}>{r.name}</Text>
+                          <Text style={[styles.rowSub, { color: muted }]}>{r.handle}</Text>
+                        </View>
+                      </TouchableOpacity>
+                    ))}
+                  </>
+                )}
+                {productResults.length > 0 && (
+                  <>
+                    <View style={styles.editorialHeader}>
+                      <View>
+                        <Text style={[styles.sectionLabel, { color: muted, paddingHorizontal: 0, paddingBottom: 3 }]}>DISCOVERED FOR YOU</Text>
+                        <Text style={[styles.editorialTitle, { color: fg }]}>{productResults.length} pieces worth a look</Text>
+                      </View>
+                      <Feather name="grid" size={18} color={primary} />
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.rowText, { color: fg }]}>{r.name}</Text>
-                      <Text style={[styles.rowSub, { color: muted }]}>
-                        {r.kind === 'brand' ? r.handle : `${r.brand} · ${r.price}`}
-                      </Text>
+                    <View style={styles.masonryGrid}>
+                      {productColumns.map((column, columnIndex) => (
+                        <View style={styles.masonryColumn} key={columnIndex}>
+                          {column.map(item => (
+                            <MasonryCard
+                              key={item.id}
+                              item={item}
+                              accent={primary}
+                              onPress={() => handleResultPress(item)}
+                            />
+                          ))}
+                        </View>
+                      ))}
                     </View>
-                    {r.kind === 'product' && (
-                      <Text style={[styles.priceTag, { color: primary }]}>{r.price}</Text>
-                    )}
-                  </TouchableOpacity>
-                ))}
+                  </>
+                )}
               </>
             )}
           </>
@@ -369,12 +511,21 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   avatarText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
-  emptyState: { alignItems: 'center', paddingTop: 80, gap: 14 },
-  emptyIconRing: {
-    width: 72, height: 72, borderRadius: 36, borderWidth: 1.5,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  emptyLabel: { fontSize: 13.5, fontFamily: 'Inter_400Regular' },
+  editorialHeader: { marginTop: 18, paddingHorizontal: 16, paddingBottom: 14, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  editorialTitle: { fontSize: 21, fontFamily: 'Inter_700Bold', letterSpacing: -0.45 },
+  masonryGrid: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingHorizontal: 12 },
+  masonryColumn: { flex: 1, gap: 18 },
+  masonryCard: { flex: 1 },
+  masonryMedia: { width: '100%', minHeight: 145, maxHeight: 280, borderRadius: 18, overflow: 'hidden', justifyContent: 'flex-end' },
+  masonryFallback: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.14)' },
+  masonryInitials: { color: '#FFFFFF', fontSize: 36, fontFamily: 'Inter_700Bold', opacity: 0.9 },
+  masonryFallbackLine: { width: 42, height: 2, borderRadius: 1, backgroundColor: 'rgba(255,255,255,0.54)', marginTop: 10 },
+  masonryPrice: { alignSelf: 'flex-start', backgroundColor: 'rgba(4,4,7,0.78)', borderRadius: 12, paddingHorizontal: 9, paddingVertical: 6, margin: 9 },
+  masonryPriceText: { color: '#FFFFFF', fontSize: 12, fontFamily: 'Inter_700Bold' },
+  masonryName: { color: FG, fontSize: 14, lineHeight: 18, fontFamily: 'Inter_700Bold', marginTop: 8 },
+  masonryBrandRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 5 },
+  masonryBrandDot: { width: 15, height: 15, borderRadius: 8 },
+  masonryBrand: { color: MUTED, fontSize: 11, fontFamily: 'Inter_500Medium', flex: 1 },
   followingBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1 },
   followingBadgeText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   filterPanel: { padding: 16, borderBottomWidth: 1 },

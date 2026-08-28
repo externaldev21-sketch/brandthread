@@ -5,6 +5,11 @@
  */
 import { useAuth } from '@clerk/expo';
 import { useMemo } from 'react';
+import {
+  ApiError,
+  dismissNetworkNotice,
+  reportNetworkError,
+} from '@/lib/networkNotice';
 
 const BASE =
   process.env.EXPO_PUBLIC_API_BASE_URL ??
@@ -149,11 +154,26 @@ async function request<T = any>(
           : (options.headers as Record<string, string>)
       : {}),
   };
-  const res = await fetch(`${BASE}${path}`, { ...options, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, { ...options, headers });
+  } catch (error) {
+    const retry = options.method === 'GET'
+      ? () => request<T>(path, options, getToken, asText)
+      : undefined;
+    reportNetworkError(error, retry);
+    throw error;
+  }
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`API ${res.status}: ${body}`);
+    const error = new ApiError(res.status, body);
+    const retry = options.method === 'GET'
+      ? () => request<T>(path, options, getToken, asText)
+      : undefined;
+    reportNetworkError(error, retry);
+    throw error;
   }
+  dismissNetworkNotice();
   if (asText) return res.text() as Promise<T>;
   return res.json() as Promise<T>;
 }
@@ -170,18 +190,27 @@ async function uploadImage<T = any>(
   const imageBlob = await source.blob();
   const contentType = image.mimeType || imageBlob.type || "image/jpeg";
   const token = await getToken();
-  const res = await fetch(`${BASE}${path}`, {
-    method: "POST",
-    headers: {
-      "Content-Type": contentType,
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(_storeContext === "own" ? { "X-Store-Context": "own" } : {}),
-    },
-    body: imageBlob,
-  });
-  if (!res.ok) {
-    throw new Error(`API ${res.status}: ${await res.text()}`);
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": contentType,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(_storeContext === "own" ? { "X-Store-Context": "own" } : {}),
+      },
+      body: imageBlob,
+    });
+  } catch (error) {
+    reportNetworkError(error);
+    throw error;
   }
+  if (!res.ok) {
+    const error = new ApiError(res.status, await res.text());
+    reportNetworkError(error);
+    throw error;
+  }
+  dismissNetworkNotice();
   return res.json() as Promise<T>;
 }
 
@@ -419,11 +448,26 @@ export function createApi(getToken: GetToken) {
           getToken,
         ),
     },
+    notificationPrefs: {
+      get: () =>
+        get<{
+          digest: 'realtime' | 'daily';
+          role: 'buyer' | 'seller';
+          categories: Record<string, boolean>;
+        }>('/api/notification-prefs'),
+      update: (body: { digest?: 'realtime' | 'daily'; categories?: Record<string, boolean> }) =>
+        put<{
+          digest: 'realtime' | 'daily';
+          role: 'buyer' | 'seller';
+          categories: Record<string, boolean>;
+        }>('/api/notification-prefs', body),
+    },
     logo: {
       generate: (brandName: string, style: string) => post<any>('/api/logo/generate', { brandName, style }),
     },
     mockup: {
-      generate: (prompt: string) => post<any>('/api/mockup/generate', { prompt }),
+      generate: (prompt: string, referenceImage?: string) =>
+        post<any>('/api/mockup/generate', { prompt, ...(referenceImage ? { referenceImage } : {}) }),
     },
     photography: {
       generate: (images: string[], prompt: string) => post<any>('/api/photography/generate', { images, prompt }),
@@ -449,6 +493,9 @@ export function createApi(getToken: GetToken) {
         createdAt: string;
         id: string;
       }>('/api/bg-removal/remove', { image }),
+      replace: (body: {
+        image: string; backgroundImage?: string; prompt?: string; color?: string; bgType?: string;
+      }) => post<{ b64_json: string }>('/api/bg-removal/replace', body),
     },
     lifestyle: {
       generate: (referenceImages: string[], productImages: string[], prompt: string) =>
@@ -818,9 +865,9 @@ export function createApi(getToken: GetToken) {
       /** Push notification frequency preference (realtime vs daily digest) */
       notificationPrefs: {
         get: () =>
-          get<{ digest: 'realtime' | 'daily' }>('/api/seller/notification-prefs'),
-        update: (body: { digest: 'realtime' | 'daily' }) =>
-          put<{ digest: 'realtime' | 'daily' }>('/api/seller/notification-prefs', body),
+          get<{ digest: 'realtime' | 'daily'; role: 'buyer' | 'seller'; categories: Record<string, boolean> }>('/api/seller/notification-prefs'),
+        update: (body: { digest?: 'realtime' | 'daily'; categories?: Record<string, boolean> }) =>
+          put<{ digest: 'realtime' | 'daily'; role: 'buyer' | 'seller'; categories: Record<string, boolean> }>('/api/seller/notification-prefs', body),
       },
       vacation: {
         get: () =>
@@ -903,6 +950,10 @@ export function createApi(getToken: GetToken) {
           isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean;
           iBlockedThem: boolean;
         }>(`/api/social/profile/${encodeURIComponent(userId)}`),
+      profilePosts: (userId: string, limit = 30, offset = 0) =>
+        get<any[]>(`/api/social/profile/${encodeURIComponent(userId)}/posts?limit=${limit}&offset=${offset}`),
+      friendActivity: (limit = 30, offset = 0) =>
+        get<any[]>(`/api/social/friends/activity?limit=${limit}&offset=${offset}`),
       /** List buyers I follow */
       following: () =>
         get<Array<{
@@ -990,6 +1041,12 @@ export function createApi(getToken: GetToken) {
     publicDrops: {
       list: () => get<any[]>('/api/public/drops'),
       get:  (id: string) => get<any>(`/api/public/drops/${encodeURIComponent(id)}`),
+      notificationStatus: (id: string) =>
+        get<{ subscribed: boolean }>(`/api/public/drops/${encodeURIComponent(id)}/notify`),
+      subscribe: (id: string) =>
+        post<{ subscribed: boolean }>(`/api/public/drops/${encodeURIComponent(id)}/notify`, {}),
+      unsubscribe: (id: string) =>
+        del<{ subscribed: boolean }>(`/api/public/drops/${encodeURIComponent(id)}/notify`),
     },
     /** Discount codes — seller-managed promo codes */
     discountCodes: {
@@ -1004,7 +1061,20 @@ export function createApi(getToken: GetToken) {
     },
     /** Returns — buyer-initiated return requests */
     returns: {
-      create: (data: { orderId: string; reason: string; notes?: string; resolutionRequested?: string }) =>
+      create: (data: {
+        orderId: string;
+        reason: string;
+        notes?: string;
+        resolutionRequested?: string;
+        evidenceUrls?: string[];
+        requestedItems?: Array<{
+          lineItemId?: string;
+          productName?: string;
+          variantTitle?: string;
+          quantity?: number;
+          unitPriceCents?: number;
+        }>;
+      }) =>
         post<any>('/api/returns', data),
       listBuyer:    () => get<any[]>('/api/returns/buyer'),
       listSeller:   () => get<any[]>('/api/returns'),
@@ -1207,9 +1277,17 @@ export function createApi(getToken: GetToken) {
     },
     /** Paid promotion boosts — boost a post or product for increased reach. */
     boosts: {
+      targets: () =>
+        get<Array<{
+          id: string; mediaUrl: string | null; mediaType: string | null;
+          caption: string | null; createdAt: string;
+        }>>('/api/boosts/targets'),
       list:    (targetId?: string) =>
         get<any[]>(`/api/boosts${targetId ? `?targetId=${encodeURIComponent(targetId)}` : ''}`),
-      create:  (body: { targetType: string; targetId: string; budgetCents: number; durationDays: number }) =>
+      create:  (body: {
+        targetType: string; targetId: string; objective: 'views' | 'likes' | 'followers' | 'profile_visits';
+        budgetCents: number; durationDays: number;
+      }) =>
         post<any>('/api/boosts', body),
       update:  (id: string, body: { status: 'paused' | 'cancelled' }) =>
         patch<any>(`/api/boosts/${encodeURIComponent(id)}`, body),

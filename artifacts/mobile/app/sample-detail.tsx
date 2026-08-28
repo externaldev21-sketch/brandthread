@@ -14,6 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import { formatCents } from '@/lib/money';
 import { File as FSFile } from 'expo-file-system';
 
 import {
@@ -425,7 +426,7 @@ export default function SampleDetailScreen() {
             </View>
             <View style={s.infoRow}>
               <Text style={s.infoLabel}>Cost</Text>
-              <Text style={s.infoValue}>${sample.cost.toFixed(2)}</Text>
+              <Text style={s.infoValue}>{formatCents(sample.costCents)}</Text>
             </View>
             <View style={s.infoRow}>
               <Text style={s.infoLabel}>Payment</Text>

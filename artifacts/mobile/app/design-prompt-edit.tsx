@@ -3,7 +3,7 @@
  * Route: /design-prompt-edit
  */
 import React, { useState } from 'react';
-import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Switch, Alert, ActivityIndicator, Image,
@@ -16,9 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE, BORDER_SUBTLE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM,
-  GRAD_PRIMARY, GRAD_CARD_GLOW,
+  FG, MUTED, SUBTLE,
   FONT, FS, SP, RADIUS, ICON, OVERLAY,
 } from '@/lib/theme';
 import {
@@ -47,7 +45,9 @@ const RECENT_PROJECTS = [
 const CARD_ELEVATED_HEX = '#18182E';
 
 export default function DesignPromptEditScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const s = createStyles(theme);
   const router = useRouter();
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [prompt, setPrompt] = useState('');
@@ -83,6 +83,10 @@ export default function DesignPromptEditScreen() {
   }
 
   async function handleGenerate() {
+    if (!imageUri || imageUri.startsWith('mock://')) {
+      Alert.alert('Choose a source image', 'Upload the real image you want to edit.');
+      return;
+    }
     if (!prompt.trim()) {
       Alert.alert('Add a prompt', 'Describe the edit you want to make.');
       return;
@@ -118,7 +122,7 @@ export default function DesignPromptEditScreen() {
           {imageUri && !imageUri.startsWith('mock://') ? (
             <Image source={{ uri: imageUri }} style={s.preview} resizeMode="cover" />
           ) : imageUri ? (
-            <LinearGradient colors={GRAD_CARD_GLOW} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.mockPreview}>
+            <LinearGradient colors={theme.glowGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.mockPreview}>
               <Feather name="image" size={ICON.xl} color={PURPLE_LIGHT} />
               <Text style={s.mockLabel}>Project image loaded</Text>
             </LinearGradient>
@@ -173,7 +177,7 @@ export default function DesignPromptEditScreen() {
 
         {/* Generate Button */}
         <View style={s.ph}>
-          <GradientCard colors={GRAD_PRIMARY} onPress={handleGenerate} glow style={s.generateBtn}>
+          <GradientCard colors={theme.primaryGradient} onPress={handleGenerate} glow style={[s.generateBtn, { shadowColor: theme.shadowColor }]}>
             <View style={s.generateInner}>
               <Feather name="zap" size={ICON.md} color="#FFF" />
               <Text style={s.generateText}>Generate edit</Text>
@@ -187,11 +191,11 @@ export default function DesignPromptEditScreen() {
             <SectionHeader title="Result" style={s.sectionHdr} />
             {showComparison ? (
               <View style={s.comparison}>
-                <ComparisonPanel label="Before" accent={MUTED} />
-                <ComparisonPanel label="After" accent={CYAN} />
+                <ComparisonPanel label="Before" accent={MUTED} uri={imageUri ?? undefined} />
+                <ComparisonPanel label="After" accent={CYAN} uri={result.imageUris[0]} />
               </View>
             ) : (
-              <ResultPlaceholder label="Edited image" />
+              <Image source={{ uri: result.imageUris[0] }} style={s.resultPlaceholder} resizeMode="cover" />
             )}
             <SecondaryButton
               label={showComparison ? 'Single view' : 'Compare Before/After'}
@@ -214,7 +218,7 @@ export default function DesignPromptEditScreen() {
       {isGenerating && (
         <View style={s.overlay}>
           <BrandthreadCard style={s.overlayCard}>
-            <LinearGradient colors={GRAD_CARD_GLOW} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.overlayGrad}>
+            <LinearGradient colors={theme.glowGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.overlayGrad}>
               <ActivityIndicator size="large" color={PURPLE} />
               <Text style={s.overlayTitle}>Generating edit…</Text>
               <Text style={s.overlaySub}>AI is applying your prompt</Text>
@@ -230,6 +234,9 @@ function ToggleRow({ label, description, value, onChange, cardElevatedHex }: {
   label: string; description: string; value: boolean;
   onChange: (v: boolean) => void; cardElevatedHex: string;
 }) {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE } = theme;
+  const s = createStyles(theme);
   return (
     <View style={s.toggleRow}>
       <View style={s.toggleInfo}>
@@ -241,25 +248,23 @@ function ToggleRow({ label, description, value, onChange, cardElevatedHex }: {
   );
 }
 
-function ComparisonPanel({ label, accent }: { label: string; accent: string }) {
+function ComparisonPanel({ label, accent, uri }: { label: string; accent: string; uri?: string }) {
+  const s = createStyles(useAppTheme().theme);
   return (
-    <LinearGradient colors={['rgba(139,92,246,0.15)', 'rgba(34,211,238,0.08)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.compPanel}>
-      <Feather name="image" size={ICON.lg} color={accent} />
+    <View style={s.compPanel}>
+      {uri ? (
+        <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      ) : (
+        <Feather name="image" size={ICON.lg} color={accent} />
+      )}
       <Text style={[s.compLabel, { color: accent }]}>{label}</Text>
-    </LinearGradient>
+    </View>
   );
 }
 
-function ResultPlaceholder({ label }: { label: string }) {
-  return (
-    <LinearGradient colors={['rgba(139,92,246,0.18)', 'rgba(34,211,238,0.10)']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.resultPlaceholder}>
-      <Feather name="image" size={ICON.xxl} color={PURPLE_LIGHT} />
-      <Text style={s.resultPlaceholderLabel}>{label}</Text>
-    </LinearGradient>
-  );
-}
-
-const s = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
+  return StyleSheet.create({
   scroll:                 { paddingBottom: 40 },
   ph:                     { paddingHorizontal: SP.md },
   sectionHdr:             { marginTop: SP.lg, marginBottom: SP.sm },
@@ -303,4 +308,5 @@ const s = StyleSheet.create({
   overlayTitle:           { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
   overlaySub:             { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
   bottomPad:              { height: 40 },
-});
+  });
+};

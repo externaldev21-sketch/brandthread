@@ -3,7 +3,7 @@
  * Route: /design-garment?projectId=<id>&garmentType=tshirt&garmentColor=#FFFFFF
  */
 import React, { useState, useEffect } from 'react';
-import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert,
 } from 'react-native';
@@ -15,8 +15,6 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM,
   SUCCESS, SUCCESS_DIM,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
@@ -68,7 +66,9 @@ const ZONE_RECTS: Record<string, { x: number; y: number; w: number; h: number }>
 };
 
 export default function DesignGarmentScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const gs = createStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ projectId?: string; garmentType?: string; garmentColor?: string }>();
@@ -282,7 +282,9 @@ export default function DesignGarmentScreen() {
   );
 }
 
-const gs = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  return StyleSheet.create({
   root:         { flex: 1, backgroundColor: BG },
   topBar:       { flexDirection: 'row', alignItems: 'center', backgroundColor: SURFACE, borderBottomWidth: 1, borderBottomColor: BORDER, paddingHorizontal: SP.md, paddingBottom: SP.sm, gap: SP.sm },
   backBtn:      { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
@@ -302,9 +304,9 @@ const gs = StyleSheet.create({
   garmentLabel: { fontSize: FS.xxl, fontFamily: FONT.bold, letterSpacing: -0.5 },
   garmentViewLabel: { fontSize: FS.sm, fontFamily: FONT.medium, marginTop: 4 },
 
-  zoneOverlay:  { position: 'absolute', borderRadius: RADIUS.xs, borderWidth: 2, borderColor: PURPLE, backgroundColor: 'rgba(139,92,246,0.25)' },
+  zoneOverlay:  { position: 'absolute', borderRadius: RADIUS.xs, borderWidth: 2, borderColor: PURPLE, backgroundColor: PURPLE_DIM },
   safeAreaOverlay: { position: 'absolute', left: '8%', top: '8%', width: '84%', height: '84%', borderRadius: RADIUS.sm, borderWidth: 1.5, borderColor: SUCCESS, backgroundColor: 'rgba(16,185,129,0.12)', borderStyle: 'dashed' },
-  embroideryOverlay: { position: 'absolute', left: '25%', top: '15%', width: '50%', height: '40%', borderRadius: RADIUS.sm, borderWidth: 1.5, borderColor: CYAN, backgroundColor: 'rgba(34,211,238,0.10)', borderStyle: 'dashed' },
+  embroideryOverlay: { position: 'absolute', left: '25%', top: '15%', width: '50%', height: '40%', borderRadius: RADIUS.sm, borderWidth: 1.5, borderColor: CYAN, backgroundColor: CYAN_DIM, borderStyle: 'dashed' },
 
   viewTabs:     { flexDirection: 'row', backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
   viewTab:      { flex: 1, paddingVertical: SP.sm, alignItems: 'center', justifyContent: 'center' },
@@ -329,4 +331,5 @@ const gs = StyleSheet.create({
   savePlacementText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
   openEditorLargeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, backgroundColor: PURPLE_DIM, borderRadius: RADIUS.md, paddingVertical: SP.md, borderWidth: 1, borderColor: BORDER_ACTIVE },
   openEditorLargeText: { fontSize: FS.base, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
-});
+  });
+};

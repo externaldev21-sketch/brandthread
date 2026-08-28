@@ -9,6 +9,7 @@ import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
+import { formatCents } from '@/lib/money';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -20,8 +21,7 @@ interface Drop {
   name: string;
   type: DropType;
   totalOrders: number;
-  totalCollected: string;
-  totalRaw: number;
+  totalCollectedCents: number;
   payoutDate: string;
   status: DropStatus;
   releaseDate?: string;
@@ -30,10 +30,6 @@ interface Drop {
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function fmtCents(cents: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
 }
 
 function dropStatusFromApiStatus(status: string): DropStatus {
@@ -51,8 +47,7 @@ const DROPS_FALLBACK: Drop[] = [
     name: 'Summer Collection Vol. 3',
     type: 'pre-order',
     totalOrders: 142,
-    totalCollected: '$18,440',
-    totalRaw: 18440,
+    totalCollectedCents: 1844000,
     releaseDate: 'Aug 15, 2026',
     payoutDate: 'Aug 18, 2026',
     status: 'held',
@@ -63,8 +58,7 @@ const DROPS_FALLBACK: Drop[] = [
     name: 'Essential Basics – Restock',
     type: 'pre-made',
     totalOrders: 89,
-    totalCollected: '$7,210',
-    totalRaw: 7210,
+    totalCollectedCents: 721000,
     payoutDate: 'Jul 9, 2026',
     status: 'processing',
   },
@@ -73,8 +67,7 @@ const DROPS_FALLBACK: Drop[] = [
     name: 'Heritage Hoodie Drop',
     type: 'pre-order',
     totalOrders: 210,
-    totalCollected: '$31,500',
-    totalRaw: 31500,
+    totalCollectedCents: 3150000,
     releaseDate: 'Jul 20, 2026',
     payoutDate: 'Jul 23, 2026',
     status: 'held',
@@ -85,8 +78,7 @@ const DROPS_FALLBACK: Drop[] = [
     name: 'Spring Capsule',
     type: 'pre-made',
     totalOrders: 156,
-    totalCollected: '$12,480',
-    totalRaw: 12480,
+    totalCollectedCents: 1248000,
     payoutDate: 'Jun 30, 2026',
     status: 'paid',
   },
@@ -95,8 +87,7 @@ const DROPS_FALLBACK: Drop[] = [
     name: 'Limited Collab – Artist Series',
     type: 'pre-order',
     totalOrders: 320,
-    totalCollected: '$44,800',
-    totalRaw: 44800,
+    totalCollectedCents: 4480000,
     releaseDate: 'Sep 1, 2026',
     payoutDate: 'Sep 4, 2026',
     status: 'held',
@@ -127,13 +118,13 @@ interface DropCardProps {
 }
 
 function DropCard({ drop, colors, isDark, isLast, broadcastState, onBroadcast }: DropCardProps) {
-  const primary = '#8B5CF6';
+  const primary = colors.primary;
   const isPreOrder = drop.type === 'pre-order';
   const s = statusConfig[drop.status];
 
-  const typeColor   = isPreOrder ? (isDark ? '#E2DDD0' : '#8B5CF6') : '#10B981';
-  const typeBg      = isPreOrder ? (isDark ? 'rgba(139,92,246,0.09)' : '#E8E1CF') : 'rgba(16,185,129,0.09)';
-  const typeBorder  = isPreOrder ? (isDark ? 'rgba(139,92,246,0.20)' : '#DBD3C0') : 'rgba(16,185,129,0.20)';
+  const typeColor   = isPreOrder ? colors.primary : '#10B981';
+  const typeBg      = isPreOrder ? colors.accent : 'rgba(16,185,129,0.09)';
+  const typeBorder  = isPreOrder ? colors.primary : 'rgba(16,185,129,0.20)';
   const progressBg  = isDark ? '#33302A' : '#E8E1CF';
 
   return (
@@ -164,7 +155,7 @@ function DropCard({ drop, colors, isDark, isLast, broadcastState, onBroadcast }:
       {/* Key numbers */}
       <View style={styles.dropStats}>
         <View style={styles.dropStat}>
-          <Text style={[styles.dropStatVal, { color: colors.foreground }]}>{drop.totalCollected}</Text>
+          <Text style={[styles.dropStatVal, { color: colors.foreground }]}>{formatCents(drop.totalCollectedCents)}</Text>
           <Text style={[styles.dropStatLabel, { color: colors.mutedForeground }]}>Collected</Text>
         </View>
         <View style={[styles.dropDivider, { backgroundColor: colors.border }]} />
@@ -227,7 +218,7 @@ function DropCard({ drop, colors, isDark, isLast, broadcastState, onBroadcast }:
               styles.broadcastBtn,
               broadcastState === 'sent' || broadcastState === 'already_sent'
                 ? { backgroundColor: 'rgba(16,185,129,0.12)', borderColor: 'rgba(16,185,129,0.30)' }
-                : { backgroundColor: 'rgba(139,92,246,0.10)', borderColor: 'rgba(139,92,246,0.28)' },
+                : { backgroundColor: colors.accent, borderColor: colors.primary },
               broadcastState === 'loading' && { opacity: 0.6 },
             ]}
             activeOpacity={broadcastState === 'idle' ? 0.75 : 1}
@@ -355,15 +346,14 @@ export default function PaymentsScreen() {
     setLoading(true);
     try {
       // Load drops from the drops API and map to our Drop shape
-      const raw: any[] = await api.drops.list();
+      const raw = (await api.drops.list()) as any[];
       if (raw.length > 0) {
         const mapped: Drop[] = raw.map((d: any) => ({
           id:             d.id,
           name:           d.name ?? d.title ?? 'Drop',
           type:           d.releaseAt ? 'pre-order' : 'pre-made',
           totalOrders:    d.orderCount ?? 0,
-          totalCollected: fmtCents((d.totalCents ?? 0)),
-          totalRaw:       (d.totalCents ?? 0) / 100,
+           totalCollectedCents: d.totalCents ?? 0,
           payoutDate:     d.releaseAt ? fmtDate(d.releaseAt) : '—',
           status:         dropStatusFromApiStatus(d.status ?? 'active'),
           releaseDate:    d.releaseAt ? fmtDate(d.releaseAt) : undefined,
@@ -379,7 +369,7 @@ export default function PaymentsScreen() {
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
 
   const isDark = colors.background === '#121110' || colors.background.startsWith('#0');
-  const primary = '#8B5CF6';
+  const primary = colors.primary;
 
   const preOrderDrops = drops.filter((d) => d.type === 'pre-order');
   const preMadeDrops  = drops.filter((d) => d.type === 'pre-made');
@@ -400,10 +390,10 @@ export default function PaymentsScreen() {
 
         {/* ── Next payout banner ── */}
         {nextPayout && (
-          <View style={[styles.banner, { backgroundColor: isDark ? 'rgba(139,92,246,0.13)' : '#E8F0FE', borderColor: isDark ? 'rgba(139,92,246,0.26)' : '#C7DBFB' }]}>
-            <Feather name="info" size={14} color={isDark ? '#E2DDD0' : '#1A56C4'} />
-            <Text style={[styles.bannerText, { color: isDark ? '#E2DDD0' : '#1A3E7A' }]}>
-              Next payout on {nextPayout.payoutDate} · ${nextPayout.totalRaw.toLocaleString()} from {nextPayout.name}
+          <View style={[styles.banner, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
+            <Feather name="info" size={14} color={colors.primary} />
+            <Text style={[styles.bannerText, { color: colors.foreground }]}>
+               Next payout on {nextPayout.payoutDate} · {formatCents(nextPayout.totalCollectedCents)} from {nextPayout.name}
             </Text>
           </View>
         )}
@@ -501,13 +491,13 @@ export default function PaymentsScreen() {
 
         {/* ── Pre Order Drops ── */}
         <View style={styles.sectionHeader}>
-          <View style={[styles.sectionDot, { backgroundColor: isDark ? '#E2DDD0' : '#8B5CF6' }]} />
+          <View style={[styles.sectionDot, { backgroundColor: colors.primary }]} />
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Pre Order Drops</Text>
           <Text style={[styles.sectionCount, { color: colors.mutedForeground }]}>{preOrderDrops.length}</Text>
         </View>
-        <View style={[styles.preOrderNote, { backgroundColor: isDark ? 'rgba(139,92,246,0.09)' : '#E8E1CF', borderColor: isDark ? 'rgba(139,92,246,0.20)' : '#DBD3C0' }]}>
-          <Feather name="clock" size={13} color={isDark ? '#E2DDD0' : primary} />
-          <Text style={[styles.preOrderNoteText, { color: isDark ? '#E2DDD0' : primary }]}>
+        <View style={[styles.preOrderNote, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
+          <Feather name="clock" size={13} color={primary} />
+          <Text style={[styles.preOrderNoteText, { color: primary }]}>
             Funds collected upfront and held until each drop ships
           </Text>
         </View>

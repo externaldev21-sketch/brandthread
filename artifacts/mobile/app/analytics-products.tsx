@@ -14,19 +14,14 @@ import {
   FONT, FS,
 } from '@/lib/theme';
 import { getProductAnalytics, getFilterState } from '@/services/analyticsService';
+import { formatCents } from '@/lib/money';
 import { ProductAnalytics, ProductAnalyticsRow, AnalyticsFilterState } from '@/services/analyticsTypes';
 
-type SortKey = 'topByRevenue' | 'topByUnits' | 'topByProfit' | 'mostViewed' | 'highestConversion' | 'lowestConversion' | 'mostReturned' | 'lowPerforming';
+type SortKey = 'topByRevenue' | 'topByUnits';
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: 'topByRevenue',      label: 'Revenue'      },
   { key: 'topByUnits',        label: 'Units'        },
-  { key: 'topByProfit',       label: 'Profit'       },
-  { key: 'mostViewed',        label: 'Most Viewed'  },
-  { key: 'highestConversion', label: 'Conversion ↑' },
-  { key: 'lowestConversion',  label: 'Conversion ↓' },
-  { key: 'mostReturned',      label: 'Returns'      },
-  { key: 'lowPerforming',     label: 'Low Perf.'    },
 ];
 
 function statusColor(status: ProductAnalyticsRow['inventoryStatus']): string {
@@ -47,6 +42,8 @@ function statusLabel(status: ProductAnalyticsRow['inventoryStatus']): string {
 }
 
 function ProductRow({ p, rank }: { p: ProductAnalyticsRow; rank: number }) {
+  const colors = useColors();
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   return (
     <TouchableOpacity
@@ -56,23 +53,23 @@ function ProductRow({ p, rank }: { p: ProductAnalyticsRow; rank: number }) {
     >
       <View style={s.rankBadge}><Text style={s.rankText}>{rank}</Text></View>
       <View style={s.prodThumb}>
-        <Feather name="package" size={18} color={PURPLE} />
+        <Feather name="package" size={18} color={colors.primary} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={s.prodName} numberOfLines={1}>{p.name}</Text>
         <View style={s.prodMeta}>
-          <Text style={s.prodStat}>${p.revenue.toLocaleString()}</Text>
+          <Text style={s.prodStat}>{formatCents(p.revenueCents)}</Text>
           <Text style={s.dotSep}>·</Text>
           <Text style={s.prodStat}>{p.unitsSold} units</Text>
           <Text style={s.dotSep}>·</Text>
-          <Text style={s.prodStat}>{p.conversionRate.toFixed(1)}% conv.</Text>
+          {typeof p.conversionRate === 'number' && <><Text style={s.dotSep}>·</Text><Text style={s.prodStat}>{p.conversionRate.toFixed(1)}% conv.</Text></>}
         </View>
       </View>
       <View style={{ alignItems: 'flex-end', gap: 4 }}>
         <View style={[s.statusDot, { backgroundColor: statusColor(p.inventoryStatus) + '22', borderColor: statusColor(p.inventoryStatus) }]}>
           <Text style={[s.statusText, { color: statusColor(p.inventoryStatus) }]}>{statusLabel(p.inventoryStatus)}</Text>
         </View>
-        {p.refundRate > 3 && (
+        {typeof p.refundRate === 'number' && p.refundRate > 3 && (
           <View style={s.refundWarn}>
             <Feather name="alert-triangle" size={10} color={RED} />
             <Text style={s.refundWarnText}>{p.refundRate.toFixed(1)}% refunds</Text>
@@ -84,7 +81,9 @@ function ProductRow({ p, rank }: { p: ProductAnalyticsRow; rank: number }) {
 }
 
 export default function AnalyticsProductsScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const colors = useColors();
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = colors;
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -94,14 +93,17 @@ export default function AnalyticsProductsScreen() {
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [sortKey,    setSortKey]    = useState<SortKey>('topByRevenue');
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
-    const f = filter ?? await getFilterState();
-    if (!filter) setFilter(f);
-    const d = await getProductAnalytics(f);
-    setData(d);
-    setLoading(false); setRefreshing(false);
+    try {
+      const f = filter ?? await getFilterState();
+      if (!filter) setFilter(f);
+      setData(await getProductAnalytics(f)); setError(null);
+    } catch (err) {
+      setData(null); setError(err instanceof Error ? err.message : 'Product analytics are unavailable.');
+    } finally { setLoading(false); setRefreshing(false); }
   }, [filter]);
 
   useEffect(() => { load(); }, []); // eslint-disable-line
@@ -111,6 +113,7 @@ export default function AnalyticsProductsScreen() {
   if (loading) {
     return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><ActivityIndicator size="large" color={PURPLE} /></View>;
   }
+  if (error) return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><Text style={{ color: MUTED }}>{error}</Text><TouchableOpacity onPress={() => load()}><Text style={{ color: PURPLE }}>Retry</Text></TouchableOpacity></View>;
 
   return (
     <ScrollView
@@ -125,7 +128,7 @@ export default function AnalyticsProductsScreen() {
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={s.pageTitle}>Product Analytics</Text>
-          <Text style={s.subtitle}>{filter?.dateRange.label ?? '30 days'}</Text>
+          <Text style={s.subtitle}>All time</Text>
         </View>
       </View>
 
@@ -146,7 +149,7 @@ export default function AnalyticsProductsScreen() {
       <View style={s.summaryRow}>
         {[
           { label: 'Products', value: rows.length },
-          { label: 'Total Revenue', value: `$${rows.reduce((a,b) => a + b.revenue, 0).toLocaleString()}` },
+          { label: 'Total Revenue', value: formatCents(rows.reduce((a,b) => a + b.revenueCents, 0)) },
           { label: 'Total Units', value: rows.reduce((a,b) => a + b.unitsSold, 0).toLocaleString() },
         ].map((item, i) => (
           <View key={i} style={s.summaryCard}>
@@ -179,7 +182,9 @@ export default function AnalyticsProductsScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => {
+  const { primary: PURPLE, accent: PURPLE_DIM } = colors;
+  return StyleSheet.create({
   scroll:   { flex: 1, backgroundColor: BG },
   content:  { paddingHorizontal: 16 },
   loadWrap: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
@@ -213,4 +218,5 @@ const s = StyleSheet.create({
   emptyState:{ alignItems: 'center', paddingVertical: 48, gap: 12 },
   emptyTitle:{ fontSize: 16, fontFamily: FONT.semibold, color: FG },
   emptyBody:{ fontSize: 13, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', paddingHorizontal: 24 },
-});
+  });
+};

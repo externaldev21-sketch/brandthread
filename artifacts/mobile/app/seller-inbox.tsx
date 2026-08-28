@@ -4,20 +4,15 @@
  */
 
 import React, { useState, useCallback, useRef } from 'react';
-import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet,
-  RefreshControl, ActivityIndicator, ListRenderItemInfo,
-} from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, ListRenderItemInfo } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
-import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM,
-  ON_DARK, FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
+import { BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
+import { reportNetworkError } from '@/lib/networkNotice';
 
 interface Participant {
   userId: string; name: string; handle: string;
@@ -60,6 +55,7 @@ export default function SellerInboxScreen() {
   const [convs, setConvs] = useState<ConvView[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async (silent = false) => {
@@ -70,8 +66,10 @@ export default function SellerInboxScreen() {
         (c) => c.type !== 'buyer_to_buyer',
       );
       setConvs(relevant);
+      setLoadError(false);
     } catch (e) {
-      if (!silent) console.error('Failed to load seller inbox', e);
+      setLoadError(true);
+      reportNetworkError(e, () => load());
     } finally {
       setIsLoading(false);
     }
@@ -163,6 +161,16 @@ export default function SellerInboxScreen() {
         <View style={s.centerFill}>
           <ActivityIndicator color={PURPLE} />
         </View>
+      ) : loadError && convs.length === 0 ? (
+        <View style={s.centerFill}>
+          <Feather name="wifi-off" size={40} color={MUTED} />
+          <Text style={s.emptyTitle}>Messages couldn't load</Text>
+          <Text style={s.emptyBody}>Check your connection and try again.</Text>
+          <TouchableOpacity style={s.retryButton} onPress={() => load()} activeOpacity={0.8}>
+            <Feather name="refresh-cw" size={15} color={PURPLE} />
+            <Text style={s.retryText}>Try again</Text>
+          </TouchableOpacity>
+        </View>
       ) : convs.length === 0 ? (
         <View style={s.centerFill}>
           <Feather name="message-circle" size={40} color={SUBTLE} />
@@ -211,6 +219,8 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
     fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED,
     textAlign: 'center', marginTop: SP.xs,
   },
+   retryButton: { flexDirection: 'row', alignItems: 'center', gap: SP.xs, marginTop: SP.md, paddingHorizontal: SP.md, paddingVertical: SP.sm, borderWidth: 1, borderColor: PURPLE, borderRadius: RADIUS.sm },
+   retryText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE },
 
   // Row — flat Instagram-style, no card chrome
   row: {

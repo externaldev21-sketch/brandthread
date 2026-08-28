@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp, json, boolean } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, timestamp, json, boolean, index } from 'drizzle-orm/pg-core';
 
 // ─── Freelancer Marketplace (Community tab) ──────────────────────────────────
 // Escrow payment model: the hirer pays the full agreed price via Stripe
@@ -49,7 +49,9 @@ export const freelancerJobs = pgTable('freelancer_jobs', {
   completedAt:             timestamp('completed_at'),
   createdAt:               timestamp('created_at').defaultNow().notNull(),
   updatedAt:               timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  freelancerIdx: index('freelancer_jobs_freelancer_idx').on(table.freelancerId),
+}));
 
 // Reviews — schema only for now (no UI in this iteration).
 export const freelancerReviews = pgTable('freelancer_reviews', {
@@ -61,4 +63,6 @@ export const freelancerReviews = pgTable('freelancer_reviews', {
   comment:        text('comment').notNull().default(''),
   createdAt:      timestamp('created_at').defaultNow().notNull(),
   updatedAt:      timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  freelancerIdx: index('freelancer_reviews_freelancer_idx').on(table.freelancerId),
+}));

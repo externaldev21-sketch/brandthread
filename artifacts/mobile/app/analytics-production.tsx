@@ -17,19 +17,23 @@ import { getProductionAnalytics, getFilterState } from '@/services/analyticsServ
 import { ProductionAnalytics, ManufacturerAnalyticsRow, AnalyticsMetric, AnalyticsFilterState } from '@/services/analyticsTypes';
 
 function KpiTile({ m, color }: { m: AnalyticsMetric; color: string }) {
+  const colors = useColors();
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const up = m.trend === 'up';
   return (
     <View style={s.kpiTile}>
       <Text style={[s.kpiValue, { color }]}>{m.formatted}</Text>
       <Text style={s.kpiLabel} numberOfLines={2}>{m.label}</Text>
       <Text style={[s.kpiChange, { color: m.trend === 'flat' ? MUTED : up ? SUCCESS : RED }]}>
-        {m.changePct > 0 ? '+' : ''}{m.changePct.toFixed(1)}%
+        {(m.changePct ?? 0) > 0 ? '+' : ''}{m.changePct?.toFixed(1) ?? '—'}%
       </Text>
     </View>
   );
 }
 
 function ManufacturerCard({ mfr }: { mfr: ManufacturerAnalyticsRow }) {
+  const colors = useColors();
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const onTimeColor = mfr.delayRate <= 10 ? SUCCESS : mfr.delayRate <= 20 ? ORANGE : RED;
   const qcColor     = mfr.qualityIssueRate <= 2 ? SUCCESS : mfr.qualityIssueRate <= 4 ? ORANGE : RED;
@@ -41,7 +45,7 @@ function ManufacturerCard({ mfr }: { mfr: ManufacturerAnalyticsRow }) {
     >
       <View style={s.mfrHeader}>
         <View style={s.mfrAvatar}>
-          <Feather name="tool" size={18} color={PURPLE} />
+          <Feather name="tool" size={18} color={colors.primary} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={s.mfrName}>{mfr.name}</Text>
@@ -84,7 +88,9 @@ function ManufacturerCard({ mfr }: { mfr: ManufacturerAnalyticsRow }) {
 }
 
 export default function AnalyticsProductionScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const colors = useColors();
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = colors;
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -93,13 +99,17 @@ export default function AnalyticsProductionScreen() {
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
-    const f = filter ?? await getFilterState();
-    if (!filter) setFilter(f);
-    setData(await getProductionAnalytics(f));
-    setLoading(false); setRefreshing(false);
+    try {
+      const f = filter ?? await getFilterState();
+      if (!filter) setFilter(f);
+      setData(await getProductionAnalytics(f)); setError(null);
+    } catch (err) {
+      setData(null); setError(err instanceof Error ? err.message : 'Production analytics are unavailable.');
+    } finally { setLoading(false); setRefreshing(false); }
   }, [filter]);
 
   useEffect(() => { load(); }, []); // eslint-disable-line
@@ -107,6 +117,7 @@ export default function AnalyticsProductionScreen() {
   if (loading) {
     return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><ActivityIndicator size="large" color={PURPLE} /></View>;
   }
+  if (error) return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><Text style={{ color: MUTED }}>{error}</Text><TouchableOpacity onPress={() => load()}><Text style={{ color: PURPLE }}>Retry</Text></TouchableOpacity></View>;
 
   return (
     <ScrollView
@@ -186,7 +197,9 @@ export default function AnalyticsProductionScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT } = colors;
+  return StyleSheet.create({
   scroll:   { flex: 1, backgroundColor: BG },
   content:  { paddingHorizontal: 16 },
   loadWrap: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
@@ -227,4 +240,5 @@ const s = StyleSheet.create({
   emptyState:{ alignItems: 'center', paddingVertical: 48, gap: 12 },
   emptyTitle:{ fontSize: 16, fontFamily: FONT.semibold, color: FG },
   emptyBody:{ fontSize: 13, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', paddingHorizontal: 24 },
-});
+  });
+};

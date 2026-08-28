@@ -4,10 +4,7 @@
  * The owner sees Edit / Connect Bank Account / My Gigs / Deactivate.
  */
 import React, { useCallback, useState } from 'react';
-import {
-  ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, Image, Modal, KeyboardAvoidingView, Platform, Linking,
-} from 'react-native';
+import { ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image, Modal, KeyboardAvoidingView, Platform, Linking } from 'react-native';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -15,19 +12,13 @@ import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi, type Freelancer } from '@/lib/api';
-import {
-  serviceLabel, serviceIcon, formatHourlyRate, formatPrice, ratingLabel,
-  apiErrorMessage, apiErrorCode,
-} from '@/lib/freelancer';
-import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM,
-  GOLD, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, RED, OVERLAY,
-  FONT, FS, SP, RADIUS, ON_DARK,
-} from '@/lib/theme';
+import { serviceLabel, serviceIcon, formatHourlyRate, formatPrice, ratingLabel, apiErrorMessage, apiErrorCode } from '@/lib/freelancer';
+import { BG, CARD, BORDER, FG, MUTED, SUBTLE, GOLD, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, RED, OVERLAY, FONT, FS, SP, RADIUS, ON_DARK, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { centsAtBasisPoints, parseDecimalToCents } from '@/lib/money';
 
-const PLATFORM_FEE_RATE = 0.05; // display only — server computes the real fee
+const PLATFORM_FEE_BASIS_POINTS = 500; // display only — server computes the real fee
 
 export default function FreelancerProfileScreen() {
   const colors = useColors();
@@ -112,10 +103,11 @@ export default function FreelancerProfileScreen() {
     );
   };
 
-  const priceCents = Math.round(parseFloat(priceText || '0') * 100);
-  const feeCents = Math.round(priceCents * PLATFORM_FEE_RATE);
+  const parsedPriceCents = priceText.trim() ? parseDecimalToCents(priceText) : 0;
+  const priceCents = parsedPriceCents ?? 0;
+  const feeCents = centsAtBasisPoints(priceCents, PLATFORM_FEE_BASIS_POINTS);
   const netCents = priceCents - feeCents;
-  const hireValid = title.trim().length > 0 && Number.isInteger(priceCents) && priceCents >= 100;
+  const hireValid = title.trim().length > 0 && parsedPriceCents !== null && priceCents >= 100;
 
   const submitHire = async () => {
     if (!freelancer || !hireValid || hiring) return;

@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
+  BG, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE, SUCCESS, ORANGE, BLUE, RED, ON_DARK,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
@@ -20,7 +20,7 @@ import {
   subscribeSocial,
 } from '@/services/socialService';
 import type { Notification, NotificationCategory } from '@/services/socialTypes';
-import { BrandedLoadingState, ThreadDivider } from '@/components/BrandthreadUI';
+import { BrandedLoadingState, EmptyState, ThreadDivider } from '@/components/BrandthreadUI';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -370,7 +370,7 @@ export default function BuyerNotifications() {
               style={[
                 styles.pill,
                 active
-                  ? { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE }
+                  ? { backgroundColor: PURPLE_DIM, borderColor: theme.accent }
                   : { backgroundColor: CARD, borderColor: BORDER },
               ]}
               onPress={() => setSelectedCategory(pill.value)}
@@ -403,13 +403,12 @@ export default function BuyerNotifications() {
         />
       )}
       {!notifLoading && listData.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Feather name="bell" size={48} color={MUTED} />
-          <Text style={styles.emptyTitle}>All caught up.</Text>
-          <Text style={styles.emptyBody}>
-            Likes, new followers, order updates, and drop alerts will appear here.
-          </Text>
-        </View>
+        <EmptyState
+          icon="bell"
+          title="Quiet looks good on you."
+          description="When someone likes your style, a drop goes live, or an order moves, you’ll hear it here."
+          style={{ flex: 1 }}
+        />
       ) : (
         <FlatList
           data={listData}

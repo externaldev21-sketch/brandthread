@@ -5,32 +5,33 @@
  */
 
 import { ProductPricing } from '@/services/productTypes';
+import { formatCents } from '@/lib/money';
 
 export interface PricingResult {
-  retailPrice: number;
-  compareAtPrice: number | undefined;
-  cost: number | undefined;
-  shippingCost: number;
-  fees: number;
-  grossProfit: number | undefined;
-  netProfit: number | undefined;
+  retailPriceCents: number;
+  compareAtPriceCents: number | undefined;
+  costCents: number | undefined;
+  shippingCostCents: number;
+  feesCents: number;
+  grossProfitCents: number | undefined;
+  netProfitCents: number | undefined;
   marginPercent: number | undefined;  // 0–100
-  breakEvenPrice: number | undefined;
+  breakEvenPriceCents: number | undefined;
   isOnSale: boolean;
   discountPercent: number | undefined;
 }
 
 export function calcPricing(pricing: ProductPricing): PricingResult {
   // Normalize: treat compareAtPrice of 0 as not set
-  const p: ProductPricing = (pricing.compareAtPrice === 0)
-    ? { ...pricing, compareAtPrice: undefined }
+  const p: ProductPricing = (pricing.compareAtPriceCents === 0)
+    ? { ...pricing, compareAtPriceCents: undefined }
     : pricing;
 
-  const retail  = p.price;
-  const compare = p.compareAtPrice;
-  const cost    = p.cost;
-  const ship    = p.estimatedShippingCost ?? 0;
-  const fees    = p.estimatedFees ?? 0;
+  const retail  = p.priceCents;
+  const compare = p.compareAtPriceCents;
+  const cost    = p.costCents;
+  const ship    = p.estimatedShippingCostCents ?? 0;
+  const fees    = p.estimatedFeesCents ?? 0;
 
   // grossProfit: retail - cost (defined only when cost is defined)
   const grossProfit = cost !== undefined ? retail - cost : undefined;
@@ -51,22 +52,22 @@ export function calcPricing(pricing: ProductPricing): PricingResult {
     : undefined;
 
   return {
-    retailPrice:    retail,
-    compareAtPrice: compare,
-    cost,
-    shippingCost:   ship,
-    fees,
-    grossProfit,
-    netProfit,
-    marginPercent:  margin !== undefined ? parseFloat(margin.toFixed(1)) : undefined,
-    breakEvenPrice: breakEven,
+    retailPriceCents: retail,
+    compareAtPriceCents: compare,
+    costCents: cost,
+    shippingCostCents: ship,
+    feesCents: fees,
+    grossProfitCents: grossProfit,
+    netProfitCents: netProfit,
+    marginPercent:  margin !== undefined ? Math.round(margin * 10) / 10 : undefined,
+    breakEvenPriceCents: breakEven,
     isOnSale,
     discountPercent: discountPct,
   };
 }
 
-export function formatCurrency(amount: number, currency = 'USD'): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 2 }).format(amount);
+export function formatCurrency(cents: number, currency = 'USD'): string {
+  return formatCents(cents, currency);
 }
 
 export function formatPercent(value: number, decimals = 1): string {
@@ -115,14 +116,14 @@ export function isOutOfStock(totalInventory: number, policy: 'deny' | 'continue'
 export function validateForPublish(product: {
   name: string;
   description: string;
-  pricing: { price: number };
+  pricing: { priceCents: number };
   media: unknown[];
   variants: unknown[];
 }): string[] {
   const warnings: string[] = [];
   if (!product.name?.trim()) warnings.push('Product name is required');
   if (!product.description?.trim()) warnings.push('Product description is required');
-  if (!product.pricing?.price || product.pricing.price <= 0) warnings.push('A valid price is required');
+  if (!product.pricing?.priceCents || product.pricing.priceCents <= 0) warnings.push('A valid price is required');
   if (!product.media?.length) warnings.push('At least one product image is required');
   return warnings;
 }

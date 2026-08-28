@@ -5,7 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 
-import { BG, SURFACE, BORDER, FG, SUBTLE, PURPLE } from '@/lib/theme';
+import { BORDER, SUBTLE } from '@/lib/theme';
 import { getDeactivationStatus, reactivate } from '@/lib/accountService';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 

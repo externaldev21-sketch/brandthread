@@ -7,9 +7,10 @@ export interface SearchProduct {
   kind: 'product';
   brand: string;
   name: string;
-  price: string;
+  priceCents: number;
   color: string;
   initials: string;
+  imageUri?: string;
 }
 
 export interface SearchBrand {
@@ -37,19 +38,19 @@ export const SEARCH_BRANDS: SearchBrand[] = [
 ];
 
 export const SEARCH_PRODUCTS: SearchProduct[] = [
-  { id: 'p1',  kind: 'product', brand: 'Vault Studio',   name: 'Canvas Cargo Jacket',      price: '$189', color: '#00C853', initials: 'VS' },
-  { id: 'p2',  kind: 'product', brand: 'Vault Studio',   name: 'Fleece Zip Jacket',        price: '$220', color: '#00C853', initials: 'VS' },
-  { id: 'p3',  kind: 'product', brand: 'NxGen Drops',    name: 'Archive Hoodie Vol.3',     price: '$135', color: '#B45309', initials: 'NX' },
-  { id: 'p4',  kind: 'product', brand: 'NxGen Drops',    name: 'Cargo Trouser S/S',        price: '$134', color: '#B45309', initials: 'NX' },
-  { id: 'p5',  kind: 'product', brand: 'Coldform',       name: 'Raw Denim Jacket',         price: '$310', color: '#065F46', initials: 'CF' },
-  { id: 'p6',  kind: 'product', brand: 'Atlas Goods',    name: 'Waxed Field Jacket',       price: '$260', color: '#1D4ED8', initials: 'AG' },
-  { id: 'p7',  kind: 'product', brand: 'Atlas Goods',    name: 'Utility Vest — Slate',     price: '$220', color: '#1D4ED8', initials: 'AG' },
-  { id: 'p8',  kind: 'product', brand: 'Softwear__',     name: 'Oversized Crewneck',       price: '$88',  color: '#BE185D', initials: 'SW' },
-  { id: 'p9',  kind: 'product', brand: 'Meridian Co.',   name: 'Essential Tee — Sage',     price: '$48',  color: '#0F766E', initials: 'MC' },
-  { id: 'p10', kind: 'product', brand: 'Rawthread',      name: 'Boxy Flannel Shirt',       price: '$96',  color: '#92400E', initials: 'RT' },
-  { id: 'p11', kind: 'product', brand: 'Fernweh Supply', name: 'Selvedge Trucker Jacket',  price: '$225', color: '#7C3AED', initials: 'FS' },
-  { id: 'p12', kind: 'product', brand: 'Northloom',      name: 'Brushed Fleece Half-Zip',  price: '$142', color: '#0891B2', initials: 'NL' },
-  { id: 'p13', kind: 'product', brand: 'Palisade',       name: 'Wide-Leg Twill Trouser',   price: '$168', color: '#9F1239', initials: 'PL' },
+  { id: 'p1',  kind: 'product', brand: 'Vault Studio',   name: 'Canvas Cargo Jacket',      priceCents: 18900, color: '#00C853', initials: 'VS' },
+  { id: 'p2',  kind: 'product', brand: 'Vault Studio',   name: 'Fleece Zip Jacket',        priceCents: 22000, color: '#00C853', initials: 'VS' },
+  { id: 'p3',  kind: 'product', brand: 'NxGen Drops',    name: 'Archive Hoodie Vol.3',     priceCents: 13500, color: '#B45309', initials: 'NX' },
+  { id: 'p4',  kind: 'product', brand: 'NxGen Drops',    name: 'Cargo Trouser S/S',        priceCents: 13400, color: '#B45309', initials: 'NX' },
+  { id: 'p5',  kind: 'product', brand: 'Coldform',       name: 'Raw Denim Jacket',         priceCents: 31000, color: '#065F46', initials: 'CF' },
+  { id: 'p6',  kind: 'product', brand: 'Atlas Goods',    name: 'Waxed Field Jacket',       priceCents: 26000, color: '#1D4ED8', initials: 'AG' },
+  { id: 'p7',  kind: 'product', brand: 'Atlas Goods',    name: 'Utility Vest — Slate',     priceCents: 22000, color: '#1D4ED8', initials: 'AG' },
+  { id: 'p8',  kind: 'product', brand: 'Softwear__',     name: 'Oversized Crewneck',       priceCents: 8800,  color: '#BE185D', initials: 'SW' },
+  { id: 'p9',  kind: 'product', brand: 'Meridian Co.',   name: 'Essential Tee — Sage',     priceCents: 4800,  color: '#0F766E', initials: 'MC' },
+  { id: 'p10', kind: 'product', brand: 'Rawthread',      name: 'Boxy Flannel Shirt',       priceCents: 9600,  color: '#92400E', initials: 'RT' },
+  { id: 'p11', kind: 'product', brand: 'Fernweh Supply', name: 'Selvedge Trucker Jacket',  priceCents: 22500, color: '#7C3AED', initials: 'FS' },
+  { id: 'p12', kind: 'product', brand: 'Northloom',      name: 'Brushed Fleece Half-Zip',  priceCents: 14200, color: '#0891B2', initials: 'NL' },
+  { id: 'p13', kind: 'product', brand: 'Palisade',       name: 'Wide-Leg Twill Trouser',   priceCents: 16800, color: '#9F1239', initials: 'PL' },
 ];
 
 export function searchCatalogue(query: string): SearchResult[] {

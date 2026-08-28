@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
   TextInput, StyleSheet, Alert, Switch, Animated, RefreshControl,
@@ -14,7 +15,7 @@ import {
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
   ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
+  GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
@@ -29,7 +30,7 @@ import {
 } from '@/services/storeService';
 import {
   Storefront, StoreSection, StoreSectionType,
-  SECTION_TYPE_LABELS, StoreThemeSettings,
+  SECTION_TYPE_LABELS, StoreThemeSettings, THREAD_THEME_NAME,
 } from '@/services/storeTypes';
 
 type EditorMode = 'sections' | 'branding' | 'header' | 'footer' | 'product_page' | 'collection_page';
@@ -51,6 +52,8 @@ function ChipGroup({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const { theme } = useAppTheme();
+  const chipStyles = makeChipStyles(theme);
   return (
     <View style={chipStyles.row}>
       {options.map(opt => (
@@ -68,16 +71,16 @@ function ChipGroup({
   );
 }
 
-const chipStyles = StyleSheet.create({
+const makeChipStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs },
   chip: {
     paddingHorizontal: 12, paddingVertical: 6,
     borderRadius: RADIUS.pill, backgroundColor: CARD,
     borderWidth: 1, borderColor: BORDER,
   },
-  active: { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
+  active: { backgroundColor: theme.accentDim, borderColor: theme.accentLight },
   label: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-  activeLabel: { color: PURPLE_LIGHT, fontFamily: FONT.semibold },
+  activeLabel: { color: theme.accentLight, fontFamily: FONT.semibold },
 });
 
 function FieldLabel({ children }: { children: string }) {
@@ -101,6 +104,8 @@ function StyledInput({
   multiline?: boolean;
   tall?: boolean;
 }) {
+  const { theme } = useAppTheme();
+  const inputStyles = makeInputStyles(theme);
   const [focused, setFocused] = useState(false);
   return (
     <TextInput
@@ -121,26 +126,27 @@ function StyledInput({
   );
 }
 
-const inputStyles = StyleSheet.create({
+const makeInputStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   input: {
     backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
     borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: SP.sm,
     fontSize: FS.base, fontFamily: FONT.regular, color: FG, minHeight: 44,
   },
-  focused: { borderColor: BORDER_ACTIVE },
+  focused: { borderColor: theme.accent },
   multiline: { minHeight: 80, textAlignVertical: 'top', paddingTop: SP.sm },
   tall: { minHeight: 120 },
 });
 
 function SwitchRow({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+  const { theme } = useAppTheme();
   return (
     <View style={swStyles.row}>
       <Text style={swStyles.label}>{label}</Text>
       <Switch
         value={value}
         onValueChange={onChange}
-        trackColor={{ false: BORDER, true: PURPLE }}
-        thumbColor={value ? PURPLE_LIGHT : MUTED}
+        trackColor={{ false: BORDER, true: theme.accent }}
+        thumbColor={value ? theme.accentLight : MUTED}
       />
     </View>
   );
@@ -154,6 +160,11 @@ const swStyles = StyleSheet.create({
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function StoreEditor() {
+  const { theme } = useAppTheme();
+  const styles = makeStyles(theme);
+  const sectionStyles = makeSectionStyles(theme);
+  const panelStyles = makePanelStyles(theme);
+  const brandStyles = makeBrandStyles(theme);
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -535,10 +546,6 @@ export default function StoreEditor() {
     const typo = store.branding.typography;
     const br = store.branding;
 
-    async function updateColor(key: string, val: string) {
-      const s = await updateBranding({ colors: { ...colors, [key]: val } });
-      setStore(s);
-    }
     async function updateBrandingField(partial: any) {
       const s = await updateBranding(partial);
       setStore(s);
@@ -546,36 +553,53 @@ export default function StoreEditor() {
 
     return (
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.tabContent}>
-        <SectionHeader title="Colors" />
+        <BrandthreadCard style={brandStyles.personalizeCard}>
+          <View style={brandStyles.personalizeHeader}>
+            <View style={brandStyles.personalizeIcon}>
+              <Feather name="aperture" size={ICON.md} color={PURPLE_LIGHT} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={brandStyles.personalizeTitle}>Personalize {THREAD_THEME_NAME}</Text>
+              <Text style={brandStyles.personalizeDesc}>
+                Optional AI tools can shape imagery, copy, and sections while the Brandthread monochrome system stays intact.
+              </Text>
+            </View>
+          </View>
+          <View style={brandStyles.personalizeActions}>
+            {[
+              { label: 'Use logo', icon: 'image' as const, route: '/store-from-logo' },
+              { label: 'Use moodboard', icon: 'grid' as const, route: '/store-from-moodboard' },
+              { label: 'Use social', icon: 'share-2' as const, route: '/store-from-social' },
+            ].map(action => (
+              <TouchableOpacity
+                key={action.label}
+                style={brandStyles.personalizeAction}
+                onPress={() => router.push(action.route as never)}
+                activeOpacity={0.75}
+              >
+                <Feather name={action.icon} size={ICON.sm} color={FG} />
+                <Text style={brandStyles.personalizeActionText}>{action.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </BrandthreadCard>
+
+        <SectionHeader title="Thread Theme palette" style={{ marginTop: SP.md }} />
+        <Text style={brandStyles.paletteNote}>
+          Black, white, and grayscale are locked to keep every storefront unmistakably Thread Theme.
+        </Text>
         {(['primary', 'secondary', 'accent', 'background', 'text'] as const).map(key => (
           <View key={key} style={brandStyles.colorRow}>
             <View style={[brandStyles.colorSwatch, { backgroundColor: (colors as any)[key] }]} />
             <Text style={brandStyles.colorLabel}>{key.charAt(0).toUpperCase() + key.slice(1)}</Text>
-            <TextInput
-              value={(colors as any)[key]}
-              onChangeText={v => updateColor(key, v)}
-              style={brandStyles.colorInput}
-              placeholderTextColor={SUBTLE}
-              autoCorrect={false}
-              autoCapitalize="none"
-            />
+            <Text style={brandStyles.colorValue}>{(colors as any)[key]}</Text>
           </View>
         ))}
-        <TouchableOpacity style={brandStyles.resetBtn}>
-          <Text style={{ color: MUTED, fontSize: FS.sm, fontFamily: FONT.medium }}>Reset to Theme Defaults</Text>
-        </TouchableOpacity>
 
         <SectionHeader title="Typography" style={{ marginTop: SP.md }} />
         <FieldRow>
           <FieldLabel>Style</FieldLabel>
-          <ChipGroup
-            options={['modern', 'luxury', 'minimal']}
-            value={typo.style}
-            onChange={v => updateBrandingField({ typography: { ...typo, style: v } })}
-          />
-          <TouchableOpacity>
-            <Text style={{ color: PURPLE_LIGHT, fontSize: FS.sm, fontFamily: FONT.medium }}>More options →</Text>
-          </TouchableOpacity>
+          <Text style={brandStyles.lockedValue}>Editorial · Cormorant Garamond / Raleway</Text>
         </FieldRow>
         <FieldRow>
           <FieldLabel>Text Case</FieldLabel>
@@ -987,7 +1011,7 @@ export default function StoreEditor() {
               onPress={() => router.push('/store-publish' as never)}
               style={[styles.headerBtn, { backgroundColor: PURPLE }]}
             >
-              <Text style={[styles.headerBtnText, { color: '#fff' }]}>Publish</Text>
+              <Text style={[styles.headerBtnText, { color: theme.onAccent }]}>Publish</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1023,7 +1047,12 @@ export default function StoreEditor() {
 
 // ─── StyleSheets ─────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE = theme.accent;
+  const PURPLE_LIGHT = theme.accentLight;
+  const PURPLE_DIM = theme.accentDim;
+  const BORDER_ACTIVE = theme.accentLight;
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   header: { paddingHorizontal: SP.md, paddingVertical: SP.xs },
   headerRow1: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
@@ -1072,9 +1101,14 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: BORDER_ACTIVE,
   },
   addSectionBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
-});
+  });
+};
 
-const sectionStyles = StyleSheet.create({
+const makeSectionStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE_LIGHT = theme.accentLight;
+  const PURPLE_DIM = theme.accentDim;
+  const BORDER_ACTIVE = theme.accentLight;
+  return StyleSheet.create({
   row: {
     backgroundColor: CARD, borderRadius: RADIUS.md,
     borderWidth: 1, borderColor: BORDER,
@@ -1110,9 +1144,14 @@ const sectionStyles = StyleSheet.create({
   orderBtns: {
     marginLeft: 'auto' as any, flexDirection: 'row', gap: SP.xs,
   },
-});
+  });
+};
 
-const panelStyles = StyleSheet.create({
+const makePanelStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE_LIGHT = theme.accentLight;
+  const PURPLE_DIM = theme.accentDim;
+  const BORDER_ACTIVE = theme.accentLight;
+  return StyleSheet.create({
   root: {
     borderTopWidth: 1, borderTopColor: BORDER,
     backgroundColor: SURFACE, padding: SP.md,
@@ -1136,9 +1175,68 @@ const panelStyles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: SP.xs,
     paddingVertical: SP.sm, marginTop: SP.xs,
   },
-});
+  });
+};
 
-const brandStyles = StyleSheet.create({
+const makeBrandStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE_DIM = theme.accentDim;
+  return StyleSheet.create({
+  personalizeCard: {
+    gap: SP.md,
+  },
+  personalizeHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SP.sm,
+  },
+  personalizeIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.sm,
+    backgroundColor: PURPLE_DIM,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  personalizeTitle: {
+    color: FG,
+    fontSize: FS.base,
+    fontFamily: FONT.bold,
+    marginBottom: 3,
+  },
+  personalizeDesc: {
+    color: MUTED,
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    lineHeight: 17,
+  },
+  personalizeActions: {
+    flexDirection: 'row',
+    gap: SP.xs,
+  },
+  personalizeAction: {
+    flex: 1,
+    minHeight: 56,
+    paddingHorizontal: SP.xs,
+    borderWidth: 1,
+    borderColor: BORDER,
+    backgroundColor: CARD_ELEVATED,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+  },
+  personalizeActionText: {
+    color: FG,
+    fontSize: 10,
+    fontFamily: FONT.semibold,
+    textAlign: 'center',
+  },
+  paletteNote: {
+    color: MUTED,
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    lineHeight: 17,
+    marginBottom: SP.sm,
+  },
   colorRow: {
     flexDirection: 'row', alignItems: 'center',
     gap: SP.sm, marginBottom: SP.sm,
@@ -1154,7 +1252,23 @@ const brandStyles = StyleSheet.create({
     paddingHorizontal: SP.sm, paddingVertical: SP.xs,
     borderWidth: 1, borderColor: BORDER,
   },
+  colorValue: {
+    flex: 1,
+    fontSize: FS.sm,
+    fontFamily: FONT.medium,
+    color: MUTED,
+    textAlign: 'right',
+  },
+  lockedValue: {
+    color: FG,
+    fontSize: FS.sm,
+    fontFamily: FONT.medium,
+    paddingVertical: SP.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: BORDER,
+  },
   resetBtn: {
     alignItems: 'center', paddingVertical: SP.sm, marginTop: SP.xs,
   },
-});
+  });
+};

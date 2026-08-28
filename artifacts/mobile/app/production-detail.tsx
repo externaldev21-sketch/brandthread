@@ -37,6 +37,7 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
+import { formatCents } from '@/lib/money';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -138,7 +139,7 @@ export default function ProductionDetailScreen() {
   const progressPct = Math.round((currentIdx / (PRODUCTION_STAGES.length - 1)) * 100);
   const currentStageLabel = PRODUCTION_STAGES[currentIdx]?.label ?? order.currentStage;
 
-  const paidAmount = order.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amount, 0);
+  const paidAmountCents = order.payments.filter(p => p.status === 'paid').reduce((s, p) => s + p.amountCents, 0);
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
@@ -275,19 +276,19 @@ export default function ProductionDetailScreen() {
           <View style={styles.costRow}>
             <View style={styles.costItem}>
               <Text style={styles.costLabel}>Total</Text>
-              <Text style={styles.costValue}>${order.totalCost.toFixed(2)}</Text>
+              <Text style={styles.costValue}>{formatCents(order.totalCostCents)}</Text>
             </View>
             <View style={styles.costItem}>
               <Text style={styles.costLabel}>Deposit</Text>
-              <Text style={styles.costValue}>${order.depositAmount.toFixed(2)}</Text>
+              <Text style={styles.costValue}>{formatCents(order.depositAmountCents)}</Text>
             </View>
             <View style={styles.costItem}>
               <Text style={styles.costLabel}>Paid</Text>
-              <Text style={[styles.costValue, { color: SUCCESS }]}>${paidAmount.toFixed(2)}</Text>
+              <Text style={[styles.costValue, { color: SUCCESS }]}>{formatCents(paidAmountCents)}</Text>
             </View>
             <View style={styles.costItem}>
               <Text style={styles.costLabel}>Remaining</Text>
-              <Text style={[styles.costValue, { color: ORANGE }]}>${order.remainingBalance.toFixed(2)}</Text>
+              <Text style={[styles.costValue, { color: ORANGE }]}>{formatCents(order.remainingBalanceCents)}</Text>
             </View>
           </View>
 
@@ -296,7 +297,7 @@ export default function ProductionDetailScreen() {
               {order.payments.map(pay => (
                 <View key={pay.id} style={styles.paymentRow}>
                   <Text style={styles.paymentType}>{pay.type.charAt(0).toUpperCase() + pay.type.slice(1)}</Text>
-                  <Text style={styles.paymentAmount}>${pay.amount.toFixed(2)}</Text>
+                  <Text style={styles.paymentAmount}>{formatCents(pay.amountCents)}</Text>
                   <StatusBadge label={pay.status.toUpperCase()} variant={paymentStatusVariant(pay.status)} small />
                   {pay.dueDate && <Text style={styles.paymentDue}>Due {fmtDate(pay.dueDate)}</Text>}
                 </View>

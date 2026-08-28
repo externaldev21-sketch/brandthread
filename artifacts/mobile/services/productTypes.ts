@@ -84,9 +84,9 @@ export interface ProductVariant {
   optionValues: { optionId: string; valueId: string }[];
   sku: string;
   barcode?: string;
-  price?: number;         // override; falls back to product price
-  compareAtPrice?: number;
-  cost?: number;          // override
+  priceCents?: number;         // override; falls back to product price
+  compareAtPriceCents?: number;
+  costCents?: number;          // override
   weight?: number;        // in grams
   inventoryQuantity: number;
   reservedQuantity: number;
@@ -138,11 +138,11 @@ export interface InventoryAdjustment {
 // ─── Pricing ──────────────────────────────────────────────────────────────────
 
 export interface ProductPricing {
-  price: number;
-  compareAtPrice?: number;
-  cost?: number;
-  estimatedShippingCost?: number;
-  estimatedFees?: number;
+  priceCents: number;
+  compareAtPriceCents?: number;
+  costCents?: number;
+  estimatedShippingCostCents?: number;
+  estimatedFeesCents?: number;
   currency: string;     // "USD"
 }
 
@@ -188,7 +188,7 @@ export interface ProductManufacturing {
   manufacturerId?: string;
   manufacturerName?: string;
   stage: ManufacturingStage;
-  targetCostPerUnit?: number;
+  targetCostPerUnitCents?: number;
   requiredQuantity?: number;
   productionDeadline?: string;
   techPackUri?: string;
@@ -225,7 +225,7 @@ export interface ProductStoreSettings {
 
 export interface ProductAnalytics {
   productId: string;
-  revenue: number;
+  revenueCents: number;
   unitsSold: number;
   pageViews: number;
   addToCartCount: number;
@@ -237,7 +237,7 @@ export interface ProductAnalytics {
   bestSize?: string;
   bestColor?: string;
   sellThroughRate: number;  // 0–1
-  revenueByDay: { date: string; revenue: number }[];
+  revenueByDay: { date: string; revenueCents: number }[];
 }
 
 // ─── Collections ─────────────────────────────────────────────────────────────
@@ -294,7 +294,7 @@ export interface Product {
 
   // Analytics (summary only — full analytics fetched separately)
   totalSales: number;
-  totalRevenue: number;
+  totalRevenueCents: number;
 
   // Meta
   status: ProductStatus;

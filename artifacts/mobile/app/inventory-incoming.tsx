@@ -1,32 +1,16 @@
 import React, { useState, useCallback } from 'react';
-import {
-  View, Text, TouchableOpacity, TextInput, ScrollView,
-  StyleSheet, FlatList, ActivityIndicator,
-} from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN, SUCCESS, SUCCESS_DIM,
-  BLUE, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import {
-  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  IconButton, StatusBadge, SectionHeader, EmptyState,
-} from '@/components/BrandthreadUI';
-import {
-  getIncoming, createIncoming, updateIncomingStatus, receiveIncoming,
-  getInventoryItems, getLocations,
-} from '@/services/inventoryService';
-import {
-  IncomingInventory, IncomingStatus, InventoryItem, InventoryLocation,
-} from '@/services/inventoryTypes';
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
+import { getIncoming, createIncoming, updateIncomingStatus, receiveIncoming, getInventoryItems, getLocations } from '@/services/inventoryService';
+import { IncomingInventory, IncomingStatus, InventoryItem, InventoryLocation } from '@/services/inventoryTypes';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -279,7 +263,7 @@ export default function IncomingInventoryScreen() {
             style={s.addBtn}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setMode('new'); }}
           >
-            <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.addBtnGrad}>
+            <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.addBtnGrad}>
               <Feather name="plus" size={ICON.sm} color="#fff" />
               <Text style={s.addBtnText}>Add</Text>
             </LinearGradient>
@@ -534,7 +518,7 @@ export default function IncomingInventoryScreen() {
 
         <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled">
           {/* Demo notice */}
-          <View style={[s.noticeBanner, { borderColor: CYAN + '55' }]}>
+          <View style={[s.noticeBanner, { borderColor: theme.secondary }]}>
             <Feather name="info" size={ICON.sm} color={CYAN} />
             <Text style={s.noticeText}>Stock will be added to inventory after confirmation.</Text>
           </View>
@@ -878,7 +862,7 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
   readonlyText: { fontSize: FS.sm, fontFamily: FONT.medium, color: SUCCESS },
 
   // Receive
-  noticeBanner: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, borderWidth: 1, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md, backgroundColor: 'rgba(34,211,238,0.08)' },
+  noticeBanner: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, borderWidth: 1, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md, backgroundColor: theme.secondaryDim },
   noticeText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
   sectionCard: { marginBottom: SP.md },
   missingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: SP.md, borderRadius: RADIUS.md, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, marginTop: SP.sm },

@@ -117,6 +117,86 @@ function safeFontFamily(val: unknown, fallback: string): string {
   return SAFE_FONT_RE.test(s) && s.length <= 200 ? s : fallback;
 }
 
+const THREAD_THEME_LIGHT = {
+  themeId: "thread",
+  primaryColor: "#111111",
+  secondaryColor: "#6B6B6B",
+  accentColor: "#2B2B2B",
+  backgroundColor: "#F7F7F5",
+  textColor: "#111111",
+  fontFamily: "Cormorant Garamond, Georgia, serif",
+  borderRadius: 0,
+};
+
+const THREAD_THEME_DARK = {
+  themeId: "thread",
+  primaryColor: "#F5F5F3",
+  secondaryColor: "#A7A7A3",
+  accentColor: "#D7D7D2",
+  backgroundColor: "#0B0B0B",
+  textColor: "#F5F5F3",
+  fontFamily: "Cormorant Garamond, Georgia, serif",
+  borderRadius: 0,
+};
+
+const THREAD_THEME_SECTIONS = [
+  {
+    id: "thread-hero",
+    type: "hero_image",
+    title: "Hero Image",
+    enabled: true,
+    settings: {
+      heading: "The new uniform.",
+      description: "Considered pieces for everyday movement.",
+      buttonLabel: "Shop the collection",
+      fullWidth: true,
+      sectionHeight: "tall",
+    },
+  },
+  {
+    id: "thread-products",
+    type: "product_grid",
+    title: "Product Grid",
+    enabled: true,
+    settings: {
+      heading: "Current collection",
+      description: "The pieces in rotation.",
+      columns: 2,
+      quickAdd: false,
+    },
+  },
+  {
+    id: "thread-story",
+    type: "brand_story",
+    title: "Brand Story",
+    enabled: true,
+    settings: {
+      heading: "Designed with intention.",
+      description: "Fewer pieces, better made, and meant to be worn often.",
+    },
+  },
+  {
+    id: "thread-newsletter",
+    type: "newsletter",
+    title: "Newsletter",
+    enabled: true,
+    settings: {
+      heading: "Stay close.",
+      description: "New releases, studio notes, and first access.",
+      buttonLabel: "Join the list",
+    },
+  },
+];
+
+function normalizeThreadTheme(value: unknown): Record<string, unknown> {
+  const theme = value && typeof value === "object"
+    ? value as Record<string, unknown>
+    : {};
+  if (theme.themeId !== "thread") return theme;
+  const dark = String(theme.backgroundColor ?? "").toUpperCase() === "#0B0B0B";
+  return dark ? THREAD_THEME_DARK : THREAD_THEME_LIGHT;
+}
+
 // Helper — build self-contained HTML for a storefront (shared by /preview and /preview/:token)
 async function buildPreviewHtml(ownerId: string): Promise<string> {
   const sf = await getOrCreateStorefront(ownerId);
@@ -126,11 +206,11 @@ async function buildPreviewHtml(ownerId: string): Promise<string> {
   const sections: any[] = Array.isArray(sf.sections) ? sf.sections : [];
 
   // CSS values — validated to hex colors and safe font names only
-  const primary   = safeCssColor(theme.primaryColor,   "#7c3aed");
-  const secondary = safeCssColor(theme.secondaryColor, "#5b21b6");
-  const bg        = safeCssColor(theme.backgroundColor,"#0f0f1a");
-  const txt       = safeCssColor(theme.textColor,      "#f4f4ff");
-  const font      = safeFontFamily(theme.fontFamily,   "Inter, system-ui, sans-serif");
+  const primary   = safeCssColor(theme.primaryColor,   THREAD_THEME_LIGHT.primaryColor);
+  const secondary = safeCssColor(theme.secondaryColor, THREAD_THEME_LIGHT.secondaryColor);
+  const bg        = safeCssColor(theme.backgroundColor,THREAD_THEME_LIGHT.backgroundColor);
+  const txt       = safeCssColor(theme.textColor,      THREAD_THEME_LIGHT.textColor);
+  const font      = safeFontFamily(theme.fontFamily,   THREAD_THEME_LIGHT.fontFamily);
 
   // Text content — HTML-escaped before interpolation
   const title   = escapeHtml(sf.title ?? "My Store");
@@ -142,19 +222,44 @@ async function buildPreviewHtml(ownerId: string): Promise<string> {
     const t = String(s.type ?? "");
     if (t.startsWith("hero")) {
       const btnLabel = escapeHtml(s.settings?.buttonLabel ?? "Shop Now");
-      return `<section style="background:linear-gradient(135deg,${primary},${secondary});padding:80px 24px;text-align:center;color:#fff;">
-        <h1 style="font-size:2.5rem;margin:0 0 16px;font-family:${font};">${h || title}</h1>
-        <p style="font-size:1rem;opacity:0.85;margin:0 0 28px;">${d}</p>
-        <a href="#" style="background:#fff;color:${primary};padding:12px 28px;border-radius:6px;font-weight:700;text-decoration:none;">${btnLabel}</a>
+      const rawImage = String(s.settings?.imageUri ?? "");
+      const image = /^https?:\/\//i.test(rawImage)
+        ? `<img class="hero-image" src="${escapeAttr(rawImage)}" alt="">`
+        : `<div class="hero-image hero-placeholder" aria-hidden="true"></div>`;
+      return `<section class="hero">
+        ${image}
+        <div class="hero-copy">
+          <p class="eyebrow">Brandthread / Collection</p>
+          <h1>${h || title}</h1>
+          <p>${d}</p>
+          <a class="text-link" href="#">${btnLabel}<span aria-hidden="true">→</span></a>
+        </div>
       </section>`;
     }
     if (t === "announcement") {
       const banner = escapeHtml(s.settings?.heading ?? s.settings?.text ?? "Free shipping on orders over $150");
-      return `<div style="background:${primary};padding:10px 24px;text-align:center;color:#fff;font-size:0.85rem;">${banner}</div>`;
+      return `<div class="announcement">${banner}</div>`;
     }
-    return `<section style="padding:48px 24px;border-bottom:1px solid ${primary}22;">
-      <h2 style="font-size:1.4rem;margin:0 0 12px;color:${primary};font-family:${font};">${h}</h2>
-      <p style="font-size:0.9rem;opacity:0.7;margin:0;line-height:1.6;">${d}</p>
+    if (t === "product_grid" || t === "featured_collection") {
+      return `<section class="collection">
+        <div class="section-heading"><h2>${h || "Current collection"}</h2><p>${d}</p></div>
+        <div class="product-grid">
+          ${[1, 2, 3, 4].map((n) => `<article class="product-card">
+            <div class="product-image"><span>0${n}</span></div>
+            <div class="product-meta"><span>Edition ${n}</span><span>—</span></div>
+          </article>`).join("")}
+        </div>
+      </section>`;
+    }
+    if (t === "brand_story") {
+      return `<section class="story"><p class="eyebrow">The label</p><h2>${h}</h2><p>${d}</p></section>`;
+    }
+    if (t === "newsletter") {
+      return `<section class="newsletter"><h2>${h}</h2><p>${d}</p><form><input aria-label="Email address" placeholder="Email address"><button type="button">${escapeHtml(s.settings?.buttonLabel ?? "Join")}</button></form></section>`;
+    }
+    return `<section class="standard-section">
+      <h2>${h}</h2>
+      <p>${d}</p>
     </section>`;
   }).join("\n");
 
@@ -172,25 +277,51 @@ async function buildPreviewHtml(ownerId: string): Promise<string> {
 <meta name="description" content="${metaDesc}">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-body{background:${bg};color:${txt};font-family:${font};-webkit-font-smoothing:antialiased;}
-nav{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;background:${bg}dd;border-bottom:1px solid ${primary}22;position:sticky;top:0;z-index:10;}
-.logo{font-size:1.2rem;font-weight:700;color:${primary};}
-.nav-links{display:flex;gap:20px;}
-.nav-links a{color:${txt};text-decoration:none;font-size:0.9rem;opacity:0.75;transition:opacity 0.2s;}
-.nav-links a:hover{opacity:1;}
-.preview-banner{background:${primary}22;border-bottom:2px solid ${primary};padding:8px 24px;text-align:center;font-size:0.78rem;color:${primary};letter-spacing:0.03em;}
-footer{padding:48px 24px;text-align:center;opacity:0.45;font-size:0.8rem;border-top:1px solid ${primary}22;margin-top:48px;}
+body{background:${bg};color:${txt};font-family:Raleway,Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+nav{display:flex;align-items:center;justify-content:space-between;padding:22px clamp(20px,4vw,64px);background:${bg}f2;border-bottom:1px solid ${secondary};position:sticky;top:0;z-index:10;}
+.logo{font:500 clamp(1.1rem,2vw,1.5rem)/1 ${font};color:${txt};letter-spacing:.08em;}
+.nav-links{display:flex;gap:clamp(14px,3vw,36px);}
+.nav-links a,.text-link{color:${txt};text-decoration:none;font-size:.72rem;text-transform:uppercase;letter-spacing:.14em;}
+.preview-banner{background:${txt};padding:8px 24px;text-align:center;font-size:.65rem;color:${bg};letter-spacing:.14em;text-transform:uppercase;}
+.hero{position:relative;min-height:min(82vh,820px);display:flex;align-items:flex-end;overflow:hidden;background:${primary};}
+.hero-image{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;filter:grayscale(1);opacity:.78;}
+.hero-placeholder{background:linear-gradient(130deg,${primary},${secondary});}
+.hero-copy{position:relative;z-index:1;width:min(760px,100%);padding:clamp(40px,8vw,110px) clamp(20px,7vw,96px);color:${bg};}
+.eyebrow{font-size:.65rem;text-transform:uppercase;letter-spacing:.2em;margin-bottom:20px;opacity:.75;}
+.hero h1{font:400 clamp(3.3rem,10vw,8.5rem)/.83 ${font};letter-spacing:-.04em;max-width:7ch;margin-bottom:26px;}
+.hero-copy>p:not(.eyebrow){max-width:36rem;font-size:clamp(.9rem,1.4vw,1.1rem);line-height:1.6;margin-bottom:34px;}
+.text-link{display:inline-flex;gap:14px;padding-bottom:7px;border-bottom:1px solid currentColor;color:${bg};}
+.collection,.standard-section{padding:clamp(64px,10vw,140px) clamp(20px,4vw,64px);}
+.section-heading{display:flex;justify-content:space-between;align-items:end;gap:24px;margin-bottom:40px;}
+.section-heading h2,.story h2,.newsletter h2,.standard-section h2{font:400 clamp(2.3rem,6vw,5rem)/.95 ${font};letter-spacing:-.03em;}
+.section-heading p,.standard-section p{max-width:28rem;color:${secondary};line-height:1.6;}
+.product-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(1px,1vw,16px);}
+.product-card{min-width:0;}
+.product-image{aspect-ratio:4/5;background:${primary};color:${bg};display:flex;align-items:flex-end;padding:14px;filter:grayscale(1);}
+.product-image span{font-size:.65rem;letter-spacing:.14em;}
+.product-meta{display:flex;justify-content:space-between;padding:12px 0 28px;font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;border-bottom:1px solid ${secondary};}
+.story{padding:clamp(100px,16vw,220px) clamp(20px,12vw,180px);text-align:center;border-top:1px solid ${secondary};}
+.story>p:last-child{max-width:44rem;margin:28px auto 0;color:${secondary};font-size:clamp(1rem,2vw,1.35rem);line-height:1.8;}
+.newsletter{margin:0 clamp(20px,4vw,64px);padding:clamp(64px,10vw,120px) 0;border-top:1px solid ${secondary};border-bottom:1px solid ${secondary};}
+.newsletter p{margin:16px 0 34px;color:${secondary};}
+.newsletter form{display:flex;max-width:560px;border-bottom:1px solid ${txt};}
+.newsletter input{flex:1;background:transparent;border:0;padding:14px 0;color:${txt};font:inherit;outline:0;}
+.newsletter button{background:transparent;border:0;color:${txt};text-transform:uppercase;letter-spacing:.12em;font-size:.68rem;}
+.announcement{background:${txt};color:${bg};padding:10px 24px;text-align:center;font-size:.68rem;text-transform:uppercase;letter-spacing:.12em;}
+footer{padding:64px 24px;text-align:center;opacity:.6;font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;}
+@media(max-width:640px){.nav-links a:nth-child(n+3){display:none}.product-grid{gap:1px}.section-heading{display:block}.section-heading p{margin-top:14px}}
 </style>
 </head>
 <body>
-<div class="preview-banner">🔒 Preview link — not yet published</div>
+<div class="preview-banner">Private preview · Not yet published</div>
 <nav>
   <span class="logo">${title}</span>
   <div class="nav-links"><a href="#">Shop</a><a href="#">Collections</a><a href="#">About</a><a href="#">Contact</a></div>
 </nav>
-${sectionHtml || `<section style="padding:100px 24px;text-align:center;">
-  <h1 style="font-size:2.5rem;margin:0 0 16px;color:${primary};">${title}</h1>
-  <p style="opacity:0.65;font-size:1.05rem;">${tagline || "Your storefront is ready. Publish to go live."}</p>
+${sectionHtml || `<section class="story">
+  <p class="eyebrow">Thread Theme by Brandthread</p>
+  <h1>${title}</h1>
+  <p>${tagline || "Your storefront is ready. Publish to go live."}</p>
 </section>`}
 <footer>© ${year} ${title}. Powered by Brandthread.</footer>
 </body>
@@ -269,7 +400,14 @@ async function getOrCreateStorefront(ownerId: string) {
   const slug = `store-${crypto.randomBytes(4).toString("hex")}`;
   const [created] = await db
     .insert(storefronts)
-    .values({ ownerId, slug, title: "My Store" })
+    .values({
+      ownerId,
+      slug,
+      title: "My Store",
+      theme: THREAD_THEME_LIGHT,
+      sections: THREAD_THEME_SECTIONS,
+      branding: { tagline: "", logoUrl: "", targetAudience: "" },
+    })
     .returning();
   return created;
 }
@@ -300,7 +438,9 @@ router.put("/", async (req, res) => {
     if (key in req.body) {
       // camelCase → snake_case mapping for DB columns
       const dbKey = key.replace(/([A-Z])/g, "_$1").toLowerCase();
-      update[dbKey] = req.body[key];
+      update[dbKey] = key === "theme"
+        ? normalizeThreadTheme(req.body[key])
+        : req.body[key];
     }
   }
 

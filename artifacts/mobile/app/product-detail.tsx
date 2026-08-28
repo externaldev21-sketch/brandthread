@@ -6,36 +6,24 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, Animated, Image, FlatList,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Animated, Image, FlatList } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, RED_DIM,
-  GOLD, GRAD_PRIMARY, GRAD_CARD_GLOW,
-  FONT, FS, SP, RADIUS, COMP, ICON, SHADOW_PURPLE,
-} from '@/lib/theme';
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, COMP, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
-import {
-  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  IconButton, SectionHeader, StatusBadge, StatCard, NavigationCard,
-  LoadingSkeleton, EmptyState, FilterChip,
-} from '@/components/BrandthreadUI';
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SectionHeader, StatusBadge, StatCard, NavigationCard, LoadingSkeleton, EmptyState, FilterChip } from '@/components/BrandthreadUI';
 
 import { getProduct, updateProduct, getProductAnalytics, archiveProduct, publishProduct, adjustInventory } from '@/services/productService';
 import { Product, ProductVariant, ProductStatus } from '@/services/productTypes';
 import { getItemsByProduct, adjustStock } from '@/services/inventoryService';
 import { InventoryItem } from '@/services/inventoryTypes';
 import { calcPricing, formatCurrency, isLowStock, isOutOfStock } from '@/lib/productUtils';
+import { reportNetworkError } from '@/lib/networkNotice';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,26 +53,41 @@ export default function ProductDetailScreen() {
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
 
   // Analytics state
   const [analytics, setAnalytics] = useState<Awaited<ReturnType<typeof getProductAnalytics>> | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState(false);
+  const [analyticsRetry, setAnalyticsRetry] = useState(0);
 
   const tabScrollRef = useRef<ScrollView>(null);
 
-  // Load product
-  useEffect(() => {
-    if (!id) return;
-    getProduct(id).then(p => {
-      setProduct(p ?? null);
+  const loadProduct = useCallback(async () => {
+    if (!id) {
       setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const p = await getProduct(id);
+      setProduct(p ?? null);
+      setLoadError(false);
       // Fix 4: set initial tab from params after loading
       if (params.tab && TABS.some(t => t.key === params.tab)) {
         setActiveTab(params.tab as Tab);
       }
-    });
-  }, [id]);
+    } catch (error) {
+      setLoadError(true);
+      reportNetworkError(error, loadProduct);
+    } finally {
+      setLoading(false);
+    }
+  }, [id, params.tab]);
+
+  // Load product
+  useEffect(() => { void loadProduct(); }, [loadProduct]);
 
   // Load analytics when tab opens
   useEffect(() => {
@@ -92,10 +95,16 @@ export default function ProductDetailScreen() {
       setAnalyticsLoading(true);
       getProductAnalytics(id).then(a => {
         setAnalytics(a);
-        setAnalyticsLoading(false);
-      });
+        setAnalyticsError(false);
+      }).catch(error => {
+        setAnalyticsError(true);
+        reportNetworkError(error, () => {
+          setAnalytics(null);
+          setActiveTab('analytics');
+        });
+      }).finally(() => setAnalyticsLoading(false));
     }
-  }, [activeTab, id]);
+  }, [activeTab, id, analyticsRetry]);
 
   const handleTabPress = useCallback((tab: Tab, index: number) => {
     Haptics.selectionAsync();
@@ -117,15 +126,22 @@ export default function ProductDetailScreen() {
     );
   }
 
-  if (!product) {
+  if (loadError && !product) {
     return (
       <View style={[s.root, { paddingTop: insets.top }]}>
         <EmptyState
-          icon="package"
-          title="Product not found"
-          description="This product may have been deleted or the link is invalid."
-          action={{ label: 'Go back', onPress: () => router.back() }}
+          icon="wifi-off"
+          title="Product couldn't load"
+          description="Check your connection and try again."
+          action={{ label: 'Try again', onPress: loadProduct, icon: 'refresh-cw' }}
         />
+      </View>
+    );
+  }
+  if (!product) {
+    return (
+      <View style={[s.root, { paddingTop: insets.top }]}>
+        <EmptyState icon="package" title="Product not found" description="This product may have been deleted or the link is invalid." action={{ label: 'Go back', onPress: () => router.back() }} />
       </View>
     );
   }
@@ -162,9 +178,19 @@ export default function ProductDetailScreen() {
               Alert.alert('Product Options', '', [
                 { text: product.status === 'active' ? 'Archive' : 'Publish', onPress: () => {
                   if (product.status === 'active') {
-                    archiveProduct(product.id).then(p => p && setProduct(p));
+                    archiveProduct(product.id).then(p => {
+                      if (p) { setProduct(p); Alert.alert('Product archived'); }
+                    }).catch(error => {
+                      reportNetworkError(error, () => archiveProduct(product.id).then(p => p && setProduct(p)));
+                      Alert.alert('Could not archive product', 'Check your connection and try again.');
+                    });
                   } else {
-                    publishProduct(product.id).then(p => p && setProduct(p));
+                    publishProduct(product.id).then(p => {
+                      if (p) { setProduct(p); Alert.alert('Product published'); }
+                    }).catch(error => {
+                      reportNetworkError(error, () => publishProduct(product.id).then(p => p && setProduct(p)));
+                      Alert.alert('Could not publish product', 'Check your connection and try again.');
+                    });
                   }
                 }},
                 { text: 'Duplicate', onPress: () => Alert.alert('Duplicating…') },
@@ -218,7 +244,7 @@ export default function ProductDetailScreen() {
         {activeTab === 'orders'     && <OrdersTab     product={product} router={router} />}
         {activeTab === 'production' && <ProductionTab product={product} router={router} />}
         {activeTab === 'content'    && <ContentTab    product={product} router={router} id={id!} />}
-        {activeTab === 'analytics'  && <AnalyticsTab  analytics={analytics} loading={analyticsLoading} product={product} />}
+        {activeTab === 'analytics'  && <AnalyticsTab  analytics={analytics} loading={analyticsLoading} error={analyticsError} onRetry={() => { setAnalyticsError(false); setAnalyticsRetry(value => value + 1); }} product={product} />}
         {activeTab === 'store'      && <StoreTab      product={product} pricing={pricing} coverImage={coverImage} router={router} id={id!} />}
       </ScrollView>
 
@@ -228,7 +254,7 @@ export default function ProductDetailScreen() {
         onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push(('/add-product?editId=' + id) as never); }}
         activeOpacity={0.85}
       >
-        <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.fabGrad}>
+        <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.fabGrad}>
           <Feather name="edit-2" size={ICON.md} color="#fff" />
         </LinearGradient>
       </TouchableOpacity>
@@ -244,12 +270,13 @@ function OverviewTab({ product, pricing, coverImage }: {
   pricing: ReturnType<typeof calcPricing>;
   coverImage: Product['media'][0] | undefined;
 }) {
+  const { theme } = useAppTheme();
   const statusVariant = product.status === 'active' ? 'success' : product.status === 'draft' ? 'warning' : product.status === 'archived' ? 'neutral' : 'info';
 
   // Fix 8: show '—' if price is 0 or undefined; show '—' for margin if cost is undefined
-  const priceDisplay = pricing.retailPrice ? formatCurrency(pricing.retailPrice) : '—';
+  const priceDisplay = pricing.retailPriceCents ? formatCurrency(pricing.retailPriceCents) : '—';
   const marginDisplay = pricing.marginPercent !== undefined ? `${pricing.marginPercent.toFixed(0)}%` : '—';
-  const profitDisplay = pricing.netProfit !== undefined ? formatCurrency(pricing.netProfit) : '—';
+  const profitDisplay = pricing.netProfitCents !== undefined ? formatCurrency(pricing.netProfitCents) : '—';
 
   return (
     <View style={{ gap: SP.md, paddingTop: SP.md }}>
@@ -258,7 +285,7 @@ function OverviewTab({ product, pricing, coverImage }: {
         {coverImage ? (
           <Image source={{ uri: coverImage.uri }} style={ov.heroImage} resizeMode="cover" />
         ) : (
-          <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={ov.heroPlaceholder}>
+          <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={ov.heroPlaceholder}>
             <Feather name="package" size={ICON.xxl} color="rgba(255,255,255,0.4)" />
           </LinearGradient>
         )}
@@ -272,8 +299,8 @@ function OverviewTab({ product, pricing, coverImage }: {
         <View style={ov.heroPriceSection}>
           <View style={ov.heroPriceRow}>
             <Text style={ov.heroPrice}>{priceDisplay}</Text>
-            {pricing.compareAtPrice && (
-              <Text style={ov.heroCompare}>{formatCurrency(pricing.compareAtPrice)}</Text>
+            {pricing.compareAtPriceCents && (
+              <Text style={ov.heroCompare}>{formatCurrency(pricing.compareAtPriceCents)}</Text>
             )}
             {pricing.discountPercent && (
               <StatusBadge label={`-${pricing.discountPercent}%`} variant="error" small />
@@ -283,7 +310,7 @@ function OverviewTab({ product, pricing, coverImage }: {
             <Text style={ov.heroMargin}>
               Profit: {profitDisplay} · Margin: {pricing.marginPercent.toFixed(1)}%
             </Text>
-          ) : pricing.cost === undefined ? (
+          ) : pricing.costCents === undefined ? (
             <Text style={ov.heroMargin}>Margin: — (add cost to calculate)</Text>
           ) : null}
         </View>
@@ -291,7 +318,7 @@ function OverviewTab({ product, pricing, coverImage }: {
 
       {/* Stat strip */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={ov.statStrip}>
-        <StatCard label="Revenue" value={formatCurrency(product.totalRevenue)} icon="dollar-sign" accent={GOLD} style={ov.statCard} />
+        <StatCard label="Revenue" value={formatCurrency(product.totalRevenueCents)} icon="dollar-sign" accent={GOLD} style={ov.statCard} />
         <StatCard label="Sold" value={String(product.totalSales)} icon="shopping-bag" accent={PURPLE} style={ov.statCard} />
         <StatCard label="Stock" value={String(product.inventory.totalStock)} icon="layers" accent={CYAN} style={ov.statCard} />
         <StatCard
@@ -395,14 +422,17 @@ const ov = StyleSheet.create({
 function VariantsTab({ product, setProduct, id }: { product: Product; setProduct: (p: Product) => void; id: string }) {
   // Fix 2: bulk edit price handler
   const handleBulkPrice = () => {
-    const currentPrice = product.pricing.price;
+    const currentPrice = product.pricing.priceCents;
     Alert.alert('Bulk Edit Price', `Current price: ${formatCurrency(currentPrice)}`, [
       {
         text: `Set all to ${formatCurrency(currentPrice)}`,
         onPress: () => {
-          const updatedVariants = product.variants.map(v => ({ ...v, price: currentPrice }));
+          const updatedVariants = product.variants.map(v => ({ ...v, priceCents: currentPrice }));
           updateProduct(id, { variants: updatedVariants }).then(p => {
-            if (p) setProduct(p);
+            if (p) { setProduct(p); Alert.alert('Variant prices updated'); }
+          }).catch(error => {
+            reportNetworkError(error, () => updateProduct(id, { variants: updatedVariants }).then(p => { if (p) setProduct(p); }));
+            Alert.alert('Could not update variants', 'Check your connection and try again.');
           });
         },
       },
@@ -423,7 +453,10 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
         onPress: () => {
           const updatedVariants = product.variants.map(v => ({ ...v, inventoryQuantity: v.inventoryQuantity + 5 }));
           updateProduct(id, { variants: updatedVariants }).then(p => {
-            if (p) setProduct(p);
+            if (p) { setProduct(p); Alert.alert('Inventory updated'); }
+          }).catch(error => {
+            reportNetworkError(error, () => updateProduct(id, { variants: updatedVariants }).then(p => { if (p) setProduct(p); }));
+            Alert.alert('Could not update inventory', 'Check your connection and try again.');
           });
         },
       },
@@ -432,7 +465,10 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
         onPress: () => {
           const updatedVariants = product.variants.map(v => ({ ...v, inventoryQuantity: Math.max(0, v.inventoryQuantity - 5) }));
           updateProduct(id, { variants: updatedVariants }).then(p => {
-            if (p) setProduct(p);
+            if (p) { setProduct(p); Alert.alert('Inventory updated'); }
+          }).catch(error => {
+            reportNetworkError(error, () => updateProduct(id, { variants: updatedVariants }).then(p => { if (p) setProduct(p); }));
+            Alert.alert('Could not update inventory', 'Check your connection and try again.');
           });
         },
       },
@@ -441,7 +477,10 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
         onPress: () => {
           const updatedVariants = product.variants.map(v => ({ ...v, inventoryQuantity: 0 }));
           updateProduct(id, { variants: updatedVariants }).then(p => {
-            if (p) setProduct(p);
+            if (p) { setProduct(p); Alert.alert('Inventory updated'); }
+          }).catch(error => {
+            reportNetworkError(error, () => updateProduct(id, { variants: updatedVariants }).then(p => { if (p) setProduct(p); }));
+            Alert.alert('Could not update inventory', 'Check your connection and try again.');
           });
         },
       },
@@ -485,7 +524,7 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
       ) : (
         <View style={{ paddingHorizontal: SP.md, gap: SP.sm }}>
           {product.variants.map(variant => {
-            const price = variant.price ?? product.pricing.price;
+            const price = variant.priceCents ?? product.pricing.priceCents;
             const inStock = variant.inventoryQuantity > 0;
             const lowStock = variant.inventoryQuantity <= 5 && variant.inventoryQuantity > 0;
             return (
@@ -568,10 +607,23 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
   const router = useRouter();
   const inv = product.inventory;
   const [invItems, setInvItems] = useState<InventoryItem[]>([]);
+  const [invLoading, setInvLoading] = useState(true);
+  const [invError, setInvError] = useState(false);
 
-  useEffect(() => {
-    getItemsByProduct(product.id).then(setInvItems).catch(() => {});
+  const loadInventoryItems = useCallback(async () => {
+    setInvLoading(true);
+    try {
+      setInvItems(await getItemsByProduct(product.id));
+      setInvError(false);
+    } catch (error) {
+      setInvError(true);
+      reportNetworkError(error, loadInventoryItems);
+    } finally {
+      setInvLoading(false);
+    }
   }, [product.id]);
+
+  useEffect(() => { void loadInventoryItems(); }, [loadInventoryItems]);
 
   const totalOnHand   = invItems.reduce((s, i) => s + i.onHand, 0);
   const totalAvail    = invItems.reduce((s, i) => s + i.available, 0);
@@ -579,11 +631,16 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
 
   // Fix 1: doAdjust calls adjustInventory then reloads product
   const doAdjust = async (delta: number, reason: string) => {
-    await adjustInventory(product.id, undefined, delta, reason);
-    const refreshed = await getProduct(id);
-    if (refreshed) setProduct(refreshed);
-    // Reload inv items
-    getItemsByProduct(product.id).then(setInvItems).catch(() => {});
+    try {
+      await adjustInventory(product.id, undefined, delta, reason);
+      const refreshed = await getProduct(id);
+      if (refreshed) setProduct(refreshed);
+      await loadInventoryItems();
+      Alert.alert('Stock updated');
+    } catch (error) {
+      reportNetworkError(error, () => doAdjust(delta, reason));
+      Alert.alert('Could not update stock', 'Check your connection and try again.');
+    }
   };
 
   // Fix 1: Adjust Stock button with Alert options
@@ -645,6 +702,16 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
           style={{ flex: 1 }}
         />
       </View>
+
+      {invLoading && <View style={{ paddingHorizontal: SP.md }}><LoadingSkeleton height={72} /></View>}
+      {invError && !invLoading && (
+        <EmptyState
+          icon="wifi-off"
+          title="Inventory details couldn't load"
+          description="Your product totals are still shown above."
+          action={{ label: 'Try again', onPress: loadInventoryItems, icon: 'refresh-cw' }}
+        />
+      )}
 
       {/* Inventory items from inventoryService */}
       {invItems.length > 0 && (
@@ -745,57 +812,14 @@ const invS = StyleSheet.create({
 
 // ─── Orders Tab ───────────────────────────────────────────────────────────────
 
-const DEMO_ORDERS = [
-  { id: 'ord_1042', customer: 'Alex Carter', qty: 2, date: '2025-01-12', status: 'fulfilled' as const, total: 136 },
-  { id: 'ord_1038', customer: 'Sam Rivera', qty: 1, date: '2025-01-10', status: 'processing' as const, total: 68 },
-  { id: 'ord_1031', customer: 'Morgan Lee', qty: 3, date: '2025-01-07', status: 'fulfilled' as const, total: 204 },
-];
-
 function OrdersTab({ product, router }: { product: Product; router: ReturnType<typeof useRouter> }) {
-  const hasOrders = product.totalSales > 0;
-
-  if (!hasOrders && DEMO_ORDERS.length === 0) {
-    return (
-      <EmptyState
-        icon="shopping-bag"
-        title="No orders yet"
-        description="Orders for this product appear here."
-        style={{ marginTop: SP.xl }}
-      />
-    );
-  }
-
   return (
-    <View style={{ gap: SP.md, paddingTop: SP.md }}>
-      <SectionHeader title={`Orders containing this product`} />
-      <View style={{ paddingHorizontal: SP.md, gap: SP.sm }}>
-        {DEMO_ORDERS.map(order => (
-          <BrandthreadCard key={order.id}>
-            <View style={ord.orderHeader}>
-              <View>
-                <Text style={ord.orderId}>#{order.id.replace('ord_', '')}</Text>
-                <Text style={ord.customer}>{order.customer}</Text>
-              </View>
-              <StatusBadge
-                label={order.status.toUpperCase()}
-                variant={order.status === 'fulfilled' ? 'success' : 'info'}
-              />
-            </View>
-            <View style={ord.orderMeta}>
-              <Text style={ord.metaText}>Qty: {order.qty} · {formatCurrency(order.total)}</Text>
-              <Text style={ord.metaDate}>{order.date}</Text>
-            </View>
-            <TouchableOpacity
-              style={ord.viewBtn}
-              onPress={() => Alert.alert('View Order', `Navigate to order #${order.id}`)}
-            >
-              <Text style={ord.viewBtnText}>View order</Text>
-              <Feather name="arrow-right" size={12} color={PURPLE_LIGHT} />
-            </TouchableOpacity>
-          </BrandthreadCard>
-        ))}
-      </View>
-    </View>
+    <EmptyState
+      icon="shopping-bag"
+      title="Order details unavailable"
+      description="Product-specific orders will appear here once the live order filter is connected."
+      style={{ marginTop: SP.xl }}
+    />
   );
 }
 
@@ -820,6 +844,7 @@ const STAGE_MAP: Record<string, number> = {
 };
 
 function ProductionTab({ product, router }: { product: Product; router: ReturnType<typeof useRouter> }) {
+  const { theme } = useAppTheme();
   const mfg = product.manufacturing;
   const stageIdx = STAGE_MAP[mfg.stage] ?? -1;
 
@@ -846,7 +871,7 @@ function ProductionTab({ product, router }: { product: Product; router: ReturnTy
             const current = idx === stageIdx;
             return (
               <View key={stage} style={pt.stageItem}>
-                <View style={[pt.stageDot, done && pt.stageDotDone, current && pt.stageDotCurrent]}>
+                <View style={[pt.stageDot, done && { backgroundColor: theme.accent, borderColor: theme.accent }, current && { backgroundColor: theme.secondary, borderColor: theme.secondary, shadowColor: theme.shadowColor }]}>
                   {done && <Feather name="check" size={8} color="#fff" />}
                 </View>
                 {idx < PRODUCTION_STAGES.length - 1 && (
@@ -912,7 +937,6 @@ const pt = StyleSheet.create({
   stageDot:        { width: 18, height: 18, borderRadius: 9, backgroundColor: CARD, borderWidth: 1,
                      borderColor: BORDER, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
   stageDotDone:    { backgroundColor: PURPLE, borderColor: PURPLE },
-  stageDotCurrent: { backgroundColor: CYAN, borderColor: CYAN, ...SHADOW_PURPLE },
   stageLine:       { position: 'absolute', top: 8, left: '50%', right: '-50%', height: 1, backgroundColor: BORDER },
   stageLineDone:   { backgroundColor: PURPLE },
   stageLabel:      { fontSize: 8, fontFamily: FONT.medium, color: MUTED, marginTop: 4, textAlign: 'center' },
@@ -923,15 +947,7 @@ const pt = StyleSheet.create({
 
 // ─── Content Tab ──────────────────────────────────────────────────────────────
 
-const DEMO_CONTENT = [
-  { id: 'c1', type: 'Reel', date: '2025-01-11', views: 12400, clicks: 342, purchases: 18, grad: [PURPLE, CYAN] as [string, string] },
-  { id: 'c2', type: 'Story', date: '2025-01-09', views: 5800, clicks: 187, purchases: 9,  grad: [ORANGE, GOLD] as [string, string] },
-  { id: 'c3', type: 'Post',  date: '2025-01-06', views: 8200, clicks: 261, purchases: 14, grad: [BLUE, CYAN] as [string, string] },
-];
-
 function ContentTab({ product, router, id }: { product: Product; router: ReturnType<typeof useRouter>; id: string }) {
-  const hasContent = DEMO_CONTENT.length > 0;
-
   return (
     <View style={{ gap: SP.md, paddingTop: SP.md }}>
       <SectionHeader
@@ -939,46 +955,12 @@ function ContentTab({ product, router, id }: { product: Product; router: ReturnT
         action={{ label: 'Create post', onPress: () => router.push('/create-post' as never) }}
       />
 
-      {!hasContent ? (
-        <EmptyState
-          icon="video"
-          title="No posts yet"
-          description="Create content with this product tagged."
-          action={{ label: 'Create post', onPress: () => router.push('/create-post' as never), icon: 'video' }}
-        />
-      ) : (
-        <View style={{ paddingHorizontal: SP.md, gap: SP.sm }}>
-          {DEMO_CONTENT.map(item => (
-            <BrandthreadCard key={item.id}>
-              <View style={ct.contentRow}>
-                <LinearGradient colors={item.grad} style={ct.thumbnail} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-                  <Feather name="play-circle" size={20} color="rgba(255,255,255,0.8)" />
-                </LinearGradient>
-                <View style={{ flex: 1 }}>
-                  <View style={ct.contentHeader}>
-                    <StatusBadge label={item.type.toUpperCase()} variant="purple" small />
-                    <Text style={ct.contentDate}>{item.date}</Text>
-                  </View>
-                  <View style={ct.statsRow}>
-                    <View style={ct.stat}>
-                      <Feather name="eye" size={10} color={MUTED} />
-                      <Text style={ct.statText}>{(item.views / 1000).toFixed(1)}k</Text>
-                    </View>
-                    <View style={ct.stat}>
-                      <Feather name="mouse-pointer" size={10} color={MUTED} />
-                      <Text style={ct.statText}>{item.clicks}</Text>
-                    </View>
-                    <View style={ct.stat}>
-                      <Feather name="shopping-bag" size={10} color={SUCCESS} />
-                      <Text style={[ct.statText, { color: SUCCESS }]}>{item.purchases}</Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            </BrandthreadCard>
-          ))}
-        </View>
-      )}
+      <EmptyState
+        icon="video"
+        title="No posts yet"
+        description="Create content with this product tagged. Performance appears here once real post analytics are available."
+        action={{ label: 'Create post', onPress: () => router.push('/create-post' as never), icon: 'video' }}
+      />
     </View>
   );
 }
@@ -996,12 +978,25 @@ const ct = StyleSheet.create({
 // ─── Analytics Tab ────────────────────────────────────────────────────────────
 
 function AnalyticsTab({
-  analytics, loading, product,
+  analytics, loading, error, onRetry, product,
 }: {
   analytics: Awaited<ReturnType<typeof getProductAnalytics>> | null;
   loading: boolean;
+  error: boolean;
+  onRetry: () => void;
   product: Product;
 }) {
+  const { theme } = useAppTheme();
+  if (error) {
+    return (
+      <EmptyState
+        icon="wifi-off"
+        title="Analytics couldn't load"
+        description="Check your connection and try again."
+        action={{ label: 'Try again', onPress: onRetry, icon: 'refresh-cw' }}
+      />
+    );
+  }
   if (loading || !analytics) {
     return (
       <View style={{ padding: SP.md, gap: SP.md }}>
@@ -1013,7 +1008,7 @@ function AnalyticsTab({
   }
 
   // Fix 5: use revenueByDay data for bar chart with proper max revenue scaling
-  const maxRev = Math.max(...analytics.revenueByDay.map(d => d.revenue), 1);
+  const maxRev = Math.max(...analytics.revenueByDay.map(d => d.revenueCents), 1);
 
   return (
     <View style={{ gap: SP.md, paddingTop: SP.md }}>
@@ -1021,7 +1016,7 @@ function AnalyticsTab({
 
       {/* 2-row stat grid */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: SP.sm, paddingHorizontal: SP.md }}>
-        <StatCard label="Revenue" value={formatCurrency(analytics.revenue)} icon="dollar-sign" accent={GOLD} style={{ minWidth: 120 }} />
+        <StatCard label="Revenue" value={formatCurrency(analytics.revenueCents)} icon="dollar-sign" accent={GOLD} style={{ minWidth: 120 }} />
         <StatCard label="Units Sold" value={String(analytics.unitsSold)} icon="shopping-bag" accent={PURPLE} style={{ minWidth: 120 }} />
         <StatCard label="Page Views" value={String(analytics.pageViews)} icon="eye" accent={CYAN} style={{ minWidth: 120 }} />
         <StatCard label="Add to Cart" value={String(analytics.addToCartCount)} icon="shopping-cart" accent={BLUE} style={{ minWidth: 120 }} />
@@ -1039,12 +1034,12 @@ function AnalyticsTab({
         <BrandthreadCard>
           <View style={an.chartRow}>
             {analytics.revenueByDay.map((day, idx) => {
-              const barH = Math.max(4, (day.revenue / maxRev) * 60);
+              const barH = Math.max(4, (day.revenueCents / maxRev) * 60);
               return (
                 <View key={day.date} style={an.barWrap}>
                   <View style={an.barContainer}>
                     <LinearGradient
-                      colors={GRAD_PRIMARY}
+                      colors={theme.primaryGradient}
                       start={{ x: 0, y: 1 }}
                       end={{ x: 0, y: 0 }}
                       style={[an.bar, { height: barH }]}
@@ -1122,6 +1117,7 @@ function StoreTab({
   router: ReturnType<typeof useRouter>;
   id: string;
 }) {
+  const { theme } = useAppTheme();
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [descOpen, setDescOpen] = useState(false);
@@ -1141,7 +1137,7 @@ function StoreTab({
         {coverImage ? (
           <Image source={{ uri: coverImage.uri }} style={st.coverImg} resizeMode="cover" />
         ) : (
-          <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.coverPlaceholder}>
+          <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.coverPlaceholder}>
             <Feather name="image" size={ICON.xxl} color="rgba(255,255,255,0.4)" />
           </LinearGradient>
         )}
@@ -1151,9 +1147,9 @@ function StoreTab({
           <View>
             <Text style={st.productName}>{product.name}</Text>
             <View style={st.priceRow}>
-              <Text style={st.price}>{formatCurrency(pricing.retailPrice)}</Text>
-              {pricing.compareAtPrice && (
-                <Text style={st.comparePrice}>{formatCurrency(pricing.compareAtPrice)}</Text>
+              <Text style={st.price}>{formatCurrency(pricing.retailPriceCents)}</Text>
+              {pricing.compareAtPriceCents && (
+                <Text style={st.comparePrice}>{formatCurrency(pricing.compareAtPriceCents)}</Text>
               )}
               {pricing.discountPercent && (
                 <StatusBadge label={`Save ${pricing.discountPercent}%`} variant="error" small />
@@ -1215,7 +1211,7 @@ function StoreTab({
 
           {/* Pre-order info */}
           {product.salesModel === 'pre-order' && product.preorderSettings && (
-            <GradientCard colors={['rgba(59,130,246,0.12)', 'rgba(34,211,238,0.04)'] as [string, string]}>
+            <GradientCard colors={[theme.accentDim, theme.secondaryDim]}>
               <View style={st.preorderRow}>
                 <Feather name="clock" size={14} color={BLUE} />
                 <Text style={st.preorderText}>
@@ -1304,7 +1300,7 @@ const st = StyleSheet.create({
 
 // ─── Root Styles ──────────────────────────────────────────────────────────────
 
-const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
+const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string; shadowColor: string }) => {
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   return StyleSheet.create({
   root:         { flex: 1, backgroundColor: BG },
@@ -1329,7 +1325,7 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
                   backgroundColor: PURPLE, borderRadius: RADIUS.pill },
   tabContent:   { flex: 1 },
   fab:          { position: 'absolute', right: SP.lg, width: 56, height: 56, borderRadius: 28,
-                  overflow: 'hidden', ...SHADOW_PURPLE },
+                  overflow: 'hidden', shadowColor: theme.shadowColor, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 16, elevation: 8 },
   fabGrad:      { width: 56, height: 56, alignItems: 'center', justifyContent: 'center' },
   });
 };

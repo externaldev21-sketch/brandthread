@@ -21,6 +21,7 @@ import {
   FONT, FS, SP, RADIUS, RED,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
+import { formatCents, parseDecimalToCents } from '@/lib/money';
 
 const STEPS = ['Service', 'Rate & Bio', 'Portfolio'];
 
@@ -50,8 +51,7 @@ export default function FreelancerApplyScreen() {
           setIsEdit(true);
           setServiceType(freelancer.serviceType);
           setTagsText((freelancer.skillTags ?? []).join(', '));
-          const dollars = freelancer.hourlyRateCents / 100;
-          setRateText(dollars % 1 === 0 ? String(dollars) : dollars.toFixed(2));
+          setRateText(formatCents(freelancer.hourlyRateCents).slice(1));
           setBio(freelancer.bio ?? '');
           const u = [...(freelancer.portfolioUrls ?? [])];
           while (u.length < 4) u.push('');
@@ -66,10 +66,10 @@ export default function FreelancerApplyScreen() {
     return () => { mounted = false; };
   }, [api]);
 
-  const rateCents = Math.round(parseFloat(rateText || '0') * 100);
+  const rateCents = rateText.trim() ? parseDecimalToCents(rateText) : 0;
   const stepValid =
     step === 0 ? serviceType !== null
-    : step === 1 ? Number.isFinite(rateCents) && rateCents >= 100
+    : step === 1 ? rateCents !== null && rateCents >= 100
     : true;
 
   const next = () => {
@@ -114,7 +114,7 @@ export default function FreelancerApplyScreen() {
       const portfolioUrls = urls.map((u) => u.trim()).filter(Boolean);
       const { freelancer } = await api.freelancers.apply({
         serviceType,
-        hourlyRateCents: rateCents,
+        hourlyRateCents: rateCents ?? 0,
         bio: bio.trim(),
         skillTags,
         portfolioUrls,
@@ -214,7 +214,7 @@ export default function FreelancerApplyScreen() {
                 />
                 <Text style={styles.rateSuffix}>/hr</Text>
               </View>
-              {rateText !== '' && rateCents < 100 && (
+              {rateText !== '' && (rateCents === null || rateCents < 100) && (
                 <Text style={styles.errorText}>Minimum rate is $1/hr</Text>
               )}
 

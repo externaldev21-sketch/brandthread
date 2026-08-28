@@ -23,6 +23,7 @@ import { eq, and, desc, inArray, sql, or } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { moderateMessage } from "../lib/contentModerator";
 import { publishNotification } from "./notifications-feed";
+import { getSellerVacationStatus } from "../lib/sellerAvailability";
 
 const router = Router();
 router.use(requireAuth);
@@ -198,6 +199,22 @@ router.post("/", async (req, res) => {
   // ── Block check: recipient has blocked sender ─────────────────────────────
   if (await isBlockedBy(myUserId, participant.userId)) {
     return res.status(403).json({ error: "Unable to start this conversation.", code: "BLOCKED" });
+  }
+
+  const [recipient] = await db
+    .select({ accountType: users.accountType })
+    .from(users)
+    .where(eq(users.clerkId, participant.userId))
+    .limit(1);
+  if (recipient?.accountType === "seller") {
+    const vacation = await getSellerVacationStatus(participant.userId);
+    if (vacation.active) {
+      return res.status(409).json({
+        error: vacation.message,
+        code: "SELLER_ON_VACATION",
+        vacationUntil: vacation.until?.toISOString() ?? null,
+      });
+    }
   }
 
   // ── DM privacy: honour recipient's "who can message me" preference ────────
@@ -399,6 +416,23 @@ router.post("/:id/messages", async (req, res) => {
 
     if (blockRows.length > 0) {
       return res.status(403).json({ error: "Unable to send message.", code: "BLOCKED" });
+    }
+
+    if (sender.accountType !== "seller") {
+      const sellerRecipients = await db
+        .select({ clerkId: users.clerkId })
+        .from(users)
+        .where(and(inArray(users.clerkId, otherIds), eq(users.accountType, "seller")));
+      for (const recipient of sellerRecipients) {
+        const vacation = await getSellerVacationStatus(recipient.clerkId);
+        if (vacation.active) {
+          return res.status(409).json({
+            error: vacation.message,
+            code: "SELLER_ON_VACATION",
+            vacationUntil: vacation.until?.toISOString() ?? null,
+          });
+        }
+      }
     }
   }
 

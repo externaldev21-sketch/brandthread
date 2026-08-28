@@ -3,7 +3,7 @@
  * Route: /design-mockup-to-model
  */
 import React, { useState } from 'react';
-import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert, Image, Dimensions,
@@ -19,9 +19,6 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM,
-  GRAD_PRIMARY, GRAD_CARD_GLOW,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
@@ -52,7 +49,9 @@ const GRAD_PALETTES: Record<number, readonly [string, string]> = {
 };
 
 export default function MockupToModelScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const s = createStyles(theme);
   const router = useRouter();
   const [step, setStep] = useState<Step>(1);
   const [mockupUri, setMockupUri] = useState<string | null>(null);
@@ -125,15 +124,7 @@ export default function MockupToModelScreen() {
           <View style={s.grid}>
             {results.imageUris.map((uri, idx) => (
               <View key={uri} style={s.resultCard}>
-                <LinearGradient
-                  colors={GRAD_PALETTES[idx % 4]}
-                  style={s.resultGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <Feather name="user" size={32} color="rgba(255,255,255,0.5)" />
-                  <Text style={s.resultLabel}>Photo {idx + 1}</Text>
-                </LinearGradient>
+                <Image source={{ uri }} style={s.resultGradient} resizeMode="cover" />
                 <View style={s.resultMeta}>
                   <Text style={s.resultMetaText}>{results.modelStyle} · {results.sceneStyle}</Text>
                 </View>
@@ -219,7 +210,7 @@ export default function MockupToModelScreen() {
               )}
             </TouchableOpacity>
             {mockupUri && (
-              <GradientCard style={s.nextCard} onPress={() => setStep(2)}>
+              <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={() => setStep(2)}>
                 <View style={s.nextInner}>
                   <Text style={s.nextText}>Next: Choose model & scene</Text>
                   <Feather name="arrow-right" size={ICON.md} color="#fff" />
@@ -264,7 +255,7 @@ export default function MockupToModelScreen() {
               ))}
             </ScrollView>
 
-            <GradientCard style={s.nextCard} onPress={() => setStep(3)}>
+            <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={() => setStep(3)}>
               <View style={s.nextInner}>
                 <Text style={s.nextText}>Next: Lighting & format</Text>
                 <Feather name="arrow-right" size={ICON.md} color="#fff" />
@@ -319,7 +310,7 @@ export default function MockupToModelScreen() {
               </TouchableOpacity>
             </View>
 
-            <GradientCard style={s.nextCard} onPress={() => setStep(4)}>
+            <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={() => setStep(4)}>
               <View style={s.nextInner}>
                 <Text style={s.nextText}>Next: Review & generate</Text>
                 <Feather name="arrow-right" size={ICON.md} color="#fff" />
@@ -349,7 +340,7 @@ export default function MockupToModelScreen() {
               ))}
             </View>
 
-            <GradientCard style={s.nextCard} onPress={handleGenerate}>
+            <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={handleGenerate}>
               <View style={s.nextInner}>
                 <Feather name="zap" size={ICON.md} color="#fff" />
                 <Text style={s.nextText}>Generate {count} photo{count !== 1 ? 's' : ''}</Text>
@@ -362,7 +353,9 @@ export default function MockupToModelScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  return StyleSheet.create({
   stepIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -708,4 +701,5 @@ const s = StyleSheet.create({
     fontSize: FS.sm,
     color: FG,
   },
-});
+  });
+};

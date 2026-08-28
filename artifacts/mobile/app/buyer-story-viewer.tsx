@@ -21,6 +21,7 @@ import {
 } from '@/services/socialService';
 import type { Story, StoryMedia } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
+import { reportNetworkError } from '@/lib/networkNotice';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -55,6 +56,8 @@ export default function BuyerStoryViewer() {
   // Like state keyed by storyId
   const [likedSet, setLikedSet] = useState<Set<string>>(new Set());
   const [likesCounts, setLikesCounts] = useState<Record<string, number>>({});
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const progress = useRef(new Animated.Value(0)).current;
   const ids = allStoryIds ? allStoryIds.split(',').filter(Boolean) : storyId ? [storyId] : [];
@@ -63,6 +66,7 @@ export default function BuyerStoryViewer() {
   const currentSlide: StoryMedia | undefined = currentStory?.media[slideIdx];
 
   const loadStories = useCallback(async () => {
+    setLoadError(false);
     try {
       const all = await getStories();
       const now = Date.now();
@@ -74,7 +78,12 @@ export default function BuyerStoryViewer() {
         const idx = filtered.findIndex(s => s.id === storyId);
         if (idx >= 0) setStoryIdx(idx);
       }
-    } catch (_) {}
+    } catch (error) {
+      setLoadError(true);
+      reportNetworkError(error, () => loadStories());
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -114,7 +123,11 @@ export default function BuyerStoryViewer() {
       const res = await api.social.likeStory(sid);
       setLikesCounts(prev => ({ ...prev, [sid]: res.likesCount }));
       setLikedSet(prev => { const n = new Set(prev); res.liked ? n.add(sid) : n.delete(sid); return n; });
-    } catch { /* keep optimistic */ }
+    } catch {
+      setLikedSet(prev => { const n = new Set(prev); wasLiked ? n.add(sid) : n.delete(sid); return n; });
+      setLikesCounts(prev => ({ ...prev, [sid]: Math.max(0, (prev[sid] ?? 0) + (wasLiked ? 1 : -1)) }));
+      Alert.alert('Could not update like', 'Try again.');
+    }
   };
 
   useEffect(() => {
@@ -167,7 +180,10 @@ export default function BuyerStoryViewer() {
   ).current;
 
   if (!currentStory || !currentSlide) {
-    return <View style={styles.container} />;
+    return <View style={[styles.container, styles.loadState]}>
+      <Text style={styles.loadText}>{loading ? 'Loading story…' : loadError ? 'Couldn’t load story' : 'This story is no longer available.'}</Text>
+      {loadError ? <TouchableOpacity onPress={loadStories}><Text style={styles.retryText}>Try again</Text></TouchableOpacity> : null}
+    </View>;
   }
 
   const isMyStory = false; // Viewer perspective
@@ -687,5 +703,8 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontFamily: FONT.medium,
     minWidth: 16,
   },
+  loadState: { alignItems: 'center', justifyContent: 'center', gap: SP.sm },
+  loadText: { color: ON_DARK, fontFamily: FONT.regular, fontSize: FS.sm },
+  retryText: { color: PURPLE, fontFamily: FONT.semibold, fontSize: FS.sm },
   });
 };

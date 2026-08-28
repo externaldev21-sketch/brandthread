@@ -1,23 +1,14 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import {
-  View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN, SUCCESS, SUCCESS_DIM,
-  BLUE, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import {
-  BrandthreadCard, BrandthreadHeader, GradientCard, PrimaryButton,
-  SecondaryButton, StatusBadge, FormInput,
-} from '@/components/BrandthreadUI';
+import { BrandthreadCard, BrandthreadHeader, GradientCard, PrimaryButton, SecondaryButton, StatusBadge, FormInput } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 import { Dispute, DisputeEvidence, DISPUTE_TYPES } from '@/services/orderTypes';
+import { formatCents } from '@/lib/money';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -108,13 +99,13 @@ export default function DisputeDetailScreen() {
           type:             (data.reason ?? 'general') as any,
           status:           mapStatus(data.status) as any,
           customerClaim:    data.customerClaim ?? '',
-          amount:           data.amount,
+           amountCents:      data.amountCents,
           evidenceDeadline: data.evidenceDeadline ?? undefined,
           evidence:         (data.evidence ?? []).filter((e: any) => !e.description?.startsWith('[INTERNAL NOTE]')),
           internalNotes:    (data.evidence ?? [])
             .filter((e: any) => e.description?.startsWith('[INTERNAL NOTE]'))
             .map((e: any) => e.description.replace('[INTERNAL NOTE] ', '')),
-          potentialHold:    data.amount,
+           potentialHoldCents: data.amountCents,
           createdAt:        data.createdAt,
           updatedAt:        data.updatedAt,
         };
@@ -126,7 +117,7 @@ export default function DisputeDetailScreen() {
           setOrder({
             orderNumber: o.orderNumber,
             createdAt:   o.createdAt,
-            payment:     { total: o.totalCents / 100 },
+             payment:     { totalCents: o.totalCents },
             lineItems:   [],
             shipments:   o.trackingNumber ? [{ trackingNumber: o.trackingNumber, carrier: o.carrier }] : [],
           });
@@ -144,7 +135,7 @@ export default function DisputeDetailScreen() {
         setOrder({
           orderNumber: o.orderNumber,
           createdAt:   o.createdAt,
-          payment:     { total: o.payment.total },
+           payment:     { totalCents: o.payment.totalCents },
           lineItems:   o.lineItems,
           shipments:   o.shipments,
         });
@@ -253,7 +244,7 @@ export default function DisputeDetailScreen() {
           <Text style={styles.alertClaim}>Customer claim: {dispute.customerClaim.slice(0, 120)}{dispute.customerClaim.length > 120 ? '…' : ''}</Text>
           <View style={styles.alertAmountRow}>
             <Text style={styles.alertAmountLabel}>Disputed amount</Text>
-            <Text style={styles.alertAmount}>${dispute.amount.toFixed(2)}</Text>
+             <Text style={styles.alertAmount}>{formatCents(dispute.amountCents)}</Text>
           </View>
           {dispute.evidenceDeadline && (
             <View style={styles.deadlineRow}>
@@ -289,12 +280,12 @@ export default function DisputeDetailScreen() {
           </View>
           <View style={styles.contextRow}>
             <Text style={styles.ctxLabel}>Total</Text>
-            <Text style={styles.ctxValue}>${order.payment.total.toFixed(2)}</Text>
+             <Text style={styles.ctxValue}>{formatCents(order.payment.totalCents)}</Text>
           </View>
           <View style={styles.contextRow}>
             <Text style={styles.ctxLabel}>Products</Text>
             <Text style={[styles.ctxValue, { flex: 1, textAlign: 'right' }]} numberOfLines={2}>
-              {order.lineItems.map(li => li.productName).join(', ')}
+               {order.lineItems.map((li: { productName: string }) => li.productName).join(', ')}
             </Text>
           </View>
           {firstShipment?.trackingNumber && (

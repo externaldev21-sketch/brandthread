@@ -5,6 +5,7 @@
  */
 import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
@@ -36,6 +37,7 @@ const POLICY_TYPES: { type: PolicyType; label: string; icon: keyof typeof Feathe
 ];
 
 export default function StorePoliciesScreen() {
+  const { theme } = useAppTheme();
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const headerTopInset = useHeaderTopInset();
@@ -152,7 +154,7 @@ export default function StorePoliciesScreen() {
           <TouchableOpacity onPress={closeEdit} style={s.backBtn} hitSlop={{ top: 2, bottom: 2, left: 2, right: 2 }}><Feather name="x" size={21} color={FG} /></TouchableOpacity>
           <Text style={[s.headerTitle, { color: FG }]}>{policyMeta.label}</Text>
           <TouchableOpacity onPress={handleSave} disabled={saving} style={[s.saveBtn, { backgroundColor: PURPLE, opacity: saving ? 0.6 : 1 }]}>
-            {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.saveBtnText}>Save</Text>}
+            {saving ? <ActivityIndicator size="small" color={theme.onAccent} /> : <Text style={[s.saveBtnText, { color: theme.onAccent }]}>Save</Text>}
           </TouchableOpacity>
         </View>
 

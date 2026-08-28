@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 const BRAND_CHECKLIST_ITEMS = [
   'Brand name finalized',
@@ -45,6 +46,7 @@ function generateBrandNames(count: number): string[] {
 
 export default function BrandScreen() {
   const colors = useColors();
+  const { theme } = useAppTheme();
   const router = useRouter();
   const [nameInput, setNameInput] = useState('Brandthread');
   const [selectedStyle, setSelectedStyle] = useState('Minimalist');
@@ -114,15 +116,15 @@ export default function BrandScreen() {
       >
 
       {/* Brand Profile */}
-      <LinearGradient colors={['#180D2E', '#0C0C17']} style={[styles.profileCard, { borderColor: 'rgba(139,92,246,0.26)' }]}>
+      <LinearGradient colors={theme.heroGradient} style={[styles.profileCard, { borderColor: theme.accent }]}>
         <View style={[styles.logoCircle, { borderColor: colors.primary }]}>
           <Text style={[styles.logoText, { color: colors.primary }]}>BT</Text>
         </View>
         <View>
           <Text style={[styles.brandName, { color: colors.primary }]}>Brandthread</Text>
-          <Text style={[styles.brandStyle, { color: 'rgba(139,92,246,0.47)' }]}>Minimalist · Est. 2025</Text>
+          <Text style={[styles.brandStyle, { color: theme.accentLight }]}>Minimalist · Est. 2025</Text>
         </View>
-        <View style={[styles.completeBadge, { backgroundColor: 'rgba(139,92,246,0.13)' }]}>
+        <View style={[styles.completeBadge, { backgroundColor: theme.accentDim }]}>
           <Text style={[styles.completeText, { color: colors.primary }]}>{completionPct}%</Text>
         </View>
       </LinearGradient>
@@ -132,7 +134,7 @@ export default function BrandScreen() {
         <View style={styles.cardHeader}>
           <Feather name="cpu" size={16} color={colors.primary} />
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>AI Brand Name Generator</Text>
-          <View style={[styles.aiBadge, { backgroundColor: 'rgba(139,92,246,0.13)' }]}>
+          <View style={[styles.aiBadge, { backgroundColor: theme.accentDim }]}>
             <Text style={[styles.aiText, { color: colors.primary }]}>AI</Text>
           </View>
         </View>
@@ -176,7 +178,7 @@ export default function BrandScreen() {
         <View style={styles.cardHeader}>
           <Feather name="aperture" size={16} color={colors.primary} />
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>AI Logo Generator</Text>
-          <View style={[styles.aiBadge, { backgroundColor: 'rgba(139,92,246,0.13)' }]}>
+          <View style={[styles.aiBadge, { backgroundColor: theme.accentDim }]}>
             <Text style={[styles.aiText, { color: colors.primary }]}>AI</Text>
           </View>
         </View>
@@ -242,7 +244,7 @@ export default function BrandScreen() {
             </View>
             {selectedLogo !== null && (
               <TouchableOpacity
-                style={[styles.generateBtn, { backgroundColor: 'rgba(139,92,246,0.13)', marginTop: 8 }]}
+                style={[styles.generateBtn, { backgroundColor: theme.accentDim, marginTop: 8 }]}
                 activeOpacity={0.8}
                 onPress={() => Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)}
               >
@@ -270,7 +272,7 @@ export default function BrandScreen() {
               onPress={() => toggleCheck(i)}
               style={[styles.checkRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}
             >
-              <View style={[styles.checkBox, { backgroundColor: done ? 'rgba(139,92,246,0.13)' : colors.secondary, borderColor: done ? colors.success : colors.border }]}>
+              <View style={[styles.checkBox, { backgroundColor: done ? theme.accentDim : colors.secondary, borderColor: done ? colors.success : colors.border }]}>
                 {done && <Feather name="check" size={12} color={colors.success} />}
               </View>
               <Text style={[styles.checkLabel, { color: done ? colors.mutedForeground : colors.foreground }]}>{label}</Text>
@@ -287,7 +289,7 @@ export default function BrandScreen() {
         </View>
         <View style={[styles.domainRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
           <Text style={[styles.domainText, { color: colors.mutedForeground }]}>brandthread.com</Text>
-          <View style={[styles.availBadge, { backgroundColor: 'rgba(139,92,246,0.13)' }]}>
+          <View style={[styles.availBadge, { backgroundColor: theme.accentDim }]}>
             <Text style={[styles.availText, { color: colors.success }]}>Available</Text>
           </View>
         </View>

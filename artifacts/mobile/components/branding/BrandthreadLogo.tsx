@@ -16,7 +16,7 @@ interface BrandthreadLogoProps {
   opacity?: number;
   /** Fade-in entrance animation. */
   animated?: boolean;
-  /** Soft purple glow halo behind the logo. */
+  /** Soft theme glow halo behind the logo. */
   showGlow?: boolean;
   glowColor?: string;
   accessibilityLabel?: string;
@@ -31,7 +31,7 @@ export default function BrandthreadLogo({
   opacity = 1,
   animated = false,
   showGlow = false,
-  glowColor = '#8B5CF6',
+  glowColor = '#DDE2E8',
   accessibilityLabel = LOGO_A11Y_LABEL,
   testID = 'brandthread-logo',
   style,

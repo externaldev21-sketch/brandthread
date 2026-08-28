@@ -21,16 +21,12 @@ const MUTED  = 'rgba(244,244,255,0.50)';
 const GREEN  = '#22C55E';
 const BLUE   = '#3B82F6';
 const ORANGE = '#F97316';
-// Content-type hues are intentionally stable metadata colors rather than app chrome.
-const PURPLE = '#8B5CF6';
-const CYAN   = '#22D3EE';
-
 type FilterTab = 'all' | 'draft' | 'scheduled' | 'published';
 
-const CONTENT_TYPES: { type: ContentType; label: string; icon: keyof typeof Feather.glyphMap; color: string }[] = [
-  { type: 'video',        label: 'Video Post',      icon: 'video',        color: PURPLE },
+const getContentTypes = (primary: string, secondary: string): { type: ContentType; label: string; icon: keyof typeof Feather.glyphMap; color: string }[] => [
+  { type: 'video',        label: 'Video Post',      icon: 'video',        color: primary },
   { type: 'image',        label: 'Image Post',      icon: 'image',        color: BLUE   },
-  { type: 'slideshow',    label: 'Slideshow',       icon: 'layers',       color: CYAN   },
+  { type: 'slideshow',    label: 'Slideshow',       icon: 'layers',       color: secondary },
   { type: 'story',        label: 'Story',           icon: 'circle',       color: ORANGE },
   { type: 'announcement', label: 'Announcement',    icon: 'bell',         color: GREEN  },
   { type: 'countdown',    label: 'Drop Countdown',  icon: 'clock',        color: '#FBBF24' },
@@ -56,6 +52,7 @@ function typeIcon(t: ContentType): keyof typeof Feather.glyphMap {
 
 export default function ContentScreen() {
   const colors = useColors();
+  const contentTypes = React.useMemo(() => getContentTypes(colors.primary, colors.info), [colors.primary, colors.info]);
   const insets  = useSafeAreaInsets();
   const router  = useRouter();
   const topPad  = Platform.OS === 'web' ? 20 : insets.top;
@@ -159,7 +156,7 @@ export default function ContentScreen() {
           <View style={s.section}>
             <Text style={s.sectionTitle}>Create new</Text>
             <View style={s.typeGrid}>
-              {CONTENT_TYPES.map(ct => (
+              {contentTypes.map(ct => (
                 <TouchableOpacity
                   key={ct.type}
                   style={s.typeCard}
@@ -303,7 +300,7 @@ const s = StyleSheet.create({
   empty:     { alignItems: 'center', paddingVertical: 36, gap: 8 },
   emptyTitle:{ fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
   emptyDesc: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
-  retryBtn: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 8, backgroundColor: PURPLE, borderRadius: 9, paddingHorizontal: 13, paddingVertical: 9 },
+  retryBtn: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 8, borderRadius: 9, paddingHorizontal: 13, paddingVertical: 9 },
   retryText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
 });
 

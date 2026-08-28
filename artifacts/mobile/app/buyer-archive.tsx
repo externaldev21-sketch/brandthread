@@ -13,7 +13,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  BG, SURFACE, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE,
+  BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE,
   FONT, FS, SP, RADIUS, ICON, OVERLAY, RED,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -210,7 +210,7 @@ const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.
   title: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
   tabRow: { flexDirection: 'row', paddingHorizontal: SP.md, paddingVertical: SP.sm, gap: SP.sm },
   tabPill: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: SP.sm, backgroundColor: CARD, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER },
-  tabPillActive: { backgroundColor: theme.accentDim, borderColor: BORDER_ACTIVE },
+  tabPillActive: { backgroundColor: theme.accentDim, borderColor: theme.accent },
   tabText: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
   tabTextActive: { color: theme.accent },
   grid: { paddingHorizontal: SP.md, paddingTop: SP.sm, gap: GAP, paddingBottom: 80 },

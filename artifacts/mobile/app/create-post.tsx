@@ -28,6 +28,7 @@ import type {
   MaxVideoDuration, ContentType,
 } from '@/services/types';
 import { useColors } from '@/hooks/useColors';
+import { formatCents } from '@/lib/money';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const BG     = '#07070F';
@@ -35,10 +36,8 @@ const CARD   = '#12121F';
 const BORDER = 'rgba(255,255,255,0.07)';
 const FG     = '#F4F4FF';
 const MUTED  = 'rgba(244,244,255,0.50)';
-const PURPLE = '#8B5CF6';
 const BLUE   = '#3B82F6';
 const ORANGE = '#F97316';
-const CYAN   = '#22D3EE';
 const PINK   = '#EC4899';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -71,15 +70,15 @@ interface SoundSelection {
 
 // ─── Purpose chips (sellers only) ────────────────────────────────────────────
 // Optional content-purpose overlay on top of media type.
-const PURPOSE_CHIPS: Array<{
+const getPurposeChips = (accent: string): Array<{
   label: string;
   icon: keyof typeof Feather.glyphMap;
   color: string;
   contentType: ContentType;
-}> = [
+}> => [
   { label: 'Drop Announcement',    icon: 'bell',   color: ORANGE, contentType: 'countdown'     },
   { label: 'Behind the Scenes',    icon: 'camera', color: PINK,   contentType: 'behind_scenes' },
-  { label: 'Product Announcement', icon: 'tag',    color: PURPLE, contentType: 'announcement'  },
+  { label: 'Product Announcement', icon: 'tag',    color: accent, contentType: 'announcement'  },
 ];
 
 const DEFAULT_VISIBILITY: PostVisibility = {
@@ -106,6 +105,10 @@ function VideoPreview({ uri }: { uri: string }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function CreatePostScreen() {
   const colors = useColors();
+  const PURPLE = colors.primary;
+  const CYAN = colors.info;
+  const PURPOSE_CHIPS = React.useMemo(() => getPurposeChips(colors.primary), [colors.primary]);
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ accountType?: string }>();
@@ -274,7 +277,7 @@ export default function CreatePostScreen() {
   function tagProduct(p: Product) {
     const already = productTags.find(t => t.productId === p.id);
     if (already) setProductTags(prev => prev.filter(t => t.productId !== p.id));
-    else setProductTags(prev => [...prev, { productId: p.id, productName: p.name, price: p.pricing.price }]);
+    else setProductTags(prev => [...prev, { productId: p.id, productName: p.name, priceCents: p.pricing.priceCents }]);
   }
 
   function resetAll() {
@@ -716,7 +719,7 @@ export default function CreatePostScreen() {
                     styleTags,
                     mediaUris: videoClips.length > 0 ? videoClips.map(c => c.uri) : slidePhotos.map(p => p.uri),
                     aspectRatio: '9:16',
-                    productTags: productTags.map(p => ({ productId: p.productId, productName: p.productName, price: p.price })),
+                    productTags: productTags.map(p => ({ productId: p.productId, productName: p.productName, priceCents: p.priceCents })),
                     sound: selectedSound ?? undefined,
                     visibility,
                     isDraft: true,
@@ -748,7 +751,7 @@ export default function CreatePostScreen() {
                     styleTags,
                     mediaUris: videoClips.length > 0 ? videoClips.map(c => c.uri) : slidePhotos.map(p => p.uri),
                     aspectRatio: '9:16',
-                    productTags: productTags.map(p => ({ productId: p.productId, productName: p.productName, price: p.price })),
+                    productTags: productTags.map(p => ({ productId: p.productId, productName: p.productName, priceCents: p.priceCents })),
                     sound: selectedSound ?? undefined,
                     visibility,
                     isDraft: false,
@@ -848,6 +851,9 @@ interface SoundModalProps {
   insets: { top: number; bottom: number };
 }
 function SoundModal({ visible, onClose, soundTab, setSoundTab, soundSearch, setSoundSearch, onUse, insets }: SoundModalProps) {
+  const colors = useColors();
+  const PURPLE = colors.primary;
+  const sm = React.useMemo(() => createModalStyles(colors), [colors]);
   const tabs = [
     { id: 'trending' as const, label: 'Trending' }, { id: 'saved' as const, label: 'Saved' },
     { id: 'recent' as const, label: 'Recent' }, { id: 'original' as const, label: 'Original' },
@@ -916,6 +922,9 @@ interface TextModalProps {
   insets: { top: number; bottom: number };
 }
 function TextModal({ visible, onClose, newTextInput, setNewTextInput, newTextColor, setNewTextColor, newTextSize, setNewTextSize, onAdd, overlayTexts, onRemoveText, insets }: TextModalProps) {
+  const colors = useColors();
+  const PURPLE = colors.primary;
+  const sm = React.useMemo(() => createModalStyles(colors), [colors]);
   const SWATCHES = ['#FFFFFF', '#000000', '#F87171', '#8B5CF6', '#3B82F6', '#FBBF24', '#22D3EE'];
   return (
     <Modal visible={visible} animationType="slide" presentationStyle={Platform.OS === 'android' ? 'fullScreen' : 'pageSheet'} onRequestClose={onClose}>
@@ -939,7 +948,7 @@ function TextModal({ visible, onClose, newTextInput, setNewTextInput, newTextCol
             ))}
           </View>
           <TouchableOpacity style={{ marginTop: 8 }} onPress={onAdd} activeOpacity={0.85}>
-            <LinearGradient colors={[PURPLE, '#6D28D9']} style={sm.addTextBtn}><Text style={sm.addTextBtnText}>Add Text</Text></LinearGradient>
+            <LinearGradient colors={colors.gradient} style={sm.addTextBtn}><Text style={sm.addTextBtnText}>Add Text</Text></LinearGradient>
           </TouchableOpacity>
           {overlayTexts.length > 0 && (
             <View style={{ marginTop: 20 }}>
@@ -973,6 +982,9 @@ interface ProductModalProps {
   insets: { top: number; bottom: number };
 }
 function ProductModal({ visible, onClose, productSearch, setProductSearch, productTags, onTag, taggableProducts, productsError, onRetryProducts, insets }: ProductModalProps) {
+  const colors = useColors();
+  const PURPLE = colors.primary;
+  const sm = React.useMemo(() => createModalStyles(colors), [colors]);
   const filtered = taggableProducts.filter(p => productSearch === '' || p.name.toLowerCase().includes(productSearch.toLowerCase()));
   const statusColor = (st: string) => st === 'active' ? PURPLE : st === 'scheduled' ? ORANGE : MUTED;
   return (
@@ -1034,7 +1046,7 @@ function ProductModal({ visible, onClose, productSearch, setProductSearch, produ
                     <View style={[sm.productSwatch, { backgroundColor: BORDER }]} />
                     <View style={{ flex: 1 }}>
                       <Text style={sm.productName}>{p.name}</Text>
-                      <Text style={sm.productPrice}>${p.pricing.price.toFixed(2)}</Text>
+                      <Text style={sm.productPrice}>{formatCents(p.pricing.priceCents)}</Text>
                     </View>
                     <View style={[sm.statusBadge, { backgroundColor: statusColor(p.status) + '22' }]}>
                       <Text style={[sm.statusBadgeText, { color: statusColor(p.status) }]}>{p.status}</Text>
@@ -1053,7 +1065,7 @@ function ProductModal({ visible, onClose, productSearch, setProductSearch, produ
         )}
         <View style={{ paddingHorizontal: 16 }}>
           <TouchableOpacity onPress={onClose} activeOpacity={0.85}>
-            <LinearGradient colors={[PURPLE, '#6D28D9']} style={sm.addTextBtn}>
+            <LinearGradient colors={colors.gradient} style={sm.addTextBtn}>
               <Text style={sm.addTextBtnText}>Done</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -1064,7 +1076,7 @@ function ProductModal({ visible, onClose, productSearch, setProductSearch, produ
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const s = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   root:   { flex: 1, backgroundColor: BG },
   center: { alignItems: 'center', justifyContent: 'center' },
 
@@ -1085,19 +1097,19 @@ const s = StyleSheet.create({
 
   durationRow:     { flexDirection: 'row', gap: 8, marginTop: 8, marginBottom: 12 },
   durationChip:    { flex: 1, backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, alignItems: 'center', paddingVertical: 12 },
-  durationChipSel: { backgroundColor: PURPLE + '11', borderColor: PURPLE },
+  durationChipSel: { backgroundColor: colors.accent, borderColor: colors.primary },
   durationChipTop: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
   durationChipSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
 
   photoThumb:    { width: 90, height: 90, borderRadius: 10, overflow: 'hidden', position: 'relative' },
   photoThumbImg: { width: 90, height: 90 },
   removeChip:    { position: 'absolute', top: 4, right: 4, backgroundColor: '#00000088', borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
-  coverLabel:    { position: 'absolute', bottom: 4, left: 4, backgroundColor: PURPLE, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
+  coverLabel:    { position: 'absolute', bottom: 4, left: 4, backgroundColor: colors.primary, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
   coverLabelText:{ fontSize: 9, fontFamily: FONT.bold, color: '#fff' },
   photoHint:     { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 8 },
 
-  typeBadge:     { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: PURPLE + '11', borderRadius: 10, borderWidth: 1, borderColor: PURPLE + '33', paddingHorizontal: 12, paddingVertical: 8, marginTop: 14 },
-  typeBadgeText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE },
+  typeBadge:     { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.accent, borderRadius: 10, borderWidth: 1, borderColor: colors.accent, paddingHorizontal: 12, paddingVertical: 8, marginTop: 14 },
+  typeBadgeText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.primary },
 
   chipRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   purposeChip:     { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: CARD, borderRadius: 20, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 14, paddingVertical: 9 },
@@ -1126,11 +1138,11 @@ const s = StyleSheet.create({
   suggestedChip:    { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 10, paddingVertical: 5 },
   suggestedChipText:{ fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   tagWrap:          { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
-  tagChip:          { flexDirection: 'row', alignItems: 'center', backgroundColor: PURPLE + '11', borderRadius: 14, borderWidth: 1, borderColor: PURPLE + '33', paddingHorizontal: 10, paddingVertical: 5 },
-  tagChipText:      { fontSize: FS.xs, fontFamily: FONT.medium, color: PURPLE },
+  tagChip:          { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.accent, borderRadius: 14, borderWidth: 1, borderColor: colors.accent, paddingHorizontal: 10, paddingVertical: 5 },
+  tagChipText:      { fontSize: FS.xs, fontFamily: FONT.medium, color: colors.primary },
 
-  soundStrip:    { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: PURPLE + '11', borderRadius: 10, borderWidth: 1, borderColor: PURPLE + '33', paddingHorizontal: 12, paddingVertical: 8 },
-  soundStripText:{ flex: 1, fontSize: FS.xs, fontFamily: FONT.medium, color: PURPLE },
+  soundStrip:    { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.accent, borderRadius: 10, borderWidth: 1, borderColor: colors.accent, paddingHorizontal: 12, paddingVertical: 8 },
+  soundStripText:{ flex: 1, fontSize: FS.xs, fontFamily: FONT.medium, color: colors.primary },
 
   locationRow:  { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 10 },
   locationInput:{ flex: 1, color: FG, fontFamily: FONT.regular, fontSize: FS.sm },
@@ -1140,7 +1152,7 @@ const s = StyleSheet.create({
 
   scheduleRow:      { flexDirection: 'row', gap: 10 },
   schedulePill:     { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 20, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 16, paddingVertical: 8 },
-  schedulePillActive:{ backgroundColor: PURPLE + '11', borderColor: PURPLE + '44' },
+  schedulePillActive:{ backgroundColor: colors.accent, borderColor: colors.accent },
   schedulePillText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
 
   outlineBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderWidth: 1, borderColor: BORDER, paddingVertical: 12, paddingHorizontal: 16 },
@@ -1161,7 +1173,7 @@ const s = StyleSheet.create({
 });
 
 // ─── Modal styles ─────────────────────────────────────────────────────────────
-const sm = StyleSheet.create({
+const createModalStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   root:       { flex: 1, backgroundColor: BG },
   header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
   title:      { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
@@ -1169,15 +1181,15 @@ const sm = StyleSheet.create({
   searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 10, marginHorizontal: 16, marginTop: 12 },
   searchInput:{ flex: 1, color: FG, fontFamily: FONT.regular, fontSize: FS.sm },
   tabPill:    { backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 6 },
-  tabPillActive:{ backgroundColor: PURPLE + '11', borderColor: PURPLE + '44' },
+  tabPillActive:{ backgroundColor: colors.accent, borderColor: colors.accent },
   tabText:    { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   soundRow:   { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: BORDER, gap: 10 },
-  soundIcon:  { width: 36, height: 36, backgroundColor: PURPLE + '11', borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  soundIcon:  { width: 36, height: 36, backgroundColor: colors.accent, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   soundTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   soundArtist:{ fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
   soundDur:   { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
-  useBtn:     { backgroundColor: PURPLE + '22', borderRadius: 8, borderWidth: 1, borderColor: PURPLE + '44', paddingHorizontal: 12, paddingVertical: 6 },
-  useBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: PURPLE },
+  useBtn:     { backgroundColor: colors.accent, borderRadius: 8, borderWidth: 1, borderColor: colors.accent, paddingHorizontal: 12, paddingVertical: 6 },
+  useBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: colors.primary },
   disclaimer: { marginTop: 20, padding: 12, backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER },
   disclaimerText:{ fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   textInput:  { backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, fontSize: FS.sm, padding: 12, minHeight: 80, marginBottom: 16 },
@@ -1191,8 +1203,8 @@ const sm = StyleSheet.create({
   addTextBtnText:{ fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
   overlayChip:{ flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 10, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 6 },
   overlayChipText:{ fontSize: FS.sm, fontFamily: FONT.regular },
-  taggedChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: PURPLE + '22', borderRadius: 14, borderWidth: 1, borderColor: PURPLE + '44', paddingHorizontal: 10, paddingVertical: 5 },
-  taggedChipText:{ fontSize: FS.xs, fontFamily: FONT.semibold, color: PURPLE },
+  taggedChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.accent, borderRadius: 14, borderWidth: 1, borderColor: colors.accent, paddingHorizontal: 10, paddingVertical: 5 },
+  taggedChipText:{ fontSize: FS.xs, fontFamily: FONT.semibold, color: colors.primary },
   productRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: BORDER, gap: 10 },
   productSwatch:{ width: 40, height: 40, borderRadius: 8, backgroundColor: CARD },
   productName:{ fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
@@ -1200,7 +1212,7 @@ const sm = StyleSheet.create({
   statusBadge:{ borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   statusBadgeText:{ fontSize: FS.xs, fontFamily: FONT.semibold },
   tagBtn:     { backgroundColor: CARD, borderRadius: 8, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 12, paddingVertical: 6 },
-  tagBtnActive:{ backgroundColor: PURPLE, borderColor: PURPLE },
+  tagBtnActive:{ backgroundColor: colors.primary, borderColor: colors.primary },
   tagBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED },
 
   // Product modal error state

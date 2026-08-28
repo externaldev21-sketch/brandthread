@@ -22,6 +22,7 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { formatCents, parseDecimalToCents } from '@/lib/money';
 import {
   BrandthreadCard, PrimaryButton, SecondaryButton,
   StatusBadge, SectionHeader, EmptyState,
@@ -41,7 +42,7 @@ interface DiscountCode {
 }
 
 function fmtValue(d: DiscountCode) {
-  return d.type === 'percentage' ? `${d.value}% off` : `$${(d.value / 100).toFixed(2)} off`;
+  return d.type === 'percentage' ? `${d.value}% off` : `${formatCents(d.value)} off`;
 }
 
 function fmtExpiry(iso?: string) {
@@ -59,6 +60,7 @@ const DEMO: DiscountCode[] = [
 export default function DiscountsScreen() {
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN } = theme;
+  const s = React.useMemo(() => createStyles(theme), [theme]);
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
   const api     = useApi();
@@ -104,17 +106,21 @@ export default function DiscountsScreen() {
 
   async function handleSave() {
     if (!code.trim()) { Alert.alert('Code required', 'Enter a discount code.'); return; }
-    const numValue = parseFloat(value);
-    if (isNaN(numValue) || numValue <= 0) { Alert.alert('Invalid value', 'Enter a valid discount amount.'); return; }
+    const percentageValue = /^\d+$/.test(value.trim()) ? Number(value.trim()) : NaN;
+    const fixedValueCents = parseDecimalToCents(value);
+    const numValue = discType === 'percentage' ? percentageValue : fixedValueCents;
+    if (numValue == null || !Number.isSafeInteger(numValue) || numValue <= 0) { Alert.alert('Invalid value', 'Enter a valid discount amount.'); return; }
     if (discType === 'percentage' && numValue > 100) { Alert.alert('Invalid %', 'Percentage cannot exceed 100.'); return; }
+    const minOrderAmount = minOrder ? parseDecimalToCents(minOrder) : undefined;
+    if (minOrder && minOrderAmount == null) { Alert.alert('Invalid minimum', 'Enter a valid minimum order amount.'); return; }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSaving(true);
     try {
       const payload = {
         code: code.trim().toUpperCase(),
         type: discType,
-        value: discType === 'percentage' ? numValue : Math.round(numValue * 100),
-        minOrderAmount: minOrder ? Math.round(parseFloat(minOrder) * 100) : undefined,
+        value: numValue,
+        minOrderAmount,
         usageLimit: usageLimit ? parseInt(usageLimit, 10) : undefined,
         active: true,
         expiresAt: hasExpiry && expiryDate ? new Date(expiryDate).toISOString() : undefined,
@@ -187,7 +193,7 @@ export default function DiscountsScreen() {
             <EmptyState
               icon="tag"
               title="No discount codes yet"
-              body="Create codes to offer buyers a percentage or fixed amount off their order."
+              description="Create codes to offer buyers a percentage or fixed amount off their order."
               action={{ label: 'Create code', onPress: openNewModal }}
             />
           )}
@@ -335,6 +341,9 @@ function DiscountCard({ d, onToggle, onDelete }: {
   onToggle: (d: DiscountCode) => void;
   onDelete: (d: DiscountCode) => void;
 }) {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE } = theme;
+  const s = React.useMemo(() => createStyles(theme), [theme]);
   const isExpired = d.expiresAt ? new Date(d.expiresAt) < new Date() : false;
   const pctUsed = d.usageLimit ? Math.round((d.usageCount / d.usageLimit) * 100) : null;
 
@@ -345,7 +354,7 @@ function DiscountCard({ d, onToggle, onDelete }: {
           <Text style={s.codeText}>{d.code}</Text>
           <Text style={s.valueText}>{fmtValue(d)}</Text>
           {d.minOrderAmount && (
-            <Text style={s.metaText}>Min. order ${(d.minOrderAmount / 100).toFixed(2)}</Text>
+            <Text style={s.metaText}>Min. order {formatCents(d.minOrderAmount)}</Text>
           )}
           <Text style={[s.metaText, isExpired && { color: RED }]}>{fmtExpiry(d.expiresAt)}</Text>
         </View>
@@ -383,7 +392,9 @@ function DiscountCard({ d, onToggle, onDelete }: {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (theme: { accent: string; accentLight: string; accentDim: string }) => {
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM } = theme;
+  return StyleSheet.create({
   root:       { flex: 1, backgroundColor: BG },
   center:     { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
@@ -411,4 +422,5 @@ const s = StyleSheet.create({
   typeBtn:     { flex: 1, paddingVertical: 10, paddingHorizontal: 12, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
   typeBtnActive:{ borderColor: PURPLE, backgroundColor: PURPLE_DIM },
   typeBtnText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-});
+  });
+};

@@ -8,12 +8,9 @@ import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
 import { isManagerRole } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
-import { PURPLE, CYAN, SUCCESS, ORANGE } from '@/lib/theme';
+import { SUCCESS, ORANGE } from '@/lib/theme';
 import { useTeamRole } from '@/hooks/useTeamRole';
-
-function fmtCents(cents: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(cents / 100);
-}
+import { formatCents } from '@/lib/money';
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -74,15 +71,15 @@ export default function FinanceScreen() {
   const totalNet = transactions.reduce((acc, t) => acc + (t.net ?? 0), 0);
 
   const overviewCards = [
-    { label: 'Available', value: balance?.available?.formatted ?? fmtCents(availAmt), color: colors.success, icon: 'trending-up' as const },
-    { label: 'Pending',   value: balance?.pending?.formatted   ?? fmtCents(pendAmt),  color: colors.primary, icon: 'activity' as const },
-    { label: 'Net (30d)', value: fmtCents(Math.abs(totalNet)),                         color: colors.info,    icon: 'percent' as const },
+    { label: 'Available', value: formatCents(availAmt), color: colors.success, icon: 'trending-up' as const },
+    { label: 'Pending',   value: formatCents(pendAmt),  color: colors.primary, icon: 'activity' as const },
+    { label: 'Net (30d)', value: formatCents(Math.abs(totalNet)), color: colors.info, icon: 'percent' as const },
   ];
 
   // Build expenses list from real transactions
   const expenseRows = transactions.slice(0, 10).map(t => ({
     name:     t.description ?? t.type,
-    amount:   (t.net >= 0 ? '+' : '') + fmtCents(t.net),
+     amount:   (t.net >= 0 ? '+' : '') + formatCents(t.net),
     date:     fmtDate(t.created),
     category: txCategory(t.type),
     positive: t.net >= 0,
@@ -90,9 +87,9 @@ export default function FinanceScreen() {
 
   // Fallback P&L data when not connected
   const PL_DATA_FALLBACK = [
-    { label: 'Gross Revenue', value: fmtCents(transactions.filter(t => t.net > 0).reduce((a, t) => a + t.amount, 0)), positive: true },
-    { label: 'Fees',          value: '-' + fmtCents(transactions.reduce((a, t) => a + Math.abs(t.fee ?? 0), 0)),        positive: false },
-    { label: 'Net Total',     value: fmtCents(Math.abs(totalNet)), positive: totalNet >= 0, highlight: true },
+     { label: 'Gross Revenue', value: formatCents(transactions.filter(t => t.net > 0).reduce((a, t) => a + t.amount, 0)), positive: true },
+     { label: 'Fees',          value: '-' + formatCents(transactions.reduce((a, t) => a + Math.abs(t.fee ?? 0), 0)),        positive: false },
+     { label: 'Net Total',     value: formatCents(Math.abs(totalNet)), positive: totalNet >= 0, highlight: true },
   ];
 
   const documents = [
@@ -144,11 +141,11 @@ export default function FinanceScreen() {
               {subStatus.plan === 'growth' ? 'Growth' : subStatus.plan === 'scale' ? 'Scale' : 'Starter'}
               {' '}
               <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular' }}>
-                {subStatus.amountCents > 0 ? `$${subStatus.amountCents / 100}/mo` : '$29/mo'}
+                 {subStatus.amountCents > 0 ? `${formatCents(subStatus.amountCents)}/mo` : formatCents(2900) + '/mo'}
               </Text>
             </Text>
             {subStatus.trialEnd ? (
-              <Text style={[styles.subCardMeta, { color: CYAN }]}>Trial ends {subStatus.trialEnd}</Text>
+              <Text style={[styles.subCardMeta, { color: colors.info }]}>Trial ends {subStatus.trialEnd}</Text>
             ) : subStatus.renewsOn ? (
               <Text style={[styles.subCardMeta, { color: colors.mutedForeground }]}>Renews {subStatus.renewsOn}</Text>
             ) : null}
@@ -156,13 +153,13 @@ export default function FinanceScreen() {
           <View style={styles.subCardRight}>
             <View style={[
               styles.subStatusPill,
-              { backgroundColor: subStatus.status === 'trialing' ? `${CYAN}22`
+              { backgroundColor: subStatus.status === 'trialing' ? colors.infoDim
                   : subStatus.status === 'active' ? `${SUCCESS}22`
                   : `${ORANGE}22` },
             ]}>
               <Text style={[
                 styles.subStatusText,
-                { color: subStatus.status === 'trialing' ? CYAN
+                { color: subStatus.status === 'trialing' ? colors.info
                     : subStatus.status === 'active' ? SUCCESS
                     : ORANGE },
               ]}>
@@ -197,7 +194,7 @@ export default function FinanceScreen() {
             style={[
               styles.plRow,
               i > 0 && { borderTopWidth: 1, borderTopColor: colors.border },
-              item.highlight && { backgroundColor: 'rgba(139,92,246,0.07)' },
+              item.highlight && { backgroundColor: colors.accent },
             ]}
           >
             <Text style={[styles.plLabel, { color: item.highlight ? colors.foreground : colors.mutedForeground, fontFamily: item.highlight ? 'Inter_600SemiBold' : 'Inter_400Regular' }]}>

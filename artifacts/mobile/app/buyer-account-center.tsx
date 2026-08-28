@@ -6,7 +6,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, GRAD_PRIMARY,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE,
   ON_DARK,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
@@ -85,7 +85,7 @@ const s = StyleSheet.create({
   back: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   title: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
   hero: { flexDirection: 'row', gap: 14, alignItems: 'center', borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: 16, marginBottom: 16 },
-  logo: { width: 46, height: 46, borderRadius: 15, backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center' },
+  logo: { width: 46, height: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   logoText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 24 },
   heroTitle: { color: FG, fontFamily: FONT.bold, fontSize: 15 },
   heroSub: { color: MUTED, fontFamily: FONT.regular, fontSize: 11.5, lineHeight: 16, marginTop: 3 },

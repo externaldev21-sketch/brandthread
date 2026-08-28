@@ -49,7 +49,12 @@ export function fmtCurrencyInt(dollars: number): string {
  * @example fmtCents(1250) → "$12.50"
  */
 export function fmtCents(cents: number): string {
-  return fmtCurrency(cents / 100);
+  if (!Number.isSafeInteger(cents)) throw new Error('Money amount must be a safe integer number of cents.');
+  const sign = cents < 0 ? '-' : '';
+  const absolute = Math.abs(cents);
+  const whole = Math.floor(absolute / 100).toLocaleString('en-US');
+  const fraction = String(absolute % 100).padStart(2, '0');
+  return `${sign}$${whole}.${fraction}`;
 }
 
 // ─── Dates ────────────────────────────────────────────────────────────────────

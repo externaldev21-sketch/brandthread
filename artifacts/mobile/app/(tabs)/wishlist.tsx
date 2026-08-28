@@ -8,6 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
+import { EmptyState } from '@/components/BrandthreadUI';
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
@@ -137,11 +138,12 @@ export default function WishlistScreen() {
       </View>
 
       {items.length === 0 ? (
-        <View style={c.empty}>
-          <Feather name="bookmark" size={48} color={muted} />
-          <Text style={[c.emptyTitle, { color: fg }]}>Your wishlist is empty</Text>
-          <Text style={[c.emptySub, { color: muted }]}>Bookmark items from Discover or any brand drop to track them here.</Text>
-        </View>
+        <EmptyState
+          icon="bookmark"
+          title="Save room for your next obsession."
+          description="Tap the bookmark on anything you love and we’ll keep it right here."
+          style={{ flex: 1 }}
+        />
       ) : (
         <FlatList
           data={items}

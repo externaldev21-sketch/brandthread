@@ -36,8 +36,8 @@ export interface Variant {
   sku:            string;
   barcode?:       string;
   inventory:      number;
-  price:          number;
-  compareAtPrice?: number;
+  priceCents:     number;
+  compareAtPriceCents?: number;
   weight?:        number;
 }
 
@@ -50,14 +50,14 @@ export interface Product {
   vendor:           string;
   status:           ProductStatus;
   salesModel:       ProductSalesModel;
-  price:            number;
-  compareAtPrice?:  number;
-  cost:             number;
+  priceCents:       number;
+  compareAtPriceCents?: number;
+  costCents:         number;
   variants:         Variant[];
   totalInventory:   number;
   lowStockThreshold: number;
   totalSales:       number;
-  revenue:          number;
+  revenueCents:     number;
   tags:             string[];
   collections:      string[];
   weight:           number;
@@ -77,8 +77,8 @@ export interface OrderItem {
   productName: string;
   variant:     string;
   quantity:    number;
-  price:       number;
-  total:       number;
+  priceCents:  number;
+  totalCents:  number;
 }
 
 export interface OrderTimeline {
@@ -101,11 +101,11 @@ export interface Order {
   status:            OrderStatus;
   paymentStatus:     PaymentStatus;
   fulfillmentStatus: FulfillmentStatus;
-  subtotal:          number;
-  discount:          number;
-  shipping:          number;
-  tax:               number;
-  total:             number;
+  subtotalCents:     number;
+  discountCents:     number;
+  shippingCents:     number;
+  taxCents:          number;
+  totalCents:        number;
   shippingAddress:   Address;
   billingAddress:    Address;
   deliveryMethod:    string;
@@ -379,7 +379,7 @@ export interface PostOverlay {
 export interface PostProductTag {
   productId:   string;
   productName: string;
-  price:       number;
+  priceCents:  number;
   imageUri?:   string;
   timestamp?:  number;
   slideIndex?: number;

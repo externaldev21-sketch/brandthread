@@ -5,23 +5,17 @@
  */
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import {
-  View, Text, FlatList, TouchableOpacity, TextInput,
-  KeyboardAvoidingView, Alert, Platform, StyleSheet, Dimensions,
-  ActivityIndicator, ListRenderItemInfo, Modal, ScrollView, Image,
-} from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, TextInput, KeyboardAvoidingView, Alert, Platform, StyleSheet, Dimensions, ActivityIndicator, ListRenderItemInfo, Modal, ScrollView, Image } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import { useUser } from '@clerk/expo';
-import {
-  BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, RED,
-  PURPLE, PURPLE_DIM, ON_DARK, FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
+import { BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, RED, ON_DARK, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
+import { formatCents } from '@/lib/money';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -47,8 +41,8 @@ interface Msg {
   text: string; attachment?: MsgAttachment; status: string; ts: number;
 }
 interface SellerProduct {
-  id: string; name: string; price?: number; status?: string;
-  variants?: Array<{ price: number }>;
+  id: string; name: string; priceCents?: number; status?: string;
+  variants?: Array<{ priceCents: number }>;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -68,8 +62,8 @@ function formatDate(ts: number): string {
 }
 
 function formatPrice(p: SellerProduct): string {
-  if (p.price != null) return `$${(p.price / 100).toFixed(2)}`;
-  if (p.variants && p.variants.length > 0) return `$${(p.variants[0].price / 100).toFixed(2)}`;
+  if (p.priceCents != null) return formatCents(p.priceCents);
+  if (p.variants && p.variants.length > 0) return formatCents(p.variants[0].priceCents);
   return '';
 }
 

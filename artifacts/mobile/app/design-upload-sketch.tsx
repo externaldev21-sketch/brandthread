@@ -3,7 +3,7 @@
  * Route: /design-upload-sketch
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert, Image, Animated, Dimensions,
@@ -19,9 +19,6 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM,
-  GRAD_PRIMARY, GRAD_CARD_GLOW,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { AI_STYLES, AIStyleKind } from '@/services/designTypes';
@@ -48,7 +45,9 @@ const GRAD_PALETTES: Record<number, readonly [string, string]> = {
 };
 
 export default function UploadSketchScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const s = createStyles(theme);
   const router = useRouter();
   const [step, setStep] = useState<Step>('upload');
   const [sketchUri, setSketchUri] = useState<string | null>(null);
@@ -144,15 +143,7 @@ export default function UploadSketchScreen() {
           <View style={s.grid}>
             {results.imageUris.map((uri, idx) => (
               <View key={uri} style={s.resultCard}>
-                <LinearGradient
-                  colors={GRAD_PALETTES[idx % 4]}
-                  style={s.resultGradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                >
-                  <Feather name="image" size={32} color="rgba(255,255,255,0.5)" />
-                  <Text style={s.resultLabel}>Design {idx + 1}</Text>
-                </LinearGradient>
+                <Image source={{ uri }} style={s.resultGradient} resizeMode="cover" />
                 <View style={s.resultActions}>
                   <TouchableOpacity style={s.actionBtn} onPress={() => Alert.alert('Saved to project')}>
                     <Feather name="folder-plus" size={ICON.sm} color={PURPLE} />
@@ -268,7 +259,7 @@ export default function UploadSketchScreen() {
             />
           </View>
 
-          <GradientCard style={s.generateCard} onPress={handleGenerate}>
+          <GradientCard colors={theme.primaryGradient} style={[s.generateCard, { shadowColor: theme.shadowColor }]} onPress={handleGenerate}>
             <View style={s.generateInner}>
               <Feather name="zap" size={ICON.md} color="#fff" />
               <Text style={s.generateText}>Generate cleaned design</Text>
@@ -326,7 +317,7 @@ export default function UploadSketchScreen() {
               </TouchableOpacity>
             </View>
 
-            <GradientCard style={s.generateCard} onPress={startProcessing}>
+            <GradientCard colors={theme.primaryGradient} style={[s.generateCard, { shadowColor: theme.shadowColor }]} onPress={startProcessing}>
               <View style={s.generateInner}>
                 <Feather name="arrow-right" size={ICON.md} color="#fff" />
                 <Text style={s.generateText}>Next: Process sketch</Text>
@@ -350,7 +341,9 @@ export default function UploadSketchScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
+  return StyleSheet.create({
   content: { padding: SP.lg, paddingBottom: SP.xxl },
   uploadHint: {
     fontFamily: FONT.regular,
@@ -654,4 +647,5 @@ const s = StyleSheet.create({
     fontSize: FS.lg,
     color: FG,
   },
-});
+  });
+};

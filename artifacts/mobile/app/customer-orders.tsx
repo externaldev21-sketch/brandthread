@@ -19,6 +19,7 @@ import {
 import { useApi } from '@/lib/api';
 import { StatusBadge } from '@/components/BrandthreadUI';
 import { useColors } from '@/hooks/useColors';
+import { formatCents } from '@/lib/money';
 
 type Customer = {
   id: string;
@@ -52,7 +53,7 @@ const STATUS_VARIANT: Record<string, 'success' | 'warning' | 'error' | 'neutral'
 };
 
 function cents(c: number) {
-  return `$${(c / 100).toFixed(2)}`;
+  return formatCents(c);
 }
 
 export default function CustomerOrdersScreen() {

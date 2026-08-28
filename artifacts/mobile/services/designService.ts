@@ -5,6 +5,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { serviceRequest } from '@/lib/serviceConfig';
 import {
   DesignProject, DesignProjectType, DesignProjectStatus, DesignCanvas,
   DesignLayer, DesignVersion, DesignVersionMeta, BrandAsset, BrandAssetTypeKind,
@@ -371,53 +372,63 @@ export async function exportProject(
 
 // ─── AI API helpers ───────────────────────────────────────────────────────────
 
-function getApiBase(): string {
-  const base =
-    typeof process !== 'undefined'
-      ? (process.env?.EXPO_PUBLIC_API_BASE_URL ?? '')
-      : '';
-  return (base as string).replace(/\/$/, '');
-}
-
 async function callGenerateAPI(endpoint: string, body: object): Promise<string> {
-  // Use serviceRequest so the Clerk Bearer token is always included.
-  // Falls back to a raw fetch (no auth) only if services aren't configured yet.
-  let data: { b64_json: string };
-  try {
-    const { serviceRequest } = await import('@/lib/serviceConfig');
-    data = await serviceRequest<{ b64_json: string }>(endpoint, {
-      method: 'POST',
-      body: JSON.stringify(body),
-    });
-  } catch (configErr: any) {
-    // If services aren't configured (e.g. during onboarding), try unauthenticated.
-    const url = `${getApiBase()}${endpoint}`;
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!resp.ok) {
-      const msg = await resp.text().catch(() => String(resp.status));
-      throw new Error(`API error ${resp.status}: ${msg}`);
-    }
-    data = await resp.json();
-  }
+  // AI design actions require an authenticated seller. Never silently retry
+  // without auth because that can disconnect generated assets from their owner.
+  const data = await serviceRequest<{ b64_json: string }>(endpoint, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
   return `data:image/png;base64,${data.b64_json}`;
 }
 
-/** Generate N images in parallel; fall through to mock URI on individual failure. */
+function inferImageMime(uri: string, reportedMime?: string): string {
+  const normalized = (reportedMime ?? '').toLowerCase();
+  if (normalized === 'image/png' || normalized === 'image/jpeg' || normalized === 'image/webp') return normalized;
+  const path = uri.split('?')[0].toLowerCase();
+  if (path.endsWith('.png')) return 'image/png';
+  if (path.endsWith('.webp')) return 'image/webp';
+  return 'image/jpeg';
+}
+
+/** Read a local, blob, data, or remote image URI into the API's data-URL contract. */
+async function imageUriToDataUrl(uri: string): Promise<string> {
+  if (!uri || uri.startsWith('mock://')) {
+    throw new Error('A real source image is required.');
+  }
+  if (/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(uri)) {
+    return uri;
+  }
+
+  const response = await fetch(uri);
+  if (!response.ok) throw new Error('Could not read the selected image.');
+  const sourceBlob = await response.blob();
+  if (sourceBlob.size <= 0) throw new Error('The selected image is empty.');
+  if (sourceBlob.size > 8 * 1024 * 1024) throw new Error('Each reference image must be under 8MB.');
+  const mime = inferImageMime(uri, sourceBlob.type);
+  const typedBlob = sourceBlob.type === mime ? sourceBlob : sourceBlob.slice(0, sourceBlob.size, mime);
+
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not convert the selected image.'));
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        reject(new Error('Could not convert the selected image.'));
+        return;
+      }
+      resolve(reader.result);
+    };
+    reader.readAsDataURL(typedBlob);
+  });
+}
+
+/** Generate N real images in parallel. Provider failures are surfaced to the UI. */
 async function generateN(
   endpoint: string,
   body: object,
   count: number,
 ): Promise<string[]> {
-  const jobs = Array.from({ length: count }, (_, i) =>
-    callGenerateAPI(endpoint, body).catch(err => {
-      console.error(`[designService] image ${i + 1} failed:`, err);
-      return `mock://failed/${i + 1}`;
-    }),
-  );
+  const jobs = Array.from({ length: count }, () => callGenerateAPI(endpoint, body));
   return Promise.all(jobs);
 }
 
@@ -462,7 +473,8 @@ export async function generateSketchToDesign(req: {
 }): Promise<GenerateDesignResult> {
   const count = req.count ?? 4;
   const prompt = `Convert this sketch to a garment design. Style: ${req.style}${req.colorPalette ? `. Colors: ${req.colorPalette}` : ''}.`;
-  const imageUris = await generateN('/mockup/generate', { prompt }, count);
+  const referenceImage = await imageUriToDataUrl(req.sketchUri);
+  const imageUris = await generateN('/mockup/generate', { prompt, referenceImage }, count);
   return makeResult(prompt, req.style, imageUris);
 }
 
@@ -477,7 +489,8 @@ export async function generateMockupToModel(req: {
 }): Promise<GenerateMockupResult> {
   const count = req.count ?? 4;
   const prompt = `Fashion model wearing the uploaded garment design. Model: ${req.modelStyle ?? 'female'}. Scene: ${req.sceneStyle ?? 'studio'}. Lighting: ${req.lightingStyle ?? 'natural'}. Professional clothing photography.`;
-  const imageUris = await generateN('/photography/generate', { images: [], prompt }, count);
+  const referenceImage = await imageUriToDataUrl(req.mockupUri);
+  const imageUris = await generateN('/photography/generate', { images: [referenceImage], prompt }, count);
   return makeResult(prompt, 'minimal' as AIStyleKind, imageUris);
 }
 
@@ -491,9 +504,18 @@ export async function generatePhotoshoot(req: {
   imageRatio?: string;
   count?: number;
 }): Promise<GeneratePhotoshootResult> {
+  if (!req.productId) throw new Error('Choose a product with at least one photo.');
   const count = req.count ?? 4;
   const prompt = `Professional product photography. Scene: ${req.sceneStyle ?? 'studio'}. Model: ${req.modelStyle ?? 'female'}. Lighting: ${req.lightingStyle ?? 'natural'}. Format: ${req.outputFormat ?? 'product_page'}. Clean, commercial fashion shoot.`;
-  const imageUris = await generateN('/photography/generate', { images: [], prompt }, count);
+  const product = await serviceRequest<{ images?: unknown }>(
+    `/api/products/${encodeURIComponent(req.productId)}`,
+  );
+  const productImageUris = Array.isArray(product.images)
+    ? product.images.filter((uri): uri is string => typeof uri === 'string' && uri.length > 0).slice(0, 4)
+    : [];
+  if (productImageUris.length === 0) throw new Error('This product does not have any photos to use.');
+  const referenceImages = await Promise.all(productImageUris.map(imageUriToDataUrl));
+  const imageUris = await generateN('/photography/generate', { images: referenceImages, prompt }, count);
   return makeResult(prompt, 'editorial' as AIStyleKind, imageUris);
 }
 
@@ -505,15 +527,16 @@ export async function applyPromptEdit(req: {
   preserveLogo?: boolean;
   preserveGarmentColor?: boolean;
 }): Promise<AIGenerationResult> {
-  const prompt = `Edit garment design: ${req.prompt}. ${req.preserveProduct ? 'Keep product shape.' : ''} ${req.preserveGarmentColor ? 'Keep original colors.' : ''}`.trim();
-  const imageUris = await generateN('/mockup/generate', { prompt }, 1);
+  const prompt = `Edit garment design: ${req.prompt}. ${req.preserveProduct ? 'Keep product shape.' : ''} ${req.preserveLogo ? 'Keep the original logo and artwork unless explicitly changed.' : ''} ${req.preserveGarmentColor ? 'Keep original colors.' : ''}`.trim();
+  const referenceImage = await imageUriToDataUrl(req.imageUri);
+  const imageUris = await generateN('/mockup/generate', { prompt, referenceImage }, 1);
   return makeResult(req.prompt, 'custom' as AIStyleKind, imageUris);
 }
 
 // removeBackgroundFromImage — returns a string URI (used by design-bg-removal.tsx)
 export async function removeBackgroundFromImage(imageUri: string): Promise<string> {
-  await delay(1200);
-  return `mock://bg-removed/${Date.now()}`;
+  const image = await imageUriToDataUrl(imageUri);
+  return callGenerateAPI('/bg-removal/remove', { image });
 }
 
 // replaceBackground — accepts an object (used by design-bg-replace.tsx)
@@ -522,9 +545,20 @@ export async function replaceBackground(req: {
   bgType?: string;
   color?: string;
   prompt?: string;
+  backgroundImageUri?: string;
 }): Promise<{ resultUri: string }> {
-  await delay(1200);
-  return { resultUri: `mock://bg-replaced/${Date.now()}` };
+  const image = await imageUriToDataUrl(req.imageUri);
+  const backgroundImage = req.backgroundImageUri
+    ? await imageUriToDataUrl(req.backgroundImageUri)
+    : undefined;
+  const resultUri = await callGenerateAPI('/bg-removal/replace', {
+    image,
+    ...(backgroundImage ? { backgroundImage } : {}),
+    bgType: req.bgType,
+    color: req.color,
+    prompt: req.prompt,
+  });
+  return { resultUri };
 }
 
 export async function generateCampaign(

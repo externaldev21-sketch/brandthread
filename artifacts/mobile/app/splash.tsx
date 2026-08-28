@@ -5,14 +5,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 
 const { width: W } = Dimensions.get('window');
 
 const BG       = '#07070F';
-const PURPLE   = '#8B5CF6';
-const CYAN     = '#22D3EE';
-
 export default function SplashScreen() {
+  const { theme } = useAppTheme();
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -60,7 +60,7 @@ export default function SplashScreen() {
   return (
     <View style={styles.root}>
       <LinearGradient
-        colors={['#07070F', '#0D0820', '#07070F']}
+        colors={[BG, theme.accentDim, BG]}
         style={StyleSheet.absoluteFill}
       />
 
@@ -72,7 +72,7 @@ export default function SplashScreen() {
 
       {/* Logo mark */}
       <Animated.View style={[styles.logoWrap, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
-        <BrandthreadLogo size={110} showGlow glowColor={PURPLE} />
+        <BrandthreadLogo size={110} showGlow glowColor={theme.shadowColor} />
       </Animated.View>
 
       {/* Wordmark + tagline */}
@@ -95,7 +95,7 @@ export default function SplashScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: BG,
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     width: 280,
     height: 280,
     borderRadius: 140,
-    backgroundColor: '#8B5CF618',
+    backgroundColor: theme.accentDim,
   },
   ring: {
     position: 'absolute',
@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 100,
     borderWidth: 1,
-    borderColor: PURPLE,
+    borderColor: theme.accent,
   },
   logoWrap: { alignItems: 'center', marginBottom: 36 },
   textWrap: { alignItems: 'center', gap: 8 },

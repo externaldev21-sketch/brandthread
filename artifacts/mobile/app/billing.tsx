@@ -9,6 +9,7 @@ import { useApi } from '@/lib/api';
 import { isManagerRole, parseRoleError } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import { useTeamRole } from '@/hooks/useTeamRole';
+import { formatCents } from '@/lib/money';
 
 type BillFilter = 'all' | 'paid' | 'unpaid';
 
@@ -20,7 +21,7 @@ export default function BillingScreen() {
   const [filter, setFilter] = useState<BillFilter>('all');
   const { currentRole, isLoadingRole } = useTeamRole();
   const [bills, setBills] = useState<Array<{
-    id: string; date: string; note: string; amount: string; status: 'Paid' | 'Unpaid';
+    id: string; date: string; note: string; amountCents: number; currency: string; status: 'Paid' | 'Unpaid';
   }>>([]);
   const [billingStatus, setBillingStatus] = useState({
     amountCents: 0,
@@ -45,7 +46,8 @@ export default function BillingScreen() {
           id: invoice.id,
           date: new Date(invoice.created).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
           note: invoice.description,
-          amount: new Intl.NumberFormat('en-US', { style: 'currency', currency: invoice.currency.toUpperCase() }).format(invoice.amountCents / 100),
+           amountCents: invoice.amountCents,
+           currency: invoice.currency.toUpperCase(),
           status: invoice.status === 'paid' ? 'Paid' : 'Unpaid',
         })));
       })
@@ -77,7 +79,7 @@ export default function BillingScreen() {
 
   function exportBills() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const text = bills.map(b => `${b.date} — ${b.note}: ${b.amount} (${b.status})`).join('\n');
+     const text = bills.map(b => `${b.date} — ${b.note}: ${formatCents(b.amountCents, b.currency)} (${b.status})`).join('\n');
     Share.share({ message: `Billing History\n\n${text}` });
   }
 
@@ -145,7 +147,7 @@ export default function BillingScreen() {
 
           <View style={styles.priceRow}>
             <Text style={[styles.price, { color: colors.foreground }]}>
-              {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(billingStatus.amountCents / 100)}
+               {formatCents(billingStatus.amountCents)}
             </Text>
             <Text style={[styles.priceSuffix, { color: colors.mutedForeground }]}>USD</Text>
           </View>
@@ -246,7 +248,7 @@ export default function BillingScreen() {
                     <Text style={[styles.billNote, { color: colors.mutedForeground }]}>{bill.date} · {bill.note}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                    <Text style={[styles.billAmount, { color: colors.foreground }]}>{bill.amount}</Text>
+                     <Text style={[styles.billAmount, { color: colors.foreground }]}>{formatCents(bill.amountCents, bill.currency)}</Text>
                     <View style={[styles.statusPill, { backgroundColor: bill.status === 'Paid' ? colors.success + '26' : colors.destructive + '26' }]}>
                       <Text style={[styles.statusText, { color: bill.status === 'Paid' ? colors.success : colors.destructive }]}>{bill.status}</Text>
                     </View>

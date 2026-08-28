@@ -13,7 +13,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
-import { PURPLE, SUCCESS, SUCCESS_DIM, FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { SUCCESS, SUCCESS_DIM, FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 interface Location {
   id: string;
@@ -131,7 +131,7 @@ export default function LocationsScreen() {
     <View style={[s.container, { backgroundColor: colors.background }]}>
       <ScreenHeader title="Locations" />
       {loading ? (
-        <View style={s.center}><ActivityIndicator color={PURPLE} /></View>
+        <View style={s.center}><ActivityIndicator color={colors.primary} /></View>
       ) : (
         <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
           <View style={s.section}>
@@ -184,8 +184,8 @@ export default function LocationsScreen() {
                       <View style={s.rowStart}>
                         <Text style={[s.rowLabel, { color: colors.foreground }]}>{loc.name}</Text>
                         {loc.is_primary && (
-                          <View style={[s.primaryBadge, { backgroundColor: `${PURPLE}20`, borderColor: `${PURPLE}40` }]}>
-                            <Text style={[s.primaryBadgeText, { color: PURPLE }]}>Primary</Text>
+                           <View style={[s.primaryBadge, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
+                             <Text style={[s.primaryBadgeText, { color: colors.primary }]}>Primary</Text>
                           </View>
                         )}
                       </View>
@@ -236,7 +236,7 @@ export default function LocationsScreen() {
             <TouchableOpacity
               onPress={handleSave}
               disabled={saving}
-              style={[s.modalSaveBtn, { backgroundColor: PURPLE, opacity: saving ? 0.6 : 1 }]}
+              style={[s.modalSaveBtn, { backgroundColor: colors.primary, opacity: saving ? 0.6 : 1 }]}
             >
               {saving ? <ActivityIndicator size="small" color="#fff" /> : <Text style={s.modalSaveBtnText}>Save</Text>}
             </TouchableOpacity>

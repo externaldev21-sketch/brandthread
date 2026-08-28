@@ -15,14 +15,17 @@ import {
 } from '@/lib/theme';
 import { getMarketingAnalytics, getFilterState } from '@/services/analyticsService';
 import { MarketingAnalytics, CampaignAnalytics, InfluencerAnalytics, AnalyticsMetric, AnalyticsFilterState } from '@/services/analyticsTypes';
+import { formatCents } from '@/lib/money';
 
-function RevenueBar({ label, value, total, color }: { label: string; value: number; total: number; color: string }) {
-  const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+function RevenueBar({ label, valueCents, totalCents, color }: { label: string; valueCents: number; totalCents: number; color: string }) {
+  const colors = useColors();
+  const s = React.useMemo(() => createStyles(colors), [colors]);
+  const pct = totalCents > 0 ? Math.round((valueCents / totalCents) * 100) : 0;
   return (
     <View style={{ marginBottom: 12 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
         <Text style={{ fontSize: 12, fontFamily: FONT.medium, color: MUTED }}>{label}</Text>
-        <Text style={{ fontSize: 12, fontFamily: FONT.bold, color: FG }}>${value.toLocaleString()} <Text style={{ color: SUBTLE }}>({pct}%)</Text></Text>
+        <Text style={{ fontSize: 12, fontFamily: FONT.bold, color: FG }}>{formatCents(valueCents)} <Text style={{ color: SUBTLE }}>({pct}%)</Text></Text>
       </View>
       <View style={{ height: 6, backgroundColor: BORDER, borderRadius: 3, overflow: 'hidden' }}>
         <View style={{ width: `${pct}%`, height: '100%', backgroundColor: color, borderRadius: 3 }} />
@@ -32,6 +35,8 @@ function RevenueBar({ label, value, total, color }: { label: string; value: numb
 }
 
 function CampaignRow({ c }: { c: CampaignAnalytics }) {
+  const colors = useColors();
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const typeColor = c.type === 'email' ? PURPLE : c.type === 'sms' ? SUCCESS : c.type === 'push' ? BLUE : ORANGE;
   const typeIcon: keyof typeof Feather.glyphMap = c.type === 'email' ? 'mail' : c.type === 'sms' ? 'message-square' : c.type === 'push' ? 'bell' : 'zap';
@@ -49,14 +54,16 @@ function CampaignRow({ c }: { c: CampaignAnalytics }) {
         <Text style={s.campaignMeta}>{c.recipients.toLocaleString()} sent · {c.orders} orders</Text>
       </View>
       <View style={{ alignItems: 'flex-end' }}>
-        <Text style={s.campaignRevenue}>${c.revenue.toLocaleString()}</Text>
-        <Text style={s.campaignRate}>${c.revenuePerRecipient.toFixed(2)}/rec.</Text>
+        <Text style={s.campaignRevenue}>{formatCents(c.revenueCents)}</Text>
+        <Text style={s.campaignRate}>{formatCents(c.revenuePerRecipientCents)}/rec.</Text>
       </View>
     </TouchableOpacity>
   );
 }
 
 function InfluencerRow({ inf }: { inf: InfluencerAnalytics }) {
+  const colors = useColors();
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={s.influencerRow}>
       <View style={s.influencerAvatar}>
@@ -67,7 +74,7 @@ function InfluencerRow({ inf }: { inf: InfluencerAnalytics }) {
         <Text style={s.influencerMeta}>{inf.orders} orders · {inf.clicks.toLocaleString()} clicks</Text>
       </View>
       <View style={{ alignItems: 'flex-end' }}>
-        <Text style={s.influencerRevenue}>${inf.revenue.toLocaleString()}</Text>
+        <Text style={s.influencerRevenue}>{formatCents(inf.revenueCents)}</Text>
         <Text style={[s.influencerROC, { color: inf.returnOnCost >= 5 ? SUCCESS : ORANGE }]}>{inf.returnOnCost}× ROC</Text>
       </View>
     </View>
@@ -75,7 +82,9 @@ function InfluencerRow({ inf }: { inf: InfluencerAnalytics }) {
 }
 
 export default function AnalyticsMarketingScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const colors = useColors();
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = colors;
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -84,13 +93,17 @@ export default function AnalyticsMarketingScreen() {
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
-    const f = filter ?? await getFilterState();
-    if (!filter) setFilter(f);
-    setData(await getMarketingAnalytics(f));
-    setLoading(false); setRefreshing(false);
+    try {
+      const f = filter ?? await getFilterState();
+      if (!filter) setFilter(f);
+      setData(await getMarketingAnalytics(f)); setError(null);
+    } catch (err) {
+      setData(null); setError(err instanceof Error ? err.message : 'Marketing analytics are unavailable.');
+    } finally { setLoading(false); setRefreshing(false); }
   }, [filter]);
 
   useEffect(() => { load(); }, []); // eslint-disable-line
@@ -100,6 +113,7 @@ export default function AnalyticsMarketingScreen() {
   if (loading) {
     return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><ActivityIndicator size="large" color={PURPLE} /></View>;
   }
+  if (error) return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><Text style={{ color: MUTED }}>{error}</Text><TouchableOpacity onPress={() => load()}><Text style={{ color: PURPLE }}>Retry</Text></TouchableOpacity></View>;
 
   return (
     <ScrollView
@@ -127,7 +141,9 @@ export default function AnalyticsMarketingScreen() {
         <Text style={s.heroValue}>{data?.marketingRevenue.formatted ?? '—'}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
           <Feather name="trending-up" size={12} color={SUCCESS} />
-          <Text style={s.heroChange}>+{data?.marketingRevenue.changePct.toFixed(1)}% vs prev period</Text>
+          {typeof data?.marketingRevenue.changePct === 'number' ? (
+            <Text style={s.heroChange}>+{data.marketingRevenue.changePct.toFixed(1)}% vs prev period</Text>
+          ) : null}
         </View>
       </View>
 
@@ -135,12 +151,12 @@ export default function AnalyticsMarketingScreen() {
       <Text style={s.sectionTitle}>Revenue by Channel</Text>
       <View style={[s.card, { padding: 16 }]}>
         {data && <>
-          <RevenueBar label="Email"         value={data.emailRevenue.value}        total={totalMarketing} color={PURPLE}  />
-          <RevenueBar label="Discounts"     value={data.discountRevenue.value}     total={totalMarketing} color={GOLD}    />
-          <RevenueBar label="SMS"           value={data.smsRevenue.value}          total={totalMarketing} color={SUCCESS} />
-          <RevenueBar label="Automation"    value={data.automationRevenue.value}   total={totalMarketing} color={BLUE}    />
-          <RevenueBar label="Influencers"   value={data.influencerRevenue.value}   total={totalMarketing} color={ORANGE}  />
-          <RevenueBar label="Referrals"     value={data.referralRevenue.value}     total={totalMarketing} color={CYAN_COLOR} />
+          <RevenueBar label="Email"         valueCents={data.emailRevenue.value}        totalCents={totalMarketing} color={PURPLE}  />
+          <RevenueBar label="Discounts"     valueCents={data.discountRevenue.value}     totalCents={totalMarketing} color={GOLD}    />
+          <RevenueBar label="SMS"           valueCents={data.smsRevenue.value}          totalCents={totalMarketing} color={SUCCESS} />
+          <RevenueBar label="Automation"    valueCents={data.automationRevenue.value}   totalCents={totalMarketing} color={BLUE}    />
+          <RevenueBar label="Influencers"   valueCents={data.influencerRevenue.value}   totalCents={totalMarketing} color={ORANGE}  />
+          <RevenueBar label="Referrals"     valueCents={data.referralRevenue.value}     totalCents={totalMarketing} color={CYAN} />
         </>}
         <View style={s.recoveredRow}>
           <Feather name="refresh-cw" size={13} color={SUCCESS} />
@@ -186,8 +202,8 @@ export default function AnalyticsMarketingScreen() {
           { label: 'Shares',              value: data?.referral.shares.toLocaleString() ?? '—' },
           { label: 'Clicks',              value: data?.referral.clicks.toLocaleString() ?? '—' },
           { label: 'Referred Customers',  value: data?.referral.referredCustomers.toLocaleString() ?? '—' },
-          { label: 'Revenue',             value: `$${data?.referral.revenue.toLocaleString() ?? '—'}` },
-          { label: 'Rewards Issued',      value: data?.referral.rewardsIssued.toLocaleString() ?? '—' },
+          { label: 'Revenue',             value: data ? formatCents(data.referral.revenueCents) : '—' },
+          { label: 'Rewards Issued',      value: data ? formatCents(data.referral.rewardsIssuedCents) : '—' },
         ].map((item, i) => (
           <View key={item.label} style={[s.simpleRow, i > 0 && s.divider]}>
             <Text style={s.simpleLabel}>{item.label}</Text>
@@ -201,9 +217,9 @@ export default function AnalyticsMarketingScreen() {
   );
 }
 
-const CYAN_COLOR = '#22D3EE';
-
-const s = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT } = colors;
+  return StyleSheet.create({
   scroll:   { flex: 1, backgroundColor: BG },
   content:  { paddingHorizontal: 16 },
   loadWrap: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
@@ -242,4 +258,5 @@ const s = StyleSheet.create({
   emptyState:{ alignItems: 'center', paddingVertical: 48, gap: 12 },
   emptyTitle:{ fontSize: 16, fontFamily: FONT.semibold, color: FG },
   emptyBody:{ fontSize: 13, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', paddingHorizontal: 24 },
-});
+  });
+};

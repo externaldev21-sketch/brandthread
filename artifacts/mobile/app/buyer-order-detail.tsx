@@ -26,7 +26,7 @@ import {
   BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
   GradientCard, StatusBadge, PrimaryButton, SecondaryButton,
 } from '@/components/BrandthreadUI';
-import { fmtCurrency } from '@/lib/format';
+import { formatCents } from '@/lib/money';
 
 // 60-minute cancellation window (mirrors server enforcement)
 const CANCEL_WINDOW_MS = 60 * 60 * 1000;
@@ -172,14 +172,14 @@ function adaptOrderDetail(row: any): BuyerOrderView {
       productName: item.productName,
       variant:     item.variantLabel ?? '',
       quantity:    item.quantity,
-      unitPrice:   item.priceCents / 100,
+      unitPriceCents: item.priceCents ?? 0,
     })),
     shippingAddress,
     payment: {
-      subtotal:      (row.subtotalCents ?? 0) / 100,
-      shippingTotal: (row.shippingCents  ?? 0) / 100,
-      taxTotal:      0,
-      total:         (row.totalCents     ?? 0) / 100,
+      subtotalCents: row.subtotalCents ?? 0,
+      shippingTotalCents: row.shippingCents ?? 0,
+      taxTotalCents: 0,
+      totalCents: row.totalCents ?? 0,
     },
     trackingNumber:      row.trackingNumber    ?? undefined,
     trackingCarrier:     row.carrier           ?? undefined,
@@ -217,7 +217,7 @@ export default function BuyerOrderDetailScreen() {
   const { theme } = useAppTheme();
   const PURPLE = colors.primary, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = colors.accent, CYAN = theme.secondary, CYAN_DIM = theme.secondaryDim, CYAN_LIGHT = theme.secondary;
   const BORDER_ACTIVE = `${theme.accent}73`;
-  const GRAD_PRIMARY = [theme.accent, theme.secondary] as const;
+  const GRAD_PRIMARY = theme.primaryGradient;
   const GRAD_CARD_GLOW = [theme.accentDim, theme.secondaryDim] as const;
   const styles = makeStyles(theme);
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -236,6 +236,7 @@ export default function BuyerOrderDetailScreen() {
   const [submittingReview, setSubmittingReview] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [returnRequest, setReturnRequest] = useState<any | null>(null);
   // Backoff: stop polling after 3 consecutive failures; resume on next focus.
   const consecutiveFailuresRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -270,6 +271,11 @@ export default function BuyerOrderDetailScreen() {
           }
         }
       });
+      api.returns.listBuyer()
+        .then(rows => {
+          if (!cancelled) setReturnRequest(rows.find((request: any) => request.orderId === id) ?? null);
+        })
+        .catch(() => {});
     }
 
     fetchOrder();
@@ -300,6 +306,7 @@ export default function BuyerOrderDetailScreen() {
       setLoading(false);
       timerRef.current = setInterval(() => {
         api.buyer.orders.get(id).then(r => setOrder(adaptOrderDetail(r))).catch(() => {});
+        api.returns.listBuyer().then(rows => setReturnRequest(rows.find((request: any) => request.orderId === id) ?? null)).catch(() => {});
       }, 15_000);
     }).catch(() => {
       setLoading(false);
@@ -318,6 +325,7 @@ export default function BuyerOrderDetailScreen() {
       setRefreshing(false);
       setFetchError(true);
     });
+    api.returns.listBuyer().then(rows => setReturnRequest(rows.find((request: any) => request.orderId === id) ?? null)).catch(() => {});
   }
 
   function handleCopyTracking() {
@@ -528,6 +536,40 @@ export default function BuyerOrderDetailScreen() {
           </GradientCard>
         </View>
 
+        {returnRequest && (
+          <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
+            <GradientCard colors={GRAD_CARD_GLOW}>
+              <View style={styles.returnHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.returnEyebrow}>RETURN / REFUND</Text>
+                  <Text style={styles.returnTitle}>
+                    {String(returnRequest.status).replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
+                  </Text>
+                </View>
+                <StatusBadge
+                  label={String(returnRequest.status).toUpperCase()}
+                  variant={returnRequest.status === 'refunded' ? 'success' : returnRequest.status === 'denied' ? 'error' : returnRequest.status === 'approved' ? 'info' : 'warning'}
+                />
+              </View>
+              <Text style={styles.returnDetail}>
+                Requested: {String(returnRequest.resolutionRequested ?? 'refund').replace(/_/g, ' ')}
+              </Text>
+              {returnRequest.refundAmountCents != null && (
+                <Text style={styles.returnDetail}>Refunded: {formatCents(returnRequest.refundAmountCents)}</Text>
+              )}
+              {returnRequest.sellerResponse ? (
+                <View style={styles.sellerResponse}>
+                  <Text style={styles.sellerResponseLabel}>Seller response</Text>
+                  <Text style={styles.sellerResponseText}>{returnRequest.sellerResponse}</Text>
+                </View>
+              ) : (
+                <Text style={styles.returnPendingText}>Waiting for the seller to respond.</Text>
+              )}
+              <Text style={styles.returnUpdated}>Updated {fmtDate(returnRequest.updatedAt)}</Text>
+            </GradientCard>
+          </View>
+        )}
+
         {/* ── Cancellation Reason ───────────────────────────────────────────── */}
         {order.status === 'cancelled' && (
           <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
@@ -566,7 +608,7 @@ export default function BuyerOrderDetailScreen() {
                 <Text style={styles.lineItemVariant}>{item.variant}</Text>
               </View>
               <Text style={styles.lineItemPrice}>
-                {item.quantity} × {fmtCurrency(item.unitPrice)}
+                {item.quantity} × {formatCents(item.unitPriceCents)}
               </Text>
             </View>
           ))}
@@ -574,13 +616,13 @@ export default function BuyerOrderDetailScreen() {
 
         {/* ── Payment Summary ───────────────────────────────────────────────── */}
         <SectionCard title="Payment Summary">
-          <Row label="Subtotal" value={fmtCurrency(order.payment.subtotal)} />
-          <Row label="Shipping" value={fmtCurrency(order.payment.shippingTotal)} />
-          <Row label="Tax"      value={fmtCurrency(order.payment.taxTotal)} />
+          <Row label="Subtotal" value={formatCents(order.payment.subtotalCents)} />
+          <Row label="Shipping" value={formatCents(order.payment.shippingTotalCents)} />
+          <Row label="Tax"      value={formatCents(order.payment.taxTotalCents)} />
           <View style={styles.divider} />
           <View style={styles.totalRow}>
             <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalAmount}>{fmtCurrency(order.payment.total)}</Text>
+            <Text style={styles.totalAmount}>{formatCents(order.payment.totalCents)}</Text>
           </View>
           <Text style={styles.paymentNote}>Payment processed securely via Brandthread</Text>
         </SectionCard>
@@ -693,9 +735,10 @@ export default function BuyerOrderDetailScreen() {
             onPress={handleContactSeller}
           />
           <SecondaryButton
-            label="Request Return"
+            label={returnRequest ? "Return Request Submitted" : "Request Return"}
             icon="refresh-ccw"
             onPress={handleRequestReturn}
+            disabled={!!returnRequest}
           />
           <SecondaryButton
             label="Report a Problem"
@@ -878,6 +921,15 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontFamily: FONT.medium,
     color: PURPLE_LIGHT,
   },
+  returnHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
+  returnEyebrow: { color: MUTED, fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 0.7 },
+  returnTitle: { color: FG, fontFamily: FONT.bold, fontSize: FS.md, marginTop: 2 },
+  returnDetail: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: 4, textTransform: 'capitalize' },
+  sellerResponse: { backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, padding: SP.sm, marginTop: SP.sm },
+  sellerResponseLabel: { color: PURPLE_LIGHT, fontFamily: FONT.semibold, fontSize: FS.xs, marginBottom: 4 },
+  sellerResponseText: { color: FG, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
+  returnPendingText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, marginTop: SP.sm },
+  returnUpdated: { color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: SP.sm },
   lineItemRow: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,7 +1,7 @@
 /**
  * Brandthread Social Service
  * All social features backed by AsyncStorage with in-memory caching.
- * Demo data seeded on first load. Pub/sub for UI reactivity.
+ * API-backed social data with user-scoped local preferences and drafts.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -29,6 +29,17 @@ let _socialUserId = 'anon';
  *  with null to reset to 'anon'). */
 export function initSocialService(userId: string | null): void {
   _socialUserId = userId ?? 'anon';
+  if (userId) {
+    const keys = K(userId);
+    AsyncStorage.getItem(keys.seeded).then((wasSeeded) => {
+      if (wasSeeded !== 'true') return;
+      return AsyncStorage.multiRemove([
+        keys.seeded, keys.friendships, keys.requests, keys.conversations,
+        keys.stories, keys.notifications, keys.saved, keys.posts, keys.reposts,
+        keys.friendLikes,
+      ]);
+    }).catch(() => {});
+  }
 }
 
 /**
@@ -113,235 +124,9 @@ async function save(key: string, value: unknown): Promise<void> {
   try { await AsyncStorage.setItem(key, JSON.stringify(value)); } catch {}
 }
 
-// ─── Seed data ────────────────────────────────────────────────────────────────
 
-const DEMO_FRIENDS: Friendship[] = [
-  { id: 'fr_maya',   userId: 'u_maya',   name: 'Maya Chen',    handle: '@mayachen',    initials: 'MC', color: '#BE185D', status: 'accepted', mutualFriendsCount: 3, lastSeenAt: new Date(Date.now() - 5 * 60000).toISOString(), updatedAt: iso() },
-  { id: 'fr_jordan', userId: 'u_jordan', name: 'Jordan Lee',   handle: '@jordanlee',   initials: 'JL', color: '#1D4ED8', status: 'accepted', mutualFriendsCount: 2, lastSeenAt: new Date(Date.now() - 30 * 60000).toISOString(), updatedAt: iso() },
-  { id: 'fr_amir',   userId: 'u_amir',   name: 'Amir Patel',   handle: '@amirpatel',   initials: 'AP', color: '#0F766E', status: 'accepted', mutualFriendsCount: 1, updatedAt: iso() },
-  { id: 'fr_sofia',  userId: 'u_sofia',  name: 'Sofia Reyes',  handle: '@sofiareyes',  initials: 'SR', color: '#B45309', status: 'accepted', mutualFriendsCount: 2, updatedAt: iso() },
-  { id: 'fr_kai',    userId: 'u_kai',    name: 'Kai Nakamura', handle: '@kainakamura', initials: 'KN', color: '#00C853', status: 'accepted', mutualFriendsCount: 1, lastSeenAt: new Date(Date.now() - 2 * 60000).toISOString(), updatedAt: iso() },
-];
-
-const DEMO_REQUESTS: FriendRequest[] = [
-  { id: 'req_alex',  fromId: 'u_alex',  fromName: 'Alex Kim',   fromHandle: '@alexkim',   fromInitials: 'AK', fromColor: '#3B82F6', toId: MY_USER_ID, status: 'pending', mutualFriends: 2, createdAt: new Date(Date.now() - 2 * 3600000).toISOString() },
-  { id: 'req_zoe',   fromId: 'u_zoe',   fromName: 'Zoe Carter', fromHandle: '@zoecarter', fromInitials: 'ZC', fromColor: '#EC4899', toId: MY_USER_ID, status: 'pending', mutualFriends: 0, createdAt: new Date(Date.now() - 24 * 3600000).toISOString() },
-];
-
-const DEMO_SUGGESTIONS: FriendSuggestion[] = [
-  { id: 'sug_casey',  userId: 'u_casey',  name: 'Casey Park',   handle: '@caseypark',   initials: 'CP', color: '#7C3AED', reason: '2 mutual friends',    mutualCount: 2 },
-  { id: 'sug_riley',  userId: 'u_riley',  name: 'Riley Moss',   handle: '@rileymoss',   initials: 'RM', color: '#0891B2', reason: 'Follows Atlas Goods', mutualCount: 0 },
-  { id: 'sug_samara', userId: 'u_samara', name: 'Samara Gold',  handle: '@samaragold',  initials: 'SG', color: '#D97706', reason: '3 mutual friends',    mutualCount: 3 },
-  { id: 'sug_dante',  userId: 'u_dante',  name: 'Dante Rivera', handle: '@danterivera', initials: 'DR', color: '#059669', reason: 'Follows Vault Studio', mutualCount: 1 },
-];
-
-const DEMO_CONVS: Conversation[] = [
-  {
-    id: 'conv_maya', type: 'buyer_to_buyer',
-    participants: [{ userId: 'u_maya', name: 'Maya Chen', handle: '@mayachen', initials: 'MC', color: '#BE185D', accountType: 'buyer' }],
-    lastMessage: 'Adding to cart rn!! Thanks ❤️', lastMessageTs: Date.now() - 53 * 60000,
-    unreadCount: 0, isFriendshipActive: true, isArchived: false, isRequest: false, updatedAt: iso(),
-  },
-  {
-    id: 'conv_kai', type: 'buyer_to_buyer',
-    participants: [{ userId: 'u_kai', name: 'Kai Nakamura', handle: '@kainakamura', initials: 'KN', color: '#00C853', accountType: 'buyer' }],
-    lastMessage: 'Lmao same struggle. The colour is different though', lastMessageTs: Date.now() - 5 * 60000,
-    unreadCount: 1, isFriendshipActive: true, isArchived: false, isRequest: false, updatedAt: iso(),
-  },
-  {
-    id: 'conv_vault', type: 'buyer_to_seller',
-    participants: [{ userId: 'u_vault', name: 'Vault Studio', handle: '@vaultstudio', initials: 'VS', color: '#00C853', accountType: 'seller' }],
-    lastMessage: 'Hi! When does the cargo jacket restock?', lastMessageTs: Date.now() - 3 * 3600000,
-    unreadCount: 0, isFriendshipActive: true, isArchived: false, isRequest: false, updatedAt: iso(),
-  },
-  {
-    id: 'conv_order', type: 'buyer_to_seller_order',
-    participants: [{ userId: 'u_meridian', name: 'Meridian Co.', handle: '@meridianco', initials: 'MC', color: '#0F766E', accountType: 'seller' }],
-    lastMessage: 'Your order has shipped!', lastMessageTs: Date.now() - 24 * 3600000,
-    unreadCount: 1, isFriendshipActive: true, isArchived: false, isRequest: false,
-    contextOrderId: 'ord_2041', contextOrderNumber: '#2041', contextOrderStatus: 'Shipped',
-    contextProductName: 'Essential Relaxed Tee', contextSellerName: 'Meridian Co.',
-    updatedAt: iso(),
-  },
-  {
-    id: 'conv_seller_req', type: 'buyer_to_seller',
-    participants: [{ userId: 'u_nxgen', name: 'NxGen Drops', handle: '@nxgendrops', initials: 'NX', color: '#B45309', accountType: 'seller' }],
-    lastMessage: 'Is the archive hoodie still available in XL?', lastMessageTs: Date.now() - 6 * 3600000,
-    unreadCount: 0, isFriendshipActive: true, isArchived: false, isRequest: true, updatedAt: iso(),
-  },
-];
-
-const now = Date.now();
-const DEMO_MESSAGES: Record<string, Message[]> = {
-  conv_maya: [
-    { id: 'm1', conversationId: 'conv_maya', fromId: 'u_maya', fromName: 'Maya Chen', fromInitials: 'MC', fromColor: '#BE185D', text: 'Omg did you see the Vault Studio drop?? 😭', reactions: [], status: 'delivered', ts: now - 62 * 60000, deletedForMe: false },
-    { id: 'm2', conversationId: 'conv_maya', fromId: MY_USER_ID, fromName: MY_NAME, fromInitials: MY_INITIALS, fromColor: MY_COLOR, text: 'I know!! I\'ve been refreshing since 8am lol', reactions: [], status: 'delivered', ts: now - 60 * 60000, deletedForMe: false },
-    { id: 'm3', conversationId: 'conv_maya', fromId: 'u_maya', fromName: 'Maya Chen', fromInitials: 'MC', fromColor: '#BE185D', text: 'The cargo jacket is so good. Are you getting it?', reactions: [], status: 'delivered', ts: now - 58 * 60000, deletedForMe: false },
-    { id: 'm4', conversationId: 'conv_maya', fromId: MY_USER_ID, fromName: MY_NAME, fromInitials: MY_INITIALS, fromColor: MY_COLOR, text: 'Already in my cart 👀 you should grab it before it sells out', reactions: [], status: 'delivered', ts: now - 55 * 60000, deletedForMe: false },
-    { id: 'm5', conversationId: 'conv_maya', fromId: 'u_maya', fromName: 'Maya Chen', fromInitials: 'MC', fromColor: '#BE185D', text: 'Adding to cart rn!! Thanks ❤️', reactions: [{ emoji: '❤️', fromId: MY_USER_ID, fromName: MY_NAME }], status: 'delivered', ts: now - 53 * 60000, deletedForMe: false },
-  ],
-  conv_kai: [
-    { id: 'k1', conversationId: 'conv_kai', fromId: 'u_kai', fromName: 'Kai Nakamura', fromInitials: 'KN', fromColor: '#00C853', text: 'You see that Meridian drop? The sage tee is so clean', reactions: [], status: 'delivered', ts: now - 30 * 60000, deletedForMe: false },
-    { id: 'k2', conversationId: 'conv_kai', fromId: MY_USER_ID, fromName: MY_NAME, fromInitials: MY_INITIALS, fromColor: MY_COLOR, text: 'Yeah I nearly copped! Held off because I already have like 6 tees lol', reactions: [], status: 'delivered', ts: now - 28 * 60000, deletedForMe: false },
-    { id: 'k3', conversationId: 'conv_kai', fromId: 'u_kai', fromName: 'Kai Nakamura', fromInitials: 'KN', fromColor: '#00C853', text: 'Lmao same struggle. The colour is different though', reactions: [], status: 'delivered', ts: now - 5 * 60000, deletedForMe: false },
-  ],
-  conv_vault: [
-    { id: 'v1', conversationId: 'conv_vault', fromId: MY_USER_ID, fromName: MY_NAME, fromInitials: MY_INITIALS, fromColor: MY_COLOR, text: 'Hi! When does the cargo jacket restock?', reactions: [], status: 'delivered', ts: now - 3 * 3600000, deletedForMe: false },
-    { id: 'v2', conversationId: 'conv_vault', fromId: 'u_vault', fromName: 'Vault Studio', fromInitials: 'VS', fromColor: '#00C853', text: 'Hey! We\'re restocking next Friday — follow our page to get notified 🙌', reactions: [], status: 'delivered', ts: now - 2.5 * 3600000, deletedForMe: false },
-  ],
-  conv_order: [
-    { id: 'o1', conversationId: 'conv_order', fromId: 'u_meridian', fromName: 'Meridian Co.', fromInitials: 'MC', fromColor: '#0F766E', text: 'Your order has shipped! Tracking number: TRK-884921', reactions: [], status: 'delivered', ts: now - 24 * 3600000, deletedForMe: false },
-  ],
-  conv_seller_req: [
-    { id: 'sr1', conversationId: 'conv_seller_req', fromId: MY_USER_ID, fromName: MY_NAME, fromInitials: MY_INITIALS, fromColor: MY_COLOR, text: 'Is the archive hoodie still available in XL?', attachment: { type: 'product', title: 'Archive Hoodie Vol.3', subtitle: '$135 · NxGen Drops', accentColor: '#B45309' }, reactions: [], status: 'delivered', ts: now - 6 * 3600000, deletedForMe: false },
-  ],
-};
 
 const H24 = 24 * 3600 * 1000;
-const DEMO_STORIES: Story[] = [
-  {
-    id: 'story_vault', authorId: 'u_vault', authorName: 'Vault Studio', authorHandle: '@vaultstudio',
-    authorInitials: 'VS', authorColor: '#00C853', authorAccountType: 'seller',
-    media: [
-      { id: 'sm1', type: 'photo', backgroundColor: '#0A2B18', duration: 5, productTagId: 'prod_canvas_cargo', productTagName: 'Canvas Cargo Jacket' },
-      { id: 'sm2', type: 'text', backgroundColor: '#003311', textContent: 'DROPPING NOW 🔥\nOnly 50 units', textColor: '#39FF88', duration: 4 },
-    ],
-    privacy: { visibility: 'public', replyPermission: 'everyone', hiddenFromUserIds: [], closeFriendsOnly: false },
-    viewers: [], repliesDisabled: false, createdAt: now - 2 * 3600000, expiresAt: now - 2 * 3600000 + H24,
-  },
-  {
-    id: 'story_maya', authorId: 'u_maya', authorName: 'Maya Chen', authorHandle: '@mayachen',
-    authorInitials: 'MC', authorColor: '#BE185D', authorAccountType: 'buyer',
-    media: [
-      { id: 'sm3', type: 'text', backgroundColor: '#3A1530', textContent: 'Waiting for this drop 😭', textColor: '#FFFFFF', duration: 4 },
-    ],
-    privacy: { visibility: 'friends', replyPermission: 'friends', hiddenFromUserIds: [], closeFriendsOnly: false },
-    viewers: [{ userId: MY_USER_ID, name: MY_NAME, handle: MY_HANDLE, viewedAt: now - 30 * 60000 }],
-    repliesDisabled: false, createdAt: now - 4 * 3600000, expiresAt: now - 4 * 3600000 + H24,
-  },
-  {
-    id: 'story_nxgen', authorId: 'u_nxgen', authorName: 'NxGen Drops', authorHandle: '@nxgendrops',
-    authorInitials: 'NX', authorColor: '#B45309', authorAccountType: 'seller',
-    media: [
-      { id: 'sm4', type: 'photo', backgroundColor: '#2B1607', duration: 5 },
-      { id: 'sm5', type: 'text', backgroundColor: '#1A0D04', textContent: 'Archive Hoodie Vol.3\nRestocking Friday', textColor: '#F59E0B', duration: 4 },
-    ],
-    privacy: { visibility: 'public', replyPermission: 'everyone', hiddenFromUserIds: [], closeFriendsOnly: false },
-    viewers: [], repliesDisabled: false, createdAt: now - 6 * 3600000, expiresAt: now - 6 * 3600000 + H24,
-  },
-];
-
-const DEMO_NOTIFS: Notification[] = [
-  { id: 'n1',  category: 'social',   type: 'friend_request',   title: 'New friend request', body: 'Alex Kim wants to be friends.',              isRead: false, isMuted: false, actorName: 'Alex Kim',   actorHandle: '@alexkim',   actorInitials: 'AK', actorColor: '#3B82F6', targetId: 'req_alex', cta: 'Respond', createdAt: new Date(now - 2 * 3600000).toISOString() },
-  { id: 'n2',  category: 'social',   type: 'friend_request',   title: 'New friend request', body: 'Zoe Carter wants to be friends.',             isRead: false, isMuted: false, actorName: 'Zoe Carter', actorHandle: '@zoecarter', actorInitials: 'ZC', actorColor: '#EC4899', targetId: 'req_zoe', cta: 'Respond', createdAt: new Date(now - 24 * 3600000).toISOString() },
-  { id: 'n3',  category: 'social',   type: 'post_like',        title: 'Maya liked your post', body: 'Maya Chen liked your photo.',              isRead: false, isMuted: false, actorName: 'Maya Chen',  actorHandle: '@mayachen',  actorInitials: 'MC', actorColor: '#BE185D', createdAt: new Date(now - 45 * 60000).toISOString() },
-  { id: 'n4',  category: 'social',   type: 'post_comment',     title: 'New comment',          body: 'Kai commented: "That\'s fire 🔥"',        isRead: true,  isMuted: false, actorName: 'Kai Nakamura', actorHandle: '@kainakamura', actorInitials: 'KN', actorColor: '#00C853', createdAt: new Date(now - 2 * 3600000).toISOString() },
-  { id: 'n5',  category: 'orders',   type: 'order_shipped',    title: 'Order shipped',        body: 'Your Essential Relaxed Tee is on its way.', isRead: false, isMuted: false, targetId: 'ord_2041', cta: 'Track order', createdAt: new Date(now - 24 * 3600000).toISOString() },
-  { id: 'n6',  category: 'orders',   type: 'order_confirmed',  title: 'Order confirmed',      body: '#2041 Canvas Cargo Jacket — $189.',         isRead: true,  isMuted: false, targetId: 'ord_2041', cta: 'View order', createdAt: new Date(now - 48 * 3600000).toISOString() },
-  { id: 'n7',  category: 'products', type: 'drop_live',        title: 'Drop is live',         body: 'Vault Studio: Canvas Cargo Jacket — 50 units.', isRead: false, isMuted: false, targetId: 'prod_canvas_cargo', cta: 'Shop now', createdAt: new Date(now - 3 * 3600000).toISOString() },
-  { id: 'n8',  category: 'products', type: 'product_restocked', title: 'Back in stock',       body: 'Archive Hoodie Vol.3 — 8 units remaining.', isRead: true,  isMuted: false, targetId: 'prod_archive_hoodie', cta: 'Buy now', createdAt: new Date(now - 6 * 3600000).toISOString() },
-  { id: 'n9',  category: 'messages', type: 'new_friend_message', title: 'Message from Kai', body: 'Lmao same struggle. The colour is different though', isRead: false, isMuted: false, actorName: 'Kai Nakamura', actorInitials: 'KN', actorColor: '#00C853', targetId: 'conv_kai', cta: 'Reply', createdAt: new Date(now - 5 * 60000).toISOString() },
-  { id: 'n10', category: 'social',   type: 'story_reaction',   title: 'Story reaction',       body: 'Maya reacted 🔥 to your story.',             isRead: true,  isMuted: false, actorName: 'Maya Chen', actorInitials: 'MC', actorColor: '#BE185D', createdAt: new Date(now - 20 * 60000).toISOString() },
-  { id: 'n11', category: 'orders',   type: 'return_update',    title: 'Return update',        body: 'Your return for Archive Hoodie was approved.', isRead: true,  isMuted: false, createdAt: new Date(now - 72 * 3600000).toISOString() },
-  { id: 'n12', category: 'products', type: 'price_drop',       title: 'Price drop alert',     body: 'Raw Denim Jacket by Coldform dropped to $280.', isRead: false, isMuted: false, cta: 'Shop now', createdAt: new Date(now - 1 * 3600000).toISOString() },
-  { id: 'n13', category: 'social',   type: 'friend_accepted',  title: 'Friend request accepted', body: 'Sofia Reyes accepted your friend request.', isRead: true, isMuted: false, actorName: 'Sofia Reyes', actorInitials: 'SR', actorColor: '#B45309', createdAt: new Date(now - 5 * 24 * 3600000).toISOString() },
-  { id: 'n14', category: 'messages', type: 'new_order_message', title: 'Message from Meridian Co.', body: 'Your order has shipped! Tracking: TRK-884921', isRead: false, isMuted: false, targetId: 'conv_order', cta: 'View', createdAt: new Date(now - 24 * 3600000).toISOString() },
-  { id: 'n15', category: 'system',   type: 'system',           title: 'Welcome to Brandthread', body: 'You\'re all set. Follow your favourite brands and never miss a drop again.', isRead: true, isMuted: false, createdAt: new Date(now - 30 * 24 * 3600000).toISOString() },
-];
-
-const DEMO_SAVED: SavedItem[] = [
-  { id: 'sav1', type: 'post',       targetId: 'post_maya_1', title: 'Maya copped the sage fleece',  subtitle: '@mayachen · June 28',       accentColor: '#BE185D', savedAt: new Date(now - 2 * 24 * 3600000).toISOString() },
-  { id: 'sav2', type: 'product',    targetId: 'prod_canvas_cargo', title: 'Canvas Cargo Jacket',    subtitle: '$189 · Vault Studio',       accentColor: '#00C853', savedAt: new Date(now - 3 * 24 * 3600000).toISOString() },
-  { id: 'sav3', type: 'store',      targetId: 'store_vault', title: 'Vault Studio',                 subtitle: 'Independent streetwear — London', accentColor: '#00C853', savedAt: new Date(now - 7 * 24 * 3600000).toISOString() },
-  { id: 'sav4', type: 'collection', targetId: 'coll_summer', title: 'Heavy Outerwear S/S 2026',    subtitle: '12 products',               accentColor: '#F59E0B', savedAt: new Date(now - 10 * 24 * 3600000).toISOString() },
-];
-
-const DEMO_COMMENTS: Record<string, Comment[]> = {
-  post_me_1: [
-    { id: 'c1', postId: 'post_me_1', authorId: 'u_maya', authorName: 'Maya Chen', authorHandle: '@mayachen', authorInitials: 'MC', authorColor: '#BE185D', text: 'This fits so well on you!! 😍', likedByMe: false, likesCount: 3, createdAt: new Date(Date.now() - 2 * 3600000).toISOString() },
-    { id: 'c2', postId: 'post_me_1', authorId: 'u_kai', authorName: 'Kai Nakamura', authorHandle: '@kainakamura', authorInitials: 'KN', authorColor: '#00C853', text: 'The colorway is everything 🔥', likedByMe: false, likesCount: 1, createdAt: new Date(Date.now() - 90 * 60000).toISOString() },
-    { id: 'c3', postId: 'post_me_1', authorId: MY_USER_ID, authorName: MY_NAME, authorHandle: MY_HANDLE, authorInitials: MY_INITIALS, authorColor: MY_COLOR, text: 'Thanks!! Vault really went off with this drop', likedByMe: false, likesCount: 0, replyToId: 'c1', replyToAuthorName: 'Maya Chen', replyToText: 'This fits so well on you!! 😍', createdAt: new Date(Date.now() - 80 * 60000).toISOString() },
-    { id: 'c4', postId: 'post_me_1', authorId: 'u_sofia', authorName: 'Sofia Reyes', authorHandle: '@sofiareyes', authorInitials: 'SR', authorColor: '#B45309', text: 'Where did you get it? I cannot find it on the app', likedByMe: false, likesCount: 0, createdAt: new Date(Date.now() - 60 * 60000).toISOString() },
-    { id: 'c5', postId: 'post_me_1', authorId: MY_USER_ID, authorName: MY_NAME, authorHandle: MY_HANDLE, authorInitials: MY_INITIALS, authorColor: MY_COLOR, text: 'Search "Canvas Cargo" on Discover — it was a limited drop!', likedByMe: false, likesCount: 2, replyToId: 'c4', replyToAuthorName: 'Sofia Reyes', replyToText: 'Where did you get it? I cannot find it on the app', createdAt: new Date(Date.now() - 45 * 60000).toISOString() },
-  ],
-  post_me_2: [
-    { id: 'd1', postId: 'post_me_2', authorId: 'u_amir', authorName: 'Amir Patel', authorHandle: '@amirpatel', authorInitials: 'AP', authorColor: '#0F766E', text: 'Great review! Did the sizing run true?', likedByMe: false, likesCount: 2, createdAt: new Date(Date.now() - 8 * 3600000).toISOString() },
-    { id: 'd2', postId: 'post_me_2', authorId: MY_USER_ID, authorName: MY_NAME, authorHandle: MY_HANDLE, authorInitials: MY_INITIALS, authorColor: MY_COLOR, text: 'Yeah, I went true to size — fits perfectly', likedByMe: false, likesCount: 1, replyToId: 'd1', replyToAuthorName: 'Amir Patel', replyToText: 'Great review! Did the sizing run true?', createdAt: new Date(Date.now() - 7.5 * 3600000).toISOString() },
-    { id: 'd3', postId: 'post_me_2', authorId: 'u_kai', authorName: 'Kai Nakamura', authorHandle: '@kainakamura', authorInitials: 'KN', authorColor: '#00C853', text: 'NxGen never misses 🙌', likedByMe: false, likesCount: 5, createdAt: new Date(Date.now() - 6 * 3600000).toISOString() },
-  ],
-  post_me_3: [
-    { id: 'e1', postId: 'post_me_3', authorId: 'u_maya', authorName: 'Maya Chen', authorHandle: '@mayachen', authorInitials: 'MC', authorColor: '#BE185D', text: 'The first one is a 10/10 no debate', likedByMe: false, likesCount: 7, createdAt: new Date(Date.now() - 15 * 3600000).toISOString() },
-    { id: 'e2', postId: 'post_me_3', authorId: 'u_sofia', authorName: 'Sofia Reyes', authorHandle: '@sofiareyes', authorInitials: 'SR', authorColor: '#B45309', text: '3rd one lowkey fire too', likedByMe: false, likesCount: 4, createdAt: new Date(Date.now() - 14 * 3600000).toISOString() },
-    { id: 'e3', postId: 'post_me_3', authorId: 'u_amir', authorName: 'Amir Patel', authorHandle: '@amirpatel', authorInitials: 'AP', authorColor: '#0F766E', text: 'Add the Vault cargo to this list!', likedByMe: false, likesCount: 2, createdAt: new Date(Date.now() - 12 * 3600000).toISOString() },
-    { id: 'e4', postId: 'post_me_3', authorId: MY_USER_ID, authorName: MY_NAME, authorHandle: MY_HANDLE, authorInitials: MY_INITIALS, authorColor: MY_COLOR, text: 'Already on the list 👀', likedByMe: false, likesCount: 3, replyToId: 'e3', replyToAuthorName: 'Amir Patel', replyToText: 'Add the Vault cargo to this list!', createdAt: new Date(Date.now() - 11 * 3600000).toISOString() },
-  ],
-  // Friend posts on the Friends feed
-  fp1: [
-    { id: 'f1', postId: 'fp1', authorId: MY_USER_ID, authorName: MY_NAME, authorHandle: MY_HANDLE, authorInitials: MY_INITIALS, authorColor: MY_COLOR, text: 'That colourway is 🔥', likedByMe: false, likesCount: 0, createdAt: new Date(Date.now() - 1.5 * 3600000).toISOString() },
-    { id: 'f2', postId: 'fp1', authorId: 'u_kai', authorName: 'Kai Nakamura', authorHandle: '@kainakamura', authorInitials: 'KN', authorColor: '#00C853', text: 'Vault dropping heat this season!', likedByMe: false, likesCount: 2, createdAt: new Date(Date.now() - 60 * 60000).toISOString() },
-  ],
-  fp2: [
-    { id: 'g1', postId: 'fp2', authorId: 'u_sofia', authorName: 'Sofia Reyes', authorHandle: '@sofiareyes', authorInitials: 'SR', authorColor: '#B45309', text: 'Convinced me — ordering tonight', likedByMe: false, likesCount: 3, createdAt: new Date(Date.now() - 4 * 3600000).toISOString() },
-    { id: 'g2', postId: 'fp2', authorId: MY_USER_ID, authorName: MY_NAME, authorHandle: MY_HANDLE, authorInitials: MY_INITIALS, authorColor: MY_COLOR, text: "Do it, you won't regret it!", likedByMe: false, likesCount: 1, replyToId: 'g1', replyToAuthorName: 'Sofia Reyes', replyToText: 'Convinced me — ordering tonight', createdAt: new Date(Date.now() - 3.5 * 3600000).toISOString() },
-  ],
-  fp3: [
-    { id: 'h1', postId: 'fp3', authorId: MY_USER_ID, authorName: MY_NAME, authorHandle: MY_HANDLE, authorInitials: MY_INITIALS, authorColor: MY_COLOR, text: '1. 10/10  2. 9/10  3. 8/10  4. 7/10  5. 10/10', likedByMe: false, likesCount: 4, createdAt: new Date(Date.now() - 22 * 3600000).toISOString() },
-    { id: 'h2', postId: 'fp3', authorId: 'u_amir', authorName: 'Amir Patel', authorHandle: '@amirpatel', authorInitials: 'AP', authorColor: '#0F766E', text: '#2 is slept on', likedByMe: false, likesCount: 1, createdAt: new Date(Date.now() - 20 * 3600000).toISOString() },
-    { id: 'h3', postId: 'fp3', authorId: 'u_maya', authorName: 'Maya Chen', authorHandle: '@mayachen', authorInitials: 'MC', authorColor: '#BE185D', text: 'Agreed, #2 is so underrated', likedByMe: false, likesCount: 2, replyToId: 'h2', replyToAuthorName: 'Amir Patel', replyToText: '#2 is slept on', createdAt: new Date(Date.now() - 19 * 3600000).toISOString() },
-  ],
-};
-
-const DEMO_POSTS: BuyerPost[] = [
-  {
-    id: 'post_me_1', authorId: MY_USER_ID, authorName: MY_NAME, authorHandle: MY_HANDLE, authorInitials: MY_INITIALS, authorColor: MY_COLOR,
-    authorAccountType: 'buyer', feedEligibility: 'profile_only', profileVisibility: 'public',
-    type: 'photo', caption: 'Finally copped the cargo jacket 🙌 been wanting this since the last drop.', hashtags: ['#brandthread', '#vault', '#streetwear'],
-    mediaColors: ['#1A1A2E', '#16213E'], likesCount: 47, commentsCount: 8, repostsCount: 3, likedByMe: false, savedByMe: false, repostedByMe: false, isArchived: false, isDraft: false,
-    createdAt: new Date(now - 3 * 24 * 3600000).toISOString(), updatedAt: new Date(now - 3 * 24 * 3600000).toISOString(),
-  },
-  {
-    id: 'post_me_2', authorId: MY_USER_ID, authorName: MY_NAME, authorHandle: MY_HANDLE, authorInitials: MY_INITIALS, authorColor: MY_COLOR,
-    authorAccountType: 'buyer', feedEligibility: 'profile_only', profileVisibility: 'friends_only',
-    type: 'video', caption: 'Unboxing the archive hoodie vol.3 — this colourway is insane', hashtags: ['#nxgendrops', '#unboxing'],
-    mediaColors: ['#0B1B33', '#0A0E14'], likesCount: 92, commentsCount: 14, repostsCount: 7, likedByMe: false, savedByMe: false, repostedByMe: false, isArchived: false, isDraft: false,
-    createdAt: new Date(now - 10 * 24 * 3600000).toISOString(), updatedAt: new Date(now - 10 * 24 * 3600000).toISOString(),
-  },
-  {
-    id: 'post_me_3', authorId: MY_USER_ID, authorName: MY_NAME, authorHandle: MY_HANDLE, authorInitials: MY_INITIALS, authorColor: MY_COLOR,
-    authorAccountType: 'buyer', feedEligibility: 'profile_only', profileVisibility: 'public',
-    type: 'slideshow', caption: 'Current wishlist — rate it 👇', hashtags: ['#wishlist', '#fits'],
-    mediaColors: ['#2B1607', '#120C08'], likesCount: 118, commentsCount: 22, repostsCount: 11, likedByMe: false, savedByMe: false, repostedByMe: false, isArchived: false, isDraft: false,
-    createdAt: new Date(now - 20 * 24 * 3600000).toISOString(), updatedAt: new Date(now - 20 * 24 * 3600000).toISOString(),
-  },
-];
-
-// ─── Seed ─────────────────────────────────────────────────────────────────────
-
-async function seedIfNeeded(): Promise<void> {
-  const k = K(); // single snapshot — no re-reads across awaits
-  const done = await AsyncStorage.getItem(k.seeded);
-  if (done === 'true') return;
-  await Promise.all([
-    save(k.friendships, DEMO_FRIENDS),
-    save(k.requests, DEMO_REQUESTS),
-    save(k.conversations, DEMO_CONVS),
-    save(k.stories, DEMO_STORIES),
-    save(k.notifications, DEMO_NOTIFS),
-    save(k.saved, DEMO_SAVED),
-    save(k.posts, DEMO_POSTS),
-    save(k.reposts, []),
-    save(k.blocks, []),
-    save(k.mutes, []),
-    save(k.privacy, DEFAULT_PRIVACY_SETTINGS),
-    save(k.notifPrefs, DEFAULT_NOTIFICATION_PREFS),
-    ...Object.entries(DEMO_MESSAGES).map(([id, msgs]) => save(k.messages(id), msgs)),
-    ...Object.entries(DEMO_COMMENTS).map(([postId, comments]) => save(k.comments(postId), comments)),
-  ]);
-  await AsyncStorage.setItem(k.seeded, 'true');
-}
-
-// Trigger seed immediately
-seedIfNeeded();
 
 // ─── Cache invalidation ───────────────────────────────────────────────────────
 
@@ -427,7 +212,11 @@ export async function hydrateMyProfileFromAccount(
 // ─── Posts ────────────────────────────────────────────────────────────────────
 
 export async function getMyPosts(k: SocialKeys = K()): Promise<BuyerPost[]> {
-  return load<BuyerPost[]>(k.posts, DEMO_POSTS);
+  if (k.userId === 'anon') return [];
+  const remote = await serviceRequest<BuyerPost[]>(
+    `/api/social/profile/${encodeURIComponent(k.userId)}/posts`,
+  );
+  return Array.isArray(remote) ? remote : [];
 }
 export async function createPost(params: {
   type: BuyerPost['type'];
@@ -437,24 +226,7 @@ export async function createPost(params: {
   profileVisibility: BuyerPost['profileVisibility'];
   isDraft?: boolean;
 }): Promise<BuyerPost> {
-  const k = K();
-  const profile = await getMyProfile(k);
-  const post: BuyerPost = {
-    id: uid(), authorId: MY_USER_ID, authorName: profile.name, authorHandle: '@' + profile.username,
-    authorInitials: profile.avatarInitials, authorColor: profile.avatarColor,
-    authorAccountType: 'buyer', feedEligibility: 'profile_only',  // ENFORCED at write time
-    profileVisibility: params.profileVisibility,
-    type: params.type, caption: params.caption, hashtags: params.hashtags,
-    mediaColors: params.mediaColors, likesCount: 0, commentsCount: 0, repostsCount: 0,
-    likedByMe: false, savedByMe: false, repostedByMe: false, isArchived: false,
-    isDraft: params.isDraft ?? false, createdAt: iso(), updatedAt: iso(),
-  };
-  const posts = await getMyPosts(k);
-  await save(k.posts, [post, ...posts]);
-  const p = await getMyProfile(k);
-  await updateMyProfile({ postsCount: p.postsCount + 1 }, k);
-  notify();
-  return post;
+  throw new Error('Buyer post publishing is not available yet.');
 }
 export async function updatePost(id: string, updates: Partial<Pick<BuyerPost, 'caption' | 'hashtags' | 'profileVisibility' | 'isDraft'>>, k: SocialKeys = K()): Promise<BuyerPost | null> {
   const posts = await getMyPosts(k);
@@ -537,20 +309,20 @@ export async function repostPost(id: string, friendMeta?: FriendPostMeta): Promi
     posts[idx].repostsCount += posts[idx].repostedByMe ? 1 : -1;
     await save(k.posts, posts);
     if (posts[idx].repostedByMe) {
-      reposts.unshift({ id: uid(), reposterId: MY_USER_ID, originalPostId: id, originalAuthorId: posts[idx].authorId, originalAuthorName: posts[idx].authorName, originalAuthorHandle: posts[idx].authorHandle, originalCaption: posts[idx].caption, feedEligibility: 'profile_only', createdAt: iso() });
+      reposts.unshift({ id: uid(), reposterId: k.userId, originalPostId: id, originalAuthorId: posts[idx].authorId, originalAuthorName: posts[idx].authorName, originalAuthorHandle: posts[idx].authorHandle, originalCaption: posts[idx].caption, feedEligibility: 'profile_only', createdAt: iso() });
     } else {
-      const filtered = reposts.filter(r => !(r.originalPostId === id && r.reposterId === MY_USER_ID));
+      const filtered = reposts.filter(r => !(r.originalPostId === id && r.reposterId === k.userId));
       reposts.length = 0; reposts.push(...filtered);
     }
   } else {
     // Friend post — not in myPosts; determine state from existing RepostRecord
-    const existing = reposts.findIndex(r => r.originalPostId === id && r.reposterId === MY_USER_ID);
+    const existing = reposts.findIndex(r => r.originalPostId === id && r.reposterId === k.userId);
     if (existing >= 0) {
       // Currently reposted → unrepost: remove the record
       reposts.splice(existing, 1);
     } else if (friendMeta) {
       // Not yet reposted → repost: create a new record using provided metadata
-      reposts.unshift({ id: uid(), reposterId: MY_USER_ID, originalPostId: id, originalAuthorId: friendMeta.authorId, originalAuthorName: friendMeta.authorName, originalAuthorHandle: friendMeta.authorHandle, originalCaption: friendMeta.caption, feedEligibility: 'profile_only', createdAt: iso() });
+      reposts.unshift({ id: uid(), reposterId: k.userId, originalPostId: id, originalAuthorId: friendMeta.authorId, originalAuthorName: friendMeta.authorName, originalAuthorHandle: friendMeta.authorHandle, originalCaption: friendMeta.caption, feedEligibility: 'profile_only', createdAt: iso() });
     }
   }
   await save(k.reposts, reposts);
@@ -574,7 +346,7 @@ export async function repostPost(id: string, friendMeta?: FriendPostMeta): Promi
 /** Returns a Set of post IDs that the current user has reposted (persisted). */
 export async function getRepostedPostIds(k: SocialKeys = K()): Promise<Set<string>> {
   const reposts = await load<RepostRecord[]>(k.reposts, []);
-  return new Set(reposts.filter(r => r.reposterId === MY_USER_ID).map(r => r.originalPostId));
+  return new Set(reposts.filter(r => r.reposterId === k.userId).map(r => r.originalPostId));
 }
 export async function getMyReposts(k: SocialKeys = K()): Promise<RepostRecord[]> {
   return load<RepostRecord[]>(k.reposts, []);
@@ -583,7 +355,7 @@ export async function getMyReposts(k: SocialKeys = K()): Promise<RepostRecord[]>
 // ─── Comments ────────────────────────────────────────────────────────────────
 
 export async function getComments(postId: string, k: SocialKeys = K()): Promise<Comment[]> {
-  return load<Comment[]>(k.comments(postId), DEMO_COMMENTS[postId] ?? []);
+  return load<Comment[]>(k.comments(postId), []);
 }
 
 export async function postComment(params: {
@@ -593,34 +365,7 @@ export async function postComment(params: {
   replyToAuthorName?: string;
   replyToText?: string;
 }): Promise<Comment> {
-  const k = K();
-  const comment: Comment = {
-    id: uid(),
-    postId: params.postId,
-    authorId: MY_USER_ID,
-    authorName: MY_NAME,
-    authorHandle: MY_HANDLE,
-    authorInitials: MY_INITIALS,
-    authorColor: MY_COLOR,
-    text: params.text.trim(),
-    replyToId: params.replyToId,
-    replyToAuthorName: params.replyToAuthorName,
-    replyToText: params.replyToText,
-    likedByMe: false,
-    likesCount: 0,
-    createdAt: iso(),
-  };
-  const existing = await getComments(params.postId, k);
-  await save(k.comments(params.postId), [...existing, comment]);
-  // Bump commentsCount on the parent post
-  const posts = await getMyPosts(k);
-  const idx = posts.findIndex(p => p.id === params.postId);
-  if (idx >= 0) {
-    posts[idx].commentsCount += 1;
-    await save(k.posts, posts);
-  }
-  notify();
-  return comment;
+  throw new Error('Buyer post comments are not available yet.');
 }
 
 export async function likeComment(postId: string, commentId: string): Promise<void> {
@@ -655,7 +400,7 @@ export async function deleteComment(postId: string, commentId: string): Promise<
 export interface SellerPostProductTag {
   productId:   string;
   productName: string;
-  price:       number;
+  priceCents:  number;
   variantId?:  string;
   slideIndex?: number;
   timestamp?:  number;
@@ -706,67 +451,8 @@ export interface SellerThreadPost {
   repostedByMe:      boolean;
 }
 
-// ─── Seed data ─────────────────────────────────────────────────────────────────
-
-const SELLER_POSTS_SEED: SellerThreadPost[] = [
-  {
-    id: 'sp_seed_001', authorId: 'u_dropsociety', authorAccountType: 'seller',
-    authorName: 'Drop Society', authorHandle: '@dropsociety', authorInitials: 'DS', authorColor: '#7C3AED',
-    sellerId: 'seller_dropsociety', brandId: 'brand_dropsociety', feedEligibility: 'thread_eligible',
-    caption: 'Limited-run canvas jacket just dropped. 50 units. First come, first served. Tap the bag to shop.',
-    hashtags: ['#streetwear', '#newdrop', '#limitededition', '#brandthread'],
-    mediaUris: ['https://assets.mixkit.co/videos/preview/mixkit-stylish-young-man-walking-through-the-city-42913-large.mp4'],
-    aspectRatio: '9:16', contentType: 'video', postStatus: 'published',
-    isDraft: false, isArchived: false, isDeleted: false,
-    productTags: [{ productId: 'prod_canvas_jacket', productName: 'Canvas Cargo Jacket', price: 189 }],
-    visibility: { allowComments: true, allowReposts: true, showLikeCount: true },
-    scheduledAt: null, publishedAt: '2026-07-10T15:00:00Z',
-    createdAt: '2026-07-10T14:22:00Z', updatedAt: '2026-07-10T15:00:00Z',
-    likesCount: 1240, commentsCount: 48, repostsCount: 118, savedCount: 230,
-    likedByMe: false, savedByMe: false, repostedByMe: false,
-  },
-  {
-    id: 'sp_seed_002', authorId: 'u_formstudio', authorAccountType: 'seller',
-    authorName: 'FORM Studio', authorHandle: '@formstudio', authorInitials: 'FS', authorColor: '#0F766E',
-    sellerId: 'seller_formstudio', brandId: 'brand_formstudio', feedEligibility: 'thread_eligible',
-    caption: 'Minimalist tees. Eight colorways. Basics done right — tap to shop.',
-    hashtags: ['#minimalist', '#essentials', '#tees', '#brandthread'],
-    mediaUris: ['https://assets.mixkit.co/videos/preview/mixkit-young-woman-posing-in-a-streetwear-outfit-42914-large.mp4'],
-    aspectRatio: '9:16', contentType: 'video', postStatus: 'published',
-    isDraft: false, isArchived: false, isDeleted: false,
-    productTags: [{ productId: 'prod_essential_tee', productName: 'Essential Relaxed Tee', price: 48 }],
-    visibility: { allowComments: true, allowReposts: true, showLikeCount: true },
-    scheduledAt: null, publishedAt: '2026-07-09T12:00:00Z',
-    createdAt: '2026-07-09T11:30:00Z', updatedAt: '2026-07-09T12:00:00Z',
-    likesCount: 892, commentsCount: 22, repostsCount: 44, savedCount: 160,
-    likedByMe: false, savedByMe: false, repostedByMe: false,
-  },
-  {
-    id: 'sp_seed_003', authorId: 'u_midnight', authorAccountType: 'seller',
-    authorName: 'Midnight Thread', authorHandle: '@midnightthread', authorInitials: 'MT', authorColor: '#B45309',
-    sellerId: 'seller_midnight', brandId: 'brand_midnight', feedEligibility: 'thread_eligible',
-    caption: 'The cargo trousers everyone asked about. Back in stock. Limited sizes remaining.',
-    hashtags: ['#cargo', '#restock', '#streetwear', '#brandthread'],
-    mediaUris: ['https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4'],
-    aspectRatio: '9:16', contentType: 'video', postStatus: 'published',
-    isDraft: false, isArchived: false, isDeleted: false,
-    productTags: [{ productId: 'prod_ripstop_cargo', productName: 'Ripstop Cargo Trousers', price: 134 }],
-    visibility: { allowComments: true, allowReposts: true, showLikeCount: true },
-    scheduledAt: null, publishedAt: '2026-07-08T18:00:00Z',
-    createdAt: '2026-07-08T17:00:00Z', updatedAt: '2026-07-08T18:00:00Z',
-    likesCount: 3410, commentsCount: 91, repostsCount: 215, savedCount: 540,
-    likedByMe: false, savedByMe: false, repostedByMe: false,
-  },
-];
-
 async function ensureSellerPostsSeed(k: SocialKeys = K()): Promise<void> {
-  const done = await load<boolean>(k.sellerPostsSeeded, false);
-  if (done) return;
-  const existing = await load<SellerThreadPost[]>(k.sellerPosts, []);
-  if (existing.length === 0) {
-    await save(k.sellerPosts, SELLER_POSTS_SEED);
-  }
-  await save(k.sellerPostsSeeded, true);
+  await AsyncStorage.removeItem(k.sellerPostsSeeded);
 }
 
 // ─── CRUD ──────────────────────────────────────────────────────────────────────
@@ -930,7 +616,7 @@ export async function getSellerPosts(): Promise<SellerThreadPost[]> {
     productTags:     (p.taggedProducts ?? []).map((tag: any) => ({
       productId: tag.productId,
       productName: tag.name ?? 'Product',
-      price: 0,
+      priceCents: typeof tag.priceCents === 'number' ? tag.priceCents : 0,
     })),
     visibility:      { allowComments: true, allowReposts: true, showLikeCount: true },
     scheduledAt:     null,
@@ -982,7 +668,7 @@ function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
     productTags:       (p.taggedProducts ?? []).map((t: any) => ({
       productId:   t.productId,
       productName: t.name ?? '',
-      price:       0,
+      priceCents: typeof t.priceCents === 'number' ? t.priceCents : 0,
     })),
     visibility:    { allowComments: true, allowReposts: true, showLikeCount: true },
     scheduledAt:   null,
@@ -1033,17 +719,17 @@ export async function getThreadPosts(): Promise<SellerThreadPost[]> {
 // ─── Friendships ──────────────────────────────────────────────────────────────
 
 export async function getFriendships(k: SocialKeys = K()): Promise<Friendship[]> {
-  return load<Friendship[]>(k.friendships, DEMO_FRIENDS);
+  return load<Friendship[]>(k.friendships, []);
 }
 export async function getAcceptedFriends(k: SocialKeys = K()): Promise<Friendship[]> {
   const all = await getFriendships(k);
   return all.filter(f => f.status === 'accepted');
 }
 export async function getFriendRequests(k: SocialKeys = K()): Promise<FriendRequest[]> {
-  return load<FriendRequest[]>(k.requests, DEMO_REQUESTS);
+  return load<FriendRequest[]>(k.requests, []);
 }
 export async function getFriendSuggestions(): Promise<FriendSuggestion[]> {
-  return Promise.resolve([...DEMO_SUGGESTIONS]);
+  return Promise.resolve([]);
 }
 export async function isFriend(userId: string): Promise<boolean> {
   const k = K();
@@ -1089,18 +775,16 @@ export async function saveCloseFriendIds(ids: string[]): Promise<void> {
 }
 export async function sendFriendRequest(params: { userId: string; name: string; handle: string; initials: string; color: string; }): Promise<{ success: boolean; message: string; request?: FriendRequest }> {
   const k = K();
-  if (params.userId === MY_USER_ID) return { success: false, message: 'You cannot send a request to yourself.' };
+  if (params.userId === k.userId) return { success: false, message: 'You cannot send a request to yourself.' };
   const blocks = await getBlockedUsers(k);
   if (blocks.some(b => b.blockedUserId === params.userId)) return { success: false, message: 'Cannot send request to this user.' };
   const existing = await getFriendships(k);
   if (existing.some(f => f.userId === params.userId)) return { success: false, message: 'Already connected or pending.' };
-  const req: FriendRequest = { id: uid(), fromId: MY_USER_ID, fromName: MY_NAME, fromHandle: MY_HANDLE, fromInitials: MY_INITIALS, fromColor: MY_COLOR, toId: params.userId, status: 'pending', mutualFriends: 0, createdAt: iso() };
-  const requests = await getFriendRequests(k);
-  await save(k.requests, [...requests, req]);
-  const friendships = await getFriendships(k);
-  await save(k.friendships, [...friendships, { id: uid(), userId: params.userId, name: params.name, handle: params.handle, initials: params.initials, color: params.color, status: 'pending_sent' as FriendshipStatus, mutualFriendsCount: 0, updatedAt: iso() }]);
+  await serviceRequest('/api/social/follow', {
+    method: 'POST', body: JSON.stringify({ userId: params.userId }),
+  });
   notify();
-  return { success: true, message: 'Friend request sent.', request: req };
+  return { success: true, message: 'Followed.' };
 }
 export async function acceptFriendRequest(requestId: string): Promise<void> {
   const k = K();
@@ -1153,21 +837,24 @@ export async function removeFriend(userId: string, k: SocialKeys = K()): Promise
 // ─── Conversations ────────────────────────────────────────────────────────────
 
 export async function getConversations(k: SocialKeys = K()): Promise<Conversation[]> {
-  try {
-    const remote = await serviceRequest<Conversation[]>('/api/conversations');
-    // Only use API result if it has data — empty means first-login DB (fall back to local demo data)
-    if (Array.isArray(remote) && remote.length > 0) {
-      // Guard: discard if account changed while request was in-flight
-      if (_socialUserId === k.userId) await save(k.conversations, remote);
-      return remote;
-    }
-  } catch { /* fall through to local */ }
-  return load<Conversation[]>(k.conversations, DEMO_CONVS);
+  const remote = await serviceRequest<Conversation[]>('/api/conversations');
+  if (!Array.isArray(remote)) throw new Error('Invalid conversations response');
+  // An empty inbox is a valid, authoritative server result.
+  if (_socialUserId === k.userId) await save(k.conversations, remote);
+  return remote;
 }
 export async function getConversation(id: string): Promise<Conversation | null> {
+  if (!id) return null;
   const k = K();
-  const convs = await getConversations(k);
-  return convs.find(c => c.id === id) ?? null;
+  const conversation = await serviceRequest<Conversation>(`/api/conversations/${encodeURIComponent(id)}`);
+  if (_socialUserId === k.userId) {
+    const conversations = await load<Conversation[]>(k.conversations, []);
+    await save(k.conversations, [
+      ...conversations.filter((conversation) => conversation.id !== id),
+      conversation,
+    ]);
+  }
+  return conversation;
 }
 export async function createOrGetConversation(params: {
   type: ConversationType;
@@ -1176,119 +863,88 @@ export async function createOrGetConversation(params: {
   contextProductId?: string; contextProductName?: string; contextSellerName?: string;
 }): Promise<Conversation> {
   const k = K();
-  try {
-    const conv = await serviceRequest<Conversation>('/api/conversations', {
-      method: 'POST',
-      body: JSON.stringify({
-        type: params.type ?? 'buyer_to_seller',
-        participant: {
-          userId: params.participant.userId, name: params.participant.name,
-          handle: params.participant.handle ?? '', initials: params.participant.initials ?? '',
-          color: params.participant.color ?? '#8B5CF6', accountType: params.participant.accountType ?? 'seller',
-        },
-        myInfo: { name: MY_NAME, handle: MY_HANDLE, initials: MY_INITIALS, color: MY_COLOR, accountType: 'buyer' },
-        contextOrderId: params.contextOrderId, contextOrderNumber: params.contextOrderNumber,
-        contextOrderStatus: params.contextOrderStatus, contextProductId: params.contextProductId,
-        contextProductName: params.contextProductName, contextSellerName: params.contextSellerName,
-      }),
-    });
-    notify();
-    return conv;
-  } catch { /* fall through to existing local logic */ }
-  const convs = await getConversations(k);
-  // For order threads, match by orderId
-  if (params.contextOrderId) {
-    const existing = convs.find(c => c.contextOrderId === params.contextOrderId);
-    if (existing) return existing;
-  } else {
-    const existing = convs.find(c => c.type === params.type && c.participants.some(p => p.userId === params.participant.userId) && !c.contextOrderId);
-    if (existing) return existing;
+  const profile = await getMyProfile(k);
+  const conv = await serviceRequest<Conversation>('/api/conversations', {
+    method: 'POST',
+    body: JSON.stringify({
+      type: params.type ?? 'buyer_to_seller',
+      participant: {
+        userId: params.participant.userId, name: params.participant.name,
+        handle: params.participant.handle ?? '', initials: params.participant.initials ?? '',
+        color: params.participant.color ?? '#8B5CF6', accountType: params.participant.accountType ?? 'seller',
+      },
+      myInfo: { name: profile.name, handle: `@${profile.username}`, initials: profile.avatarInitials, color: profile.avatarColor, accountType: 'buyer' },
+      contextOrderId: params.contextOrderId, contextOrderNumber: params.contextOrderNumber,
+      contextOrderStatus: params.contextOrderStatus, contextProductId: params.contextProductId,
+      contextProductName: params.contextProductName, contextSellerName: params.contextSellerName,
+    }),
+  });
+  if (_socialUserId === k.userId) {
+    const conversations = await load<Conversation[]>(k.conversations, []);
+    await save(k.conversations, [...conversations.filter((conversation) => conversation.id !== conv.id), conv]);
   }
-  const conv: Conversation = {
-    id: uid(), type: params.type, participants: [params.participant],
-    unreadCount: 0, isFriendshipActive: true, isArchived: false, isRequest: params.type !== 'buyer_to_buyer',
-    contextOrderId: params.contextOrderId, contextOrderNumber: params.contextOrderNumber,
-    contextOrderStatus: params.contextOrderStatus, contextProductId: params.contextProductId,
-    contextProductName: params.contextProductName, contextSellerName: params.contextSellerName,
-    updatedAt: iso(),
-  };
-  await save(k.conversations, [...convs, conv]);
   notify();
   return conv;
 }
 export async function getMessages(conversationId: string, k: SocialKeys = K()): Promise<Message[]> {
   const msgKey = k.messages(conversationId);
-  try {
-    const remote = await serviceRequest<Message[]>(`/api/conversations/${conversationId}/messages`);
-    // Only use API result if it has data — empty means conversation not yet in DB (use local demo/cached)
-    if (Array.isArray(remote) && remote.length > 0) {
-      // Guard: discard if account changed while request was in-flight
-      if (_socialUserId === k.userId) await save(msgKey, remote);
-      return remote;
-    }
-  } catch { /* fall through to local */ }
-  return load<Message[]>(msgKey, DEMO_MESSAGES[conversationId] ?? []);
+  const remote = await serviceRequest<Message[]>(`/api/conversations/${encodeURIComponent(conversationId)}/messages`);
+  if (!Array.isArray(remote)) throw new Error('Invalid messages response');
+  // An empty conversation is not a signal to substitute seeded messages.
+  if (_socialUserId === k.userId) await save(msgKey, remote);
+  return remote;
 }
 export async function sendMessage(conversationId: string, text: string, attachment?: MessageAttachment): Promise<Message> {
-  // Snapshot keys at function entry so async callbacks use the same userId
-  // even if _socialUserId changes while the network request is in-flight.
   const k = K();
-  const msgKey  = k.messages(conversationId);
-  const convsKey = k.conversations;
-  const msg: Message = {
-    id: uid(), conversationId, fromId: MY_USER_ID, fromName: MY_NAME, fromInitials: MY_INITIALS, fromColor: MY_COLOR,
-    text, attachment, reactions: [], status: 'sending', ts: Date.now(), deletedForMe: false,
-  };
-  const msgs = await getMessages(conversationId, k);
-  const updated = [...msgs, msg];
-  await save(msgKey, updated);
-  // Update conversation last message
-  const convs = await getConversations(k);
-  const idx = convs.findIndex(c => c.id === conversationId);
-  if (idx >= 0) {
-    convs[idx] = {
-      ...convs[idx],
-      lastMessage: getMessagePreview(text, attachment),
-      lastMessageTs: msg.ts,
-      updatedAt: iso(),
-    };
-    await save(convsKey, convs);
-  }
-  notify();
-  // Send to API in background; update status on success or failure.
-  // Always read from the pre-captured msgKey — never re-call K() inside these callbacks.
-  // Pre-dispatch guard: check identity immediately before firing the request so user A's
-  // message is never POSTed using user B's Clerk token. The guards in .then/.catch also
-  // prevent stale cache writes if a switch occurs while the request is in-flight.
+  const msgKey = k.messages(conversationId);
+  const message = await serviceRequest<Message>(`/api/conversations/${encodeURIComponent(conversationId)}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ text, attachment }),
+  });
   if (_socialUserId === k.userId) {
-    serviceRequest(`/api/conversations/${conversationId}/messages`, { method: 'POST', body: JSON.stringify({ text, attachment }) })
-      .then(async (apiMsg: any) => {
-        if (_socialUserId !== k.userId) return; // account switched mid-flight — discard
-        const m2 = await load<Message[]>(msgKey, []);
-        const mi = m2.findIndex(m => m.id === msg.id);
-        if (mi >= 0) { m2[mi] = { ...m2[mi], id: apiMsg?.id ?? m2[mi].id, status: 'delivered' }; await save(msgKey, m2); notify(); }
-      })
-      .catch(async () => {
-        if (_socialUserId !== k.userId) return; // account switched — don't mark failed under wrong key
-        const m2 = await load<Message[]>(msgKey, []);
-        const mi = m2.findIndex(m => m.id === msg.id);
-        if (mi >= 0) { m2[mi] = { ...m2[mi], status: 'failed' }; await save(msgKey, m2); notify(); }
-      });
+    const messages = await load<Message[]>(msgKey, []);
+    await save(msgKey, [...messages.filter((item) => item.id !== message.id), message]);
+    const conversations = await load<Conversation[]>(k.conversations, []);
+    const preview = getMessagePreview(message.text, message.attachment);
+    await save(k.conversations, conversations.map((conversation) => conversation.id === conversationId
+      ? { ...conversation, lastMessage: preview, lastMessageTs: message.ts, updatedAt: iso() }
+      : conversation));
+    notify();
   }
-  return msg;
+  return message;
 }
 export async function retryMessage(conversationId: string, messageId: string): Promise<void> {
-  // Snapshot key at function entry; do NOT call getMessages() inside setTimeout
-  // (that would re-invoke K() after the delay with a potentially different userId).
-  const msgKey = K().messages(conversationId);
+  const k = K();
+  const msgKey = k.messages(conversationId);
   const msgs = await load<Message[]>(msgKey, []);
   const idx = msgs.findIndex(m => m.id === messageId);
-  if (idx >= 0) { msgs[idx] = { ...msgs[idx], status: 'sending' }; await save(msgKey, msgs); notify(); }
-  setTimeout(async () => {
-    const m2 = await load<Message[]>(msgKey, []); // read from pre-captured key, never K()
-    const mi = m2.findIndex(m => m.id === messageId);
-    if (mi >= 0) { m2[mi] = { ...m2[mi], status: 'sent' }; await save(msgKey, m2); notify(); }
-  }, 800);
+  if (idx < 0) throw new Error('Message not found');
+  const message = msgs[idx];
+  msgs[idx] = { ...message, status: 'sending' };
+  await save(msgKey, msgs);
+  notify();
+  try {
+    const canonical = await serviceRequest<Message>(`/api/conversations/${encodeURIComponent(conversationId)}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ text: message.text, attachment: message.attachment, replyToId: message.replyToId }),
+    });
+    if (_socialUserId === k.userId) {
+      const current = await load<Message[]>(msgKey, []);
+      await save(msgKey, [...current.filter((item) => item.id !== messageId && item.id !== canonical.id), canonical]);
+      notify();
+    }
+  } catch (error) {
+    if (_socialUserId === k.userId) {
+      const current = await load<Message[]>(msgKey, []);
+      const currentIndex = current.findIndex((item) => item.id === messageId);
+      if (currentIndex >= 0) {
+        current[currentIndex] = { ...current[currentIndex], status: 'failed' };
+        await save(msgKey, current);
+        notify();
+      }
+    }
+    throw error;
+  }
 }
 export async function addReaction(conversationId: string, messageId: string, emoji: string): Promise<void> {
   const k = K();
@@ -1310,8 +966,8 @@ export async function deleteMessageForMe(conversationId: string, messageId: stri
 }
 export async function markConversationRead(conversationId: string): Promise<void> {
   const k = K();
-  serviceRequest(`/api/conversations/${conversationId}/read`, { method: 'PATCH', body: JSON.stringify({}) }).catch(() => {});
-  const convs = await getConversations(k);
+  await serviceRequest(`/api/conversations/${encodeURIComponent(conversationId)}/read`, { method: 'PATCH', body: JSON.stringify({}) });
+  const convs = await load<Conversation[]>(k.conversations, []);
   const updated = convs.map(c => c.id === conversationId ? { ...c, unreadCount: 0 } : c);
   await save(k.conversations, updated); notify();
 }
@@ -1324,40 +980,39 @@ export async function archiveConversation(conversationId: string): Promise<void>
 // ─── Stories ─────────────────────────────────────────────────────────────────
 
 async function loadStories(k: SocialKeys = K()): Promise<Story[]> {
-  const all = await load<Story[]>(k.stories, DEMO_STORIES);
+  const all = await load<Story[]>(k.stories, []);
   return all.filter(s => s.expiresAt > Date.now()); // prune expired
 }
 export async function getStories(k: SocialKeys = K()): Promise<Story[]> {
   return loadStories(k);
 }
 export async function getMyStories(k: SocialKeys = K()): Promise<Story[]> {
-  const all = await loadStories(k);
-  return all.filter(s => s.authorId === MY_USER_ID);
+  const remote = await serviceRequest<Story[]>('/api/social/stories/me');
+  return Array.isArray(remote) ? remote : [];
 }
 export async function createStory(params: { media: StoryMedia[]; privacy: StoryPrivacySettings; repliesDisabled: boolean; }): Promise<Story> {
   const k = K();
   const profile = await getMyProfile(k);
-  const ts = Date.now();
-  const story: Story = {
-    id: uid(), authorId: MY_USER_ID, authorName: profile.name, authorHandle: '@' + profile.username,
-    authorInitials: profile.avatarInitials, authorColor: profile.avatarColor,
-    authorAccountType: 'buyer', media: params.media, privacy: params.privacy,
-    viewers: [], repliesDisabled: params.repliesDisabled, createdAt: ts, expiresAt: ts + H24,
-  };
-  const stories = await loadStories(k);
-  await save(k.stories, [...stories, story]); notify();
+  const story = await serviceRequest<Story>('/api/social/stories', {
+    method: 'POST',
+    body: JSON.stringify({
+      authorName: profile.name,
+      authorHandle: `@${profile.username}`,
+      authorInitials: profile.avatarInitials,
+      authorColor: profile.avatarColor,
+      authorAccountType: 'buyer',
+      media: params.media,
+      privacy: params.privacy,
+      repliesDisabled: params.repliesDisabled,
+    }),
+  });
+  notify();
   return story;
 }
 export async function trackStoryView(storyId: string): Promise<void> {
-  const k = K();
-  const stories = await loadStories(k);
-  const idx = stories.findIndex(s => s.id === storyId);
-  if (idx < 0) return;
-  const alreadyViewed = stories[idx].viewers.some(v => v.userId === MY_USER_ID);
-  if (!alreadyViewed) {
-    stories[idx].viewers = [...stories[idx].viewers, { userId: MY_USER_ID, name: MY_NAME, handle: MY_HANDLE, viewedAt: Date.now() }];
-    await save(k.stories, stories); notify();
-  }
+  await serviceRequest(`/api/social/stories/${encodeURIComponent(storyId)}/view`, {
+    method: 'POST', body: JSON.stringify({}),
+  });
 }
 export async function deleteStory(storyId: string): Promise<void> {
   const k = K();
@@ -1368,16 +1023,10 @@ export async function deleteStory(storyId: string): Promise<void> {
 // ─── Notifications ────────────────────────────────────────────────────────────
 
 export async function getNotifications(k: SocialKeys = K()): Promise<Notification[]> {
-  try {
-    const remote = await serviceRequest<Notification[]>('/api/buyer/notifications');
-    // Only use API result if it has data — empty means first-login DB (fall back to local demo data)
-    if (Array.isArray(remote) && remote.length > 0) {
-      // Guard: discard if account changed while request was in-flight
-      if (_socialUserId === k.userId) await save(k.notifications, remote);
-      return remote;
-    }
-  } catch { /* fall through to local */ }
-  return load<Notification[]>(k.notifications, DEMO_NOTIFS);
+  const remote = await serviceRequest<Notification[]>('/api/buyer/notifications');
+  const authoritative = Array.isArray(remote) ? remote : [];
+  if (_socialUserId === k.userId) await save(k.notifications, authoritative);
+  return authoritative;
 }
 export async function markNotificationRead(id: string): Promise<void> {
   const k = K();
@@ -1500,16 +1149,10 @@ export async function submitReport(params: { targetType: ReportTargetType; targe
 // ─── Saved Content ────────────────────────────────────────────────────────────
 
 export async function getSavedItems(k: SocialKeys = K()): Promise<SavedItem[]> {
-  try {
-    const remote = await serviceRequest<SavedItem[]>('/api/buyer/saved');
-    // Only use API result if it has data — empty means first-login DB (fall back to local demo data)
-    if (Array.isArray(remote) && remote.length > 0) {
-      // Guard: discard if account changed while request was in-flight
-      if (_socialUserId === k.userId) await save(k.saved, remote);
-      return remote;
-    }
-  } catch { /* fall through to local */ }
-  return load<SavedItem[]>(k.saved, DEMO_SAVED);
+  const remote = await serviceRequest<SavedItem[]>('/api/buyer/saved');
+  const authoritative = Array.isArray(remote) ? remote : [];
+  if (_socialUserId === k.userId) await save(k.saved, authoritative);
+  return authoritative;
 }
 export async function saveItem(params: { type: SavedItemType; targetId: string; title: string; subtitle?: string; accentColor?: string; }): Promise<SavedItem> {
   const k = K();
@@ -1562,25 +1205,10 @@ export async function updatePrivacySettings(updates: Partial<PrivacySettings>): 
 
 // ─── Search ───────────────────────────────────────────────────────────────────
 
-const SEARCH_POOL: ProfileSearchResult[] = [
-  { id: 'sr_maya',   userId: 'u_maya',   name: 'Maya Chen',    handle: '@mayachen',    initials: 'MC', color: '#BE185D', accountType: 'buyer',  profileVisibility: 'public',  mutualFriendsCount: 3, isBlocked: false, friendshipStatus: 'accepted' },
-  { id: 'sr_jordan', userId: 'u_jordan', name: 'Jordan Lee',   handle: '@jordanlee',   initials: 'JL', color: '#1D4ED8', accountType: 'buyer',  profileVisibility: 'public',  mutualFriendsCount: 2, isBlocked: false, friendshipStatus: 'accepted' },
-  { id: 'sr_amir',   userId: 'u_amir',   name: 'Amir Patel',   handle: '@amirpatel',   initials: 'AP', color: '#0F766E', accountType: 'buyer',  profileVisibility: 'public',  mutualFriendsCount: 1, isBlocked: false, friendshipStatus: 'accepted' },
-  { id: 'sr_sofia',  userId: 'u_sofia',  name: 'Sofia Reyes',  handle: '@sofiareyes',  initials: 'SR', color: '#B45309', accountType: 'buyer',  profileVisibility: 'private', mutualFriendsCount: 2, isBlocked: false, friendshipStatus: 'accepted' },
-  { id: 'sr_kai',    userId: 'u_kai',    name: 'Kai Nakamura', handle: '@kainakamura', initials: 'KN', color: '#00C853', accountType: 'buyer',  profileVisibility: 'public',  mutualFriendsCount: 1, isBlocked: false, friendshipStatus: 'accepted' },
-  { id: 'sr_casey',  userId: 'u_casey',  name: 'Casey Park',   handle: '@caseypark',   initials: 'CP', color: '#7C3AED', accountType: 'buyer',  profileVisibility: 'public',  mutualFriendsCount: 2, isBlocked: false },
-  { id: 'sr_riley',  userId: 'u_riley',  name: 'Riley Moss',   handle: '@rileymoss',   initials: 'RM', color: '#0891B2', accountType: 'buyer',  profileVisibility: 'public',  mutualFriendsCount: 0, isBlocked: false },
-  { id: 'sr_vault',  userId: 'u_vault',  name: 'Vault Studio', handle: '@vaultstudio', initials: 'VS', color: '#00C853', accountType: 'seller', profileVisibility: 'public',  mutualFriendsCount: 0, isBlocked: false },
-  { id: 'sr_nxgen',  userId: 'u_nxgen',  name: 'NxGen Drops',  handle: '@nxgendrops',  initials: 'NX', color: '#B45309', accountType: 'seller', profileVisibility: 'public',  mutualFriendsCount: 0, isBlocked: false },
-];
-
 export async function searchProfiles(query: string): Promise<ProfileSearchResult[]> {
   if (!query.trim()) return [];
-  const q = query.toLowerCase();
-  const blocks = await getBlockedUsers();
-  const blockedIds = new Set(blocks.map(b => b.blockedUserId));
-  return SEARCH_POOL.filter(r =>
-    !blockedIds.has(r.userId) &&
-    (r.name.toLowerCase().includes(q) || r.handle.toLowerCase().includes(q))
+  const remote = await serviceRequest<ProfileSearchResult[]>(
+    `/api/social/search?q=${encodeURIComponent(query.trim())}`,
   );
+  return Array.isArray(remote) ? remote : [];
 }

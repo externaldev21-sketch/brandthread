@@ -40,19 +40,12 @@ type CreationCard = {
   route: string;
 };
 
-// These are authored tool and template identities, rather than app-chrome accents.
-const AUTHORED_DESIGN_ACCENTS = {
-  purple: '#8B5CF6',
-  purpleLight: '#A78BFA',
-  cyan: '#22D3EE',
-} as const;
-
-const CREATION_CARDS: CreationCard[] = [
-  { icon: 'edit-2',      label: 'Blank Canvas',        desc: 'Start from scratch',              accent: AUTHORED_DESIGN_ACCENTS.purple,       route: '/design-project?type=canvas' },
-  { icon: 'layers',      label: 'Garment Design',       desc: 'Design any apparel piece',        accent: AUTHORED_DESIGN_ACCENTS.cyan,         route: '/design-project?type=garment' },
+const creationCards = (theme: ReturnType<typeof useAppTheme>['theme']): CreationCard[] => [
+  { icon: 'edit-2',      label: 'Blank Canvas',        desc: 'Start from scratch',              accent: theme.accent,       route: '/design-project?type=canvas' },
+  { icon: 'layers',      label: 'Garment Design',       desc: 'Design any apparel piece',        accent: theme.secondary,         route: '/design-project?type=garment' },
   { icon: 'zap',         label: 'AI Design',            desc: 'Generate from a prompt',          accent: BLUE,         route: '/design-text-to-design' },
   { icon: 'box',         label: 'Product Mockup',        desc: 'Realistic product visuals',       accent: ORANGE,       route: '/design-project?type=mockup' },
-  { icon: 'camera',      label: 'AI Photoshoot',        desc: 'AI model & scene photography',    accent: AUTHORED_DESIGN_ACCENTS.purpleLight, route: '/design-ai-photoshoot' },
+  { icon: 'camera',      label: 'AI Photoshoot',        desc: 'AI model & scene photography',    accent: theme.accentLight, route: '/design-ai-photoshoot' },
   { icon: 'trending-up', label: 'Campaign',             desc: 'Multi-format content kit',        accent: SUCCESS,      route: '/design-campaign' },
   { icon: 'scissors',    label: 'Background Removal',   desc: 'Clean cutouts instantly',         accent: GOLD,         route: '/design-bg-removal' },
 ];
@@ -61,10 +54,10 @@ const CREATION_CARDS: CreationCard[] = [
 
 type AITool = { icon: string; label: string; route: string; accent: string };
 
-const AI_TOOLS: AITool[] = [
+const aiTools = (theme: ReturnType<typeof useAppTheme>['theme']): AITool[] => [
   { icon: 'zap',         label: 'Text to Design',     route: '/design-text-to-design',   accent: BLUE },
-  { icon: 'upload',      label: 'Upload Sketch',       route: '/design-sketch-upload',    accent: AUTHORED_DESIGN_ACCENTS.purple },
-  { icon: 'image',       label: 'Mockup to Model',     route: '/design-mockup-model',     accent: AUTHORED_DESIGN_ACCENTS.cyan },
+  { icon: 'upload',      label: 'Upload Sketch',       route: '/design-sketch-upload',    accent: theme.accent },
+  { icon: 'image',       label: 'Mockup to Model',     route: '/design-mockup-model',     accent: theme.secondary },
   { icon: 'edit',        label: 'Edit with Prompt',    route: '/design-prompt-edit',      accent: ORANGE },
   { icon: 'refresh-cw',  label: 'Replace BG',          route: '/design-bg-replace',       accent: SUCCESS },
 ];
@@ -84,15 +77,15 @@ const FILTERS: { key: FilterKind; label: string }[] = [
 
 // ─── Template quick cards ─────────────────────────────────────────────────────
 
-const QUICK_TEMPLATES = [
-  { label: 'T-Shirt',      garmentType: 'tshirt',     accent: AUTHORED_DESIGN_ACCENTS.purple,      route: '/design-project?type=garment&garmentType=tshirt' },
-  { label: 'Hoodie',       garmentType: 'hoodie',     accent: AUTHORED_DESIGN_ACCENTS.cyan,        route: '/design-project?type=garment&garmentType=hoodie' },
+const quickTemplates = (theme: ReturnType<typeof useAppTheme>['theme']) => [
+  { label: 'T-Shirt',      garmentType: 'tshirt',     accent: theme.accent,      route: '/design-project?type=garment&garmentType=tshirt' },
+  { label: 'Hoodie',       garmentType: 'hoodie',     accent: theme.secondary,        route: '/design-project?type=garment&garmentType=hoodie' },
   { label: 'Sweatshirt',   garmentType: 'sweatshirt', accent: BLUE,        route: '/design-project?type=garment&garmentType=sweatshirt' },
   { label: 'Hat',          garmentType: 'hat',        accent: GOLD,        route: '/design-project?type=garment&garmentType=hat' },
   { label: 'Bag',          garmentType: 'bag',        accent: SUCCESS,     route: '/design-project?type=garment&garmentType=bag' },
   { label: 'Product Card', garmentType: null,         accent: ORANGE,      route: '/design-project?type=mockup' },
-  { label: 'Social Post',  garmentType: null,         accent: AUTHORED_DESIGN_ACCENTS.purpleLight,route: '/design-project?type=social' },
-  { label: 'Story',        garmentType: null,         accent: AUTHORED_DESIGN_ACCENTS.cyan,        route: '/design-project?type=social' },
+  { label: 'Social Post',  garmentType: null,         accent: theme.accentLight,route: '/design-project?type=social' },
+  { label: 'Story',        garmentType: null,         accent: theme.secondary,        route: '/design-project?type=social' },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -189,6 +182,9 @@ function ProjectCard({ project, onOpen, onMore }: ProjectCardProps) {
 
 export default function DesignScreen() {
   const { theme } = useAppTheme();
+  const creationCardItems = creationCards(theme);
+  const aiToolItems = aiTools(theme);
+  const quickTemplateItems = quickTemplates(theme);
   const router = useRouter();
   const [projects, setProjects] = useState<DesignProject[]>([]);
   const [loading, setLoading] = useState(true);
@@ -284,7 +280,7 @@ export default function DesignScreen() {
           <Text style={styles.sectionTitle}>Start creating</Text>
         </View>
         <View style={styles.grid}>
-          {CREATION_CARDS.map(card => (
+          {creationCardItems.map(card => (
             <TouchableOpacity
               key={card.label}
               style={[styles.creationCard, { borderColor: card.accent + '33' }]}
@@ -305,7 +301,7 @@ export default function DesignScreen() {
           <Text style={styles.sectionTitle}>AI Tools</Text>
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pillRow}>
-          {AI_TOOLS.map(tool => (
+          {aiToolItems.map(tool => (
             <TouchableOpacity
               key={tool.label}
               style={[styles.aiPill, { borderColor: tool.accent + '44', backgroundColor: tool.accent + '14' }]}
@@ -365,7 +361,7 @@ export default function DesignScreen() {
           style={styles.templateHeader}
         />
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templateRow}>
-          {QUICK_TEMPLATES.map((tmpl, idx) => (
+          {quickTemplateItems.map((tmpl, idx) => (
             <TouchableOpacity
               key={idx}
               style={styles.templateCard}

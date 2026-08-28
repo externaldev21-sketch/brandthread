@@ -3,7 +3,7 @@
  * Route: /design-ai-photoshoot
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert, Dimensions, Image,
@@ -18,9 +18,6 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM,
-  GRAD_PRIMARY, GRAD_CARD_GLOW,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
@@ -30,6 +27,7 @@ import {
 import {
   generatePhotoshoot, GeneratePhotoshootResult,
 } from '@/services/designService';
+import { useApi } from '@/hooks/useApi';
 import { File, Paths } from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 
@@ -55,6 +53,7 @@ const OUTPUT_FORMATS = [
 ] as const;
 
 type OutputFormat = typeof OUTPUT_FORMATS[number]['value'];
+type ProductOption = { id: string; name: string; images?: string[]; status?: string };
 
 const GRAD_PALETTES: Record<number, readonly [string, string]> = {
   0: ['#8B5CF6', '#22D3EE'],
@@ -64,12 +63,19 @@ const GRAD_PALETTES: Record<number, readonly [string, string]> = {
 };
 
 export default function AIPhotoshootScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const s = createStyles(theme);
   const router = useRouter();
+  const api = useApi();
   const [step, setStep] = useState<Step>(1);
 
   // Step 1
   const [productSearch, setProductSearch] = useState('');
+  const [selectedProductId, setSelectedProductId] = useState('');
+  const [products, setProducts] = useState<ProductOption[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [productError, setProductError] = useState('');
   // Step 2
   const [modelStyle, setModelStyle] = useState<ModelStyleKind>('female');
   // Step 3
@@ -99,6 +105,23 @@ export default function AIPhotoshootScreen() {
   }
 
   const counterRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setLoadingProducts(true);
+    setProductError('');
+    api.products.list()
+      .then((rows) => {
+        if (active) setProducts(Array.isArray(rows) ? rows as ProductOption[] : []);
+      })
+      .catch(() => {
+        if (active) setProductError('Could not load your products. Try again.');
+      })
+      .finally(() => {
+        if (active) setLoadingProducts(false);
+      });
+    return () => { active = false; };
+  }, [api]);
 
   async function saveDataUriToDevice(dataUri: string): Promise<void> {
     const { status } = await MediaLibrary.requestPermissionsAsync();
@@ -159,7 +182,7 @@ export default function AIPhotoshootScreen() {
 
     try {
       const result = await generatePhotoshoot({
-        productId: productSearch || undefined,
+        productId: selectedProductId,
         modelStyle,
         sceneStyle,
         lightingStyle,
@@ -169,8 +192,8 @@ export default function AIPhotoshootScreen() {
       });
       setResults(result);
       setSelected(new Set());
-    } catch {
-      Alert.alert('Generation failed', 'Please try again.');
+    } catch (error: any) {
+      Alert.alert('Generation failed', error?.message || 'Please try again.');
     } finally {
       setIsGenerating(false);
       if (counterRef.current) clearInterval(counterRef.current);
@@ -183,6 +206,10 @@ export default function AIPhotoshootScreen() {
   }
 
   function goNext() {
+    if (step === 1 && !selectedProductId) {
+      Alert.alert('Choose a product', 'Select a product with at least one photo for the AI photoshoot.');
+      return;
+    }
     if (step < 6) setStep((step + 1) as Step);
   }
 
@@ -310,7 +337,7 @@ export default function AIPhotoshootScreen() {
         {step === 1 && (
           <>
             <Text style={s.stepTitle}>Choose product</Text>
-            <Text style={s.stepSub}>Search or select a product, or skip to use a custom photoshoot.</Text>
+            <Text style={s.stepSub}>Select the real product photos the AI should use as its reference.</Text>
             <View style={s.inputWrap}>
               <Feather name="search" size={ICON.sm} color={SUBTLE} style={s.inputIcon} />
               <TextInput
@@ -322,17 +349,54 @@ export default function AIPhotoshootScreen() {
               />
             </View>
 
-            <View style={s.productPlaceholder}>
-              <Feather name="box" size={ICON.xl} color={SUBTLE} />
-              <Text style={s.productPlaceholderText}>Select product</Text>
-              <Text style={s.productPlaceholderSub}>No product selected — AI will generate a styled streetwear shoot</Text>
-            </View>
+            {loadingProducts ? (
+              <ActivityIndicator color={PURPLE} style={{ marginVertical: SP.xl }} />
+            ) : productError ? (
+              <View style={s.productPlaceholder}>
+                <Feather name="wifi-off" size={ICON.xl} color={SUBTLE} />
+                <Text style={s.productPlaceholderText}>Products unavailable</Text>
+                <Text style={s.productPlaceholderSub}>{productError}</Text>
+              </View>
+            ) : (
+              <View style={s.productList}>
+                {products
+                  .filter(p => p.name.toLowerCase().includes(productSearch.trim().toLowerCase()))
+                  .map(product => {
+                    const selectedProduct = selectedProductId === product.id;
+                    const cover = Array.isArray(product.images) ? product.images[0] : undefined;
+                    return (
+                      <TouchableOpacity
+                        key={product.id}
+                        style={[s.productOption, selectedProduct && s.productOptionActive]}
+                        onPress={() => setSelectedProductId(product.id)}
+                        activeOpacity={0.82}
+                      >
+                        {cover ? (
+                          <Image source={{ uri: cover }} style={s.productCover} resizeMode="cover" />
+                        ) : (
+                          <View style={[s.productCover, s.productCoverEmpty]}>
+                            <Feather name="image" size={ICON.md} color={SUBTLE} />
+                          </View>
+                        )}
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.productOptionName} numberOfLines={1}>{product.name}</Text>
+                          <Text style={s.productOptionMeta}>
+                            {cover ? 'Product photo ready' : 'No product photo'}
+                          </Text>
+                        </View>
+                        <Feather
+                          name={selectedProduct ? 'check-circle' : 'circle'}
+                          size={ICON.md}
+                          color={selectedProduct ? PURPLE : MUTED}
+                        />
+                      </TouchableOpacity>
+                    );
+                  })}
+              </View>
+            )}
 
             <View style={s.stepBtns}>
-              <TouchableOpacity style={s.skipBtn} onPress={goNext}>
-                <Text style={s.skipBtnText}>Skip</Text>
-              </TouchableOpacity>
-              <GradientCard style={{ flex: 1 }} onPress={goNext}>
+              <GradientCard colors={theme.primaryGradient} style={{ flex: 1, shadowColor: theme.shadowColor }} onPress={goNext}>
                 <View style={s.nextInner}>
                   <Text style={s.nextText}>Next</Text>
                   <Feather name="arrow-right" size={ICON.sm} color="#fff" />
@@ -363,7 +427,7 @@ export default function AIPhotoshootScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            <GradientCard style={s.nextCard} onPress={goNext}>
+            <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={goNext}>
               <View style={s.nextInner}>
                 <Text style={s.nextText}>Next: Scene</Text>
                 <Feather name="arrow-right" size={ICON.md} color="#fff" />
@@ -385,7 +449,7 @@ export default function AIPhotoshootScreen() {
                   onPress={() => setSceneStyle(sc.value)}
                 >
                   <LinearGradient
-                    colors={sceneStyle === sc.value ? GRAD_PRIMARY : ['#18182E', '#12121F']}
+                    colors={sceneStyle === sc.value ? theme.primaryGradient : ['#18182E', '#12121F']}
                     style={s.sceneCardGrad}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 1 }}
@@ -398,7 +462,7 @@ export default function AIPhotoshootScreen() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
-            <GradientCard style={s.nextCard} onPress={goNext}>
+            <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={goNext}>
               <View style={s.nextInner}>
                 <Text style={s.nextText}>Next: Lighting</Text>
                 <Feather name="arrow-right" size={ICON.md} color="#fff" />
@@ -425,7 +489,7 @@ export default function AIPhotoshootScreen() {
                 </TouchableOpacity>
               ))}
             </View>
-            <GradientCard style={s.nextCard} onPress={goNext}>
+            <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={goNext}>
               <View style={s.nextInner}>
                 <Text style={s.nextText}>Next: Output format</Text>
                 <Feather name="arrow-right" size={ICON.md} color="#fff" />
@@ -484,7 +548,7 @@ export default function AIPhotoshootScreen() {
               ))}
             </View>
 
-            <GradientCard style={s.nextCard} onPress={goNext}>
+            <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={goNext}>
               <View style={s.nextInner}>
                 <Text style={s.nextText}>Next: Review</Text>
                 <Feather name="arrow-right" size={ICON.md} color="#fff" />
@@ -502,7 +566,7 @@ export default function AIPhotoshootScreen() {
             <View style={s.summaryCard}>
               <Text style={s.summaryTitle}>Photoshoot summary</Text>
               {[
-                { label: 'Product', value: productSearch || 'No product selected' },
+                { label: 'Product', value: products.find(p => p.id === selectedProductId)?.name || 'No product selected' },
                 { label: 'Model', value: MODEL_STYLES.find(m => m.value === modelStyle)?.label ?? modelStyle },
                 { label: 'Scene', value: SCENE_STYLES.find(sc => sc.value === sceneStyle)?.label ?? sceneStyle },
                 { label: 'Lighting', value: LIGHTING_STYLES.find(l => l.value === lightingStyle)?.label ?? lightingStyle },
@@ -517,7 +581,7 @@ export default function AIPhotoshootScreen() {
               ))}
             </View>
 
-            <GradientCard style={s.nextCard} onPress={handleGenerate}>
+            <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={handleGenerate}>
               <View style={s.nextInner}>
                 <Feather name="camera" size={ICON.md} color="#fff" />
                 <Text style={s.nextText}>Generate photoshoot</Text>
@@ -530,7 +594,9 @@ export default function AIPhotoshootScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  return StyleSheet.create({
   stepBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -638,6 +704,46 @@ const s = StyleSheet.create({
     color: SUBTLE,
     textAlign: 'center',
     paddingHorizontal: SP.xl,
+  },
+  productList: {
+    gap: SP.sm,
+    marginBottom: SP.xl,
+  },
+  productOption: {
+    minHeight: 70,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.md,
+    backgroundColor: CARD,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: SP.sm,
+  },
+  productOptionActive: {
+    borderColor: PURPLE,
+    backgroundColor: PURPLE_DIM,
+  },
+  productCover: {
+    width: 52,
+    height: 52,
+    borderRadius: RADIUS.sm,
+  },
+  productCoverEmpty: {
+    backgroundColor: CARD_ELEVATED,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  productOptionName: {
+    fontFamily: FONT.semibold,
+    fontSize: FS.sm,
+    color: FG,
+    marginBottom: 4,
+  },
+  productOptionMeta: {
+    fontFamily: FONT.regular,
+    fontSize: FS.xs,
+    color: MUTED,
   },
   stepBtns: {
     flexDirection: 'row',
@@ -1003,4 +1109,5 @@ const s = StyleSheet.create({
     color: MUTED,
     lineHeight: 18,
   },
-});
+  });
+};

@@ -14,18 +14,11 @@
  */
 
 import React from 'react';
-import {
-  Modal, View, Text, TouchableOpacity, StyleSheet, Pressable, ScrollView,
-} from 'react-native';
+import { Modal, View, Text, TouchableOpacity, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import {
-  BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_DIM, SUCCESS, SUCCESS_DIM,
-  BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, GOLD,
-  FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
+import { BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, GOLD, FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
 interface Props {
@@ -47,14 +40,14 @@ interface GrowthTool {
   accentDim: string;
 }
 
-const GROWTH_STUDIO_TOOLS: GrowthTool[] = [
+const getGrowthStudioTools = (theme: ReturnType<typeof useAppTheme>['theme']): GrowthTool[] => [
   {
     id: 'design-studio',
     title: 'Design Studio',
     desc: 'Create product artwork, graphics and custom designs.',
     icon: 'edit-3',
-    accent: PURPLE,
-    accentDim: PURPLE_DIM,
+    accent: theme.accent,
+    accentDim: theme.accentDim,
   },
   {
     id: 'ai-photoshoot',
@@ -85,16 +78,16 @@ const GROWTH_STUDIO_TOOLS: GrowthTool[] = [
     title: 'Background Replace',
     desc: 'Swap or generate stunning new backgrounds.',
     icon: 'image',
-    accent: '#06B6D4',
-    accentDim: '#0E4A56',
+    accent: theme.secondary,
+    accentDim: theme.secondaryDim,
   },
   {
     id: 'ai-design',
     title: 'AI Design',
     desc: 'Describe your idea and watch unique designs appear.',
     icon: 'zap',
-    accent: '#A78BFA',
-    accentDim: '#3B2A6E',
+    accent: theme.accentLight,
+    accentDim: theme.accentDim,
   },
   {
     id: 'brand-assets',
@@ -140,6 +133,7 @@ export default function PlanUpsellModal({
   requiredPlan = 'growth',
 }: Props) {
   const { theme } = useAppTheme();
+  const growthStudioTools = React.useMemo(() => getGrowthStudioTools(theme), [theme]);
   const planLabel = requiredPlan === 'pro' ? 'Pro' : 'Growth';
   const planPrice = requiredPlan === 'pro' ? '$79' : '$29';
 
@@ -171,7 +165,7 @@ export default function PlanUpsellModal({
 
           {/* ── Gradient header ── */}
           <LinearGradient
-            colors={[theme.accent, theme.accentLight]}
+            colors={[...theme.primaryGradient]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={s.header}
@@ -189,7 +183,7 @@ export default function PlanUpsellModal({
             <Text style={s.headerTitle}>Upgrade to {planLabel}</Text>
             <Text style={s.headerSubtitle}>
               <Text style={s.featureNameText}>{featureName}</Text>
-              {' '}and {isGrowth ? (GROWTH_STUDIO_TOOLS.length - 1) + ' more tools are' : 'more features are'} available on the {planLabel} plan ({planPrice}/mo).
+              {' '}and {isGrowth ? (growthStudioTools.length - 1) + ' more tools are' : 'more features are'} available on the {planLabel} plan ({planPrice}/mo).
             </Text>
           </LinearGradient>
 
@@ -206,7 +200,7 @@ export default function PlanUpsellModal({
                 <Text style={s.sectionLabel}>Studio tools you'll unlock</Text>
 
                 {/* Full tool list */}
-                {GROWTH_STUDIO_TOOLS.map((tool) => {
+                {growthStudioTools.map((tool) => {
                   const isTapped = tool.title === featureName;
                   return (
                     <View

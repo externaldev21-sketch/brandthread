@@ -16,7 +16,12 @@ export function useColors() {
     primaryForeground: theme.onAccent,
     accent: theme.accentDim,
     accentForeground: theme.accentLight,
-    info: colors.dark.info,
+    info: theme.secondary,
+    infoDim: theme.secondaryDim,
+    gradient: theme.primaryGradient,
+    heroGradient: theme.heroGradient,
+    glowGradient: theme.glowGradient,
+    shadowColor: theme.shadowColor,
     radius: colors.radius,
   };
 }

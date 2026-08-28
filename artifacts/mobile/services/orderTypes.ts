@@ -87,7 +87,7 @@ export interface OrderCustomer {
   phone?: string;
   initials: string;
   totalOrders: number;
-  lifetimeValue: number;
+  lifetimeValueCents: number;
   tags: string[];
   shippingAddress: OrderAddress;
   billingAddress: OrderAddress;
@@ -103,10 +103,10 @@ export interface OrderLineItem {
   sku?: string;
   imageUri?: string;
   quantity: number;
-  unitPrice: number;
-  discountAmount: number;
-  taxAmount: number;
-  total: number;
+  unitPriceCents: number;
+  discountAmountCents: number;
+  taxAmountCents: number;
+  totalCents: number;
   fulfillmentSource: FulfillmentType;
   fulfillmentGroupId?: string;
   productionStatus?: string;
@@ -120,7 +120,7 @@ export interface ShippingRate {
   id: string;
   carrier: string;
   service: string;
-  price: number;
+  priceCents: number;
   estimatedDays: number;
   estimatedDelivery: string;
   trackingIncluded: boolean;
@@ -144,7 +144,7 @@ export interface ShippingLabel {
   service: string;
   trackingNumber: string;
   labelUrl?: string;
-  price: number;
+  priceCents: number;
   status: 'active' | 'voided';
   isDemo: boolean;
   purchasedAt: string;
@@ -207,13 +207,13 @@ export interface HeldFundsRecord {
   id: string;
   orderId: string;
   status: HeldFundsStatus;
-  totalReceived: number;
-  currentlyHeld: number;
-  manufacturerReserved: number;
-  shippingReserved: number;
-  platformFee: number;
-  sellerPending: number;
-  sellerReleased: number;
+  totalReceivedCents: number;
+  currentlyHeldCents: number;
+  manufacturerReservedCents: number;
+  shippingReservedCents: number;
+  platformFeeCents: number;
+  sellerPendingCents: number;
+  sellerReleasedCents: number;
   milestones: PayoutMilestone[];
   holdReason?: string;
   expectedReleaseDate?: string;
@@ -222,19 +222,19 @@ export interface HeldFundsRecord {
 }
 
 export interface PaymentSummary {
-  subtotal: number;
-  discountTotal: number;
-  shippingTotal: number;
-  taxTotal: number;
-  total: number;
-  amountPaid: number;
-  amountRefunded: number;
-  amountHeld: number;
-  amountPending: number;
-  sellerAllocation: number;
-  manufacturerAllocation: number;
-  shippingLabelAllocation: number;
-  platformFee: number;
+  subtotalCents: number;
+  discountTotalCents: number;
+  shippingTotalCents: number;
+  taxTotalCents: number;
+  totalCents: number;
+  amountPaidCents: number;
+  amountRefundedCents: number;
+  amountHeldCents: number;
+  amountPendingCents: number;
+  sellerAllocationCents: number;
+  manufacturerAllocationCents: number;
+  shippingLabelAllocationCents: number;
+  platformFeeCents: number;
   payoutStatus: 'available' | 'pending' | 'held' | 'paid';
 }
 
@@ -279,7 +279,7 @@ export interface Cancellation {
   orderId: string;
   reason: CancellationReason;
   notes?: string;
-  refundAmount: number;
+  refundAmountCents: number;
   notifyCustomer: boolean;
   cancelledAt: string;
 }
@@ -291,7 +291,7 @@ export interface ReturnItem {
   productName: string;
   variant: string;
   quantity: number;
-  unitPrice: number;
+  unitPriceCents: number;
   reason: ReturnReason;
 }
 
@@ -333,7 +333,7 @@ export interface RefundLineItem {
   productName: string;
   variant: string;
   quantity: number;
-  amount: number;
+  amountCents: number;
 }
 
 export interface Refund {
@@ -343,9 +343,9 @@ export interface Refund {
   type: RefundType;
   status: RefundStatus;
   lineItems: RefundLineItem[];
-  shippingAmount: number;
-  taxAmount: number;
-  totalAmount: number;
+  shippingAmountCents: number;
+  taxAmountCents: number;
+  totalAmountCents: number;
   reason?: string;
   restockInventory: boolean;
   notifyCustomer: boolean;
@@ -372,11 +372,11 @@ export interface Dispute {
   type: DisputeType;
   status: DisputeStatus;
   customerClaim: string;
-  amount: number;
+  amountCents: number;
   evidenceDeadline?: string;
   evidence: DisputeEvidence[];
   internalNotes: string[];
-  potentialHold: number;
+  potentialHoldCents: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -386,7 +386,7 @@ export interface Dispute {
 export interface PreOrderInfo {
   manufacturerId?: string;
   manufacturerName?: string;
-  fundingGoal?: number;
+  fundingGoalCents?: number;
   unitsOrdered: number;
   estimatedProductionDate?: string;
   estimatedShipDate?: string;
@@ -449,11 +449,11 @@ export interface BuyerOrderView {
     productName: string;
     variant: string;
     quantity: number;
-    unitPrice: number;
+    unitPriceCents: number;
     imageUri?: string;
   }[];
   shippingAddress: OrderAddress;
-  payment: Pick<PaymentSummary, 'subtotal' | 'shippingTotal' | 'taxTotal' | 'total'>;
+  payment: Pick<PaymentSummary, 'subtotalCents' | 'shippingTotalCents' | 'taxTotalCents' | 'totalCents'>;
   trackingNumber?: string;
   trackingCarrier?: string;
   trackingStatus?: TrackingStatus;
@@ -528,7 +528,7 @@ export const DEMO_CARRIER_RATES: ShippingRate[] = [
   {
     id: 'rate_ups_ground',
     carrier: 'UPS', service: 'Ground',
-    price: 8.99, estimatedDays: 5,
+    priceCents: 899, estimatedDays: 5,
     estimatedDelivery: 'Jul 21',
     trackingIncluded: true, insuranceIncluded: false,
     isRecommended: false,
@@ -536,7 +536,7 @@ export const DEMO_CARRIER_RATES: ShippingRate[] = [
   {
     id: 'rate_usps_priority',
     carrier: 'USPS', service: 'Priority Mail',
-    price: 12.40, estimatedDays: 3,
+    priceCents: 1240, estimatedDays: 3,
     estimatedDelivery: 'Jul 19',
     trackingIncluded: true, insuranceIncluded: true,
     isRecommended: true,
@@ -544,7 +544,7 @@ export const DEMO_CARRIER_RATES: ShippingRate[] = [
   {
     id: 'rate_fedex_2day',
     carrier: 'FedEx', service: '2Day',
-    price: 19.85, estimatedDays: 2,
+    priceCents: 1985, estimatedDays: 2,
     estimatedDelivery: 'Jul 18',
     trackingIncluded: true, insuranceIncluded: true,
     isRecommended: false,
@@ -552,7 +552,7 @@ export const DEMO_CARRIER_RATES: ShippingRate[] = [
   {
     id: 'rate_ups_next',
     carrier: 'UPS', service: 'Next Day Air',
-    price: 38.50, estimatedDays: 1,
+    priceCents: 3850, estimatedDays: 1,
     estimatedDelivery: 'Jul 17',
     trackingIncluded: true, insuranceIncluded: true,
     isRecommended: false,

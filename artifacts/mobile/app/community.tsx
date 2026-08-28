@@ -16,8 +16,8 @@ import { useApi, type Freelancer } from '@/lib/api';
 import { FREELANCER_SERVICE_TYPES, serviceLabel, formatHourlyRate, ratingLabel } from '@/lib/freelancer';
 import { useColors } from '@/hooks/useColors';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN,
-  GOLD, SUCCESS, ORANGE, FONT, FS, SP, RADIUS, GRAD_PRIMARY, ON_DARK,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE,
+  GOLD, SUCCESS, ORANGE, FONT, FS, SP, RADIUS, ON_DARK,
 } from '@/lib/theme';
 
 export default function CommunityScreen() {
@@ -128,7 +128,7 @@ export default function CommunityScreen() {
               }}
             >
               <LinearGradient
-                colors={[colors.primary, colors.accentForeground]}
+                colors={colors.gradient as any}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.ctaCard}
@@ -232,7 +232,7 @@ export default function CommunityScreen() {
                           <Text style={styles.metaText}>{rating}</Text>
                         </>
                       ) : (
-                        <View style={styles.newBadge}>
+                       <View style={[styles.newBadge, { backgroundColor: colors.infoDim }]}>
                          <Text style={[styles.newBadgeText, { color: colors.info }]}>NEW</Text>
                         </View>
                       )}
@@ -289,9 +289,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.sm + 4, paddingVertical: 7,
     borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
   },
-  chipActive: { backgroundColor: PURPLE_DIM, borderColor: 'rgba(139,92,246,0.45)' },
+  chipActive: {},
   chipText: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium },
-  chipTextActive: { color: PURPLE },
+  chipTextActive: {},
   centerBox: { alignItems: 'center', gap: SP.sm, paddingVertical: SP.xl + 8 },
   emptyTitle: { color: FG, fontSize: FS.sm, fontFamily: FONT.semibold },
   emptyText: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, textAlign: 'center' },
@@ -301,22 +301,22 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md, padding: SP.md - 2, marginBottom: SP.sm + 2,
   },
   avatar: { width: 46, height: 46, borderRadius: 23 },
-  avatarFallback: { backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
-  avatarInitial: { color: PURPLE, fontSize: FS.md, fontFamily: FONT.bold },
+  avatarFallback: { alignItems: 'center', justifyContent: 'center' },
+  avatarInitial: { fontSize: FS.md, fontFamily: FONT.bold },
   name: { color: FG, fontSize: FS.sm, fontFamily: FONT.semibold, maxWidth: 150 },
   skill: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   metaText: { color: FG, fontSize: FS.xs, fontFamily: FONT.semibold },
   metaMuted: { color: SUBTLE, fontSize: FS.xs, fontFamily: FONT.regular },
   newBadge: {
-    backgroundColor: 'rgba(34,211,238,0.15)', paddingHorizontal: 6, paddingVertical: 2,
+    paddingHorizontal: 6, paddingVertical: 2,
     borderRadius: RADIUS.xs,
   },
-  newBadgeText: { color: CYAN, fontSize: 9, fontFamily: FONT.bold, letterSpacing: 0.5 },
+  newBadgeText: { fontSize: 9, fontFamily: FONT.bold, letterSpacing: 0.5 },
   rate: { color: FG, fontSize: FS.sm, fontFamily: FONT.bold },
   hireBtn: {
-    backgroundColor: PURPLE_DIM, paddingHorizontal: SP.md, paddingVertical: 7,
+    paddingHorizontal: SP.md, paddingVertical: 7,
     borderRadius: RADIUS.sm,
   },
-  hireBtnText: { color: PURPLE, fontSize: FS.xs, fontFamily: FONT.semibold },
+  hireBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold },
 });

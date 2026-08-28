@@ -202,7 +202,7 @@ export function PrimaryButton({
   label, onPress, icon, loading, disabled, small, style, colors,
 }: PrimaryButtonProps) {
   const { theme } = useAppTheme();
-  const buttonColors = colors ?? [theme.accent, theme.accentLight] as const;
+  const buttonColors = colors ?? theme.primaryGradient;
   const foreground = colors ? ON_DARK : theme.onAccent;
   const h = small ? COMP.buttonHSm : COMP.buttonH;
   return (
@@ -273,7 +273,7 @@ export function SecondaryButton({ label, onPress, icon, disabled, small, style, 
 
 const sbS = StyleSheet.create({
   root:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm,
-           borderRadius: RADIUS.md, borderWidth: 1, backgroundColor: 'rgba(139,92,246,0.08)' },
+           borderRadius: RADIUS.md, borderWidth: 1, backgroundColor: 'rgba(199,205,213,0.08)' },
   label: { fontFamily: FONT.semibold },
 });
 
@@ -480,9 +480,24 @@ export function EmptyState({ icon, title, description, action, secondaryAction, 
   const { theme } = useAppTheme();
   return (
     <View style={[esS.root, style]}>
-      <View style={esS.iconWrap}>
-        <LinearGradient colors={[theme.accentDim, theme.secondaryDim]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[esS.iconBg, { borderColor: theme.accent + '66' }]}>
-          <Feather name={icon} size={ICON.xl} color={theme.accentLight} />
+      <View style={esS.illustration} accessibilityElementsHidden>
+        <View style={[esS.orbit, { borderColor: theme.accent + '30' }]} />
+        <View style={[esS.spark, esS.sparkOne, { backgroundColor: theme.secondary }]} />
+        <View style={[esS.spark, esS.sparkTwo, { backgroundColor: theme.accentLight }]} />
+        <View style={[esS.floor, { backgroundColor: theme.accentDim }]} />
+        <LinearGradient
+          colors={[theme.accentDim, theme.secondaryDim]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={[esS.artCard, { borderColor: theme.accent + '70' }]}
+        >
+          <View style={[esS.artInset, { backgroundColor: theme.accent + '18' }]}>
+            <Feather name={icon} size={34} color={theme.accentLight} />
+          </View>
+          <View style={esS.artLines}>
+            <View style={[esS.artLine, { backgroundColor: theme.accentLight + '66', width: 35 }]} />
+            <View style={[esS.artLine, { backgroundColor: theme.secondary + '55', width: 24 }]} />
+          </View>
         </LinearGradient>
       </View>
       <Text style={esS.title}>{title}</Text>
@@ -500,14 +515,53 @@ export function EmptyState({ icon, title, description, action, secondaryAction, 
 }
 
 const esS = StyleSheet.create({
-  root:    { alignItems: 'center', paddingHorizontal: SP.xl, paddingVertical: SP.xxl, gap: SP.md },
-  iconWrap:{ marginBottom: SP.sm },
-  iconBg:  { width: 72, height: 72, borderRadius: RADIUS.xl, alignItems: 'center', justifyContent: 'center',
-             borderWidth: 1, borderColor: BORDER_ACTIVE },
+  root:    { alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl, paddingVertical: SP.xxl, gap: SP.sm },
+  illustration: { width: 150, height: 128, alignItems: 'center', justifyContent: 'center', marginBottom: SP.sm },
+  orbit: { position: 'absolute', width: 122, height: 122, borderRadius: 61, borderWidth: 1 },
+  floor: { position: 'absolute', bottom: 10, width: 94, height: 16, borderRadius: 12, transform: [{ scaleX: 1.2 }] },
+  artCard: { width: 91, height: 94, borderRadius: 24, borderWidth: 1, alignItems: 'center', justifyContent: 'center', transform: [{ rotate: '-4deg' }] },
+  artInset: { width: 57, height: 57, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+  artLines: { position: 'absolute', bottom: 10, right: 9, gap: 3, alignItems: 'flex-end' },
+  artLine: { height: 3, borderRadius: 2 },
+  spark: { position: 'absolute', width: 7, height: 7, borderRadius: 4 },
+  sparkOne: { top: 20, right: 14 },
+  sparkTwo: { left: 19, bottom: 27, width: 5, height: 5 },
   title:   { fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center', letterSpacing: -0.2 },
-  desc:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20 },
+  desc:    { maxWidth: 330, fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 21 },
   actions: { width: '100%', gap: SP.sm, marginTop: SP.sm },
   btn:     { width: '100%' },
+});
+
+export function BrandedLoader({ label = 'Stitching things together…', style }: {
+  label?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const { theme } = useAppTheme();
+  const pulse = useRef(new Animated.Value(0.72)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulse, { toValue: 1, duration: 650, useNativeDriver: true }),
+      Animated.timing(pulse, { toValue: 0.72, duration: 650, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, []);
+  return (
+    <View style={[brLoaderS.root, style]}>
+      <Animated.View style={[brLoaderS.mark, { backgroundColor: theme.accentDim, borderColor: theme.accent + '70', opacity: pulse, transform: [{ scale: pulse }] }]}>
+        <View style={[brLoaderS.thread, { borderColor: theme.accentLight }]} />
+        <Feather name="scissors" size={22} color={theme.accentLight} />
+      </Animated.View>
+      <Text style={brLoaderS.label}>{label}</Text>
+    </View>
+  );
+}
+
+const brLoaderS = StyleSheet.create({
+  root: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.md, padding: SP.xl },
+  mark: { width: 76, height: 76, borderRadius: 26, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  thread: { position: 'absolute', width: 45, height: 45, borderRadius: 23, borderWidth: 1, borderStyle: 'dashed' },
+  label: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.sm, textAlign: 'center' },
 });
 
 // ─── SectionHeader ────────────────────────────────────────────────────────────
@@ -907,7 +961,7 @@ export function BrandedLoadingState({ message, style }: { message?: string; styl
     <View style={[blS.root, style]}>
       <Animated.View style={{ opacity: pulse }}>
         <LinearGradient
-          colors={[theme.accent, theme.accentLight]}
+          colors={theme.primaryGradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={blS.iconWrap}

@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Alert, Dimensions, ActivityIndicator,
@@ -15,8 +15,8 @@ import * as Haptics from 'expo-haptics';
 import Svg, { Path, Rect } from 'react-native-svg';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, BLUE, ORANGE, GOLD,
+  FG, MUTED, SUBTLE,
+  BLUE, ORANGE, GOLD,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
@@ -43,7 +43,9 @@ const SHADOW_STYLES = ['None', 'Soft', 'Hard', 'Drop'] as const;
 type ShadowStyle = typeof SHADOW_STYLES[number];
 
 export default function DesignMockupPreviewScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
+  const styles = createStyles(theme);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { projectId } = useLocalSearchParams<{ projectId?: string }>();
@@ -251,7 +253,9 @@ export default function DesignMockupPreviewScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   scrollContent: { paddingBottom: 120 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.lg },
@@ -305,4 +309,5 @@ const styles = StyleSheet.create({
 
   actionsWrap: { padding: SP.md, gap: SP.sm },
   actionBtn: { marginBottom: 0 },
-});
+  });
+};

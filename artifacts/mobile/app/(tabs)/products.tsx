@@ -5,40 +5,20 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
-import {
-  View, Text, ScrollView, FlatList, TouchableOpacity,
-  StyleSheet, Alert, Share, Modal, Pressable, Image, ActivityIndicator,
-} from 'react-native';
+import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, Share, Modal, Pressable, Image, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
-  ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_PRIMARY, GRAD_CARD_GLOW,
-  FONT, FS, SP, RADIUS, COMP, ICON,
-} from '@/lib/theme';
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, COMP, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import {
-  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  IconButton, SearchBar, FilterChip, StatusBadge,
-  EmptyState, SectionHeader, StatCard, GuidedTip,
-} from '@/components/BrandthreadUI';
-import {
-  getProducts, getProductStats, archiveProduct, unarchiveProduct,
-  deleteProduct, duplicateProduct, listDrafts, deleteDraft,
-} from '@/services/productService';
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SearchBar, FilterChip, StatusBadge, EmptyState, SectionHeader, StatCard, GuidedTip } from '@/components/BrandthreadUI';
+import { getProducts, getProductStats, archiveProduct, unarchiveProduct, deleteProduct, duplicateProduct, listDrafts, deleteDraft } from '@/services/productService';
 import { Product, ProductDraft, ProductFilter, ProductCategory } from '@/services/productTypes';
+import { formatCents, integerPercent } from '@/lib/money';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatCurrency(n: number): string {
-  return '$' + n.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,');
-}
 
 function categoryGradient(category: string): [string, string] {
   if (category === 'T-shirt' || category === 'Sweatshirt') return ['#8B5CF6', '#22D3EE'];
@@ -67,7 +47,7 @@ interface Stats {
   lowStock: number;
   outOfStock: number;
   preOrder: number;
-  totalInventoryValue: number;
+  totalInventoryValueCents: number;
 }
 
 // ─── Product Card ─────────────────────────────────────────────────────────────
@@ -88,10 +68,10 @@ function ProductCard({ product, onEdit, onDuplicate, onMore }: ProductCardProps)
   const stockColor = stock === 0 ? RED : stock <= threshold ? ORANGE : SUCCESS;
   const stockLabel = stock === 0 ? 'Out of stock' : `${stock} in stock`;
 
-  const price = product.pricing.price;
-  const compare = product.pricing.compareAtPrice;
+  const price = product.pricing.priceCents;
+  const compare = product.pricing.compareAtPriceCents;
   const discountPct = compare && compare > price
-    ? Math.round((1 - price / compare) * 100)
+    ? integerPercent(compare - price, compare)
     : null;
 
   return (
@@ -128,9 +108,9 @@ function ProductCard({ product, onEdit, onDuplicate, onMore }: ProductCardProps)
 
           {/* Price row */}
           <View style={s.priceRow}>
-            <Text style={s.price}>{formatCurrency(price)}</Text>
+            <Text style={s.price}>{formatCents(price)}</Text>
             {compare && compare > price && (
-              <Text style={s.comparePrice}>{formatCurrency(compare)}</Text>
+              <Text style={s.comparePrice}>{formatCents(compare)}</Text>
             )}
             {discountPct && (
               <Text style={s.discount}>-{discountPct}%</Text>
@@ -152,7 +132,7 @@ function ProductCard({ product, onEdit, onDuplicate, onMore }: ProductCardProps)
             <Feather name="bar-chart-2" size={11} color={MUTED} />
             <Text style={s.infoText}>{product.totalSales} sold</Text>
             <Text style={s.bullet}> · </Text>
-            <Text style={[s.infoText, { color: SUBTLE }]}>{formatCurrency(product.totalRevenue)} revenue</Text>
+            <Text style={[s.infoText, { color: SUBTLE }]}>{formatCents(product.totalRevenueCents)} revenue</Text>
           </View>
         </View>
       </View>
@@ -382,7 +362,7 @@ export default function ProductsScreen() {
         lowStock: s.lowStock,
         outOfStock: s.outOfStock,
         preOrder: s.preOrder,
-        totalInventoryValue: s.totalInventoryValue,
+        totalInventoryValueCents: s.totalInventoryValueCents,
       });
     } catch { /* use defaults */ }
   }, []);
@@ -488,7 +468,7 @@ export default function ProductsScreen() {
 
   const keyExtractor = useCallback((item: Product) => item.id, []);
 
-  const statsForDisplay = stats ?? { active: 0, draft: 0, lowStock: 0, outOfStock: 0, preOrder: 0, totalInventoryValue: 0 };
+  const statsForDisplay = stats ?? { active: 0, draft: 0, lowStock: 0, outOfStock: 0, preOrder: 0, totalInventoryValueCents: 0 };
 
   const ListHeader = useMemo(() => (
     <>
@@ -561,7 +541,7 @@ export default function ProductsScreen() {
         <StatCard label="Low Stock" value={String(statsForDisplay.lowStock)} icon="alert-triangle" accent={RED} style={s.statCard} />
         <StatCard label="Out of Stock" value={String(statsForDisplay.outOfStock)} icon="x-circle" accent={RED} style={s.statCard} />
         <StatCard label="Pre-orders" value={String(statsForDisplay.preOrder)} icon="clock" accent={PURPLE} style={s.statCard} />
-        <StatCard label="Value" value={formatCurrency(statsForDisplay.totalInventoryValue)} icon="dollar-sign" accent={GOLD} style={s.statCard} />
+        <StatCard label="Value" value={formatCents(statsForDisplay.totalInventoryValueCents)} icon="dollar-sign" accent={GOLD} style={s.statCard} />
       </ScrollView>
 
       {/* Filter chips */}

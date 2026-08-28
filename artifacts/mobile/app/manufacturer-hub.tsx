@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Alert, Modal, Switch, RefreshControl, ActionSheetIOS, Platform,
@@ -15,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { LinearGradient } from 'expo-linear-gradient';
+import { formatCents } from '@/lib/money';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -264,7 +266,7 @@ interface Filters {
   country: string;
   category: string;
   moqMax: number | undefined;
-  unitPriceMax: number | undefined;
+  unitPriceMaxCents: number | undefined;
   leadTimeDaysMax: number | undefined;
   verifiedOnly: boolean;
   ratingMin: number | undefined;
@@ -274,7 +276,7 @@ const DEFAULT_FILTERS: Filters = {
   country: '',
   category: '',
   moqMax: undefined,
-  unitPriceMax: undefined,
+  unitPriceMaxCents: undefined,
   leadTimeDaysMax: undefined,
   verifiedOnly: false,
   ratingMin: undefined,
@@ -298,7 +300,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
         country: f.country || undefined,
         category: f.category || undefined,
         moqMax: f.moqMax,
-        unitPriceMax: f.unitPriceMax,
+        unitPriceMaxCents: f.unitPriceMaxCents,
         leadTimeDaysMax: f.leadTimeDaysMax,
         verifiedOnly: f.verifiedOnly || undefined,
         ratingMin: f.ratingMin,
@@ -435,6 +437,7 @@ interface ManufacturerCardProps {
 }
 
 function ManufacturerCard({ mfg, saved, onSave, onMessage, onProfile, onQuote }: ManufacturerCardProps) {
+  const { theme } = useAppTheme();
   return (
     <View style={card.root}>
       {/* Row 1: avatar + name + verified */}
@@ -446,9 +449,9 @@ function ManufacturerCard({ mfg, saved, onSave, onMessage, onProfile, onQuote }:
           <View style={card.nameRow}>
             <Text style={card.name} numberOfLines={1}>{mfg.name}</Text>
             {mfg.isVerified && (
-              <View style={card.verifiedBadge}>
-                <Feather name="check-circle" size={12} color={CYAN} />
-                <Text style={card.verifiedText}>Verified</Text>
+              <View style={[card.verifiedBadge, { backgroundColor: theme.secondaryDim }]}>
+                <Feather name="check-circle" size={12} color={theme.secondary} />
+                <Text style={[card.verifiedText, { color: theme.secondary }]}>Verified</Text>
               </View>
             )}
           </View>
@@ -468,7 +471,7 @@ function ManufacturerCard({ mfg, saved, onSave, onMessage, onProfile, onQuote }:
         {(Array.isArray(mfg.specialties) ? mfg.specialties : []).slice(0, 3).join(' • ')}
       </Text>
       <Text style={card.stats}>
-        MOQ: {mfg.moq} · Lead: {mfg.leadTimeDays}d · ${mfg.unitPriceMin}–${mfg.unitPriceMax}/unit
+        MOQ: {mfg.moq} · Lead: {mfg.leadTimeDays}d · {formatCents(mfg.unitPriceMinCents)}–{formatCents(mfg.unitPriceMaxCents)}/unit
       </Text>
       <Text style={card.response}>Response: ~{mfg.responseTimeHours}h</Text>
 
@@ -493,13 +496,13 @@ function ManufacturerCard({ mfg, saved, onSave, onMessage, onProfile, onQuote }:
           <Feather name={saved ? 'heart' : 'heart'} size={ICON.sm} color={saved ? RED : MUTED} />
           <Text style={[card.actionLabel, saved && { color: RED }]}>{saved ? 'Saved' : 'Save'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={card.actionBtn} onPress={onMessage} activeOpacity={0.7}>
-          <Feather name="mail" size={ICON.sm} color={CYAN} />
-          <Text style={[card.actionLabel, { color: CYAN }]}>Message</Text>
+        <TouchableOpacity style={[card.actionBtn, { borderColor: theme.secondary }]} onPress={onMessage} activeOpacity={0.7}>
+          <Feather name="mail" size={ICON.sm} color={theme.secondary} />
+          <Text style={[card.actionLabel, { color: theme.secondary }]}>Message</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[card.actionBtn, card.profileBtn]} onPress={onProfile} activeOpacity={0.7}>
-          <Text style={card.profileBtnText}>View profile</Text>
-          <Feather name="arrow-right" size={ICON.sm} color={ON_DARK} />
+        <TouchableOpacity style={[card.actionBtn, card.profileBtn, { backgroundColor: theme.accent, borderColor: theme.accent }]} onPress={onProfile} activeOpacity={0.7}>
+          <Text style={[card.profileBtnText, { color: theme.onAccent }]}>View profile</Text>
+          <Feather name="arrow-right" size={ICON.sm} color={theme.onAccent} />
         </TouchableOpacity>
       </View>
     </View>
@@ -514,7 +517,7 @@ const card = StyleSheet.create({
   nameCol:       { flex: 1 },
   nameRow:       { flexDirection: 'row', alignItems: 'center', gap: SP.xs, flexWrap: 'wrap' },
   name:          { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, flex: 1 },
-  verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(34,211,238,0.12)', borderRadius: RADIUS.pill, paddingHorizontal: 6, paddingVertical: 2 },
+  verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: RADIUS.pill, paddingHorizontal: 6, paddingVertical: 2 },
   verifiedText:  { fontSize: FS.xs, fontFamily: FONT.semibold, color: CYAN },
   location:      { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
   ratingRow:     { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
@@ -591,7 +594,7 @@ function FilterModal({ visible, filters, onApply, onClose }: {
           <Text style={fm.sectionLabel}>Unit Price</Text>
           <View style={fm.chipRow}>
             {[{ label: '≤$10', val: 10 }, { label: '≤$20', val: 20 }, { label: '≤$35', val: 35 }, { label: 'Any', val: undefined }].map(({ label, val }) => (
-              <FilterChip key={label} label={label} active={local.unitPriceMax === val} onPress={() => set('unitPriceMax', val)} />
+              <FilterChip key={label} label={label} active={local.unitPriceMaxCents === (val === undefined ? undefined : val * 100)} onPress={() => set('unitPriceMaxCents', val === undefined ? undefined : val * 100)} />
             ))}
           </View>
 
@@ -816,7 +819,7 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   useFocusEffect(useCallback(() => { setLoading(true); load(); }, []));
 
   const handleAccept = (quote: Quote) => {
-    Alert.alert('Accept Quote', `Accept this quote for $${quote.unitPrice}/unit?`, [
+    Alert.alert('Accept Quote', `Accept this quote for ${formatCents(quote.unitPriceCents)}/unit?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Accept', onPress: () => acceptQuote(quote.id).then(load) },
     ]);
@@ -924,7 +927,7 @@ function QuoteRequestCard({ req, onView, onWithdraw }: { req: QuoteRequest; onVi
         <StatusBadge label={req.status.replace(/_/g, ' ')} variant={quoteRequestStatusVariant(req.status)} small />
       </View>
       {mfg && <Text style={qc.mfgName}>{mfg.name}</Text>}
-      <Text style={qc.details}>Qty: {req.quantity}{req.targetUnitPrice ? ` · Target: $${req.targetUnitPrice}/unit` : ''}</Text>
+      <Text style={qc.details}>Qty: {req.quantity}{req.targetUnitPriceCents ? ` · Target: ${formatCents(req.targetUnitPriceCents)}/unit` : ''}</Text>
       {req.submittedAt && <Text style={qc.date}>Submitted: {fmtDate(req.submittedAt)}</Text>}
       <View style={qc.actionRow}>
         <TouchableOpacity style={qc.btn} onPress={onView}>
@@ -951,7 +954,7 @@ function QuoteReceivedCard({ quote, canCompare, onAccept, onDecline, onCounter, 
         <StatusBadge label="Quote received" variant="success" small />
       </View>
       {mfg && <Text style={qc.mfgName}>{mfg.name}</Text>}
-      <Text style={qc.details}>Unit: ${quote.unitPrice} · Total: ~${quote.totalEstimate.toLocaleString()}</Text>
+      <Text style={qc.details}>Unit: {formatCents(quote.unitPriceCents)} · Total: ~{formatCents(quote.totalEstimateCents)}</Text>
       {quote.validUntil && <Text style={qc.date}>Expires: {fmtDate(quote.validUntil)}</Text>}
       <View style={[qc.actionRow, { flexWrap: 'wrap' }]}>
         <TouchableOpacity style={[qc.btn, qc.successBtn]} onPress={onAccept}>
@@ -1042,7 +1045,7 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
             {item.estimatedCompletionDate && (
               <Text style={smpCard.date}>Est: {fmtDate(item.estimatedCompletionDate)}</Text>
             )}
-            <Text style={smpCard.details}>Type: {item.type.replace(/_/g, ' ')} · Cost: ${item.cost}</Text>
+            <Text style={smpCard.details}>Type: {item.type.replace(/_/g, ' ')} · Cost: {formatCents(item.costCents)}</Text>
             <View style={smpCard.actionRow}>
               <TouchableOpacity style={smpCard.btn} onPress={() => router.push((`/sample-detail?id=${item.id}`) as never)}>
                 <Text style={smpCard.btnText}>Details</Text>
@@ -1154,7 +1157,7 @@ function ProductionTab({ router }: { router: ReturnType<typeof useRouter> }) {
             </Text>
 
             <Text style={prodCard.costs}>
-              Cost: ${order.totalCost.toLocaleString()} · Paid: ${order.depositAmount.toLocaleString()} · Remaining: ${order.remainingBalance.toLocaleString()}
+              Cost: {formatCents(order.totalCostCents)} · Paid: {formatCents(order.depositAmountCents)} · Remaining: {formatCents(order.remainingBalanceCents)}
             </Text>
 
             {/* Progress bar */}

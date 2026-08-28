@@ -33,11 +33,11 @@ import {
   BrandedLoadingState,
 } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
+import { formatCents, integerPercent, parseDecimalToCents } from '@/lib/money';
 
-function fmtCents(cents: number) { return '$' + (cents / 100).toFixed(2); }
-function parseDollars(s: string): number {
-  const n = parseFloat(s.replace(/[^0-9.]/g, ''));
-  return isNaN(n) ? 0 : Math.round(n * 100);
+function centsToDecimalInput(cents: number | undefined): string {
+  if (cents === undefined) return '';
+  return `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, '0')}`;
 }
 
 // ─── Main screen ──────────────────────────────────────────────────────────────
@@ -75,7 +75,7 @@ export default function ProductBundleEditScreen() {
       ?.then((b: any) => {
         setName(b.name ?? '');
         setDescription(b.description ?? '');
-        setPriceStr(b.bundlePriceCents ? (b.bundlePriceCents / 100).toFixed(2) : '');
+        setPriceStr(centsToDecimalInput(b.bundlePriceCents));
         setIsActive(b.status === 'active');
         setItems(b.items ?? []);
       })
@@ -95,7 +95,7 @@ export default function ProductBundleEditScreen() {
 
   // ── Computed totals ─────────────────────────────────────────────────────────
   const compareAtCents = items.reduce((sum, i) => sum + (i.priceCents ?? 0) * (i.quantity ?? 1), 0);
-  const bundlePriceCents = parseDollars(priceStr);
+  const bundlePriceCents = parseDecimalToCents(priceStr) ?? 0;
   const savings = compareAtCents - bundlePriceCents;
 
   // ── Picker: add/remove items ─────────────────────────────────────────────────
@@ -134,7 +134,11 @@ export default function ProductBundleEditScreen() {
   async function save() {
     const trimName = name.trim();
     if (!trimName) { Alert.alert('Name required'); return; }
-    if (bundlePriceCents <= 0) { Alert.alert('Valid price required'); return; }
+    const parsedBundlePriceCents = parseDecimalToCents(priceStr);
+    if (parsedBundlePriceCents === null || parsedBundlePriceCents <= 0) {
+      Alert.alert('Valid price required', 'Enter a price with up to two decimal places.');
+      return;
+    }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSaving(true);
@@ -143,7 +147,7 @@ export default function ProductBundleEditScreen() {
         const created = await (api as any).bundles.create({
           name:             trimName,
           description:      description.trim() || undefined,
-          bundlePriceCents,
+          bundlePriceCents:     parsedBundlePriceCents,
           compareAtCents:   0,
           images:           [],
         });
@@ -152,7 +156,7 @@ export default function ProductBundleEditScreen() {
         await (api as any).bundles.update(bundleId!, {
           name:             trimName,
           description:      description.trim() || undefined,
-          bundlePriceCents,
+          bundlePriceCents:     parsedBundlePriceCents,
           compareAtCents,
           status:           isActive ? 'active' : 'draft',
         });
@@ -231,9 +235,9 @@ export default function ProductBundleEditScreen() {
 
         {compareAtCents > 0 && bundlePriceCents > 0 && (
           <View style={s.savingsCard}>
-            <Text style={s.savingsLabel}>Individual total: {fmtCents(compareAtCents)}</Text>
+              <Text style={s.savingsLabel}>Individual total: {formatCents(compareAtCents)}</Text>
             {savings > 0
-              ? <Text style={s.savingsAmount}>Buyers save {fmtCents(savings)} ({Math.round(savings / compareAtCents * 100)}%)</Text>
+              ? <Text style={s.savingsAmount}>Buyers save {formatCents(savings)} ({integerPercent(savings, compareAtCents)}%)</Text>
               : <Text style={[s.savingsAmount, { color: RED }]}>Bundle should be cheaper than individual items</Text>
             }
           </View>
@@ -285,7 +289,7 @@ export default function ProductBundleEditScreen() {
               {(item.size || item.color) && (
                 <Text style={s.itemVariant}>{[item.size, item.color].filter(Boolean).join(' / ')}</Text>
               )}
-              <Text style={s.itemPrice}>{fmtCents(item.priceCents ?? 0)}</Text>
+              <Text style={s.itemPrice}>{formatCents(item.priceCents ?? 0)}</Text>
             </View>
             <TouchableOpacity onPress={() => removeItem(item.id)} style={s.removeBtn}>
               <Feather name="trash-2" size={14} color={RED} />
@@ -310,7 +314,7 @@ export default function ProductBundleEditScreen() {
                   activeOpacity={0.7}
                 >
                   <Text style={s.catalogName}>{p.name}</Text>
-                  <Text style={s.catalogPrice}>{fmtCents(p.variants?.[0]?.priceCents ?? 0)}</Text>
+                  <Text style={s.catalogPrice}>{formatCents(p.variants?.[0]?.priceCents ?? 0)}</Text>
                 </TouchableOpacity>
               ))
             )}

@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, ON_DARK,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK,
   SUCCESS, RED, ORANGE, GOLD,
   FONT, FS, SP, RADIUS, OVERLAY,
 } from '@/lib/theme';
@@ -282,7 +282,7 @@ const makeStyles = (theme: { accent: string }) => StyleSheet.create({
   createBtnText: { fontFamily: FONT.bold, fontSize: FS.base, color: ON_DARK },
   emojiTrigger: { alignItems: 'center', paddingVertical: SP.md, gap: 4 },
   emojiHint: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE },
-  labelInput: { borderWidth: 1, borderColor: BORDER_ACTIVE, borderRadius: RADIUS.md, padding: SP.md, color: FG, fontFamily: FONT.regular, fontSize: FS.base, marginBottom: SP.md },
+  labelInput: { borderWidth: 1, borderColor: theme.accent, borderRadius: RADIUS.md, padding: SP.md, color: FG, fontFamily: FONT.regular, fontSize: FS.base, marginBottom: SP.md },
   colorLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SP.sm },
   colorRow: { flexDirection: 'row', gap: 10, marginBottom: SP.lg },
   colorSwatch: { width: 32, height: 32, borderRadius: 16 },

@@ -1,128 +1,32 @@
-/**
- * Brandthread — Buyer Drop Detail
- * Shows a drop's products, countdown timer (if releaseAt is future), and seller info.
- */
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Image, Dimensions,
+  ActivityIndicator, Alert, Animated, Dimensions, Image, ScrollView,
+  StyleSheet, Text, TouchableOpacity, View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useApi } from '@/lib/api';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import * as Haptics from 'expo-haptics';
+import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  SUCCESS, SUCCESS_DIM, RED,
-  FONT, FS, SP, RADIUS,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK, ON_DARK_MUTED,
+  SUCCESS, RED, RED_DIM, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 
 const { width: W } = Dimensions.get('window');
-
-// ─── Countdown hook ───────────────────────────────────────────────────────────
+const HERO_H = Math.max(470, Math.min(590, W * 1.38));
 
 interface CountdownParts {
-  days: number; hours: number; minutes: number; seconds: number;
-  isLive: boolean; isPast: boolean;
+  days: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+  isLive: boolean;
 }
-
-function useCountdown(releaseAt?: string | null): CountdownParts {
-  function compute(): CountdownParts {
-    if (!releaseAt) return { days: 0, hours: 0, minutes: 0, seconds: 0, isLive: true, isPast: true };
-    const diff = new Date(releaseAt).getTime() - Date.now();
-    if (diff <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0, isLive: true, isPast: diff < -3600000 };
-    const total = Math.floor(diff / 1000);
-    return {
-      days:    Math.floor(total / 86400),
-      hours:   Math.floor((total % 86400) / 3600),
-      minutes: Math.floor((total % 3600) / 60),
-      seconds: total % 60,
-      isLive:  false,
-      isPast:  false,
-    };
-  }
-
-  const [parts, setParts] = useState<CountdownParts>(compute);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    setParts(compute());
-    if (releaseAt) {
-      intervalRef.current = setInterval(() => setParts(compute()), 1000);
-    }
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [releaseAt]);
-
-  return parts;
-}
-
-// ─── Countdown display ────────────────────────────────────────────────────────
-
-function CountdownBlock({ releaseAt, dropType }: { releaseAt?: string | null; dropType?: string }) {
-  const { theme } = useAppTheme();
-  const cd = makeCountdownStyles(theme);
-  const { days, hours, minutes, seconds, isLive, isPast } = useCountdown(releaseAt);
-
-  if (!releaseAt) return null;
-
-  if (isLive && !isPast) {
-    return (
-      <View style={[cd.container, { backgroundColor: `${SUCCESS}18`, borderColor: `${SUCCESS}40` }]}>
-        <View style={[cd.liveDot, { backgroundColor: SUCCESS }]} />
-        <Text style={[cd.liveText, { color: SUCCESS }]}>Live Now — Shop available</Text>
-      </View>
-    );
-  }
-
-  if (isPast) {
-    return (
-      <View style={[cd.container, { backgroundColor: `${MUTED}15`, borderColor: BORDER }]}>
-        <Text style={[cd.liveText, { color: MUTED }]}>Drop ended</Text>
-      </View>
-    );
-  }
-
-  const label = dropType === 'pre-made' ? 'Ships in' : 'Pre-order closes in';
-
-  return (
-    <View style={cd.container}>
-      <Text style={cd.label}>{label}</Text>
-      <View style={cd.timerRow}>
-        {[{ v: days, u: 'days' }, { v: hours, u: 'hrs' }, { v: minutes, u: 'min' }, { v: seconds, u: 'sec' }].map(({ v, u }) => (
-          <View key={u} style={cd.unit}>
-            <View style={cd.unitBox}>
-              <Text style={cd.unitNum}>{String(v).padStart(2, '0')}</Text>
-            </View>
-            <Text style={cd.unitLabel}>{u}</Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-const makeCountdownStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const PURPLE = theme.accent, PURPLE_DIM = theme.accentDim;
-  return StyleSheet.create({
-  container: {
-    borderRadius: RADIUS.lg, borderWidth: 1, borderColor: `${PURPLE}40`,
-    backgroundColor: PURPLE_DIM, padding: 16, marginHorizontal: 20, marginBottom: 16,
-  },
-  label: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, textAlign: 'center', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.8 },
-  timerRow: { flexDirection: 'row', justifyContent: 'center', gap: 10 },
-  unit: { alignItems: 'center', gap: 4, minWidth: 54 },
-  unitBox: { backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 10, paddingVertical: 8, minWidth: 54, alignItems: 'center' },
-  unitNum: { fontSize: 24, fontFamily: FONT.bold, color: PURPLE, letterSpacing: 1 },
-  unitLabel: { fontSize: 10, fontFamily: FONT.regular, color: MUTED, textTransform: 'uppercase' },
-  liveDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
-  liveText: { fontSize: FS.sm, fontFamily: FONT.semibold, textAlign: 'center' },
-  });
-};
-
-// ─── Product card ─────────────────────────────────────────────────────────────
 
 interface DropProduct {
   id: string;
@@ -133,48 +37,6 @@ interface DropProduct {
   isPreOrder?: boolean;
 }
 
-function ProductCard({ product, onPress }: { product: DropProduct; onPress: () => void }) {
-  const { theme } = useAppTheme();
-  const pc = makeProductCardStyles(theme);
-  const img = product.images?.[0];
-  return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.82} style={pc.card}>
-      <View style={pc.imgBox}>
-        {img ? (
-          <Image source={{ uri: img }} style={pc.img} resizeMode="cover" />
-        ) : (
-          <View style={[pc.img, pc.imgPlaceholder]}>
-            <Feather name="image" size={28} color={SUBTLE} />
-          </View>
-        )}
-        {product.isPreOrder && (
-          <View style={pc.badge}>
-            <Text style={pc.badgeText}>Pre-order</Text>
-          </View>
-        )}
-      </View>
-      <Text style={pc.name} numberOfLines={2}>{product.name}</Text>
-      {product.category && <Text style={pc.cat} numberOfLines={1}>{product.category}</Text>}
-    </TouchableOpacity>
-  );
-}
-
-const makeProductCardStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const PURPLE = theme.accent;
-  return StyleSheet.create({
-  card: { width: (W - 20 * 2 - 12) / 2, backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
-  imgBox: { position: 'relative' },
-  img: { width: '100%', height: (W - 20 * 2 - 12) / 2, backgroundColor: '#1a1a2a' },
-  imgPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  badge: { position: 'absolute', top: 8, left: 8, backgroundColor: `${PURPLE}E0`, borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 4 },
-  badgeText: { fontSize: 10, fontFamily: FONT.semibold, color: '#fff' },
-  name: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, paddingHorizontal: 10, paddingTop: 10, paddingBottom: 2 },
-  cat: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, paddingHorizontal: 10, paddingBottom: 10 },
-  });
-};
-
-// ─── Screen ───────────────────────────────────────────────────────────────────
-
 interface DropDetail {
   id: string;
   name: string;
@@ -183,175 +45,355 @@ interface DropDetail {
   releaseAt?: string | null;
   estimatedShipDate?: string | null;
   orderCount?: number;
-  mfgProgress?: number;
   createdAt: string;
   seller?: { displayName?: string; brandName?: string; verified?: boolean } | null;
   products?: DropProduct[];
 }
 
-export default function BuyerDropDetail() {
-  const colors = useColors();
-  const { theme } = useAppTheme();
-  const PURPLE = colors.primary, PURPLE_DIM = colors.accent;
-  const BORDER_ACTIVE = `${theme.accent}73`;
-  const s = makeStyles(theme);
-  const { dropId, dropName } = useLocalSearchParams<{ dropId: string; dropName?: string }>();
-  const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const api = useApi();
-
-  const [drop, setDrop] = useState<DropDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+function useCountdown(releaseAt?: string | null): CountdownParts {
+  const compute = (): CountdownParts => {
+    const difference = releaseAt ? new Date(releaseAt).getTime() - Date.now() : 0;
+    if (difference <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0, isLive: true };
+    const totalSeconds = Math.floor(difference / 1000);
+    return {
+      days: Math.floor(totalSeconds / 86400),
+      hours: Math.floor((totalSeconds % 86400) / 3600),
+      minutes: Math.floor((totalSeconds % 3600) / 60),
+      seconds: totalSeconds % 60,
+      isLive: false,
+    };
+  };
+  const [parts, setParts] = useState<CountdownParts>(compute);
 
   useEffect(() => {
-    if (!dropId) { setError('No drop ID provided.'); setLoading(false); return; }
-    api.publicDrops.get(dropId)
-      .then((data: any) => setDrop(data))
-      .catch(() => setError('Could not load this drop. It may no longer be active.'))
-      .finally(() => setLoading(false));
-  }, [dropId]);
+    setParts(compute());
+    const interval = setInterval(() => setParts(compute()), 1000);
+    return () => clearInterval(interval);
+  }, [releaseAt]);
 
-  const sellerName = drop?.seller?.brandName ?? drop?.seller?.displayName ?? 'Seller';
-  const products = drop?.products ?? [];
+  return parts;
+}
+
+function HeroVideo({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri, instance => {
+    instance.loop = true;
+    instance.muted = true;
+    instance.play();
+  });
+  return <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />;
+}
+
+function Countdown({ releaseAt }: { releaseAt?: string | null }) {
+  const { theme } = useAppTheme();
+  const { days, hours, minutes, seconds, isLive } = useCountdown(releaseAt);
+  const units = [
+    { label: 'DAYS', value: days },
+    { label: 'HOURS', value: hours },
+    { label: 'MIN', value: minutes },
+    { label: 'SEC', value: seconds },
+  ];
+
+  if (isLive) {
+    return (
+      <View style={styles.livePanel}>
+        <View style={styles.livePulse} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.liveTitle}>LIVE NOW</Text>
+          <Text style={styles.liveSub}>Limited release · while stock lasts</Text>
+        </View>
+        <Feather name="zap" size={22} color={ON_DARK} />
+      </View>
+    );
+  }
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
-          <Feather name="arrow-left" size={22} color={FG} />
-        </TouchableOpacity>
-        <Text style={s.title} numberOfLines={1}>{drop?.name ?? dropName ?? 'Drop'}</Text>
-        <View style={{ width: 40 }} />
+    <View>
+      <Text style={styles.eyebrow}>THE DROP OPENS IN</Text>
+      <View style={styles.timerRow}>
+        {units.map(unit => (
+          <View key={unit.label} style={styles.timerUnit}>
+            <Text style={styles.timerNumber}>{String(unit.value).padStart(2, '0')}</Text>
+            <Text style={styles.timerLabel}>{unit.label}</Text>
+          </View>
+        ))}
       </View>
-
-      {loading ? (
-        <View style={s.center}><ActivityIndicator color={PURPLE} /></View>
-      ) : error ? (
-        <View style={s.center}>
-          <Feather name="alert-circle" size={30} color={MUTED} style={{ marginBottom: 12 }} />
-          <Text style={s.errorText}>{error}</Text>
-        </View>
-      ) : drop ? (
-        <ScrollView
-          contentContainerStyle={[s.body, { paddingBottom: insets.bottom + 40 }]}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Seller + type row */}
-          <View style={s.metaRow}>
-            <View style={[s.avatar, { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE }]}>
-              <Text style={s.avatarText}>{sellerName.slice(0, 2).toUpperCase()}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={s.sellerName}>{sellerName}</Text>
-              <Text style={s.dropType}>{drop.type === 'pre-order' ? 'Pre-order drop' : 'Pre-made drop'}</Text>
-            </View>
-            {drop.seller?.verified && (
-              <View style={s.verifiedBadge}>
-                <Feather name="check" size={11} color={SUCCESS} />
-                <Text style={s.verifiedText}>Verified</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Stats row */}
-          <View style={s.statsRow}>
-            {drop.orderCount != null && (
-              <View style={s.stat}>
-                <Text style={s.statValue}>{drop.orderCount}</Text>
-                <Text style={s.statLabel}>orders</Text>
-              </View>
-            )}
-            {drop.mfgProgress != null && drop.mfgProgress > 0 && (
-              <View style={s.stat}>
-                <Text style={s.statValue}>{drop.mfgProgress}%</Text>
-                <Text style={s.statLabel}>production</Text>
-              </View>
-            )}
-            {products.length > 0 && (
-              <View style={s.stat}>
-                <Text style={s.statValue}>{products.length}</Text>
-                <Text style={s.statLabel}>{products.length === 1 ? 'item' : 'items'}</Text>
-              </View>
-            )}
-            {drop.estimatedShipDate && (
-              <View style={s.stat}>
-                <Text style={s.statValue} numberOfLines={1}>
-                  {new Date(drop.estimatedShipDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                </Text>
-                <Text style={s.statLabel}>est. ship</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Countdown timer */}
-          <CountdownBlock releaseAt={drop.releaseAt} dropType={drop.type} />
-
-          {/* Products section */}
-          {products.length > 0 ? (
-            <>
-              <Text style={s.sectionTitle}>Items in this drop</Text>
-              <View style={s.grid}>
-                {products.map(p => (
-                  <ProductCard
-                    key={p.id}
-                    product={p}
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      router.push((`/buyer-product-detail?productId=${p.id}&productName=${encodeURIComponent(p.name)}`) as never);
-                    }}
-                  />
-                ))}
-              </View>
-            </>
-          ) : (
-            <View style={s.emptyProducts}>
-              <Feather name="package" size={30} color={MUTED} style={{ marginBottom: 10 }} />
-              <Text style={s.emptyText}>Products for this drop haven't been listed yet.</Text>
-              <Text style={s.emptySubtext}>Check back closer to the release date.</Text>
-            </View>
-          )}
-        </ScrollView>
-      ) : null}
+      <View style={[styles.timerRule, { backgroundColor: theme.accent }]} />
     </View>
   );
 }
 
-const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
-  const PURPLE = theme.accent, PURPLE_DIM = theme.accentDim, BORDER_ACTIVE = `${theme.accent}73`;
-  return StyleSheet.create({
-  root:   { flex: 1, backgroundColor: BG },
-  header: {
-    height: 56, flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between', paddingHorizontal: SP.md,
-    borderBottomWidth: 1, borderBottomColor: BORDER,
-  },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  title:   { flex: 1, fontSize: FS.base, fontFamily: FONT.semibold, color: FG, textAlign: 'center' },
-  center:  { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl },
-  errorText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20 },
+function ProductTile({ product, onPress }: { product: DropProduct; onPress: () => void }) {
+  const imageUri = product.images?.find(Boolean);
+  return (
+    <TouchableOpacity style={styles.productTile} onPress={onPress} activeOpacity={0.86}>
+      <View style={styles.productMedia}>
+        {imageUri ? (
+          <Image source={{ uri: imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        ) : (
+          <View style={styles.productFallback}><Feather name="image" size={28} color={SUBTLE} /></View>
+        )}
+        <LinearGradient colors={['transparent', 'rgba(0,0,0,0.72)']} style={StyleSheet.absoluteFill} />
+        <View style={styles.productCaption}>
+          <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
+          <Text style={styles.productCategory}>{product.category ?? (product.isPreOrder ? 'PRE-ORDER' : 'LIMITED')}</Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
 
-  body: { paddingTop: SP.md },
+export default function BuyerDropDetail() {
+  const colors = useColors();
+  const { theme } = useAppTheme();
+  const { dropId, dropName } = useLocalSearchParams<{ dropId: string; dropName?: string }>();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const api = useApi();
+  const scrollRef = useRef<ScrollView>(null);
+  const entrance = useRef(new Animated.Value(0)).current;
 
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, marginBottom: 14 },
-  avatar:  { width: 44, height: 44, borderRadius: 22, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: FS.sm, fontFamily: FONT.bold, color: PURPLE },
-  sellerName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
-  dropType:   { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
-  verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: SUCCESS_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 4 },
-  verifiedText:  { fontSize: FS.xs, fontFamily: FONT.semibold, color: SUCCESS },
+  const [drop, setDrop] = useState<DropDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [subscribed, setSubscribed] = useState(false);
+  const [notifyLoading, setNotifyLoading] = useState(false);
 
-  statsRow: { flexDirection: 'row', justifyContent: 'center', gap: 0, marginBottom: 16, paddingHorizontal: 20 },
-  stat:     { flex: 1, alignItems: 'center', paddingVertical: 10, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, marginHorizontal: 3, borderRadius: RADIUS.sm },
-  statValue: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
-  statLabel: { fontSize: 10, fontFamily: FONT.regular, color: MUTED, textTransform: 'uppercase', marginTop: 2 },
+  useEffect(() => {
+    if (!dropId) {
+      setError('No drop ID provided.');
+      setLoading(false);
+      return;
+    }
+    Promise.all([
+      api.publicDrops.get(dropId),
+      api.publicDrops.notificationStatus(dropId).catch(() => ({ subscribed: false })),
+    ]).then(([data, notification]) => {
+      setDrop(data as DropDetail);
+      setSubscribed(notification.subscribed);
+      Animated.timing(entrance, { toValue: 1, duration: 650, useNativeDriver: true }).start();
+    }).catch(() => setError('Could not load this drop. It may no longer be active.'))
+      .finally(() => setLoading(false));
+  }, [dropId]);
 
-  sectionTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, paddingHorizontal: 20, marginBottom: 12 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 20, gap: 12 },
+  const countdown = useCountdown(drop?.releaseAt);
+  const products = drop?.products ?? [];
+  const sellerName = drop?.seller?.brandName ?? drop?.seller?.displayName ?? 'Independent brand';
+  const heroUri = products.flatMap(product => product.images ?? []).find(Boolean);
+  const heroIsVideo = !!heroUri && /\.(mp4|mov|m4v|webm)(\?|$)/i.test(heroUri);
 
-  emptyProducts: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 40 },
-  emptyText:    { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, textAlign: 'center', marginBottom: 6 },
-  emptySubtext: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', lineHeight: 18 },
-  });
-};
+  async function toggleNotification() {
+    if (!dropId || notifyLoading) return;
+    setNotifyLoading(true);
+    try {
+      const result = subscribed
+        ? await api.publicDrops.unsubscribe(dropId)
+        : await api.publicDrops.subscribe(dropId);
+      setSubscribed(result.subscribed);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      Alert.alert('Sign in to get drop alerts', 'Create or sign in to your buyer account, then tap Notify me again.');
+    } finally {
+      setNotifyLoading(false);
+    }
+  }
+
+  if (loading) {
+    return <View style={styles.center}><ActivityIndicator color={colors.primary} size="large" /></View>;
+  }
+  if (error || !drop) {
+    return (
+      <View style={[styles.center, { paddingTop: insets.top }]}>
+        <Feather name="alert-circle" size={34} color={MUTED} />
+        <Text style={styles.errorText}>{error ?? 'Drop unavailable.'}</Text>
+        <TouchableOpacity style={styles.errorBack} onPress={() => router.back()}>
+          <Text style={styles.errorBackText}>Go back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.root}>
+      <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 48 }}>
+        <View style={styles.hero}>
+          {heroUri ? (
+            heroIsVideo ? <HeroVideo uri={heroUri} /> : <Image source={{ uri: heroUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          ) : (
+            <LinearGradient colors={['#23202A', '#050506']} style={StyleSheet.absoluteFill} />
+          )}
+          <LinearGradient colors={['rgba(0,0,0,0.18)', 'rgba(0,0,0,0.20)', 'rgba(0,0,0,0.96)']} locations={[0, 0.42, 1]} style={StyleSheet.absoluteFill} />
+
+          <View style={[styles.heroHeader, { paddingTop: insets.top + SP.sm }]}>
+            <TouchableOpacity style={styles.roundButton} onPress={() => router.back()} accessibilityLabel="Go back">
+              <Feather name="arrow-left" size={21} color={ON_DARK} />
+            </TouchableOpacity>
+            <View style={styles.heroBadge}>
+              <Text style={styles.heroBadgeText}>{countdown.isLive ? 'LIVE DROP' : 'UPCOMING'}</Text>
+            </View>
+            <TouchableOpacity style={styles.roundButton} onPress={toggleNotification} accessibilityLabel="Toggle drop alert">
+              <Feather name={subscribed ? 'bell-off' : 'bell'} size={19} color={ON_DARK} />
+            </TouchableOpacity>
+          </View>
+
+          <Animated.View
+            style={[
+              styles.heroCopy,
+              { opacity: entrance, transform: [{ translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }] },
+            ]}
+          >
+            <View style={styles.brandRow}>
+              <View style={[styles.brandMark, { borderColor: `${theme.accent}AA` }]}>
+                <Text style={styles.brandInitials}>{sellerName.slice(0, 2).toUpperCase()}</Text>
+              </View>
+              <View>
+                <View style={styles.brandNameRow}>
+                  <Text style={styles.brandName}>{sellerName}</Text>
+                  {drop.seller?.verified && <Feather name="check-circle" size={14} color={theme.secondary} />}
+                </View>
+                <Text style={styles.dropType}>{drop.type === 'pre-order' ? 'PRE-ORDER EDITION' : 'READY TO SHIP'}</Text>
+              </View>
+            </View>
+
+            <Text style={styles.dropName}>{drop.name ?? dropName}</Text>
+            <Countdown releaseAt={drop.releaseAt} />
+
+            <View style={styles.actionRow}>
+              {!countdown.isLive ? (
+                <TouchableOpacity
+                  style={[styles.primaryButton, { backgroundColor: subscribed ? CARD : theme.accent }]}
+                  onPress={toggleNotification}
+                  disabled={notifyLoading}
+                  testID="drop-notify-button"
+                >
+                  {notifyLoading ? <ActivityIndicator color={ON_DARK} /> : (
+                    <>
+                      <Feather name={subscribed ? 'check' : 'bell'} size={18} color={ON_DARK} />
+                      <Text style={styles.primaryButtonText}>{subscribed ? 'You’ll be notified' : 'Notify me'}</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.primaryButton, { backgroundColor: RED }]}
+                  onPress={() => scrollRef.current?.scrollTo({ y: HERO_H - 24, animated: true })}
+                  testID="shop-live-drop-button"
+                >
+                  <Feather name="shopping-bag" size={18} color={ON_DARK} />
+                  <Text style={styles.primaryButtonText}>Shop the drop</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </Animated.View>
+        </View>
+
+        <View style={styles.content}>
+          <View style={styles.releaseMeta}>
+            <View>
+              <Text style={styles.metaLabel}>RELEASE</Text>
+              <Text style={styles.metaValue}>
+                {drop.releaseAt ? new Date(drop.releaseAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Available now'}
+              </Text>
+            </View>
+            <View style={styles.metaDivider} />
+            <View>
+              <Text style={styles.metaLabel}>EST. SHIP</Text>
+              <Text style={styles.metaValue}>
+                {drop.estimatedShipDate ? new Date(drop.estimatedShipDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Shown at checkout'}
+              </Text>
+            </View>
+            {!!drop.orderCount && (
+              <>
+                <View style={styles.metaDivider} />
+                <View>
+                  <Text style={styles.metaLabel}>ORDERS</Text>
+                  <Text style={styles.metaValue}>{drop.orderCount}</Text>
+                </View>
+              </>
+            )}
+          </View>
+
+          <View style={styles.collectionHeader}>
+            <View>
+              <Text style={styles.collectionEyebrow}>{countdown.isLive ? 'AVAILABLE NOW' : 'PREVIEW THE COLLECTION'}</Text>
+              <Text style={styles.collectionTitle}>{products.length} {products.length === 1 ? 'piece' : 'pieces'}</Text>
+            </View>
+            {countdown.isLive && <View style={styles.stockPill}><View style={styles.stockDot} /><Text style={styles.stockText}>LIMITED</Text></View>}
+          </View>
+
+          {products.length ? (
+            <View style={styles.grid}>
+              {products.map(product => (
+                <ProductTile
+                  key={product.id}
+                  product={product}
+                  onPress={() => router.push((`/buyer-product-detail?productId=${product.id}&productName=${encodeURIComponent(product.name)}`) as never)}
+                />
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyProducts}>
+              <Feather name="package" size={32} color={MUTED} />
+              <Text style={styles.emptyTitle}>The reveal is coming</Text>
+              <Text style={styles.emptyText}>Products will appear here as the brand unveils this drop.</Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: BG },
+  center: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl, gap: SP.md },
+  errorText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center' },
+  errorBack: { borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.pill, paddingHorizontal: SP.lg, paddingVertical: SP.sm },
+  errorBackText: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
+  hero: { height: HERO_H, backgroundColor: CARD, position: 'relative', justifyContent: 'flex-end' },
+  heroHeader: { position: 'absolute', top: 0, left: SP.md, right: SP.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', zIndex: 2 },
+  roundButton: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(0,0,0,0.48)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  heroBadge: { backgroundColor: 'rgba(0,0,0,0.58)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', borderRadius: RADIUS.pill, paddingHorizontal: 13, paddingVertical: 7 },
+  heroBadgeText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 10, letterSpacing: 1.5 },
+  heroCopy: { padding: 20, paddingBottom: 28 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: SP.md },
+  brandMark: { width: 38, height: 38, borderRadius: 19, borderWidth: 1.5, backgroundColor: 'rgba(0,0,0,0.62)', alignItems: 'center', justifyContent: 'center' },
+  brandInitials: { color: ON_DARK, fontFamily: FONT.bold, fontSize: 11 },
+  brandNameRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  brandName: { color: ON_DARK, fontFamily: FONT.semibold, fontSize: FS.sm },
+  dropType: { color: ON_DARK_MUTED, fontFamily: FONT.medium, fontSize: 9, letterSpacing: 1.2, marginTop: 2 },
+  dropName: { color: ON_DARK, fontFamily: FONT.extrabold, fontSize: 39, lineHeight: 41, letterSpacing: -1.5, marginBottom: SP.lg, maxWidth: W - 40 },
+  eyebrow: { color: ON_DARK_MUTED, fontFamily: FONT.semibold, fontSize: 10, letterSpacing: 1.7, marginBottom: 9 },
+  timerRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  timerUnit: { minWidth: 58 },
+  timerNumber: { color: ON_DARK, fontFamily: FONT.light, fontSize: 42, lineHeight: 48, letterSpacing: -1.8, fontVariant: ['tabular-nums'] },
+  timerLabel: { color: ON_DARK_MUTED, fontFamily: FONT.semibold, fontSize: 8, letterSpacing: 1.25 },
+  timerRule: { height: 2, marginTop: 13, width: 58 },
+  livePanel: { backgroundColor: RED_DIM, borderWidth: 1, borderColor: `${RED}66`, borderRadius: RADIUS.md, flexDirection: 'row', alignItems: 'center', gap: 10, padding: 13 },
+  livePulse: { width: 10, height: 10, borderRadius: 5, backgroundColor: RED },
+  liveTitle: { color: ON_DARK, fontFamily: FONT.extrabold, fontSize: FS.md, letterSpacing: 1.3 },
+  liveSub: { color: ON_DARK_MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 2 },
+  actionRow: { flexDirection: 'row', marginTop: SP.lg },
+  primaryButton: { flex: 1, minHeight: 52, borderRadius: RADIUS.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9 },
+  primaryButtonText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.base },
+  content: { paddingTop: SP.lg },
+  releaseMeta: { marginHorizontal: SP.md, paddingBottom: SP.lg, flexDirection: 'row', alignItems: 'center', gap: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
+  metaLabel: { color: SUBTLE, fontFamily: FONT.semibold, fontSize: 9, letterSpacing: 1.2, marginBottom: 4 },
+  metaValue: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
+  metaDivider: { width: 1, height: 30, backgroundColor: BORDER },
+  collectionHeader: { paddingHorizontal: SP.md, paddingTop: SP.xl, paddingBottom: SP.md, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  collectionEyebrow: { color: SUBTLE, fontFamily: FONT.semibold, fontSize: 9, letterSpacing: 1.4 },
+  collectionTitle: { color: FG, fontFamily: FONT.bold, fontSize: FS.xxl, marginTop: 4, letterSpacing: -0.5 },
+  stockPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, paddingVertical: 6, borderRadius: RADIUS.pill, backgroundColor: RED_DIM },
+  stockDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: RED },
+  stockText: { color: RED, fontFamily: FONT.bold, fontSize: 9, letterSpacing: 1 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: SP.md },
+  productTile: { width: (W - SP.md * 2 - 10) / 2, borderRadius: RADIUS.sm, overflow: 'hidden', backgroundColor: CARD },
+  productMedia: { height: (W - SP.md * 2 - 10) * 0.68, justifyContent: 'flex-end' },
+  productFallback: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: CARD },
+  productCaption: { padding: 11 },
+  productName: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.sm, lineHeight: 17 },
+  productCategory: { color: ON_DARK_MUTED, fontFamily: FONT.semibold, fontSize: 8, letterSpacing: 1.1, marginTop: 5 },
+  emptyProducts: { margin: SP.md, padding: SP.xl, borderRadius: RADIUS.lg, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', gap: SP.sm },
+  emptyTitle: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
+  emptyText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 20 },
+});

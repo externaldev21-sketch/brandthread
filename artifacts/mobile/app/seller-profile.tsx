@@ -24,6 +24,7 @@ import type { SellerPost } from '@/services/types';
 import type { Product } from '@/services/productTypes';
 import { useApi } from '@/hooks/useApi';
 import { useColors } from '@/hooks/useColors';
+import { formatCents } from '@/lib/money';
 
 // ─── Design Tokens ─────────────────────────────────────────────────────────────
 const BG        = '#07070F';
@@ -31,9 +32,6 @@ const CARD      = '#12121F';
 const BORDER    = 'rgba(255,255,255,0.07)';
 const FG        = '#F4F4FF';
 const MUTED     = 'rgba(244,244,255,0.50)';
-const GREEN     = '#8B5CF6';
-const GREEN_DIM = 'rgba(139,92,246,0.18)';
-const PURPLE    = '#8B5CF6';
 const BLUE      = '#3B82F6';
 const ORANGE    = '#F97316';
 const ERR       = '#F87171';
@@ -87,7 +85,7 @@ function mapApiPost(post: any): SellerPost {
     productTags: (post.taggedProducts ?? []).map((tag: any) => ({
       productId: tag.productId,
       productName: tag.name ?? 'Product',
-      price: 0,
+      priceCents: typeof tag.priceCents === 'number' ? tag.priceCents : 0,
     })),
     visibility: { isPublic: true, allowComments: true, allowReposts: true, showLikeCount: true },
     isPinned: false,
@@ -136,7 +134,12 @@ function mapApiProfile(profile: any, postsCount = 0, productsCount = 0): import(
     totalLikes: Number(profile.totalLikes ?? 0),
     productCount: productsCount,
     postCount: postsCount,
+    vacationMode: Boolean(profile.vacationMode),
+    vacationMessage: profile.vacationMessage ?? undefined,
     createdAt: new Date().toISOString(),
+  } as import('@/services/types').SellerProfile & {
+    vacationMode: boolean;
+    vacationMessage?: string;
   };
 }
 
@@ -150,6 +153,9 @@ interface PostTileProps {
 }
 
 function PostTile({ post, index, isOwner, onPress }: PostTileProps) {
+  const colorsTheme = useColors();
+  const styles = React.useMemo(() => createStyles(colorsTheme), [colorsTheme]);
+  const GREEN = colorsTheme.primary;
   const colors = GRADIENT_PAIRS[index % GRADIENT_PAIRS.length];
   const icon = typeIcon(post.type);
   const views = post.analytics?.views;
@@ -198,6 +204,9 @@ function PostTile({ post, index, isOwner, onPress }: PostTileProps) {
 // ─── Create Post Tile ──────────────────────────────────────────────────────────
 
 function CreatePostTile({ onPress }: { onPress: () => void }) {
+  const colorsTheme = useColors();
+  const styles = React.useMemo(() => createStyles(colorsTheme), [colorsTheme]);
+  const GREEN = colorsTheme.primary;
   return (
     <TouchableOpacity
       style={[styles.postTile, styles.createTile, { width: TILE_SIZE, height: TILE_SIZE }]}
@@ -219,6 +228,11 @@ interface ProductCardProps {
 }
 
 function ProductCard({ product, index, onPress }: ProductCardProps) {
+  const colorsTheme = useColors();
+  const styles = React.useMemo(() => createStyles(colorsTheme), [colorsTheme]);
+  const GREEN = colorsTheme.primary;
+  const GREEN_DIM = colorsTheme.accent;
+  const PURPLE = colorsTheme.primary;
   const gradColors = GRADIENT_PAIRS[index % GRADIENT_PAIRS.length];
   const totalInventory = product.inventory.totalStock;
   const lowStockThreshold = product.inventory.lowStockThreshold;
@@ -268,9 +282,9 @@ function ProductCard({ product, index, onPress }: ProductCardProps) {
       <View style={styles.productInfo}>
         <Text style={styles.productName} numberOfLines={2}>{product.name}</Text>
         <View style={styles.productPriceRow}>
-          <Text style={styles.productPrice}>${product.pricing.price.toFixed(2)}</Text>
-          {product.pricing.compareAtPrice != null && (
-            <Text style={styles.productCompare}>${product.pricing.compareAtPrice.toFixed(2)}</Text>
+          <Text style={styles.productPrice}>{formatCents(product.pricing.priceCents)}</Text>
+          {product.pricing.compareAtPriceCents != null && (
+            <Text style={styles.productCompare}>{formatCents(product.pricing.compareAtPriceCents)}</Text>
           )}
         </View>
         <View style={styles.productBadgeRow}>
@@ -289,6 +303,8 @@ function ProductCard({ product, index, onPress }: ProductCardProps) {
 // ─── Empty State ───────────────────────────────────────────────────────────────
 
 function EmptyState({ icon, title, subtitle }: { icon: keyof typeof Feather.glyphMap; title: string; subtitle?: string }) {
+  const colorsTheme = useColors();
+  const styles = React.useMemo(() => createStyles(colorsTheme), [colorsTheme]);
   return (
     <View style={styles.emptyState}>
       <Feather name={icon} size={48} color={MUTED} />
@@ -301,6 +317,8 @@ function EmptyState({ icon, title, subtitle }: { icon: keyof typeof Feather.glyp
 // ─── Main Screen ───────────────────────────────────────────────────────────────
 
 export default function SellerProfileScreen() {
+  const colorsTheme = useColors();
+  const styles = React.useMemo(() => createStyles(colorsTheme), [colorsTheme]);
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -395,6 +413,13 @@ export default function SellerProfileScreen() {
   }, [profile.username]);
 
   const handleMessageSeller = useCallback(() => {
+    if ((profile as any).vacationMode) {
+      Alert.alert(
+        'Seller is away',
+        (profile as any).vacationMessage ?? 'This seller is currently away and is not accepting new messages.',
+      );
+      return;
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const sellerId = params.id ?? profile.sellerId;
     router.push((
@@ -598,6 +623,18 @@ export default function SellerProfileScreen() {
 
           {/* Username */}
           <Text style={styles.username}>@{profile.username}</Text>
+
+          {!isOwner && (profile as any).vacationMode && (
+            <View style={styles.vacationBanner}>
+              <Feather name="sun" size={16} color={ORANGE} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.vacationTitle}>This seller is away</Text>
+                <Text style={styles.vacationText}>
+                  {(profile as any).vacationMessage ?? 'Purchases and new messages are paused for now.'}
+                </Text>
+              </View>
+            </View>
+          )}
 
           {/* Bio */}
           <Text style={styles.bio}>
@@ -916,6 +953,8 @@ interface ActionRowProps {
 }
 
 function ActionRow({ icon, label, color = FG, onPress }: ActionRowProps) {
+  const colorsTheme = useColors();
+  const styles = React.useMemo(() => createStyles(colorsTheme), [colorsTheme]);
   return (
     <TouchableOpacity style={styles.actionRow} onPress={onPress} activeOpacity={0.7}>
       <Feather name={icon} size={18} color={color} />
@@ -927,7 +966,7 @@ function ActionRow({ icon, label, color = FG, onPress }: ActionRowProps) {
 
 // ─── Styles ────────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const createStyles = (colorsTheme: ReturnType<typeof useColors>) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: BG,
@@ -980,7 +1019,7 @@ const styles = StyleSheet.create({
   },
   verifiedRing: {
     borderWidth: 1.5,
-    borderColor: GREEN,
+    borderColor: colorsTheme.primary,
     borderRadius: 40,
     padding: 2,
   },
@@ -1034,16 +1073,16 @@ const styles = StyleSheet.create({
   },
   followBtn: {
     borderWidth: 1,
-    borderColor: GREEN,
+    borderColor: colorsTheme.primary,
     borderRadius: 20,
     paddingHorizontal: 18,
     paddingVertical: 7,
   },
   followingBtn: {
-    backgroundColor: GREEN,
+    backgroundColor: colorsTheme.primary,
   },
   followBtnText: {
-    color: GREEN,
+    color: colorsTheme.primary,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -1075,6 +1114,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 8,
   },
+  vacationBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+    marginTop: 8, borderWidth: 1, borderColor: `${ORANGE}66`,
+    backgroundColor: `${ORANGE}12`, borderRadius: 12, padding: 12,
+  },
+  vacationTitle: { color: ORANGE, fontWeight: '700', fontSize: 13, marginBottom: 3 },
+  vacationText: { color: FG, fontSize: 12, lineHeight: 18 },
   bio: {
     color: FG,
     fontSize: 14,
@@ -1092,7 +1138,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   websiteText: {
-    color: GREEN,
+    color: colorsTheme.primary,
     fontSize: 13,
   },
   locationText: {
@@ -1194,7 +1240,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 2,
-    backgroundColor: GREEN,
+    backgroundColor: colorsTheme.primary,
     borderRadius: 1,
   },
 
@@ -1321,7 +1367,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   productPrice: {
-    color: GREEN,
+    color: colorsTheme.primary,
     fontSize: 14,
     fontWeight: '700',
   },

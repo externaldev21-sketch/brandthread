@@ -576,214 +576,45 @@ export const COLOR_PRESETS: { label: string; colors: StoreColorPalette }[] = [
   { label: 'Obsidian', colors: { primary: '#2d2d2d', secondary: '#1a1a1a', accent: '#c9a96e', background: '#080808', text: '#f4f4f4', buttonText: '#080808' } },
 ];
 
+export const THREAD_THEME_ID = 'thread';
+export const THREAD_THEME_NAME = 'Thread Theme';
+export const THREAD_THEME_LIGHT_PALETTE: StoreColorPalette = {
+  primary: '#111111',
+  secondary: '#6B6B6B',
+  accent: '#2B2B2B',
+  background: '#F7F7F5',
+  text: '#111111',
+  buttonText: '#F7F7F5',
+};
+export const THREAD_THEME_DARK_PALETTE: StoreColorPalette = {
+  primary: '#F5F5F3',
+  secondary: '#A7A7A3',
+  accent: '#D7D7D2',
+  background: '#0B0B0B',
+  text: '#F5F5F3',
+  buttonText: '#0B0B0B',
+};
+
+/**
+ * Thread Theme is the only Brandthread starting template. Personalization
+ * tools may change imagery, copy, and sections, but never the grayscale system.
+ */
 export const BUILTIN_THEMES: StoreTheme[] = [
   {
-    id: 'street', name: 'Street', category: 'streetwear',
-    description: 'Raw energy meets polished execution. Built for brands that live on the block.',
-    bestFor: 'Streetwear, urban, hype', supportedModes: ['dark', 'light'],
-    previewColor: '#1a1a1a', accentColor: '#ff0054', defaultTypography: 'bold',
-    supportedSections: ['hero_video', 'hero_image', 'product_grid', 'drop_countdown', 'seller_posts', 'featured_collection', 'customer_reviews', 'announcement', 'newsletter'],
-    tags: ['streetwear', 'urban', 'hype', 'bold'],
+    id: THREAD_THEME_ID,
+    name: THREAD_THEME_NAME,
+    category: 'editorial',
+    description: 'An original Brandthread storefront system where the garment, image, and point of view do the talking.',
+    bestFor: 'Independent fashion labels, elevated essentials, and image-led collections',
+    supportedModes: ['light', 'dark'],
+    previewColor: THREAD_THEME_LIGHT_PALETTE.background,
+    accentColor: THREAD_THEME_LIGHT_PALETTE.primary,
+    defaultTypography: 'editorial',
+    supportedSections: ['hero_image', 'product_grid', 'featured_collection', 'brand_story', 'lookbook', 'seller_posts', 'customer_reviews', 'newsletter'],
+    tags: ['brandthread', 'editorial', 'monochrome', 'fashion', 'minimal'],
     presets: [
-      { paletteId: 'dark', label: 'Dark', colors: { primary: '#1a1a1a', secondary: '#2d2d2d', accent: '#ff0054', background: '#080808', text: '#f4f4f4', buttonText: '#ffffff' } },
-      { paletteId: 'light', label: 'Light', colors: { primary: '#f4f4f4', secondary: '#e0e0e0', accent: '#ff0054', background: '#ffffff', text: '#1a1a1a', buttonText: '#ffffff' } },
-    ],
-  },
-  {
-    id: 'noir', name: 'Noir', category: 'luxury',
-    description: 'Absolute darkness. Maximum drama. For brands that demand attention.',
-    bestFor: 'High fashion, exclusive drops, editorial', supportedModes: ['dark'],
-    previewColor: '#0a0a0a', accentColor: '#c9a96e', defaultTypography: 'luxury',
-    supportedSections: ['hero_image', 'hero_video', 'featured_product', 'brand_story', 'lookbook', 'drop_countdown', 'seller_posts', 'customer_reviews'],
-    tags: ['luxury', 'dark', 'editorial', 'exclusive'],
-    presets: [
-      { paletteId: 'noir', label: 'Noir', colors: { primary: '#c9a96e', secondary: '#8b7355', accent: '#f0e6d0', background: '#050505', text: '#f0e6d0', buttonText: '#050505' } },
-    ],
-  },
-  {
-    id: 'canvas', name: 'Canvas', category: 'minimal',
-    description: 'Let your product speak. Nothing between your work and the customer.',
-    bestFor: 'Minimal, basics, clean aesthetics', supportedModes: ['light', 'dark'],
-    previewColor: '#f9f4ec', accentColor: '#2c1810', defaultTypography: 'minimal',
-    supportedSections: ['hero_image', 'product_grid', 'featured_collection', 'image_with_text', 'brand_story', 'newsletter', 'customer_reviews'],
-    tags: ['minimal', 'clean', 'basics', 'neutral'],
-    presets: [
-      { paletteId: 'linen', label: 'Linen', colors: { primary: '#e8dcc8', secondary: '#c4a882', accent: '#2c1810', background: '#f9f4ec', text: '#2c1810', buttonText: '#f9f4ec' } },
-      { paletteId: 'white', label: 'White', colors: { primary: '#1a1a1a', secondary: '#4a4a4a', accent: '#c9a96e', background: '#ffffff', text: '#1a1a1a', buttonText: '#ffffff' } },
-    ],
-  },
-  {
-    id: 'muse', name: 'Muse', category: 'editorial',
-    description: 'Fashion meets art. For brands that inspire as much as they sell.',
-    bestFor: 'Editorial, artistic, lookbook-driven', supportedModes: ['light', 'dark', 'auto'],
-    previewColor: '#f5f0eb', accentColor: '#8b4513', defaultTypography: 'editorial',
-    supportedSections: ['hero_image', 'lookbook', 'brand_story', 'featured_product', 'image_with_text', 'seller_posts', 'customer_reviews', 'newsletter'],
-    tags: ['editorial', 'artistic', 'lookbook', 'premium'],
-    presets: [
-      { paletteId: 'cream', label: 'Cream', colors: { primary: '#2c2c2c', secondary: '#5a4a3a', accent: '#c4956a', background: '#f5f0eb', text: '#1a1a1a', buttonText: '#f5f0eb' } },
-      { paletteId: 'ink', label: 'Ink', colors: { primary: '#e8e0d0', secondary: '#a0927c', accent: '#d4a96e', background: '#0e0a06', text: '#e8e0d0', buttonText: '#0e0a06' } },
-    ],
-  },
-  {
-    id: 'tokyo', name: 'Tokyo', category: 'experimental',
-    description: 'High-voltage style from the future. Neon energy, razor precision.',
-    bestFor: 'Y2K, techwear, futuristic, loud', supportedModes: ['dark'],
-    previewColor: '#0d0d0d', accentColor: '#ff0054', defaultTypography: 'technical',
-    supportedSections: ['hero_video', 'hero_slideshow', 'drop_countdown', 'product_grid', 'featured_collection', 'seller_posts', 'announcement', 'newsletter'],
-    tags: ['y2k', 'futuristic', 'neon', 'techwear'],
-    presets: [
-      { paletteId: 'neon', label: 'Neon', colors: { primary: '#ff0054', secondary: '#ff5400', accent: '#00f5ff', background: '#0d0d0d', text: '#ffffff', buttonText: '#0d0d0d' } },
-    ],
-  },
-  {
-    id: 'gallery', name: 'Gallery', category: 'editorial',
-    description: 'White space is the design. Product photography takes center stage.',
-    bestFor: 'Contemporary, high-end photography, lookbooks', supportedModes: ['light'],
-    previewColor: '#ffffff', accentColor: '#1a1a1a', defaultTypography: 'minimal',
-    supportedSections: ['hero_image', 'lookbook', 'product_grid', 'image_with_text', 'featured_product', 'brand_story', 'customer_reviews'],
-    tags: ['gallery', 'white', 'photography', 'contemporary'],
-    presets: [
-      { paletteId: 'white', label: 'White', colors: { primary: '#1a1a1a', secondary: '#666666', accent: '#1a1a1a', background: '#ffffff', text: '#1a1a1a', buttonText: '#ffffff' } },
-    ],
-  },
-  {
-    id: 'motion', name: 'Motion', category: 'modern',
-    description: 'Built for brands that move. Dynamic layouts that flow with the scroll.',
-    bestFor: 'Sportswear, activewear, outdoor brands', supportedModes: ['dark', 'light'],
-    previewColor: '#001a3a', accentColor: '#ffd700', defaultTypography: 'bold',
-    supportedSections: ['hero_video', 'hero_slideshow', 'product_grid', 'featured_collection', 'drop_countdown', 'customer_reviews', 'seller_posts', 'newsletter'],
-    tags: ['sportswear', 'active', 'outdoor', 'dynamic'],
-    presets: [
-      { paletteId: 'cobalt', label: 'Cobalt', colors: { primary: '#003f8a', secondary: '#0066cc', accent: '#ffd700', background: '#001a3a', text: '#f0f4ff', buttonText: '#001a3a' } },
-      { paletteId: 'onyx', label: 'Onyx', colors: { primary: '#2d2d2d', secondary: '#4a4a4a', accent: '#00e5ff', background: '#0a0a0a', text: '#f4f4f4', buttonText: '#0a0a0a' } },
-    ],
-  },
-  {
-    id: 'archive', name: 'Archive', category: 'streetwear',
-    description: 'The archive aesthetic. Reference culture lives here.',
-    bestFor: 'Vintage, archive, reference-heavy streetwear', supportedModes: ['dark', 'light'],
-    previewColor: '#1a1a0e', accentColor: '#c8b560', defaultTypography: 'classic',
-    supportedSections: ['hero_image', 'product_grid', 'featured_collection', 'brand_story', 'lookbook', 'customer_reviews', 'newsletter'],
-    tags: ['vintage', 'archive', 'classic', 'reference'],
-    presets: [
-      { paletteId: 'olive', label: 'Olive', colors: { primary: '#4a4a1e', secondary: '#6b6b30', accent: '#c8b560', background: '#0e0e06', text: '#f0ecd4', buttonText: '#0e0e06' } },
-      { paletteId: 'natural', label: 'Natural', colors: { primary: '#3d2b1f', secondary: '#6b4c35', accent: '#c4956a', background: '#f5ece0', text: '#1a0f0a', buttonText: '#f5ece0' } },
-    ],
-  },
-  {
-    id: 'vertex', name: 'Vertex', category: 'modern',
-    description: 'Sharp angles, modern grid, technical precision. The brand architect\'s choice.',
-    bestFor: 'Contemporary, techwear, brand-focused', supportedModes: ['dark', 'light'],
-    previewColor: '#0f0f1a', accentColor: '#7c3aed', defaultTypography: 'technical',
-    supportedSections: ['hero_image', 'hero_video', 'product_grid', 'featured_collection', 'drop_countdown', 'brand_story', 'announcement', 'newsletter'],
-    tags: ['technical', 'modern', 'grid', 'sharp'],
-    presets: [
-      { paletteId: 'violet', label: 'Violet', colors: { primary: '#7c3aed', secondary: '#5b21b6', accent: '#a78bfa', background: '#0f0f1a', text: '#f4f4ff', buttonText: '#0f0f1a' } },
-      { paletteId: 'chrome', label: 'Chrome', colors: { primary: '#c0c0c0', secondary: '#808080', accent: '#ffffff', background: '#0a0a0a', text: '#f4f4f4', buttonText: '#0a0a0a' } },
-    ],
-  },
-  {
-    id: 'luxe', name: 'Luxe', category: 'luxury',
-    description: 'For the rare few. Materials, tailoring, legacy — communicated before a word is read.',
-    bestFor: 'Ultra-premium, luxury ready-to-wear, couture-adjacent', supportedModes: ['dark', 'light'],
-    previewColor: '#0a0806', accentColor: '#c9a96e', defaultTypography: 'luxury',
-    supportedSections: ['hero_image', 'featured_product', 'lookbook', 'brand_story', 'image_with_text', 'customer_reviews', 'newsletter'],
-    tags: ['luxury', 'premium', 'couture', 'gold'],
-    presets: [
-      { paletteId: 'gold', label: 'Gold', colors: { primary: '#c9a96e', secondary: '#8b7355', accent: '#f0ddb0', background: '#050302', text: '#f0e6d0', buttonText: '#050302' } },
-      { paletteId: 'ivory', label: 'Ivory', colors: { primary: '#1a1610', secondary: '#3d3326', accent: '#c9a96e', background: '#faf6ee', text: '#1a1610', buttonText: '#faf6ee' } },
-    ],
-  },
-  {
-    id: 'mono', name: 'Mono', category: 'minimal',
-    description: 'Black. White. Nothing else matters.',
-    bestFor: 'Minimalist, basics, monochrome brands', supportedModes: ['light', 'dark', 'auto'],
-    previewColor: '#ffffff', accentColor: '#000000', defaultTypography: 'minimal',
-    supportedSections: ['hero_image', 'product_grid', 'featured_collection', 'brand_story', 'image_with_text', 'newsletter'],
-    tags: ['monochrome', 'minimal', 'clean', 'basics'],
-    presets: [
-      { paletteId: 'white', label: 'White', colors: { primary: '#000000', secondary: '#333333', accent: '#000000', background: '#ffffff', text: '#000000', buttonText: '#ffffff' } },
-      { paletteId: 'black', label: 'Black', colors: { primary: '#ffffff', secondary: '#cccccc', accent: '#ffffff', background: '#000000', text: '#ffffff', buttonText: '#000000' } },
-    ],
-  },
-  {
-    id: 'district', name: 'District', category: 'streetwear',
-    description: 'Community-first. The neighborhood store in your pocket.',
-    bestFor: 'Local brands, community-driven, authentic streetwear', supportedModes: ['dark', 'light'],
-    previewColor: '#1a1212', accentColor: '#ff3d00', defaultTypography: 'bold',
-    supportedSections: ['hero_image', 'product_grid', 'seller_posts', 'drop_countdown', 'brand_story', 'customer_reviews', 'newsletter', 'announcement'],
-    tags: ['community', 'local', 'authentic', 'bold'],
-    presets: [
-      { paletteId: 'fire', label: 'Fire', colors: { primary: '#ff3d00', secondary: '#ff6d00', accent: '#ffd600', background: '#0a0505', text: '#f5f5f5', buttonText: '#0a0505' } },
-      { paletteId: 'cement', label: 'Cement', colors: { primary: '#757575', secondary: '#424242', accent: '#ff3d00', background: '#1a1a1a', text: '#f5f5f5', buttonText: '#1a1a1a' } },
-    ],
-  },
-  {
-    id: 'pulse', name: 'Pulse', category: 'modern',
-    description: 'Drop culture lives here. Hype, anticipation, urgency — built in.',
-    bestFor: 'Limited drops, hype brands, collectors', supportedModes: ['dark'],
-    previewColor: '#050510', accentColor: '#00f5ff', defaultTypography: 'technical',
-    supportedSections: ['hero_video', 'drop_countdown', 'product_grid', 'featured_product', 'announcement', 'newsletter', 'seller_posts'],
-    tags: ['drops', 'hype', 'limited', 'countdown'],
-    presets: [
-      { paletteId: 'cyber', label: 'Cyber', colors: { primary: '#00f5ff', secondary: '#7c3aed', accent: '#ff0054', background: '#050510', text: '#f4f4ff', buttonText: '#050510' } },
-    ],
-  },
-  {
-    id: 'studio', name: 'Studio', category: 'modern',
-    description: 'The working studio aesthetic. Behind-the-scenes energy, production-forward.',
-    bestFor: 'Ateliers, small-batch, artisan clothing brands', supportedModes: ['light', 'dark'],
-    previewColor: '#f0ece4', accentColor: '#2d4a3e', defaultTypography: 'classic',
-    supportedSections: ['hero_image', 'brand_story', 'lookbook', 'product_grid', 'image_with_text', 'seller_posts', 'customer_reviews', 'newsletter'],
-    tags: ['studio', 'artisan', 'handmade', 'process'],
-    presets: [
-      { paletteId: 'sage', label: 'Sage', colors: { primary: '#2d4a3e', secondary: '#4a7c6a', accent: '#c8a95e', background: '#f0ece4', text: '#1a2a24', buttonText: '#f0ece4' } },
-    ],
-  },
-  {
-    id: 'horizon', name: 'Horizon', category: 'modern',
-    description: 'Expansive, aspirational, category-defining. Apparel for the open road.',
-    bestFor: 'Outdoor, adventure, lifestyle brands', supportedModes: ['light', 'dark', 'auto'],
-    previewColor: '#0a1628', accentColor: '#ff6b35', defaultTypography: 'modern',
-    supportedSections: ['hero_video', 'hero_slideshow', 'product_grid', 'featured_collection', 'brand_story', 'customer_reviews', 'newsletter', 'image_with_text'],
-    tags: ['outdoor', 'adventure', 'lifestyle', 'aspirational'],
-    presets: [
-      { paletteId: 'dusk', label: 'Dusk', colors: { primary: '#ff6b35', secondary: '#ff9a5c', accent: '#ffd166', background: '#0a1628', text: '#f0f4ff', buttonText: '#0a1628' } },
-      { paletteId: 'earth', label: 'Earth', colors: { primary: '#8b5e3c', secondary: '#c4956a', accent: '#2d4a1e', background: '#f5ece0', text: '#1a0f0a', buttonText: '#f5ece0' } },
-    ],
-  },
-  {
-    id: 'atelier', name: 'Atelier', category: 'luxury',
-    description: 'The house of craft. Every detail deliberate. Every stitch considered.',
-    bestFor: 'Luxury, made-to-order, bespoke, couture', supportedModes: ['light', 'dark'],
-    previewColor: '#f8f4ee', accentColor: '#1a1410', defaultTypography: 'editorial',
-    supportedSections: ['hero_image', 'lookbook', 'brand_story', 'featured_product', 'image_with_text', 'customer_reviews', 'newsletter'],
-    tags: ['atelier', 'bespoke', 'luxury', 'craftsmanship'],
-    presets: [
-      { paletteId: 'ecru', label: 'Ecru', colors: { primary: '#1a1410', secondary: '#3d3028', accent: '#8b7355', background: '#f8f4ee', text: '#1a1410', buttonText: '#f8f4ee' } },
-      { paletteId: 'slate', label: 'Slate', colors: { primary: '#c8bfb0', secondary: '#8a8278', accent: '#c9a96e', background: '#12100e', text: '#c8bfb0', buttonText: '#12100e' } },
-    ],
-  },
-  {
-    id: 'concrete', name: 'Concrete', category: 'experimental',
-    description: 'Industrial texture. Brutalist grid. Nothing soft, nothing compromising.',
-    bestFor: 'Experimental, brutalist, deconstructed fashion', supportedModes: ['dark'],
-    previewColor: '#0e0e0e', accentColor: '#ffffff', defaultTypography: 'experimental',
-    supportedSections: ['hero_image', 'product_grid', 'drop_countdown', 'brand_story', 'seller_posts', 'announcement', 'newsletter', 'image_with_text'],
-    tags: ['brutalist', 'experimental', 'raw', 'industrial'],
-    presets: [
-      { paletteId: 'raw', label: 'Raw', colors: { primary: '#f0f0f0', secondary: '#a0a0a0', accent: '#ff0000', background: '#0e0e0e', text: '#f0f0f0', buttonText: '#0e0e0e' } },
-    ],
-  },
-  {
-    id: 'prestige', name: 'Prestige', category: 'luxury',
-    description: 'Worn by those who don\'t need to prove anything. Status without noise.',
-    bestFor: 'Ultra-premium, legacy brands, collector-grade fashion', supportedModes: ['dark'],
-    previewColor: '#080608', accentColor: '#d4af37', defaultTypography: 'luxury',
-    supportedSections: ['hero_image', 'featured_product', 'lookbook', 'brand_story', 'customer_reviews', 'newsletter'],
-    tags: ['prestige', 'legacy', 'premium', 'collector'],
-    presets: [
-      { paletteId: 'gold', label: 'Gold', colors: { primary: '#d4af37', secondary: '#9e7f28', accent: '#f0d060', background: '#080608', text: '#f0e8d0', buttonText: '#080608' } },
+      { paletteId: 'light', label: 'Light', colors: THREAD_THEME_LIGHT_PALETTE },
+      { paletteId: 'dark', label: 'Dark', colors: THREAD_THEME_DARK_PALETTE },
     ],
   },
 ];

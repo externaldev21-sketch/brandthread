@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
-  Alert, StyleSheet, Dimensions, Share,
+  Alert, StyleSheet, Dimensions, Share, Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -11,21 +11,17 @@ import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, SUCCESS, RED, ORANGE, BLUE,
-  GRAD_PRIMARY, GRAD_CARD_GLOW,
+  BG, CARD, CARD_ELEVATED, BORDER,
+  FG, MUTED, SUBTLE, SUCCESS, RED, ORANGE, BLUE,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
 import {
-  MY_USER_ID, MY_COLOR, MY_INITIALS, MY_NAME,
-  getAcceptedFriends, getFriendRequests, getStories,
-  subscribeSocial, getMyPosts,
-  repostPost, saveItem, getRepostedPostIds, createOrGetConversation,
-  likeFriendPost, getFriendPostEngagements, getComments,
+  MY_USER_ID, MY_COLOR, MY_INITIALS,
+  getStories, subscribeSocial, saveItem, createOrGetConversation,
 } from '@/services/socialService';
 import type { Friendship, Story, BuyerPost } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
+import { reportNetworkError } from '@/lib/networkNotice';
 
 type ApiFollowing = {
   userId: string; name: string; username: string | null;
@@ -45,42 +41,6 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-// ─── Demo Feed Data ───────────────────────────────────────────────────────────
-
-const DEMO_FRIEND_POSTS: BuyerPost[] = [
-  {
-    id: 'fp1', authorId: 'u_maya', authorName: 'Maya Chen', authorHandle: '@mayachen',
-    authorInitials: 'MC', authorColor: '#BE185D', authorAccountType: 'buyer',
-    feedEligibility: 'profile_only', profileVisibility: 'public', type: 'photo',
-    caption: 'Just copped this from the Vault drop 😭🔥', hashtags: ['#vaultstudio', '#streetwear'],
-    mediaColors: ['#1a0a14', '#2d0f1f'], likesCount: 47, commentsCount: 8, repostsCount: 3,
-    likedByMe: false, savedByMe: false, repostedByMe: false, isArchived: false, isDraft: false,
-    createdAt: new Date(Date.now() - 2 * 3600000).toISOString(),
-    updatedAt: new Date(Date.now() - 2 * 3600000).toISOString(),
-  },
-  {
-    id: 'fp2', authorId: 'u_kai', authorName: 'Kai Nakamura', authorHandle: '@kainakamura',
-    authorInitials: 'KN', authorColor: '#8B5CF6', authorAccountType: 'buyer',
-    feedEligibility: 'profile_only', profileVisibility: 'public', type: 'video',
-    caption: 'Review of the archive hoodie — take it from me, worth every penny.',
-    hashtags: ['#nxgendrops', '#review'],
-    mediaColors: ['#071a0f', '#0a2b18'], likesCount: 92, commentsCount: 14, repostsCount: 7,
-    likedByMe: false, savedByMe: false, repostedByMe: false, isArchived: false, isDraft: false,
-    createdAt: new Date(Date.now() - 5 * 3600000).toISOString(),
-    updatedAt: new Date(Date.now() - 5 * 3600000).toISOString(),
-  },
-  {
-    id: 'fp3', authorId: 'u_sofia', authorName: 'Sofia Reyes', authorHandle: '@sofiareyes',
-    authorInitials: 'SR', authorColor: '#B45309', authorAccountType: 'buyer',
-    feedEligibility: 'profile_only', profileVisibility: 'public', type: 'slideshow',
-    caption: 'Current wishlist ✨ Rate them 1-5 below', hashtags: ['#wishlist', '#fashion'],
-    mediaColors: ['#1a0f07', '#2b1607'], likesCount: 118, commentsCount: 22, repostsCount: 11,
-    likedByMe: false, savedByMe: false, repostedByMe: false, isArchived: false, isDraft: false,
-    createdAt: new Date(Date.now() - 24 * 3600000).toISOString(),
-    updatedAt: new Date(Date.now() - 24 * 3600000).toISOString(),
-  },
-];
-
 // ─── Post Card ───────────────────────────────────────────────────────────────
 
 function PostCard({
@@ -97,6 +57,7 @@ function PostCard({
   onOpenComments: (post: BuyerPost) => void;
 }) {
   const router = useRouter();
+  const { theme } = useAppTheme();
 
   return (
     <View style={s.card}>
@@ -135,10 +96,10 @@ function PostCard({
 
       {/* Media */}
       <TouchableOpacity activeOpacity={0.9} onPress={() => onOpenComments(post)}>
-        <LinearGradient
-          colors={post.mediaColors as [string, string]}
-          style={s.media}
-        >
+        {post.mediaUrl ? (
+          <Image source={{ uri: post.mediaUrl }} style={s.media} resizeMode="cover" />
+        ) : (
+          <View style={[s.media, { backgroundColor: CARD_ELEVATED }]}>
           <Feather
             name={post.type === 'video' ? 'video' : 'image'}
             size={44}
@@ -146,10 +107,11 @@ function PostCard({
           />
           {post.type === 'video' && (
             <View style={s.playBtn}>
-              <Feather name="play" size={ICON.md} color={PURPLE} />
+              <Feather name="play" size={ICON.md} color={theme.accent} />
             </View>
           )}
-        </LinearGradient>
+          </View>
+        )}
       </TouchableOpacity>
 
       {/* Actions */}
@@ -170,7 +132,7 @@ function PostCard({
           <Feather
             name="repeat"
             size={ICON.lg}
-            color={post.repostedByMe ? PURPLE : MUTED}
+            color={post.repostedByMe ? theme.accent : MUTED}
           />
           <Text style={s.actionCount}>{post.repostsCount}</Text>
         </TouchableOpacity>
@@ -198,7 +160,7 @@ function PostCard({
         {post.hashtags.length > 0 && (
           <View style={s.hashtagRow}>
             {post.hashtags.map(tag => (
-              <Text key={tag} style={s.hashtag}>
+              <Text key={tag} style={[s.hashtag, { color: theme.accent }]}>
                 {tag}
               </Text>
             ))}
@@ -221,61 +183,31 @@ export default function FriendsScreen() {
   const [apiFollowing, setApiFollowing] = useState<ApiFollowing[]>([]);
   const [stories,      setStories]      = useState<Story[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
-  const [feedPosts,    setFeedPosts]    = useState<BuyerPost[]>(DEMO_FRIEND_POSTS);
+  const [feedPosts,    setFeedPosts]    = useState<BuyerPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   async function loadData() {
+    setLoadError(false);
     try {
-      const postIds = DEMO_FRIEND_POSTS.map(p => p.id);
-      const [friendRows, requestRows, storyRows, engagementRows, ...commentRows] = await Promise.all([
-        getAcceptedFriends(),
-        getFriendRequests(),
+      const [storyRows, followingRows, activityRows] = await Promise.all([
         getStories(),
-        getFriendPostEngagements(),
-        ...postIds.map(id => getComments(id)),
+        api.social.following(),
+        api.social.friendActivity(),
       ]);
-      const friends = Array.isArray(friendRows) ? friendRows : [];
-      const requests = Array.isArray(requestRows) ? requestRows : [];
       const stories = Array.isArray(storyRows) ? storyRows : [];
-      const engagements = engagementRows && typeof engagementRows === 'object' && !Array.isArray(engagementRows)
-        ? engagementRows as Record<string, { likedByMe: boolean; likesCount: number }>
-        : {};
 
-      setFriends(friends);
-      const incoming = requests.filter(
-        r => r.toId === MY_USER_ID && r.status === 'pending',
-      );
-      setPendingCount(incoming.length);
+      setFriends([]);
+      setPendingCount(0);
       const now = Date.now();
       setStories(stories.filter(s => s.expiresAt > now));
-
-      // Real API: load people I actually follow (backed by DB)
-      try {
-        const following = await api.social.following();
-        setApiFollowing(Array.isArray(following) ? following : []);
-      } catch {
-        setApiFollowing([]);
-      }
-
-      // Merge persisted like + repost state and real comment counts into feed posts
-      const repostedIds = await getRepostedPostIds();
-      setFeedPosts(DEMO_FRIEND_POSTS.map((post, i) => {
-        const eng = engagements[post.id];
-        const commentCount = Array.isArray(commentRows[i]) ? commentRows[i].length : 0;
-        const repostedByMe = repostedIds.has(post.id);
-        return {
-          ...post,
-          likedByMe:     eng ? eng.likedByMe  : post.likedByMe,
-          likesCount:    eng ? eng.likesCount : post.likesCount,
-          commentsCount: commentCount,
-          repostedByMe,
-        };
-      }));
-    } catch {
-      setFriends([]);
-      setApiFollowing([]);
-      setStories([]);
-      setPendingCount(0);
-      setFeedPosts([]);
+      setApiFollowing(Array.isArray(followingRows) ? followingRows : []);
+      setFeedPosts(Array.isArray(activityRows) ? activityRows : []);
+    } catch (error) {
+      setLoadError(true);
+      reportNetworkError(error, loadData);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -300,8 +232,7 @@ export default function FriendsScreen() {
           : p,
       ),
     );
-    // Persist asynchronously (fire and forget; errors are silent)
-    likeFriendPost(post.id, post.likesCount, post.likedByMe);
+    api.posts.interact(post.id, { type: 'like' }).catch(() => { setFeedPosts(prev => prev.map(p => p.id === post.id ? post : p)); Alert.alert('Could not update like', 'Try again.'); });
   }
 
   function handleRepost(postId: string) {
@@ -317,13 +248,7 @@ export default function FriendsScreen() {
           : p,
       ),
     );
-    // Pass friend post metadata so repostPost can create/remove a RepostRecord
-    // even though the post is not in getMyPosts()
-    const post = DEMO_FRIEND_POSTS.find(p => p.id === postId);
-    repostPost(postId, post
-      ? { authorId: post.authorId, authorName: post.authorName, authorHandle: post.authorHandle, caption: post.caption }
-      : undefined
-    );
+    api.posts.interact(postId, { type: 'repost' }).catch(() => { setFeedPosts(prev => prev.map(p => p.id === postId ? { ...p, repostedByMe: !p.repostedByMe, repostsCount: p.repostedByMe ? p.repostsCount - 1 : p.repostsCount + 1 } : p)); Alert.alert('Could not update repost', 'Try again.'); });
   }
 
   function handleSave(post: BuyerPost) {
@@ -408,6 +333,7 @@ export default function FriendsScreen() {
         keyExtractor={p => p.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
+        ListEmptyComponent={loading ? <View style={s.emptyState}><Text style={s.emptyBody}>Loading activity…</Text></View> : loadError ? <View style={s.emptyState}><Text style={s.emptyTitle}>Couldn't load activity</Text><TouchableOpacity onPress={loadData}><Text style={{ color: theme.accent, fontFamily: FONT.semibold }}>Try again</Text></TouchableOpacity></View> : null}
         ListHeaderComponent={() => (
           <>
             {/* Stories row */}
@@ -424,7 +350,7 @@ export default function FriendsScreen() {
               >
                 <View style={[s.storyCircle, { backgroundColor: MY_COLOR }]}>
                   <Text style={s.storyInitials}>{MY_INITIALS}</Text>
-                  <View style={s.plusBadge}>
+                  <View style={[s.plusBadge, { backgroundColor: theme.accent }]}>
                     <Feather name="plus" size={10} color="#fff" />
                   </View>
                 </View>
@@ -451,7 +377,7 @@ export default function FriendsScreen() {
                       style={[
                         s.storyCircle,
                         { backgroundColor: story.authorColor },
-                        viewed ? s.storyRingViewed : s.storyRingUnviewed,
+                        viewed ? s.storyRingViewed : [s.storyRingUnviewed, { borderColor: theme.accent }],
                       ]}
                     >
                       <Text style={s.storyInitials}>{story.authorInitials}</Text>
@@ -470,7 +396,7 @@ export default function FriendsScreen() {
                 <View style={s.sectionHeader}>
                   <Text style={s.sectionTitle}>Following</Text>
                   <TouchableOpacity onPress={() => router.push('/buyer-friend-requests' as never)}>
-                    <Text style={s.seeAll}>See all</Text>
+                    <Text style={[s.seeAll, { color: theme.accent }]}>See all</Text>
                   </TouchableOpacity>
                 </View>
                 <ScrollView
@@ -497,10 +423,10 @@ export default function FriendsScreen() {
                         {f.name.split(' ')[0]}
                       </Text>
                       <TouchableOpacity
-                        style={s.msgBubble}
+                        style={[s.msgBubble, { backgroundColor: theme.accentDim }]}
                         onPress={() => handleMessageFriend({ userId: f.userId, name: f.name, handle: f.handle, initials: f.initials, color: f.color } as any)}
                       >
-                        <Feather name="message-circle" size={14} color={PURPLE} />
+                        <Feather name="message-circle" size={14} color={theme.accent} />
                       </TouchableOpacity>
                     </TouchableOpacity>
                   ))}
@@ -514,7 +440,7 @@ export default function FriendsScreen() {
               <TouchableOpacity
                 onPress={() => router.push('/(tabs)/discover' as never)}
               >
-                <Text style={s.seeAll}>See all</Text>
+                <Text style={[s.seeAll, { color: theme.accent }]}>See all</Text>
               </TouchableOpacity>
             </View>
 
@@ -531,7 +457,7 @@ export default function FriendsScreen() {
                   activeOpacity={0.85}
                 >
                   <LinearGradient
-                    colors={[theme.accent, theme.secondary]}
+                    colors={[...theme.primaryGradient]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={s.findFriendsBtn}
@@ -607,7 +533,6 @@ const s = StyleSheet.create({
     minWidth: 16,
     height: 16,
     borderRadius: RADIUS.pill,
-    backgroundColor: PURPLE,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 3,
@@ -627,7 +552,7 @@ const s = StyleSheet.create({
   followingItem: { alignItems: 'center', gap: SP.xs, width: 68 },
   msgBubble: {
     width: 24, height: 24, borderRadius: 12,
-    backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center',
+    alignItems: 'center', justifyContent: 'center',
   },
   storyItem: { alignItems: 'center', gap: SP.xs },
   storyCircle: {
@@ -638,7 +563,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   storyRingViewed: { borderWidth: 2, borderColor: MUTED },
-  storyRingUnviewed: { borderWidth: 2, borderColor: PURPLE },
+  storyRingUnviewed: { borderWidth: 2 },
   storyInitials: {
     fontFamily: FONT.bold,
     fontSize: FS.base,
@@ -651,7 +576,6 @@ const s = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: RADIUS.pill,
-    backgroundColor: PURPLE,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -680,7 +604,6 @@ const s = StyleSheet.create({
   seeAll: {
     fontFamily: FONT.medium,
     fontSize: FS.sm,
-    color: PURPLE,
   },
 
   emptyState: {
@@ -812,7 +735,6 @@ const s = StyleSheet.create({
   hashtag: {
     fontFamily: FONT.regular,
     fontSize: FS.sm,
-    color: PURPLE,
     marginRight: SP.xs,
   },
 

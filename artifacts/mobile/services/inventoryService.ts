@@ -54,6 +54,21 @@ const LEGACY_DEMO_LOCATION_IDS    = new Set(['loc_main','loc_studio']);
 
 function uid(): string { return Math.random().toString(36).slice(2, 11); }
 function now(): string { return new Date().toISOString(); }
+function integer(value: unknown, field: string): number {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) throw new Error(`Inventory ${field} must be a safe integer.`);
+  return parsed;
+}
+function multiplyCents(units: number, cents: number): number {
+  const total = units * cents;
+  if (!Number.isSafeInteger(total)) throw new Error('Inventory valuation exceeds the safe integer range.');
+  return total;
+}
+function addCents(total: number, amount: number): number {
+  const result = total + amount;
+  if (!Number.isSafeInteger(result)) throw new Error('Inventory valuation exceeds the safe integer range.');
+  return result;
+}
 function daysFromNow(n: number): string {
   const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString();
 }
@@ -182,8 +197,8 @@ function apiRowToInventoryItem(row: any): InventoryItem {
     variantLabel:     row.variantLabel ?? row.sku,
     sku:              row.sku,
     barcode:          undefined,
-    onHand:           row.stock,
-    available:        row.stock,
+    onHand:           integer(row.stock ?? 0, 'stock'),
+    available:        integer(row.stock ?? 0, 'stock'),
     reserved:         0,
     committed:        0,
     incoming:         0,
@@ -191,7 +206,9 @@ function apiRowToInventoryItem(row: any): InventoryItem {
     unavailable:      0,
     lowStockThreshold: row.lowStockThreshold,
     status:           row.status as InventoryStatus,
-    inventoryValue:   Math.round(Number(row.stock ?? 0) * Number(row.priceCents ?? 0)) / 100,
+    costCents:        integer(row.priceCents ?? 0, 'priceCents'),
+    retailPriceCents: integer(row.priceCents ?? 0, 'priceCents'),
+    inventoryValueCents: multiplyCents(integer(row.stock ?? 0, 'stock'), integer(row.priceCents ?? 0, 'priceCents')),
     oversellPolicy:   'deny' as OversellPolicy,
     isTracked:        true,
     isContinuouslySynced: false,
@@ -217,18 +234,18 @@ export async function getInventoryOverview(): Promise<InventoryOverview> {
   try {
     const rows = await serviceRequest<any[]>('/api/inventory');
     return {
-      totalOnHand:           rows.reduce((s, r) => s + r.stock, 0),
-      totalAvailable:        rows.reduce((s, r) => s + r.stock, 0),
+      totalOnHand:           rows.reduce((s, r) => s + integer(r.stock ?? 0, 'stock'), 0),
+      totalAvailable:        rows.reduce((s, r) => s + integer(r.stock ?? 0, 'stock'), 0),
       totalReserved:         0,
       totalIncoming:         0,
       totalCommitted:        0,
       totalDamaged:          0,
       lowStockCount:         rows.filter(r => r.status === 'low_stock').length,
       outOfStockCount:       rows.filter(r => r.status === 'out_of_stock').length,
-      inventoryValue:        rows.reduce(
-        (totalCents, row) => totalCents + Math.round(Number(row.stock ?? 0) * Number(row.priceCents ?? 0)),
+      inventoryValueCents:   rows.reduce(
+        (totalCents, row) => addCents(totalCents, multiplyCents(integer(row.stock ?? 0, 'stock'), integer(row.priceCents ?? 0, 'priceCents'))),
         0,
-      ) / 100,
+      ),
       locationCount:         0,
       unitsInProduction:     0,
       recentAdjustmentCount: 0,
@@ -320,7 +337,7 @@ export async function adjustStock(params: {
     quantityAfter: newOnHand,
     availableBefore: item.available,
     availableAfter: Math.max(0, item.available + params.quantityChange),
-    inventoryValueImpact: params.quantityChange * item.cost,
+    inventoryValueImpactCents: multiplyCents(params.quantityChange, item.costCents),
     reason: params.reason,
     note: params.note,
     referenceNumber: params.referenceNumber,
@@ -334,7 +351,7 @@ export async function adjustStock(params: {
   // Update item
   item.onHand = newOnHand;
   item.available = Math.max(0, item.available + params.quantityChange);
-  item.inventoryValue = item.onHand * item.cost;
+  item.inventoryValueCents = multiplyCents(item.onHand, item.costCents);
   item.status = computeStatus(item);
   item.updatedAt = now();
 
@@ -493,7 +510,7 @@ export async function receiveTransfer(id: string, receipts: { itemId: string; re
       const qBefore = item.onHand;
       item.onHand += r.received;
       item.available += r.received;
-      item.inventoryValue = item.onHand * item.cost;
+      item.inventoryValueCents = multiplyCents(item.onHand, item.costCents);
       item.status = computeStatus(item);
       item.updatedAt = now();
       addEvent(item, 'transfer_in', qBefore, r.received, item.onHand, `Received from transfer ${t.transferNumber}`, 'Transfer', { transferId: id });
@@ -589,7 +606,7 @@ export async function receiveIncoming(id: string, receivedQty: number, damagedQt
     item.available += receivedQty;
     item.incoming   = Math.max(0, item.incoming - receivedQty - damagedQty);
     if (damagedQty > 0) item.damaged += damagedQty;
-    item.inventoryValue = item.onHand * item.cost;
+    item.inventoryValueCents = multiplyCents(item.onHand, item.costCents);
     item.status = computeStatus(item);
     item.updatedAt = now();
     addEvent(item, 'incoming_received', qBefore, receivedQty, item.onHand, `Received incoming from ${rec.manufacturerName ?? rec.source}`, 'Incoming');
@@ -823,18 +840,18 @@ export async function completeCount(countId: string): Promise<InventoryCount | u
 
 export async function getValuation(): Promise<InventoryValuation> {
   await ensureInitialized();
-  const productMap: Record<string, { productId: string; productName: string; totalUnits: number; costValue: number }> = {};
+  const productMap: Record<string, { productId: string; productName: string; totalUnits: number; costValueCents: number }> = {};
   for (const item of _items) {
-    if (!productMap[item.productId]) productMap[item.productId] = { productId: item.productId, productName: item.productName, totalUnits: 0, costValue: 0 };
+    if (!productMap[item.productId]) productMap[item.productId] = { productId: item.productId, productName: item.productName, totalUnits: 0, costValueCents: 0 };
     productMap[item.productId].totalUnits += item.onHand;
-    productMap[item.productId].costValue  += item.inventoryValue;
+    productMap[item.productId].costValueCents = addCents(productMap[item.productId].costValueCents, item.inventoryValueCents);
   }
   return {
-    totalCostValue:    _items.reduce((s, i) => s + i.inventoryValue, 0),
-    availableCostValue:_items.reduce((s, i) => s + i.available * i.cost, 0),
-    reservedCostValue: _items.reduce((s, i) => s + i.reserved  * i.cost, 0),
-    incomingCostValue: _items.reduce((s, i) => s + i.incoming  * i.cost, 0),
-    damagedCostValue:  _items.reduce((s, i) => s + i.damaged   * i.cost, 0),
+    totalCostValueCents: _items.reduce((s, i) => addCents(s, i.inventoryValueCents), 0),
+    availableCostValueCents: _items.reduce((s, i) => addCents(s, multiplyCents(i.available, i.costCents)), 0),
+    reservedCostValueCents: _items.reduce((s, i) => addCents(s, multiplyCents(i.reserved, i.costCents)), 0),
+    incomingCostValueCents: _items.reduce((s, i) => addCents(s, multiplyCents(i.incoming, i.costCents)), 0),
+    damagedCostValueCents: _items.reduce((s, i) => addCents(s, multiplyCents(i.damaged, i.costCents)), 0),
     totalUnits: _items.reduce((s, i) => s + i.onHand, 0),
     byProduct: Object.values(productMap),
     calculatedAt: now(),
@@ -872,7 +889,7 @@ export async function exportInventoryCsv(items?: InventoryItem[]): Promise<strin
   const header = 'Product,Variant,SKU,On Hand,Available,Reserved,Incoming,Damaged,Value,Status';
   const rows = src.map(i =>
     [i.productName, i.variantLabel, i.sku, i.onHand, i.available, i.reserved, i.incoming, i.damaged,
-     `$${i.inventoryValue.toFixed(2)}`, i.status].join(',')
+     i.inventoryValueCents, i.status].join(',')
   );
   return [header, ...rows].join('\n');
 }

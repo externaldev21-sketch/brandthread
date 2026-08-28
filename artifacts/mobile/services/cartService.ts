@@ -17,6 +17,7 @@ import {
   BuyerReturnRequest, BuyerReturnReason, BuyerReturnResolution,
   BuyerRefundRequest, BuyerProblemReport, BuyerProblemType,
 } from './cartTypes';
+import { centsAtPercent, formatCents } from '@/lib/money';
 
 // ─── Storage keys (scoped by user ID so two accounts never share storage) ─────
 
@@ -44,6 +45,20 @@ function keys(uid = _cartUserId) {
 /** Keys snapshot type — passed through the call chain so private helpers
  *  never re-resolve _cartUserId in async continuations. */
 type CartKeys = ReturnType<typeof keys>;
+
+/**
+ * Money-schema boundary for persisted cart records.  Pre-cents records used a
+ * floating `price` field; intentionally do not guess/scale it.  Such lines
+ * must be refreshed from the catalog rather than charged at an inferred price.
+ */
+function normalizeCart(cart: Cart): Cart {
+  const isCents = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value);
+  return {
+    ...cart,
+    items: (Array.isArray(cart.items) ? cart.items : []).filter(item => isCents((item as CartItem).priceCents)),
+    savedItems: (Array.isArray(cart.savedItems) ? cart.savedItems : []).filter(item => isCents((item as SavedCartItem).priceCents)),
+  };
+}
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
@@ -91,7 +106,7 @@ function adaptApiProduct(row: any): BuyerProduct {
       id: variant.id,
       title: [variant.size, variant.color].filter(Boolean).join(' / ') || 'Default',
       optionValues,
-      price: (variant.priceCents ?? 0) / 100,
+      priceCents: variant.priceCents ?? 0,
       inventoryQuantity: variant.stock ?? 0,
       isAvailable: (variant.stock ?? 0) > 0,
       imageUri: firstImage,
@@ -105,7 +120,7 @@ function adaptApiProduct(row: any): BuyerProduct {
     sellerHandle: row.sellerHandle ?? '',
     name: row.name,
     description: row.description ?? '',
-    price: variants.length > 0 ? Math.min(...variants.map(v => v.price)) : 0,
+    priceCents: variants.length > 0 ? Math.min(...variants.map(v => v.priceCents)) : 0,
     imageUris: Array.isArray(row.images) ? row.images : [],
     category: row.category ?? 'apparel',
     isPreOrder: row.isPreOrder ?? false,
@@ -159,7 +174,7 @@ async function loadCart(k: CartKeys = keys()): Promise<Cart> {
   try {
     const raw = await AsyncStorage.getItem(k.cart);
     if (raw) {
-      cart = JSON.parse(raw) as Cart;
+      cart = normalizeCart(JSON.parse(raw) as Cart);
     } else {
       cart = { id: uid(), items: [], savedItems: [], updatedAt: now() };
     }
@@ -175,8 +190,8 @@ async function loadCart(k: CartKeys = keys()): Promise<Cart> {
       // DB has data — use it and update local cache.
       // Guard: skip cache write if account switched while the request was in-flight.
       if (_cartUserId === k.userId) {
-        cart.items = items;
-        cart.savedItems = savedItems;
+        cart.items = items.filter(item => typeof item?.priceCents === 'number' && Number.isSafeInteger(item.priceCents));
+        cart.savedItems = savedItems.filter(item => typeof item?.priceCents === 'number' && Number.isSafeInteger(item.priceCents));
         await AsyncStorage.setItem(k.cart, JSON.stringify(cart));
       }
     }
@@ -239,8 +254,8 @@ export async function addToCart(params: AddToCartParams): Promise<{ success: boo
       sellerId: product.sellerId,
       sellerName: product.sellerName,
       sellerHandle: product.sellerHandle,
-      price: variant.price ?? product.price,
-      compareAtPrice: variant.compareAtPrice ?? product.compareAtPrice,
+      priceCents: variant.priceCents ?? product.priceCents,
+      compareAtPriceCents: variant.compareAtPriceCents ?? product.compareAtPriceCents,
       quantity,
       maxQuantity: variant.inventoryQuantity > 0 ? variant.inventoryQuantity : 99,
       isPreOrder: product.isPreOrder,
@@ -311,8 +326,8 @@ export async function replaceCartItemVariant(
       productName: product.name,
       variantTitle: variant.title,
       imageUri: variant.imageUri ?? product.imageUris[0],
-      price: variant.price ?? product.price,
-      compareAtPrice: variant.compareAtPrice ?? product.compareAtPrice,
+      priceCents: variant.priceCents ?? product.priceCents,
+      compareAtPriceCents: variant.compareAtPriceCents ?? product.compareAtPriceCents,
       quantity,
       maxQuantity: variant.inventoryQuantity || 99,
       isAvailable: true,
@@ -412,15 +427,15 @@ export function groupCartBySeller(items: CartItem[]): CartSellerGroup[] {
         sellerHandle: item.sellerHandle,
         sellerInitial: item.sellerName.charAt(0).toUpperCase(),
         items: [],
-        subtotal: 0,
+        subtotalCents: 0,
         hasPreOrder: false,
-        estimatedShipping: 0,
+        estimatedShippingCents: 0,
         fulfillmentEstimate: '3–5 business days',
       });
     }
     const group = map.get(item.sellerId)!;
     group.items.push(item);
-    group.subtotal += item.price * item.quantity;
+    group.subtotalCents += item.priceCents * item.quantity;
     if (item.isPreOrder) group.hasPreOrder = true;
   }
   return Array.from(map.values());
@@ -428,16 +443,16 @@ export function groupCartBySeller(items: CartItem[]): CartSellerGroup[] {
 
 // ─── Cart summary ─────────────────────────────────────────────────────────────
 
-export function calculateCartSummary(items: CartItem[], discountTotal = 0, shippingTotal = 0): CheckoutSummary {
-  const subtotal = items.reduce((s, i) => s + i.price * i.quantity, 0);
-  const taxTotal = 0; // Calculated accurately by Stripe at checkout; not estimated here
-  const total = +(subtotal - discountTotal + shippingTotal + taxTotal).toFixed(2);
+export function calculateCartSummary(items: CartItem[], discountTotalCents = 0, shippingTotalCents = 0): CheckoutSummary {
+  const subtotalCents = items.reduce((s, i) => s + i.priceCents * i.quantity, 0);
+  const taxTotalCents = 0; // Calculated accurately by Stripe at checkout; not estimated here
+  const totalCents = Math.max(0, subtotalCents - discountTotalCents + shippingTotalCents + taxTotalCents);
   return {
-    subtotal: +subtotal.toFixed(2),
-    discountTotal: +discountTotal.toFixed(2),
-    shippingTotal: +shippingTotal.toFixed(2),
-    taxTotal,
-    total: Math.max(total, 0),
+    subtotalCents,
+    discountTotalCents,
+    shippingTotalCents,
+    taxTotalCents,
+    totalCents,
     currency: 'USD',
   };
 }
@@ -452,7 +467,7 @@ export function calculateCartSummary(items: CartItem[], discountTotal = 0, shipp
 async function fetchShippingRateDetails(
   sellerId: string,
   subtotalCents: number,
-): Promise<{ id: string; name: string; amount: number }> {
+): Promise<{ id: string; name: string; amountCents: number }> {
   const resp = await serviceRequest<{
     shippingCents: number;
     rateName: string;
@@ -462,7 +477,7 @@ async function fetchShippingRateDetails(
   return {
     id: `seller_rate_${sellerId}`,
     name: resp.rateName || (resp.isFree ? 'Free shipping' : 'Standard shipping'),
-    amount: resp.shippingCents / 100,
+    amountCents: resp.shippingCents,
   };
 }
 
@@ -479,7 +494,7 @@ export async function validateCart(items: CartItem[], discountCodes: string[] = 
           productId: item.productId,
           variantId: item.variantId,
           quantity: item.quantity,
-          price: item.price,
+          priceCents: item.priceCents,
         })),
         discountCodes,
       }),
@@ -513,12 +528,12 @@ export async function createCheckoutSession(
   const groups = groupCartBySeller(items);
 
   const deliveryGroups: CheckoutDeliveryGroup[] = await Promise.all(groups.map(async group => {
-    const rate = await fetchShippingRateDetails(group.sellerId, Math.round(group.subtotal * 100));
+    const rate = await fetchShippingRateDetails(group.sellerId, group.subtotalCents);
     const method: CheckoutShippingMethod = {
       id: rate.id,
       carrier: 'Seller shipping',
       service: rate.name,
-      price: rate.amount,
+      priceCents: rate.amountCents,
       estimatedDays: 0,
       estimatedDelivery: group.hasPreOrder ? 'Ships after production' : 'Rate set by seller',
       trackingIncluded: false,
@@ -535,15 +550,15 @@ export async function createCheckoutSession(
     };
   }));
 
-  const shippingTotal = deliveryGroups.reduce((total, group) => {
+  const shippingTotalCents = deliveryGroups.reduce((total, group) => {
     const selected = group.availableMethods.find(method => method.id === group.selectedMethodId);
-    return total + (selected?.price ?? 0);
+    return total + (selected?.priceCents ?? 0);
   }, 0);
-  const loyaltyDiscount = Math.min(
+  const loyaltyDiscountCents = Math.min(
     loyaltyRedemption?.discountCents ?? 0,
-    Math.round((items.reduce((total, item) => total + item.price * item.quantity, 0) + shippingTotal) * 100),
-  ) / 100;
-  const summary = calculateCartSummary(items, loyaltyDiscount, shippingTotal);
+    items.reduce((total, item) => total + item.priceCents * item.quantity, 0) + shippingTotalCents,
+  );
+  const summary = calculateCartSummary(items, loyaltyDiscountCents, shippingTotalCents);
 
   const acks: CheckoutAcknowledgment[] = [];
   const hasPreOrder = items.some(i => i.isPreOrder);
@@ -619,7 +634,7 @@ const DEMO_DISCOUNT_CODES: Record<string, CheckoutDiscount> = {
     code: 'THREAD10',
     type: 'percentage',
     value: 10,
-    appliedAmount: 0,
+    appliedAmountCents: 0,
     description: '10% off your order',
     isValid: true,
   },
@@ -627,15 +642,15 @@ const DEMO_DISCOUNT_CODES: Record<string, CheckoutDiscount> = {
     code: 'FREESHIP',
     type: 'free_shipping',
     value: 0,
-    appliedAmount: 0,
+    appliedAmountCents: 0,
     description: 'Free standard shipping',
     isValid: true,
   },
   'FIRST20': {
     code: 'FIRST20',
     type: 'fixed',
-    value: 20,
-    appliedAmount: 20,
+    value: 2000,
+    appliedAmountCents: 2000,
     description: '$20 off your first order',
     isValid: true,
   },
@@ -643,12 +658,12 @@ const DEMO_DISCOUNT_CODES: Record<string, CheckoutDiscount> = {
 
 export async function applyDiscount(
   code: string,
-  subtotalDollars: number,
+  subtotalCents: number,
   existingDiscounts: CheckoutDiscount[],
 ): Promise<CheckoutDiscount> {
   const trimmedCode = code.trim().toUpperCase();
   if (!trimmedCode) {
-    return { code: '', type: 'percentage' as any, value: 0, description: '', isValid: false, appliedAmount: 0, errorMessage: 'Please enter a code.' };
+    return { code: '', type: 'percentage' as any, value: 0, description: '', isValid: false, appliedAmountCents: 0, errorMessage: 'Please enter a code.' };
   }
   // Get current checkout session to find the seller
   const sess = await getCheckoutSession();
@@ -657,19 +672,18 @@ export async function applyDiscount(
     // Fall back to demo codes if no seller context
     const upper = trimmedCode;
     if (existingDiscounts.some(d => d.code === upper)) {
-      return { code: upper, type: 'percentage' as any, value: 0, appliedAmount: 0, description: '', isValid: false, errorMessage: 'This code has already been applied.' };
+      return { code: upper, type: 'percentage' as any, value: 0, appliedAmountCents: 0, description: '', isValid: false, errorMessage: 'This code has already been applied.' };
     }
     const found = DEMO_DISCOUNT_CODES[upper];
     if (!found) {
-      return { code: upper, type: 'percentage' as any, value: 0, appliedAmount: 0, description: '', isValid: false, errorMessage: 'Invalid discount code.' };
+      return { code: upper, type: 'percentage' as any, value: 0, appliedAmountCents: 0, description: '', isValid: false, errorMessage: 'Invalid discount code.' };
     }
-    let appliedAmount = 0;
-    if (found.type === 'percentage') appliedAmount = +(subtotalDollars * found.value / 100).toFixed(2) as unknown as number;
-    else if (found.type === 'fixed') appliedAmount = Math.min(found.value, subtotalDollars);
-    else if (found.type === 'free_shipping') appliedAmount = 12.40;
-    return { ...found, appliedAmount };
+    let appliedAmountCents = 0;
+    if (found.type === 'percentage') appliedAmountCents = centsAtPercent(subtotalCents, found.value);
+    else if (found.type === 'fixed') appliedAmountCents = Math.min(found.value, subtotalCents);
+    else if (found.type === 'free_shipping') appliedAmountCents = 1240;
+    return { ...found, appliedAmountCents };
   }
-  const subtotalCents = Math.round(subtotalDollars * 100);
   try {
     const { api } = await import('@/lib/api');
     const result = await api.discountCodes.validate(trimmedCode, sellerId, subtotalCents);
@@ -677,9 +691,9 @@ export async function applyDiscount(
       code: result.code,
       type: result.type,
       value: result.value,
-      description: result.description ?? `${result.type === 'percentage' ? result.value + '% off' : '$' + (result.value / 100).toFixed(2) + ' off'}`,
+      description: result.description ?? `${result.type === 'percentage' ? result.value + '% off' : formatCents(result.value) + ' off'}`,
       isValid: true,
-      appliedAmount: result.appliedAmountCents / 100,
+      appliedAmountCents: result.appliedAmountCents,
       errorMessage: undefined,
     } as CheckoutDiscount;
   } catch (err: any) {
@@ -697,7 +711,7 @@ export async function applyDiscount(
                 errCode === 'MAX_USES_REACHED' ? 'This code has reached its usage limit.' :
                 errCode === 'MIN_ORDER_NOT_MET' ? 'Minimum order not met for this code.' :
                 'Invalid or expired discount code.';
-    return { code: trimmedCode, type: 'percentage' as any, value: 0, description: '', isValid: false, appliedAmount: 0, errorMessage: msg };
+    return { code: trimmedCode, type: 'percentage' as any, value: 0, description: '', isValid: false, appliedAmountCents: 0, errorMessage: msg };
   }
 }
 
@@ -725,8 +739,8 @@ export async function createBuyNowSession(
     sellerId: product.sellerId,
     sellerName: product.sellerName,
     sellerHandle: product.sellerHandle,
-    price: variant.price,
-    compareAtPrice: variant.compareAtPrice,
+    priceCents: variant.priceCents,
+    compareAtPriceCents: variant.compareAtPriceCents,
     quantity,
     maxQuantity: variant.inventoryQuantity || 99,
     isPreOrder: product.isPreOrder,
@@ -768,56 +782,34 @@ export async function createReturnRequest(params: {
   imageUris: string[];
   preferredResolution: BuyerReturnResolution;
 }): Promise<BuyerReturnRequest> {
-  const k = keys();
-  // Try real API first
-  try {
-    const { api } = await import('@/lib/api');
-    const result = await api.returns.create({
-      orderId: params.orderId,
-      reason: params.reason,
-      notes: params.description,
-      resolutionRequested: params.preferredResolution,
-    });
-    // Map API response back to local BuyerReturnRequest shape
-    const req: BuyerReturnRequest = {
-      id: result.id ?? uid(),
-      orderId: params.orderId,
-      orderNumber: params.orderNumber,
-      sellerName: params.sellerName,
-      items: params.items,
-      reason: params.reason,
-      description: params.description,
-      imageUris: params.imageUris,
-      preferredResolution: params.preferredResolution,
-      status: result.status ?? 'requested',
-      refundEstimate: params.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0),
-      returnDeadline: daysFromNow(30),
-      returnPolicy: '30-day returns on unworn items. Return shipping may be covered by the seller.',
-      submittedAt: result.createdAt ?? now(),
-      updatedAt: result.updatedAt ?? now(),
-    };
-    // Cache locally for offline viewing — pass k so we write to the right user's key
-    const returns = await loadReturns(k);
-    returns.push(req);
-    await AsyncStorage.setItem(k.returns, JSON.stringify(returns));
-    return req;
-  } catch {
-    // AsyncStorage fallback for demo/offline
-    const returns = await loadReturns(k);
-    const req: BuyerReturnRequest = {
-      id: uid(),
-      ...params,
-      status: 'requested',
-      refundEstimate: params.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0),
-      returnDeadline: daysFromNow(30),
-      returnPolicy: '30-day returns on unworn items. Return shipping may be covered by the seller.',
-      submittedAt: now(),
-      updatedAt: now(),
-    };
-    returns.push(req);
-    await AsyncStorage.setItem(k.returns, JSON.stringify(returns));
-    return req;
-  }
+  const { api } = await import('@/lib/api');
+  const result = await api.returns.create({
+    orderId: params.orderId,
+    reason: params.reason,
+    notes: params.description,
+    resolutionRequested: params.preferredResolution,
+    evidenceUrls: params.imageUris,
+    requestedItems: params.items,
+  });
+  return {
+    id: result.id,
+    orderId: result.orderId,
+    orderNumber: params.orderNumber,
+    sellerName: params.sellerName,
+    items: result.requestedItems ?? params.items,
+    reason: result.reason,
+    description: result.notes ?? '',
+    imageUris: result.evidenceUrls ?? [],
+    preferredResolution: result.resolutionRequested,
+    status: result.status,
+    refundEstimateCents: params.items.reduce((sum, item) => sum + item.unitPriceCents * item.quantity, 0),
+    returnDeadline: daysFromNow(30),
+    returnPolicy: 'Return approval and refund amount are determined by the seller.',
+    submittedAt: result.createdAt,
+    updatedAt: result.updatedAt,
+    sellerResponse: result.sellerResponse ?? undefined,
+    refundAmountCents: result.refundAmountCents ?? undefined,
+  };
 }
 
 async function loadReturns(k: CartKeys = keys()): Promise<BuyerReturnRequest[]> {
@@ -829,7 +821,27 @@ async function loadReturns(k: CartKeys = keys()): Promise<BuyerReturnRequest[]> 
 }
 
 export async function getBuyerReturns(): Promise<BuyerReturnRequest[]> {
-  return loadReturns(keys());
+  const { api } = await import('@/lib/api');
+  const rows = await api.returns.listBuyer();
+  return rows.map((row: any) => ({
+    id: row.id,
+    orderId: row.orderId,
+    orderNumber: row.orderNumber,
+    sellerName: row.sellerName ?? 'Seller',
+    items: row.requestedItems ?? [],
+    reason: row.reason,
+    description: row.notes ?? '',
+    imageUris: row.evidenceUrls ?? [],
+    preferredResolution: row.resolutionRequested,
+    status: row.status,
+    refundEstimateCents: row.refundAmountCents ?? row.totalCents ?? 0,
+    returnDeadline: daysFromNow(30),
+    returnPolicy: 'Return approval and refund amount are determined by the seller.',
+    submittedAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    sellerResponse: row.sellerResponse ?? undefined,
+    refundAmountCents: row.refundAmountCents ?? undefined,
+  }));
 }
 
 // ─── Refunds ──────────────────────────────────────────────────────────────────
@@ -843,16 +855,22 @@ export async function createRefundRequest(params: {
   evidenceUris: string[];
   maxRefundAmount: number;
 }): Promise<BuyerRefundRequest> {
-  const k = keys();
-  const refunds = await loadRefunds(k);
+  const { api } = await import('@/lib/api');
+  const result = await api.returns.create({
+    orderId: params.orderId,
+    reason: params.reason,
+    notes: params.description,
+    resolutionRequested: 'refund',
+    evidenceUrls: params.evidenceUris,
+  });
   const req: BuyerRefundRequest = {
-    id: uid(),
+    id: result.id,
     ...params,
-    status: 'pending',
-    submittedAt: now(),
+    status: result.status,
+    submittedAt: result.createdAt,
+    sellerResponse: result.sellerResponse ?? undefined,
+    refundAmountCents: result.refundAmountCents ?? undefined,
   };
-  refunds.push(req);
-  await AsyncStorage.setItem(k.refunds, JSON.stringify(refunds));
   return req;
 }
 

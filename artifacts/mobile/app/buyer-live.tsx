@@ -20,6 +20,8 @@ import {
   BG, BORDER, FG, MUTED, SUBTLE, RED,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { formatCents } from '@/lib/money';
+import * as WebBrowser from 'expo-web-browser';
 
 const LIVE_RED = '#FF3B30';
 const { width: W, height: H } = Dimensions.get('window');
@@ -29,7 +31,7 @@ let AgoraModule: any = null;
 try { AgoraModule = require('react-native-agora'); } catch {}
 
 interface Comment { id: string; display_name: string; message: string; created_at: string; }
-interface ProductTag { productId: string; productName: string; price: number; }
+interface ProductTag { productId: string; productName: string; priceCents: number; highlighted?: boolean; }
 
 export default function BuyerLiveScreen() {
   const colors = useColors();
@@ -51,6 +53,19 @@ export default function BuyerLiveScreen() {
   const [viewerCount, setViewerCount]     = useState(0);
   const [broadcastUid, setBroadcastUid]   = useState<number | null>(null);
   const [agoraReady, setAgoraReady]       = useState(false);
+  const [purchaseTag, setPurchaseTag]     = useState<ProductTag | null>(null);
+  const [purchaseProduct, setPurchaseProduct] = useState<any>(null);
+  const [purchaseLoading, setPurchaseLoading] = useState(false);
+  const [selectedVariantId, setSelectedVariantId] = useState('');
+  const [checkoutBusy, setCheckoutBusy]   = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
+  const [buyerEmail, setBuyerEmail]       = useState(user?.primaryEmailAddress?.emailAddress ?? '');
+  const [buyerName, setBuyerName]         = useState(user?.fullName ?? '');
+  const [street, setStreet]               = useState('');
+  const [city, setCity]                   = useState('');
+  const [region, setRegion]               = useState('');
+  const [postalCode, setPostalCode]       = useState('');
+  const lastHighlightedRef = useRef<string | null>(null);
 
   const engineRef   = useRef<any>(null);
   const scrollRef   = useRef<ScrollView>(null);
@@ -130,7 +145,13 @@ export default function BuyerLiveScreen() {
       }
       if (streamData.stream?.status !== 'live') setEnded(true);
       setViewerCount(streamData.stream?.viewer_count ?? 0);
-      setProductTags(streamData.stream?.product_tags ?? []);
+      const nextTags: ProductTag[] = streamData.stream?.product_tags ?? [];
+      setProductTags(nextTags);
+      const highlighted = nextTags.find(tag => tag.highlighted);
+      if (highlighted && highlighted.productId !== lastHighlightedRef.current) {
+        lastHighlightedRef.current = highlighted.productId;
+        void openPurchase(highlighted);
+      }
     } catch {}
   }
 
@@ -162,8 +183,78 @@ export default function BuyerLiveScreen() {
     } catch {}
   }
 
-  function handleShop(tag: ProductTag) {
-    router.push(`/buyer-product-detail?productId=${encodeURIComponent(tag.productId)}` as any);
+  async function openPurchase(tag: ProductTag) {
+    setPurchaseTag(tag);
+    setPurchaseProduct(null);
+    setSelectedVariantId('');
+    setCheckoutError('');
+    setPurchaseLoading(true);
+    try {
+      const product = await api.publicProducts.get(tag.productId);
+      if (product?.sellerVacationMode) {
+        setCheckoutError(product.sellerVacationMessage ?? 'This seller is currently away and is not accepting purchases.');
+      }
+      setPurchaseProduct(product);
+      const firstAvailable = (product?.variants ?? []).find((variant: any) => (variant.stock ?? 0) > 0);
+      setSelectedVariantId(firstAvailable?.id ?? '');
+    } catch (error: any) {
+      setCheckoutError(error?.message ?? 'This product could not be loaded.');
+    } finally {
+      setPurchaseLoading(false);
+    }
+  }
+
+  async function checkoutInStream() {
+    if (!purchaseProduct || !selectedVariantId) {
+      setCheckoutError('Choose an available option first.');
+      return;
+    }
+    if (!buyerEmail.trim() || !buyerName.trim() || !street.trim() || !city.trim() || !region.trim() || !postalCode.trim()) {
+      setCheckoutError('Add your email and shipping address to continue.');
+      return;
+    }
+    setCheckoutBusy(true);
+    setCheckoutError('');
+    try {
+      const result = await api.buyer.checkout.createSession(
+        [{ variantId: selectedVariantId, productId: purchaseProduct.id, quantity: 1 }],
+        {
+          contactEmail: buyerEmail.trim(),
+          shippingAddress: {
+            name: buyerName.trim(),
+            street: street.trim(),
+            city: city.trim(),
+            state: region.trim(),
+            zip: postalCode.trim(),
+            country: 'US',
+          },
+          clientIdempotencyKey: `live_${params.streamId}_${purchaseProduct.id}_${Date.now()}`,
+        },
+      );
+      const browser = await WebBrowser.openBrowserAsync(result.url);
+      if (browser.type === 'cancel' || browser.type === 'dismiss') {
+        setCheckoutError('Payment was cancelled. The live stream is still playing.');
+        return;
+      }
+      let verification: any = null;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        verification = await api.buyer.checkout.verifySession(result.sessionId);
+        if (verification?.paymentStatus === 'paid' || verification?.orderNumber) break;
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
+      if (verification?.paymentStatus !== 'paid') {
+        setCheckoutError(verification?.declineReason ?? 'Payment is still pending. Please check your orders shortly.');
+        return;
+      }
+      Alert.alert('Order confirmed', verification.orderNumber
+        ? `Order ${verification.orderNumber} was placed without leaving the live stream.`
+        : 'Your order was placed without leaving the live stream.');
+      setPurchaseTag(null);
+    } catch (error: any) {
+      setCheckoutError(error?.message ?? 'Checkout could not be started.');
+    } finally {
+      setCheckoutBusy(false);
+    }
   }
 
   const RemoteVideoView = AgoraModule ? AgoraModule.RtcSurfaceView : null;
@@ -246,13 +337,13 @@ export default function BuyerLiveScreen() {
             {productTags.map(tag => (
               <TouchableOpacity
                 key={tag.productId}
-                onPress={() => handleShop(tag)}
+                onPress={() => openPurchase(tag)}
                 activeOpacity={0.8}
                 style={[s.productChip, { backgroundColor: 'rgba(0,0,0,0.7)' }]}
               >
                 <Feather name="shopping-bag" size={12} color={LIVE_RED} />
                 <Text style={s.productChipName} numberOfLines={1}>{tag.productName}</Text>
-                <Text style={s.productChipPrice}>${Number(tag.price).toFixed(0)}</Text>
+                <Text style={s.productChipPrice}>{formatCents(tag.priceCents)}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -293,6 +384,80 @@ export default function BuyerLiveScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+
+      {purchaseTag && (
+        <View style={[s.purchaseSheet, { paddingBottom: insets.bottom + SP.sm }]}>
+          <View style={s.purchaseHandle} />
+          <View style={s.purchaseHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.purchaseEyebrow}>BUY WITHOUT LEAVING LIVE</Text>
+              <Text style={s.purchaseTitle}>{purchaseTag.productName}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setPurchaseTag(null)} style={s.purchaseClose}>
+              <Feather name="x" size={20} color={FG} />
+            </TouchableOpacity>
+          </View>
+          {purchaseLoading ? (
+            <ActivityIndicator color={PURPLE} style={{ marginVertical: SP.lg }} />
+          ) : (
+            <ScrollView
+              style={s.purchaseScroll}
+              contentContainerStyle={s.purchaseContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text style={s.purchasePrice}>
+                {formatCents(
+                  (purchaseProduct?.variants ?? []).find((variant: any) => variant.id === selectedVariantId)?.priceCents
+                    ?? purchaseTag.priceCents,
+                )}
+              </Text>
+              <Text style={s.fieldLabel}>Option</Text>
+              <View style={s.variantRow}>
+                {(purchaseProduct?.variants ?? []).map((variant: any) => {
+                  const available = (variant.stock ?? 0) > 0;
+                  const label = [variant.size, variant.color].filter(Boolean).join(' / ') || 'Default';
+                  return (
+                    <TouchableOpacity
+                      key={variant.id}
+                      disabled={!available}
+                      onPress={() => setSelectedVariantId(variant.id)}
+                      style={[
+                        s.variantChip,
+                        selectedVariantId === variant.id && { borderColor: PURPLE },
+                        !available && s.variantDisabled,
+                      ]}
+                    >
+                      <Text style={s.variantText}>{label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <Text style={s.fieldLabel}>Delivery</Text>
+              <TextInput value={buyerEmail} onChangeText={setBuyerEmail} placeholder="Email" placeholderTextColor={SUBTLE} keyboardType="email-address" autoCapitalize="none" style={s.purchaseInput} />
+              <TextInput value={buyerName} onChangeText={setBuyerName} placeholder="Full name" placeholderTextColor={SUBTLE} style={s.purchaseInput} />
+              <TextInput value={street} onChangeText={setStreet} placeholder="Street address" placeholderTextColor={SUBTLE} style={s.purchaseInput} />
+              <View style={s.addressRow}>
+                <TextInput value={city} onChangeText={setCity} placeholder="City" placeholderTextColor={SUBTLE} style={[s.purchaseInput, { flex: 1 }]} />
+                <TextInput value={region} onChangeText={setRegion} placeholder="State" placeholderTextColor={SUBTLE} autoCapitalize="characters" style={[s.purchaseInput, s.regionInput]} />
+                <TextInput value={postalCode} onChangeText={setPostalCode} placeholder="ZIP" placeholderTextColor={SUBTLE} keyboardType="numbers-and-punctuation" style={[s.purchaseInput, s.postalInput]} />
+              </View>
+              {checkoutError ? <Text style={s.checkoutError}>{checkoutError}</Text> : null}
+              <TouchableOpacity
+                onPress={checkoutInStream}
+                disabled={checkoutBusy || !!purchaseProduct?.sellerVacationMode}
+                style={[s.buyNowButton, { backgroundColor: PURPLE }, (checkoutBusy || purchaseProduct?.sellerVacationMode) && s.buyNowDisabled]}
+              >
+                {checkoutBusy ? <ActivityIndicator color={BG} /> : (
+                  <Text style={s.buyNowText}>
+                    {purchaseProduct?.sellerVacationMode ? 'Seller is away' : 'Buy now'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+              <Text style={s.purchaseFootnote}>Secure payment opens over the live stream. Return here when finished.</Text>
+            </ScrollView>
+          )}
+        </View>
+      )}
     </View>
   );
 }
@@ -332,6 +497,34 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   inputRow:         { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingTop: 6 },
   textInput:        { flex: 1, backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: RADIUS.pill, paddingHorizontal: 15, paddingVertical: 9, color: '#fff', fontFamily: FONT.regular, fontSize: FS.sm },
   sendBtn:          { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
+  purchaseSheet: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 30,
+    maxHeight: H * 0.78, backgroundColor: BG, borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl, borderWidth: 1, borderColor: BORDER,
+    paddingHorizontal: SP.md, paddingTop: SP.xs,
+  },
+  purchaseHandle: { width: 42, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: SP.md },
+  purchaseHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm },
+  purchaseEyebrow: { color: LIVE_RED, fontFamily: FONT.bold, fontSize: 9, letterSpacing: 1.1, marginBottom: 4 },
+  purchaseTitle: { color: FG, fontFamily: FONT.bold, fontSize: FS.lg },
+  purchaseClose: { width: 38, height: 38, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: BORDER },
+  purchaseScroll: { marginTop: SP.sm },
+  purchaseContent: { paddingBottom: SP.md, gap: SP.sm },
+  purchasePrice: { color: FG, fontFamily: FONT.bold, fontSize: FS.xl },
+  fieldLabel: { color: MUTED, fontFamily: FONT.semibold, fontSize: FS.xs, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: SP.xs },
+  variantRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs },
+  variantChip: { borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: SP.xs },
+  variantDisabled: { opacity: 0.35 },
+  variantText: { color: FG, fontFamily: FONT.medium, fontSize: FS.xs },
+  purchaseInput: { minHeight: 44, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, paddingHorizontal: SP.sm, color: FG, fontFamily: FONT.regular, fontSize: FS.sm },
+  addressRow: { flexDirection: 'row', gap: SP.xs },
+  regionInput: { width: 72 },
+  postalInput: { width: 88 },
+  checkoutError: { color: RED, fontFamily: FONT.medium, fontSize: FS.xs, lineHeight: 17 },
+  buyNowButton: { minHeight: 48, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center', marginTop: SP.xs },
+  buyNowDisabled: { opacity: 0.45 },
+  buyNowText: { color: BG, fontFamily: FONT.bold, fontSize: FS.sm },
+  purchaseFootnote: { color: MUTED, fontFamily: FONT.regular, fontSize: 10, textAlign: 'center', lineHeight: 15 },
   // Ended
   endedIcon:        { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   endedTitle:       { fontSize: FS.lg, fontFamily: FONT.bold },

@@ -13,7 +13,8 @@ import {
   FONT, FS,
 } from '@/lib/theme';
 import { useApi } from '@/lib/api';
-import { fmtCurrency, fmtDate } from '@/lib/format';
+import { fmtDate } from '@/lib/format';
+import { formatCents } from '@/lib/money';
 import { getCustomerAnalytics, getFilterState } from '@/services/analyticsService';
 import { CustomerAnalytics, AnalyticsMetric, CustomerCohort, AnalyticsFilterState } from '@/services/analyticsTypes';
 
@@ -29,6 +30,8 @@ type TopCustomer = {
 };
 
 function KpiRow({ m, iconName, iconColor }: { m: AnalyticsMetric; iconName: keyof typeof Feather.glyphMap; iconColor: string }) {
+  const colors = useColors();
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const upColor = m.trend === 'up' ? SUCCESS : RED;
   return (
     <View style={s.kpiRow}>
@@ -40,16 +43,20 @@ function KpiRow({ m, iconName, iconColor }: { m: AnalyticsMetric; iconName: keyo
       </View>
       <View style={{ alignItems: 'flex-end' }}>
         <Text style={s.kpiValue}>{m.formatted}</Text>
-        <Text style={[s.kpiChange, { color: m.trend === 'flat' ? MUTED : upColor }]}>
-          {m.changePct > 0 ? '+' : ''}{m.changePct.toFixed(1)}%
-        </Text>
+        {m.trend && m.trend !== 'flat' && typeof m.changePct === 'number' ? (
+          <Text style={[s.kpiChange, { color: upColor }]}>
+            {m.changePct > 0 ? '+' : ''}{m.changePct.toFixed(1)}%
+          </Text>
+        ) : null}
       </View>
     </View>
   );
 }
 
 export default function AnalyticsCustomersScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const colors = useColors();
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = colors;
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
@@ -61,24 +68,28 @@ export default function AnalyticsCustomersScreen() {
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
-    const f = filter ?? await getFilterState();
-    if (!filter) setFilter(f);
-    const [analytics, customerResponse] = await Promise.all([
-      getCustomerAnalytics(f),
-      api.analytics.customers(10).catch(() => null),
-    ]);
-    setData(analytics);
-    if (customerResponse) {
-      setTopCustomers(customerResponse.topCustomers ?? []);
-      setTopCustomersError(null);
-    } else {
-      setTopCustomers([]);
-      setTopCustomersError('Could not load top customers. Pull to refresh to try again.');
-    }
-    setLoading(false); setRefreshing(false);
+    try {
+      const f = filter ?? await getFilterState();
+      if (!filter) setFilter(f);
+      const [analytics, customerResponse] = await Promise.all([
+        getCustomerAnalytics(f), api.analytics.customers(10).catch(() => null),
+      ]);
+      setData(analytics); setError(null);
+      if (customerResponse) {
+        setTopCustomers(customerResponse.topCustomers ?? []);
+        setTopCustomersError(null);
+      } else {
+        setTopCustomers([]);
+        setTopCustomersError('Could not load top customers. Pull to refresh to try again.');
+      }
+    } catch (err) {
+      setData(null); setTopCustomers([]);
+      setError(err instanceof Error ? err.message : 'Customer analytics are unavailable.');
+    } finally { setLoading(false); setRefreshing(false); }
   }, [api, filter]);
 
   useEffect(() => { load(); }, []); // eslint-disable-line
@@ -86,6 +97,7 @@ export default function AnalyticsCustomersScreen() {
   if (loading) {
     return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><ActivityIndicator size="large" color={PURPLE} /></View>;
   }
+  if (error) return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><Text style={{ color: MUTED }}>{error}</Text><TouchableOpacity onPress={() => load()}><Text style={{ color: PURPLE }}>Retry</Text></TouchableOpacity></View>;
 
   return (
     <ScrollView
@@ -100,7 +112,7 @@ export default function AnalyticsCustomersScreen() {
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={s.pageTitle}>Customer Analytics</Text>
-          <Text style={s.subtitle}>{filter?.dateRange.label ?? '30 days'}</Text>
+          <Text style={s.subtitle}>All time</Text>
         </View>
       </View>
 
@@ -110,19 +122,11 @@ export default function AnalyticsCustomersScreen() {
         {data && <>
           <KpiRow m={data.totalCustomers}       iconName="users"    iconColor={PURPLE} />
           <View style={s.divider} />
-          <KpiRow m={data.newCustomers}         iconName="user-plus" iconColor={SUCCESS} />
-          <View style={s.divider} />
           <KpiRow m={data.returningCustomers}   iconName="repeat"   iconColor={BLUE} />
           <View style={s.divider} />
           <KpiRow m={data.repeatRate}           iconName="refresh-cw" iconColor={PURPLE} />
           <View style={s.divider} />
-          <KpiRow m={data.avgCustomerValue}     iconName="dollar-sign" iconColor={GOLD} />
-          <View style={s.divider} />
-          <KpiRow m={data.clv}                  iconName="heart"    iconColor={SUCCESS} />
-          <View style={s.divider} />
           <KpiRow m={data.purchaseFrequency}    iconName="shopping-bag" iconColor={BLUE} />
-          <View style={s.divider} />
-          <KpiRow m={data.avgDaysBetweenOrders} iconName="clock"    iconColor={MUTED} />
         </>}
       </View>
 
@@ -155,7 +159,7 @@ export default function AnalyticsCustomersScreen() {
                 </Text>
               </View>
               <View style={s.customerSpend}>
-                <Text style={s.customerSpendValue}>{fmtCurrency(customer.totalCents / 100)}</Text>
+                <Text style={s.customerSpendValue}>{formatCents(customer.totalCents)}</Text>
                 {customer.customerId ? <Feather name="chevron-right" size={16} color={MUTED} /> : null}
               </View>
               </>
@@ -185,21 +189,21 @@ export default function AnalyticsCustomersScreen() {
           <View style={[s.riskIcon, { backgroundColor: ORANGE_DIM }]}>
             <Feather name="alert-triangle" size={18} color={ORANGE} />
           </View>
-          <Text style={[s.riskValue, { color: ORANGE }]}>{data?.atRiskCount.formatted ?? '—'}</Text>
+          <Text style={[s.riskValue, { color: ORANGE }]}>—</Text>
           <Text style={s.riskLabel}>At-Risk</Text>
         </View>
         <View style={[s.riskCard, { borderColor: GOLD + '44' }]}>
           <View style={[s.riskIcon, { backgroundColor: 'rgba(245,158,11,0.12)' }]}>
             <Feather name="star" size={18} color={GOLD} />
           </View>
-          <Text style={[s.riskValue, { color: GOLD }]}>{data?.vipCount.formatted ?? '—'}</Text>
+          <Text style={[s.riskValue, { color: GOLD }]}>—</Text>
           <Text style={s.riskLabel}>VIP</Text>
         </View>
         <View style={[s.riskCard, { borderColor: RED + '44' }]}>
           <View style={[s.riskIcon, { backgroundColor: RED_DIM }]}>
             <Feather name="user-x" size={18} color={RED} />
           </View>
-          <Text style={[s.riskValue, { color: RED }]}>{data?.churnRisk.formatted ?? '—'}</Text>
+          <Text style={[s.riskValue, { color: RED }]}>—</Text>
           <Text style={s.riskLabel}>Churn Risk</Text>
         </View>
       </View>
@@ -223,7 +227,7 @@ export default function AnalyticsCustomersScreen() {
               <Text style={[s.cohortCell, { color: retColor(c.month1RetentionPct) }]}>{c.month1RetentionPct > 0 ? `${c.month1RetentionPct}%` : '—'}</Text>
               <Text style={[s.cohortCell, { color: retColor(c.month2RetentionPct) }]}>{c.month2RetentionPct > 0 ? `${c.month2RetentionPct}%` : '—'}</Text>
               <Text style={[s.cohortCell, { color: retColor(c.month3RetentionPct) }]}>{c.month3RetentionPct > 0 ? `${c.month3RetentionPct}%` : '—'}</Text>
-              <Text style={[s.cohortCell, { color: GOLD }]}>${c.avgLtv}</Text>
+               <Text style={[s.cohortCell, { color: GOLD }]}>{formatCents(c.avgLtvCents)}</Text>
             </View>
           ))}
         </View>
@@ -260,7 +264,9 @@ function retColor(pct: number): string {
   return RED;
 }
 
-const s = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT } = colors;
+  return StyleSheet.create({
   scroll:   { flex: 1, backgroundColor: BG },
   content:  { paddingHorizontal: 16 },
   loadWrap: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
@@ -301,4 +307,5 @@ const s = StyleSheet.create({
   customerSpendValue: { fontSize: 14, fontFamily: FONT.semibold, color: FG },
   customerEmpty: { minHeight: 90, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 20, gap: 8 },
   customerEmptyText: { fontSize: 12, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' },
-});
+  });
+};

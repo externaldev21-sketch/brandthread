@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
 import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
+import { formatCents } from '@/lib/money';
 
 const SHIPMENTS = [
   { id: 'SH-8821', customer: 'Jordan Lee', carrier: 'UPS', status: 'In Transit', eta: 'Jul 10', progress: 70 },
@@ -207,13 +208,13 @@ export default function ShippingScreen() {
                 <Text style={[styles.rateName, { color: colors.foreground }]}>{rate.name ?? 'Shipping Rate'}</Text>
                 {rate.freeAboveCents != null && (
                   <Text style={[styles.rateSub, { color: colors.mutedForeground }]}>
-                    Free above ${(rate.freeAboveCents / 100).toFixed(2)}
+                    Free above {formatCents(rate.freeAboveCents)}
                   </Text>
                 )}
               </View>
               <View style={styles.rateRight}>
                 <Text style={[styles.rateAmount, { color: colors.foreground }]}>
-                  ${(rate.flatRateCents / 100).toFixed(2)}
+                  {formatCents(rate.flatRateCents)}
                 </Text>
                 <Badge
                   label={rate.active !== false ? 'Active' : 'Inactive'}

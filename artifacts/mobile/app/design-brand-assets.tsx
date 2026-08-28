@@ -3,7 +3,7 @@
  * Route: /design-brand-assets
  */
 import React, { useState, useEffect, useMemo } from 'react';
-import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList,
   Alert, Image, Modal,
@@ -17,8 +17,6 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM,
   RED, RED_DIM,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
@@ -40,7 +38,9 @@ function formatDate(iso: string): string {
 }
 
 export default function DesignBrandAssetsScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const bas = createStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [assets, setAssets] = useState<BrandAsset[]>([]);
@@ -318,7 +318,9 @@ function assetTypeIcon(type: BrandAssetType): keyof typeof Feather.glyphMap {
   return map[type] ?? 'file';
 }
 
-const bas = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { accent: PURPLE, accentDim: PURPLE_DIM } = theme;
+  return StyleSheet.create({
   root:          { flex: 1, backgroundColor: BG },
   topBar:        { flexDirection: 'row', alignItems: 'center', backgroundColor: SURFACE, borderBottomWidth: 1, borderBottomColor: BORDER, paddingHorizontal: SP.md, paddingBottom: SP.sm, gap: SP.sm },
   backBtn:       { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
@@ -357,4 +359,5 @@ const bas = StyleSheet.create({
 
   fab:           { position: 'absolute', right: SP.md, flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: PURPLE, borderRadius: RADIUS.pill, paddingHorizontal: SP.md, paddingVertical: SP.sm },
   fabText:       { fontSize: FS.sm, fontFamily: FONT.semibold, color: '#FFFFFF' },
-});
+  });
+};

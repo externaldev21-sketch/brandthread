@@ -197,6 +197,64 @@ router.post("/remove", async (req, res) => {
   }
 });
 
+// ─── POST /api/bg-removal/replace ───────────────────────────────────────────
+// { image, backgroundImage?, prompt?, color?, bgType? }
+// Image 1 is always the locked source subject. Image 2, when supplied, is the
+// replacement background reference.
+router.post("/replace", async (req, res) => {
+  const userId: string = (req as any).auth?.userId ?? (req as any).auth?.sub ?? "anon";
+  if (!checkRateLimit(userId)) {
+    res.status(429).json({ error: "Rate limit reached. Please wait a minute and try again." });
+    return;
+  }
+
+  const { image, backgroundImage, prompt, color, bgType } = req.body ?? {};
+  const source = decodeDataUrl(image);
+  const background = backgroundImage === undefined ? null : decodeDataUrl(backgroundImage);
+  if (!source) {
+    res.status(400).json({ error: "A valid source image is required." });
+    return;
+  }
+  if (backgroundImage !== undefined && !background) {
+    res.status(400).json({ error: "The replacement background image is invalid." });
+    return;
+  }
+  if (source.buffer.length > MAX_IMAGE_BYTES || (background && background.buffer.length > MAX_IMAGE_BYTES)) {
+    res.status(400).json({ error: "Each image must be under 8 MB." });
+    return;
+  }
+
+  const safePrompt = typeof prompt === "string" ? prompt.trim().slice(0, 400) : "";
+  const safeColor = typeof color === "string" ? color.trim().slice(0, 32) : "";
+  const safeBgType = typeof bgType === "string" ? bgType.trim().slice(0, 32) : "";
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "bg-replace-"));
+
+  try {
+    const sourcePath = path.join(tmpDir, `${randomUUID()}-source.png`);
+    await fs.writeFile(sourcePath, source.buffer);
+    const files = [sourcePath];
+    if (background) {
+      const backgroundPath = path.join(tmpDir, `${randomUUID()}-background.png`);
+      await fs.writeFile(backgroundPath, background.buffer);
+      files.push(backgroundPath);
+    }
+
+    const direction = background
+      ? "Use Image 2 as the new background."
+      : safePrompt || (safeColor ? `Use a solid ${safeColor} background.` : `Create the requested ${safeBgType || "studio"} background.`);
+    const editPrompt =
+      `Replace only the background of Image 1. Keep the foreground subject or product exactly as it appears: preserve its identity, shape, colors, artwork, logo, texture, position, scale, crop, and fine edge detail. ${direction} ` +
+      "Blend edges, lighting, and shadows naturally, but do not redesign or replace the foreground subject.";
+
+    const resultBuffer = await editImages(files, editPrompt);
+    res.json({ b64_json: resultBuffer.toString("base64") });
+  } catch {
+    res.status(502).json({ error: "Background replacement failed. Please try again." });
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
 // ─── GET /api/bg-removal/results/:key(*) ────────────────────────────────────
 // Serves a previously processed result from GCS.
 // The storageKey is URL-encoded in the path.

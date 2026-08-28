@@ -18,6 +18,7 @@ import {
 import { getOrder, updateReturnStatus } from '@/services/orderService';
 import { Order, ReturnRequest, RETURN_REASONS } from '@/services/orderTypes';
 import { useColors } from '@/hooks/useColors';
+import { formatCents } from '@/lib/money';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -206,8 +207,8 @@ export default function ReturnDetailScreen() {
               <Text style={styles.itemVariant}>{item.variant}</Text>
               <View style={styles.itemRow}>
                 <Text style={styles.itemQty}>Qty: {item.quantity}</Text>
-                <Text style={styles.itemPrice}>× ${item.unitPrice.toFixed(2)}</Text>
-                <Text style={styles.itemTotal}> = ${(item.quantity * item.unitPrice).toFixed(2)}</Text>
+                <Text style={styles.itemPrice}>× {formatCents(item.unitPriceCents)}</Text>
+                <Text style={styles.itemTotal}> = {formatCents(item.quantity * item.unitPriceCents)}</Text>
               </View>
               <View style={styles.reasonRow}>
                 <Text style={styles.metaLabel}>Reason: </Text>

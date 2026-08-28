@@ -59,6 +59,10 @@ export const users = pgTable('users', {
   vacationMode:    boolean('vacation_mode').notNull().default(false),
   vacationMessage: text('vacation_message'),
   vacationUntil:   timestamp('vacation_until', { withTimezone: true }),
+  notificationPreferences: json('notification_preferences')
+    .$type<Record<string, boolean>>()
+    .notNull()
+    .default({}),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -101,7 +105,9 @@ export const products = pgTable('products', {
   sizeChart:             json('size_chart').$type<Record<string, unknown> | null>(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  dropIdx: index('products_drop_id_idx').on(table.dropId),
+}));
 
 // ─── Product Variants (size / color / SKU combos) ─────────────────────────────
 
@@ -116,7 +122,9 @@ export const productVariants = pgTable('product_variants', {
   lowStockThreshold: integer('low_stock_threshold').notNull().default(10),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  productIdx: index('product_variants_product_id_idx').on(table.productId),
+}));
 
 // ─── Customers ────────────────────────────────────────────────────────────────
 
@@ -158,6 +166,16 @@ export const drops = pgTable('drops', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
+
+export const dropAlertSubscriptions = pgTable('drop_alert_subscriptions', {
+  id:        uuid('id').primaryKey().defaultRandom(),
+  dropId:    uuid('drop_id').notNull().references(() => drops.id, { onDelete: 'cascade' }),
+  userId:    text('user_id').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  uniq:    unique().on(t.dropId, t.userId),
+  userIdx: index('drop_alert_subscriptions_user_idx').on(t.userId),
+}));
 
 // ─── Orders ───────────────────────────────────────────────────────────────────
 
@@ -203,7 +221,10 @@ export const orders = pgTable('orders', {
   stripeCheckoutSessionId: text('stripe_checkout_session_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  customerIdx: index('orders_customer_id_idx').on(table.customerId),
+  dropIdx: index('orders_drop_id_idx').on(table.dropId),
+}));
 
 // ─── Order Items ──────────────────────────────────────────────────────────────
 
@@ -215,7 +236,10 @@ export const orderItems = pgTable('order_items', {
   variantLabel: text('variant_label'),
   quantity: integer('quantity').notNull(),
   priceCents: integer('price_cents').notNull(), // server-resolved price at time of order
-});
+}, (table) => ({
+  orderIdx: index('order_items_order_id_idx').on(table.orderId),
+  variantIdx: index('order_items_variant_id_idx').on(table.variantId),
+}));
 
 // ─── Posts ────────────────────────────────────────────────────────────────────
 
@@ -238,7 +262,9 @@ export const interactions = pgTable('interactions', {
   type: text('type').notNull(),        // 'like' | 'comment' | 'follow' | 'watch_time'
   value: text('value'),               // e.g. comment text, seconds watched, followed user ID
   createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  postIdx: index('interactions_post_id_idx').on(table.postId),
+}));
 
 // ─── Checkout Sessions (server-side cart record for Stripe webhook reconstruction)
 
@@ -350,7 +376,9 @@ export const sellerQuoteRequests = pgTable('seller_quote_requests', {
   notes:            text('notes'),
   createdAt:        timestamp('created_at').defaultNow().notNull(),
   updatedAt:        timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  manufacturerIdx: index('seller_quote_requests_mfr_idx').on(table.manufacturerId),
+}));
 
 // ─── Relations ────────────────────────────────────────────────────────────────
 
@@ -558,7 +586,10 @@ export const reviews = pgTable('reviews', {
   body:      text('body'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  orderIdx: index('reviews_order_id_idx').on(table.orderId),
+  productIdx: index('reviews_product_id_idx').on(table.productId),
+}));
 
 // ─── Shoppable post tagging ────────────────────────────────────────────────────
 
@@ -568,7 +599,10 @@ export const postTaggedProducts = pgTable('post_tagged_products', {
   productId: uuid('product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
   position:  integer('position').notNull().default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  postIdx: index('ptp_post_id_idx').on(table.postId),
+  productIdx: index('ptp_product_id_idx').on(table.productId),
+}));
 
 // ─── Server-side stories (buyers + sellers, 24 h TTL) ────────────────────────
 
@@ -654,6 +688,14 @@ export const returns = pgTable('returns', {
   stripeRefundId:      text('stripe_refund_id'),
   refundAmountCents:   integer('refund_amount_cents'),
   sellerResponse:      text('seller_response'),
+  evidenceUrls:        json('evidence_urls').$type<string[]>().notNull().default([]),
+  requestedItems:      json('requested_items').$type<Array<{
+    lineItemId?: string;
+    productName?: string;
+    variantTitle?: string;
+    quantity?: number;
+    unitPriceCents?: number;
+  }>>().notNull().default([]),
   createdAt:           timestamp('created_at').defaultNow().notNull(),
   updatedAt:           timestamp('updated_at').defaultNow().notNull(),
 }, (t) => ({
@@ -719,6 +761,7 @@ export const waitlistEntries = pgTable('waitlist_entries', {
   createdAt:    timestamp('created_at').defaultNow().notNull(),
 }, (t) => ({
   uniq: unique().on(t.productId, t.variantId, t.userId),
+  variantIdx: index('waitlist_entries_variant_id').on(t.variantId),
 }));
 
 // ─── Product bundles ──────────────────────────────────────────────────────────
@@ -742,7 +785,11 @@ export const bundleItems = pgTable('bundle_items', {
   productId:  uuid('product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
   variantId:  uuid('variant_id'),
   quantity:   integer('quantity').notNull().default(1),
-});
+}, (table) => ({
+  bundleIdx: index('bundle_items_bundle_id_idx').on(table.bundleId),
+  productIdx: index('bundle_items_product_id_idx').on(table.productId),
+  variantIdx: index('bundle_items_variant_id_idx').on(table.variantId),
+}));
 
 // ─── Storefronts ─────────────────────────────────────────────────────────────
 export const storefronts = pgTable('storefronts', {
@@ -775,7 +822,9 @@ export const storefrontVersions = pgTable('storefront_versions', {
   snapshot:     json('snapshot').$type<Record<string, unknown>>().notNull().default({}),
   createdBy:    text('created_by').notNull(),
   createdAt:    timestamp('created_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  storefrontIdx: index('storefront_versions_storefront_id_idx').on(table.storefrontId),
+}));
 
 export const storefrontCustomDomains = pgTable('storefront_custom_domains', {
   id:           uuid('id').primaryKey().defaultRandom(),
@@ -784,7 +833,9 @@ export const storefrontCustomDomains = pgTable('storefront_custom_domains', {
   verified:     boolean('verified').notNull().default(false),
   verifyToken:  text('verify_token'),
   createdAt:    timestamp('created_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  storefrontIdx: index('storefront_custom_domains_storefront_id_idx').on(table.storefrontId),
+}));
 
 // ─── Team Members ─────────────────────────────────────────────────────────────
 export const teamMembers = pgTable('team_members', {
@@ -828,7 +879,9 @@ export const teamActivityLogs = pgTable('team_activity_logs', {
   target:    text('target'),
   metadata:  json('metadata').$type<Record<string, unknown>>().notNull().default({}),
   createdAt: timestamp('created_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  memberIdx: index('team_activity_logs_member_id_idx').on(table.memberId),
+}));
 
 // ─── Disputes / Chargebacks ───────────────────────────────────────────────────
 export const disputes = pgTable('disputes', {
@@ -850,7 +903,9 @@ export const disputes = pgTable('disputes', {
   customerClaim:          text('customer_claim').notNull().default(''),
   createdAt:              timestamp('created_at').defaultNow().notNull(),
   updatedAt:              timestamp('updated_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  orderIdx: index('disputes_order_idx').on(table.orderId),
+}));
 
 // ─── Paid Promotion Boosts ────────────────────────────────────────────────────
 export const boosts = pgTable('boosts', {
@@ -858,6 +913,7 @@ export const boosts = pgTable('boosts', {
   sellerId:                text('seller_id').notNull(),
   targetType:              text('target_type').notNull(),             // 'post' | 'product'
   targetId:                text('target_id').notNull(),
+  objective:               text('objective').notNull().default('views'), // 'views' | 'likes' | 'followers' | 'profile_visits'
   budgetCents:             integer('budget_cents').notNull(),
   spentCents:              integer('spent_cents').notNull().default(0),
   durationDays:            integer('duration_days').notNull().default(7),

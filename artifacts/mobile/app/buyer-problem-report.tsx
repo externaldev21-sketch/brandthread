@@ -18,7 +18,7 @@ import { PROBLEM_TYPE_OPTIONS, BuyerProblemType } from '@/services/cartTypes';
 import { getBuyerOrder } from '@/services/orderService';
 import { BuyerOrderView } from '@/services/orderTypes';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
+  BG, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE,
   SUCCESS, ON_DARK,
   ORANGE, ORANGE_DIM,
@@ -32,7 +32,7 @@ export default function BuyerProblemReportScreen() {
   const PURPLE = theme.accent;
   const PURPLE_LIGHT = theme.accentLight;
   const PURPLE_DIM = theme.accentDim;
-  const GRAD_PRIMARY = [theme.accent, theme.accentLight] as const;
+  const GRAD_PRIMARY = theme.primaryGradient;
   const s = makeStyles(theme);
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const router = useRouter();
@@ -257,7 +257,7 @@ const makeStyles = (theme: { accent: string; accentLight: string; accentDim: str
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
   switchLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginBottom: 2 },
   switchSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  contactBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: SP.sm, padding: SP.sm, backgroundColor: theme.accentDim, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER_ACTIVE, alignSelf: 'flex-start' },
+  contactBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: SP.sm, padding: SP.sm, backgroundColor: theme.accentDim, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: theme.accent, alignSelf: 'flex-start' },
   contactBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.accentLight },
   disputeNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: ORANGE_DIM, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: 'rgba(249,115,22,0.3)', padding: SP.sm, marginBottom: SP.md },
   disputeNoteText: { fontSize: FS.xs, fontFamily: FONT.regular, color: ORANGE, flex: 1, lineHeight: 17 },

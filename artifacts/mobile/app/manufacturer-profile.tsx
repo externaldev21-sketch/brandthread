@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Alert, ActivityIndicator, Platform, Image,
@@ -32,6 +33,7 @@ import {
 } from '@/services/manufacturerService';
 
 import { Manufacturer, ManufacturerRelationship } from '@/services/manufacturerTypes';
+import { formatCents } from '@/lib/money';
 
 // ─── Star Rating ──────────────────────────────────────────────────────────────
 
@@ -83,6 +85,7 @@ const DEMO_REVIEWS = [
 
 export default function ManufacturerProfileScreen() {
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { theme } = useAppTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -161,7 +164,7 @@ export default function ManufacturerProfileScreen() {
       >
         {/* ── Sticky Hero ── */}
         <LinearGradient
-          colors={['#1a0a2e', '#0a1628', '#07070F']}
+          colors={theme.heroGradient}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[s.hero, { paddingTop: insets.top + SP.sm }]}
@@ -173,8 +176,8 @@ export default function ManufacturerProfileScreen() {
 
           {/* Factory icon */}
           <View style={s.factoryIconWrap}>
-            <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.factoryIconBg}>
-              <Feather name="settings" size={ICON.xxl} color={ON_DARK} />
+            <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.factoryIconBg}>
+              <Feather name="settings" size={ICON.xxl} color={theme.onAccent} />
             </LinearGradient>
           </View>
 
@@ -182,9 +185,9 @@ export default function ManufacturerProfileScreen() {
           <View style={s.heroNameRow}>
             <Text style={s.heroName}>{m.name}</Text>
             {m.isVerified && (
-              <View style={s.verifiedBadge}>
-                <Feather name="check-circle" size={14} color={CYAN} />
-                <Text style={s.verifiedText}>Verified</Text>
+              <View style={[s.verifiedBadge, { backgroundColor: theme.secondaryDim }]}>
+                <Feather name="check-circle" size={14} color={theme.secondary} />
+                <Text style={[s.verifiedText, { color: theme.secondary }]}>Verified</Text>
               </View>
             )}
           </View>
@@ -268,7 +271,7 @@ export default function ManufacturerProfileScreen() {
           {m.specialties.length > 0 && (
             <SectionCard title="Specialties">
               <View style={s.chipRow}>
-                {m.specialties.map(s2 => <Chip key={s2} label={s2} color={'rgba(34,211,238,0.12)'} textColor={CYAN_LIGHT} />)}
+                {m.specialties.map(s2 => <Chip key={s2} label={s2} color={theme.secondaryDim} textColor={theme.secondary} />)}
               </View>
             </SectionCard>
           )}
@@ -337,11 +340,11 @@ export default function ManufacturerProfileScreen() {
               </View>
               <View style={s.pricingItem}>
                 <Text style={s.pricingLabel}>Unit Price</Text>
-                <Text style={s.pricingValue}>${m.unitPriceMin}–${m.unitPriceMax}</Text>
+                <Text style={s.pricingValue}>{formatCents(m.unitPriceMinCents)}–{formatCents(m.unitPriceMaxCents)}</Text>
               </View>
               <View style={s.pricingItem}>
                 <Text style={s.pricingLabel}>Sample Price</Text>
-                <Text style={s.pricingValue}>${m.samplePriceMin}–${m.samplePriceMax}</Text>
+                <Text style={s.pricingValue}>{formatCents(m.samplePriceMinCents)}–{formatCents(m.samplePriceMaxCents)}</Text>
               </View>
               <View style={s.pricingItem}>
                 <Text style={s.pricingLabel}>Lead Time</Text>
@@ -460,7 +463,7 @@ const s = StyleSheet.create({
   },
   verifiedBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: 'rgba(34,211,238,0.15)', borderRadius: RADIUS.pill,
+    borderRadius: RADIUS.pill,
     paddingHorizontal: SP.sm, paddingVertical: 3,
   },
   verifiedText: {

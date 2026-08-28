@@ -3,30 +3,18 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View, Text, ScrollView, TouchableOpacity, TextInput,
-  StyleSheet, Alert, ActivityIndicator, Switch, FlatList,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, ActivityIndicator, Switch, FlatList } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN, SUCCESS, SUCCESS_DIM,
-  BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM,
-  GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import {
-  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  IconButton, StatusBadge, SectionHeader,
-} from '@/components/BrandthreadUI';
-import {
-  getOrder, getDemoShippingRates, buyDemoLabel, voidLabel,
-} from '@/services/orderService';
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader } from '@/components/BrandthreadUI';
+import { getOrder, getDemoShippingRates, buyDemoLabel, voidLabel } from '@/services/orderService';
 import { Order, ShippingRate, ShippingLabel } from '@/services/orderTypes';
+import { formatCents } from '@/lib/money';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,8 +25,8 @@ type PackageType = 'parcel' | 'envelope' | 'flat_rate_box';
 function fmt(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
-function usd(n: number) {
-  return `$${n.toFixed(2)}`;
+function usd(cents: number) {
+  return formatCents(cents);
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -201,7 +189,7 @@ export default function ShippingLabelScreen() {
                 </View>
                 <View style={s.labelInfoRow}>
                   <Text style={s.labelInfoLabel}>Price</Text>
-                  <Text style={[s.labelInfoValue, { color: SUCCESS }]}>{usd(label.price)}</Text>
+                  <Text style={[s.labelInfoValue, { color: SUCCESS }]}>{usd(label.priceCents)}</Text>
                 </View>
                 <View style={s.labelInfoRow}>
                   <Text style={s.labelInfoLabel}>Purchased</Text>
@@ -267,7 +255,7 @@ export default function ShippingLabelScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {/* Demo notice */}
-        <GradientCard colors={['rgba(34,211,238,0.12)', 'rgba(34,211,238,0.04)']} style={{ borderColor: CYAN + '44' }}>
+        <GradientCard colors={[theme.secondaryDim, theme.accentDim]} style={{ borderColor: theme.secondary }}>
           <View style={s.demoRow}>
             <Feather name="info" size={ICON.sm} color={CYAN} />
             <Text style={s.demoText}>
@@ -435,7 +423,7 @@ export default function ShippingLabelScreen() {
                         <Text style={s.rateCarrier}>{rate.carrier}</Text>
                         <Text style={s.rateService}>{rate.service}</Text>
                       </View>
-                      <Text style={[s.ratePrice, selected && { color: PURPLE }]}>{usd(rate.price)}</Text>
+                      <Text style={[s.ratePrice, selected && { color: PURPLE }]}>{usd(rate.priceCents)}</Text>
                     </View>
                     <View style={s.rateMeta}>
                       <Text style={s.rateDelivery}>Est. delivery: {rate.estimatedDelivery} · {rate.estimatedDays}d</Text>
@@ -473,7 +461,7 @@ export default function ShippingLabelScreen() {
               </View>
               <View style={s.summaryRow}>
                 <Text style={s.summaryLabel}>Label Price</Text>
-                <Text style={[s.summaryValue, { color: PURPLE }]}>{usd(selectedRate.price)}</Text>
+                <Text style={[s.summaryValue, { color: PURPLE }]}>{usd(selectedRate.priceCents)}</Text>
               </View>
               <View style={s.summaryRow}>
                 <Text style={s.summaryLabel}>Funds Source</Text>

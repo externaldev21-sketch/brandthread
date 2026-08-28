@@ -9,10 +9,7 @@ import SellerTutorialOverlay from '@/components/SellerTutorialOverlay';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { useApi } from '@/lib/api';
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  useWindowDimensions, Alert, ActivityIndicator,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions, Alert, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -22,19 +19,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { dismissTip, markFeatureOpened, getSetupState } from '@/lib/setupStore';
 import { getProjects } from '@/services/designService';
 import { DesignProject, PROJECT_TYPE_LABELS, PROJECT_STATUS_LABELS } from '@/services/designTypes';
-import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
-  ORANGE, ORANGE_DIM, GOLD,
-  GRAD_PRIMARY, GRAD_CARD_GLOW,
-  FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import {
-  BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
-  SectionHeader, EmptyState, GuidedTip, NewFeatureBadge, StatusBadge, LockBadge,
-} from '@/components/BrandthreadUI';
+import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, SectionHeader, EmptyState, GuidedTip, NewFeatureBadge, StatusBadge, LockBadge } from '@/components/BrandthreadUI';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
@@ -150,8 +137,8 @@ const STUDIO_TOOLS: StudioTool[] = [
     title: 'AI Design',
     desc: 'Describe your idea and create unique designs.',
     icon: 'zap',
-    accent: '#A78BFA',
-    accentDim: '#3B2A6E',
+    accent: '',
+    accentDim: '',
     route: '/design-text-to-design',
   },
   {
@@ -339,17 +326,19 @@ export default function StudioScreen() {
         <View style={[s.toolGrid, { paddingHorizontal: H_PAD }]}>
           {STUDIO_TOOLS.map((tool) => {
             const isLocked = GROWTH_REQUIRED_TOOLS.has(tool.id) && !hasPlan('growth');
+            const toolAccent = tool.id === 'ai-design' ? theme.accentLight : tool.accent;
+            const toolAccentDim = tool.id === 'ai-design' ? theme.accentDim : tool.accentDim;
             return (
               <TouchableOpacity
                 key={tool.id}
                 activeOpacity={0.85}
                 onPress={() => handleToolPress(tool)}
-                style={[s.toolCard, { width: toolCardWidth, borderColor: tool.accent + '33' }]}
+                style={[s.toolCard, { width: toolCardWidth, borderColor: toolAccent + '33' }]}
               >
                 {/* Icon row */}
                 <View style={s.toolCardTop}>
-                  <View style={[s.toolIconBg, { backgroundColor: tool.accentDim }]}>
-                    <Feather name={tool.icon} size={ICON.sm} color={tool.accent} />
+                  <View style={[s.toolIconBg, { backgroundColor: toolAccentDim }]}>
+                    <Feather name={tool.icon} size={ICON.sm} color={toolAccent} />
                   </View>
                   {isLocked ? (
                     <LockBadge locked />
@@ -363,7 +352,7 @@ export default function StudioScreen() {
                 {/* Labels */}
                 <Text style={s.toolTitle} numberOfLines={1}>{tool.title}</Text>
                 <Text style={s.toolDesc}>{tool.desc}</Text>
-                <Text style={[s.toolCta, { color: isLocked ? MUTED : tool.accent }]}>
+                <Text style={[s.toolCta, { color: isLocked ? MUTED : toolAccent }]}>
                   {isLocked ? 'Growth plan →' : 'Open →'}
                 </Text>
               </TouchableOpacity>
@@ -408,7 +397,7 @@ export default function StudioScreen() {
                 style={s.projCard}
               >
                 <LinearGradient
-                  colors={['#7C3AED', '#2563EB']}
+                  colors={theme.primaryGradient}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={s.projThumb}

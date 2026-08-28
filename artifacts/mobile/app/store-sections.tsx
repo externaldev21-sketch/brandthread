@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -11,7 +12,7 @@ import {
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
   ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
+  GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
@@ -71,6 +72,8 @@ const SECTION_CATALOG = [
 ];
 
 export default function StoreSectionsScreen() {
+  const { theme } = useAppTheme();
+  const styles = makeStyles(theme);
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -153,7 +156,11 @@ export default function StoreSectionsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE = theme.accent;
+  const PURPLE_DIM = theme.accentDim;
+  const BORDER_ACTIVE = theme.accentLight;
+  return StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: BG,
@@ -250,4 +257,5 @@ const styles = StyleSheet.create({
     fontFamily: FONT.semibold,
     color: PURPLE,
   },
-});
+  });
+};

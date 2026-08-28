@@ -43,7 +43,7 @@ function Divider() {
 export default function BuyerPersonalDetails() {
   const { theme } = useAppTheme();
   const PURPLE = theme.accent;
-  const GRAD_PRIMARY = [theme.accent, theme.accentLight] as const;
+  const GRAD_PRIMARY = theme.primaryGradient;
   const s = makeStyles();
   const insets = useSafeAreaInsets();
   const router = useRouter();

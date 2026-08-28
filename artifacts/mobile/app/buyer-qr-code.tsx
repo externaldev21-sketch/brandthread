@@ -7,7 +7,7 @@ import * as Haptics from 'expo-haptics';
 import QRCode from 'react-native-qrcode-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, ON_DARK,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -17,8 +17,8 @@ import type { BuyerSocialProfile } from '@/services/socialTypes';
 export default function BuyerQRCode() {
   const { theme } = useAppTheme();
   const PURPLE = theme.accent;
-  const GRAD_PRIMARY = [theme.accent, theme.accentLight] as const;
-  const s = makeStyles();
+  const GRAD_PRIMARY = theme.primaryGradient;
+  const s = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [profile, setProfile] = useState<BuyerSocialProfile | null>(null);
@@ -113,7 +113,7 @@ export default function BuyerQRCode() {
   );
 }
 
-const makeStyles = () => StyleSheet.create({
+const makeStyles = (theme: { accent: string }) => StyleSheet.create({
   page: { flex: 1, backgroundColor: BG },
   header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
@@ -126,7 +126,7 @@ const makeStyles = () => StyleSheet.create({
   cardBrand: { fontFamily: FONT.bold, fontSize: FS.md, color: ON_DARK, letterSpacing: 1.5 },
 
   qrWrap: { alignItems: 'center', paddingVertical: SP.xl },
-  qrBg: { padding: 20, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER_ACTIVE },
+  qrBg: { padding: 20, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: RADIUS.lg, borderWidth: 1, borderColor: theme.accent },
 
   handleRow: { alignItems: 'center', marginBottom: SP.md },
   handleBadge: { paddingHorizontal: SP.lg, paddingVertical: 8, borderRadius: RADIUS.pill },

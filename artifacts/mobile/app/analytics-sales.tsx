@@ -17,7 +17,9 @@ import {
 import { getSalesAnalytics, getFilterState, exportAnalytics } from '@/services/analyticsService';
 import { SalesAnalytics, AnalyticsMetric, AnalyticsPoint, AnalyticsFilterState } from '@/services/analyticsTypes';
 
-function MiniBar({ points, color = PURPLE }: { points: AnalyticsPoint[]; color?: string }) {
+function MiniBar({ points, color }: { points: AnalyticsPoint[]; color: string }) {
+  const colors = useColors();
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const max = Math.max(...points.map(p => p.value), 1);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 32, gap: 2 }}>
@@ -29,6 +31,8 @@ function MiniBar({ points, color = PURPLE }: { points: AnalyticsPoint[]; color?:
 }
 
 function StatRow({ m, isDeduction = false }: { m: AnalyticsMetric; isDeduction?: boolean }) {
+  const colors = useColors();
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const upColor = isDeduction ? (m.trend === 'up' ? RED : SUCCESS) : (m.trend === 'up' ? SUCCESS : RED);
   return (
     <View style={s.statRow}>
@@ -37,16 +41,20 @@ function StatRow({ m, isDeduction = false }: { m: AnalyticsMetric; isDeduction?:
       </View>
       <View style={{ alignItems: 'flex-end' }}>
         <Text style={[s.statValue, isDeduction && { color: RED }]}>{isDeduction ? `−${m.formatted}` : m.formatted}</Text>
-        <Text style={[s.statChange, { color: upColor }]}>
-          {m.changePct > 0 ? '+' : ''}{m.changePct.toFixed(1)}% vs prev
-        </Text>
+        {typeof m.changePct === 'number' ? (
+          <Text style={[s.statChange, { color: upColor }]}>
+            {m.changePct > 0 ? '+' : ''}{m.changePct.toFixed(1)}% vs prev
+          </Text>
+        ) : null}
       </View>
     </View>
   );
 }
 
 export default function AnalyticsSalesScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const colors = useColors();
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = colors;
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -56,14 +64,17 @@ export default function AnalyticsSalesScreen() {
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeChart, setActiveChart] = useState<'sales' | 'orders' | 'units' | 'aov' | 'refunds'>('sales');
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
-    const f = filter ?? await getFilterState();
-    if (!filter) setFilter(f);
-    const d = await getSalesAnalytics(f);
-    setData(d);
-    setLoading(false); setRefreshing(false);
+    try {
+      const f = filter ?? await getFilterState();
+      if (!filter) setFilter(f);
+      setData(await getSalesAnalytics(f)); setError(null);
+    } catch (err) {
+      setData(null); setError(err instanceof Error ? err.message : 'Sales analytics are unavailable.');
+    } finally { setLoading(false); setRefreshing(false); }
   }, [filter]);
 
   useEffect(() => { load(); }, []); // eslint-disable-line
@@ -82,6 +93,7 @@ export default function AnalyticsSalesScreen() {
   if (loading) {
     return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><ActivityIndicator size="large" color={PURPLE} /><Text style={s.loadText}>Loading…</Text></View>;
   }
+  if (error) return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><Text style={s.loadText}>{error}</Text><TouchableOpacity onPress={() => load()}><Text style={{ color: PURPLE }}>Retry</Text></TouchableOpacity></View>;
 
   return (
     <ScrollView
@@ -107,12 +119,12 @@ export default function AnalyticsSalesScreen() {
       <View style={s.chartCard}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, flexDirection: 'row', marginBottom: 12 }}>
           {(['sales','orders','units','aov','refunds'] as const).map(k => (
-            <TouchableOpacity key={k} onPress={() => setActiveChart(k)} style={[s.chartTab, activeChart === k && s.chartTabActive]}>
-              <Text style={[s.chartTabText, activeChart === k && s.chartTabTextActive]}>{k.charAt(0).toUpperCase() + k.slice(1)}</Text>
+            <TouchableOpacity key={k} onPress={() => setActiveChart(k)} style={[s.chartTab, activeChart === k && s.chartTabActive, activeChart === k && { backgroundColor: PURPLE_DIM, borderColor: PURPLE }]}>
+              <Text style={[s.chartTabText, activeChart === k && s.chartTabTextActive, activeChart === k && { color: PURPLE_LIGHT }]}>{k.charAt(0).toUpperCase() + k.slice(1)}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
-        <MiniBar points={chartData()} />
+        <MiniBar points={chartData()} color={PURPLE} />
         <View style={s.xRow}>
           <Text style={s.xLabel}>Start</Text>
           <Text style={s.xLabel}>Today</Text>
@@ -124,38 +136,6 @@ export default function AnalyticsSalesScreen() {
       <View style={s.card}>
         {data && <>
           <StatRow m={data.grossSales} />
-          <View style={s.divider} />
-          <StatRow m={data.discounts}  isDeduction />
-          <StatRow m={data.returns}    isDeduction />
-          <StatRow m={data.refunds}    isDeduction />
-          <View style={s.divider} />
-          <StatRow m={data.shippingRevenue} />
-          <StatRow m={data.taxes} />
-          <View style={[s.divider, { borderColor: BORDER_ACTIVE }]} />
-          <View style={s.statRow}>
-            <Text style={[s.statLabel, { color: FG, fontFamily: FONT.bold }]}>Net Sales</Text>
-            <Text style={[s.statValue, { color: SUCCESS, fontSize: 18 }]}>{data.netSales.formatted}</Text>
-          </View>
-        </>}
-      </View>
-
-      {/* Cost & profit */}
-      <Text style={s.sectionTitle}>Cost & Profit Estimate</Text>
-      <View style={s.card}>
-        {data && <>
-          <StatRow m={data.cogs}            isDeduction />
-          <StatRow m={data.estimatedFees}   isDeduction />
-          <View style={s.divider} />
-          <View style={s.statRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={[s.statLabel, { color: FG, fontFamily: FONT.bold }]}>Est. Profit</Text>
-              <Text style={[s.statLabel, { color: SUBTLE }]}>Estimate — actual costs may differ</Text>
-            </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={[s.statValue, { color: GOLD, fontSize: 18 }]}>{data.estimatedProfit.formatted}</Text>
-              <Text style={[s.statChange, { color: SUCCESS }]}>{data.profitMargin.formatted} margin</Text>
-            </View>
-          </View>
         </>}
       </View>
 
@@ -174,6 +154,7 @@ export default function AnalyticsSalesScreen() {
             </View>
           </View>
         ))}
+        {data?.breakdown.length === 0 && <Text style={[s.statLabel, { padding: 16 }]}>No product breakdown is available for this period.</Text>}
       </View>
 
       <View style={{ height: 120 }} />
@@ -181,7 +162,9 @@ export default function AnalyticsSalesScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT } = colors;
+  return StyleSheet.create({
   scroll:   { flex: 1, backgroundColor: BG },
   content:  { paddingHorizontal: 16 },
   loadWrap: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', gap: 16 },
@@ -206,9 +189,10 @@ const s = StyleSheet.create({
   breakShare:{ fontSize: 11, fontFamily: FONT.regular, color: MUTED },
   chartCard:{ backgroundColor: CARD, borderRadius: 14, padding: 16, borderWidth: 1, borderColor: BORDER, marginBottom: 20 },
   chartTab: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, backgroundColor: CARD_ELEVATED },
-  chartTabActive:{ backgroundColor: PURPLE_DIM, borderWidth: 1, borderColor: PURPLE },
+  chartTabActive:{ borderWidth: 1 },
   chartTabText:{ fontSize: 11, fontFamily: FONT.medium, color: MUTED },
-  chartTabTextActive:{ color: PURPLE_LIGHT },
+  chartTabTextActive:{},
   xRow:     { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
   xLabel:   { fontSize: 10, fontFamily: FONT.regular, color: SUBTLE },
-});
+  });
+};

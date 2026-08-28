@@ -31,6 +31,7 @@ export interface AnalyticsComparison {
 /** A single chart data point */
 export interface AnalyticsPoint {
   date:  string;  // ISO date
+  /** Currency series use integer cents; other series use their native unit. */
   value: number;
   label?: string;
 }
@@ -39,13 +40,14 @@ export interface AnalyticsPoint {
 export interface AnalyticsMetric {
   key:           string;
   label:         string;
+  /** Currency metrics are always integer cents; other metrics use their native unit. */
   value:         number;
   formatted:     string;         // "$12,400" | "3.4%" | "48"
-  change:        number;         // absolute change
-  changePct:     number;         // percent change (e.g. 12.5 = +12.5%)
-  trend:         'up' | 'down' | 'flat';
-  sparkline:     AnalyticsPoint[];
-  comparedTo:    string;         // "vs. previous period"
+  change?:       number;         // available only when the API returns comparison data
+  changePct?:    number;
+  trend?:        'up' | 'down' | 'flat';
+  sparkline?:    AnalyticsPoint[];
+  comparedTo?:   string;
   unit:          'currency' | 'percent' | 'number' | 'days';
 }
 
@@ -118,7 +120,7 @@ export interface ProductAnalyticsRow {
   productId:      string;
   name:           string;
   imageUrl?:      string;
-  revenue:        number;
+  revenueCents:   number;
   unitsSold:      number;
   profit:         number;
   conversionRate: number;
@@ -179,7 +181,7 @@ export interface CustomerCohort {
   month1RetentionPct: number;
   month2RetentionPct: number;
   month3RetentionPct: number;
-  avgLtv:          number;
+  avgLtvCents:     number;
 }
 
 export interface CustomerLocationRow {
@@ -294,10 +296,10 @@ export interface CampaignAnalytics {
   opens:            number;
   clicks:           number;
   orders:           number;
-  revenue:          number;
+  revenueCents:     number;
   conversionRate:   number;
   unsubscribes:     number;
-  revenuePerRecipient: number;
+  revenuePerRecipientCents: number;
   sentAt:           string;
 }
 
@@ -307,8 +309,8 @@ export interface InfluencerAnalytics {
   views:         number;
   clicks:        number;
   orders:        number;
-  revenue:       number;
-  commission:    number;
+  revenueCents:  number;
+  commissionCents: number;
   returnOnCost:  number;
   discountUsage: number;
 }
@@ -318,9 +320,9 @@ export interface ReferralAnalytics {
   clicks:           number;
   referredCustomers: number;
   orders:           number;
-  revenue:          number;
-  rewardsIssued:    number;
-  topAdvocates:     Array<{ name: string; referrals: number; revenue: number }>;
+  revenueCents:     number;
+  rewardsIssuedCents: number;
+  topAdvocates:     Array<{ name: string; referrals: number; revenueCents: number }>;
 }
 
 export interface MarketingAnalytics {

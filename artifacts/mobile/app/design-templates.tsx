@@ -3,7 +3,7 @@
  * Route: /design-templates
  */
 import React, { useState, useMemo } from 'react';
-import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList,
 } from 'react-native';
@@ -16,10 +16,7 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM,
   FONT, FS, SP, RADIUS, ICON,
-  GRAD_PRIMARY, GRAD_CARD_GLOW,
 } from '@/lib/theme';
 import { SearchBar, EmptyState } from '@/components/BrandthreadUI';
 
@@ -70,7 +67,9 @@ const TEMPLATES: DesignTemplate[] = [
 const CATEGORIES: TemplateCategory[] = ['Garments', 'Social', 'Product', 'Packaging'];
 
 export default function DesignTemplatesScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
+  const ts = createStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [search, setSearch] = useState('');
@@ -182,7 +181,9 @@ export default function DesignTemplatesScreen() {
   );
 }
 
-const ts = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
+  return StyleSheet.create({
   root:          { flex: 1, backgroundColor: BG },
   topBar:        { flexDirection: 'row', alignItems: 'center', backgroundColor: SURFACE, borderBottomWidth: 1, borderBottomColor: BORDER, paddingHorizontal: SP.md, paddingBottom: SP.sm, gap: SP.sm },
   backBtn:       { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
@@ -208,4 +209,5 @@ const ts = StyleSheet.create({
   cardDims:      { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   useBtn:        { margin: SP.sm, marginTop: 0, backgroundColor: PURPLE_DIM, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER_ACTIVE, paddingVertical: 8, alignItems: 'center' },
   useBtnText:    { fontSize: FS.xs, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
-});
+  });
+};

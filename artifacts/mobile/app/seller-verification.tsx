@@ -6,34 +6,16 @@
  * Stripe sends a webhook that flips the status; the screen polls on re-focus.
  */
 import React, { useEffect, useState, useCallback } from 'react';
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, Linking,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
-import {
-  BG, CARD, BORDER,
-  FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  SUCCESS, SUCCESS_DIM,
-  RED, RED_DIM,
-  ORANGE, ORANGE_DIM,
-  GRAD_PRIMARY,
-  FONT, FS, SP, RADIUS, ICON,
-} from '@/lib/theme';
+import { BG, CARD, BORDER, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, RED, RED_DIM, ORANGE, ORANGE_DIM, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import {
-  BrandthreadHeader,
-  PrimaryButton,
-  SecondaryButton,
-  GradientCard,
-  BrandedLoadingState,
-} from '@/components/BrandthreadUI';
+import { BrandthreadHeader, PrimaryButton, SecondaryButton, GradientCard, BrandedLoadingState } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 
 type VerificationStatus = 'unverified' | 'pending' | 'verified' | 'failed';

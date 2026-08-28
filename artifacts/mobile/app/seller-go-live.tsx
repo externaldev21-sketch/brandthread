@@ -3,26 +3,22 @@
  * Sets title, optional product tags, then calls POST /api/live/start.
  */
 import React, { useState, useEffect } from 'react';
-import {
-  View, Text, TextInput, TouchableOpacity, ScrollView,
-  StyleSheet, Alert, ActivityIndicator, Image,
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, StyleSheet, Alert, ActivityIndicator, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
-import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, RED,
-  FONT, FS, SP, RADIUS,
-} from '@/lib/theme';
+import { BG, CARD, BORDER, FG, MUTED, SUBTLE, RED, FONT, FS, SP, RADIUS, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { formatCents } from '@/lib/money';
 
 const LIVE_RED = '#FF3B30';
 const LIVE_DIM = '#FF3B3020';
 
 export default function SellerGoLiveScreen() {
   const { theme } = useAppTheme();
+  const s = makeStyles(theme);
   const { accent: PURPLE } = theme;
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -61,11 +57,12 @@ export default function SellerGoLiveScreen() {
     try {
       const selectedProducts = products
         .filter(p => selectedProductIds.has(p.id))
-        .map(p => ({
+        .map((p, index) => ({
           productId: p.id,
           productName: p.name,
-          price: p.priceCents ? p.priceCents / 100 : 0,
+          priceCents: p.priceCents ?? 0,
           variantId: p.variants?.[0]?.id ?? null,
+          highlighted: index === 0,
         }));
 
       const result = await (api as any).live.start({
@@ -174,11 +171,11 @@ export default function SellerGoLiveScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={[s.productName, { color: FG }]} numberOfLines={1}>{p.name}</Text>
                       <Text style={[s.productPrice, { color: MUTED }]}>
-                        ${p.priceCents ? (p.priceCents / 100).toFixed(2) : '—'}
+                        {typeof p.priceCents === 'number' ? formatCents(p.priceCents) : '—'}
                       </Text>
                     </View>
                     <View style={[s.checkbox, selected && { backgroundColor: PURPLE, borderColor: PURPLE }]}>
-                      {selected && <Feather name="check" size={13} color="#fff" />}
+                      {selected && <Feather name="check" size={13} color={theme.onAccent} />}
                     </View>
                   </TouchableOpacity>
                 );
@@ -230,7 +227,9 @@ export default function SellerGoLiveScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE = theme.accent;
+  return StyleSheet.create({
   root:           { flex: 1, backgroundColor: BG },
   header:         { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1 },
   closeBtn:       { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
@@ -260,4 +259,5 @@ const s = StyleSheet.create({
   footer:         { borderTopWidth: 1, padding: SP.md },
   goLiveBtn:      { borderRadius: RADIUS.pill, height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   goLiveBtnText:  { color: '#fff', fontFamily: FONT.bold, fontSize: FS.base, letterSpacing: 0.5 },
-});
+  });
+};

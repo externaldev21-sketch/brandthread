@@ -28,10 +28,11 @@ interface NotifRow {
 }
 
 const ROWS: NotifRow[] = [
-  { key: 'customer',    icon: 'user',    label: 'Customer notifications',              description: 'Notify customers about order and account events' },
-  { key: 'staff',       icon: 'users',   label: 'Staff notifications',                 description: 'Notify staff members about new order events' },
-  { key: 'fulfillment', icon: 'package', label: 'Fulfillment request notification',    description: 'Notify your fulfillment service when you mark an order as fulfilled' },
-  { key: 'webhooks',    icon: 'code',    label: 'Webhooks',                            description: 'Send XML or JSON notifications about store events to a URL' },
+  { key: 'new_orders',             icon: 'shopping-bag',   label: 'New orders',             description: 'Get notified when a customer places an order' },
+  { key: 'production_milestones',  icon: 'package',        label: 'Production milestones',  description: 'Sampling, production, and fulfillment progress' },
+  { key: 'payout_confirmations',   icon: 'credit-card',    label: 'Payout confirmations',   description: 'Payout sent, completed, or delayed updates' },
+  { key: 'customer_messages',      icon: 'message-circle', label: 'Customer messages',      description: 'New messages and replies from customers' },
+  { key: 'disputes',               icon: 'alert-triangle', label: 'Disputes',               description: 'New disputes and time-sensitive case updates' },
 ];
 
 export default function NotificationsSettingsScreen() {
@@ -42,11 +43,12 @@ export default function NotificationsSettingsScreen() {
   const [digest, setDigest] = useState<DigestMode>('realtime');
   const [loading, setLoading] = useState(true);
   const [saving,  setSaving]  = useState(false);
+  const [categories, setCategories] = useState<Record<string, boolean>>({});
 
   // Load current preference from API
   useEffect(() => {
     api.seller.notificationPrefs.get()
-      .then(data => { setDigest(data.digest); })
+      .then(data => { setDigest(data.digest); setCategories(data.categories); })
       .catch(() => {/* fallback to realtime */})
       .finally(() => setLoading(false));
   }, []);
@@ -68,6 +70,18 @@ export default function NotificationsSettingsScreen() {
 
   function haptic() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  }
+
+  async function handleCategory(key: string, value: boolean) {
+    Haptics.selectionAsync();
+    const prior = categories;
+    setCategories({ ...categories, [key]: value });
+    try {
+      const result = await api.seller.notificationPrefs.update({ categories: { [key]: value } });
+      setCategories(result.categories);
+    } catch {
+      setCategories(prior);
+    }
   }
 
   return (
@@ -169,10 +183,8 @@ export default function NotificationsSettingsScreen() {
         <View style={s.section}>
           <View style={[s.listCard, { backgroundColor: CARD, borderColor: BORDER }]}>
             {ROWS.map((row, i) => (
-              <TouchableOpacity
+              <View
                 key={row.key}
-                onPress={haptic}
-                activeOpacity={0.7}
                 style={[s.row, i !== ROWS.length - 1 && { borderBottomWidth: 1, borderBottomColor: BORDER }]}
               >
                 <Feather name={row.icon} size={17} color={FG} style={s.rowIcon} />
@@ -180,8 +192,14 @@ export default function NotificationsSettingsScreen() {
                   <Text style={[s.rowLabel, { color: FG }]}>{row.label}</Text>
                   <Text style={[s.rowDescription, { color: MUTED }]}>{row.description}</Text>
                 </View>
-                <Feather name="chevron-right" size={16} color={MUTED} />
-              </TouchableOpacity>
+                <Switch
+                  value={categories[row.key] ?? true}
+                  onValueChange={(value) => handleCategory(row.key, value)}
+                  trackColor={{ false: SUBTLE, true: theme.accent }}
+                  thumbColor={FG}
+                  accessibilityLabel={`${row.label} push notifications`}
+                />
+              </View>
             ))}
           </View>
         </View>

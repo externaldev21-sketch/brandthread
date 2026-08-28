@@ -27,6 +27,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { formatCents } from '@/lib/money';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -112,7 +113,7 @@ export default function BuyerConversationScreen() {
   const { theme } = useAppTheme();
   const PURPLE = colors.primary, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = colors.accent, CYAN = theme.secondary, CYAN_DIM = theme.secondaryDim;
   const BORDER_ACTIVE = `${theme.accent}73`;
-  const GRAD_PRIMARY = [theme.accent, theme.secondary] as const;
+  const GRAD_PRIMARY = theme.primaryGradient;
   const s = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -519,11 +520,11 @@ export default function BuyerConversationScreen() {
     const prices = (product.variants ?? [])
       .map((variant) => variant.priceCents ?? 0)
       .filter((price) => price > 0);
-    const lowestPrice = prices.length > 0 ? Math.min(...prices) / 100 : null;
+    const lowestPriceCents = prices.length > 0 ? Math.min(...prices) : null;
     const attachment: MessageAttachment = {
       type: 'product',
       title: product.name,
-      subtitle: `${lowestPrice == null ? 'Product' : `$${lowestPrice.toFixed(2)}`}${product.category ? ` · ${product.category}` : ''}`,
+      subtitle: `${lowestPriceCents == null ? 'Product' : formatCents(lowestPriceCents)}${product.category ? ` · ${product.category}` : ''}`,
       accentColor: PURPLE,
       uri: product.images?.[0] ?? undefined,
       meta: { productId: product.id },
@@ -1125,7 +1126,7 @@ export default function BuyerConversationScreen() {
                     const prices = (product.variants ?? [])
                       .map((variant) => variant.priceCents ?? 0)
                       .filter((price) => price > 0);
-                    const lowestPrice = prices.length > 0 ? Math.min(...prices) / 100 : null;
+                    const lowestPriceCents = prices.length > 0 ? Math.min(...prices) : null;
                     return (
                       <TouchableOpacity
                         key={product.id}
@@ -1143,7 +1144,7 @@ export default function BuyerConversationScreen() {
                         <View style={{ flex: 1, marginLeft: SP.sm }}>
                           <Text style={s.productOptionName} numberOfLines={1}>{product.name}</Text>
                           <Text style={s.productOptionMeta} numberOfLines={1}>
-                            {lowestPrice == null ? 'Product' : `$${lowestPrice.toFixed(2)}`}
+                            {lowestPriceCents == null ? 'Product' : formatCents(lowestPriceCents)}
                             {product.category ? ` · ${product.category}` : ''}
                           </Text>
                         </View>

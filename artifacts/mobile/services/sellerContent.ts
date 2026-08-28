@@ -97,7 +97,7 @@ export const DEMO_SELLER_POSTS: SellerPost[] = [
     mediaUrls: ['https://assets.mixkit.co/videos/preview/mixkit-young-woman-posing-in-a-streetwear-outfit-42914-large.mp4'],
     overlays: [],
     productTags: [
-      { productId: 'p5', productName: 'Canvas Cargo Jacket', price: 149.99, timestamp: 4 },
+      { productId: 'p5', productName: 'Canvas Cargo Jacket', priceCents: 14999, timestamp: 4 },
     ],
     visibility: DEFAULT_VISIBILITY,
     isPinned: true,
@@ -117,7 +117,7 @@ export const DEMO_SELLER_POSTS: SellerPost[] = [
     mediaUrls: [],
     overlays: [],
     productTags: [
-      { productId: 'p1', productName: 'Vintage Washed Tee', price: 59.99, slideIndex: 0 },
+      { productId: 'p1', productName: 'Vintage Washed Tee', priceCents: 5999, slideIndex: 0 },
     ],
     visibility: DEFAULT_VISIBILITY,
     isPinned: false,
@@ -137,7 +137,7 @@ export const DEMO_SELLER_POSTS: SellerPost[] = [
     mediaUrls: [],
     overlays: [],
     productTags: [
-      { productId: 'p4', productName: 'Cargo Sweatpants', price: 79.99 },
+      { productId: 'p4', productName: 'Cargo Sweatpants', priceCents: 7999 },
     ],
     visibility: DEFAULT_VISIBILITY,
     isPinned: false,
@@ -155,7 +155,7 @@ export const DEMO_SELLER_POSTS: SellerPost[] = [
     mediaUrls: [],
     overlays: [],
     productTags: [
-      { productId: 'p3', productName: 'Archive Tee Vol.3', price: 69.99 },
+      { productId: 'p3', productName: 'Archive Tee Vol.3', priceCents: 6999 },
     ],
     visibility: DEFAULT_VISIBILITY,
     isPinned: false,
@@ -192,7 +192,7 @@ export const DEMO_SELLER_POSTS: SellerPost[] = [
     mediaUrls: [],
     overlays: [],
     productTags: [
-      { productId: 'p6', productName: 'Heavyweight Crewneck', price: 99.99 },
+      { productId: 'p6', productName: 'Heavyweight Crewneck', priceCents: 9999 },
     ],
     visibility: DEFAULT_VISIBILITY,
     isPinned: false,
@@ -262,7 +262,7 @@ export const DEMO_PRODUCTS_FOR_TAG = DEMO_PRODUCTS.filter(
 ).map(p => ({
   id:    p.id,
   name:  p.name,
-  price: p.price,
+  priceCents: p.priceCents,
   status: p.status,
   salesModel: p.salesModel,
   colors: ['#4A3B7A', '#1E1540'] as [string, string],

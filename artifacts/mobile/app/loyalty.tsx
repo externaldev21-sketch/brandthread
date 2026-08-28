@@ -18,6 +18,7 @@ import {
   ORANGE, GOLD, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { formatCents } from '@/lib/money';
 
 type PointEntry = {
   id: string;
@@ -111,7 +112,7 @@ export default function LoyaltyScreen() {
           <Text style={[s.heroUnit, { color: theme.accentLight }]}>points</Text>
           {balance > 0 && (
             <View style={[s.heroValuePill, { backgroundColor: theme.accentDim }]}>
-              <Text style={[s.heroValueText, { color: theme.accentLight }]}>≈ ${(valueCents / 100).toFixed(2)} off your next order</Text>
+              <Text style={[s.heroValueText, { color: theme.accentLight }]}>≈ {formatCents(valueCents)} off your next order</Text>
             </View>
           )}
           {balance === 0 && (
@@ -150,7 +151,7 @@ export default function LoyaltyScreen() {
             />
             {previewDiscount >= 100 && (
               <View style={s.discountPreview}>
-                <Text style={s.discountPreviewText}>= ${(previewDiscount / 100).toFixed(2)} off</Text>
+                <Text style={s.discountPreviewText}>= {formatCents(previewDiscount)} off</Text>
               </View>
             )}
           </View>

@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, Alert,
@@ -21,6 +22,8 @@ import { StoreDomain } from '@/services/storeTypes';
 type MergedDomain = StoreDomain & { dnsToken?: string };
 
 export default function StoreDomainScreen() {
+  const { theme } = useAppTheme();
+  const dm = makeStyles(theme);
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const headerTopInset = useHeaderTopInset();
@@ -265,7 +268,10 @@ export default function StoreDomainScreen() {
   );
 }
 
-const dm = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE_LIGHT = theme.accentLight;
+  const CYAN = theme.secondary;
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
@@ -309,4 +315,5 @@ const dm = StyleSheet.create({
   addDomainText: { fontSize: FS.base, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
   fieldLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
   noteText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-});
+  });
+};

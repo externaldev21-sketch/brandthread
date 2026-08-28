@@ -2,7 +2,7 @@
  * Brandthread Design Studio — Project Creation Wizard (6 steps)
  */
 import React, { useState, useEffect } from 'react';
-import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, ActivityIndicator, Alert,
@@ -15,9 +15,7 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE, BORDER_SUBTLE,
   FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM,
   SUCCESS, BLUE, ORANGE, GOLD,
-  GRAD_PRIMARY, GRAD_CARD_GLOW,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
@@ -43,12 +41,12 @@ type ProjectTypeOption = {
   accent: string;
 };
 
-const PROJECT_TYPE_OPTIONS: ProjectTypeOption[] = [
-  { type: 'garment',   icon: 'layers',      label: 'Garment Design',   desc: 'Design apparel — tees, hoodies, hats & more', accent: PURPLE },
-  { type: 'canvas',    icon: 'edit-2',      label: 'Free Canvas',      desc: 'Open canvas for any creative work',           accent: CYAN },
+const projectTypeOptions = (theme: ReturnType<typeof useAppTheme>['theme']): ProjectTypeOption[] => [
+  { type: 'garment',   icon: 'layers',      label: 'Garment Design',   desc: 'Design apparel — tees, hoodies, hats & more', accent: theme.accent },
+  { type: 'canvas',    icon: 'edit-2',      label: 'Free Canvas',      desc: 'Open canvas for any creative work',           accent: theme.secondary },
   { type: 'mockup',    icon: 'box',         label: 'Product Mockup',   desc: 'Photorealistic product visuals',               accent: ORANGE },
   { type: 'campaign',  icon: 'trending-up', label: 'Campaign Image',   desc: 'Multi-format marketing content',               accent: BLUE },
-  { type: 'social',    icon: 'instagram',   label: 'Social Content',   desc: 'Posts, stories & reels content',               accent: PURPLE_LIGHT },
+  { type: 'social',    icon: 'instagram',   label: 'Social Content',   desc: 'Posts, stories & reels content',               accent: theme.accentLight },
   { type: 'packaging', icon: 'package',     label: 'Packaging',        desc: 'Box, bag & label design',                      accent: GOLD },
 ];
 
@@ -61,15 +59,15 @@ const BG_OPTIONS: { label: string; value: string; icon: string }[] = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function typeAccent(type: DesignProjectType): string {
+function typeAccent(type: DesignProjectType, theme: ReturnType<typeof useAppTheme>['theme']): string {
   switch (type) {
-    case 'garment':   return PURPLE;
-    case 'canvas':    return CYAN;
+    case 'garment':   return theme.accent;
+    case 'canvas':    return theme.secondary;
     case 'mockup':    return ORANGE;
     case 'campaign':  return BLUE;
-    case 'social':    return PURPLE_LIGHT;
+    case 'social':    return theme.accentLight;
     case 'packaging': return GOLD;
-    default:          return PURPLE;
+    default:          return theme.accent;
   }
 }
 
@@ -83,11 +81,12 @@ interface StepHeaderProps {
 }
 
 function StepHeader({ step, total, title, subtitle }: StepHeaderProps) {
+  const { theme } = useAppTheme();
   const pct = (step / total) * 100;
   return (
     <View style={sh.root}>
       <View style={sh.barBg}>
-        <LinearGradient colors={GRAD_PRIMARY} style={[sh.barFill, { width: `${pct}%` }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
+        <LinearGradient colors={theme.primaryGradient} style={[sh.barFill, { width: `${pct}%` }]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} />
       </View>
       <Text style={sh.stepCount}>Step {step} of {total}</Text>
       <Text style={sh.title}>{title}</Text>
@@ -108,7 +107,9 @@ const sh = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function DesignProjectScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const styles = createStyles(theme);
   const router = useRouter();
   const params = useLocalSearchParams<{ type?: string; garmentType?: string }>();
 
@@ -206,7 +207,8 @@ export default function DesignProjectScreen() {
     }
   }
 
-  const accent = projectType ? typeAccent(projectType) : PURPLE;
+  const options = projectTypeOptions(theme);
+  const accent = projectType ? typeAccent(projectType, theme) : PURPLE;
   const canProceedStep2 = projectType === 'garment' ? selectedTemplate !== null : selectedPreset !== null;
   const finalName = projectName || (projectType ? PROJECT_TYPE_LABELS[projectType] : 'New Project');
 
@@ -231,7 +233,7 @@ export default function DesignProjectScreen() {
           <View>
             <StepHeader step={1} total={6} title="What are you creating?" subtitle="Choose the type of project to start." />
             <View style={styles.typeGrid}>
-              {PROJECT_TYPE_OPTIONS.map(opt => (
+              {options.map(opt => (
                 <TouchableOpacity
                   key={opt.type}
                   style={[styles.typeCard, projectType === opt.type && { borderColor: opt.accent }]}
@@ -494,7 +496,7 @@ export default function DesignProjectScreen() {
             <StepHeader step={6} total={6} title="Ready to create" subtitle="Review your project settings before creating." />
             <BrandthreadCard style={styles.summaryCard} elevated>
               <View style={[styles.summaryIcon, { backgroundColor: accent + '22' }]}>
-                <Feather name={PROJECT_TYPE_OPTIONS.find(o => o.type === projectType)?.icon as any ?? 'edit-2'} size={ICON.xl} color={accent} />
+                <Feather name={options.find(o => o.type === projectType)?.icon as any ?? 'edit-2'} size={ICON.xl} color={accent} />
               </View>
               <Text style={styles.summaryName}>{finalName}</Text>
 
@@ -542,6 +544,7 @@ export default function DesignProjectScreen() {
 // ─── Summary Row ──────────────────────────────────────────────────────────────
 
 function SummaryRow({ label, value, swatch, swatchColor }: { label: string; value: string; swatch?: boolean; swatchColor?: string }) {
+  const styles = createStyles(useAppTheme().theme);
   return (
     <View style={sr.row}>
       <Text style={sr.label}>{label}</Text>
@@ -565,7 +568,9 @@ const sr = StyleSheet.create({
 
 // ─── Main Styles ──────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
+  return StyleSheet.create({
   scroll: {
     paddingBottom: 40,
   },
@@ -884,4 +889,5 @@ const styles = StyleSheet.create({
     fontSize: FS.base,
     color: MUTED,
   },
-});
+  });
+};

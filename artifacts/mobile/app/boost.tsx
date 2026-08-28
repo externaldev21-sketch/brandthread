@@ -2,12 +2,14 @@
  * Paid Promotion Boost Tool
  * Route: /boost?targetType=post|product&targetId=<uuid>
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator,
+  Alert, ActivityIndicator, PanResponder, LayoutChangeEvent,
 } from 'react-native';
+import { Image } from 'expo-image';
+import { VideoView, useVideoPlayer } from 'expo-video';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,25 +20,34 @@ import {
   PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, SUCCESS, SUCCESS_DIM,
   ORANGE, RED, GOLD, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { divideCents, formatCents } from '@/lib/money';
 
-const BUDGETS = [
-  { label: '$10',  cents: 1000  },
-  { label: '$25',  cents: 2500  },
-  { label: '$50',  cents: 5000  },
-  { label: '$100', cents: 10000 },
-  { label: '$250', cents: 25000 },
+type BoostObjective = 'views' | 'likes' | 'followers' | 'profile_visits';
+
+const OBJECTIVES: Array<{
+  value: BoostObjective;
+  label: string;
+  description: string;
+  icon: React.ComponentProps<typeof Feather>['name'];
+}> = [
+  { value: 'views', label: 'More video views', description: 'Reach people likely to watch', icon: 'play-circle' },
+  { value: 'likes', label: 'More likes', description: 'Find people likely to engage', icon: 'heart' },
+  { value: 'followers', label: 'More followers', description: 'Grow your audience', icon: 'user-plus' },
+  { value: 'profile_visits', label: 'More profile visits', description: 'Drive people to your shop', icon: 'user' },
 ];
-const DURATIONS = [
-  { label: '3 days',  days: 3  },
-  { label: '7 days',  days: 7  },
-  { label: '14 days', days: 14 },
-  { label: '30 days', days: 30 },
-];
+
+type BoostTarget = {
+  id: string;
+  mediaUrl: string | null;
+  mediaType: string | null;
+  caption: string | null;
+  createdAt: string;
+};
 
 type Boost = {
   id: string; status: string; budgetCents: number; spentCents: number;
   impressionsCount: number; durationDays: number; startsAt: string; endsAt: string;
-  estimatedImpressions: number;
+  estimatedImpressions: number; objective: BoostObjective;
 };
 
 type Summary = {
@@ -50,28 +61,151 @@ function daysRemaining(endsAt: string): number {
   return Math.max(0, Math.ceil(ms / 86_400_000));
 }
 
+function objectiveLabel(value: BoostObjective): string {
+  return OBJECTIVES.find((item) => item.value === value)?.label ?? 'More video views';
+}
+
+function PostThumbnail({ target }: { target: BoostTarget }) {
+  const colors = useColors();
+  const s = React.useMemo(() => createStyles(colors), [colors]);
+  const isVideo = target.mediaType === 'video';
+  const player = useVideoPlayer(isVideo && target.mediaUrl ? target.mediaUrl : null, (instance) => {
+    instance.muted = true;
+    instance.loop = false;
+  });
+
+  if (!target.mediaUrl) {
+    return (
+      <View style={s.thumbnailFallback}>
+        <Feather name="file-text" size={26} color={MUTED} />
+      </View>
+    );
+  }
+
+  if (isVideo) {
+    return (
+      <View style={StyleSheet.absoluteFill}>
+        <VideoView player={player} style={StyleSheet.absoluteFill} contentFit="cover" nativeControls={false} />
+        <View style={s.videoBadge}><Feather name="play" size={10} color="#fff" /></View>
+      </View>
+    );
+  }
+
+  return <Image source={{ uri: target.mediaUrl }} style={StyleSheet.absoluteFill} contentFit="cover" />;
+}
+
+function SnapSlider({
+  value, min, max, step, onChange, accessibilityLabel,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (value: number) => void;
+  accessibilityLabel: string;
+}) {
+  const colors = useColors();
+  const s = React.useMemo(() => createStyles(colors), [colors]);
+  const widthRef = useRef(1);
+  const startValueRef = useRef(value);
+  startValueRef.current = value;
+
+  const snap = useCallback((raw: number) => {
+    const clamped = Math.max(min, Math.min(max, raw));
+    return Math.round((clamped - min) / step) * step + min;
+  }, [max, min, step]);
+
+  const updateFromX = useCallback((x: number) => {
+    onChange(snap(min + (Math.max(0, Math.min(widthRef.current, x)) / widthRef.current) * (max - min)));
+  }, [max, min, onChange, snap]);
+
+  const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: () => {
+      startValueRef.current = value;
+      Haptics.selectionAsync();
+    },
+    onPanResponderMove: (_event, gesture) => {
+      onChange(snap(startValueRef.current + (gesture.dx / widthRef.current) * (max - min)));
+    },
+  });
+
+  const fraction = (value - min) / (max - min);
+  return (
+    <View
+      style={s.sliderTouchArea}
+      onLayout={(event: LayoutChangeEvent) => { widthRef.current = Math.max(1, event.nativeEvent.layout.width); }}
+      onTouchEnd={(event) => updateFromX(event.nativeEvent.locationX)}
+      accessible
+      accessibilityRole="adjustable"
+      accessibilityLabel={accessibilityLabel}
+      accessibilityValue={{ min, max, now: value }}
+      accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+      onAccessibilityAction={(event) => {
+        onChange(snap(value + (event.nativeEvent.actionName === 'increment' ? step : -step)));
+      }}
+      {...panResponder.panHandlers}
+    >
+      <View style={s.sliderTrack}>
+        <View style={[s.sliderFill, { width: `${fraction * 100}%` }]} />
+      </View>
+      <View style={[s.sliderThumb, { left: `${fraction * 100}%` }]} />
+    </View>
+  );
+}
+
 export default function BoostScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const colors = useColors();
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = colors;
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
   const api     = useApi();
-  const { targetType, targetId } = useLocalSearchParams<{ targetType: string; targetId: string }>();
+  const params = useLocalSearchParams<{ targetType?: string; targetId?: string }>();
+  const initialTargetId = typeof params.targetId === 'string' ? params.targetId : '';
+  const initialTargetType = params.targetType === 'product' ? 'product' : 'post';
 
-  const [selectedBudget,   setSelectedBudget]   = useState(BUDGETS[1]);    // $25 default
-  const [selectedDuration, setSelectedDuration] = useState(DURATIONS[1]);  // 7d default
+  const [selectedTargetId, setSelectedTargetId] = useState(initialTargetId);
+  const [selectedTargetType, setSelectedTargetType] = useState<'post' | 'product'>(initialTargetType);
+  const [showPicker, setShowPicker] = useState(!initialTargetId);
+  const [targets, setTargets] = useState<BoostTarget[]>([]);
+  const [loadingTargets, setLoadingTargets] = useState(!initialTargetId);
+  const [targetError, setTargetError] = useState('');
+  const [objective, setObjective] = useState<BoostObjective>('views');
+  const [budgetCents, setBudgetCents] = useState(2500);
+  const [durationDays, setDurationDays] = useState(7);
   const [launching,        setLaunching]         = useState(false);
   const [existing,         setExisting]          = useState<Boost[]>([]);
   const [loadingExisting,  setLoadingExisting]   = useState(true);
   const [summary,          setSummary]           = useState<Summary | null>(null);
   const [loadingSummary,   setLoadingSummary]    = useState(true);
 
-  const estimatedImpressions = Math.round(selectedBudget.cents * 0.4);
+  const estimatedImpressions = Math.round(budgetCents * 0.4);
+  const selectedTarget = targets.find((item) => item.id === selectedTargetId);
+  const budgetLabel = formatCents(budgetCents);
+  const durationLabel = `${durationDays} ${durationDays === 1 ? 'day' : 'days'}`;
+
+  const loadTargets = useCallback(async () => {
+    setLoadingTargets(true);
+    setTargetError('');
+    try {
+      const rows = await api.boosts.targets();
+      setTargets(rows ?? []);
+    } catch {
+      setTargetError('We couldn’t load your posts. Check your connection and try again.');
+    } finally {
+      setLoadingTargets(false);
+    }
+  }, [api]);
 
   useFocusEffect(useCallback(() => {
+    loadTargets();
+
     // Load existing boosts for this target
-    if (targetId) {
+    if (selectedTargetId) {
       setLoadingExisting(true);
-      (api as any).boosts?.list?.(targetId)
+      api.boosts.list(selectedTargetId)
         .then((rows: Boost[]) => setExisting(rows ?? []))
         .catch(() => setExisting([]))
         .finally(() => setLoadingExisting(false));
@@ -81,29 +215,30 @@ export default function BoostScreen() {
 
     // Load summary stats
     setLoadingSummary(true);
-    (api as any).boosts?.summary?.()
+    api.boosts.summary()
       .then((s: Summary) => setSummary(s))
       .catch(() => setSummary(null))
       .finally(() => setLoadingSummary(false));
-  }, [api, targetId]));
+  }, [api, loadTargets, selectedTargetId]));
 
   async function handleLaunch() {
-    if (!targetType || !targetId) {
-      Alert.alert('Error', 'Invalid boost target.'); return;
+    if (!selectedTargetId) {
+      Alert.alert('Choose a post', 'Select the post you want to promote first.'); return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setLaunching(true);
     try {
-      await (api as any).boosts?.create?.({
-        targetType,
-        targetId,
-        budgetCents:  selectedBudget.cents,
-        durationDays: selectedDuration.days,
+      await api.boosts.create({
+        targetType: selectedTargetType,
+        targetId: selectedTargetId,
+        objective,
+        budgetCents,
+        durationDays,
       });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(
         '🚀 Boost Launched!',
-        `Your ${targetType} will get elevated placement for ${selectedDuration.label}. You'll see impressions grow in your analytics.`,
+        `Your ${selectedTargetType} will be promoted for ${durationLabel} with the goal “${objectiveLabel(objective)}.” You’ll see progress in your Boost history.`,
         [{ text: 'Done', onPress: () => router.back() }],
       );
     } catch (e: any) {
@@ -140,7 +275,7 @@ export default function BoostScreen() {
         <TouchableOpacity onPress={() => router.back()} style={s.headerBack} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
           <Feather name="arrow-left" size={20} color={FG} />
         </TouchableOpacity>
-        <Text style={s.headerTitle}>Boost {targetType === 'post' ? 'Post' : 'Product'}</Text>
+        <Text style={s.headerTitle}>Promote</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -161,7 +296,7 @@ export default function BoostScreen() {
                 <View style={s.summarySep} />
                 <View style={s.summaryItem}>
                   <Feather name="dollar-sign" size={16} color={GOLD} />
-                  <Text style={s.summaryValue}>${(summary.spentCentsThisMonth / 100).toFixed(2)}</Text>
+                  <Text style={s.summaryValue}>{formatCents(summary.spentCentsThisMonth)}</Text>
                   <Text style={s.summaryLabel}>Spent</Text>
                 </View>
                 <View style={s.summarySep} />
@@ -175,87 +310,202 @@ export default function BoostScreen() {
           )
         }
 
-        {/* What is a boost */}
-        <View style={s.infoBanner}>
-          <Feather name="zap" size={16} color={GOLD} />
-          <Text style={s.infoBannerText}>
-            Boosted content is ranked higher in buyer feeds, reaching beyond your existing followers.
-          </Text>
-        </View>
-
-        {/* Budget picker */}
-        <Text style={s.sectionLabel}>BUDGET</Text>
-        <View style={s.chipRow}>
-          {BUDGETS.map(b => (
-            <TouchableOpacity
-              key={b.cents}
-              style={[s.chip, selectedBudget.cents === b.cents && s.chipActive]}
-              onPress={() => { Haptics.selectionAsync(); setSelectedBudget(b); }}
-            >
-              <Text style={[s.chipText, selectedBudget.cents === b.cents && s.chipTextActive]}>{b.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Duration picker */}
-        <Text style={s.sectionLabel}>DURATION</Text>
-        <View style={s.chipRow}>
-          {DURATIONS.map(d => (
-            <TouchableOpacity
-              key={d.days}
-              style={[s.chip, selectedDuration.days === d.days && s.chipActive]}
-              onPress={() => { Haptics.selectionAsync(); setSelectedDuration(d); }}
-            >
-              <Text style={[s.chipText, selectedDuration.days === d.days && s.chipTextActive]}>{d.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Estimated reach */}
-        <View style={s.reachCard}>
-          <View style={s.reachRow}>
-            <Feather name="eye" size={18} color={PURPLE_LIGHT} />
-            <View style={{ flex: 1 }}>
-              <Text style={s.reachTitle}>Estimated Reach</Text>
-              <Text style={s.reachValue}>~{estimatedImpressions.toLocaleString()} impressions</Text>
+        {showPicker ? (
+          <View>
+            <View style={s.pickerHeadingRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={s.setupTitle}>Choose a post to promote</Text>
+                <Text style={s.setupSub}>Select one of your published posts or videos.</Text>
+              </View>
+              {selectedTargetId ? (
+                <TouchableOpacity onPress={() => setShowPicker(false)} style={s.cancelPickerBtn}>
+                  <Text style={s.cancelPickerText}>Cancel</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
+
+            {loadingTargets ? (
+              <ActivityIndicator color={PURPLE} style={{ marginVertical: 48 }} />
+            ) : targetError ? (
+              <View style={s.pickerState}>
+                <Feather name="wifi-off" size={24} color={MUTED} />
+                <Text style={s.pickerStateText}>{targetError}</Text>
+                <TouchableOpacity style={s.retryBtn} onPress={loadTargets}>
+                  <Text style={s.retryText}>Try again</Text>
+                </TouchableOpacity>
+              </View>
+            ) : targets.length === 0 ? (
+              <View style={s.pickerState}>
+                <Feather name="video" size={26} color={MUTED} />
+                <Text style={s.pickerStateTitle}>No posts to promote yet</Text>
+                <Text style={s.pickerStateText}>Publish a post or video first, then come back to Promote.</Text>
+              </View>
+            ) : (
+              <View style={s.postGrid}>
+                {targets.map((target) => (
+                  <TouchableOpacity
+                    key={target.id}
+                    style={s.postTile}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Promote ${target.caption || 'post'}`}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setSelectedTargetId(target.id);
+                      setSelectedTargetType('post');
+                      setShowPicker(false);
+                    }}
+                  >
+                    <PostThumbnail target={target} />
+                    <View style={s.tileScrim} />
+                    <Text style={s.tileCaption} numberOfLines={2}>{target.caption || 'Untitled post'}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
           </View>
-          <View style={s.divider} />
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-            <View style={s.reachStat}>
-              <Text style={s.reachStatLabel}>Total Charge</Text>
-              <Text style={s.reachStatValue}>{selectedBudget.label}</Text>
+        ) : (
+          <>
+            {/* Selected promotion target */}
+            <View style={s.selectedTargetCard}>
+              <View style={s.selectedTargetThumb}>
+                {selectedTarget ? (
+                  <PostThumbnail target={selectedTarget} />
+                ) : (
+                  <View style={s.thumbnailFallback}>
+                    <Feather name={selectedTargetType === 'product' ? 'shopping-bag' : 'video'} size={22} color={PURPLE_LIGHT} />
+                  </View>
+                )}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.selectedTargetEyebrow}>PROMOTING</Text>
+                <Text style={s.selectedTargetTitle} numberOfLines={2}>
+                  {selectedTarget?.caption || (selectedTargetType === 'product' ? 'Selected product' : 'Selected post')}
+                </Text>
+              </View>
+              {selectedTargetType === 'post' ? (
+                <TouchableOpacity style={s.changeBtn} onPress={() => setShowPicker(true)}>
+                  <Text style={s.changeBtnText}>Change</Text>
+                </TouchableOpacity>
+              ) : null}
             </View>
-            <View style={s.reachStat}>
-              <Text style={s.reachStatLabel}>Duration</Text>
-              <Text style={s.reachStatValue}>{selectedDuration.label}</Text>
-            </View>
-            <View style={s.reachStat}>
-              <Text style={s.reachStatLabel}>Per Day</Text>
-              <Text style={s.reachStatValue}>${(selectedBudget.cents / selectedDuration.days / 100).toFixed(2)}</Text>
-            </View>
-          </View>
-        </View>
 
-        {/* Launch button */}
-        <TouchableOpacity
-          style={[s.launchBtn, launching && { opacity: 0.6 }]}
-          onPress={handleLaunch}
-          disabled={launching}
-          activeOpacity={0.85}
-        >
-          {launching
-            ? <ActivityIndicator color="#fff" />
-            : <>
-                <Feather name="zap" size={18} color="#fff" />
-                <Text style={s.launchBtnText}>Launch Boost — Pay {selectedBudget.label}</Text>
-              </>
-          }
-        </TouchableOpacity>
+            {/* Goal selector */}
+            <Text style={s.sectionLabel}>WHAT IS YOUR GOAL?</Text>
+            <View style={s.objectiveList}>
+              {OBJECTIVES.map((item) => {
+                const active = objective === item.value;
+                return (
+                  <TouchableOpacity
+                    key={item.value}
+                    style={[s.objectiveRow, active && s.objectiveRowActive]}
+                    onPress={() => { Haptics.selectionAsync(); setObjective(item.value); }}
+                    activeOpacity={0.8}
+                  >
+                    <View style={[s.objectiveIcon, active && s.objectiveIconActive]}>
+                      <Feather name={item.icon} size={18} color={active ? PURPLE_LIGHT : MUTED} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[s.objectiveTitle, active && s.objectiveTitleActive]}>{item.label}</Text>
+                      <Text style={s.objectiveDescription}>{item.description}</Text>
+                    </View>
+                    <View style={[s.radioOuter, active && s.radioOuterActive]}>
+                      {active ? <View style={s.radioInner} /> : null}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
 
-        <Text style={s.disclaimer}>
-          Your stored payment method will be charged {selectedBudget.label}. Boosts can be paused from your Boost history.
-        </Text>
+            {/* What is a boost */}
+            <View style={s.infoBanner}>
+              <Feather name="zap" size={16} color={GOLD} />
+              <Text style={s.infoBannerText}>
+                Boosted content is ranked higher in buyer feeds, reaching beyond your existing followers.
+              </Text>
+            </View>
+
+            {/* Budget slider */}
+            <View style={s.sliderSection}>
+              <View style={s.sliderHeading}>
+                <Text style={s.sectionLabelInline}>BUDGET</Text>
+                <Text style={s.sliderValue}>{budgetLabel}</Text>
+              </View>
+              <SnapSlider
+                value={budgetCents}
+                min={500}
+                max={25000}
+                step={500}
+                onChange={setBudgetCents}
+                accessibilityLabel="Promotion budget"
+              />
+              <View style={s.sliderRange}><Text style={s.sliderRangeText}>$5</Text><Text style={s.sliderRangeText}>$250</Text></View>
+            </View>
+
+            {/* Duration slider */}
+            <View style={s.sliderSection}>
+              <View style={s.sliderHeading}>
+                <Text style={s.sectionLabelInline}>HOW MANY DAYS?</Text>
+                <Text style={s.sliderValue}>{durationLabel}</Text>
+              </View>
+              <SnapSlider
+                value={durationDays}
+                min={1}
+                max={30}
+                step={1}
+                onChange={setDurationDays}
+                accessibilityLabel="Promotion duration in days"
+              />
+              <View style={s.sliderRange}><Text style={s.sliderRangeText}>1 day</Text><Text style={s.sliderRangeText}>30 days</Text></View>
+            </View>
+
+            {/* Estimated reach */}
+            <View style={s.reachCard}>
+              <View style={s.reachRow}>
+                <Feather name="eye" size={18} color={PURPLE_LIGHT} />
+                <View style={{ flex: 1 }}>
+                  <Text style={s.reachTitle}>Estimated Reach</Text>
+                  <Text style={s.reachValue}>~{estimatedImpressions.toLocaleString()} impressions</Text>
+                </View>
+              </View>
+              <View style={s.divider} />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <View style={s.reachStat}>
+                  <Text style={s.reachStatLabel}>Total Charge</Text>
+                  <Text style={s.reachStatValue}>{budgetLabel}</Text>
+                </View>
+                <View style={s.reachStat}>
+                  <Text style={s.reachStatLabel}>Duration</Text>
+                  <Text style={s.reachStatValue}>{durationLabel}</Text>
+                </View>
+                <View style={s.reachStat}>
+                  <Text style={s.reachStatLabel}>Per Day</Text>
+                  <Text style={s.reachStatValue}>{formatCents(divideCents(budgetCents, durationDays))}</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Launch button */}
+            <TouchableOpacity
+              style={[s.launchBtn, launching && { opacity: 0.6 }]}
+              onPress={handleLaunch}
+              disabled={launching}
+              activeOpacity={0.85}
+            >
+              {launching
+                ? <ActivityIndicator color="#fff" />
+                : <>
+                    <Feather name="zap" size={18} color="#fff" />
+                    <Text style={s.launchBtnText}>Launch Boost — Pay {budgetLabel}</Text>
+                  </>
+              }
+            </TouchableOpacity>
+
+            <Text style={s.disclaimer}>
+              Your stored payment method will be charged {budgetLabel}. Boosts can be paused from your Boost history.
+            </Text>
+          </>
+        )}
 
         {/* ── Boost history ─────────────────────────────────────────────────── */}
         {(loadingExisting ? true : existing.length > 0) && (
@@ -274,7 +524,7 @@ export default function BoostScreen() {
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                         <View style={[s.statusDot, { backgroundColor: statusColor(b.status) }]} />
                         <Text style={s.boostStatus}>{statusLabel(b.status)}</Text>
-                        <Text style={s.boostMeta}>{b.durationDays}d boost</Text>
+                        <Text style={s.boostMeta}>{objectiveLabel(b.objective || 'views')}</Text>
                         {b.status === 'active' && (
                           <Text style={[s.boostMeta, { marginLeft: 'auto' }]}>
                             {daysLeft === 0 ? 'Ends today' : `${daysLeft}d left`}
@@ -294,8 +544,8 @@ export default function BoostScreen() {
                         <View style={s.statPill}>
                           <Feather name="dollar-sign" size={11} color={GOLD} />
                           <Text style={s.statPillText}>
-                            ${(b.spentCents / 100).toFixed(2)}
-                            <Text style={{ color: MUTED }}> / ${(b.budgetCents / 100).toFixed(2)}</Text>
+                            {formatCents(b.spentCents)}
+                            <Text style={{ color: MUTED }}> / {formatCents(b.budgetCents)}</Text>
                           </Text>
                         </View>
                       </View>
@@ -318,7 +568,9 @@ export default function BoostScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT } = colors;
+  return StyleSheet.create({
   root:          { flex: 1, backgroundColor: BG },
   header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
   headerBack:    { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
@@ -333,15 +585,102 @@ const s = StyleSheet.create({
   summaryLabel: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   summarySep:   { width: 1, height: 40, backgroundColor: BORDER },
 
+  setupTitle: { color: FG, fontFamily: FONT.bold, fontSize: FS.xl, marginBottom: 5 },
+  setupSub: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19 },
+  pickerHeadingRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: SP.md },
+  cancelPickerBtn: { paddingHorizontal: 12, paddingVertical: 8 },
+  cancelPickerText: { color: PURPLE_LIGHT, fontFamily: FONT.semibold, fontSize: FS.sm },
+  postGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 3, marginBottom: SP.xl },
+  postTile: {
+    width: '32.6%',
+    aspectRatio: 0.76,
+    backgroundColor: CARD_ELEVATED,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  tileScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.16)' },
+  tileCaption: {
+    position: 'absolute', left: 7, right: 7, bottom: 7,
+    color: '#fff', fontFamily: FONT.semibold, fontSize: 11, lineHeight: 14,
+    textShadowColor: 'rgba(0,0,0,0.85)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3,
+  },
+  videoBadge: {
+    position: 'absolute', top: 7, right: 7, width: 22, height: 22, borderRadius: 11,
+    alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.62)',
+  },
+  thumbnailFallback: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: CARD_ELEVATED,
+  },
+  pickerState: {
+    minHeight: 220, alignItems: 'center', justifyContent: 'center',
+    padding: SP.xl, backgroundColor: CARD, borderRadius: RADIUS.md,
+    borderWidth: 1, borderColor: BORDER, marginBottom: SP.xl,
+  },
+  pickerStateTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.base, marginTop: 12, marginBottom: 5 },
+  pickerStateText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', lineHeight: 19, marginTop: 10 },
+  retryBtn: { marginTop: 16, borderRadius: RADIUS.sm, backgroundColor: PURPLE, paddingHorizontal: 18, paddingVertical: 10 },
+  retryText: { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.sm },
+
+  selectedTargetCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    borderRadius: RADIUS.md, padding: 10, marginBottom: SP.lg,
+  },
+  selectedTargetThumb: {
+    width: 58, height: 72, borderRadius: RADIUS.sm, overflow: 'hidden',
+    backgroundColor: CARD_ELEVATED, position: 'relative',
+  },
+  selectedTargetEyebrow: { color: MUTED, fontFamily: FONT.semibold, fontSize: 10, letterSpacing: 1, marginBottom: 4 },
+  selectedTargetTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, lineHeight: 18 },
+  changeBtn: { paddingHorizontal: 10, paddingVertical: 8 },
+  changeBtnText: { color: PURPLE_LIGHT, fontFamily: FONT.semibold, fontSize: FS.sm },
+
+  objectiveList: { gap: 8, marginBottom: SP.lg },
+  objectiveRow: {
+    minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    borderRadius: RADIUS.md, paddingHorizontal: 12, paddingVertical: 10,
+  },
+  objectiveRowActive: { borderColor: PURPLE, backgroundColor: PURPLE_DIM },
+  objectiveIcon: {
+    width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: CARD_ELEVATED,
+  },
+  objectiveIconActive: { backgroundColor: PURPLE_DIM },
+  objectiveTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, marginBottom: 3 },
+  objectiveTitleActive: { color: PURPLE_LIGHT },
+  objectiveDescription: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs },
+  radioOuter: {
+    width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: MUTED,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  radioOuterActive: { borderColor: PURPLE },
+  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: PURPLE },
+
   infoBanner:     { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#1A1505', borderWidth: 1, borderColor: '#4A3800', borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.lg },
   infoBannerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: '#D97706', lineHeight: 18 },
 
   sectionLabel:  { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, letterSpacing: 1, textTransform: 'uppercase', marginBottom: SP.sm, marginTop: SP.sm },
-  chipRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: SP.md },
-  chip:          { paddingHorizontal: 16, paddingVertical: 10, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
-  chipActive:    { borderColor: PURPLE, backgroundColor: PURPLE_DIM },
-  chipText:      { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-  chipTextActive:{ color: PURPLE_LIGHT },
+  sectionLabelInline: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, letterSpacing: 1, textTransform: 'uppercase' },
+  sliderSection: {
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md,
+  },
+  sliderHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 },
+  sliderValue: { color: FG, fontFamily: FONT.bold, fontSize: FS.lg },
+  sliderTouchArea: { height: 38, justifyContent: 'center', position: 'relative' },
+  sliderTrack: { height: 5, borderRadius: 3, backgroundColor: SUBTLE, overflow: 'hidden' },
+  sliderFill: { height: 5, borderRadius: 3, backgroundColor: PURPLE },
+  sliderThumb: {
+    position: 'absolute', top: 7, width: 24, height: 24, borderRadius: 12,
+    marginLeft: -12, backgroundColor: '#fff', borderWidth: 5, borderColor: PURPLE,
+    shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 4, shadowOffset: { width: 0, height: 2 },
+  },
+  sliderRange: { flexDirection: 'row', justifyContent: 'space-between' },
+  sliderRangeText: { color: MUTED, fontFamily: FONT.regular, fontSize: 11 },
 
   reachCard:   { backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md },
   reachRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: SP.sm },
@@ -368,4 +707,5 @@ const s = StyleSheet.create({
   progressTrack: { height: 4, backgroundColor: SUBTLE, borderRadius: 2, overflow: 'hidden', marginBottom: 4 },
   progressFill:  { height: 4, backgroundColor: PURPLE, borderRadius: 2 },
   progressLabel: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-});
+  });
+};

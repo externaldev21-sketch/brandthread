@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
 import {
-  BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE,
   ON_DARK,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';

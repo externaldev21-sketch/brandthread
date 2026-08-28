@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, ActivityIndicator, Image, Modal, FlatList,
@@ -31,9 +31,6 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE, BORDER_SUBTLE,
   FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN,
-  GRAD_PRIMARY,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
@@ -74,7 +71,9 @@ interface ProcessingError {
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function DesignBgRemovalScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
+  const s = createStyles(theme);
   const router = useRouter();
   const { getToken } = useAuth();
   const insets = useSafeAreaInsets();
@@ -527,7 +526,7 @@ export default function DesignBgRemovalScreen() {
             {/* Library picker */}
             <TouchableOpacity style={s.uploadZone} onPress={pickFromLibrary} activeOpacity={0.85}>
               <LinearGradient
-                colors={['rgba(139,92,246,0.12)', 'rgba(34,211,238,0.06)']}
+                colors={theme.glowGradient}
                 style={s.uploadZoneInner}
               >
                 <View style={s.uploadIconRing}>
@@ -593,7 +592,7 @@ export default function DesignBgRemovalScreen() {
               {phase === 'pick' && (
                 <>
                   <TouchableOpacity style={s.primaryBtn} onPress={handleRemove} activeOpacity={0.85}>
-                    <LinearGradient colors={GRAD_PRIMARY} style={s.primaryBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                    <LinearGradient colors={theme.primaryGradient} style={s.primaryBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
                       <Feather name="scissors" size={ICON.sm} color="#FFF" />
                       <Text style={s.primaryBtnText}>Remove Background</Text>
                     </LinearGradient>
@@ -619,7 +618,7 @@ export default function DesignBgRemovalScreen() {
                   </View>
                   {error.retryable && (
                     <TouchableOpacity style={s.primaryBtn} onPress={handleRetry} activeOpacity={0.85}>
-                      <LinearGradient colors={GRAD_PRIMARY} style={s.primaryBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                      <LinearGradient colors={theme.primaryGradient} style={s.primaryBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
                         <Feather name="refresh-cw" size={ICON.sm} color="#FFF" />
                         <Text style={s.primaryBtnText}>Try Again</Text>
                       </LinearGradient>
@@ -754,6 +753,7 @@ function RecentResultRow({
   onSelect: () => void;
   onDelete: () => void;
 }) {
+  const s = createStyles(useAppTheme().theme);
   return (
     <TouchableOpacity style={s.recentRow} onPress={onSelect} activeOpacity={0.85}>
       <View style={[s.recentThumbWrap, s.checkerboard]}>
@@ -772,7 +772,9 @@ function RecentResultRow({
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
+const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { accent: PURPLE, accentDim: PURPLE_DIM } = theme;
+  return StyleSheet.create({
   root:             { flex: 1 },
   scroll:           { flex: 1 },
   scrollContent:    { padding: SP.md, gap: SP.lg },
@@ -803,7 +805,6 @@ const s = StyleSheet.create({
   compareImg:       { width: '100%', height: '100%' },
   checkerboard:     {
     backgroundColor: '#CBD5C0',
-    backgroundImage: undefined,
     // React Native doesn't support CSS background-image.
     // The grey tone hints at transparency without a white bake-in.
   },
@@ -860,4 +861,5 @@ const s = StyleSheet.create({
   productInfo:      { flex: 1 },
   productName:      { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
   productStatus:    { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, textTransform: 'capitalize' },
-});
+  });
+};

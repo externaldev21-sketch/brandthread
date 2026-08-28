@@ -10,6 +10,7 @@ import {
 } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { computeApplicationFeeCents, mapStripeError, requireStripe } from "../lib/stripe";
+import { getSellerVacationStatus } from "../lib/sellerAvailability";
 
 const router = Router();
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -96,6 +97,14 @@ router.post("/session", async (req, res) => {
     }
     const [seller] = await db.select({ stripeAccountId: users.stripeAccountId, stripeAccountStatus: users.stripeAccountStatus })
       .from(users).where(eq(users.clerkId, sellerId)).limit(1);
+    const vacation = await getSellerVacationStatus(sellerId);
+    if (vacation.active) {
+      return res.status(409).json({
+        error: vacation.message,
+        code: "SELLER_ON_VACATION",
+        vacationUntil: vacation.until?.toISOString() ?? null,
+      });
+    }
     if (!seller?.stripeAccountId || seller.stripeAccountStatus !== "active") {
       return res.status(400).json({ error: "Seller payment account is not active. Please try again later." });
     }

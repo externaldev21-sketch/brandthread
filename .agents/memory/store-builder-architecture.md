@@ -1,26 +1,14 @@
 ---
 name: Store Builder Architecture
-description: Brandthread AI Store Builder — file list, storage keys, Metro crash rules, service constraints.
+description: Durable Store Builder constraints, including Thread Theme and Metro safety rules.
 ---
 
-## Files
-- `services/storeTypes.ts` — all 23 typed models + BUILTIN_THEMES (18), SECTION_TYPE_LABELS, COLOR_PRESETS, BRAND_STYLES, BRAND_MOODS, HOMEPAGE_PRIORITIES, TARGET_CUSTOMERS, STORE_FEATURES, STORE_CONTENT_OPTIONS, TYPOGRAPHY_STYLES, AI_SUGGESTION_POOL
-- `services/storeService.ts` — AsyncStorage CRUD; key: `bt:store:v1`, `bt:store:draft_answers:v1`; exports StoreValidationResult (NOT in storeTypes); mock AI generation separated into pure functions
-- 20 store-*.tsx screens in app/
+## Thread Theme
+Thread Theme is the sole starting template for new Brandthread storefronts. Keep it original to Brandthread: editorial typography, generous whitespace, full-bleed monochrome imagery, and restrained product chrome.
 
-## Screens
-store-builder (entry/home), store-generate (10-step wizard), store-generating (animated generation),
-store-theme-picker (18-theme library), store-preview (phone-frame preview), store-editor (section/branding/header/footer tabs),
-store-sections (add section picker), store-collections (CRUD), store-pages (CRUD), store-nav (menu management),
-store-settings, store-policies (AI policy draft), store-seo, store-domain, store-publish (validate+publish flow),
-store-versions, store-from-logo, store-from-moodboard, store-from-social, store-ai-improve
+**Why:** The product intentionally replaced the template chooser with one recognizable Brandthread storefront foundation.
 
-## Routes in _layout.tsx
-All 19 store-* routes registered. store-generating, store-publish, store-ai-improve use presentation: 'modal'.
-
-## Navigation integrations
-- more.tsx STORE section: Store Builder→/store-builder, Collections→/store-collections, Domains→/store-domain
-- store-builder accessible from seller home, more, setup checklist
+**How to apply:** Logo, moodboard, social, and other AI tools may personalize imagery, copy, and sections, but must preserve the grayscale palette and Thread Theme identity. Keep those tools optional inside the editor, not as competing entry paths.
 
 ## Critical rules
 1. **NO dynamic `await import()`** in storeService.ts — Metro Babel crashes on duplicate binding for destructured names (BORDER, SECTION_TYPE_LABELS, etc.). Use top-level static imports only.

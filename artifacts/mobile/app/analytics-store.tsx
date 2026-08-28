@@ -17,6 +17,8 @@ import { getStoreAnalytics, getFilterState } from '@/services/analyticsService';
 import { StoreAnalytics, StoreFunnelStep, StoreSectionAnalytics, AnalyticsMetric, AnalyticsFilterState } from '@/services/analyticsTypes';
 
 function KpiCard({ m, icon, color }: { m: AnalyticsMetric; icon: keyof typeof Feather.glyphMap; color: string }) {
+  const colors = useColors();
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const up = m.trend === 'up';
   return (
     <View style={s.kpiCard}>
@@ -26,13 +28,15 @@ function KpiCard({ m, icon, color }: { m: AnalyticsMetric; icon: keyof typeof Fe
       <Text style={s.kpiValue}>{m.formatted}</Text>
       <Text style={s.kpiLabel} numberOfLines={1}>{m.label}</Text>
       <Text style={[s.kpiChange, { color: m.trend === 'flat' ? MUTED : up ? SUCCESS : RED }]}>
-        {m.changePct > 0 ? '+' : ''}{m.changePct.toFixed(1)}%
+        {(m.changePct ?? 0) > 0 ? '+' : ''}{m.changePct?.toFixed(1) ?? '—'}%
       </Text>
     </View>
   );
 }
 
 function FunnelStep({ step, isLast }: { step: StoreFunnelStep; isLast: boolean }) {
+  const colors = useColors();
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const pct = step.conversionPct;
   const barColor = pct >= 50 ? SUCCESS : pct >= 20 ? ORANGE : RED;
@@ -58,7 +62,9 @@ function FunnelStep({ step, isLast }: { step: StoreFunnelStep; isLast: boolean }
 }
 
 export default function AnalyticsStoreScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const colors = useColors();
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = colors;
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -67,13 +73,17 @@ export default function AnalyticsStoreScreen() {
   const [filter,     setFilter]     = useState<AnalyticsFilterState | null>(null);
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
-    const f = filter ?? await getFilterState();
-    if (!filter) setFilter(f);
-    setData(await getStoreAnalytics(f));
-    setLoading(false); setRefreshing(false);
+    try {
+      const f = filter ?? await getFilterState();
+      if (!filter) setFilter(f);
+      setData(await getStoreAnalytics(f)); setError(null);
+    } catch (err) {
+      setData(null); setError(err instanceof Error ? err.message : 'Store analytics are unavailable.');
+    } finally { setLoading(false); setRefreshing(false); }
   }, [filter]);
 
   useEffect(() => { load(); }, []); // eslint-disable-line
@@ -81,6 +91,7 @@ export default function AnalyticsStoreScreen() {
   if (loading) {
     return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><ActivityIndicator size="large" color={PURPLE} /></View>;
   }
+  if (error) return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><Text style={{ color: MUTED }}>{error}</Text><TouchableOpacity onPress={() => load()}><Text style={{ color: PURPLE }}>Retry</Text></TouchableOpacity></View>;
 
   return (
     <ScrollView
@@ -97,8 +108,8 @@ export default function AnalyticsStoreScreen() {
           <Text style={s.pageTitle}>Store Analytics</Text>
           <Text style={s.subtitle}>{filter?.dateRange.label ?? '30 days'}</Text>
         </View>
-        <TouchableOpacity onPress={() => { Haptics.selectionAsync(); router.push('/store-builder' as never); }} style={s.storeBtn}>
-          <Text style={s.storeBtnText}>Edit Store</Text>
+        <TouchableOpacity onPress={() => { Haptics.selectionAsync(); router.push('/store-builder' as never); }} style={[s.storeBtn, { backgroundColor: PURPLE_DIM, borderColor: PURPLE }]}>
+          <Text style={[s.storeBtnText, { color: PURPLE_LIGHT }]}>Edit Store</Text>
         </TouchableOpacity>
       </View>
 
@@ -108,7 +119,7 @@ export default function AnalyticsStoreScreen() {
         {data && [
           { m: data.visitors,          icon: 'users'    as const, color: PURPLE },
           { m: data.uniqueVisitors,     icon: 'user'     as const, color: BLUE   },
-          { m: data.sessions,           icon: 'activity' as const, color: CYAN_COLOR },
+          { m: data.sessions,           icon: 'activity' as const, color: CYAN },
           { m: data.productPageViews,   icon: 'eye'      as const, color: GOLD   },
           { m: data.returningVisitors,  icon: 'repeat'   as const, color: SUCCESS },
           { m: data.mobileTrafficPct,   icon: 'smartphone' as const, color: ORANGE },
@@ -171,9 +182,9 @@ export default function AnalyticsStoreScreen() {
   );
 }
 
-const CYAN_COLOR = '#22D3EE';
-
-const s = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT } = colors;
+  return StyleSheet.create({
   scroll:   { flex: 1, backgroundColor: BG },
   content:  { paddingHorizontal: 16 },
   loadWrap: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
@@ -181,8 +192,8 @@ const s = StyleSheet.create({
   backBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   pageTitle:{ fontSize: 22, fontFamily: FONT.bold, color: FG },
   subtitle: { fontSize: 12, fontFamily: FONT.regular, color: MUTED },
-  storeBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: PURPLE_DIM, borderWidth: 1, borderColor: PURPLE },
-  storeBtnText:{ fontSize: 12, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
+  storeBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
+  storeBtnText:{ fontSize: 12, fontFamily: FONT.semibold },
   sectionTitle:{ fontSize: 15, fontFamily: FONT.semibold, color: FG, marginBottom: 10 },
   card:     { backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, marginBottom: 20, overflow: 'hidden' },
   divider:  { height: 1, backgroundColor: BORDER, marginHorizontal: 16 },
@@ -206,4 +217,5 @@ const s = StyleSheet.create({
   dotSep:   { fontSize: 11, color: SUBTLE },
   secPurchases:{ fontSize: 15, fontFamily: FONT.bold, color: SUCCESS },
   secPurchasesLabel:{ fontSize: 10, fontFamily: FONT.regular, color: MUTED },
-});
+  });
+};

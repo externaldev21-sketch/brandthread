@@ -6,30 +6,20 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Image, Alert, Share, Dimensions,
-} from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, Alert, Share, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
-import {
-  BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, CYAN, SUCCESS, SUCCESS_DIM,
-  BLUE, ORANGE, RED, ON_DARK,
-  GRAD_PRIMARY, FONT, FS, SP, RADIUS, COMP, ICON,
-} from '@/lib/theme';
+import { BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, ON_DARK, FONT, FS, SP, RADIUS, COMP, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import {
-  BrandthreadCard, PrimaryButton, SecondaryButton,
-  StatusBadge, FilterChip, SectionHeader,
-} from '@/components/BrandthreadUI';
+import { BrandthreadCard, PrimaryButton, SecondaryButton, StatusBadge, FilterChip, SectionHeader } from '@/components/BrandthreadUI';
 import { getProduct } from '@/services/productService';
 import { Product, ProductVariant, OptionValue } from '@/services/productTypes';
-import { calcPricing, formatCurrency } from '@/lib/productUtils';
+import { calcPricing } from '@/lib/productUtils';
+import { formatCents, integerPercent } from '@/lib/money';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const GALLERY_H = 380;
@@ -150,11 +140,11 @@ export default function ProductStoreScreen() {
     v.optionValues.every(ov => selectedOptions[ov.optionId] === ov.valueId)
   ) ?? null;
 
-  const effectivePrice = selectedVariant?.price ?? product?.pricing.price ?? 0;
-  const effectiveCompare = selectedVariant?.compareAtPrice ?? product?.pricing.compareAtPrice;
+  const effectivePrice = selectedVariant?.priceCents ?? product?.pricing.priceCents ?? 0;
+  const effectiveCompare = selectedVariant?.compareAtPriceCents ?? product?.pricing.compareAtPriceCents;
   const isOnSale = effectiveCompare !== undefined && effectiveCompare > effectivePrice;
   const discountPct = isOnSale && effectiveCompare
-    ? Math.round(((effectiveCompare - effectivePrice) / effectiveCompare) * 100)
+    ? integerPercent(effectiveCompare - effectivePrice, effectiveCompare)
     : undefined;
 
   function getStockBadge(): { label: string; variant: 'success' | 'warning' | 'error' | 'info' | 'neutral' | 'purple' } {
@@ -383,9 +373,9 @@ export default function ProductStoreScreen() {
 
           {/* Price row */}
           <View style={s.priceRow}>
-            <Text style={s.retailPrice}>{formatCurrency(effectivePrice)}</Text>
+            <Text style={s.retailPrice}>{formatCents(effectivePrice)}</Text>
             {isOnSale && effectiveCompare && (
-              <Text style={s.comparePrice}>{formatCurrency(effectiveCompare)}</Text>
+              <Text style={s.comparePrice}>{formatCents(effectiveCompare)}</Text>
             )}
             {discountPct !== undefined && (
               <View style={s.discountBadge}>
@@ -423,10 +413,10 @@ export default function ProductStoreScreen() {
             ))}
 
             {/* Variant price/stock override */}
-            {selectedVariant && selectedVariant.price !== undefined && (
+            {selectedVariant && selectedVariant.priceCents !== undefined && (
               <View style={s.variantOverride}>
                 <Text style={s.variantOverrideLabel}>
-                  {selectedVariant.title}: {formatCurrency(selectedVariant.price)}
+                  {selectedVariant.title}: {formatCents(selectedVariant.priceCents)}
                   {'  '}
                   <Text style={s.variantStock}>
                     ({selectedVariant.inventoryQuantity} in stock)
@@ -441,7 +431,7 @@ export default function ProductStoreScreen() {
         {isPreorder && preorder && (
           <View style={s.sectionPad}>
             <LinearGradient
-              colors={['rgba(139,92,246,0.15)', 'rgba(34,211,238,0.05)']}
+              colors={[theme.accentDim, theme.secondaryDim]}
               style={s.preorderCard}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
@@ -582,7 +572,7 @@ export default function ProductStoreScreen() {
           style={s.stickyBtn}
         >
           <LinearGradient
-            colors={GRAD_PRIMARY}
+            colors={theme.primaryGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={s.stickyBtnGrad}

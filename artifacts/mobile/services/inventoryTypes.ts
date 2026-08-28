@@ -83,8 +83,8 @@ export interface InventoryItem {
   variantLabel: string; // e.g. "Black / L"
   sku: string;
   barcode?: string;
-  cost: number;
-  retailPrice: number;
+  costCents: number;
+  retailPriceCents: number;
   imageUri?: string;
   // Totals (sum across locations)
   onHand: number;
@@ -100,7 +100,7 @@ export interface InventoryItem {
   trackInventory: boolean;
   // Computed
   status: InventoryStatus;
-  inventoryValue: number; // onHand * cost
+  inventoryValueCents: number; // onHand * costCents
   // Location breakdown
   levels: InventoryLevel[];
   // Linked data IDs
@@ -126,7 +126,7 @@ export interface InventoryAdjustment {
   quantityAfter: number;
   availableBefore: number;
   availableAfter: number;
-  inventoryValueImpact: number;
+  inventoryValueImpactCents: number;
   reason: string;
   note?: string;
   referenceNumber?: string;
@@ -373,17 +373,17 @@ export interface RestockRecommendation {
 // ─── Valuation ────────────────────────────────────────────────────────────────
 
 export interface InventoryValuation {
-  totalCostValue: number;
-  availableCostValue: number;
-  reservedCostValue: number;
-  incomingCostValue: number;
-  damagedCostValue: number;
+  totalCostValueCents: number;
+  availableCostValueCents: number;
+  reservedCostValueCents: number;
+  incomingCostValueCents: number;
+  damagedCostValueCents: number;
   totalUnits: number;
   byProduct: {
     productId: string;
     productName: string;
     totalUnits: number;
-    costValue: number;
+    costValueCents: number;
   }[];
   calculatedAt: string;
 }
@@ -399,7 +399,7 @@ export interface InventoryOverview {
   totalDamaged: number;
   lowStockCount: number;
   outOfStockCount: number;
-  inventoryValue: number;
+  inventoryValueCents: number;
   locationCount: number;
   unitsInProduction: number;
   recentAdjustmentCount: number;

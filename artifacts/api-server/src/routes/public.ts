@@ -3,12 +3,13 @@
  * Mounted at /api/public — no requireAuth middleware.
  */
 import { Router } from "express";
-import { db, products, productVariants, users, drops, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, boosts } from "@workspace/db";
+import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, boosts } from "@workspace/db";
 import { eq, and, asc, desc, ne, inArray, or, ilike, sql, count, gte } from "drizzle-orm";
 import { computeTrendingForToday, isCacheFresh } from "../jobs/computeTrending";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { requireAuth } from "../middlewares/requireAuth";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
+import { getSellerVacationStatus } from "../lib/sellerAvailability";
 
 // ─── In-flight guard for synchronous cache-miss computation ──────────────────
 // Prevents concurrent requests from each triggering an independent full
@@ -229,8 +230,16 @@ router.get("/products/:id", async (req, res) => {
       .from(users)
       .where(eq(users.clerkId, product.ownerId))
       .limit(1);
+    const vacation = await getSellerVacationStatus(product.ownerId);
 
-    res.json({ ...product, sellerDisplayName: seller?.displayName ?? null, variants });
+    res.json({
+      ...product,
+      sellerDisplayName: seller?.displayName ?? null,
+      sellerVacationMode: vacation.active,
+      sellerVacationMessage: vacation.active ? vacation.message : null,
+      sellerVacationUntil: vacation.until?.toISOString() ?? null,
+      variants,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch product" });
@@ -287,6 +296,7 @@ router.get("/search", async (req, res): Promise<void> => {
         name:       products.name,
         ownerId:    products.ownerId,
         category:   products.category,
+        images:     products.images,
         createdAt:  products.createdAt,
         priceCents: productVariants.priceCents,
       }).from(products)
@@ -338,12 +348,12 @@ router.get("/search", async (req, res): Promise<void> => {
     }
 
     // Products — collapse variants to one row with the minimum price
-    const prodMap = new Map<string, { id: string; name: string; ownerId: string; category: string; createdAt: Date; minPrice: number }>();
+    const prodMap = new Map<string, { id: string; name: string; ownerId: string; category: string; images: string[]; createdAt: Date; minPrice: number }>();
     for (const p of prods) {
       const price = p.priceCents ?? 0;
       const prev = prodMap.get(p.id);
       if (!prev) {
-        prodMap.set(p.id, { id: p.id, name: p.name, ownerId: p.ownerId, category: p.category, createdAt: p.createdAt, minPrice: price });
+        prodMap.set(p.id, { id: p.id, name: p.name, ownerId: p.ownerId, category: p.category, images: Array.isArray(p.images) ? p.images.filter((image): image is string => typeof image === "string") : [], createdAt: p.createdAt, minPrice: price });
       } else if (price < prev.minPrice) {
         prev.minPrice = price;
       }
@@ -369,6 +379,7 @@ router.get("/search", async (req, res): Promise<void> => {
         price:     "$" + Math.round(p.minPrice / 100),
         priceCents: p.minPrice,
         category: p.category,
+        imageUri: p.images[0] ?? null,
         createdAt: p.createdAt,
         color:     hashColor(p.ownerId),
         initials:  mkInitials(brandName),
@@ -407,6 +418,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
     .limit(1);
 
   if (!seller) return res.status(404).json({ error: "Seller not found" });
+  const vacation = await getSellerVacationStatus(sellerId);
 
   const [sellerProducts, sellerPosts] = await Promise.all([
     db
@@ -456,7 +468,13 @@ router.get("/sellers/:sellerId", async (req, res) => {
   }
 
   return res.json({
-    profile: { ...seller, profileImageUrl },
+    profile: {
+      ...seller,
+      vacationMode: vacation.active,
+      vacationMessage: vacation.active ? vacation.message : null,
+      vacationUntil: vacation.until?.toISOString() ?? null,
+      profileImageUrl,
+    },
     products: sellerProducts,
     posts: sellerPosts.map((p) => ({
       ...p,
@@ -530,6 +548,40 @@ router.get("/drops/:id", async (req, res) => {
   ]);
 
   return res.json({ ...drop, seller: seller ?? null, products: dropProducts });
+});
+
+router.get("/drops/:id/notify", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as any).clerkUserId as string;
+  const dropId = typeof req.params.id === "string" ? req.params.id : undefined;
+  if (!dropId) { res.status(400).json({ error: "drop id required" }); return; }
+  const [subscription] = await db
+    .select({ id: dropAlertSubscriptions.id })
+    .from(dropAlertSubscriptions)
+    .where(and(eq(dropAlertSubscriptions.dropId, dropId), eq(dropAlertSubscriptions.userId, userId)))
+    .limit(1);
+  res.json({ subscribed: !!subscription });
+});
+
+router.post("/drops/:id/notify", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as any).clerkUserId as string;
+  const dropId = typeof req.params.id === "string" ? req.params.id : undefined;
+  if (!dropId) { res.status(400).json({ error: "drop id required" }); return; }
+  const [drop] = await db.select({ id: drops.id }).from(drops)
+    .where(and(eq(drops.id, dropId), eq(drops.status, "active")))
+    .limit(1);
+  if (!drop) { res.status(404).json({ error: "Drop not found or not active" }); return; }
+  await db.insert(dropAlertSubscriptions).values({ dropId: drop.id, userId }).onConflictDoNothing();
+  res.json({ subscribed: true });
+});
+
+router.delete("/drops/:id/notify", requireAuth, async (req, res): Promise<void> => {
+  const userId = (req as any).clerkUserId as string;
+  const dropId = typeof req.params.id === "string" ? req.params.id : undefined;
+  if (!dropId) { res.status(400).json({ error: "drop id required" }); return; }
+  await db.delete(dropAlertSubscriptions).where(
+    and(eq(dropAlertSubscriptions.dropId, dropId), eq(dropAlertSubscriptions.userId, userId)),
+  );
+  res.json({ subscribed: false });
 });
 
 // POST /api/public/sellers/:sellerId/visit

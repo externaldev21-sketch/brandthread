@@ -23,27 +23,24 @@ import {
 import { useApi } from '@/hooks/useApi';
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
+  BG, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM,
   SUCCESS, SUCCESS_DIM,
   ORANGE, ORANGE_DIM,
   RED, RED_DIM,
-  GRAD_PRIMARY,
   FONT, FS, SP, RADIUS, COMP, ICON,
-  SHADOW_PURPLE,
 } from '@/lib/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  BrandthreadScreen, BrandthreadHeader, StatusBadge, EmptyState,
+  BrandthreadScreen, BrandthreadHeader, StatusBadge, EmptyState, BrandedLoader,
 } from '@/components/BrandthreadUI';
 
 import { useAuth } from '@clerk/expo';
+import { formatCents } from '@/lib/money';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmtPrice(n: number) { return '$' + n.toFixed(2); }
+const fmtPrice = formatCents;
 
 // ─── Quantity Row ─────────────────────────────────────────────────────────────
 
@@ -81,8 +78,9 @@ function CartItemRow({
   onSaveForLater: () => void;
   onEditVariant: () => void;
 }) {
-  const lineTotal = item.price * item.quantity;
-  const hasDiscount = item.compareAtPrice && item.compareAtPrice > item.price;
+  const { theme } = useAppTheme();
+  const lineTotal = item.priceCents * item.quantity;
+  const hasDiscount = item.compareAtPriceCents && item.compareAtPriceCents > item.priceCents;
 
   return (
     <View style={ir.root}>
@@ -97,13 +95,13 @@ function CartItemRow({
         <Text style={ir.name} numberOfLines={2}>{item.productName}</Text>
         <TouchableOpacity style={ir.variantRow} onPress={onEditVariant} activeOpacity={0.7}>
           <Text style={ir.variant}>{item.variantTitle}</Text>
-          <Feather name="edit-2" size={11} color={PURPLE_LIGHT} />
+          <Feather name="edit-2" size={11} color={theme.accentLight} />
         </TouchableOpacity>
 
         {item.isPreOrder && (
           <View style={ir.preOrderBadge}>
-            <Feather name="clock" size={10} color={CYAN} />
-            <Text style={ir.preOrderText}>
+            <Feather name="clock" size={10} color={theme.secondary} />
+            <Text style={[ir.preOrderText, { color: theme.secondary }]}>
               Pre-order{item.preOrderEstShipDate ? ` · est. ${new Date(item.preOrderEstShipDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}` : ''}
             </Text>
           </View>
@@ -129,7 +127,7 @@ function CartItemRow({
           />
           <View style={ir.priceBlock}>
             {hasDiscount && (
-              <Text style={ir.comparePrice}>{fmtPrice(item.compareAtPrice! * item.quantity)}</Text>
+              <Text style={ir.comparePrice}>{fmtPrice(item.compareAtPriceCents! * item.quantity)}</Text>
             )}
             <Text style={[ir.price, hasDiscount ? ir.priceDiscounted : undefined]}>{fmtPrice(lineTotal)}</Text>
           </View>
@@ -162,9 +160,9 @@ const ir = StyleSheet.create({
   productImage: { width: '100%', height: '100%' },
   name: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginBottom: 4, lineHeight: 18 },
   variantRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
-  variant: { fontSize: FS.xs, fontFamily: FONT.regular, color: PURPLE_LIGHT },
+  variant: { fontSize: FS.xs, fontFamily: FONT.regular },
   preOrderBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 },
-  preOrderText: { fontSize: FS.xs, fontFamily: FONT.medium, color: CYAN },
+  preOrderText: { fontSize: FS.xs, fontFamily: FONT.medium },
   unavailBadge: { backgroundColor: RED_DIM, borderRadius: RADIUS.xs, paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start', marginBottom: 4 },
   unavailText: { fontSize: FS.xs, fontFamily: FONT.medium, color: RED },
   stockWarn: { fontSize: FS.xs, fontFamily: FONT.medium, color: ORANGE, marginBottom: 4 },
@@ -191,13 +189,14 @@ function SellerGroup({
   onSaveForLater: (itemId: string) => void;
   onEditVariant: (item: CartItem) => void;
 }) {
+  const { theme } = useAppTheme();
   const router = useRouter();
   return (
     <View style={sg.root}>
       {/* Seller header */}
       <View style={sg.sellerRow}>
-        <View style={sg.avatar}>
-          <Text style={sg.avatarText}>{group.sellerInitial}</Text>
+        <View style={[sg.avatar, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
+          <Text style={[sg.avatarText, { color: theme.accentLight }]}>{group.sellerInitial}</Text>
         </View>
         <View style={{ flex: 1 }}>
           <Text style={sg.sellerName}>{group.sellerName}</Text>
@@ -206,9 +205,9 @@ function SellerGroup({
         <TouchableOpacity
           onPress={() => router.push(('/seller-profile?id=' + group.sellerId) as never)}
           activeOpacity={0.7}
-          style={sg.visitBtn}
+          style={[sg.visitBtn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}
         >
-          <Text style={sg.visitBtnText}>Visit Store</Text>
+          <Text style={[sg.visitBtnText, { color: theme.accentLight }]}>Visit Store</Text>
         </TouchableOpacity>
       </View>
 
@@ -235,11 +234,11 @@ function SellerGroup({
         </View>
         {group.hasPreOrder && (
           <View style={sg.footerRow}>
-            <Feather name="clock" size={12} color={CYAN} />
-            <Text style={[sg.footerText, { color: CYAN }]}>Contains pre-order items</Text>
+            <Feather name="clock" size={12} color={theme.secondary} />
+            <Text style={[sg.footerText, { color: theme.secondary }]}>Contains pre-order items</Text>
           </View>
         )}
-        <Text style={sg.groupSubtotal}>Group subtotal: {fmtPrice(group.subtotal)}</Text>
+        <Text style={sg.groupSubtotal}>Group subtotal: {fmtPrice(group.subtotalCents)}</Text>
       </View>
     </View>
   );
@@ -248,12 +247,12 @@ function SellerGroup({
 const sg = StyleSheet.create({
   root: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md, marginBottom: SP.md },
   sellerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
-  avatar: { width: 36, height: 36, borderRadius: RADIUS.pill, backgroundColor: PURPLE_DIM, borderWidth: 1, borderColor: BORDER_ACTIVE, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontSize: FS.sm, fontFamily: FONT.bold, color: PURPLE_LIGHT },
+  avatar: { width: 36, height: 36, borderRadius: RADIUS.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: FS.sm, fontFamily: FONT.bold },
   sellerName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   sellerHandle: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  visitBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADIUS.sm, backgroundColor: PURPLE_DIM, borderWidth: 1, borderColor: BORDER_ACTIVE },
-  visitBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
+  visitBtn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADIUS.sm, borderWidth: 1 },
+  visitBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   divider: { height: 1, backgroundColor: BORDER, marginVertical: SP.xs },
   footer: { borderTopWidth: 1, borderTopColor: BORDER, marginTop: SP.sm, paddingTop: SP.sm, gap: 4 },
   footerRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
@@ -268,6 +267,7 @@ function SavedItemRow({ item, onMove, onRemove }: {
   onMove: () => void;
   onRemove: () => void;
 }) {
+  const { theme } = useAppTheme();
   return (
     <View style={si.root}>
       <View style={si.img}>
@@ -276,13 +276,13 @@ function SavedItemRow({ item, onMove, onRemove }: {
       <View style={{ flex: 1 }}>
         <Text style={si.name} numberOfLines={1}>{item.productName}</Text>
         <Text style={si.variant}>{item.variantTitle}</Text>
-        <Text style={si.price}>{fmtPrice(item.price)}</Text>
+        <Text style={si.price}>{fmtPrice(item.priceCents)}</Text>
         {!item.isAvailable && (
           <Text style={si.unavail}>No longer available</Text>
         )}
         <View style={si.actions}>
-          <TouchableOpacity style={si.btn} onPress={onMove} activeOpacity={0.7} disabled={!item.isAvailable}>
-            <Text style={[si.btnText, !item.isAvailable && { color: SUBTLE }]}>Move to Cart</Text>
+          <TouchableOpacity style={[si.btn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]} onPress={onMove} activeOpacity={0.7} disabled={!item.isAvailable}>
+            <Text style={[si.btnText, { color: theme.accentLight }, !item.isAvailable && { color: SUBTLE }]}>Move to Cart</Text>
           </TouchableOpacity>
           <TouchableOpacity style={si.btnGhost} onPress={onRemove} activeOpacity={0.7}>
             <Text style={si.btnGhostText}>Remove</Text>
@@ -301,8 +301,8 @@ const si = StyleSheet.create({
   price: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginBottom: 4 },
   unavail: { fontSize: FS.xs, fontFamily: FONT.medium, color: RED, marginBottom: 4 },
   actions: { flexDirection: 'row', gap: SP.sm },
-  btn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADIUS.sm, backgroundColor: PURPLE_DIM, borderWidth: 1, borderColor: BORDER_ACTIVE },
-  btnText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
+  btn: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: RADIUS.sm, borderWidth: 1 },
+  btnText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   btnGhost: { paddingHorizontal: 10, paddingVertical: 5 },
   btnGhostText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
 });
@@ -312,6 +312,7 @@ const si = StyleSheet.create({
 function SummaryCard({ subtotal, discountTotal, shipping, tax, total, hasPreOrder }: {
   subtotal: number; discountTotal: number; shipping: number; tax: number; total: number; hasPreOrder: boolean;
 }) {
+  const { theme } = useAppTheme();
   function Row({ label, value, accent, small }: { label: string; value: string; accent?: string; small?: boolean }) {
     return (
       <View style={sum.row}>
@@ -332,8 +333,8 @@ function SummaryCard({ subtotal, discountTotal, shipping, tax, total, hasPreOrde
       <Text style={sum.note}>Shipping and tax are estimated. Final amount calculated at checkout.</Text>
       {hasPreOrder && (
         <View style={sum.preOrderNote}>
-          <Feather name="clock" size={12} color={CYAN} />
-          <Text style={sum.preOrderNoteText}>Pre-order items will ship after production. Items may ship separately.</Text>
+          <Feather name="clock" size={12} color={theme.secondary} />
+          <Text style={[sum.preOrderNoteText, { color: theme.secondary }]}>Pre-order items will ship after production. Items may ship separately.</Text>
         </View>
       )}
     </View>
@@ -351,7 +352,7 @@ const sum = StyleSheet.create({
   divider: { height: 1, backgroundColor: BORDER, marginVertical: SP.sm },
   note: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginTop: SP.sm },
   preOrderNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: SP.sm },
-  preOrderNoteText: { fontSize: FS.xs, fontFamily: FONT.regular, color: CYAN, flex: 1 },
+  preOrderNoteText: { fontSize: FS.xs, fontFamily: FONT.regular, flex: 1 },
 });
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -419,13 +420,13 @@ export default function CartScreen() {
   const requestedPoints = Math.floor(Number(pointsInput));
   const maxRedeemablePoints = Math.min(
     loyaltyBalance,
-    Math.max(0, Math.floor(summary.subtotal * 100) - 1),
+    Math.max(0, summary.subtotalCents - 1),
   );
   const loyaltyPreviewCents = Number.isFinite(requestedPoints) && requestedPoints >= 100
     ? Math.min(requestedPoints, maxRedeemablePoints)
     : 0;
-  const displayedDiscount = summary.discountTotal + (loyaltyRedemption?.discountCents ?? 0) / 100;
-  const displayedTotal = Math.max(0, summary.total - (loyaltyRedemption?.discountCents ?? 0) / 100);
+  const displayedDiscount = summary.discountTotalCents + (loyaltyRedemption?.discountCents ?? 0);
+  const displayedTotal = Math.max(0, summary.totalCents - (loyaltyRedemption?.discountCents ?? 0));
 
   async function handleQtyDec(itemId: string) {
     Haptics.selectionAsync();
@@ -576,8 +577,8 @@ export default function CartScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={theme.accent} size="large" />
+      <View style={{ flex: 1, backgroundColor: BG }}>
+        <BrandedLoader label="Gathering your picks…" />
       </View>
     );
   }
@@ -643,16 +644,16 @@ export default function CartScreen() {
             {hasItems && (
               <>
               {groups.length > 1 && (
-                <View style={s.multiSellerNotice}>
-                  <Feather name="layers" size={16} color={CYAN} />
-                  <Text style={s.multiSellerText}>Items from {groups.length} sellers require a separate secure Stripe payment for each seller.</Text>
+                <View style={[s.multiSellerNotice, { backgroundColor: theme.secondaryDim }]}>
+                  <Feather name="layers" size={16} color={theme.secondary} />
+                  <Text style={[s.multiSellerText, { color: theme.secondary }]}>Items from {groups.length} sellers require a separate secure Stripe payment for each seller.</Text>
                 </View>
               )}
               {isSignedIn && (
-              <View style={s.loyaltyCard}>
+              <View style={[s.loyaltyCard, { borderColor: theme.accent }]}>
                 <View style={s.loyaltyHeading}>
-                  <View style={s.loyaltyIcon}>
-                    <Feather name="gift" size={15} color={PURPLE_LIGHT} />
+                  <View style={[s.loyaltyIcon, { backgroundColor: theme.accentDim }]}>
+                    <Feather name="gift" size={15} color={theme.accentLight} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.loyaltyTitle}>Use points</Text>
@@ -668,7 +669,7 @@ export default function CartScreen() {
                         {loyaltyRedemption.pointsUsed.toLocaleString()} points applied
                       </Text>
                       <Text style={s.appliedPointsSub}>
-                        −{fmtPrice(loyaltyRedemption.discountCents / 100)} at secure checkout
+                         −{fmtPrice(loyaltyRedemption.discountCents)} at secure checkout
                       </Text>
                     </View>
                     <Feather name="check-circle" size={19} color={SUCCESS} />
@@ -685,21 +686,21 @@ export default function CartScreen() {
                         style={s.pointsInput}
                       />
                       <TouchableOpacity
-                        style={[s.pointsApply, (redeemingPoints || groups.length !== 1) && s.pointsApplyDisabled]}
+                        style={[s.pointsApply, { backgroundColor: theme.accentDim, borderColor: theme.accent }, (redeemingPoints || groups.length !== 1) && s.pointsApplyDisabled]}
                         onPress={handleApplyPoints}
                         disabled={redeemingPoints || groups.length !== 1}
                         activeOpacity={0.75}
                       >
                         {redeemingPoints
-                          ? <ActivityIndicator color={PURPLE_LIGHT} size="small" />
-                          : <Text style={s.pointsApplyText}>Apply</Text>}
+                          ? <ActivityIndicator color={theme.accentLight} size="small" />
+                          : <Text style={[s.pointsApplyText, { color: theme.accentLight }]}>Apply</Text>}
                       </TouchableOpacity>
                     </View>
                     <Text style={s.pointsPreview}>
                       {groups.length !== 1
                         ? 'Rewards apply to one seller checkout at a time.'
                         : loyaltyPreviewCents > 0
-                          ? `You’ll save ${fmtPrice(loyaltyPreviewCents / 100)} at checkout.`
+                          ? `You’ll save ${fmtPrice(loyaltyPreviewCents)} at checkout.`
                           : `Use up to ${maxRedeemablePoints.toLocaleString()} points on this order.`}
                     </Text>
                   </>
@@ -707,10 +708,10 @@ export default function CartScreen() {
               </View>
               )}
               <SummaryCard
-                subtotal={summary.subtotal}
+                subtotal={summary.subtotalCents}
                 discountTotal={displayedDiscount}
-                shipping={summary.shippingTotal}
-                tax={summary.taxTotal}
+                shipping={summary.shippingTotalCents}
+                tax={summary.taxTotalCents}
                 total={displayedTotal}
                 hasPreOrder={hasPreOrder}
               />
@@ -745,13 +746,13 @@ export default function CartScreen() {
           {hasItems && (
           <View style={[s.checkoutBar, { paddingBottom: insets.bottom + SP.md }]}>
               <TouchableOpacity
-                style={s.checkoutBtn}
+                style={[s.checkoutBtn, { shadowColor: theme.shadowColor }]}
                 onPress={handleCheckout}
                 activeOpacity={0.88}
                 disabled={validating}
               >
                 <LinearGradient
-                  colors={[theme.accent, theme.secondary]}
+                  colors={[...theme.primaryGradient]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={s.checkoutGrad}
@@ -800,18 +801,18 @@ const s = StyleSheet.create({
   savedTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
   savedCard: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md },
   divider: { height: 1, backgroundColor: BORDER, marginVertical: SP.xs },
-  multiSellerNotice: { flexDirection: 'row', gap: SP.sm, backgroundColor: CYAN_DIM, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md },
-  multiSellerText: { flex: 1, color: CYAN, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
-  loyaltyCard: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER_ACTIVE, padding: SP.md, marginBottom: SP.md },
+  multiSellerNotice: { flexDirection: 'row', gap: SP.sm, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md },
+  multiSellerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
+  loyaltyCard: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, padding: SP.md, marginBottom: SP.md },
   loyaltyHeading: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
-  loyaltyIcon: { width: 30, height: 30, borderRadius: RADIUS.sm, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
+  loyaltyIcon: { width: 30, height: 30, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   loyaltyTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   loyaltySub: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
   pointsRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'center' },
   pointsInput: { flex: 1, height: COMP.inputH, borderRadius: RADIUS.md, backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, paddingHorizontal: SP.md },
-  pointsApply: { minWidth: 76, height: COMP.inputH, borderRadius: RADIUS.md, backgroundColor: PURPLE_DIM, borderWidth: 1, borderColor: BORDER_ACTIVE, alignItems: 'center', justifyContent: 'center' },
+  pointsApply: { minWidth: 76, height: COMP.inputH, borderRadius: RADIUS.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   pointsApplyDisabled: { opacity: 0.5 },
-  pointsApplyText: { fontSize: FS.sm, fontFamily: FONT.bold, color: PURPLE_LIGHT },
+  pointsApplyText: { fontSize: FS.sm, fontFamily: FONT.bold },
   pointsPreview: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: SP.xs, lineHeight: 17 },
   appliedPoints: { flexDirection: 'row', alignItems: 'center', backgroundColor: SUCCESS_DIM, borderRadius: RADIUS.md, padding: SP.sm, gap: SP.sm },
   appliedPointsTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: SUCCESS },
@@ -828,7 +829,7 @@ const s = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: BORDER,
   },
-  checkoutBtn: { borderRadius: RADIUS.lg, overflow: 'hidden', ...SHADOW_PURPLE },
+  checkoutBtn: { borderRadius: RADIUS.lg, overflow: 'hidden', shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
   checkoutGrad: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -14,6 +14,8 @@ import {
   BUILTIN_THEMES, AI_SUGGESTION_POOL, COLOR_PRESETS, TYPOGRAPHY_STYLES,
   SECTION_TYPE_LABELS,
   StoreTheme, BrandStyle, BrandMood, HomepagePriority,
+  THREAD_THEME_ID, THREAD_THEME_LIGHT_PALETTE,
+  THREAD_THEME_DARK_PALETTE,
 } from './storeTypes';
 
 const STORE_KEY = 'bt:store:v1';
@@ -76,47 +78,40 @@ function uid(prefix = 'id'): string {
 // ─── Default structures ───────────────────────────────────────────────────────
 function defaultBranding(): StoreBranding {
   return {
-    colors: {
-      primary: '#7c3aed',
-      secondary: '#5b21b6',
-      accent: '#a78bfa',
-      background: '#0f0f1a',
-      text: '#f4f4ff',
-      buttonText: '#0f0f1a',
-    },
+    colors: THREAD_THEME_LIGHT_PALETTE,
     typography: {
-      style: 'modern',
-      headingFont: 'Inter',
-      bodyFont: 'Inter',
-      buttonFont: 'Inter',
-      fontWeight: '600',
-      letterSpacing: 0,
+      style: 'editorial',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Raleway',
+      buttonFont: 'Raleway',
+      fontWeight: '500',
+      letterSpacing: 0.4,
       textCase: 'none',
     },
-    buttonStyle: 'filled',
-    cornerRadius: 'rounded',
+    buttonStyle: 'underline',
+    cornerRadius: 'sharp',
     iconStyle: 'outline',
-    animationLevel: 'standard',
+    animationLevel: 'subtle',
   };
 }
 
-function defaultThemeSettings(themeId = 'vertex'): StoreThemeSettings {
+function defaultThemeSettings(themeId = THREAD_THEME_ID): StoreThemeSettings {
   return {
     themeId,
-    activePresetId: 'violet',
+    activePresetId: 'light',
     overrides: {},
     headerLogoPosition: 'left',
     headerMenuStyle: 'inline',
     headerSearch: true,
     headerCart: true,
     headerAccount: true,
-    stickyHeader: true,
-    transparentHeader: false,
+    stickyHeader: false,
+    transparentHeader: true,
     announcementBar: {
       enabled: false,
       text: 'Free shipping on orders over $150',
-      backgroundColor: '#7c3aed',
-      textColor: '#ffffff',
+      backgroundColor: THREAD_THEME_LIGHT_PALETTE.primary,
+      textColor: THREAD_THEME_LIGHT_PALETTE.buttonText,
       dismissible: true,
       sticky: true,
       hasCountdown: false,
@@ -128,7 +123,7 @@ function defaultThemeSettings(themeId = 'vertex'): StoreThemeSettings {
     footerCopyright: `© ${new Date().getFullYear()} Your Brand Name`,
     footerPaymentIcons: true,
     productPage: {
-      mediaLayout: 'stacked',
+      mediaLayout: 'full_width',
       imageSize: 'large',
       infoPosition: 'below',
       variantStyle: 'buttons',
@@ -141,13 +136,86 @@ function defaultThemeSettings(themeId = 'vertex'): StoreThemeSettings {
     },
     collectionPage: {
       columns: 2,
-      cardStyle: 'standard',
+      cardStyle: 'minimal',
       filters: true,
       sorting: true,
-      quickAdd: true,
+      quickAdd: false,
       pagination: 'infinite',
     },
   };
+}
+
+function defaultThreadSections(): StoreSection[] {
+  const now = new Date().toISOString();
+  return [
+    {
+      id: uid('sec'),
+      type: 'hero_image',
+      label: 'Hero Image',
+      enabled: true,
+      order: 0,
+      settings: {
+        heading: 'The new uniform.',
+        description: 'Considered pieces for everyday movement.',
+        buttonLabel: 'Shop the collection',
+        textAlignment: 'left',
+        contentPosition: 'bottom',
+        fullWidth: true,
+        sectionHeight: 'tall',
+        overlayStrength: 0,
+      },
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: uid('sec'),
+      type: 'product_grid',
+      label: 'Product Grid',
+      enabled: true,
+      order: 1,
+      settings: {
+        heading: 'Current collection',
+        description: 'The pieces in rotation.',
+        columns: 2,
+        collectionRef: 'new_arrivals',
+        quickAdd: false,
+        spacing: 'spacious',
+      },
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: uid('sec'),
+      type: 'brand_story',
+      label: 'Brand Story',
+      enabled: true,
+      order: 2,
+      settings: {
+        heading: 'Designed with intention.',
+        description: 'A slower approach to getting dressed: fewer pieces, better made, and meant to be worn often.',
+        textAlignment: 'center',
+        spacing: 'spacious',
+      },
+      createdAt: now,
+      updatedAt: now,
+    },
+    {
+      id: uid('sec'),
+      type: 'newsletter',
+      label: 'Newsletter',
+      enabled: true,
+      order: 3,
+      settings: {
+        heading: 'Stay close.',
+        description: 'New releases, studio notes, and first access.',
+        buttonLabel: 'Join the list',
+        textAlignment: 'center',
+        spacing: 'spacious',
+      },
+      createdAt: now,
+      updatedAt: now,
+    },
+  ];
 }
 
 function defaultSettings(): StoreSettings {
@@ -206,7 +274,7 @@ function defaultStorefront(): Storefront {
     settings: defaultSettings(),
     branding: defaultBranding(),
     themeSettings: defaultThemeSettings(),
-    sections: [],
+    sections: defaultThreadSections(),
     collections: [],
     pages: [],
     policies: [],
@@ -229,6 +297,23 @@ export async function getStorefront(): Promise<Storefront> {
     // Load from AsyncStorage first (local truth for complex UI state)
     const raw = await AsyncStorage.getItem(STORE_KEY);
     const local: Storefront = raw ? JSON.parse(raw) as Storefront : defaultStorefront();
+    let migratedToThread = false;
+
+    // Stores created before Thread Theme existed used Vertex as the implicit
+    // starter. Only untouched stores are migrated; established stores keep
+    // their saved appearance and content.
+    if (
+      local.publishStatus === 'not_started'
+      && local.themeSettings?.themeId !== THREAD_THEME_ID
+    ) {
+      local.themeSettings = defaultThemeSettings();
+      local.branding = {
+        ...defaultBranding(),
+        logoUri: local.branding?.logoUri,
+      };
+      if (!local.sections?.length) local.sections = defaultThreadSections();
+      migratedToThread = true;
+    }
 
     // Overlay server-side published state (non-blocking)
     try {
@@ -246,7 +331,7 @@ export async function getStorefront(): Promise<Storefront> {
       }
     } catch { /* no-op — API may not be reachable */ }
 
-    if (!raw) await AsyncStorage.setItem(STORE_KEY, JSON.stringify(local));
+    if (!raw || migratedToThread) await AsyncStorage.setItem(STORE_KEY, JSON.stringify(local));
     return local;
   } catch {
     return defaultStorefront();
@@ -302,13 +387,38 @@ export async function updateSettings(settings: Partial<StoreSettings>): Promise<
 
 export async function updateBranding(branding: Partial<StoreBranding>): Promise<Storefront> {
   const store = await getStorefront();
-  store.branding = { ...store.branding, ...branding };
+  const nextBranding = { ...store.branding, ...branding };
+  if (store.themeSettings.themeId === THREAD_THEME_ID) {
+    nextBranding.colors = store.themeSettings.activePresetId === 'dark'
+      ? THREAD_THEME_DARK_PALETTE
+      : THREAD_THEME_LIGHT_PALETTE;
+    nextBranding.typography = {
+      ...nextBranding.typography,
+      style: 'editorial',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Raleway',
+      buttonFont: 'Raleway',
+    };
+    nextBranding.buttonStyle = 'underline';
+    nextBranding.cornerRadius = 'sharp';
+  }
+  store.branding = nextBranding;
   return saveStorefront(store);
 }
 
 export async function updateThemeSettings(ts: Partial<StoreThemeSettings>): Promise<Storefront> {
   const store = await getStorefront();
-  store.themeSettings = { ...store.themeSettings, ...ts };
+  store.themeSettings = {
+    ...store.themeSettings,
+    ...ts,
+    themeId: THREAD_THEME_ID,
+  };
+  if (store.themeSettings.activePresetId === 'dark') {
+    store.branding.colors = THREAD_THEME_DARK_PALETTE;
+  } else {
+    store.themeSettings.activePresetId = 'light';
+    store.branding.colors = THREAD_THEME_LIGHT_PALETTE;
+  }
   return saveStorefront(store);
 }
 
@@ -820,34 +930,13 @@ export async function dismissAISuggestion(id: string): Promise<Storefront> {
 // Pure functions. No network calls. Separated from UI.
 
 function _pickColorFromAnswers(answers: StoreGenerationAnswers): StoreColorPalette {
-  if (answers.colors.primary !== '#7c3aed') return answers.colors; // user customized
-  // pick a preset based on mood + style
-  const mood = answers.moods[0];
-  const style = answers.primaryStyle;
-  if (style === 'luxury' || mood === 'premium' || mood === 'exclusive') return COLOR_PRESETS[7].colors; // Obsidian
-  if (style === 'minimal' || mood === 'clean') return COLOR_PRESETS[1].colors; // Alabaster
-  if (style === 'streetwear' || mood === 'bold' || mood === 'raw') return COLOR_PRESETS[3].colors; // Tokyo
-  if (style === 'vintage') return COLOR_PRESETS[4].colors; // Linen
-  if (style === 'y2k' || mood === 'colorful' || mood === 'playful') return COLOR_PRESETS[3].colors; // Tokyo
-  if (style === 'outdoor' || style === 'sportswear') return COLOR_PRESETS[5].colors; // Cobalt
-  if (mood === 'dark' || mood === 'futuristic') return COLOR_PRESETS[0].colors; // Midnight
-  return COLOR_PRESETS[0].colors; // default Midnight
+  return answers.moods.includes('dark')
+    ? THREAD_THEME_DARK_PALETTE
+    : THREAD_THEME_LIGHT_PALETTE;
 }
 
-function _pickThemeFromAnswers(answers: StoreGenerationAnswers): string {
-  const style = answers.primaryStyle;
-  const mood = answers.moods[0];
-  if (style === 'luxury') return 'luxe';
-  if (style === 'streetwear') return mood === 'dark' ? 'noir' : 'street';
-  if (style === 'minimal') return 'canvas';
-  if (style === 'vintage') return 'archive';
-  if (style === 'y2k' || style === 'techwear') return 'tokyo';
-  if (style === 'outdoor' || style === 'sportswear') return mood === 'bold' ? 'motion' : 'horizon';
-  if (style === 'high_fashion') return 'muse';
-  if (mood === 'editorial') return 'gallery';
-  if (mood === 'futuristic' || mood === 'dark') return 'pulse';
-  if (mood === 'bold') return 'district';
-  return 'vertex';
+function _pickThemeFromAnswers(_answers: StoreGenerationAnswers): string {
+  return THREAD_THEME_ID;
 }
 
 function _buildSectionsFromAnswers(answers: StoreGenerationAnswers): StoreSection[] {
@@ -993,14 +1082,9 @@ function mapAiConfigToResult(
   fromAnswers: StoreGenerationAnswers,
 ): StoreGenerationResult {
   const t = cfg?.theme ?? {};
-  const palette: StoreColorPalette = {
-    primary:    t.primaryColor    ?? currentStore.branding.colors.primary,
-    secondary:  t.secondaryColor  ?? currentStore.branding.colors.secondary,
-    accent:     t.accentColor     ?? currentStore.branding.colors.accent,
-    background: t.backgroundColor ?? currentStore.branding.colors.background,
-    text:       t.textColor       ?? currentStore.branding.colors.text,
-    buttonText: currentStore.branding.colors.buttonText,
-  };
+  const palette = currentStore.themeSettings.activePresetId === 'dark'
+    ? THREAD_THEME_DARK_PALETTE
+    : THREAD_THEME_LIGHT_PALETTE;
   const aiSections = mapAiConfigToSections(cfg);
   const b = cfg?.branding ?? {};
   const hasSeo = cfg?.seo?.metaTitle || cfg?.seo?.metaDescription || cfg?.seo?.keywords?.length;
@@ -1010,19 +1094,19 @@ function mapAiConfigToResult(
     branding: {
       ...currentStore.branding,
       colors: palette,
-      cornerRadius: t.borderRadius !== undefined
-        ? mapAiBorderRadius(t.borderRadius)
-        : currentStore.branding.cornerRadius,
+      cornerRadius: 'sharp',
+      buttonStyle: 'underline',
+      iconStyle: 'outline',
+      animationLevel: 'subtle',
       typography: {
         ...currentStore.branding.typography,
-        style:       mapAiTypography(t.fontFamily),
-        // Preserve exact AI font name so the DB receives the real typeface
-        headingFont: t.fontFamily ?? currentStore.branding.typography.headingFont,
-        bodyFont:    t.fontFamily ?? currentStore.branding.typography.bodyFont,
-        buttonFont:  t.fontFamily ?? currentStore.branding.typography.buttonFont,
+        style: 'editorial',
+        headingFont: 'Cormorant Garamond',
+        bodyFont: 'Raleway',
+        buttonFont: 'Raleway',
       },
     },
-    suggestedThemeId: t.themeId ?? 'vertex',
+    suggestedThemeId: THREAD_THEME_ID,
     generatedAt:      new Date().toISOString(),
     fromAnswers,
     storeTitle:       cfg?.title       || undefined,
@@ -1048,9 +1132,25 @@ export async function applyGenerationResult(result: StoreGenerationResult): Prom
   const preAiSnapshot = await _createVersionSnapshot(store, 'ai_change', 'Before AI generation');
   api.store.saveVersion('Before AI generation', preAiSnapshot as Record<string, unknown>).catch(() => {});
   store.sections = result.sections;
-  store.branding  = result.branding;
-  store.themeSettings.themeId = result.suggestedThemeId;
-  const theme = BUILTIN_THEMES.find(t => t.id === result.suggestedThemeId);
+  store.branding = {
+    ...result.branding,
+    colors: store.themeSettings.activePresetId === 'dark'
+      ? THREAD_THEME_DARK_PALETTE
+      : THREAD_THEME_LIGHT_PALETTE,
+    typography: {
+      ...result.branding.typography,
+      style: 'editorial',
+      headingFont: 'Cormorant Garamond',
+      bodyFont: 'Raleway',
+      buttonFont: 'Raleway',
+    },
+    buttonStyle: 'underline',
+    cornerRadius: 'sharp',
+    iconStyle: 'outline',
+    animationLevel: 'subtle',
+  };
+  store.themeSettings.themeId = THREAD_THEME_ID;
+  const theme = BUILTIN_THEMES.find(t => t.id === THREAD_THEME_ID);
   if (theme?.presets[0]) store.themeSettings.activePresetId = theme.presets[0].paletteId;
   store.generatedFrom = result.fromAnswers;
   if (result.storeTitle)                    store.settings.storeName      = result.storeTitle;
@@ -1182,19 +1282,12 @@ export async function generateFromLogo(logoUri: string, base64?: string | null):
       const aiData = await api.store.fromLogo(base64, {});
       if (aiData?.config?.theme) {
         const cfg = aiData.config;
-        const palette: StoreColorPalette = {
-          primary:    cfg.theme?.primaryColor ?? '#7c3aed',
-          secondary:  cfg.theme?.secondaryColor ?? '#5b21b6',
-          accent:     cfg.theme?.accentColor ?? '#a78bfa',
-          background: cfg.theme?.backgroundColor ?? '#0f0f1a',
-          text:       cfg.theme?.textColor ?? '#f4f4ff',
-          buttonText: '#0f0f1a',
-        };
+        const palette = THREAD_THEME_LIGHT_PALETTE;
         return {
           dominantColors: [palette.primary, palette.accent, palette.secondary],
           suggestedPalette: palette,
-          suggestedThemeId: (cfg.theme as any)?.themeId ?? 'vertex',
-          suggestedTypography: 'modern',
+          suggestedThemeId: THREAD_THEME_ID,
+          suggestedTypography: 'editorial',
           brandMoods: ['premium', 'clean'],
           aiSections: mapAiConfigToSections(cfg),
           source: 'ai',
@@ -1206,19 +1299,12 @@ export async function generateFromLogo(logoUri: string, base64?: string | null):
     const aiData = await api.store.fromLogo(logoUri, {});
     if (aiData?.config?.theme) {
       const cfg = aiData.config;
-      const palette: StoreColorPalette = {
-        primary:    cfg.theme?.primaryColor ?? '#7c3aed',
-        secondary:  cfg.theme?.secondaryColor ?? '#5b21b6',
-        accent:     cfg.theme?.accentColor ?? '#a78bfa',
-        background: cfg.theme?.backgroundColor ?? '#0f0f1a',
-        text:       cfg.theme?.textColor ?? '#f4f4ff',
-        buttonText: '#0f0f1a',
-      };
+      const palette = THREAD_THEME_LIGHT_PALETTE;
       return {
         dominantColors: [palette.primary, palette.accent, palette.secondary],
         suggestedPalette: palette,
-        suggestedThemeId: 'vertex',
-        suggestedTypography: 'modern',
+        suggestedThemeId: THREAD_THEME_ID,
+        suggestedTypography: 'editorial',
         brandMoods: ['premium', 'clean'],
         aiSections: mapAiConfigToSections(cfg),
         source: 'ai',
@@ -1228,13 +1314,15 @@ export async function generateFromLogo(logoUri: string, base64?: string | null):
 
   // Deterministic mock fallback — AI could not read the image
   await new Promise(r => setTimeout(r, 800));
-  const idx = logoUri.length % COLOR_PRESETS.length;
-  const palette = COLOR_PRESETS[idx];
   return {
-    dominantColors: [palette.colors.primary, palette.colors.accent, palette.colors.secondary],
-    suggestedPalette: palette.colors,
-    suggestedThemeId: BUILTIN_THEMES[idx % BUILTIN_THEMES.length].id,
-    suggestedTypography: TYPOGRAPHY_STYLES[idx % TYPOGRAPHY_STYLES.length].value,
+    dominantColors: [
+      THREAD_THEME_LIGHT_PALETTE.primary,
+      THREAD_THEME_LIGHT_PALETTE.accent,
+      THREAD_THEME_LIGHT_PALETTE.secondary,
+    ],
+    suggestedPalette: THREAD_THEME_LIGHT_PALETTE,
+    suggestedThemeId: THREAD_THEME_ID,
+    suggestedTypography: 'editorial',
     brandMoods: ['premium', 'clean'],
     aiSections: [],
     source: 'fallback',
@@ -1257,20 +1345,12 @@ export async function generateFromMoodBoard(imageUris: string[], base64List?: st
       const aiData = await api.store.fromMoodboard(base64List, {});
       if (aiData?.config?.theme) {
         const cfg = aiData.config;
-        const palette: StoreColorPalette = {
-          primary:    cfg.theme?.primaryColor ?? '#7c3aed',
-          secondary:  cfg.theme?.secondaryColor ?? '#5b21b6',
-          accent:     cfg.theme?.accentColor ?? '#a78bfa',
-          background: cfg.theme?.backgroundColor ?? '#0f0f1a',
-          text:       cfg.theme?.textColor ?? '#f4f4ff',
-          buttonText: '#0f0f1a',
-        };
         return {
-          colorPalette: palette,
-          typographyDirection: 'modern',
+          colorPalette: THREAD_THEME_LIGHT_PALETTE,
+          typographyDirection: 'editorial',
           layoutStyle: 'editorial',
-          imageTreatment: 'high-contrast with minimal overlay',
-          suggestedThemeId: (cfg.theme as any)?.themeId ?? 'vertex',
+          imageTreatment: 'full-bleed monochrome with natural contrast',
+          suggestedThemeId: THREAD_THEME_ID,
           suggestedSections: ['hero_image', 'lookbook', 'featured_collection', 'brand_story', 'seller_posts', 'newsletter'],
           aiSections: mapAiConfigToSections(cfg),
           source: 'ai',
@@ -1282,20 +1362,12 @@ export async function generateFromMoodBoard(imageUris: string[], base64List?: st
     const aiData = await api.store.fromMoodboard(imageUris, {});
     if (aiData?.config?.theme) {
       const cfg = aiData.config;
-      const palette: StoreColorPalette = {
-        primary:    cfg.theme?.primaryColor ?? '#7c3aed',
-        secondary:  cfg.theme?.secondaryColor ?? '#5b21b6',
-        accent:     cfg.theme?.accentColor ?? '#a78bfa',
-        background: cfg.theme?.backgroundColor ?? '#0f0f1a',
-        text:       cfg.theme?.textColor ?? '#f4f4ff',
-        buttonText: '#0f0f1a',
-      };
       return {
-        colorPalette: palette,
-        typographyDirection: 'modern',
+        colorPalette: THREAD_THEME_LIGHT_PALETTE,
+        typographyDirection: 'editorial',
         layoutStyle: 'editorial',
-        imageTreatment: 'high-contrast with minimal overlay',
-        suggestedThemeId: 'vertex',
+        imageTreatment: 'full-bleed monochrome with natural contrast',
+        suggestedThemeId: THREAD_THEME_ID,
         suggestedSections: ['hero_image', 'lookbook', 'featured_collection', 'brand_story', 'seller_posts', 'newsletter'],
         aiSections: mapAiConfigToSections(cfg),
         source: 'ai',
@@ -1305,14 +1377,12 @@ export async function generateFromMoodBoard(imageUris: string[], base64List?: st
 
   // Mock fallback — AI could not read the images
   await new Promise(r => setTimeout(r, 1000));
-  const idx = imageUris.length % COLOR_PRESETS.length;
-  const palette = COLOR_PRESETS[idx];
   return {
-    colorPalette: palette.colors,
-    typographyDirection: TYPOGRAPHY_STYLES[idx % TYPOGRAPHY_STYLES.length].value,
+    colorPalette: THREAD_THEME_LIGHT_PALETTE,
+    typographyDirection: 'editorial',
     layoutStyle: 'editorial',
-    imageTreatment: 'high-contrast with minimal overlay',
-    suggestedThemeId: BUILTIN_THEMES[(idx + 2) % BUILTIN_THEMES.length].id,
+    imageTreatment: 'full-bleed monochrome with natural contrast',
+    suggestedThemeId: THREAD_THEME_ID,
     suggestedSections: ['hero_image', 'lookbook', 'featured_collection', 'brand_story', 'seller_posts', 'newsletter'],
     aiSections: [],
     source: 'fallback',

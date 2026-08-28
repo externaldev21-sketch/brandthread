@@ -17,6 +17,8 @@ import { getProfitAnalytics, getPayoutAnalytics, getFilterState, exportAnalytics
 import { ProfitAnalytics, PayoutAnalytics, ProfitLineItem, AnalyticsMetric, AnalyticsFilterState } from '@/services/analyticsTypes';
 
 function MiniBar({ points, color = SUCCESS }: { points: Array<{ value: number }>; color?: string }) {
+  const colors = useColors();
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const max = Math.max(...points.map(p => p.value), 1);
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: 28, gap: 2 }}>
@@ -28,7 +30,9 @@ function MiniBar({ points, color = SUCCESS }: { points: Array<{ value: number }>
 }
 
 export default function AnalyticsProfitScreen() {
-  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const colors = useColors();
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = colors;
+  const s = React.useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -39,14 +43,19 @@ export default function AnalyticsProfitScreen() {
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [tab,        setTab]        = useState<'profit' | 'payout'>('profit');
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true); else setLoading(true);
-    const f = filter ?? await getFilterState();
-    if (!filter) setFilter(f);
-    const [p, pay] = await Promise.all([getProfitAnalytics(f), getPayoutAnalytics()]);
-    setProfit(p); setPayout(pay);
-    setLoading(false); setRefreshing(false);
+    try {
+      const f = filter ?? await getFilterState();
+      if (!filter) setFilter(f);
+      const [p, pay] = await Promise.all([getProfitAnalytics(f), getPayoutAnalytics()]);
+      setProfit(p); setPayout(pay); setError(null);
+    } catch (err) {
+      setProfit(null); setPayout(null);
+      setError(err instanceof Error ? err.message : 'Profit analytics are unavailable.');
+    } finally { setLoading(false); setRefreshing(false); }
   }, [filter]);
 
   useEffect(() => { load(); }, []); // eslint-disable-line
@@ -54,6 +63,7 @@ export default function AnalyticsProfitScreen() {
   if (loading) {
     return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><ActivityIndicator size="large" color={PURPLE} /></View>;
   }
+  if (error) return <View style={[s.loadWrap, { paddingTop: topPad + 48 }]}><Text style={{ color: MUTED }}>{error}</Text><TouchableOpacity onPress={() => load()}><Text style={{ color: PURPLE }}>Retry</Text></TouchableOpacity></View>;
 
   return (
     <ScrollView
@@ -83,8 +93,8 @@ export default function AnalyticsProfitScreen() {
       {/* Tab toggle */}
       <View style={s.tabRow}>
         {(['profit','payout'] as const).map(t => (
-          <TouchableOpacity key={t} onPress={() => { Haptics.selectionAsync(); setTab(t); }} style={[s.tabBtn, tab === t && s.tabBtnActive]}>
-            <Text style={[s.tabBtnText, tab === t && s.tabBtnTextActive]}>{t === 'profit' ? 'Profit' : 'Payouts'}</Text>
+          <TouchableOpacity key={t} onPress={() => { Haptics.selectionAsync(); setTab(t); }} style={[s.tabBtn, tab === t && s.tabBtnActive, tab === t && { backgroundColor: PURPLE_DIM, borderColor: PURPLE }]}>
+            <Text style={[s.tabBtnText, tab === t && s.tabBtnTextActive, tab === t && { color: PURPLE_LIGHT }]}>{t === 'profit' ? 'Profit' : 'Payouts'}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -140,7 +150,7 @@ export default function AnalyticsProfitScreen() {
                 <Text style={[s.metValue, { color: item.color }]}>{item.m.formatted}</Text>
                 <Text style={s.metLabel}>{item.m.label}</Text>
                 <Text style={[s.metChange, { color: item.m.trend === 'up' ? SUCCESS : RED }]}>
-                  {item.m.changePct > 0 ? '+' : ''}{item.m.changePct.toFixed(1)}%
+                  {(item.m.changePct ?? 0) > 0 ? '+' : ''}{item.m.changePct?.toFixed(1) ?? '—'}%
                 </Text>
               </View>
             ))}
@@ -195,7 +205,9 @@ export default function AnalyticsProfitScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT } = colors;
+  return StyleSheet.create({
   scroll:   { flex: 1, backgroundColor: BG },
   content:  { paddingHorizontal: 16 },
   loadWrap: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
@@ -206,9 +218,9 @@ const s = StyleSheet.create({
   iconBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   tabRow:   { flexDirection: 'row', gap: 10, marginBottom: 20 },
   tabBtn:   { flex: 1, paddingVertical: 10, borderRadius: 12, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
-  tabBtnActive:{ backgroundColor: PURPLE_DIM, borderColor: PURPLE },
+  tabBtnActive:{},
   tabBtnText:{ fontSize: 14, fontFamily: FONT.semibold, color: MUTED },
-  tabBtnTextActive:{ color: PURPLE_LIGHT },
+  tabBtnTextActive:{},
   heroCard: { backgroundColor: CARD_ELEVATED, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: BORDER_ACTIVE, marginBottom: 20, alignItems: 'center', gap: 4 },
   heroEst:  { fontSize: 11, fontFamily: FONT.medium, color: SUBTLE, letterSpacing: 0.8, textTransform: 'uppercase' },
   heroValue:{ fontSize: 44, fontFamily: FONT.bold, color: FG },
@@ -240,4 +252,5 @@ const s = StyleSheet.create({
   payRowNote:{ fontSize: 10, fontFamily: FONT.regular, color: SUBTLE, marginTop: 1 },
   payRowValue:{ fontSize: 14, fontFamily: FONT.semibold, color: FG },
   payoutDisclaimer:{ fontSize: 11, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', paddingHorizontal: 16, marginBottom: 12 },
-});
+  });
+};
