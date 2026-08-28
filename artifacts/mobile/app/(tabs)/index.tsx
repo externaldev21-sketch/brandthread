@@ -6,7 +6,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -163,9 +163,30 @@ export default function SellerHomeScreen() {
     payoutsEnabled: boolean;
     status: string;
   } | null>(null);
+  const connectStatusRef = useRef<string | null>(null);
   const [connectBannerLoading, setConnectBannerLoading] = useState(false);
 
   const progressAnim = useRef(new Animated.Value(0)).current;
+
+  const refreshConnectStatus = useCallback(async () => {
+    try {
+      const data: any = await api.seller.connect.status();
+      if (data && typeof data === 'object') {
+        const status = typeof data.status === 'string' ? data.status : 'unknown';
+        connectStatusRef.current = status;
+        setConnectStatus({
+          connected: !!data.connected,
+          chargesEnabled: !!data.chargesEnabled,
+          payoutsEnabled: !!data.payoutsEnabled,
+          status,
+        });
+      }
+    } catch {
+      // Leave null — don't show a banner when we can't determine status
+      connectStatusRef.current = null;
+      setConnectStatus(null);
+    }
+  }, [api]);
 
   // ── Load setup state ──────────────────────────────────────────────────────
   const loadSetup = useCallback(async () => {
@@ -222,20 +243,6 @@ export default function SellerHomeScreen() {
       incomingCount: s.incomingCount,
       delayedCount: s.delayedCount,
     })).catch(() => { setStatsError(true); });
-    // ── Stripe Connect account status ──────────────────────────────────────
-    api.seller.connect.status().then((data: any) => {
-      if (data && typeof data === 'object') {
-        setConnectStatus({
-          connected: !!data.connected,
-          chargesEnabled: !!data.chargesEnabled,
-          payoutsEnabled: !!data.payoutsEnabled,
-          status: typeof data.status === 'string' ? data.status : 'unknown',
-        });
-      }
-    }).catch(() => {
-      // Leave null — don't show a banner when we can't determine status
-      setConnectStatus(null);
-    });
     // ── Dashboard visual upgrade: hero card + trend chart + real orders ──
     api.finance.balance().then((data: any) => {
       setPayoutInfo(data && typeof data === 'object' ? data : null);
@@ -252,6 +259,15 @@ export default function SellerHomeScreen() {
     }).catch(() => setSalesTrend([]));
     return () => { clearTimeout(timer); clearTimeout(minLoad); };
   }, []);
+
+  // Re-check Stripe after returning from onboarding, but don't poll while the
+  // seller remains on the dashboard once the account is active.
+  useFocusEffect(
+    useCallback(() => {
+      if (connectStatusRef.current === 'active') return;
+      refreshConnectStatus();
+    }, [refreshConnectStatus]),
+  );
 
   // ── Derived values ────────────────────────────────────────────────────────
   const pct = completionPercent(setupState);
