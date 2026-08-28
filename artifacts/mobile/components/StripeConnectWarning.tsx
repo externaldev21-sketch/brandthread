@@ -1,6 +1,7 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  AppState,
   Linking,
   StyleSheet,
   Text,
@@ -11,6 +12,7 @@ import { Feather } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BORDER,
   FONT,
@@ -20,45 +22,68 @@ import {
   SP,
 } from '@/lib/theme';
 
-interface ConnectStatus {
+export interface ConnectStatus {
   connected: boolean;
   chargesEnabled: boolean;
   payoutsEnabled: boolean;
   status: string;
+  verified: boolean;
+  bankLast4: string | null;
 }
+
+export function normalizeConnectStatus(data: unknown): ConnectStatus | null {
+  if (!data || typeof data !== 'object') return null;
+  const value = data as Record<string, unknown>;
+  return {
+    connected: value.connected === true,
+    chargesEnabled: value.chargesEnabled === true,
+    payoutsEnabled: value.payoutsEnabled === true,
+    status: typeof value.status === 'string' && value.status.trim() ? value.status : 'unknown',
+    verified: value.verified === true,
+    bankLast4: typeof value.bankLast4 === 'string' && /^\d{4}$/.test(value.bankLast4)
+      ? value.bankLast4
+      : null,
+  };
+}
+
+type StripeConnectWarningProps = {
+  /** Supplying this lets a screen share its live status with related Connect UI. */
+  connectStatus?: ConnectStatus | null;
+  onConnect?: () => Promise<void>;
+  isConnecting?: boolean;
+};
 
 /**
  * Shows the seller's Stripe Connect setup warning wherever seller money
  * actions are surfaced. The status is refreshed when the screen regains focus
  * so returning from Stripe onboarding reflects the latest account state.
  */
-export default function StripeConnectWarning() {
+export default function StripeConnectWarning({
+  connectStatus: providedStatus,
+  onConnect,
+  isConnecting = false,
+}: StripeConnectWarningProps) {
   const api = useApi();
-  const [connectStatus, setConnectStatus] = useState<ConnectStatus | null>(null);
+  const { theme } = useAppTheme();
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
+  const [localStatus, setLocalStatus] = useState<ConnectStatus | null>(null);
   const [loading, setLoading] = useState(false);
-  const connectStatusRef = useRef<string | null>(null);
+  const isRefreshing = useRef(false);
+  const connectStatus = providedStatus === undefined ? localStatus : providedStatus;
 
   const refreshConnectStatus = useCallback(async () => {
-    if (connectStatusRef.current === 'active') return;
+    if (providedStatus !== undefined || isRefreshing.current) return;
+    isRefreshing.current = true;
 
     try {
       const data: any = await api.seller.connect.status();
-      if (data && typeof data === 'object') {
-        const status = typeof data.status === 'string' ? data.status : 'unknown';
-        connectStatusRef.current = status;
-        setConnectStatus({
-          connected: !!data.connected,
-          chargesEnabled: !!data.chargesEnabled,
-          payoutsEnabled: !!data.payoutsEnabled,
-          status,
-        });
-      }
+      setLocalStatus(normalizeConnectStatus(data));
     } catch {
-      // Don't show a warning when the account status cannot be determined.
-      connectStatusRef.current = null;
-      setConnectStatus(null);
+      setLocalStatus(null);
+    } finally {
+      isRefreshing.current = false;
     }
-  }, [api]);
+  }, [api, providedStatus]);
 
   useFocusEffect(
     useCallback(() => {
@@ -66,14 +91,30 @@ export default function StripeConnectWarning() {
     }, [refreshConnectStatus]),
   );
 
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refreshConnectStatus();
+    });
+    return () => subscription.remove();
+  }, [refreshConnectStatus]);
+
   const handleFixStripeConnect = async () => {
+    if (loading || isConnecting) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (onConnect) {
+      await onConnect();
+      return;
+    }
     setLoading(true);
     try {
       const data = await api.seller.connect.onboard();
-      if (data?.url) {
-        await Linking.openURL(data.url);
+      if (!data || typeof data.url !== 'string' || !/^https:\/\//i.test(data.url)) {
+        Alert.alert('Onboarding unavailable', 'Stripe did not provide a valid onboarding link. Please try again.');
+        return;
       }
+      const canOpen = await Linking.canOpenURL(data.url);
+      if (!canOpen) throw new Error('Unable to open onboarding link');
+      await Linking.openURL(data.url);
     } catch {
       Alert.alert('Error', 'Could not open Stripe onboarding. Please try again.');
     } finally {
@@ -81,14 +122,14 @@ export default function StripeConnectWarning() {
     }
   };
 
-  if (connectStatus === null || connectStatus.status === 'active') return null;
+  if (connectStatus === null || (connectStatus.connected && connectStatus.payoutsEnabled)) return null;
 
   return (
     <TouchableOpacity
       style={styles.connectBanner}
       onPress={handleFixStripeConnect}
       activeOpacity={0.85}
-      disabled={loading}
+      disabled={loading || isConnecting}
       accessibilityRole="button"
       accessibilityLabel="Fix Stripe Connect setup"
     >
@@ -108,7 +149,7 @@ export default function StripeConnectWarning() {
         </Text>
       </View>
       <View style={styles.connectBannerArrow}>
-        {loading
+        {loading || isConnecting
           ? <Text style={styles.opening}>Opening…</Text>
           : <>
               <Text style={styles.connectBannerFix}>Fix Now</Text>
@@ -119,24 +160,24 @@ export default function StripeConnectWarning() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: { accent: string; accentDim: string; onAccent: string }) => StyleSheet.create({
   connectBanner: {
     marginHorizontal: SP.md,
     marginBottom: SP.sm,
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.sm,
-    backgroundColor: 'rgba(239,68,68,0.10)',
+    backgroundColor: theme.accentDim,
     borderRadius: RADIUS.md,
     padding: SP.md,
     borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.30)',
+    borderColor: theme.accent,
   },
   connectBannerIcon: {
     width: 36,
     height: 36,
     borderRadius: RADIUS.sm,
-    backgroundColor: 'rgba(239,68,68,0.12)',
+    backgroundColor: theme.accentDim,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -147,13 +188,13 @@ const styles = StyleSheet.create({
   connectBannerTitle: {
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
-    color: '#F87171',
+    color: theme.accent,
     marginBottom: 3,
   },
   connectBannerSub: {
     fontSize: FS.xs,
     fontFamily: FONT.regular,
-    color: 'rgba(248,113,113,0.75)',
+    color: theme.onAccent === '#FFFFFF' ? theme.accent : RED,
     lineHeight: 16,
   },
   connectBannerArrow: {

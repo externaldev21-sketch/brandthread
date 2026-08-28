@@ -40,7 +40,12 @@ export const APP_THEME_PRESETS: readonly AppThemePreset[] = [
 ] as const;
 
 export const DEFAULT_THEME = APP_THEME_PRESETS.find((theme) => theme.id === 'silver')!;
-const getTheme = (id: AppThemeId) => APP_THEME_PRESETS.find((theme) => theme.id === id) ?? DEFAULT_THEME;
+const getTheme = (id: unknown): AppThemePreset =>
+  typeof id === 'string'
+    ? APP_THEME_PRESETS.find((theme) => theme.id === id) ?? DEFAULT_THEME
+    : DEFAULT_THEME;
+const isThemeId = (id: unknown): id is AppThemeId =>
+  typeof id === 'string' && APP_THEME_PRESETS.some((theme) => theme.id === id);
 const storageKeyFor = (userId?: string | null) => `@brandthread/app-theme:v1:${userId ?? 'guest'}`;
 
 type ThemeContextValue = {
@@ -67,8 +72,11 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
     setThemeId(DEFAULT_THEME.id);
     AsyncStorage.getItem(storageKey)
       .then((saved) => {
-        if (!active || !saved || !APP_THEME_PRESETS.some((theme) => theme.id === saved)) return;
-        setThemeId(saved as AppThemeId);
+        if (!active || !isThemeId(saved)) return;
+        setThemeId(saved);
+      })
+      .catch(() => {
+        // Storage is optional: retain the complete default preset when it is unavailable.
       })
       .finally(() => {
         if (active) setIsHydrated(true);
@@ -77,9 +85,13 @@ export function AppThemeProvider({ children }: { children: React.ReactNode }) {
   }, [storageKey]);
 
   const selectTheme = useCallback(async (id: AppThemeId) => {
-    if (!APP_THEME_PRESETS.some((theme) => theme.id === id)) return;
+    if (!isThemeId(id)) return;
     setThemeId(id);
-    await AsyncStorage.setItem(storageKey, id);
+    try {
+      await AsyncStorage.setItem(storageKey, id);
+    } catch {
+      // Keep the in-memory selection when persistence is unavailable.
+    }
   }, [storageKey]);
 
   const value = useMemo(() => ({ theme: getTheme(themeId), isHydrated, selectTheme }), [isHydrated, selectTheme, themeId]);

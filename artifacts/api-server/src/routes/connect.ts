@@ -100,20 +100,46 @@ router.get("/status", async (req, res) => {
         payoutsEnabled: false,
         detailsSubmitted: false,
         status: "not_started",
+        verified: false,
+        bankLast4: null,
       });
       return;
     }
 
-    // Fetch live status from Stripe
-    const account = await stripe.accounts.retrieve(user.stripeAccountId);
+    // Fetch the live account and only the external-account data needed to
+    // identify the payout bank. Never return Stripe's account object itself.
+    const account = await stripe.accounts.retrieve(user.stripeAccountId, {
+      expand: ["external_accounts"],
+    });
+    const chargesEnabled = account.charges_enabled === true;
+    const payoutsEnabled = account.payouts_enabled === true;
+    const detailsSubmitted = account.details_submitted === true;
+    // A seller cannot receive payouts until Stripe has enabled payouts. Keep
+    // this deliberately simple so an incomplete account never looks active.
+    const stripeAccountStatus = payoutsEnabled ? "active" : "pending";
+    const externalAccounts = account.external_accounts?.data ?? [];
+    const bankAccount = externalAccounts.find(
+      (externalAccount) => externalAccount.object === "bank_account",
+    );
+    const bankLast4 =
+      bankAccount?.object === "bank_account" ? bankAccount.last4 ?? null : null;
+
+    if (stripeAccountStatus !== user.stripeAccountStatus) {
+      await db
+        .update(users)
+        .set({ stripeAccountStatus, updatedAt: new Date() })
+        .where(eq(users.clerkId, clerkUserId));
+    }
 
     res.json({
       connected: true,
       stripeAccountId: user.stripeAccountId,
-      chargesEnabled: account.charges_enabled,
-      payoutsEnabled: account.payouts_enabled,
-      detailsSubmitted: account.details_submitted,
-      status: user.stripeAccountStatus ?? "pending",
+      chargesEnabled,
+      payoutsEnabled,
+      detailsSubmitted,
+      status: stripeAccountStatus,
+      verified: payoutsEnabled && chargesEnabled,
+      bankLast4,
     });
   } catch (err: any) {
     const status = err.status ?? 500;
