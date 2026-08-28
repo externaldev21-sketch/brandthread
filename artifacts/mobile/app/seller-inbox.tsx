@@ -57,33 +57,59 @@ export default function SellerInboxScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const consecutiveFailuresRef = useRef(0);
+  const generationRef = useRef(0);
+  const requestGenerationRef = useRef<number | null>(null);
 
-  const load = useCallback(async (silent = false) => {
+  const load = useCallback(async (generation: number, silent = false) => {
+    // Keep one request in flight per focus cycle so a slow request cannot
+    // overlap a later poll and corrupt the consecutive-failure count.
+    if (requestGenerationRef.current === generation) return;
+    requestGenerationRef.current = generation;
     try {
       const list = await api.conversations.list();
+      if (generationRef.current !== generation) return;
       // Sellers only handle buyer↔seller threads
       const relevant = (list as ConvView[]).filter(
         (c) => c.type !== 'buyer_to_buyer',
       );
       setConvs(relevant);
       setLoadError(false);
+      consecutiveFailuresRef.current = 0;
     } catch (e) {
+      if (generationRef.current !== generation) return;
       setLoadError(true);
-      reportNetworkError(e, () => load());
+      reportNetworkError(e, () => load(generation, true));
+      consecutiveFailuresRef.current += 1;
+      if (consecutiveFailuresRef.current >= 3 && pollRef.current !== null) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
     } finally {
-      setIsLoading(false);
+      if (generationRef.current === generation) setIsLoading(false);
+      if (requestGenerationRef.current === generation) {
+        requestGenerationRef.current = null;
+      }
     }
   }, [api]);
 
   useFocusEffect(useCallback(() => {
-    load();
-    pollRef.current = setInterval(() => load(true), 30_000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    const generation = ++generationRef.current;
+    consecutiveFailuresRef.current = 0;
+    load(generation);
+    pollRef.current = setInterval(() => load(generation, true), 30_000);
+    return () => {
+      if (pollRef.current !== null) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
   }, [load]));
 
   async function onRefresh() {
     setIsRefreshing(true);
-    await load(true);
+    consecutiveFailuresRef.current = 0;
+    await load(generationRef.current, true);
     setIsRefreshing(false);
   }
 
@@ -166,7 +192,14 @@ export default function SellerInboxScreen() {
           <Feather name="wifi-off" size={40} color={MUTED} />
           <Text style={s.emptyTitle}>Messages couldn't load</Text>
           <Text style={s.emptyBody}>Check your connection and try again.</Text>
-          <TouchableOpacity style={s.retryButton} onPress={() => load()} activeOpacity={0.8}>
+          <TouchableOpacity
+            style={s.retryButton}
+            onPress={() => {
+              consecutiveFailuresRef.current = 0;
+              load(generationRef.current, true);
+            }}
+            activeOpacity={0.8}
+          >
             <Feather name="refresh-cw" size={15} color={PURPLE} />
             <Text style={s.retryText}>Try again</Text>
           </TouchableOpacity>

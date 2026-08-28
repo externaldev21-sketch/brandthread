@@ -52,6 +52,9 @@ export default function SellerLiveScreen() {
   const commentsRef   = useRef<ScrollView>(null);
   const pollRef       = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerRef      = useRef<ReturnType<typeof setInterval> | null>(null);
+  const consecutiveFailuresRef = useRef(0);
+  const generationRef = useRef(0);
+  const requestGenerationRef = useRef<number | null>(null);
   const lastCommentTs = useRef<string>(new Date().toISOString());
 
   // ─── Init Agora ─────────────────────────────────────────────────────────────
@@ -98,26 +101,44 @@ export default function SellerLiveScreen() {
 
   // ─── Timers: duration + comment polling ──────────────────────────────────────
   useEffect(() => {
+    const generation = ++generationRef.current;
+    consecutiveFailuresRef.current = 0;
     timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
-    pollRef.current  = setInterval(pollComments, 3000);
-    pollComments();
+    pollRef.current  = setInterval(() => pollComments(generation), 3000);
+    pollComments(generation);
     loadProducts();
     return () => {
       clearInterval(timerRef.current!);
-      clearInterval(pollRef.current!);
+      if (pollRef.current !== null) clearInterval(pollRef.current);
+      pollRef.current = null;
     };
   }, []);
 
-  async function pollComments() {
+  async function pollComments(generation: number) {
+    if (requestGenerationRef.current === generation) return;
+    requestGenerationRef.current = generation;
     try {
       const data = await (api as any).live.comments(params.streamId, lastCommentTs.current) as any;
+      if (generationRef.current !== generation) return;
       const newComments: Comment[] = (data.comments ?? []).reverse();
       if (newComments.length) {
         lastCommentTs.current = newComments[newComments.length - 1].created_at;
         setComments(prev => [...prev, ...newComments].slice(-80));
         setTimeout(() => commentsRef.current?.scrollToEnd({ animated: true }), 100);
       }
-    } catch {}
+      consecutiveFailuresRef.current = 0;
+    } catch {
+      if (generationRef.current !== generation) return;
+      consecutiveFailuresRef.current += 1;
+      if (consecutiveFailuresRef.current >= 3 && pollRef.current !== null) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    } finally {
+      if (requestGenerationRef.current === generation) {
+        requestGenerationRef.current = null;
+      }
+    }
   }
 
   async function loadProducts() {

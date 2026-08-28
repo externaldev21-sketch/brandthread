@@ -61,6 +61,9 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
     userId ? getBadgeCount(userId) : 0,
   );
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const consecutiveFailuresRef = useRef(0);
+  const generationRef = useRef(0);
+  const requestGenerationRef = useRef<number | null>(null);
 
   useEffect(() => {
     // No authenticated seller → clear badge and stop.
@@ -68,6 +71,8 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
       setNewOrderCount(0);
       return;
     }
+    const generation = ++generationRef.current;
+    consecutiveFailuresRef.current = 0;
 
     // Subscribe to store changes → re-render on any badge update.
     const unsub = subscribe(() => setNewOrderCount(getBadgeCount(userId)));
@@ -75,6 +80,8 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
     let cancelled = false;
 
     const poll = async () => {
+      if (requestGenerationRef.current === generation) return;
+      requestGenerationRef.current = generation;
       // Record poll start time before the async fetch. If the seller opens
       // Orders while the request is in-flight, clearBadge() advances
       // lastViewedAt past pollStartMs, and setBadgeCount will discard the
@@ -82,7 +89,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
       const pollStartMs = Date.now();
       try {
         const rows = await api.orders.list();
-        if (cancelled) return;
+        if (cancelled || generationRef.current !== generation) return;
 
         // Count orders placed after the seller last viewed the Orders screen.
         const lastViewed = getLastViewedAt(userId);
@@ -97,8 +104,19 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
         // setBadgeCount discards this result if lastViewedAt advanced past
         // pollStartMs (i.e. the seller opened Orders mid-flight).
         setBadgeCount(userId, count, pollStartMs);
+        consecutiveFailuresRef.current = 0;
       } catch {
         // Non-critical — badge simply won't show if offline.
+        if (cancelled || generationRef.current !== generation) return;
+        consecutiveFailuresRef.current += 1;
+        if (consecutiveFailuresRef.current >= 3 && pollRef.current !== null) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+        }
+      } finally {
+        if (requestGenerationRef.current === generation) {
+          requestGenerationRef.current = null;
+        }
       }
     };
 

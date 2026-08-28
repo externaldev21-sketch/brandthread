@@ -104,6 +104,9 @@ export default function SellerConversationScreen() {
 
   const flatListRef = useRef<FlatList<ListRow>>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const consecutiveFailuresRef = useRef(0);
+  const generationRef = useRef(0);
+  const requestGenerationRef = useRef<number | null>(null);
 
   const [conv, setConv] = useState<ConvView | null>(null);
   const [messages, setMessages] = useState<Msg[]>([]);
@@ -126,34 +129,59 @@ export default function SellerConversationScreen() {
 
   // ── Data loading ────────────────────────────────────────────────────────────
 
-  const loadMessages = useCallback(async () => {
+  const loadMessages = useCallback(async (generation: number) => {
     if (!id) return;
+    // Prevent a slow poll from overlapping the next tick in the same focus
+    // cycle. This keeps failures attributable to the current request stream.
+    if (requestGenerationRef.current === generation) return;
+    requestGenerationRef.current = generation;
     try {
       const msgs = await api.conversations.messages(id, 100);
+      if (generationRef.current !== generation) return;
       setMessages(msgs as Msg[]);
-    } catch { /* keep last state while polling */ }
+      consecutiveFailuresRef.current = 0;
+    } catch {
+      if (generationRef.current !== generation) return;
+      consecutiveFailuresRef.current += 1;
+      if (consecutiveFailuresRef.current >= 3 && pollRef.current !== null) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    } finally {
+      if (requestGenerationRef.current === generation) {
+        requestGenerationRef.current = null;
+      }
+    }
   }, [api, id]);
 
-  const loadAll = useCallback(async () => {
+  const loadAll = useCallback(async (generation: number) => {
     if (!id) { setIsLoading(false); return; }
     try {
       const [c] = await Promise.all([
         api.conversations.get(id),
-        loadMessages(),
+        loadMessages(generation),
       ]);
+      if (generationRef.current !== generation) return;
       setConv(c as ConvView);
       api.conversations.markRead(id).catch(() => {});
     } catch (e) {
       console.error('Failed to load conversation', e);
     } finally {
-      setIsLoading(false);
+      if (generationRef.current === generation) setIsLoading(false);
     }
   }, [api, id, loadMessages]);
 
   useFocusEffect(useCallback(() => {
-    loadAll();
-    pollRef.current = setInterval(loadMessages, 15_000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    const generation = ++generationRef.current;
+    consecutiveFailuresRef.current = 0;
+    loadAll(generation);
+    pollRef.current = setInterval(() => loadMessages(generation), 15_000);
+    return () => {
+      if (pollRef.current !== null) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
   }, [loadAll, loadMessages]));
 
   useEffect(() => {
