@@ -30,7 +30,7 @@ import { isManagerRole, parseRoleError } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import { formatCents } from '@/lib/money';
 import { useTeamRole } from '@/hooks/useTeamRole';
-import { getGrowthStudioTools, GROWTH_EXTRAS } from '@/components/planFeatures';
+import { getGrowthStudioTools, GROWTH_EXTRAS } from '@/lib/growthTools';
 
 // ─── Static plan catalogue ────────────────────────────────────────────────────
 

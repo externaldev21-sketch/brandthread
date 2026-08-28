@@ -19,9 +19,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { dismissTip, markFeatureOpened, getSetupState } from '@/lib/setupStore';
 import { getProjects } from '@/services/designService';
 import { DesignProject, PROJECT_TYPE_LABELS, PROJECT_STATUS_LABELS } from '@/services/designTypes';
-import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, ORANGE, ORANGE_DIM, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, SectionHeader, EmptyState, GuidedTip, NewFeatureBadge, StatusBadge, LockBadge } from '@/components/BrandthreadUI';
+import { GROWTH_STUDIO_TOOLS, type GrowthTool, type GrowthToolId } from '@/lib/growthTools';
 
 // ─── Layout constants ─────────────────────────────────────────────────────────
 
@@ -43,39 +44,31 @@ function cardWidth(screenWidth: number, cols: number): number {
 // ─── Tool definitions ─────────────────────────────────────────────────────────
 
 /** Tool IDs that require a Growth (or higher) subscription to use. */
-const GROWTH_REQUIRED_TOOLS = new Set([
-  'design-studio',
-  'ai-photoshoot',
-  'mockup-to-model',
-  'remove-bg',
-  'bg-replace',
-  'ai-design',
-  'brand-assets',
-  'campaign-gen',
-]);
+const GROWTH_REQUIRED_TOOLS = new Set<string>(GROWTH_STUDIO_TOOLS.map((tool) => tool.id));
 
-interface StudioTool {
-  id: string;
-  title: string;
-  desc: string;
-  icon: keyof typeof Feather.glyphMap;
-  accent: string;
-  accentDim: string;
+interface StudioTool extends GrowthTool {
   route: string;
   badge?: boolean;
 }
 
-const STUDIO_TOOLS: StudioTool[] = [
-  {
-    id: 'design-studio',
-    title: 'Design Studio',
-    desc: 'Create product artwork, graphics and custom designs.',
-    icon: 'edit-3',
-    accent: PURPLE,
-    accentDim: PURPLE_DIM,
-    route: '/design',
-    badge: true,
-  },
+const GROWTH_TOOL_ROUTES: Record<GrowthToolId, string> = {
+  'design-studio': '/design',
+  'ai-photoshoot': '/design-ai-photoshoot',
+  'mockup-to-model': '/design-mockup-to-model',
+  'remove-bg': '/design-bg-removal',
+  'bg-replace': '/design-bg-replace',
+  'ai-design': '/design-text-to-design',
+  'brand-assets': '/design-brand-assets',
+  'campaign-gen': '/design-campaign',
+};
+
+const GROWTH_STUDIO_TOOL_CARDS: StudioTool[] = GROWTH_STUDIO_TOOLS.map((tool) => ({
+  ...tool,
+  route: GROWTH_TOOL_ROUTES[tool.id],
+  badge: tool.id === 'design-studio' || undefined,
+}));
+
+const STANDARD_STUDIO_TOOLS: StudioTool[] = [
   {
     id: 'go-live',
     title: 'Go Live',
@@ -96,69 +89,12 @@ const STUDIO_TOOLS: StudioTool[] = [
     route: '/create-post',
     badge: true,
   },
-  {
-    id: 'ai-photoshoot',
-    title: 'AI Photoshoot',
-    desc: 'Generate product photos with AI.',
-    icon: 'camera',
-    accent: BLUE,
-    accentDim: BLUE_DIM,
-    route: '/design-ai-photoshoot',
-  },
-  {
-    id: 'mockup-to-model',
-    title: 'Mockup to Model',
-    desc: 'Wear your design on a model.',
-    icon: 'user',
-    accent: ORANGE,
-    accentDim: ORANGE_DIM,
-    route: '/design-mockup-to-model',
-  },
-  {
-    id: 'remove-bg',
-    title: 'Remove Background',
-    desc: 'Remove backgrounds instantly.',
-    icon: 'scissors',
-    accent: SUCCESS,
-    accentDim: SUCCESS_DIM,
-    route: '/design-bg-removal',
-  },
-  {
-    id: 'bg-replace',
-    title: 'Background Replace',
-    desc: 'Change or generate new backgrounds.',
-    icon: 'image',
-    accent: '#06B6D4',
-    accentDim: '#0E4A56',
-    route: '/design-bg-replace',
-  },
-  {
-    id: 'ai-design',
-    title: 'AI Design',
-    desc: 'Describe your idea and create unique designs.',
-    icon: 'zap',
-    accent: '',
-    accentDim: '',
-    route: '/design-text-to-design',
-  },
-  {
-    id: 'brand-assets',
-    title: 'Brand Assets',
-    desc: 'Access logos, colors, fonts and saved assets.',
-    icon: 'layers',
-    accent: GOLD,
-    accentDim: '#3D2A0A',
-    route: '/design-brand-assets',
-  },
-  {
-    id: 'campaign-gen',
-    title: 'Campaign Generator',
-    desc: 'Generate marketing content and campaigns.',
-    icon: 'trending-up',
-    accent: '#F472B6',
-    accentDim: '#4A1230',
-    route: '/design-campaign',
-  },
+];
+
+const STUDIO_TOOLS: StudioTool[] = [
+  ...GROWTH_STUDIO_TOOL_CARDS.slice(0, 1),
+  ...STANDARD_STUDIO_TOOLS,
+  ...GROWTH_STUDIO_TOOL_CARDS.slice(1),
 ];
 
 const TEMPLATES = [

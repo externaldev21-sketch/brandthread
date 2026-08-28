@@ -20,7 +20,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { CARD, BORDER, FG, MUTED, SUBTLE, SUCCESS, FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
-import { getGrowthStudioTools, GROWTH_EXTRAS } from '@/components/planFeatures';
+import { GROWTH_EXTRAS, GROWTH_STUDIO_TOOLS, getGrowthStudioTools } from '@/lib/growthTools';
 
 interface Props {
   visible: boolean;
@@ -97,7 +97,7 @@ export default function PlanUpsellModal({
             <Text style={[s.headerTitle, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Upgrade to {planLabel}</Text>
             <Text style={s.headerSubtitle}>
               <Text style={s.featureNameText}>{featureName}</Text>
-              {' '}and {isGrowth ? (growthStudioTools.length - 1) + ' more tools are' : 'more features are'} available on the {planLabel} plan ({planPrice}/mo).
+              {' '}and {isGrowth ? (GROWTH_STUDIO_TOOLS.length - 1) + ' more tools are' : 'more features are'} available on the {planLabel} plan ({planPrice}/mo).
             </Text>
           </LinearGradient>
 
