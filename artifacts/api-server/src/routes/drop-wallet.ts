@@ -75,7 +75,7 @@ router.post("/:dropId", async (req, res) => {
       updatedAt: wallet.updatedAt.toISOString(),
     });
   } catch (err) {
-    console.error(err);
+    req.log.error({ err }, "Failed to create wallet");
     res.status(500).json({ error: "Failed to create wallet" });
   }
 });
@@ -111,7 +111,7 @@ router.get("/:dropId", async (req, res) => {
       updatedAt:  wallet.updatedAt.toISOString(),
     });
   } catch (err) {
-    console.error(err);
+    req.log.error({ err }, "Failed to get wallet");
     res.status(500).json({ error: "Failed to get wallet" });
   }
 });
@@ -155,7 +155,7 @@ router.post("/:dropId/deposit", async (req, res) => {
     res.json({ deposited: true, amountCents });
   } catch (err: any) {
     if (err.status && err.status < 500) { res.status(err.status).json({ error: err.message }); return; }
-    console.error(err);
+    req.log.error({ err }, "Failed to deposit into wallet");
     res.status(500).json({ error: "Failed to deposit" });
   }
 });
@@ -276,7 +276,7 @@ router.post("/:dropId/release-order/:orderId", async (req, res) => {
     if (err.status && err.status < 500) {
       res.status(err.status).json({ error: err.message }); return;
     }
-    console.error(err);
+    req.log.error({ err }, "Failed to release order share");
     res.status(500).json({ error: "Failed to release order share" });
   }
 });
@@ -339,7 +339,7 @@ router.post("/:dropId/pay-shipping/:orderId", async (req, res) => {
 
     res.json({ paid: true, labelCents, deductedFromWallet: true });
   } catch (err) {
-    console.error(err);
+    req.log.error({ err }, "Failed to pay shipping from wallet");
     res.status(500).json({ error: "Failed to pay shipping from wallet" });
   }
 });

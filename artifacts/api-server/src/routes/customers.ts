@@ -3,6 +3,7 @@ import { db, customers, orders } from "@workspace/db";
 import { eq, desc, ilike, or, and, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
+import { logger } from "../lib/logger";
 
 // ─── Startup migration — add tags + notes columns ────────────────────────────
 (async () => {
@@ -10,7 +11,7 @@ import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
     await db.execute(sql`ALTER TABLE customers ADD COLUMN IF NOT EXISTS tags JSONB NOT NULL DEFAULT '[]'`);
     await db.execute(sql`ALTER TABLE customers ADD COLUMN IF NOT EXISTS notes TEXT`);
   } catch (err) {
-    console.error("[customers] migration error:", err);
+    logger.error({ err }, "Failed to apply customers migration");
   }
 })();
 

@@ -88,7 +88,7 @@ router.get("/", async (req, res) => {
 
     res.json(rows.map(serializePublicManufacturer));
   } catch (err) {
-    console.error(err);
+    req.log.error({ err }, "Failed to fetch public manufacturers");
     res.status(500).json({ error: "Failed to fetch manufacturers" });
   }
 });
@@ -144,7 +144,7 @@ router.post("/apply", async (req, res) => {
       updatedAt:  mfr.updatedAt.toISOString(),
     });
   } catch (err) {
-    console.error(err);
+    req.log.error({ err }, "Failed to submit manufacturer application");
     res.status(500).json({ error: "Application failed" });
   }
 });
@@ -171,7 +171,7 @@ router.get("/:id", async (req, res) => {
 
     res.json(serializePublicManufacturer(mfr));
   } catch (err) {
-    console.error(err);
+    req.log.error({ err, manufacturerId: req.params.id }, "Failed to fetch public manufacturer");
     res.status(500).json({ error: "Failed to fetch manufacturer" });
   }
 });

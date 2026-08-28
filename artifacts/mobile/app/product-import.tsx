@@ -22,6 +22,59 @@ const IMPORT_HISTORY = [
   { date: '2 weeks ago', method: 'CSV', count: 8, status: 'failed' },
 ] as const;
 
+function parseCsvLine(line: string): string[] {
+  const values: string[] = [];
+  let value = '';
+  let quoted = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    if (character === '"') {
+      if (quoted && line[index + 1] === '"') {
+        value += '"';
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (character === ',' && !quoted) {
+      values.push(value.trim());
+      value = '';
+    } else {
+      value += character;
+    }
+  }
+  values.push(value.trim());
+  return values;
+}
+
+function parseProductCsv(csv: string): { name: string; description?: string; category?: string; price?: string }[] {
+  const lines = csv.split(/\r?\n/).filter((line) => line.trim());
+  if (lines.length < 2) return [];
+
+  const headers = parseCsvLine(lines[0]).map((header) => header.trim().toLowerCase());
+  const nameIndex = headers.indexOf('name');
+  if (nameIndex < 0) throw new Error('CSV must include a name column.');
+
+  const descriptionIndex = headers.indexOf('description');
+  const categoryIndex = headers.indexOf('category');
+  const priceIndex = headers.indexOf('price');
+
+  return lines.slice(1).map((line) => {
+    const values = parseCsvLine(line);
+    const name = values[nameIndex]?.trim() ?? '';
+    if (!name) throw new Error('Every product must have a name.');
+    const description = descriptionIndex >= 0 ? values[descriptionIndex]?.trim() : undefined;
+    const category = categoryIndex >= 0 ? values[categoryIndex]?.trim() : undefined;
+    const price = priceIndex >= 0 ? values[priceIndex]?.trim() : undefined;
+    return {
+      name,
+      ...(description ? { description } : {}),
+      ...(category ? { category } : {}),
+      ...(price ? { price } : {}),
+    };
+  });
+}
+
 function methodIcon(method: string): keyof typeof Feather.glyphMap {
   if (method === 'CSV') return 'file-text';
   if (method === 'Manual') return 'list';
@@ -54,8 +107,10 @@ export default function ProductImportScreen() {
     setCsvUploading(true);
     setShowCsvModal(false);
     try {
-      const res = await api.products.import({ csvContent: csvText.trim() });
-      const count = res?.imported ?? csvText.split('\n').length - 1;
+      const rows = parseProductCsv(csvText.trim());
+      if (rows.length === 0) throw new Error('CSV contains no products.');
+      const res = await api.products.import(rows);
+      const count = res.successCount;
       Alert.alert('Import complete', `${count} product${count !== 1 ? 's' : ''} imported successfully.`);
       setCsvText('');
     } catch {

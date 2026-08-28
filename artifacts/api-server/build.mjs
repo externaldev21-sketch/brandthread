@@ -126,6 +126,9 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
 }
 
 buildAll().catch((err) => {
-  console.error(err);
+  const error = err instanceof Error
+    ? { name: err.name, message: err.message, stack: err.stack }
+    : { message: "Unknown build failure" };
+  process.stderr.write(`${JSON.stringify({ level: "error", msg: "API build failed", err: error })}\n`);
   process.exit(1);
 });

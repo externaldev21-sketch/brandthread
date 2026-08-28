@@ -12,6 +12,7 @@ import { openai } from "@workspace/integrations-openai-ai-server";
 import { requireAuth } from "../middlewares/requireAuth";
 import { db, users, products, orders, drops, dropWallets, dropWalletTransactions } from "@workspace/db";
 import { eq, desc, and, sql } from "drizzle-orm";
+import { logger } from "../lib/logger";
 
 const router = Router();
 router.use(requireAuth);
@@ -179,7 +180,7 @@ async function buildUserContext(clerkId: string): Promise<{ role: string; summar
 
     return { role: "buyer", summary };
   } catch (err) {
-    console.error("[support-chat] context error:", err);
+    logger.error({ err, clerkId }, "Failed to build support chat user context");
     return { role: "unknown", summary: "Could not load account data." };
   }
 }
@@ -337,7 +338,7 @@ router.post("/escalate", async (req: Request, res: Response): Promise<void> => {
 
     res.json({ ok: true, message: "Support ticket created. We'll follow up within 2 business hours." });
   } catch (err) {
-    console.error("[support-chat] escalate error:", err);
+    req.log.error({ err, clerkId }, "Failed to escalate support chat ticket");
     res.status(500).json({ error: "Could not create ticket. Please email support@brandthread.app directly." });
   }
 });

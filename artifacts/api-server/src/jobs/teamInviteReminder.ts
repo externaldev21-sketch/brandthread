@@ -14,6 +14,7 @@ import {
   sendTeamInviteEmail,
   teamInviteReminderIdempotencyKey,
 } from "../lib/teamInvites";
+import { logger } from "../lib/logger";
 
 const REMINDER_WINDOW_MS = 24 * 60 * 60 * 1000;
 const INTERVAL_MS = 60 * 60 * 1000;
@@ -22,7 +23,7 @@ const CLAIM_LEASE_MS = 15 * 60 * 1000;
 export async function runTeamInviteReminder(): Promise<void> {
   const key = process.env.RESEND_API_KEY;
   if (!key) {
-    console.log("[teamInviteReminder] Skipped: RESEND_API_KEY is not configured");
+    logger.warn({ job: "teamInviteReminder" }, "Invite reminder job skipped because email is not configured");
     return;
   }
 
@@ -139,10 +140,10 @@ export async function runTeamInviteReminder(): Promise<void> {
     }
 
     if (reminded > 0) {
-      console.log(`[teamInviteReminder] Sent ${reminded} invite reminder(s)`);
+      logger.info({ job: "teamInviteReminder", reminded }, "Invite reminders sent");
     }
   } catch (err) {
-    console.error("[teamInviteReminder] Error:", err);
+    logger.error({ err, job: "teamInviteReminder" }, "Invite reminder job failed");
   }
 }
 
@@ -151,5 +152,5 @@ export function startTeamInviteReminderJob(): void {
   // does not wait for the first full interval.
   setTimeout(() => void runTeamInviteReminder(), 5 * 60 * 1000);
   setInterval(() => void runTeamInviteReminder(), INTERVAL_MS);
-  console.log("[teamInviteReminder] Job scheduled (runs every hour, first run in 5 min)");
+  logger.info({ job: "teamInviteReminder", intervalMs: INTERVAL_MS, initialDelayMs: 5 * 60 * 1000 }, "Invite reminder job scheduled");
 }

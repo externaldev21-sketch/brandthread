@@ -59,3 +59,4 @@
 - [Mobile API resilience](mobile-api-resilience.md) — classify transport/server failures centrally; only read requests get global retry actions, while mutations require explicit screen-level retries.
 - [Promote objective boundary](promote-objectives.md) — Boost objectives are persisted and reported now; true objective-aware delivery requires separate event attribution and ranking work.
 - [Returns and push preferences](returns-push-preferences.md) — return/refund submissions are server-authoritative; granular category switches gate push delivery, not the in-app feed.
+- [API failure contract](api-failure-contract.md) — every API failure uses one request-correlated envelope; 5xx responses stay generic while diagnostics remain in structured logs.

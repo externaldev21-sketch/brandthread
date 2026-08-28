@@ -38,7 +38,7 @@ export async function requireModerator(req: Request, res: Response, next: NextFu
     }
     next();
   } catch (error) {
-    console.error("[requireModerator] DB lookup failed:", error);
+    req.log.error({ err: error }, "Moderator access lookup failed");
     res.status(503).json({ error: "Unable to verify moderator access" });
   }
 }
@@ -106,7 +106,7 @@ export function requirePlan(minPlan: "growth" | "pro") {
 
       next();
     } catch (err) {
-      console.error("[requirePlan] DB lookup failed:", err);
+      req.log.error({ err, requiredPlan: minPlan }, "Subscription plan lookup failed");
       // Fail open — don't block the user if we can't check the plan
       next();
     }

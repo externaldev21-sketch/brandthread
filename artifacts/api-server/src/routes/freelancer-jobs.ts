@@ -19,6 +19,7 @@ import { and, eq, desc, inArray, isNull, ne, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireStripe, computeApplicationFeeCents } from "../lib/stripe";
 import { payoutIdempotencyKey, refundJobPayment } from "../lib/freelancerEscrow";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -71,14 +72,14 @@ function roleFor(
   return null;
 }
 
-function sendError(res: any, err: any, fallback: string) {
+function sendError(req: any, res: any, err: any, fallback: string) {
   const status =
     err?.status ??
     (typeof err?.statusCode === "number" && err.statusCode < 500 ? 409 : 500);
   if (status < 500) {
     res.status(status).json({ error: err?.message ?? fallback });
   } else {
-    console.error(fallback, err);
+    (req.log ?? logger).error({ err }, fallback);
     res.status(500).json({ error: fallback });
   }
 }
@@ -166,7 +167,7 @@ router.post("/", async (req, res) => {
           .where(eq(freelancers.id, freelancer.id));
       }
     } catch (acctErr) {
-      console.warn("freelancer hire: Connect account check failed", acctErr);
+      req.log.warn({ err: acctErr, freelancerId }, "Freelancer Connect account check failed");
     }
     if (!payoutsReady) {
       res.status(409).json({
@@ -254,7 +255,7 @@ router.post("/", async (req, res) => {
 
     res.status(201).json({ job: shapeJob(updated), checkoutUrl: session.url, sessionId: session.id });
   } catch (err: any) {
-    sendError(res, err, "Failed to create job");
+    sendError(req, res, err, "Failed to create job");
   }
 });
 
@@ -312,7 +313,7 @@ router.get("/", async (req, res) => {
       ),
     });
   } catch (err) {
-    console.error("freelancer jobs list:", err);
+    req.log.error({ err }, "Failed to list freelancer jobs");
     res.status(500).json({ error: "Failed to load jobs" });
   }
 });
@@ -360,7 +361,7 @@ router.get("/:id", async (req, res) => {
       }),
     });
   } catch (err) {
-    console.error("freelancer job get:", err);
+    req.log.error({ err, jobId: req.params.id }, "Failed to load freelancer job");
     res.status(500).json({ error: "Failed to load job" });
   }
 });
@@ -461,7 +462,7 @@ router.post("/:id/sync-payment", async (req, res) => {
       res.json({ job: shapeJob(row.job, { role }), paymentStatus: session.payment_status });
     }
   } catch (err: any) {
-    sendError(res, err, "Failed to sync payment");
+    sendError(req, res, err, "Failed to sync payment");
   }
 });
 
@@ -509,7 +510,7 @@ router.patch("/:id/accept", async (req, res) => {
     }
     res.json({ job: shapeJob(updated, { role: "freelancer" }) });
   } catch (err) {
-    sendError(res, err, "Failed to accept job");
+    sendError(req, res, err, "Failed to accept job");
   }
 });
 
@@ -550,7 +551,7 @@ router.patch("/:id/start", async (req, res) => {
     }
     res.json({ job: shapeJob(updated, { role: "freelancer" }) });
   } catch (err) {
-    sendError(res, err, "Failed to start job");
+    sendError(req, res, err, "Failed to start job");
   }
 });
 
@@ -675,7 +676,7 @@ router.patch("/:id/complete", async (req, res) => {
           sourceCharge =
             typeof pi.latest_charge === "string" ? pi.latest_charge : pi.latest_charge?.id;
         } catch (piErr) {
-          console.warn("freelancer job complete: couldn't retrieve PaymentIntent", piErr);
+          (req.log ?? logger).warn({ err: piErr, jobId: id }, "Could not retrieve job PaymentIntent");
         }
       }
       if (!sourceCharge) {
@@ -779,7 +780,7 @@ router.patch("/:id/complete", async (req, res) => {
       },
     });
   } catch (err: any) {
-    sendError(res, err, "Failed to complete job");
+    sendError(req, res, err, "Failed to complete job");
   }
 });
 
@@ -903,7 +904,7 @@ router.patch("/:id/cancel", async (req, res) => {
           }
         }
       } catch (sessionErr) {
-        console.warn("freelancer job cancel: session check failed", sessionErr);
+        req.log.warn({ err: sessionErr, jobId: id }, "Freelancer job cancellation session check failed");
       }
     }
 
@@ -919,7 +920,7 @@ router.patch("/:id/cancel", async (req, res) => {
 
     res.json({ job: shapeJob(updated ?? claimed, { role }) });
   } catch (err: any) {
-    sendError(res, err, "Failed to cancel job");
+    sendError(req, res, err, "Failed to cancel job");
   }
 });
 

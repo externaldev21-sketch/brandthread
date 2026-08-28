@@ -159,8 +159,17 @@ router.post("/brand-memory/rebuild", requireAuth, async (req: Request, res: Resp
 
   // Gather context from DB in parallel
   const [sellerProducts, sellerPosts, sellerStore] = await Promise.allSettled([
-    db.select({ name: products.name, description: products.description, priceCents: products.priceCents, category: products.category })
-      .from(products).where(eq(products.ownerId, ownerId)).limit(20),
+    db.select({
+      name: products.name,
+      description: products.description,
+      priceCents: sql<number | null>`min(${productVariants.priceCents})`,
+      category: products.category,
+    })
+      .from(products)
+      .leftJoin(productVariants, eq(productVariants.productId, products.id))
+      .where(eq(products.ownerId, ownerId))
+      .groupBy(products.id)
+      .limit(20),
     db.select({ caption: posts.caption, mediaType: posts.mediaType, createdAt: posts.createdAt })
       .from(posts).where(eq(posts.userId, ownerId)).orderBy(desc(posts.createdAt)).limit(15),
     db.select({ title: storefronts.title, subtitle: storefronts.subtitle, description: storefronts.description, branding: storefronts.branding })
@@ -254,7 +263,7 @@ router.get("/suggestions", requireAuth, async (req: Request, res: Response): Pro
     const unfulfilledOrders = await db
       .select({ id: orders.id, status: orders.status, createdAt: orders.createdAt })
       .from(orders)
-      .where(and(eq(orders.sellerId, ownerId), eq(orders.status, "paid")))
+      .where(and(eq(orders.ownerId, ownerId), eq(orders.status, "paid")))
       .limit(10);
 
     if (unfulfilledOrders.length > 0) {

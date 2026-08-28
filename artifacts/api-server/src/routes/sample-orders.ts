@@ -110,7 +110,7 @@ router.get("/", async (req, res) => {
       deliveredAt: r.order.deliveredAt?.toISOString() ?? null,
     })));
   } catch (err) {
-    console.error(err);
+    req.log.error({ err }, "Failed to list sample orders");
     res.status(500).json({ error: "Failed to list orders" });
   }
 });
@@ -184,7 +184,7 @@ router.post("/", async (req, res) => {
       updatedAt:   order.updatedAt.toISOString(),
     });
   } catch (err) {
-    console.error(err);
+    req.log.error({ err }, "Failed to create sample order");
     res.status(500).json({ error: "Failed to create order" });
   }
 });
@@ -227,7 +227,7 @@ router.get("/:id", async (req, res) => {
       deliveredAt: row.order.deliveredAt?.toISOString() ?? null,
     });
   } catch (err) {
-    console.error(err);
+    req.log.error({ err, orderId: req.params.id }, "Failed to get sample order");
     res.status(500).json({ error: "Failed to get order" });
   }
 });
@@ -276,7 +276,7 @@ router.patch("/:id/sample-detail", async (req, res) => {
       .returning();
     res.json({ ...updated, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() });
   } catch (err) {
-    console.error(err);
+    req.log.error({ err, orderId: req.params.id }, "Failed to update sample order detail");
     res.status(500).json({ error: "Failed to update sample detail" });
   }
 });
@@ -330,7 +330,7 @@ router.patch("/:id/advance", async (req, res) => {
       deliveredAt: updated.deliveredAt?.toISOString() ?? null,
     });
   } catch (err) {
-    console.error(err);
+    req.log.error({ err, orderId: req.params.id }, "Failed to advance sample order stage");
     res.status(500).json({ error: "Failed to advance stage" });
   }
 });
@@ -377,7 +377,7 @@ router.patch("/:id/tracking", async (req, res) => {
         });
         stripeTransferId = transfer.id;
       } catch (e) {
-        console.error("Stripe transfer failed (non-fatal):", e);
+        req.log.error({ err: e, orderId: order.id }, "Stripe transfer failed for sample order");
       }
     }
 
@@ -403,7 +403,7 @@ router.patch("/:id/tracking", async (req, res) => {
       deliveredAt: updated.deliveredAt?.toISOString() ?? null,
     });
   } catch (err) {
-    console.error(err);
+    req.log.error({ err, orderId: req.params.id }, "Failed to add sample order tracking");
     res.status(500).json({ error: "Failed to add tracking" });
   }
 });
@@ -500,7 +500,7 @@ router.post("/:id/pay-from-wallet", async (req, res) => {
       updatedAt: updated.updatedAt.toISOString(),
     });
   } catch (err) {
-    console.error(err);
+    req.log.error({ err, orderId: req.params.id }, "Failed to pay sample order from wallet");
     res.status(500).json({ error: "Failed to pay from wallet" });
   }
 });
@@ -556,7 +556,7 @@ router.post("/:id/images/upload", express.raw({ type: "image/*", limit: MAX_IMAG
       throw err;
     }
   } catch (err) {
-    console.error("[sample-orders] request-upload error:", err);
+    req.log.error({ err, orderId: req.params.id }, "Sample order image upload failed");
     res.status(500).json({ error: "Failed to generate upload URL" });
   }
 });
@@ -588,7 +588,7 @@ router.get("/:id/images", async (req, res) => {
     );
     res.json({ imageUrls: displayUrls.filter((u): u is string => !!u) });
   } catch (err) {
-    console.error("[sample-orders] list-images error:", err);
+    req.log.error({ err, orderId: req.params.id }, "Failed to list sample order images");
     res.status(500).json({ error: "Failed to list images" });
   }
 });

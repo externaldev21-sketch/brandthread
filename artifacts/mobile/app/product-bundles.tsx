@@ -7,10 +7,9 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, RefreshControl,
+  ActivityIndicator, RefreshControl,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -22,7 +21,7 @@ import {
   ORANGE, ORANGE_DIM,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
-import { BrandthreadHeader, BrandedEmptyState } from '@/components/BrandthreadUI';
+import { BrandthreadHeader, EmptyState, IconButton } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 import { formatCents } from '@/lib/money';
@@ -90,10 +89,12 @@ export default function ProductBundlesScreen() {
       <BrandthreadHeader
         title="Bundles"
         onBack={() => router.back()}
-        rightAction={{
-          icon: 'plus',
-          onPress: () => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/product-bundle-edit' as any); },
-        }}
+        rightElement={
+          <IconButton
+            name="plus"
+            onPress={() => router.push('/product-bundle-edit' as never)}
+          />
+        }
       />
 
       {loading ? (
@@ -101,11 +102,11 @@ export default function ProductBundlesScreen() {
           <ActivityIndicator color={colors.accentForeground} />
         </View>
       ) : bundles.length === 0 ? (
-        <BrandedEmptyState
+        <EmptyState
           icon="package"
           title="No bundles yet"
-          subtitle="Group 2+ products together and offer them at a special price."
-          action={{ label: 'Create first bundle', onPress: () => router.push('/product-bundle-edit' as any) }}
+          description="Group 2+ products together and offer them at a special price."
+          action={{ label: 'Create first bundle', onPress: () => router.push('/product-bundle-edit' as never) }}
         />
       ) : (
         <ScrollView
@@ -145,6 +146,6 @@ const r = StyleSheet.create({
   badge:       { paddingHorizontal: 8, paddingVertical: 2, borderRadius: RADIUS.pill },
   activeBadge: { backgroundColor: SUCCESS_DIM },
   draftBadge:  { backgroundColor: ORANGE_DIM },
-  badgeText:   { fontFamily: FONT.semibold, fontSize: FS.xxs, letterSpacing: 0.4 },
+  badgeText:   { fontFamily: FONT.semibold, fontSize: FS.xs, letterSpacing: 0.4 },
   meta:        { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
 });

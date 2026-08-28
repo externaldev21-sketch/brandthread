@@ -21,7 +21,7 @@ router.get("/", async (req, res) => {
       .where(eq(discountCodes.sellerId, sellerId));
     res.json(codes);
   } catch (err) {
-    console.error("GET /discount-codes error:", err);
+    req.log.error({ err }, "Failed to list discount codes");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -81,7 +81,7 @@ router.post("/", async (req, res) => {
 
     res.status(201).json(created);
   } catch (err) {
-    console.error("POST /discount-codes error:", err);
+    req.log.error({ err }, "Failed to create discount code");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -177,7 +177,7 @@ router.get("/validate", async (req, res) => {
       description,
     });
   } catch (err) {
-    console.error("GET /discount-codes/validate error:", err);
+    req.log.error({ err }, "Failed to validate discount code");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -218,7 +218,7 @@ router.patch("/:id", async (req, res) => {
 
     res.json(updated);
   } catch (err) {
-    console.error("PATCH /discount-codes/:id error:", err);
+    req.log.error({ err, discountCodeId: req.params.id }, "Failed to update discount code");
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -241,7 +241,7 @@ router.delete("/:id", async (req, res) => {
 
     res.json({ success: true });
   } catch (err) {
-    console.error("DELETE /discount-codes/:id error:", err);
+    req.log.error({ err, discountCodeId: req.params.id }, "Failed to delete discount code");
     res.status(500).json({ error: "Internal server error" });
   }
 });

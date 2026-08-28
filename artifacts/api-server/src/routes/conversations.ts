@@ -686,7 +686,7 @@ router.post("/upload-media", async (req, res) => {
     const url = `https://storage.googleapis.com/${BUCKET_ID}/${filename}`;
     return res.json({ url });
   } catch (err: any) {
-    console.error("[conversations/upload-media]", err?.message ?? err);
+    req.log.error({ err, userId }, "Failed to upload conversation media");
     return res.status(500).json({ error: "Upload failed" });
   }
 });

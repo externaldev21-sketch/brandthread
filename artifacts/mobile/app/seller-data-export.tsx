@@ -6,7 +6,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as FileSystem from 'expo-file-system';
+import { File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { BG, CARD, SURFACE, BORDER, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -53,8 +53,9 @@ export default function SellerDataExportScreen() {
       if (format === 'json') {
         // Write JSON to a temp file and share
         const json = JSON.stringify(data, null, 2);
-        const uri = (FileSystem.cacheDirectory ?? '') + `brandthread-export-${Date.now()}.json`;
-        await FileSystem.writeAsStringAsync(uri, json, { encoding: FileSystem.EncodingType.UTF8 });
+        const file = new File(Paths.cache, `brandthread-export-${Date.now()}.json`);
+        file.write(json);
+        const uri = file.uri;
         const canShare = await Sharing.isAvailableAsync();
         if (canShare) {
           await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: 'Export Data' });
@@ -65,8 +66,9 @@ export default function SellerDataExportScreen() {
       } else {
         // CSV: data is a string from server
         const csv = typeof data === 'string' ? data : JSON.stringify(data);
-        const uri = (FileSystem.cacheDirectory ?? '') + `brandthread-export-${Date.now()}.csv`;
-        await FileSystem.writeAsStringAsync(uri, csv, { encoding: FileSystem.EncodingType.UTF8 });
+        const file = new File(Paths.cache, `brandthread-export-${Date.now()}.csv`);
+        file.write(csv);
+        const uri = file.uri;
         const canShare = await Sharing.isAvailableAsync();
         if (canShare) {
           await Sharing.shareAsync(uri, { mimeType: 'text/csv', dialogTitle: 'Export CSV' });

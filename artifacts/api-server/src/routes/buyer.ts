@@ -23,6 +23,7 @@ import {
   reversePurchasePointsOnce,
 } from "./loyalty";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
+import { logger } from "../lib/logger";
 
 const router = Router();
 router.use(requireAuth);
@@ -182,7 +183,7 @@ router.delete("/addresses/:id", async (req, res) => {
         ADD COLUMN IF NOT EXISTS estimated_delivery TEXT
     `);
   } catch (err) {
-    console.error("[buyer] migration error:", err);
+    logger.error({ err }, "Failed to apply buyer orders migration");
   }
 })();
 
@@ -816,7 +817,7 @@ router.post("/checkout/session", async (req, res) => {
           }
         });
       } catch (releaseErr) {
-        console.error("Could not clean up failed checkout reservation:", releaseErr);
+        req.log.error({ err: releaseErr }, "Failed to clean up checkout reservation");
       }
     }
     // A concurrent request with the same checkout key may encounter the
@@ -843,7 +844,7 @@ router.post("/checkout/session", async (req, res) => {
           await new Promise(resolve => setTimeout(resolve, 100));
         }
       } catch (recoveryError) {
-        console.error("Could not recover concurrent checkout request:", recoveryError);
+        req.log.error({ err: recoveryError }, "Failed to recover concurrent checkout request");
       }
     }
     if (err instanceof LoyaltyRedemptionError) {
@@ -867,7 +868,7 @@ router.post("/checkout/session", async (req, res) => {
     if (status < 500) {
       res.status(status).json({ error: err.message });
     } else {
-      console.error(err);
+      req.log.error({ err }, "Failed to create checkout session");
       res.status(500).json({ error: "Failed to create checkout session" });
     }
   }
@@ -928,7 +929,7 @@ router.get("/checkout/session/:sessionId", async (req, res) => {
     if (status < 500) {
       res.status(status).json({ error: err.message });
     } else {
-      console.error(err);
+      req.log.error({ err }, "Failed to retrieve checkout session");
       res.status(500).json({ error: "Failed to retrieve session" });
     }
   }
@@ -963,7 +964,7 @@ router.get("/orders", async (req, res) => {
       .orderBy(desc(orders.createdAt));
     res.json(rows);
   } catch (err) {
-    console.error(err);
+    req.log.error({ err }, "Failed to fetch buyer orders");
     res.status(500).json({ error: "Failed to fetch orders" });
   }
 });
@@ -1008,7 +1009,7 @@ router.get("/orders/:id", async (req, res) => {
 
     res.json({ ...row, items });
   } catch (err) {
-    console.error(err);
+    req.log.error({ err, orderId: req.params.id }, "Failed to fetch buyer order");
     res.status(500).json({ error: "Failed to fetch order" });
   }
 });
@@ -1022,9 +1023,9 @@ router.get("/orders/:id", async (req, res) => {
  * we never mark an order cancelled without confirming the refund.
  */
 router.post("/orders/:id/cancel", async (req, res) => {
+  const { id } = req.params;
   try {
     const buyerId = (req as any).clerkUserId as string;
-    const { id }  = req.params;
     const CANCEL_WINDOW_MS = 60 * 60 * 1000; // 60 minutes
 
     // ── Fetch order — must belong to this buyer ─────────────────────────────
@@ -1093,7 +1094,7 @@ router.post("/orders/:id/cancel", async (req, res) => {
           }, tx);
         });
       } catch (stripeErr: any) {
-        console.error("[buyerCancel] Stripe refund failed:", stripeErr?.message);
+        req.log.error({ err: stripeErr, orderId: id }, "Stripe refund failed for buyer cancellation");
         res.status(502).json({
           error: "Refund could not be processed. Please contact support to cancel this order.",
         });
@@ -1116,7 +1117,7 @@ router.post("/orders/:id/cancel", async (req, res) => {
 
     res.json({ cancelled: true, refunded, orderNumber: order.orderNumber });
   } catch (err) {
-    console.error("POST /buyer/orders/:id/cancel error:", err);
+    req.log.error({ err, orderId: id }, "Failed to cancel buyer order");
     res.status(500).json({ error: "Failed to cancel order" });
   }
 });
@@ -1162,7 +1163,7 @@ router.get("/seller-payment-status/:sellerId", async (req, res) => {
 
     res.json({ ready: true });
   } catch (err) {
-    console.error(err);
+    req.log.error({ err, sellerId: req.params.sellerId }, "Failed to verify seller payment status");
     res.status(500).json({ ready: false, reason: "Could not verify seller payment status." });
   }
 });

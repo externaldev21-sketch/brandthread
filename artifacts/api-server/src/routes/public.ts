@@ -156,7 +156,7 @@ router.get("/products", async (req, res) => {
 
     res.json(result);
   } catch (err) {
-    console.error(err);
+    req.log.error({ err }, "Failed to fetch public products");
     res.status(500).json({ error: "Failed to fetch products" });
   }
 });
@@ -200,7 +200,7 @@ router.get("/products/:id/related", async (req, res) => {
       variants: variantsByProduct[product.id] ?? [],
     })));
   } catch (err) {
-    console.error("GET /api/public/products/:id/related error:", err);
+    req.log.error({ err, productId: req.params.id }, "Failed to fetch related products");
     return res.status(500).json({ error: "Failed to fetch related products" });
   }
 });
@@ -241,7 +241,7 @@ router.get("/products/:id", async (req, res) => {
       variants,
     });
   } catch (err) {
-    console.error(err);
+    req.log.error({ err, productId: req.params.id }, "Failed to fetch public product");
     res.status(500).json({ error: "Failed to fetch product" });
   }
 });
@@ -389,7 +389,7 @@ router.get("/search", async (req, res): Promise<void> => {
 
     res.json({ results: results.slice(0, lim) });
   } catch (err) {
-    console.error("search error:", err);
+    req.log.error({ err }, "Public search failed");
     res.status(500).json({ error: "Search failed" });
   }
 });
@@ -744,7 +744,7 @@ router.get("/posts", async (req, res) => {
 
     return res.json(result);
   } catch (err) {
-    console.error("GET /api/public/posts error:", err);
+    req.log.error({ err }, "Failed to fetch public posts");
     return res.status(500).json({ error: "Failed to fetch posts" });
   }
 });
@@ -778,7 +778,7 @@ router.get("/trending", async (req, res) => {
 
     // ── Cache miss — compute synchronously (once per day maximum) ───────────
     // Use a module-level Promise so all concurrent requests share one computation.
-    console.log("[computeTrending] Cache miss for", today, "— computing synchronously");
+    req.log.info({ cacheDate: today }, "Trending cache miss; computing synchronously");
     if (!trendingInflight) {
       trendingInflight = computeTrendingForToday().finally(() => {
         trendingInflight = null;
@@ -802,7 +802,7 @@ router.get("/trending", async (req, res) => {
 
     return res.json({ trending: [], source: "empty" });
   } catch (err) {
-    console.error("GET /api/public/trending error:", err);
+    req.log.error({ err }, "Failed to fetch public trending results");
     return res.status(500).json({ error: "Failed to fetch trending" });
   }
 });

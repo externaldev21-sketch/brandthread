@@ -106,7 +106,7 @@ router.post("/onboard", async (req, res) => {
     if (status < 500) {
       res.status(status).json({ error: err.message });
     } else {
-      console.error(err);
+      req.log.error({ err }, "Failed to create freelancer Connect onboarding link");
       res.status(500).json({ error: "Failed to create onboarding link" });
     }
   }
@@ -176,7 +176,7 @@ router.get("/status", async (req, res) => {
     if (status < 500) {
       res.status(status).json({ error: err.message });
     } else {
-      console.error(err);
+      req.log.error({ err }, "Failed to retrieve freelancer Connect status");
       res.status(500).json({ error: "Failed to fetch Connect status" });
     }
   }

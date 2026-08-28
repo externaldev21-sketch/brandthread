@@ -107,7 +107,7 @@ router.post("/sync", requireAuth, async (req, res) => {
     });
     res.status(created ? 201 : 200).json(user);
   } catch (err) {
-    console.error(err);
+    req.log.error({ err, clerkUserId }, "Failed to sync user");
     res.status(500).json({ error: "Failed to sync user" });
   }
 });

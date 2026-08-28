@@ -98,7 +98,7 @@ router.get("/", async (req, res) => {
 
     res.json({ freelancers: rows.map((r) => shapeFreelancer(r.freelancer, r.user)) });
   } catch (err) {
-    console.error("freelancers list:", err);
+    req.log.error({ err }, "Failed to list freelancers");
     res.status(500).json({ error: "Failed to load freelancers" });
   }
 });
@@ -119,7 +119,7 @@ router.get("/me", requireAuth, async (req, res) => {
 
     res.json({ freelancer: row ? shapeFreelancer(row.freelancer, row.user, { includePrivate: true }) : null });
   } catch (err) {
-    console.error("freelancers me:", err);
+    req.log.error({ err }, "Failed to load freelancer profile");
     res.status(500).json({ error: "Failed to load your freelancer profile" });
   }
 });
@@ -203,7 +203,7 @@ router.post("/apply", requireAuth, async (req, res) => {
 
     res.status(201).json({ freelancer: shapeFreelancer(saved, u ?? null, { includePrivate: true }) });
   } catch (err) {
-    console.error("freelancers apply:", err);
+    req.log.error({ err }, "Failed to save freelancer profile");
     res.status(500).json({ error: "Failed to save freelancer profile" });
   }
 });
@@ -227,7 +227,7 @@ router.delete("/me", requireAuth, async (req, res) => {
     }
     res.json({ ok: true });
   } catch (err) {
-    console.error("freelancers deactivate:", err);
+    req.log.error({ err }, "Failed to deactivate freelancer listing");
     res.status(500).json({ error: "Failed to deactivate listing" });
   }
 });
@@ -256,7 +256,7 @@ router.get("/:id", async (req, res) => {
     }
     res.json({ freelancer: shapeFreelancer(row.freelancer, row.user) });
   } catch (err) {
-    console.error("freelancers get:", err);
+    req.log.error({ err, freelancerId: req.params.id }, "Failed to load freelancer");
     res.status(500).json({ error: "Failed to load freelancer" });
   }
 });

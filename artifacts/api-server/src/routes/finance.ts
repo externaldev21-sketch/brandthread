@@ -90,7 +90,7 @@ router.get("/balance", requireRole("owner"), async (req, res) => {
       connected: true,
     });
   } catch (err: any) {
-    console.error(err);
+    req.log.error({ err }, "Failed to load balance");
     res.status(err.status ?? 500).json({ error: err.message ?? "Failed to load balance" });
   }
 });
@@ -134,7 +134,7 @@ router.get("/payouts", requireRole("owner"), async (req, res) => {
       connected: true,
     });
   } catch (err: any) {
-    console.error(err);
+    req.log.error({ err }, "Failed to load payouts");
     res.status(err.status ?? 500).json({ error: err.message ?? "Failed to load payouts" });
   }
 });
@@ -180,7 +180,7 @@ router.get("/transactions", requireRole("owner"), async (req, res) => {
       connected: true,
     });
   } catch (err: any) {
-    console.error(err);
+    req.log.error({ err }, "Failed to load transactions");
     res.status(err.status ?? 500).json({ error: err.message ?? "Failed to load transactions" });
   }
 });
@@ -221,7 +221,7 @@ router.get("/statement.csv", requireRole("owner"), async (req, res) => {
     res.setHeader("Content-Disposition", `attachment; filename="brandthread-statement-${new Date().toISOString().slice(0, 10)}.csv"`);
     res.send(csv);
   } catch (err: any) {
-    console.error(err);
+    req.log.error({ err }, "Failed to generate statement");
     res.status(500).json({ error: "Failed to generate statement" });
   }
 });
@@ -256,7 +256,7 @@ router.post("/payout", requireRole("owner"), async (req, res) => {
       arrivalDate: new Date(payout.arrival_date * 1000).toISOString(),
     });
   } catch (err: any) {
-    console.error(err);
+    req.log.error({ err }, "Failed to request payout");
     res.status(err.status ?? 500).json({ error: err.message ?? "Payout failed" });
   }
 });

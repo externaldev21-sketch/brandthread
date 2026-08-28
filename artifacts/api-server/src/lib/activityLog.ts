@@ -8,6 +8,7 @@ import { db, teamActivityLogs, teamMembers, users } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import type { Request } from "express";
 import type { TeamRole } from "../middlewares/requireRole";
+import { logger } from "./logger";
 
 export async function logActivity(
   ownerClerkId: string,
@@ -55,7 +56,7 @@ export async function logActivity(
       metadata: metadata ?? {},
     });
   } catch (err) {
-    console.error("[activityLog] failed to record activity:", err);
+    logger.error({ err, action, resourceType, resourceId }, "Failed to record team activity");
   }
 }
 

@@ -7,6 +7,7 @@ import { Router } from "express";
 import { db } from "@workspace/db";
 import { sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { logger } from "../lib/logger";
 
 const router = Router();
 
@@ -28,7 +29,7 @@ const router = Router();
       )
     `);
   } catch (err) {
-    console.error("[support] migration error:", err);
+    logger.error({ err }, "Support tickets migration failed");
   }
 })();
 

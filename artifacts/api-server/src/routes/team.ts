@@ -220,7 +220,7 @@ router.get("/my-membership", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("[team] my-membership lookup failed:", err);
+    req.log.error({ err, userId }, "Team membership lookup failed");
     res.json({ membership: null });
   }
 });

@@ -5,6 +5,7 @@
  */
 import { db, pushTokens, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { logger } from "./logger";
 
 export interface PushPayload {
   title: string;
@@ -95,10 +96,10 @@ export async function sendPushToUser(
             "Accept-Encoding": "gzip, deflate",
           },
           body: JSON.stringify(chunk),
-        }).catch((err) => console.warn("[push] send failed:", err)),
+        }).catch((err) => logger.warn({ err, category }, "Push notification send failed")),
       ),
     );
   } catch (err) {
-    console.warn("[push] sendPushToUser error:", err);
+    logger.warn({ err, category }, "Push notification delivery failed");
   }
 }

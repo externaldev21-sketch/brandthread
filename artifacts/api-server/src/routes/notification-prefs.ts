@@ -57,7 +57,7 @@ router.get("/", async (req, res) => {
       categories: { ...defaultsFor(row?.accountType), ...(row?.preferences ?? {}) },
     });
   } catch (err) {
-    console.error("GET /notification-prefs error:", err);
+    req.log.error({ err, clerkId }, "Failed to fetch notification preferences");
     return res.status(500).json({ error: "Failed to fetch notification preferences" });
   }
 });
@@ -117,7 +117,7 @@ router.put("/", async (req, res) => {
       categories: merged,
     });
   } catch (err) {
-    console.error("PUT /notification-prefs error:", err);
+    req.log.error({ err, clerkId }, "Failed to update notification preferences");
     return res.status(500).json({ error: "Failed to update notification preferences" });
   }
 });

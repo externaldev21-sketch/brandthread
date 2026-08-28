@@ -86,7 +86,7 @@ router.get("/", async (req, res) => {
 
     res.json(rows.map(rowToDispute));
   } catch (err) {
-    console.error(err);
+    req.log.error({ err }, "Failed to load disputes");
     res.status(500).json({ error: "Failed to load disputes" });
   }
 });
@@ -133,7 +133,7 @@ router.get("/:id", async (req, res) => {
 
     res.json({ ...rowToDispute(row), order: orderCtx });
   } catch (err) {
-    console.error(err);
+    req.log.error({ err, disputeId: req.params.id }, "Failed to load dispute");
     res.status(500).json({ error: "Failed to load dispute" });
   }
 });
@@ -191,7 +191,7 @@ router.post("/:id/evidence", async (req, res) => {
         });
         stripeStatus = mapStripeStatus(updated.status);
       } catch (stripeErr: any) {
-        console.error("Stripe evidence update failed:", stripeErr.message);
+        req.log.error({ err: stripeErr, disputeId: row.id }, "Failed to update Stripe dispute evidence");
         // Non-fatal — we still save to our DB
       }
     }
@@ -208,7 +208,7 @@ router.post("/:id/evidence", async (req, res) => {
 
     res.json({ success: true, dispute: rowToDispute(updated), evidenceItem });
   } catch (err) {
-    console.error(err);
+    req.log.error({ err, disputeId: req.params.id }, "Failed to submit evidence");
     res.status(500).json({ error: "Failed to submit evidence" });
   }
 });
@@ -248,7 +248,7 @@ router.post("/:id/submit", async (req, res) => {
 
     res.json({ success: true, dispute: rowToDispute(dbRow) });
   } catch (err: any) {
-    console.error(err);
+    req.log.error({ err, disputeId: req.params.id }, "Failed to submit dispute");
     res.status(err.status ?? 500).json({ error: err.message ?? "Failed to submit" });
   }
 });
@@ -276,7 +276,7 @@ router.post("/:id/accept", async (req, res) => {
 
     res.json({ accepted: true, dispute: rowToDispute(updated) });
   } catch (err) {
-    console.error(err);
+    req.log.error({ err, disputeId: req.params.id }, "Failed to accept dispute");
     res.status(500).json({ error: "Failed to accept dispute" });
   }
 });

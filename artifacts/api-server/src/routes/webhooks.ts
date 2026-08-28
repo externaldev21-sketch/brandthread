@@ -11,6 +11,7 @@ import {
 import { eq, and, ne, sql } from "drizzle-orm";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe";
 import { refundJobPayment } from "../lib/freelancerEscrow";
+import { logger } from "../lib/logger";
 import {
   awardLoyaltyPointsOnce,
   consumeLoyaltyRedemption,
@@ -36,7 +37,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_WEBHOOK_SECRET);
   } catch (err: any) {
-    console.error("Stripe webhook signature verification failed:", err.message);
+    req.log.error({ err }, "Stripe webhook signature verification failed");
     res.status(400).json({ error: `Webhook error: ${err.message}` });
     return;
   }
@@ -110,7 +111,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
 
     res.json({ received: true });
   } catch (err) {
-    console.error("Webhook handler error:", err);
+    req.log.error({ err, eventType: event.type, eventId: event.id }, "Stripe webhook handler failed");
     res.status(500).json({ error: "Webhook handler failed" });
   }
 });
@@ -199,7 +200,7 @@ export async function handleCheckoutPaid(session: any) {
     .limit(1);
   if (existing) {
     await awardPurchasePoints(existing);
-    console.log(`Order already exists for session ${sessionId}, skipping`);
+    logger.info({ stripeSessionId: sessionId, orderId: existing.id }, "Order already exists for checkout session; skipping");
     return;
   }
 
@@ -221,19 +222,19 @@ export async function handleCheckoutPaid(session: any) {
       .limit(1);
   }
   if (!csRecord) {
-    console.error(`checkout paid: no server-side cart record for session ${sessionId}`);
+    logger.error({ stripeSessionId: sessionId }, "Checkout paid without a server-side cart record");
     return;
   }
   // Do not use client_reference_id as an identity assertion: it is absent for
   // guests and is Stripe-side mutable data. The durable cart row is authoritative.
   if (csRecord.stripeSessionId && csRecord.stripeSessionId !== sessionId) {
-    console.error(`checkout paid: Stripe session does not match checkout record ${csRecord.id}`);
+    logger.error({ stripeSessionId: sessionId, checkoutSessionId: csRecord.id }, "Stripe session does not match checkout record");
     return;
   }
   const buyerId = csRecord.buyerId;
   const guestEmail = buyerId ? null : csRecord.guestEmail;
   if (!buyerId && !guestEmail) {
-    console.error(`checkout paid: checkout ${csRecord.id} has no buyer or guest identity`);
+    logger.error({ checkoutSessionId: csRecord.id }, "Checkout record has no buyer or guest identity");
     return;
   }
 
@@ -457,8 +458,9 @@ export async function handleCheckoutPaid(session: any) {
 
   // ── Issue Stripe refund for oversold orders ───────────────────────────────
   if (oversoldItems.length > 0) {
-    console.error(
-      `Oversold after payment — issuing refund. Session: ${sessionId}. Items: ${oversoldItems.join(", ")}`,
+    logger.error(
+      { stripeSessionId: sessionId, itemCount: oversoldItems.length },
+      "Oversold order after payment; issuing refund",
     );
     if (piId && stripe) {
       try {
@@ -470,14 +472,14 @@ export async function handleCheckoutPaid(session: any) {
             session_id:     sessionId,
           },
         });
-        console.log(`Refund issued for payment intent ${piId}`);
+        logger.info({ paymentIntentId: piId, stripeSessionId: sessionId }, "Automatic refund issued for oversold order");
       } catch (refundErr) {
         // Refund failed — order remains "refund_pending" for manual review
-        console.error(`Failed to issue automatic refund for ${piId}:`, refundErr);
+        logger.error({ err: refundErr, paymentIntentId: piId, stripeSessionId: sessionId }, "Automatic refund for oversold order failed");
       }
     }
   } else {
-    console.log(`Order created for ${buyerId ? `buyer ${buyerId}` : "guest"}, session ${sessionId}`);
+    logger.info({ orderId: createdOrderId, buyerId: buyerId ?? undefined, isGuest: !buyerId, stripeSessionId: sessionId }, "Order created from paid checkout");
 
     // ── Auto-credit drop wallet (Fix #1) ───────────────────────────────────
     // If this order is part of a drop, credit the drop's escrow wallet so
@@ -488,7 +490,7 @@ export async function handleCheckoutPaid(session: any) {
         await creditDropWallet(dropId, createdOrderId, subtotalCents, piId);
       } catch (walletErr) {
         // Non-fatal — log for manual recovery; order record is committed
-        console.error(`Auto-credit drop wallet failed for order ${createdOrderId}:`, walletErr);
+        logger.error({ err: walletErr, orderId: createdOrderId, dropId }, "Auto-crediting drop wallet failed");
       }
     }
   }
@@ -542,7 +544,7 @@ async function creditDropWallet(
     );
     const walletRow = (lockResult as any).rows?.[0];
     if (!walletRow) {
-      console.warn(`creditDropWallet: no wallet found for drop ${dropId}`);
+      logger.warn({ dropId, orderId }, "Drop wallet not found for auto-credit");
       return;
     }
 
@@ -551,7 +553,7 @@ async function creditDropWallet(
       sql`SELECT id FROM drop_wallet_transactions WHERE wallet_id = ${walletRow.id}::uuid AND order_id = ${orderId}::uuid AND type = 'deposit' LIMIT 1`,
     );
     if ((already as any).rows?.length > 0) {
-      console.log(`creditDropWallet: order ${orderId} already deposited — skipping`);
+      logger.info({ orderId, dropId }, "Drop wallet was already credited for order; skipping");
       return;
     }
 
@@ -581,7 +583,7 @@ async function handleSubscriptionUpdated(sub: any) {
   const customerId: string =
     typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
   if (!customerId) {
-    console.warn("subscription.updated: missing customer id");
+    logger.warn({ subscriptionId: sub.id }, "Subscription update missing customer ID");
     return;
   }
 
@@ -607,8 +609,9 @@ async function handleSubscriptionUpdated(sub: any) {
     updatedAt: new Date(),
   }).where(eq(users.stripeCustomerId, customerId));
 
-  console.log(
-    `Subscription ${sub.id} updated — customer: ${customerId}, status: ${sub.status}`,
+  logger.info(
+    { subscriptionId: sub.id, customerId, subscriptionStatus: sub.status, planId },
+    "Subscription updated",
   );
 }
 
@@ -627,7 +630,7 @@ async function handleSubscriptionDeleted(sub: any) {
     updatedAt: new Date(),
   }).where(eq(users.stripeCustomerId, customerId));
 
-  console.log(`Subscription ${sub.id} deleted — customer: ${customerId}`);
+  logger.info({ subscriptionId: sub.id, customerId }, "Subscription deleted");
 }
 
 // ─── Stripe Identity handlers ─────────────────────────────────────────────────
@@ -635,7 +638,7 @@ async function handleSubscriptionDeleted(sub: any) {
 async function handleIdentityVerified(session: any) {
   const clerkId: string | undefined = session.metadata?.seller_clerk_id;
   if (!clerkId) {
-    console.warn("identity.verification_session.verified: missing seller_clerk_id in metadata", session.id);
+    logger.warn({ verificationSessionId: session.id }, "Verified identity session missing seller ID");
     return;
   }
 
@@ -661,13 +664,13 @@ async function handleIdentityVerified(session: any) {
     // Non-critical
   }
 
-  console.log(`Seller ${clerkId} verified via Stripe Identity (session ${session.id})`);
+  logger.info({ sellerId: clerkId, verificationSessionId: session.id }, "Seller verified via Stripe Identity");
 }
 
 async function handleIdentityFailed(session: any) {
   const clerkId: string | undefined = session.metadata?.seller_clerk_id;
   if (!clerkId) {
-    console.warn("identity.verification_session.requires_input: missing seller_clerk_id in metadata", session.id);
+    logger.warn({ verificationSessionId: session.id }, "Failed identity session missing seller ID");
     return;
   }
 
@@ -695,7 +698,7 @@ async function handleIdentityFailed(session: any) {
     // Non-critical
   }
 
-  console.log(`Seller ${clerkId} identity verification failed (session ${session.id}, reason: ${reason})`);
+  logger.info({ sellerId: clerkId, verificationSessionId: session.id, reason }, "Seller identity verification requires input");
 }
 
 // ─── Dispute handlers ─────────────────────────────────────────────────────────
@@ -774,7 +777,7 @@ async function handleDisputeCreated(dispute: any) {
     })
     .onConflictDoNothing();
 
-  console.log(`Dispute created: ${dispute.id} — seller ${sellerId} — reason ${dispute.reason}`);
+  logger.info({ disputeId: dispute.id, sellerId, orderId, reason: dispute.reason }, "Dispute created");
 }
 
 async function handleDisputeUpdated(stripeDispute: any) {
@@ -792,7 +795,7 @@ async function handleDisputeUpdated(stripeDispute: any) {
     })
     .where(eq(disputes.stripeDisputeId, stripeDispute.id));
 
-  console.log(`Dispute updated: ${stripeDispute.id} — status ${stripeDispute.status}`);
+  logger.info({ disputeId: stripeDispute.id, disputeStatus: stripeDispute.status }, "Dispute updated");
 }
 
 async function handleDisputeClosed(stripeDispute: any) {
@@ -804,7 +807,7 @@ async function handleDisputeClosed(stripeDispute: any) {
     })
     .where(eq(disputes.stripeDisputeId, stripeDispute.id));
 
-  console.log(`Dispute closed: ${stripeDispute.id} — outcome ${stripeDispute.status}`);
+  logger.info({ disputeId: stripeDispute.id, disputeStatus: stripeDispute.status }, "Dispute closed");
 }
 
 /**
@@ -815,7 +818,7 @@ async function handleDisputeClosed(stripeDispute: any) {
 async function handleFreelancerJobPaid(session: any, jobIdOverride?: string) {
   const jobId: string = jobIdOverride ?? session.metadata?.["freelancerJobId"] ?? "";
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(jobId)) {
-    console.error("freelancer job paid: invalid job id in metadata", session.id);
+    logger.error({ stripeSessionId: session.id }, "Freelancer job payment has invalid job ID");
     return;
   }
   const piId: string | null =
@@ -840,7 +843,7 @@ async function handleFreelancerJobPaid(session: any, jobIdOverride?: string) {
     .returning({ id: freelancerJobs.id });
 
   if (updated) {
-    console.log(`Freelancer job ${jobId} marked paid (session ${session.id})`);
+    logger.info({ jobId, stripeSessionId: session.id }, "Freelancer job marked paid");
     return;
   }
 
@@ -861,14 +864,14 @@ async function handleFreelancerJobPaid(session: any, jobIdOverride?: string) {
         .update(freelancerJobs)
         .set({ paymentStatus: "refunded", stripePaymentIntentId: piId, updatedAt: new Date() })
         .where(eq(freelancerJobs.id, jobId));
-      console.log(`Freelancer job ${jobId} was cancelled — late payment refunded`);
+      logger.info({ jobId, stripeSessionId: session.id }, "Late freelancer job payment refunded after cancellation");
     } catch (refundErr) {
-      console.error(`freelancer job ${jobId}: late-payment refund failed`, refundErr);
+      logger.error({ err: refundErr, jobId, stripeSessionId: session.id }, "Late freelancer job payment refund failed");
     }
     return;
   }
 
-  console.log(`Freelancer job ${jobId} already paid or not found, skipping`);
+  logger.info({ jobId, stripeSessionId: session.id }, "Freelancer job already paid or not found; skipping");
 }
 
 async function handleAccountUpdated(account: any) {
@@ -896,7 +899,7 @@ async function handleAccountUpdated(account: any) {
     .set({ stripeAccountStatus: status, updatedAt: new Date() })
     .where(eq(freelancers.stripeAccountId, stripeAccountId));
 
-  console.log(`Connect account ${stripeAccountId} updated — status: ${status}`);
+  logger.info({ stripeAccountId, accountStatus: status }, "Connect account updated");
 }
 
 export default router;

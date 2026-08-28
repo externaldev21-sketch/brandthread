@@ -7,6 +7,7 @@ import { teamContext, requireRole } from "../middlewares/requireRole";
 import { logActivity, reqActor } from "../lib/activityLog";
 import { publishNotification } from "./notifications-feed";
 import { reversePurchasePointsOnce } from "./loyalty";
+import { logger } from "../lib/logger";
 
 const router = Router();
 router.use(requireAuth);
@@ -196,7 +197,7 @@ router.post("/", requireRole("manager"), async (req, res) => {
     if (status < 500) {
       res.status(status).json({ error: err.message });
     } else {
-      console.error(err);
+      req.log.error({ err, status }, "Order creation failed");
       res.status(500).json({ error: "Order creation failed" });
     }
   }
@@ -401,7 +402,7 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
   if (statusTransition?.dropId) {
     setImmediate(() => {
       autoReleaseDropOrder(statusTransition.id, statusTransition.ownerId, statusTransition.dropId!, statusTransition.subtotalCents)
-        .catch(err => console.error(`Auto drop-wallet release failed for order ${statusTransition.id}:`, err));
+        .catch(err => logger.error({ err, orderId: statusTransition.id, dropId: statusTransition.dropId, sellerId: statusTransition.ownerId }, "Auto drop-wallet release failed"));
     });
   }
 
@@ -416,7 +417,10 @@ async function autoReleaseDropOrder(
   dropId: string,
   subtotalCents: number,
 ): Promise<void> {
-  if (!stripe) { console.warn("autoReleaseDropOrder: Stripe not configured"); return; }
+  if (!stripe) {
+    logger.warn({ orderId, dropId, sellerId }, "Skipping drop-wallet auto-release because Stripe is not configured");
+    return;
+  }
 
   const [user] = await db
     .select({ stripeAccountId: users.stripeAccountId })
@@ -425,7 +429,8 @@ async function autoReleaseDropOrder(
     .limit(1);
 
   if (!user?.stripeAccountId) {
-    console.warn(`autoReleaseDropOrder: seller ${sellerId} has no Connect account`); return;
+    logger.warn({ orderId, dropId, sellerId }, "Skipping drop-wallet auto-release because seller has no Connect account");
+    return;
   }
 
   const feeCents      = Math.round(subtotalCents * PLATFORM_COMMISSION_RATE);
@@ -437,7 +442,10 @@ async function autoReleaseDropOrder(
       sql`SELECT id, balance_cents, released_cents, reserved_cents, stripe_transfer_group FROM drop_wallets WHERE drop_id = ${dropId}::uuid FOR UPDATE LIMIT 1`,
     );
     const w = (lockResult as any).rows?.[0];
-    if (!w) { console.warn(`autoReleaseDropOrder: no wallet for drop ${dropId}`); return; }
+    if (!w) {
+      logger.warn({ orderId, dropId, sellerId }, "Skipping drop-wallet auto-release because no wallet was found");
+      return;
+    }
 
     // Idempotency — skip if already released for this order
     const already = await tx.execute(
@@ -447,7 +455,8 @@ async function autoReleaseDropOrder(
 
     const available = w.balance_cents - w.released_cents - w.reserved_cents;
     if (available < subtotalCents) {
-      console.error(`autoReleaseDropOrder: insufficient balance. available=${available}, need=${subtotalCents}`); return;
+      logger.error({ orderId, dropId, sellerId, availableCents: available, requiredCents: subtotalCents }, "Drop-wallet auto-release has insufficient balance");
+      return;
     }
 
     let stripeTransferId: string | null = null;
@@ -462,7 +471,7 @@ async function autoReleaseDropOrder(
         });
         stripeTransferId = transfer.id;
       } catch (stripeErr) {
-        console.error("autoReleaseDropOrder: Stripe transfer failed:", stripeErr);
+        logger.error({ err: stripeErr, orderId, dropId, sellerId, transferCents }, "Drop-wallet Stripe transfer failed");
         return; // Don't mark released if Stripe call failed
       }
     }

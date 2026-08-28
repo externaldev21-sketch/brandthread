@@ -8,6 +8,7 @@ import { Router } from "express";
 import { db, reviews, orders, products, users } from "@workspace/db";
 import { eq, desc, sql, and } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { logger } from "../lib/logger";
 
 // ─── Startup migration — add seller reply columns ─────────────────────────────
 (async () => {
@@ -15,7 +16,7 @@ import { requireAuth } from "../middlewares/requireAuth";
     await db.execute(sql`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS seller_reply TEXT`);
     await db.execute(sql`ALTER TABLE reviews ADD COLUMN IF NOT EXISTS seller_replied_at TIMESTAMPTZ`);
   } catch (err) {
-    console.error("[reviews] migration error:", err);
+    logger.error({ err }, "Failed to add review seller reply columns");
   }
 })();
 

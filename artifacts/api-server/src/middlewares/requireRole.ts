@@ -83,7 +83,7 @@ async function resolveTeamContext(req: Request): Promise<TeamContext | null> {
           .then(() => {}, () => {});
       }
     } catch (err) {
-      console.error("[teamContext] membership lookup failed:", err);
+      req.log.error({ err, actorClerkId: userId }, "Team membership lookup failed");
       // Fail open as owner-of-self — never lock a seller out of their own store.
     }
   }

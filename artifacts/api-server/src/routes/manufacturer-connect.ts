@@ -66,7 +66,7 @@ router.post("/onboard", async (req, res) => {
     if (status < 500) {
       res.status(status).json({ error: err.message });
     } else {
-      console.error(err);
+      req.log.error({ err, status }, "Failed to create manufacturer Connect onboarding link");
       res.status(500).json({ error: "Failed to create onboarding link" });
     }
   }
@@ -116,7 +116,10 @@ router.get("/status", async (req, res) => {
   } catch (err: any) {
     const status = err.status ?? 500;
     if (status < 500) res.status(status).json({ error: err.message });
-    else { console.error(err); res.status(500).json({ error: "Failed to retrieve Connect status" }); }
+    else {
+      req.log.error({ err, status }, "Failed to retrieve manufacturer Connect status");
+      res.status(500).json({ error: "Failed to retrieve Connect status" });
+    }
   }
 });
 

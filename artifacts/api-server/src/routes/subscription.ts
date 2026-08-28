@@ -22,6 +22,7 @@ import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 import { requireStripe } from "../lib/stripe";
+import { logger } from "../lib/logger";
 
 const router = Router();
 router.use(requireAuth);
@@ -60,9 +61,9 @@ async function ensurePrice(stripe: any, planId: PlanId): Promise<string> {
     if (found.unit_amount === cfg.amountCents) return found.id;
     // Amount mismatch: catalogue was updated but old Stripe Price still holds the key.
     // Create a corrected price and transfer the lookup_key to it.
-    console.warn(
-      `ensurePrice: lookup_key ${cfg.lookupKey} has stale amount ${found.unit_amount} cents ` +
-      `(expected ${cfg.amountCents}). Creating corrected price with transfer_lookup_key.`,
+    logger.warn(
+      { lookupKey: cfg.lookupKey, foundAmountCents: found.unit_amount, expectedAmountCents: cfg.amountCents },
+      "Subscription price lookup key has a stale amount; creating corrected price",
     );
   }
 
@@ -179,7 +180,7 @@ router.get("/status", requireRole("owner"), async (req, res) => {
   } catch (err: any) {
     const status = err.status ?? 500;
     if (status < 500) { res.status(status).json({ error: err.message }); return; }
-    console.error(err);
+    req.log.error({ err }, "Failed to fetch subscription status");
     res.status(500).json({ error: "Failed to fetch subscription status" });
   }
 });
@@ -221,7 +222,7 @@ router.get("/invoices", requireRole("owner"), async (req, res) => {
       res.status(status).json({ error: err.message });
       return;
     }
-    console.error(err);
+    req.log.error({ err }, "Failed to fetch subscription invoice history");
     res.status(500).json({ error: "Failed to fetch invoice history" });
   }
 });
@@ -278,7 +279,7 @@ router.post("/checkout", requireRole("owner"), async (req, res) => {
         }
       } catch (retrieveErr: any) {
         // Subscription no longer exists in Stripe — fall through to new Checkout.
-        console.warn("Could not retrieve existing subscription:", retrieveErr?.message);
+        req.log.warn({ err: retrieveErr, subscriptionId: user.subscriptionId }, "Could not retrieve existing subscription");
       }
     }
 
@@ -308,7 +309,7 @@ router.post("/checkout", requireRole("owner"), async (req, res) => {
   } catch (err: any) {
     const status = err.status ?? 500;
     if (status < 500) { res.status(status).json({ error: err.message }); return; }
-    console.error(err);
+    req.log.error({ err }, "Failed to create subscription checkout");
     res.status(500).json({ error: "Failed to create subscription checkout" });
   }
 });
@@ -345,7 +346,7 @@ router.post("/portal", requireRole("owner"), async (req, res) => {
   } catch (err: any) {
     const status = err.status ?? 500;
     if (status < 500) { res.status(status).json({ error: err.message }); return; }
-    console.error(err);
+    req.log.error({ err }, "Failed to create billing portal session");
     res.status(500).json({ error: "Failed to create billing portal session" });
   }
 });

@@ -166,7 +166,7 @@ export default function SellerReviewsScreen() {
   const load = useCallback(async () => {
     try {
       setError(null);
-      const data = await api.reviews.forSeller();
+      const data = await api.reviews.mine();
       if (Array.isArray(data)) setReviews(data);
     } catch {
       setError('Could not load reviews. Pull to refresh.');

@@ -11,6 +11,7 @@
  */
 import { db, cartItems, notificationsFeed } from "@workspace/db";
 import { isNull, lt, sql, eq } from "drizzle-orm";
+import { logger } from "../lib/logger";
 
 const WINDOW_HOURS = 24;
 const INTERVAL_MS  = 30 * 60 * 1000; // 30 minutes
@@ -52,9 +53,9 @@ async function runRecovery(): Promise<void> {
         );
     }
 
-    console.log(`[abandonedCartRecovery] Notified ${staleUsers.length} buyer(s) about abandoned carts`);
+    logger.info({ job: "abandonedCartRecovery", notifiedUsers: staleUsers.length }, "Abandoned cart notifications sent");
   } catch (err) {
-    console.error("[abandonedCartRecovery] Error:", err);
+    logger.error({ err, job: "abandonedCartRecovery" }, "Abandoned cart recovery job failed");
   }
 }
 
@@ -65,5 +66,5 @@ export function startAbandonedCartJob(): void {
   // Then run on the recurring interval
   setInterval(runRecovery, INTERVAL_MS);
 
-  console.log("[abandonedCartRecovery] Job scheduled (runs every 30 min)");
+  logger.info({ job: "abandonedCartRecovery", intervalMs: INTERVAL_MS }, "Abandoned cart recovery job scheduled");
 }

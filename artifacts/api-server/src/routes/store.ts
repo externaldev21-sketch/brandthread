@@ -313,7 +313,7 @@ footer{padding:64px 24px;text-align:center;opacity:.6;font-size:.68rem;text-tran
 </style>
 </head>
 <body>
-<div class="preview-banner">Private preview · Not yet published</div>
+<div class="preview-banner">Private Preview link · Not yet published</div>
 <nav>
   <span class="logo">${title}</span>
   <div class="nav-links"><a href="#">Shop</a><a href="#">Collections</a><a href="#">About</a><a href="#">Contact</a></div>

@@ -202,10 +202,10 @@ router.post(
         .where(eq(manufacturers.id, mfr.id))
         .returning({ photos: manufacturers.photos });
 
-      res.status(201).json({ photo: objectPath, photos: updated.photos });
+      return res.status(201).json({ photo: objectPath, photos: updated.photos });
     } catch (error) {
-      console.error("manufacturer photo upload failed", error);
-      res.status(500).json({ error: "Unable to upload factory image" });
+      req.log.error({ err: error }, "Manufacturer photo upload failed");
+      return res.status(500).json({ error: "Unable to upload factory image" });
     }
   },
 );

@@ -20,12 +20,47 @@ function emit() {
 }
 
 export class ApiError extends Error {
+  public readonly code?: string;
+  public readonly details?: Record<string, unknown>;
+  public readonly requestId?: string;
+
   constructor(
     public readonly status: number,
     public readonly body: string,
   ) {
-    super(`API ${status}: ${body}`);
+    let message = body;
+    let code: string | undefined;
+    let details: Record<string, unknown> | undefined;
+    let requestId: string | undefined;
+    try {
+      const parsed: unknown = JSON.parse(body);
+      if (typeof parsed === 'object' && parsed !== null) {
+        const value = parsed as Record<string, unknown>;
+        requestId = typeof value.requestId === 'string' ? value.requestId : undefined;
+        if (typeof value.error === 'object' && value.error !== null) {
+          const error = value.error as Record<string, unknown>;
+          message = typeof error.message === 'string' ? error.message : body;
+          code = typeof error.code === 'string' ? error.code : undefined;
+          details = typeof error.details === 'object' && error.details !== null
+            ? error.details as Record<string, unknown>
+            : undefined;
+        } else {
+          message = typeof value.message === 'string'
+            ? value.message
+            : typeof value.error === 'string'
+              ? value.error
+              : body;
+          code = typeof value.code === 'string' ? value.code : undefined;
+        }
+      }
+    } catch {
+      // Non-JSON failures (proxies, gateways) remain readable.
+    }
+    super(`API ${status}: ${message}`);
     this.name = 'ApiError';
+    this.code = code;
+    this.details = details;
+    this.requestId = requestId;
   }
 }
 

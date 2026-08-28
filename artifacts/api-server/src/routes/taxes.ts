@@ -72,7 +72,7 @@ router.get("/status", async (req, res) => {
       stripeSettings,
     });
   } catch (err) {
-    console.error(err);
+    req.log.error({ err, sellerId }, "Failed to load seller tax configuration");
     res.status(500).json({ error: "Failed to load tax config" });
   }
 });
@@ -116,7 +116,7 @@ router.post("/enable", async (req, res) => {
       );
     } catch (taxErr: any) {
       // Stripe Tax may not be available in test mode on all accounts
-      console.warn("Stripe Tax settings update:", taxErr.message);
+      req.log.warn({ err: taxErr, sellerId }, "Stripe Tax settings update failed");
     }
 
     await db
@@ -129,7 +129,7 @@ router.post("/enable", async (req, res) => {
 
     res.json({ enabled: true });
   } catch (err) {
-    console.error(err);
+    req.log.error({ err, sellerId }, "Failed to enable Stripe Tax");
     res.status(500).json({ error: "Failed to enable Stripe Tax" });
   }
 });
@@ -160,7 +160,7 @@ router.patch("/config", async (req, res) => {
 
     res.json(updated);
   } catch (err) {
-    console.error(err);
+    req.log.error({ err, sellerId }, "Failed to update seller tax configuration");
     res.status(500).json({ error: "Failed to update tax config" });
   }
 });
@@ -213,7 +213,7 @@ router.get("/1099", async (req, res) => {
         : null,
     });
   } catch (err) {
-    console.error(err);
+    req.log.error({ err, sellerId }, "Failed to load tax forms");
     res.status(500).json({ error: "Failed to load tax forms" });
   }
 });
@@ -283,11 +283,11 @@ router.post("/calculate", async (req, res) => {
         estimated:      false,
       });
     } catch (taxErr: any) {
-      console.error("Stripe Tax calculation:", taxErr.message);
+      req.log.error({ err: taxErr, sellerId }, "Stripe Tax calculation failed");
       res.json({ taxAmountCents: 0, taxBreakdown: [], currency, estimated: true, error: taxErr.message });
     }
   } catch (err) {
-    console.error(err);
+    req.log.error({ err, sellerId }, "Tax calculation failed");
     res.status(500).json({ error: "Tax calculation failed" });
   }
 });

@@ -7,8 +7,7 @@
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Linking } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useFocusEffect } from '@react-navigation/native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -275,7 +274,7 @@ export default function SellerVerificationScreen() {
         <View style={s.ctaSection}>
           {status === 'unverified' && (
             <PrimaryButton
-              title={starting ? 'Opening Stripe…' : 'Start verification'}
+              label={starting ? 'Opening Stripe…' : 'Start verification'}
               onPress={handleStart}
               loading={starting}
               disabled={starting}
@@ -285,7 +284,7 @@ export default function SellerVerificationScreen() {
           {status === 'pending' && (
             <>
               <SecondaryButton
-                title={loading ? 'Checking…' : 'Check status'}
+                label={loading ? 'Checking…' : 'Check status'}
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); loadStatus(); }}
               />
               <Text style={s.pendingHint}>
@@ -298,7 +297,7 @@ export default function SellerVerificationScreen() {
           {status === 'failed' && (
             <>
               <PrimaryButton
-                title={starting ? 'Opening Stripe…' : 'Try again'}
+                label={starting ? 'Opening Stripe…' : 'Try again'}
                 onPress={handleRetry}
                 loading={cancelling}
                 disabled={starting || cancelling}

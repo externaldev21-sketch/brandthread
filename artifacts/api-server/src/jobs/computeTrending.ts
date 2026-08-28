@@ -31,6 +31,7 @@ import {
   postTaggedProducts, products, boosts, trendingCache,
 } from "@workspace/db";
 import { eq, and, inArray, count, gte, desc, sql } from "drizzle-orm";
+import { logger } from "../lib/logger";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -154,7 +155,7 @@ export async function computeTrendingForToday(): Promise<void> {
     // If there are no recent posts at all, write an empty cache entry and exit.
     if (recentPosts.length === 0) {
       await upsertCache(today, []);
-      console.log(`[computeTrending] No posts in last 48 h — empty cache written for ${today}`);
+      logger.info({ job: "computeTrending", cacheDate: today }, "Empty trending cache written");
       return;
     }
 
@@ -365,12 +366,15 @@ export async function computeTrendingForToday(): Promise<void> {
 
     // ── 12. Upsert into trending_cache ────────────────────────────────────────
     await upsertCache(today, results);
-    console.log(
-      `[computeTrending] ${results.length} items cached for ${today}` +
-      ` (pool=${recentPosts.length}, boosted=${boostedPostIds.size})`,
-    );
+    logger.info({
+      job: "computeTrending",
+      cacheDate: today,
+      itemCount: results.length,
+      candidateCount: recentPosts.length,
+      boostedCount: boostedPostIds.size,
+    }, "Trending cache written");
   } catch (err) {
-    console.error("[computeTrending] Error:", err);
+    logger.error({ err, job: "computeTrending" }, "Trending computation failed");
     // Do not rethrow — a failed computation shouldn't crash the server.
   }
 }
@@ -415,5 +419,5 @@ export function startTrendingJob(): void {
   // Then recompute every 24 h.
   setInterval(() => computeTrendingForToday(), INTERVAL_24H_MS);
 
-  console.log("[computeTrending] Job scheduled (runs every 24 h, first run in 2 min)");
+  logger.info({ job: "computeTrending", intervalMs: INTERVAL_24H_MS, initialDelayMs: 2 * 60 * 1000 }, "Trending job scheduled");
 }

@@ -223,7 +223,7 @@ router.get("/post-clicks", async (req, res) => {
     `);
     res.json(rows.rows ?? rows);
   } catch (err) {
-    console.error('post-clicks analytics error:', err);
+    req.log.error({ err }, "Failed to load post click analytics");
     res.status(500).json({ error: 'Failed to load post click analytics' });
   }
 });
@@ -274,7 +274,7 @@ router.get("/customers", async (req, res) => {
 
     res.json(buildCustomerAnalyticsResponse(topRows.rows, statsRows.rows));
   } catch (err) {
-    console.error("GET /analytics/customers error:", err);
+    req.log.error({ err }, "Failed to fetch customer analytics");
     res.status(500).json({ error: "Failed to fetch customer analytics" });
   }
 });

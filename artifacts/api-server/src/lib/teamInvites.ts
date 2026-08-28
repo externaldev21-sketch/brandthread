@@ -1,4 +1,5 @@
 /** Shared team invite link and email helpers. */
+import { logger } from "./logger";
 
 /** Shareable invite links: web URL (expo web serves the domain root) + native deep link. */
 export function inviteUrls(token: string) {
@@ -57,11 +58,11 @@ export async function sendTeamInviteEmail(
       }),
     });
     if (!response.ok) {
-      console.error("[team] Resend email failed:", response.status, await response.text());
+      logger.error({ statusCode: response.status }, "Team invite email provider request failed");
     }
     return response.ok;
   } catch (err) {
-    console.error("[team] Resend email failed:", err);
+    logger.error({ err }, "Team invite email request failed");
     return false;
   }
 }

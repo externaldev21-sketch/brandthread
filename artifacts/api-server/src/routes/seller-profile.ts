@@ -8,6 +8,7 @@ import { db, interactions, orders, posts, users } from "@workspace/db";
 import { and, count, eq, isNotNull, notInArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { logger } from "../lib/logger";
 
 // ─── Startup migration — add tutorial flag + questionnaire columns ─────────────
 (async () => {
@@ -16,7 +17,7 @@ import { ObjectStorageService } from "../lib/objectStorage";
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS seller_goals JSONB`);
     await db.execute(sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS buyer_style_interests JSONB`);
   } catch (err) {
-    console.error("[seller-profile] migration error:", err);
+    logger.error({ err }, "Seller profile migration failed");
   }
 })();
 

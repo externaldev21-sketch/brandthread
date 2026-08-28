@@ -175,7 +175,7 @@ router.post("/apply", async (req, res) => {
       referenceId: myId,
       note:        "Referral bonus — friend joined",
     })
-    .catch((err) => console.error("loyalty award error:", err));
+    .catch((err) => req.log.error({ err, inviterId: inviter.clerkId, inviteeId: myId }, "Failed to award referral loyalty points"));
 
   res.json({ ok: true, inviterId: inviter.clerkId });
 });

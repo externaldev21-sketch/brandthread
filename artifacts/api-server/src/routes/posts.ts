@@ -175,7 +175,7 @@ router.get("/feed", requireAuth, async (req, res) => {
 
     return res.json(result);
   } catch (err) {
-    console.error("GET /api/posts/feed error:", err);
+    req.log.error({ err, clerkId }, "Failed to fetch posts feed");
     return res.status(500).json({ error: "Failed to fetch feed" });
   }
 });
@@ -280,6 +280,9 @@ router.get("/:id", async (req, res) => {
 router.post("/:id/interact", requireAuth, async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   const { id } = req.params;
+  if (typeof id !== "string" || !UUID_RE.test(id)) {
+    return res.status(404).json({ error: "Post not found" });
+  }
   const { type, value } = req.body as {
     type: "like" | "repost" | "watch_time";
     value?: string;

@@ -323,7 +323,7 @@ export default function ProductBundleEditScreen() {
 
         {/* Actions */}
         <PrimaryButton
-          title={saving ? 'Saving…' : isNew ? 'Create Bundle' : 'Save Changes'}
+          label={saving ? 'Saving…' : isNew ? 'Create Bundle' : 'Save Changes'}
           onPress={save}
           loading={saving}
           disabled={saving}

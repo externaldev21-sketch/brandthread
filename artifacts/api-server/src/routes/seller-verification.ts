@@ -118,7 +118,7 @@ router.post("/start", async (req, res) => {
       return_url: returnUrl,
     });
   } catch (err: any) {
-    console.error("Stripe Identity create error:", err);
+    req.log.error({ err, clerkId }, "Stripe Identity verification session creation failed");
     // Surface a friendly error when Identity is not enabled on the account
     if (err?.code === "identity_not_enabled" || err?.type === "StripeInvalidRequestError") {
       return res.status(503).json({
