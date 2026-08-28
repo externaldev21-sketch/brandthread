@@ -12,6 +12,94 @@ const BASE =
 
 type GetToken = () => Promise<string | null>;
 
+// Seller payment readiness changes infrequently, but product browsing and
+// checkout can ask for it repeatedly in a short window. Keep this cache in
+// module scope so separate screen API clients share the same result.
+export const SELLER_PAYMENT_STATUS_CACHE_TTL_MS = 60_000;
+
+export interface SellerPaymentStatus {
+  ready: boolean;
+  reason?: string;
+}
+
+type SellerPaymentStatusCacheEntry = {
+  status: SellerPaymentStatus;
+  expiresAt: number;
+};
+
+const sellerPaymentStatusCache = new Map<string, SellerPaymentStatusCacheEntry>();
+const sellerPaymentStatusInFlight = new Map<string, Promise<SellerPaymentStatus>>();
+const sellerPaymentStatusGenerations = new Map<string, number>();
+
+/**
+ * Clear cached seller payment readiness. Checkout screens call this before a
+ * user-initiated refresh so a refresh always gets a fresh server response.
+ * With no sellerId, clear all sellers (useful when cart contents change).
+ */
+export function invalidateSellerPaymentStatusCache(sellerId?: string): void {
+  if (sellerId) {
+    sellerPaymentStatusCache.delete(sellerId);
+    sellerPaymentStatusInFlight.delete(sellerId);
+    sellerPaymentStatusGenerations.set(
+      sellerId,
+      (sellerPaymentStatusGenerations.get(sellerId) ?? 0) + 1,
+    );
+    return;
+  }
+
+  sellerPaymentStatusCache.clear();
+  sellerPaymentStatusInFlight.clear();
+  for (const sellerKey of sellerPaymentStatusGenerations.keys()) {
+    sellerPaymentStatusGenerations.set(
+      sellerKey,
+      (sellerPaymentStatusGenerations.get(sellerKey) ?? 0) + 1,
+    );
+  }
+}
+
+async function getCachedSellerPaymentStatus(
+  sellerId: string,
+  fetchStatus: () => Promise<SellerPaymentStatus>,
+): Promise<SellerPaymentStatus> {
+  const now = Date.now();
+  const cached = sellerPaymentStatusCache.get(sellerId);
+  if (cached) {
+    if (cached.expiresAt > now) return cached.status;
+    sellerPaymentStatusCache.delete(sellerId);
+  }
+
+  const inFlight = sellerPaymentStatusInFlight.get(sellerId);
+  if (inFlight) return inFlight;
+
+  const generation = sellerPaymentStatusGenerations.get(sellerId) ?? 0;
+  sellerPaymentStatusGenerations.set(sellerId, generation);
+  const requestPromise = fetchStatus().then((status) => {
+    // An explicit refresh may have started a newer generation while this
+    // request was pending. Do not let the older response repopulate the cache.
+    if ((sellerPaymentStatusGenerations.get(sellerId) ?? 0) === generation) {
+      sellerPaymentStatusCache.set(sellerId, {
+        status,
+        expiresAt: Date.now() + SELLER_PAYMENT_STATUS_CACHE_TTL_MS,
+      });
+    }
+    return status;
+  });
+  sellerPaymentStatusInFlight.set(sellerId, requestPromise);
+  void requestPromise.then(
+    () => {
+      if (sellerPaymentStatusInFlight.get(sellerId) === requestPromise) {
+        sellerPaymentStatusInFlight.delete(sellerId);
+      }
+    },
+    () => {
+      if (sellerPaymentStatusInFlight.get(sellerId) === requestPromise) {
+        sellerPaymentStatusInFlight.delete(sellerId);
+      }
+    },
+  );
+  return requestPromise;
+}
+
 // ─── Store context switcher ───────────────────────────────────────────────────
 // When a team member wants to act on their own store instead of the joined store,
 // the client sends X-Store-Context: own. The backend teamContext() middleware
@@ -462,8 +550,11 @@ export function createApi(getToken: GetToken) {
       /** Check whether a seller's Stripe Connect account can accept payments.
        *  Returns { ready: boolean, reason?: string }. */
       sellerPaymentStatus: (sellerId: string) =>
-        get<{ ready: boolean; reason?: string }>(
-          `/api/buyer/seller-payment-status/${encodeURIComponent(sellerId)}`
+        getCachedSellerPaymentStatus(
+          sellerId,
+          () => get<SellerPaymentStatus>(
+            `/api/buyer/seller-payment-status/${encodeURIComponent(sellerId)}`
+          ),
         ),
     },
     /** DM conversations between buyers and sellers. */

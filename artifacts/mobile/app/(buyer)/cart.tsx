@@ -5,7 +5,7 @@
 import React, { useState, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Image,
-  ActivityIndicator, Alert, TextInput,
+  ActivityIndicator, Alert, TextInput, RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -20,6 +20,7 @@ import {
   Cart, CartItem, SavedCartItem, CartSellerGroup, CheckoutLoyaltyRedemption,
 } from '@/services/cartTypes';
 import { useApi } from '@/hooks/useApi';
+import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
@@ -364,6 +365,7 @@ export default function CartScreen() {
   const [pointsInput, setPointsInput] = useState('');
   const [redeemingPoints, setRedeemingPoints] = useState(false);
   const [loyaltyRedemption, setLoyaltyRedemption] = useState<CheckoutLoyaltyRedemption | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -383,6 +385,16 @@ export default function CartScreen() {
     } catch {}
     setLoading(false);
   }, []);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    invalidateSellerPaymentStatusCache();
+    try {
+      await load();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [load]);
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -589,6 +601,13 @@ export default function CartScreen() {
         <>
           <ScrollView
             showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor={PURPLE}
+              />
+            }
             contentContainerStyle={{
               paddingHorizontal: SP.md,
               paddingTop: SP.sm,

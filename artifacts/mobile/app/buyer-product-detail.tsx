@@ -4,7 +4,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image, RefreshControl,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,6 +17,7 @@ import {
 } from '@/services/cartService';
 import { BuyerProduct, BuyerProductOption, BuyerProductVariant, CheckoutAttribution } from '@/services/cartTypes';
 import { useApi } from '@/hooks/useApi';
+import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, BORDER_FOCUS,
   FG, MUTED, SUBTLE, ON_DARK,
@@ -270,6 +271,7 @@ export default function BuyerProductDetailScreen() {
   const [addedToCart, setAddedToCart] = useState(false);
   const [sellerPaymentReady, setSellerPaymentReady] = useState<boolean | null>(null);
   const [sellerPaymentReason, setSellerPaymentReason] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [productReviews, setProductReviews] = useState<any[]>([]);
   const [avgRating, setAvgRating] = useState(0);
   const [reviewCount, setReviewCount] = useState(0);
@@ -346,6 +348,22 @@ export default function BuyerProductDetailScreen() {
       })
       .catch(() => {});
   }, [product?.id]);
+
+  async function handleRefresh() {
+    if (!product?.sellerId) return;
+    setRefreshing(true);
+    invalidateSellerPaymentStatusCache(product.sellerId);
+    try {
+      const status = await api.buyer.sellerPaymentStatus(product.sellerId);
+      setSellerPaymentReady(status.ready);
+      setSellerPaymentReason(status.reason ?? null);
+    } catch {
+      // Keep the existing readiness state visible if a manual refresh loses
+      // connectivity; Buy Now still performs its own check before checkout.
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   // Check waitlist status when selected variant changes
   useEffect(() => {
@@ -502,6 +520,13 @@ export default function BuyerProductDetailScreen() {
     <View style={{ flex: 1, backgroundColor: BG }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={PURPLE}
+          />
+        }
         contentContainerStyle={{ paddingBottom: insets.bottom + 130 }}
       >
         {/* Image area */}
