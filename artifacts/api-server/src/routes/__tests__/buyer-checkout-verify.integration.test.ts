@@ -63,7 +63,7 @@ interface StripeScenario {
   paymentStatus: "paid" | "unpaid" | "no_payment_required";
   sessionStatus: "open" | "complete" | "expired";
   sessionBuyerId: string;
-  paymentIntentId: string | null;
+  paymentIntentId: string | { id: string } | null;
   lastPaymentError: { decline_code?: string; code?: string; type?: string } | null;
   paymentIntentRetrieveFails: boolean;
 }
@@ -253,6 +253,21 @@ describe("GET /api/buyer/checkout/session/:sessionId — decline reason surfacin
     const { status, body } = await get("/api/buyer/checkout/session/cs_fake_code_only");
     expect(status).toBe(200);
     expect(typeof body.declineReason).toBe("string");
+    assertNoRawStripes(body.declineReason);
+  });
+
+  it("A: unpaid session with an expanded PaymentIntent object still surfaces the decline reason", async () => {
+    stripeScenario.paymentStatus = "unpaid";
+    stripeScenario.paymentIntentId = { id: "pi_fake_expanded" };
+    stripeScenario.lastPaymentError = {
+      type: "StripeCardError",
+      decline_code: "card_velocity_exceeded",
+      code: "card_declined",
+    };
+
+    const { status, body } = await get("/api/buyer/checkout/session/cs_fake_expanded_pi");
+    expect(status).toBe(200);
+    expect(body.declineReason).toMatch(/too many attempts/i);
     assertNoRawStripes(body.declineReason);
   });
 

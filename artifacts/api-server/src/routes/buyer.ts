@@ -730,10 +730,13 @@ router.get("/checkout/session/:sessionId", async (req, res) => {
     // If payment was not completed, try to surface a buyer-friendly decline reason
     // by inspecting the PaymentIntent's last_payment_error.
     let declineReason: string | null = null;
-    if (session.payment_status !== "paid" && session.payment_intent) {
+    const paymentIntentId = typeof session.payment_intent === "string"
+      ? session.payment_intent
+      : (session.payment_intent as { id?: string } | null | undefined)?.id;
+    if (session.payment_status !== "paid" && paymentIntentId) {
       try {
         const pi = await stripe.paymentIntents.retrieve(
-          session.payment_intent as string,
+          paymentIntentId,
         );
         if (pi.last_payment_error) {
           declineReason = mapStripeError(pi.last_payment_error as any);

@@ -202,6 +202,7 @@ export default function BuyerCheckoutScreen() {
   const [loading, setLoading] = useState(true);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState('');
+  const [canRetryPayment, setCanRetryPayment] = useState(false);
   const [orders, setOrders] = useState<string[]>([]);
   const [pendingSessionIds, setPendingSessionIds] = useState<string[]>([]);
   const paid = useRef(new Map<string, string>());
@@ -261,7 +262,7 @@ export default function BuyerCheckoutScreen() {
     }
   };
   const pay = async () => {
-    setPlacing(true); setError('');
+    setPlacing(true); setError(''); setCanRetryPayment(false);
     const unresolved: string[] = []; const confirmed: string[] = [];
     try {
       for (const group of current.deliveryGroups) {
@@ -282,7 +283,12 @@ export default function BuyerCheckoutScreen() {
           if (verification.orderNumber || verification.paymentStatus !== 'paid') break;
           await new Promise(resolve => setTimeout(resolve, 2000));
         }
-        if (verification?.paymentStatus !== 'paid') { setError(verification?.declineReason ?? 'Payment could not be completed. Please try again.'); setPlacing(false); return; }
+        if (verification?.paymentStatus !== 'paid') {
+          setError(verification?.declineReason ?? 'Your payment was declined. Please try a different card or contact your card issuer.');
+          setCanRetryPayment(true);
+          setPlacing(false);
+          return;
+        }
         if (verification.orderNumber) { confirmed.push(verification.orderNumber); paid.current.set(group.sellerId, verification.orderNumber); } else unresolved.push(result.sessionId);
       }
       setOrders(confirmed); setPendingSessionIds(unresolved);
@@ -290,6 +296,9 @@ export default function BuyerCheckoutScreen() {
       await persist({ ...current, step: 'confirmation' });
     } catch { setError('We could not start secure checkout. Please try again.'); }
     setPlacing(false);
+  };
+  const retryPayment = async () => {
+    await pay();
   };
   const refreshOrders = useCallback(async () => {
     setPlacing(true);
@@ -302,7 +311,9 @@ export default function BuyerCheckoutScreen() {
     setPlacing(false);
   }, [api, orders, pendingSessionIds]);
   if (loading || !session) return <View style={styles.loading}><ActivityIndicator color={PURPLE} size="large" /></View>;
-  const label = current.step === 'review' ? `Continue to Stripe · ${money(current.summary.total)}` : 'Continue';
+  const label = current.step === 'review'
+    ? canRetryPayment ? 'Try a different card' : `Continue to Stripe · ${money(current.summary.total)}`
+    : 'Continue';
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       {current.step !== 'confirmation' && <View style={[styles.header, { paddingTop: insets.top + SP.xs }]}><TouchableOpacity style={styles.back} onPress={() => { const index = STEPS.indexOf(current.step); if (index <= 0) router.back(); else void persist({ ...current, step: STEPS[index - 1] }); }}><Feather name="chevron-left" size={ICON.md} color={FG} /></TouchableOpacity><View style={{ flex: 1, alignItems: 'center' }}><Text style={styles.stepLabel}>{current.step === 'information' ? 'Information' : current.step === 'delivery' ? 'Delivery' : 'Review & Pay'}</Text><Progress step={current.step} /></View><View style={styles.back} /></View>}
@@ -311,9 +322,18 @@ export default function BuyerCheckoutScreen() {
         {current.step === 'delivery' && <Delivery session={current} onSelect={(sellerId, methodId) => void persist({ ...current, deliveryGroups: current.deliveryGroups.map(group => group.sellerId === sellerId ? { ...group, selectedMethodId: methodId } : group) })} onApply={async code => { const discount = await applyDiscount(code, current.summary.subtotal, current.discounts); await persist({ ...current, discounts: [...current.discounts.filter(item => item.code !== discount.code), discount] }); }} onRemove={code => void removeDiscount(code, current.discounts).then(discounts => persist({ ...current, discounts }))} />}
         {current.step === 'review' && <Review session={current} onAck={(key, checked) => void persist({ ...current, acknowledgments: current.acknowledgments.map(ack => ack.key === key ? { ...ack, acknowledged: checked } : ack) })} />}
         {current.step === 'confirmation' && <Confirmation orderNumbers={orders} finalizing={pendingSessionIds.length > 0} onRefresh={refreshOrders} refreshing={placing} />}
-        {!!error && <View style={styles.error}><Feather name="alert-circle" size={16} color={RED} /><Text style={styles.errorText}>{error}</Text></View>}
+         {!!error && <View style={styles.error}>
+           <Feather name="alert-circle" size={16} color={RED} style={{ marginTop: 2 }} />
+           <View style={{ flex: 1 }}>
+             <Text style={styles.errorText}>{error}</Text>
+             {canRetryPayment && <TouchableOpacity style={styles.retryButton} onPress={retryPayment} disabled={placing}>
+               <Feather name="credit-card" size={14} color={RED} />
+               <Text style={styles.retryText}>Try a different card</Text>
+             </TouchableOpacity>}
+           </View>
+         </View>}
       </ScrollView>
-      {current.step !== 'confirmation' && <View style={[styles.bottom, { paddingBottom: insets.bottom + SP.sm }]}><TouchableOpacity style={styles.continue} disabled={placing} onPress={handleContinue}><LinearGradient colors={[...GRAD_PRIMARY]} style={styles.continueGradient}>{placing ? <ActivityIndicator color={ON_DARK} /> : <Text style={styles.continueText}>{label}</Text>}</LinearGradient></TouchableOpacity></View>}
+       {current.step !== 'confirmation' && <View style={[styles.bottom, { paddingBottom: insets.bottom + SP.sm }]}><TouchableOpacity style={styles.continue} disabled={placing} onPress={canRetryPayment ? retryPayment : handleContinue}><LinearGradient colors={[...GRAD_PRIMARY]} style={styles.continueGradient}>{placing ? <ActivityIndicator color={ON_DARK} /> : <Text style={styles.continueText}>{label}</Text>}</LinearGradient></TouchableOpacity></View>}
     </KeyboardAvoidingView>
   );
 }
@@ -324,6 +344,6 @@ const styles = StyleSheet.create({
   card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md, marginBottom: SP.md }, sectionTitle: { fontFamily: FONT.semibold, fontSize: FS.base, color: FG, marginBottom: SP.sm }, field: { marginBottom: SP.sm }, fieldLabel: { color: MUTED, fontFamily: FONT.semibold, fontSize: FS.xs, textTransform: 'uppercase', marginBottom: 4 }, input: { height: COMP.inputH, borderRadius: RADIUS.md, backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, paddingHorizontal: SP.md }, twoCol: { flexDirection: 'row', gap: SP.sm }, toggleRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingTop: SP.sm }, toggleTitle: { color: FG, fontFamily: FONT.medium, fontSize: FS.sm }, muted: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19 },
   method: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.sm, borderRadius: RADIUS.md, marginBottom: 6 }, methodActive: { backgroundColor: PURPLE_DIM }, radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: MUTED }, radioActive: { borderColor: PURPLE, backgroundColor: PURPLE }, methodTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm }, promoToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm }, promoRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'center' }, applyButton: { backgroundColor: PURPLE_DIM, borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: 13 }, applyText: { color: PURPLE_LIGHT, fontFamily: FONT.bold, fontSize: FS.sm }, discountRow: { flexDirection: 'row', justifyContent: 'space-between', gap: SP.sm, marginTop: SP.sm }, discountText: { flex: 1, color: SUCCESS, fontFamily: FONT.regular, fontSize: FS.sm }, removeText: { color: PURPLE_LIGHT, fontFamily: FONT.semibold, fontSize: FS.sm },
   address: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, marginBottom: SP.md }, line: { flexDirection: 'row', justifyContent: 'space-between', gap: SP.sm, paddingVertical: 5 }, lineName: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm }, divider: { height: 1, backgroundColor: BORDER, marginVertical: SP.sm }, total: { color: FG, fontFamily: FONT.bold, fontSize: FS.lg }, multiSeller: { flexDirection: 'row', gap: SP.sm, backgroundColor: CYAN_DIM, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md }, multiSellerText: { flex: 1, color: CYAN, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 }, ack: { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', marginBottom: SP.sm }, checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1, borderColor: MUTED, alignItems: 'center', justifyContent: 'center', marginTop: 1 }, checkboxActive: { backgroundColor: PURPLE, borderColor: PURPLE }, ackText: { flex: 1, color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
-  bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: SP.md, backgroundColor: BG, borderTopWidth: 1, borderColor: BORDER }, continue: { overflow: 'hidden', borderRadius: RADIUS.lg, ...SHADOW_PURPLE }, continueGradient: { height: COMP.buttonH, alignItems: 'center', justifyContent: 'center' }, continueText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.base }, error: { flexDirection: 'row', gap: SP.sm, backgroundColor: RED_DIM, padding: SP.md, borderRadius: RADIUS.md }, errorText: { color: RED, flex: 1, fontFamily: FONT.medium, fontSize: FS.sm },
+  bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: SP.md, backgroundColor: BG, borderTopWidth: 1, borderColor: BORDER }, continue: { overflow: 'hidden', borderRadius: RADIUS.lg, ...SHADOW_PURPLE }, continueGradient: { height: COMP.buttonH, alignItems: 'center', justifyContent: 'center' }, continueText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.base }, error: { flexDirection: 'row', gap: SP.sm, backgroundColor: RED_DIM, padding: SP.md, borderRadius: RADIUS.md }, errorText: { color: RED, flex: 1, fontFamily: FONT.medium, fontSize: FS.sm, lineHeight: 20 }, retryButton: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: SP.sm, paddingVertical: 7, paddingHorizontal: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: RED }, retryText: { color: RED, fontFamily: FONT.semibold, fontSize: FS.sm },
   confirmation: { alignItems: 'center', paddingTop: SP.xxl }, confirmIcon: { width: 78, height: 78, borderRadius: 39, alignItems: 'center', justifyContent: 'center', backgroundColor: SUCCESS, marginBottom: SP.md }, headline: { color: FG, fontFamily: FONT.bold, fontSize: FS.xxl, marginBottom: SP.sm }, confirmText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.base, lineHeight: 22, textAlign: 'center', maxWidth: 320 }, orderNumber: { color: FG, fontFamily: FONT.bold, fontSize: FS.base, marginTop: SP.md }, refreshButton: { borderWidth: 1, borderColor: PURPLE, borderRadius: RADIUS.md, paddingHorizontal: SP.lg, paddingVertical: SP.sm, marginTop: SP.lg }, refreshText: { color: PURPLE_LIGHT, fontFamily: FONT.bold, fontSize: FS.sm },
 });
