@@ -7,6 +7,7 @@
     "dev": "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY EXPO_PUBLIC_API_BASE_URL=https://$REPLIT_DEV_DOMAIN EXPO_PACKAGER_PROXY_URL=https://$REPLIT_EXPO_DEV_DOMAIN EXPO_PUBLIC_DOMAIN=$REPLIT_DEV_DOMAIN EXPO_PUBLIC_REPL_ID=$REPL_ID REACT_NATIVE_PACKAGER_HOSTNAME=$REPLIT_DEV_DOMAIN pnpm exec expo start --tunnel --port $PORT",
     "build": "node scripts/build-web.js",
     "serve": "node server/serve.js",
+    "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
@@ -21,6 +22,7 @@
     "@tanstack/react-query": "catalog:",
     "@types/react": "~19.1.10",
     "@types/react-dom": "~19.1.7",
+    "@types/react-test-renderer": "19.1.0",
     "@ungap/structured-clone": "^1.3.0",
     "@workspace/api-client-react": "workspace:*",
     "babel-plugin-react-compiler": "^19.0.0-beta-e993439-20250117",
@@ -45,6 +47,7 @@
     "expo-system-ui": "~6.0.9",
     "expo-web-browser": "~15.0.10",
     "react": "catalog:",
+    "react-test-renderer": "19.1.0",
     "react-dom": "catalog:",
     "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",
@@ -56,6 +59,7 @@
     "react-native-web": "^0.21.0",
     "react-native-worklets": "0.5.1",
     "typescript": "~5.9.2",
+    "vitest": "^4.1.10",
     "zod": "catalog:",
     "zod-validation-error": "^3.4.0"
   },
