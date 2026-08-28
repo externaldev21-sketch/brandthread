@@ -439,8 +439,12 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
   }, []);
 
   const desc = flow === 'buyer'
-    ? 'Get drop alerts, friend requests, messages and order updates.'
-    : 'Get order, production, payout and customer alerts instantly.';
+    ? Platform.OS === 'web'
+      ? 'Browser notifications are not enabled here. You can turn on mobile alerts later from the Brandthread app.'
+      : 'Get drop alerts, friend requests, messages and order updates.'
+    : Platform.OS === 'web'
+      ? 'Browser notifications are not enabled here. You can turn on mobile alerts later from the Brandthread app.'
+      : 'Get order, production, payout and customer alerts instantly.';
 
   const items = flow === 'buyer'
     ? ['New brand drops', 'Messages from brands', 'Order updates', 'Friend requests']
@@ -478,17 +482,23 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
           activeOpacity={0.88}
           disabled={requesting}
           onPress={async () => {
+            if (Platform.OS === 'web') {
+              onEnable(false);
+              return;
+            }
             setRequesting(true);
             let granted = false;
             try {
               const result = await Notifications.requestPermissionsAsync();
               granted = result.status === 'granted';
-            } catch { /* not supported in web */ }
+            } catch { /* permission request is best-effort on native */ }
             onEnable(granted);
           }}
         >
           <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sn.enableBtn}>
-            <Text style={[sn.enableBtnText, getOnAccentTextStyle(theme)]}>Enable notifications</Text>
+              <Text style={[sn.enableBtnText, getOnAccentTextStyle(theme)]}>
+                {Platform.OS === 'web' ? 'Continue in browser' : 'Enable notifications'}
+              </Text>
           </LinearGradient>
         </TouchableOpacity>
 

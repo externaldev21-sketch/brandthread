@@ -68,10 +68,12 @@ export default function AIPhotographyChatScreen() {
       ? (heroPhoto ? MAX_GARMENTS - garments.length : MAX_GARMENTS + 1)
       : MAX_PHOTOS - photos.length;
     if (remaining <= 0) return;
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please allow photo library access to upload product photos.');
-      return;
+    if (Platform.OS !== 'web') {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please allow photo library access to upload product photos.');
+        return;
+      }
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,

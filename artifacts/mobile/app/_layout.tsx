@@ -30,20 +30,24 @@ import StoreContextBanner from '@/components/StoreContextBanner';
 import NetworkNoticeBanner from '@/components/NetworkNoticeBanner';
 import { dismissNetworkNotice } from '@/lib/networkNotice';
 
-// ─── Push notification handler (show alerts while app is foregrounded) ────────
-Notifications.setNotificationHandler({
-  handleNotification: async () =>
-    ({ shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: true }) as any,
-});
-
-// ─── Android notification channel ─────────────────────────────────────────────
-if (Platform.OS === 'android') {
-  Notifications.setNotificationChannelAsync('default', {
-    name:       'Brandthread',
-    importance: Notifications.AndroidImportance.MAX,
-    vibrationPattern: [0, 250, 250, 250],
-    lightColor: '#DDE2E8',
+// Push notifications are native-only. Importing the package is safe for the
+// web bundle, but registering a handler/listener there produces unsupported
+// API warnings and gives users the impression that browser push is enabled.
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () =>
+      ({ shouldShowAlert: true, shouldPlaySound: true, shouldSetBadge: true }) as any,
   });
+
+  // ─── Android notification channel ───────────────────────────────────────────
+  if (Platform.OS === 'android') {
+    Notifications.setNotificationChannelAsync('default', {
+      name:       'Brandthread',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#DDE2E8',
+    });
+  }
 }
 
 SplashScreen.preventAutoHideAsync();
@@ -67,9 +71,9 @@ const DEV_BYPASS_ROLE: 'buyer' | 'seller' | null = null;
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
   if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined') return null;
   const v = new URLSearchParams(window.location.search).get('bt_preview');
-  // Default to seller in dev/web so the preview pane shows the seller dashboard.
-  // Use ?bt_preview=buyer to see the buyer side instead.
-  return v === 'buyer' ? 'buyer' : 'seller';
+  // Preview mode must be opt-in. Never let a normal browser visit bypass Clerk
+  // just because it is running in the development web bundle.
+  return v === 'buyer' || v === 'seller' ? v : null;
 })();
 
 // Seed storage so AuthGate doesn't loop waiting on onboarding data.
@@ -200,7 +204,7 @@ function AuthGate() {
     // Allow public access to specific buyer routes for guests
     const isGuestAllowedRoute =
       (inBuyerGroup && ['discover', 'search', 'cart'].includes(segments[1] as string)) ||
-      ['buyer-product-detail', 'buyer-checkout'].includes(segments[0] as string);
+      ['buyer-product-detail', 'buyer-checkout', 'seller-profile'].includes(segments[0] as string);
 
     // DEV bypass (all platforms): skip auth and go straight to dashboard.
     const devRole = PREVIEW_ROLE ?? DEV_BYPASS_ROLE;
@@ -348,6 +352,9 @@ function PushRegistrar() {
   const api = useApi();
   const registered = useRef(false);
   useEffect(() => {
+    // Browser push is not configured for this app. Keep registration out of the
+    // web path so a web session never requests native permissions or tokens.
+    if (Platform.OS === 'web') return;
     if (registered.current) return;
     registered.current = true;
     (async () => {

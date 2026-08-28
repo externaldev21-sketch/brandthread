@@ -17,6 +17,7 @@ export default function Index() {
 
   useEffect(() => {
     if (!__DEV__ || Platform.OS !== 'web') return;
+    if (previewRole !== 'buyer' && previewRole !== 'seller') return;
     if (!rootNavigationState?.key) return;
     const redirect = setTimeout(() => {
       router.replace((previewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/') as never);

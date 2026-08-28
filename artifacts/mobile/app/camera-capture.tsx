@@ -43,11 +43,27 @@ function formatTime(seconds: number): string {
 }
 
 function CameraCaptureWeb() {
-  useEffect(() => {
-    Alert.alert('Not supported', 'In-app recording is not available on web. Use the upload option instead.');
-    router.back();
-  }, []);
-  return null;
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  return (
+    <View style={[s.root, s.webFallback, { backgroundColor: colors.background, paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
+      <View style={s.webFallbackIcon}>
+        <Feather name="camera-off" size={34} color={colors.primary} />
+      </View>
+      <Text style={[s.webFallbackTitle, { color: colors.foreground }]}>Camera capture is mobile-only</Text>
+      <Text style={[s.webFallbackText, { color: colors.mutedForeground }]}>
+        Recording and shooting from inside Brandthread are available in the mobile app. On the web, choose photos or video from your device instead.
+      </Text>
+      <TouchableOpacity
+        style={[s.webFallbackButton, { backgroundColor: colors.primary }]}
+        onPress={() => router.back()}
+        accessibilityRole="button"
+        accessibilityLabel="Back to upload options"
+      >
+        <Text style={s.webFallbackButtonText}>Back to upload options</Text>
+      </TouchableOpacity>
+    </View>
+  );
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -287,6 +303,12 @@ export default function CameraCapture() {
 
 const s = StyleSheet.create({
   root: { flex: 1 },
+  webFallback: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
+  webFallbackIcon: { width: 76, height: 76, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(139,92,246,0.14)', marginBottom: 20 },
+  webFallbackTitle: { fontSize: 24, fontWeight: '700', textAlign: 'center', marginBottom: 10 },
+  webFallbackText: { maxWidth: 520, fontSize: 15, lineHeight: 22, textAlign: 'center', marginBottom: 24 },
+  webFallbackButton: { borderRadius: 14, paddingHorizontal: 20, paddingVertical: 14 },
+  webFallbackButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
 
   // ── Top bar
   topBar: {

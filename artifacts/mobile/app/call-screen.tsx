@@ -23,6 +23,7 @@ import {
   FG, MUTED, SUBTLE, CARD, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
+import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 
 // ─── Agora SDK — native only, gracefully absent on web / Expo Go ──────────────
 let AgoraModule: any = null;
@@ -66,6 +67,19 @@ const av = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function CallScreen() {
+  if (Platform.OS === 'web') {
+    return (
+      <NativeOnlyFeature
+        icon="phone-off"
+        title="Calls are available in the mobile app"
+        description="Voice and video calls use native device audio and video. Continue your conversation by message on web, or open Brandthread on iOS or Android to call."
+      />
+    );
+  }
+  return <NativeCallScreen />;
+}
+
+function NativeCallScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();

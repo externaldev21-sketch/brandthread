@@ -17,6 +17,11 @@ export default function BiometricUnlockScreen() {
 
   useEffect(() => {
     (async () => {
+      if (Platform.OS === 'web') {
+        setSupported(false);
+        setLoading(false);
+        return;
+      }
       try {
         // Check hardware support
         const hasHardware = await LocalAuthentication.hasHardwareAsync();
@@ -35,11 +40,8 @@ export default function BiometricUnlockScreen() {
           }
         }
 
-        // Restore saved preference
-        if (Platform.OS !== 'web') {
-          const saved = await SecureStore.getItemAsync(BIOMETRIC_KEY);
-          setFaceId(saved === 'true');
-        }
+        const saved = await SecureStore.getItemAsync(BIOMETRIC_KEY);
+        setFaceId(saved === 'true');
       } catch { /* device may not support */ }
       setLoading(false);
     })();

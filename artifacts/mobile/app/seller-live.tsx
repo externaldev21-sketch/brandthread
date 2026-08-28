@@ -14,6 +14,7 @@ import { useUser } from '@clerk/expo';
 import { BG, BORDER, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
+import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 
 const LIVE_RED = '#FF3B30';
 const { width: W, height: H } = Dimensions.get('window');
@@ -27,6 +28,19 @@ try {
 interface Comment { id: string; display_name: string; message: string; created_at: string; }
 
 export default function SellerLiveScreen() {
+  if (Platform.OS === 'web') {
+    return (
+      <NativeOnlyFeature
+        icon="video-off"
+        title="Broadcasting is mobile-only"
+        description="Start and manage a Brandthread live broadcast from the iOS or Android app, where camera, microphone, and live-stream controls are available."
+      />
+    );
+  }
+  return <SellerLiveNativeScreen />;
+}
+
+function SellerLiveNativeScreen() {
   const { theme } = useAppTheme();
   const { accent: PURPLE } = theme;
   const params = useLocalSearchParams<{

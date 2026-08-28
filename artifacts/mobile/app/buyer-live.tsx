@@ -22,6 +22,7 @@ import {
 } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
 import * as WebBrowser from 'expo-web-browser';
+import NativeOnlyFeature from '@/components/NativeOnlyFeature';
 
 const LIVE_RED = '#FF3B30';
 const { width: W, height: H } = Dimensions.get('window');
@@ -34,6 +35,19 @@ interface Comment { id: string; display_name: string; message: string; created_a
 interface ProductTag { productId: string; productName: string; priceCents: number; highlighted?: boolean; }
 
 export default function BuyerLiveScreen() {
+  if (Platform.OS === 'web') {
+    return (
+      <NativeOnlyFeature
+        icon="video-off"
+        title="Live video is available in the mobile app"
+        description="Brandthread live broadcasts use device video technology that is not enabled in the browser. Product pages and standard checkout remain available on web."
+      />
+    );
+  }
+  return <BuyerLiveNativeScreen />;
+}
+
+function BuyerLiveNativeScreen() {
   const colors = useColors();
   const { theme } = useAppTheme();
   const PURPLE = colors.primary;

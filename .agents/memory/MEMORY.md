@@ -61,3 +61,4 @@
 - [Returns and push preferences](returns-push-preferences.md) — return/refund submissions are server-authoritative; granular category switches gate push delivery, not the in-app feed.
 - [API failure contract](api-failure-contract.md) — every API failure uses one request-correlated envelope; 5xx responses stay generic while diagnostics remain in structured logs.
 - [Stripe Connect payout truth](stripe-connect-payout-truth.md) — seller bank and verification UI must come from live Connect account state, never finance balances or cached labels.
+- [Expo web production boundary](expo-web-production-boundary.md) — browser hosting uses an Expo Router static export, same-origin Clerk/API routing, and explicit mobile-only fallbacks.
