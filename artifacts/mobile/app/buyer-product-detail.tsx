@@ -268,6 +268,8 @@ export default function BuyerProductDetailScreen() {
   const [addingToCart, setAddingToCart] = useState(false);
   const [buyingNow, setBuyingNow] = useState(false);
   const [addedToCart, setAddedToCart] = useState(false);
+  const [sellerPaymentReady, setSellerPaymentReady] = useState<boolean | null>(null);
+  const [sellerPaymentReason, setSellerPaymentReason] = useState<string | null>(null);
   const [productReviews, setProductReviews] = useState<any[]>([]);
   const [avgRating, setAvgRating] = useState(0);
   const [reviewCount, setReviewCount] = useState(0);
@@ -280,9 +282,16 @@ export default function BuyerProductDetailScreen() {
   const [sizeChartOpen,   setSizeChartOpen]   = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
+
+    setLoading(true);
+    setSellerPaymentReady(null);
+    setSellerPaymentReason(null);
+
     (async () => {
       try {
         let prod: BuyerProduct | null = null;
+        let paymentStatus: { ready: boolean; reason?: string } | null = null;
 
         if (productId) {
           // Load the live product from the public API.
@@ -290,16 +299,34 @@ export default function BuyerProductDetailScreen() {
           // so the checkout server can look them up correctly.
           try {
             const row = await api.publicProducts.get(productId);
-            if (row && !row.error) prod = adaptApiProductToBuyerProduct(row);
+            if (row && !row.error) {
+              // Adapt the product and check payment readiness together as soon
+              // as the product supplies the seller ID. A payment-status failure
+              // is non-fatal: Buy Now performs its own safety check on tap.
+              [prod, paymentStatus] = await Promise.all([
+                Promise.resolve(adaptApiProductToBuyerProduct(row)),
+                row.ownerId
+                  ? api.buyer.sellerPaymentStatus(row.ownerId).catch(() => null)
+                  : Promise.resolve(null),
+              ]);
+            }
           } catch { /* API unavailable — product will show as not found */ }
         }
         // productName-only navigation is not supported; all entry points
         // must supply a productId so real variant data is loaded.
 
-        setProduct(prod);
+        if (!cancelled) {
+          setProduct(prod);
+          if (paymentStatus) {
+            setSellerPaymentReady(paymentStatus.ready);
+            setSellerPaymentReason(paymentStatus.reason ?? null);
+          }
+        }
       } catch {}
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     })();
+
+    return () => { cancelled = true; };
   }, [productId]);
 
   useEffect(() => {
@@ -369,6 +396,7 @@ export default function BuyerProductDetailScreen() {
   const allSelected = product.options.length > 0 && Object.keys(selections).length === product.options.length;
   const inStock = variant ? variant.isAvailable && variant.inventoryQuantity > 0 : true;
   const maxQty = variant ? Math.max(1, variant.inventoryQuantity) : 10;
+  const paymentUnavailable = sellerPaymentReady === false;
 
   function handleSelect(optionId: string, valueId: string) {
     setSelections(prev => {
@@ -524,6 +552,17 @@ export default function BuyerProductDetailScreen() {
             <Text style={s.sellerHandle}>{product.sellerHandle}</Text>
             <Feather name="chevron-right" size={14} color={MUTED} />
           </TouchableOpacity>
+           {paymentUnavailable && (
+             <View style={s.paymentWarningBanner} accessibilityRole="alert">
+               <Feather name="alert-triangle" size={ICON.xs} color={ORANGE} />
+               <View style={s.paymentWarningCopy}>
+                 <Text style={s.paymentWarningTitle}>Payments unavailable</Text>
+                 <Text style={s.paymentWarningText}>
+                   {sellerPaymentReason ?? "This seller can't accept payments right now."} You can still add this item to your cart.
+                 </Text>
+               </View>
+             </View>
+           )}
 
           {/* Price */}
           <View style={s.priceRow}>
@@ -729,21 +768,23 @@ export default function BuyerProductDetailScreen() {
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
-            style={[s.buyNowBtn, (!allSelected || !inStock) && s.btnDisabled]}
+            style={[s.buyNowBtn, (!allSelected || !inStock || paymentUnavailable) && s.btnDisabled]}
             onPress={handleBuyNow}
             activeOpacity={0.85}
-            disabled={buyingNow || !inStock || !allSelected}
+            disabled={buyingNow || !inStock || !allSelected || paymentUnavailable}
+            accessibilityLabel={paymentUnavailable ? 'Payments unavailable' : !allSelected ? 'Select options' : !inStock ? 'Out of stock' : 'Buy now'}
+            accessibilityState={{ disabled: buyingNow || !inStock || !allSelected || paymentUnavailable }}
           >
             <LinearGradient
-              colors={allSelected && inStock ? [...GRAD_PRIMARY] : [CARD_ELEVATED, CARD_ELEVATED]}
+              colors={allSelected && inStock && !paymentUnavailable ? [...GRAD_PRIMARY] : [CARD_ELEVATED, CARD_ELEVATED]}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={s.actionGrad}
             >
               {buyingNow ? (
                 <ActivityIndicator color={ON_DARK} size="small" />
               ) : (
-                <Text style={[s.actionBtnText, (!allSelected || !inStock) && { color: SUBTLE }]}>
-                  {!allSelected ? 'Select Options' : 'Buy Now'}
+                <Text style={[s.actionBtnText, (!allSelected || !inStock || paymentUnavailable) && { color: SUBTLE }]}>
+                  {paymentUnavailable ? 'Payments unavailable' : !allSelected ? 'Select Options' : !inStock ? 'Out of Stock' : 'Buy Now'}
                 </Text>
               )}
             </LinearGradient>
@@ -848,6 +889,21 @@ const s = StyleSheet.create({
   sellerInitial: { fontSize: FS.xs, fontFamily: FONT.bold, color: PURPLE_LIGHT },
   sellerName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   sellerHandle: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  paymentWarningBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SP.xs,
+    marginBottom: SP.md,
+    backgroundColor: ORANGE_DIM,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: ORANGE + '44',
+    paddingHorizontal: SP.sm,
+    paddingVertical: SP.sm,
+  },
+  paymentWarningCopy: { flex: 1, gap: 2 },
+  paymentWarningTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: ORANGE },
+  paymentWarningText: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, lineHeight: 17 },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
   price: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
   priceSale: { color: SUCCESS },
