@@ -30,6 +30,7 @@ import { isManagerRole, parseRoleError } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import { formatCents } from '@/lib/money';
 import { useTeamRole } from '@/hooks/useTeamRole';
+import { getGrowthStudioTools, GROWTH_EXTRAS } from '@/components/planFeatures';
 
 // ─── Static plan catalogue ────────────────────────────────────────────────────
 
@@ -115,6 +116,7 @@ export default function SubscriptionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api    = useApi();
+  const growthStudioTools = React.useMemo(() => getGrowthStudioTools(theme), [theme]);
 
   const [activeTab,   setActiveTab]   = useState<'plan' | 'usage' | 'billing'>('plan');
   const { currentRole, isLoadingRole } = useTeamRole();
@@ -133,6 +135,7 @@ export default function SubscriptionScreen() {
 
   // Derive the active plan id from loaded data
   const selectedPlan = currentPlan.name.toLowerCase();
+  const hasGrowthAccess = selectedPlan === 'growth' || selectedPlan === 'scale';
 
   const portalOpenedRef = useRef(false);
 
@@ -394,6 +397,75 @@ export default function SubscriptionScreen() {
               );
             })}
 
+            {/* ── Growth feature comparison ── */}
+            <View style={styles.growthComparison}>
+              <View style={styles.growthComparisonHeader}>
+                <View style={styles.growthComparisonIcon}>
+                  <Feather name="layers" size={18} color={PURPLE_LIGHT} />
+                </View>
+                <View style={styles.growthComparisonHeading}>
+                  <Text style={styles.growthComparisonTitle}>What’s included in your plan</Text>
+                  <Text style={styles.growthComparisonSubtitle}>
+                    Your Growth Studio toolkit at a glance
+                  </Text>
+                </View>
+              </View>
+
+              {growthStudioTools.map((tool) => (
+                <View key={tool.id} style={styles.growthFeatureRow}>
+                  <View style={[styles.growthToolIcon, { backgroundColor: tool.accentDim }]}>
+                    <Feather name={tool.icon} size={16} color={tool.accent} />
+                  </View>
+                  <View style={styles.growthFeatureLabels}>
+                    <Text style={styles.growthFeatureTitle}>{tool.title}</Text>
+                    <Text style={styles.growthFeatureDescription}>{tool.desc}</Text>
+                  </View>
+                  <View style={[
+                    styles.growthFeatureStatus,
+                    { backgroundColor: hasGrowthAccess ? `${SUCCESS}18` : `${SUBTLE}12` },
+                  ]}>
+                    <Feather
+                      name={hasGrowthAccess ? 'check' : 'lock'}
+                      size={11}
+                      color={hasGrowthAccess ? SUCCESS : SUBTLE}
+                    />
+                    <Text style={[
+                      styles.growthFeatureStatusText,
+                      { color: hasGrowthAccess ? SUCCESS : SUBTLE },
+                    ]}>
+                      {hasGrowthAccess ? 'Included' : 'Growth only'}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+
+              <View style={styles.growthComparisonDivider} />
+              <Text style={styles.growthExtrasLabel}>More Growth perks</Text>
+              {GROWTH_EXTRAS.map((perk) => (
+                <View key={perk.label} style={styles.growthPerkRow}>
+                  <View style={[
+                    styles.growthPerkIcon,
+                    { backgroundColor: hasGrowthAccess ? `${SUCCESS}18` : `${SUBTLE}12` },
+                  ]}>
+                    <Feather
+                      name={hasGrowthAccess ? 'check' : 'lock'}
+                      size={11}
+                      color={hasGrowthAccess ? SUCCESS : SUBTLE}
+                    />
+                  </View>
+                  <Text style={[
+                    styles.growthPerkText,
+                    !hasGrowthAccess && styles.growthPerkTextDim,
+                  ]}>
+                    {perk.label}
+                  </Text>
+                  {!hasGrowthAccess && (
+                    <Text style={styles.growthPerkStatus}>Growth only</Text>
+                  )}
+                </View>
+              ))}
+            </View>
+
              {!isReadOnly && (
                <TouchableOpacity style={styles.cancelBtn} onPress={handleOpenPortal}>
                  <Text style={styles.cancelText}>Manage or cancel subscription</Text>
@@ -503,6 +575,26 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
   planCard:           { backgroundColor: CARD, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: BORDER, marginBottom: SP.md },
   planCardHighlight:  { borderColor: SUCCESS, backgroundColor: CARD_ELEVATED },
   planCardFeatured:   { borderColor: PURPLE, backgroundColor: CARD_ELEVATED },
+   growthComparison:   { backgroundColor: CARD, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: BORDER, marginBottom: SP.md },
+   growthComparisonHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.lg },
+   growthComparisonIcon: { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
+   growthComparisonHeading: { flex: 1 },
+   growthComparisonTitle: { color: FG, fontSize: FS.md, fontFamily: FONT.semibold },
+   growthComparisonSubtitle: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
+   growthFeatureRow: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, marginBottom: SP.md },
+   growthToolIcon: { width: 36, height: 36, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+   growthFeatureLabels: { flex: 1, paddingTop: 1 },
+   growthFeatureTitle: { color: FG, fontSize: FS.sm, fontFamily: FONT.semibold },
+   growthFeatureDescription: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.regular, lineHeight: 16, marginTop: 2 },
+   growthFeatureStatus: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: RADIUS.pill, paddingHorizontal: 7, paddingVertical: 4, marginTop: 1 },
+   growthFeatureStatusText: { fontSize: 10, fontFamily: FONT.medium },
+   growthComparisonDivider: { height: 1, backgroundColor: BORDER, marginTop: SP.xs, marginBottom: SP.md },
+   growthExtrasLabel: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: SP.sm },
+   growthPerkRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
+   growthPerkIcon: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+   growthPerkText: { color: FG, fontSize: FS.sm, fontFamily: FONT.regular, flex: 1 },
+   growthPerkTextDim: { color: SUBTLE },
+   growthPerkStatus: { color: SUBTLE, fontSize: 10, fontFamily: FONT.medium },
   popularBadge:       { alignSelf: 'flex-start', backgroundColor: `${SUCCESS}22`, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2, marginBottom: SP.sm },
   popularText:        { color: SUCCESS, fontSize: 10, fontFamily: FONT.semibold, letterSpacing: 0.5 },
   planHeader:         { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SP.md },

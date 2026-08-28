@@ -18,8 +18,9 @@ import { Modal, View, Text, TouchableOpacity, StyleSheet, Pressable, ScrollView 
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, GOLD, FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { CARD, BORDER, FG, MUTED, SUBTLE, SUCCESS, FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { getGrowthStudioTools, GROWTH_EXTRAS } from '@/components/planFeatures';
 
 interface Props {
   visible: boolean;
@@ -28,93 +29,6 @@ interface Props {
   featureName: string;
   requiredPlan?: 'growth' | 'pro';
 }
-
-// ─── Growth-only Studio tools (mirrors GROWTH_REQUIRED_TOOLS in studio.tsx) ──
-
-interface GrowthTool {
-  id: string;
-  title: string;
-  desc: string;
-  icon: keyof typeof Feather.glyphMap;
-  accent: string;
-  accentDim: string;
-}
-
-const getGrowthStudioTools = (theme: ReturnType<typeof useAppTheme>['theme']): GrowthTool[] => [
-  {
-    id: 'design-studio',
-    title: 'Design Studio',
-    desc: 'Create product artwork, graphics and custom designs.',
-    icon: 'edit-3',
-    accent: theme.accent,
-    accentDim: theme.accentDim,
-  },
-  {
-    id: 'ai-photoshoot',
-    title: 'AI Photoshoot',
-    desc: 'Generate professional product photos with AI.',
-    icon: 'camera',
-    accent: BLUE,
-    accentDim: BLUE_DIM,
-  },
-  {
-    id: 'mockup-to-model',
-    title: 'Mockup to Model',
-    desc: 'Place your design on a realistic model.',
-    icon: 'user',
-    accent: ORANGE,
-    accentDim: ORANGE_DIM,
-  },
-  {
-    id: 'remove-bg',
-    title: 'Remove Background',
-    desc: 'Remove product backgrounds in one tap.',
-    icon: 'scissors',
-    accent: SUCCESS,
-    accentDim: SUCCESS_DIM,
-  },
-  {
-    id: 'bg-replace',
-    title: 'Background Replace',
-    desc: 'Swap or generate stunning new backgrounds.',
-    icon: 'image',
-    accent: theme.secondary,
-    accentDim: theme.secondaryDim,
-  },
-  {
-    id: 'ai-design',
-    title: 'AI Design',
-    desc: 'Describe your idea and watch unique designs appear.',
-    icon: 'zap',
-    accent: theme.accentLight,
-    accentDim: theme.accentDim,
-  },
-  {
-    id: 'brand-assets',
-    title: 'Brand Assets',
-    desc: 'Store and access logos, colors, fonts and saved assets.',
-    icon: 'layers',
-    accent: GOLD,
-    accentDim: '#3D2A0A',
-  },
-  {
-    id: 'campaign-gen',
-    title: 'Campaign Generator',
-    desc: 'Generate full marketing content and campaigns.',
-    icon: 'trending-up',
-    accent: '#F472B6',
-    accentDim: '#4A1230',
-  },
-];
-
-// Extra non-tool Growth perks shown beneath the tool list
-const GROWTH_EXTRAS = [
-  { icon: 'package' as const,   label: 'Unlimited products' },
-  { icon: 'globe' as const,     label: 'Custom storefront + domain' },
-  { icon: 'truck' as const,     label: 'Manufacturer Hub access' },
-  { icon: 'bar-chart-2' as const, label: 'Advanced sales analytics' },
-];
-
 const PRO_FEATURES = [
   'Everything in Growth',
   'Advanced analytics',
