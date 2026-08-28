@@ -376,6 +376,7 @@ export default function OrderDetailScreen() {
 
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [updatesPaused, setUpdatesPaused] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>((tab as Tab) || 'overview');
 
   // Cancel modal
@@ -400,27 +401,40 @@ export default function OrderDetailScreen() {
   const consecutiveFailuresRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const generationRef = useRef(0);
+  const requestGenerationRef = useRef<number | null>(null);
   const hasLoadedRef = useRef(false);
 
   const load = useCallback(async (generation: number) => {
+    // Keep one request in flight per focus cycle. Without this guard, a slow
+    // poll can overlap the next tick and an older success can clear the
+    // paused state after a later failure has already stopped the timer.
+    if (requestGenerationRef.current === generation) return;
+    requestGenerationRef.current = generation;
     if (!hasLoadedRef.current) setLoading(true);
     try {
       const raw = await api.orders.get(id);
       if (generationRef.current !== generation) return; // stale focus cycle
       setOrder(adaptApiOrder(raw));
+      setUpdatesPaused(false);
       consecutiveFailuresRef.current = 0;
     } catch {
       if (generationRef.current !== generation) return; // stale focus cycle
       if (!hasLoadedRef.current) setOrder(null);
       consecutiveFailuresRef.current += 1;
-      if (consecutiveFailuresRef.current >= 3 && timerRef.current !== null) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
+      if (consecutiveFailuresRef.current >= 3) {
+        setUpdatesPaused(true);
+        if (timerRef.current !== null) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
       }
     } finally {
       if (generationRef.current === generation) {
         setLoading(false);
         hasLoadedRef.current = true;
+      }
+      if (requestGenerationRef.current === generation) {
+        requestGenerationRef.current = null;
       }
     }
   }, [id, api]);
@@ -432,6 +446,7 @@ export default function OrderDetailScreen() {
     useCallback(() => {
       const generation = ++generationRef.current;
       consecutiveFailuresRef.current = 0;
+      setUpdatesPaused(false);
       load(generation);
       timerRef.current = setInterval(() => load(generation), 15_000);
       return () => {
@@ -442,6 +457,17 @@ export default function OrderDetailScreen() {
       };
     }, [load])
   );
+
+  const retryUpdates = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const generation = generationRef.current;
+    consecutiveFailuresRef.current = 0;
+    setUpdatesPaused(false);
+    if (timerRef.current === null) {
+      timerRef.current = setInterval(() => load(generation), 15_000);
+    }
+    load(generation);
+  }, [load]);
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
@@ -574,6 +600,21 @@ export default function OrderDetailScreen() {
   if (!order) {
     return (
       <View style={[s.root, { paddingTop: insets.top }]}>
+        {updatesPaused && (
+          <TouchableOpacity
+            style={s.pausedBanner}
+            onPress={retryUpdates}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Live updates paused. Tap to retry."
+            testID="order-detail-live-updates-retry"
+          >
+            <Feather name="wifi-off" size={ICON.sm} color={ORANGE} />
+            <Text style={s.pausedBannerText}>Live updates paused</Text>
+            <Text style={s.pausedBannerAction}>Tap to retry</Text>
+            <Feather name="refresh-cw" size={12} color={ORANGE} />
+          </TouchableOpacity>
+        )}
         <EmptyState
           icon="alert-circle"
           title="Order not found"
@@ -597,7 +638,7 @@ export default function OrderDetailScreen() {
           <Text style={s.headerTitle}>{order.orderNumber}</Text>
           <Text style={s.headerSub}>{order.customer.name}</Text>
         </View>
-        <IconButton name="refresh-cw" onPress={() => load(generationRef.current)} color={MUTED} />
+        <IconButton name="refresh-cw" onPress={retryUpdates} color={MUTED} />
       </View>
 
       {/* Tab bar */}
@@ -619,6 +660,22 @@ export default function OrderDetailScreen() {
       </ScrollView>
 
       {/* Cancellation confirmed banner */}
+      {updatesPaused && (
+        <TouchableOpacity
+          style={s.pausedBanner}
+          onPress={retryUpdates}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Live updates paused. Tap to retry."
+          testID="order-detail-live-updates-retry"
+        >
+          <Feather name="wifi-off" size={ICON.sm} color={ORANGE} />
+          <Text style={s.pausedBannerText}>Live updates paused</Text>
+          <Text style={s.pausedBannerAction}>Tap to retry</Text>
+          <Feather name="refresh-cw" size={12} color={ORANGE} />
+        </TouchableOpacity>
+      )}
+
       {cancelConfirmed && (
         <View style={s.cancelBanner}>
           <Feather name="check-circle" size={ICON.sm} color={FG} />
@@ -1609,6 +1666,9 @@ const s = StyleSheet.create({
   warningCard:        { borderColor: RED + '44' },
   warningRow:       { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start' },
   warningText:      { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: RED, lineHeight: 20 },
+  pausedBanner:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: ORANGE_DIM, borderBottomWidth: 1, borderBottomColor: ORANGE + '55', paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  pausedBannerText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.medium, color: FG },
+  pausedBannerAction: { fontSize: FS.xs, fontFamily: FONT.semibold, color: ORANGE },
   cancelBanner:     { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: '#1A3A2A', borderBottomWidth: 1, borderBottomColor: SUCCESS + '55', paddingHorizontal: SP.md, paddingVertical: SP.sm },
   cancelBannerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
 

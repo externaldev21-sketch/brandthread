@@ -442,6 +442,7 @@ export default function OrdersScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [updatesPaused, setUpdatesPaused] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchActive, setSearchActive] = useState(false);
   const [activeFilter, setActiveFilter] = useState<OrderFilterKey>('all');
@@ -456,9 +457,15 @@ export default function OrdersScreen() {
   const consecutiveFailuresRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const generationRef = useRef(0);
+  const requestGenerationRef = useRef<number | null>(null);
   const hasLoadedRef = useRef(false);
 
   const loadData = useCallback(async (generation: number) => {
+    // Keep one request in flight per focus cycle. Without this guard, a slow
+    // poll can overlap the next tick and an older success can clear the
+    // paused state after a later failure has already stopped the timer.
+    if (requestGenerationRef.current === generation) return;
+    requestGenerationRef.current = generation;
     try {
       const rows = await api.orders.list();
       if (generationRef.current !== generation) return; // stale focus cycle
@@ -469,6 +476,7 @@ export default function OrdersScreen() {
       setOrders(all);
       setStats(computeStats(all));
       setLoadError(null);
+      setUpdatesPaused(false);
       consecutiveFailuresRef.current = 0;
     } catch (e) {
       if (generationRef.current !== generation) return; // stale focus cycle
@@ -477,15 +485,21 @@ export default function OrdersScreen() {
       setStats(computeStats([]));
       setLoadError('Could not load orders. Check your connection and try again.');
       consecutiveFailuresRef.current += 1;
-      if (consecutiveFailuresRef.current >= 3 && timerRef.current !== null) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
+      if (consecutiveFailuresRef.current >= 3) {
+        setUpdatesPaused(true);
+        if (timerRef.current !== null) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
       }
     } finally {
       if (generationRef.current === generation) {
         setLoading(false);
         setRefreshing(false);
         hasLoadedRef.current = true;
+      }
+      if (requestGenerationRef.current === generation) {
+        requestGenerationRef.current = null;
       }
     }
   }, [api]);
@@ -503,6 +517,7 @@ export default function OrdersScreen() {
 
       const generation = ++generationRef.current;
       consecutiveFailuresRef.current = 0;
+      setUpdatesPaused(false);
       if (!hasLoadedRef.current) setLoading(true);
       loadData(generation);
       timerRef.current = setInterval(() => loadData(generation), 30_000);
@@ -515,10 +530,21 @@ export default function OrdersScreen() {
     }, [loadData])
   );
 
+  const retryUpdates = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const generation = generationRef.current;
+    consecutiveFailuresRef.current = 0;
+    setUpdatesPaused(false);
+    if (timerRef.current === null) {
+      timerRef.current = setInterval(() => loadData(generation), 30_000);
+    }
+    loadData(generation);
+  }, [loadData]);
+
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    loadData(generationRef.current);
-  }, [loadData]);
+    retryUpdates();
+  }, [retryUpdates]);
 
   // Filtered + sorted list
   const filtered = useMemo(() => {
@@ -821,8 +847,25 @@ export default function OrdersScreen() {
         </View>
       )}
 
+      {/* Live update backoff banner */}
+      {updatesPaused && !loading && (
+        <TouchableOpacity
+          style={s.pausedBanner}
+          onPress={retryUpdates}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Live updates paused. Tap to retry."
+          testID="orders-live-updates-retry"
+        >
+          <Feather name="wifi-off" size={ICON.sm} color={ORANGE} />
+          <Text style={s.pausedBannerText}>Live updates paused</Text>
+          <Text style={s.pausedBannerAction}>Tap to retry</Text>
+          <Feather name="refresh-cw" size={12} color={ORANGE} />
+        </TouchableOpacity>
+      )}
+
       {/* Error banner with retry */}
-      {loadError && !loading && (
+      {loadError && !loading && !updatesPaused && (
         <View style={s.errorBanner}>
           <Feather name="alert-circle" size={ICON.sm} color={RED} />
           <Text style={s.errorBannerText} numberOfLines={2}>{loadError}</Text>
@@ -1405,6 +1448,31 @@ const s = StyleSheet.create({
   },
 
   // Error banner
+  pausedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    marginHorizontal: SP.md,
+    marginTop: SP.sm,
+    marginBottom: SP.xs,
+    backgroundColor: ORANGE_DIM,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: ORANGE + '44',
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+  },
+  pausedBannerText: {
+    flex: 1,
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: FG,
+  },
+  pausedBannerAction: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: ORANGE,
+  },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
