@@ -13,3 +13,9 @@ description: Which color system is canonical in the mobile app, which older pale
 **Why:** the buyer side shipped with three palettes at once (purple tokens, Vault Archive cream/green leftovers, and a bespoke Discover palette), which read as two different apps. Stale theme memory describing an old rebrand as current made this worse.
 
 **How to apply:** base surfaces and typography come from `lib/theme.ts`; runtime accent/chrome values and multi-stop action gradients come from the shared app-theme provider. Static accent exports are chrome-only startup fallbacks, not screen styling APIs. After a rebrand, grep every route for stale fixed accent hexes, including onboarding and secondary screens. Preserve semantic status colors and intentional artwork/color-picker choices.
+
+**Accent contrast rule:** Text, icons, and loading indicators directly on runtime accent fills use the preset's `onAccent`. Labels on runtime gradients also use the shared inverse text-shadow helper.
+
+**Why:** Chrome and other metallic gradients cross dark and light stops inside one control, so a fixed white label—or even an unshadowed theme foreground—can lose contrast within the same button.
+
+**How to apply:** Use the runtime primary/hero gradients for branded actions, `onAccent` for every direct foreground, and the shared on-accent text style for gradient labels. Do not apply this rule to translucent accent-dim surfaces, semantic status colors, artwork, or arbitrary user-selected colors.

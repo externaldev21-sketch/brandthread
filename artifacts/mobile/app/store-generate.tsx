@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useColors } from '@/hooks/useColors';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet,
   KeyboardAvoidingView, Platform, Alert, Switch } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -196,7 +196,7 @@ export default function StoreGenerateScreen() {
             >
               {isPrimary ? (
                 <LinearGradient colors={[...theme.primaryGradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.chipGrad}>
-                  <Text style={st.chipTextActive}>{label}</Text>
+                  <Text style={[st.chipTextActive, getOnAccentTextStyle(theme)]}>{label}</Text>
                 </LinearGradient>
               ) : (
                 <View style={st.chip}>
@@ -263,7 +263,7 @@ export default function StoreGenerateScreen() {
             >
               {isSelected ? (
                 <LinearGradient colors={[...theme.primaryGradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.chipGrad}>
-                  <Text style={st.chipTextActive}>{label}</Text>
+                  <Text style={[st.chipTextActive, getOnAccentTextStyle(theme)]}>{label}</Text>
                 </LinearGradient>
               ) : (
                 <View style={st.chip}>
@@ -436,7 +436,7 @@ export default function StoreGenerateScreen() {
               {isSelected ? (
                 <LinearGradient colors={[...theme.primaryGradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={st.priorityCardGrad}>
                   <Feather name={icon as any} size={ICON.md} color={theme.onAccent} />
-                  <Text style={st.priorityCardTextActive}>{label}</Text>
+                  <Text style={[st.priorityCardTextActive, getOnAccentTextStyle(theme)]}>{label}</Text>
                 </LinearGradient>
               ) : (
                 <View style={st.priorityCard}>
@@ -554,7 +554,7 @@ export default function StoreGenerateScreen() {
             >
               {isSelected ? (
                 <LinearGradient colors={[...theme.primaryGradient]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={st.chipGrad}>
-                  <Text style={st.chipTextActive}>{label}</Text>
+                  <Text style={[st.chipTextActive, getOnAccentTextStyle(theme)]}>{label}</Text>
                 </LinearGradient>
               ) : (
                 <View style={st.chip}>
@@ -910,7 +910,7 @@ export default function StoreGenerateScreen() {
               end={{ x: 1, y: 0 }}
               style={st.navContinueGrad}
             >
-              <Text style={st.navContinueText}>Continue</Text>
+              <Text style={[st.navContinueText, continueEnabled && getOnAccentTextStyle(theme)]}>Continue</Text>
               <Feather name="arrow-right" size={ICON.sm} color={theme.onAccent} />
             </LinearGradient>
           </TouchableOpacity>
@@ -926,7 +926,7 @@ export default function StoreGenerateScreen() {
               end={{ x: 1, y: 0 }}
               style={st.navContinueGrad}
             >
-              <Text style={st.navContinueText}>Generate →</Text>
+              <Text style={[st.navContinueText, getOnAccentTextStyle(theme)]}>Generate →</Text>
             </LinearGradient>
           </TouchableOpacity>
         )}

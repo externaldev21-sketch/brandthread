@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, RED, ON_DARK, FONT, FS, SP, RADIUS, COMP, SUCCESS } from '@/lib/theme';
+import { BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, RED, FONT, FS, SP, RADIUS, COMP, SUCCESS } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 
@@ -211,14 +211,14 @@ export default function BuyerAddressesScreen() {
               {!isDefault && (
                 <TouchableOpacity style={styles.defaultToggle} onPress={() => setIsDefault(!isDefault)} activeOpacity={0.7}>
                   <View style={[styles.checkbox, isDefault && styles.checkboxActive]}>
-                    {isDefault && <Feather name="check" size={14} color={ON_DARK} />}
+                     {isDefault && <Feather name="check" size={14} color={theme.onAccent} />}
                   </View>
                   <Text style={styles.defaultToggleText}>Set as default address</Text>
                 </TouchableOpacity>
               )}
 
               <TouchableOpacity style={[styles.saveBtn, saving && { opacity: 0.7 }]} onPress={handleSave} disabled={saving} activeOpacity={0.8}>
-                {saving ? <ActivityIndicator color={ON_DARK} /> : <Text style={styles.saveBtnText}>Save Address</Text>}
+                {saving ? <ActivityIndicator color={theme.onAccent} /> : <Text style={styles.saveBtnText}>Save Address</Text>}
               </TouchableOpacity>
             </View>
           ) : (
@@ -315,5 +315,5 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleShee
   defaultToggleText: { color: FG, fontFamily: FONT.medium, fontSize: FS.base },
   
   saveBtn: { backgroundColor: theme.accent, height: COMP.buttonH, borderRadius: RADIUS.lg, alignItems: 'center', justifyContent: 'center', marginTop: SP.lg },
-  saveBtnText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.base },
+  saveBtnText: { color: theme.onAccent, fontFamily: FONT.bold, fontSize: FS.base },
 });

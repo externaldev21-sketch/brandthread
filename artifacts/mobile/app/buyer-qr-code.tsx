@@ -10,7 +10,7 @@ import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { getMyProfile } from '@/services/socialService';
 import type { BuyerSocialProfile } from '@/services/socialTypes';
 
@@ -58,7 +58,7 @@ export default function BuyerQRCode() {
         <View style={s.card}>
           {/* Gradient top strip */}
           <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.cardTop}>
-            <Text style={s.cardBrand}>Brandthread</Text>
+            <Text style={[s.cardBrand, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Brandthread</Text>
           </LinearGradient>
 
           {/* QR area */}
@@ -78,7 +78,7 @@ export default function BuyerQRCode() {
           {/* Handle */}
           <View style={s.handleRow}>
             <LinearGradient colors={GRAD_PRIMARY} style={s.handleBadge}>
-              <Text style={s.handleText}>{handle}</Text>
+              <Text style={[s.handleText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>{handle}</Text>
             </LinearGradient>
           </View>
 
@@ -89,8 +89,8 @@ export default function BuyerQRCode() {
         {/* Share button */}
         <TouchableOpacity onPress={handleShare} activeOpacity={0.85} style={s.shareBtnWrap}>
           <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.shareBtn}>
-            <Feather name="share-2" size={18} color={ON_DARK} />
-            <Text style={s.shareBtnText}>Share QR Code</Text>
+            <Feather name="share-2" size={18} color={theme.onAccent} />
+            <Text style={[s.shareBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Share QR Code</Text>
           </LinearGradient>
         </TouchableOpacity>
 
@@ -113,7 +113,7 @@ export default function BuyerQRCode() {
   );
 }
 
-const makeStyles = (theme: { accent: string }) => StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   page: { flex: 1, backgroundColor: BG },
   header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
@@ -136,7 +136,7 @@ const makeStyles = (theme: { accent: string }) => StyleSheet.create({
 
   shareBtnWrap: { marginTop: SP.lg, width: '100%', maxWidth: 320 },
   shareBtn: { height: 50, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: SP.sm },
-  shareBtnText: { fontFamily: FONT.bold, fontSize: FS.base, color: ON_DARK },
+  shareBtnText: { fontFamily: FONT.bold, fontSize: FS.base },
 
   infoCard: { width: '100%', maxWidth: 320, backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden', marginTop: SP.md },
   infoRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: 14, gap: SP.sm },

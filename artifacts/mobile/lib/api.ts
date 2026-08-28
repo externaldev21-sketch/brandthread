@@ -788,7 +788,10 @@ export function createApi(getToken: GetToken) {
           stripeAccountId: string | null;
           chargesEnabled: boolean;
           payoutsEnabled: boolean;
+          detailsSubmitted?: boolean;
           status: string;
+          verified: boolean;
+          bankLast4: string | null;
         }>('/api/seller/connect/status'),
       },
       /** Update the current user's public profile. username must be letters/numbers/underscores, 3-30 chars. */

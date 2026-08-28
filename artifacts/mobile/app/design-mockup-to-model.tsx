@@ -3,7 +3,7 @@
  * Route: /design-mockup-to-model
  */
 import React, { useState } from 'react';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert, Image, Dimensions,
@@ -212,8 +212,8 @@ export default function MockupToModelScreen() {
             {mockupUri && (
               <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={() => setStep(2)}>
                 <View style={s.nextInner}>
-                  <Text style={s.nextText}>Next: Choose model & scene</Text>
-                  <Feather name="arrow-right" size={ICON.md} color="#fff" />
+                  <Text style={[s.nextText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Next: Choose model & scene</Text>
+                  <Feather name="arrow-right" size={ICON.md} color={theme.onAccent} />
                 </View>
               </GradientCard>
             )}
@@ -257,8 +257,8 @@ export default function MockupToModelScreen() {
 
             <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={() => setStep(3)}>
               <View style={s.nextInner}>
-                <Text style={s.nextText}>Next: Lighting & format</Text>
-                <Feather name="arrow-right" size={ICON.md} color="#fff" />
+                <Text style={[s.nextText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Next: Lighting & format</Text>
+                <Feather name="arrow-right" size={ICON.md} color={theme.onAccent} />
               </View>
             </GradientCard>
           </>
@@ -312,8 +312,8 @@ export default function MockupToModelScreen() {
 
             <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={() => setStep(4)}>
               <View style={s.nextInner}>
-                <Text style={s.nextText}>Next: Review & generate</Text>
-                <Feather name="arrow-right" size={ICON.md} color="#fff" />
+                <Text style={[s.nextText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Next: Review & generate</Text>
+                <Feather name="arrow-right" size={ICON.md} color={theme.onAccent} />
               </View>
             </GradientCard>
           </>
@@ -342,8 +342,8 @@ export default function MockupToModelScreen() {
 
             <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={handleGenerate}>
               <View style={s.nextInner}>
-                <Feather name="zap" size={ICON.md} color="#fff" />
-                <Text style={s.nextText}>Generate {count} photo{count !== 1 ? 's' : ''}</Text>
+                <Feather name="zap" size={ICON.md} color={theme.onAccent} />
+                <Text style={[s.nextText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Generate {count} photo{count !== 1 ? 's' : ''}</Text>
               </View>
             </GradientCard>
           </>

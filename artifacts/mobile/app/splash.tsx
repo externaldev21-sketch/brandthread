@@ -24,14 +24,14 @@ export default function SplashScreen() {
   const glowOpacity = useRef(new Animated.Value(0)).current;
   const ringScale   = useRef(new Animated.Value(0.6)).current;
   const ringOpacity = useRef(new Animated.Value(0)).current;
-  const advancing   = useRef(false);
+  const continuing  = useRef(false);
 
   const continueForward = () => {
-    if (advancing.current) return;
-    advancing.current = true;
+    if (continuing.current) return;
+    continuing.current = true;
     AsyncStorage.setItem('splash_seen', 'true')
       .catch(() => {})
-      .finally(() => router.replace('/account-type' as never));
+      .finally(() => router.replace('/onboarding' as never));
   };
 
   useEffect(() => {
@@ -51,9 +51,6 @@ export default function SplashScreen() {
       ]).start();
     });
 
-    const timer = setTimeout(continueForward, 2600);
-
-    return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -81,7 +78,7 @@ export default function SplashScreen() {
         <Text style={styles.tagline}>Build it. Wear it. Scale it.</Text>
       </Animated.View>
 
-      {/* Optional early exit; the automatic advance keeps this moment frictionless. */}
+      {/* The only way forward is an explicit tap. */}
       <Animated.View style={[styles.ctaWrap, { bottom: insets.bottom + 28, opacity: ctaOpacity }]}>
         <TouchableOpacity
           style={styles.cta}

@@ -255,7 +255,7 @@ export default function ProductDetailScreen() {
         activeOpacity={0.85}
       >
         <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.fabGrad}>
-          <Feather name="edit-2" size={ICON.md} color="#fff" />
+          <Feather name="edit-2" size={ICON.md} color={theme.onAccent} />
         </LinearGradient>
       </TouchableOpacity>
       <AIBrainFAB context={{ screen: 'product_detail' as const, productId: String(id ?? ''), productName: String(product.name ?? '') }} bottomOffset={0} />

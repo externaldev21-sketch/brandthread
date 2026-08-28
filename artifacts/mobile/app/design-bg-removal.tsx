@@ -11,7 +11,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, ActivityIndicator, Image, Modal, FlatList,
@@ -593,8 +593,8 @@ export default function DesignBgRemovalScreen() {
                 <>
                   <TouchableOpacity style={s.primaryBtn} onPress={handleRemove} activeOpacity={0.85}>
                     <LinearGradient colors={theme.primaryGradient} style={s.primaryBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                      <Feather name="scissors" size={ICON.sm} color="#FFF" />
-                      <Text style={s.primaryBtnText}>Remove Background</Text>
+                      <Feather name="scissors" size={ICON.sm} color={theme.onAccent} />
+                      <Text style={[s.primaryBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Remove Background</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                   <TouchableOpacity style={s.ghostBtn} onPress={pickFromLibrary} activeOpacity={0.7}>
@@ -619,8 +619,8 @@ export default function DesignBgRemovalScreen() {
                   {error.retryable && (
                     <TouchableOpacity style={s.primaryBtn} onPress={handleRetry} activeOpacity={0.85}>
                       <LinearGradient colors={theme.primaryGradient} style={s.primaryBtnGrad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-                        <Feather name="refresh-cw" size={ICON.sm} color="#FFF" />
-                        <Text style={s.primaryBtnText}>Try Again</Text>
+                        <Feather name="refresh-cw" size={ICON.sm} color={theme.onAccent} />
+                        <Text style={[s.primaryBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Try Again</Text>
                       </LinearGradient>
                     </TouchableOpacity>
                   )}

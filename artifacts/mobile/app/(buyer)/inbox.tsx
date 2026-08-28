@@ -231,7 +231,7 @@ export default function InboxScreen() {
                 disabled={isLoadingAction}
                 activeOpacity={0.8}
               >
-                <Text style={s.requestAcceptText}>Accept</Text>
+                <Text style={[s.requestAcceptText, { color: theme.onAccent }]}>Accept</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[s.requestDeclineBtn, isLoadingAction && s.requestBtnDisabled]}
@@ -291,7 +291,7 @@ export default function InboxScreen() {
         {/* Trailing */}
         {isUnread ? (
           <View style={[s.unreadBadge, { backgroundColor: theme.accent }]}>
-            <Text style={s.unreadBadgeText}>{conv.unreadCount > 99 ? '99+' : conv.unreadCount}</Text>
+            <Text style={[s.unreadBadgeText, { color: theme.onAccent }]}>{conv.unreadCount > 99 ? '99+' : conv.unreadCount}</Text>
           </View>
         ) : (
           <Feather name="camera" size={ICON.sm} color={MUTED} />
@@ -330,7 +330,7 @@ export default function InboxScreen() {
             <Feather name="bell" size={ICON.lg} color={FG} />
             {unreadNotifCount > 0 && (
               <View style={[s.notifBadge, { backgroundColor: theme.accent }]}>
-                <Text style={s.notifBadgeText}>
+                <Text style={[s.notifBadgeText, { color: theme.onAccent }]}>
                   {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
                 </Text>
               </View>
@@ -363,7 +363,7 @@ export default function InboxScreen() {
           <View style={[s.storyCircle, { backgroundColor: MY_COLOR }]}>
             <Text style={s.storyInitials}>{MY_INITIALS}</Text>
             <View style={[s.storyAddBadge, { backgroundColor: theme.accent }]}>
-              <Feather name="plus" size={10} color={FG} />
+              <Feather name="plus" size={10} color={theme.onAccent} />
             </View>
           </View>
           <Text style={s.storyLabel} numberOfLines={1}>Your story</Text>

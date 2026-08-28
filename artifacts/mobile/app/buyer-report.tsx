@@ -12,7 +12,7 @@ import {
   SUCCESS, SUCCESS_DIM,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { submitReport } from '@/services/socialService';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { ReportReason, ReportTargetType, REPORT_REASON_LABELS } from '@/services/socialTypes';
@@ -37,7 +37,6 @@ export default function BuyerReport() {
   const { theme } = useAppTheme();
   const PURPLE = theme.accent;
   const PURPLE_DIM = theme.accentDim;
-  const GRAD_PRIMARY = theme.primaryGradient;
   const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -114,12 +113,12 @@ export default function BuyerReport() {
           </Text>
           <TouchableOpacity onPress={() => router.back()} activeOpacity={0.85} style={styles.doneWrap}>
             <LinearGradient
-              colors={GRAD_PRIMARY}
+               colors={theme.primaryGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.doneBtn}
             >
-              <Text style={styles.doneBtnText}>Done</Text>
+               <Text style={[styles.doneBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Done</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -223,12 +222,12 @@ export default function BuyerReport() {
           activeOpacity={0.85}
         >
           <LinearGradient
-            colors={GRAD_PRIMARY}
+             colors={theme.primaryGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.submitBtn}
           >
-            <Text style={styles.submitBtnText}>
+             <Text style={[styles.submitBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
               {isSubmitting ? 'Submitting...' : 'Submit Report'}
             </Text>
           </LinearGradient>

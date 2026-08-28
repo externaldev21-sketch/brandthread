@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 import { BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, ON_DARK, FONT, FS, SP, RADIUS, COMP, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, StatusBadge, FilterChip, SectionHeader } from '@/components/BrandthreadUI';
 import { getProduct } from '@/services/productService';
 import { Product, ProductVariant, OptionValue } from '@/services/productTypes';
@@ -577,8 +577,8 @@ export default function ProductStoreScreen() {
             end={{ x: 1, y: 0 }}
             style={s.stickyBtnGrad}
           >
-            <Feather name="shopping-bag" size={ICON.sm} color={ON_DARK} />
-            <Text style={s.stickyBtnText}>Add to cart</Text>
+            <Feather name="shopping-bag" size={ICON.sm} color={theme.onAccent} />
+            <Text style={[s.stickyBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Add to cart</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -1039,7 +1039,6 @@ const s = StyleSheet.create({
   stickyBtnText: {
     fontSize: FS.base,
     fontFamily: FONT.bold,
-    color: ON_DARK,
     letterSpacing: 0.2,
   },
 });

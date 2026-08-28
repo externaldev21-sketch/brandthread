@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useColors } from '@/hooks/useColors';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Alert, Modal, Switch, RefreshControl, ActionSheetIOS, Platform,
@@ -898,15 +898,16 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
 }
 
 function QuotesFAB({ router }: { router: ReturnType<typeof useRouter> }) {
+  const { theme } = useAppTheme();
   return (
     <TouchableOpacity
       style={fab.root}
       onPress={() => router.push('/quote-request' as never)}
       activeOpacity={0.85}
     >
-      <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={fab.grad}>
-        <Feather name="plus" size={ICON.md} color={ON_DARK} />
-        <Text style={fab.label}>Request quote</Text>
+      <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={fab.grad}>
+        <Feather name="plus" size={ICON.md} color={theme.onAccent} />
+        <Text style={[fab.label, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Request quote</Text>
       </LinearGradient>
     </TouchableOpacity>
   );

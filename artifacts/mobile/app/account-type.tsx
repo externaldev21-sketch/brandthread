@@ -1,15 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, StatusBar } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ONBOARDING_KEY } from './_layout';
-import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-
-type AccountType = 'buyer' | 'seller';
+import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
 
 const BG     = '#07070F';
 const getCards = (theme: AppThemePreset): {
@@ -49,29 +45,28 @@ const getCards = (theme: AppThemePreset): {
   },
 ];
 
-export default function AccountTypeScreen() {
+export type AccountType = 'buyer' | 'seller';
+
+export function AccountTypeStep({
+  selected,
+  onSelect,
+  onContinue,
+  saving = false,
+  embedded = false,
+}: {
+  selected: AccountType | null;
+  onSelect: (type: AccountType) => void;
+  onContinue: () => void;
+  saving?: boolean;
+  embedded?: boolean;
+}) {
   const { theme } = useAppTheme();
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   const cards = React.useMemo(() => getCards(theme), [theme]);
-  const router  = useRouter();
   const insets  = useSafeAreaInsets();
 
-  const [selected, setSelected] = useState<AccountType | null>(null);
-  const [saving, setSaving]     = useState(false);
-
-  const handleContinue = async () => {
-    if (!selected || saving) return;
-    setSaving(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    await AsyncStorage.multiSet([
-      ['user_role', selected],
-      [ONBOARDING_KEY, 'false'],
-    ]);
-    router.replace('/onboarding' as never);
-  };
-
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[styles.root, { paddingTop: embedded ? 0 : insets.top }]}>
       <StatusBar barStyle="light-content" />
 
       {/* Ambient glow */}
@@ -81,9 +76,9 @@ export default function AccountTypeScreen() {
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerText}>
-          <Text style={styles.headline}>How will you use{'\n'}Brandthread?</Text>
+           <Text style={styles.headline}>Are you a buyer{'\n'}or a seller?</Text>
           <Text style={styles.subtext}>
-            You can explore both sides later. We'll personalize your first experience now.
+             Choose your path so we can personalize your first experience.
           </Text>
         </View>
       </View>
@@ -100,7 +95,7 @@ export default function AccountTypeScreen() {
               key={c.type}
               activeOpacity={0.85}
               onPress={() => {
-                setSelected(c.type);
+                onSelect(c.type);
                 Haptics.selectionAsync();
               }}
             >
@@ -125,7 +120,7 @@ export default function AccountTypeScreen() {
                 {/* Check badge */}
                 {isSelected && (
                   <View style={[styles.checkBadge, { backgroundColor: c.accent }]}>
-                    <Feather name="check" size={13} color="#FFF" />
+                    <Feather name="check" size={13} color={theme.onAccent} />
                   </View>
                 )}
 
@@ -172,7 +167,7 @@ export default function AccountTypeScreen() {
       >
         <TouchableOpacity
           activeOpacity={0.88}
-          onPress={handleContinue}
+          onPress={onContinue}
           disabled={!selected || saving}
         >
           {selected ? (
@@ -182,7 +177,7 @@ export default function AccountTypeScreen() {
               end={{ x: 1, y: 0 }}
               style={styles.continueBtn}
             >
-              <Text style={styles.continueBtnText}>
+              <Text style={[styles.continueBtnText, getOnAccentTextStyle(theme)]}>
                 {saving ? 'Loading…' : 'Continue'}
               </Text>
             </LinearGradient>
@@ -197,6 +192,15 @@ export default function AccountTypeScreen() {
       </LinearGradient>
     </View>
   );
+}
+
+export default function AccountTypeScreen() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/onboarding' as never);
+  }, [router]);
+
+  return <View style={{ flex: 1, backgroundColor: BG }} />;
 }
 
 const createStyles = (theme: AppThemePreset) => StyleSheet.create({

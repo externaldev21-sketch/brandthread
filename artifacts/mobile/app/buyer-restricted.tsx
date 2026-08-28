@@ -140,7 +140,7 @@ export default function RestrictedAccountsScreen() {
   );
 }
 
-const makeStyles = (theme: { accent: string }) => StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   page: { flex: 1, backgroundColor: BG },
   header: {
     height: 58, flexDirection: 'row', alignItems: 'center',
@@ -184,5 +184,5 @@ const makeStyles = (theme: { accent: string }) => StyleSheet.create({
   cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
   cancelText: { fontFamily: FONT.medium, fontSize: FS.base, color: MUTED },
   confirmBtn: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, backgroundColor: theme.accent, alignItems: 'center' },
-  confirmText: { fontFamily: FONT.bold, fontSize: FS.base, color: ON_DARK },
+  confirmText: { fontFamily: FONT.bold, fontSize: FS.base, color: theme.onAccent },
 });

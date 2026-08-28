@@ -122,7 +122,15 @@ export default function StripeConnectWarning({
     }
   };
 
-  if (connectStatus === null || (connectStatus.connected && connectStatus.payoutsEnabled)) return null;
+  if (
+    connectStatus === null
+    || (
+      connectStatus.connected
+      && connectStatus.chargesEnabled
+      && connectStatus.payoutsEnabled
+      && connectStatus.status === 'active'
+    )
+  ) return null;
 
   return (
     <TouchableOpacity

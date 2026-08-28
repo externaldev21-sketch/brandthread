@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, GRAD_DARK_FADE, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState, StatCard, SearchBar, BrandedLoader } from '@/components/BrandthreadUI';
 import { filterOrders, sortOrders } from '@/services/orderService';
 import { Order, OrderFilterKey, OrderSortKey, OrderAddress, OrderCustomer, FulfillmentStatus, FulfillmentType, OrderStatus, PaymentStatus } from '@/services/orderTypes';
@@ -331,8 +331,8 @@ function OrderCard({
             activeOpacity={0.8}
           >
             <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.actionBtnGrad}>
-              <Feather name="check-circle" size={12} color="#fff" />
-              <Text style={s.actionBtnText}>Accept</Text>
+              <Feather name="check-circle" size={12} color={theme.onAccent} />
+              <Text style={[s.actionBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Accept</Text>
             </LinearGradient>
           </TouchableOpacity>
         )}

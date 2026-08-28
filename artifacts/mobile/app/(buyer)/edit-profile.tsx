@@ -18,7 +18,7 @@ import {
   RED, ORANGE, SUCCESS,
   FONT, FS, SP, RADIUS, OVERLAY,
 } from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 
 const GENDER_OPTIONS = ['Woman', 'Man', 'Non-binary', 'Prefer not to say', 'Custom'] as const;
 
@@ -273,7 +273,7 @@ export default function BuyerEditProfileScreen() {
                 <Image source={{ uri: avatarUri }} style={styles.avatar} />
               ) : (
                 <LinearGradient colors={[...theme.primaryGradient]} style={styles.avatar}>
-                  <Text style={styles.avatarText}>
+                  <Text style={[styles.avatarText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
                     {fields.name ? fields.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2) : '😎'}
                   </Text>
                 </LinearGradient>

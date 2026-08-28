@@ -3,7 +3,7 @@
  * Route: /design-upload-sketch
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert, Image, Animated, Dimensions,
@@ -261,8 +261,8 @@ export default function UploadSketchScreen() {
 
           <GradientCard colors={theme.primaryGradient} style={[s.generateCard, { shadowColor: theme.shadowColor }]} onPress={handleGenerate}>
             <View style={s.generateInner}>
-              <Feather name="zap" size={ICON.md} color="#fff" />
-              <Text style={s.generateText}>Generate cleaned design</Text>
+              <Feather name="zap" size={ICON.md} color={theme.onAccent} />
+              <Text style={[s.generateText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Generate cleaned design</Text>
             </View>
           </GradientCard>
         </ScrollView>
@@ -319,8 +319,8 @@ export default function UploadSketchScreen() {
 
             <GradientCard colors={theme.primaryGradient} style={[s.generateCard, { shadowColor: theme.shadowColor }]} onPress={startProcessing}>
               <View style={s.generateInner}>
-                <Feather name="arrow-right" size={ICON.md} color="#fff" />
-                <Text style={s.generateText}>Next: Process sketch</Text>
+                <Feather name="arrow-right" size={ICON.md} color={theme.onAccent} />
+                <Text style={[s.generateText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Next: Process sketch</Text>
               </View>
             </GradientCard>
           </>

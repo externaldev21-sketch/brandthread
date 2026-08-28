@@ -17,6 +17,7 @@ import {
   FONT, FS, SP, RADIUS, GRAD_PRIMARY,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { loadBuyerSettings, patchBuyerSettings, type BuyerSettingsState } from '@/lib/buyerSettings';
 
 const TOPS = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL+'];
@@ -51,6 +52,7 @@ function SizeSelector({
   onSelect: (v: string) => void;
 }) {
   const colors = useColors();
+  const { theme } = useAppTheme();
   const s = createStyles(colors);
   return (
     <View style={s.sizeBlock}>
@@ -72,6 +74,7 @@ function SizeSelector({
 
 export default function ShoppingPreferences() {
   const colors = useColors();
+  const { theme } = useAppTheme();
   const s = createStyles(colors);
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -244,8 +247,8 @@ export default function ShoppingPreferences() {
       {/* Save button */}
       <View style={[s.saveBar, { paddingBottom: insets.bottom + SP.md }]}>
         <TouchableOpacity onPress={save} activeOpacity={0.85} style={{ flex: 1 }}>
-          <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.saveBtn}>
-            <Text style={s.saveBtnText}>Save Preferences</Text>
+          <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.saveBtn}>
+            <Text style={[s.saveBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Save Preferences</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>

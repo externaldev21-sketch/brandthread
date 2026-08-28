@@ -3,7 +3,7 @@
  * Route: /design-prompt-edit
  */
 import React, { useState } from 'react';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Switch, Alert, ActivityIndicator, Image,
@@ -179,8 +179,8 @@ export default function DesignPromptEditScreen() {
         <View style={s.ph}>
           <GradientCard colors={theme.primaryGradient} onPress={handleGenerate} glow style={[s.generateBtn, { shadowColor: theme.shadowColor }]}>
             <View style={s.generateInner}>
-              <Feather name="zap" size={ICON.md} color="#FFF" />
-              <Text style={s.generateText}>Generate edit</Text>
+              <Feather name="zap" size={ICON.md} color={theme.onAccent} />
+              <Text style={[s.generateText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Generate edit</Text>
             </View>
           </GradientCard>
         </View>

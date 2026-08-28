@@ -17,7 +17,7 @@ import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -117,7 +117,7 @@ export default function SignInScreen() {
         // Session was created by Clerk automatically — AuthGate picks it up
       } else if (ssoSignUp) {
         // Brand-new user with no account yet — send them through onboarding
-        router.replace('/account-type' as never);
+        router.replace('/onboarding' as never);
       }
       // If user cancelled (result with no session) we fall through silently
     } catch (e: any) {
@@ -168,7 +168,7 @@ export default function SignInScreen() {
           <View style={s.sessionCard}>
             <View style={s.sessionAvatarRow}>
               <LinearGradient colors={[theme.accent, theme.secondary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.sessionAvatar}>
-                <Text style={s.sessionAvatarText}>
+                <Text style={[s.sessionAvatarText, getOnAccentTextStyle(theme)]}>
                   {(currentEmail[0] ?? 'B').toUpperCase()}
                 </Text>
               </LinearGradient>
@@ -188,7 +188,7 @@ export default function SignInScreen() {
             activeOpacity={0.88}
           >
             <LinearGradient colors={[theme.accent, theme.secondary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.primaryBtn}>
-              <Text style={s.primaryBtnText}>Continue with this account</Text>
+              <Text style={[s.primaryBtnText, getOnAccentTextStyle(theme)]}>Continue with this account</Text>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -349,15 +349,15 @@ export default function SignInScreen() {
               style={s.primaryBtn}
             >
               {isFetching
-                ? <ActivityIndicator color={FG} size="small" />
-                : <Text style={s.primaryBtnText}>Sign in</Text>}
+                ? <ActivityIndicator color={theme.onAccent} size="small" />
+                : <Text style={[s.primaryBtnText, getOnAccentTextStyle(theme)]}>Sign in</Text>}
             </LinearGradient>
           </TouchableOpacity>
 
           {/* ── Create account ─────────────────────────────────────────────────── */}
           <TouchableOpacity
             style={s.secondaryBtn}
-            onPress={() => { Haptics.selectionAsync(); router.replace('/account-type' as never); }}
+            onPress={() => { Haptics.selectionAsync(); router.replace('/onboarding' as never); }}
             activeOpacity={0.85}
           >
             <Text style={s.secondaryBtnText}>Create an account</Text>

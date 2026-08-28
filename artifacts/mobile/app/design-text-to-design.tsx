@@ -3,7 +3,7 @@
  * Route: /design-text-to-design
  */
 import React, { useState } from 'react';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert, Image, Dimensions,
@@ -354,8 +354,8 @@ export default function TextToDesignScreen() {
         {/* Generate button */}
         <GradientCard colors={theme.primaryGradient} style={[s.generateCard, { shadowColor: theme.shadowColor }]} onPress={handleGenerate}>
           <View style={s.generateInner}>
-            <Feather name="zap" size={ICON.md} color="#fff" />
-            <Text style={s.generateText}>Generate {count} design{count !== 1 ? 's' : ''}</Text>
+          <Feather name="zap" size={ICON.md} color={theme.onAccent} />
+          <Text style={[s.generateText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Generate {count} design{count !== 1 ? 's' : ''}</Text>
           </View>
         </GradientCard>
       </ScrollView>

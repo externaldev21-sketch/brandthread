@@ -9,7 +9,7 @@ import {
   BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM,
   ON_DARK, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { requestDataExport, getDataExportStatus } from '@/lib/accountService';
 
 type DataCategory = { key: string; label: string; sub: string; icon: keyof typeof Feather.glyphMap; selected: boolean };
@@ -26,7 +26,6 @@ const DEFAULT_CATEGORIES: DataCategory[] = [
 export default function BuyerDownloadData() {
   const { theme } = useAppTheme();
   const PURPLE = theme.accent;
-  const GRAD_PRIMARY = theme.primaryGradient;
   const s = makeStyles();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -134,9 +133,9 @@ export default function BuyerDownloadData() {
             activeOpacity={selectedCount > 0 ? 0.85 : 1}
             style={{ opacity: selectedCount > 0 ? 1 : 0.4 }}
           >
-            <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.requestBtn}>
-              <Feather name="download" size={18} color={ON_DARK} />
-              <Text style={s.requestBtnText}>Request Export</Text>
+            <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.requestBtn}>
+              <Feather name="download" size={18} color={theme.onAccent} />
+              <Text style={[s.requestBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Request Export</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>

@@ -13,7 +13,7 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { createRefundRequest } from '@/services/cartService';
 import { getBuyerOrder } from '@/services/orderService';
 import { BuyerOrderView } from '@/services/orderTypes';
@@ -41,7 +41,6 @@ export default function BuyerRefundRequestScreen() {
   const { theme } = useAppTheme();
   const PURPLE = colors.primary, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = colors.accent;
   const BORDER_ACTIVE = `${theme.accent}73`;
-  const GRAD_PRIMARY = theme.primaryGradient;
   const s = makeStyles(theme);
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const router = useRouter();
@@ -114,8 +113,8 @@ export default function BuyerRefundRequestScreen() {
         <Text style={s.successSub}>Your request is under review. Refunds are not automatic — the seller or payment provider must confirm.</Text>
         <Text style={s.successNote}>Refund updates will appear here.</Text>
         <TouchableOpacity style={s.doneBtn} onPress={() => router.back()} activeOpacity={0.85}>
-          <LinearGradient colors={[...GRAD_PRIMARY]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.doneBtnGrad}>
-            <Text style={s.doneBtnText}>Back to Order</Text>
+          <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.doneBtnGrad}>
+            <Text style={[s.doneBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Back to Order</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -223,8 +222,8 @@ export default function BuyerRefundRequestScreen() {
 
       <View style={[s.bottomBar, { paddingBottom: insets.bottom + SP.sm }]}>
         <TouchableOpacity style={s.submitBtn} onPress={handleSubmit} activeOpacity={0.88} disabled={submitting}>
-          <LinearGradient colors={[...GRAD_PRIMARY]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.submitGrad}>
-            {submitting ? <ActivityIndicator color={ON_DARK} size="small" /> : <Text style={s.submitText}>Submit Refund Request</Text>}
+          <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.submitGrad}>
+            {submitting ? <ActivityIndicator color={theme.onAccent} size="small" /> : <Text style={[s.submitText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Submit Refund Request</Text>}
           </LinearGradient>
         </TouchableOpacity>
       </View>

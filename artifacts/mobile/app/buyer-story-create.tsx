@@ -18,7 +18,7 @@ import { createStory, MY_USER_ID, MY_COLOR, MY_INITIALS, MY_HANDLE } from '@/ser
 import { useApi } from '@/lib/api';
 import type { StoryMedia, StoryPrivacySettings } from '@/services/socialTypes';
 import { useColors } from '@/hooks/useColors';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 
 const { width: W } = Dimensions.get('window');
 const CANVAS_H = Math.min(W * 1.4, 400);
@@ -38,7 +38,6 @@ export default function BuyerStoryCreate() {
   const { theme } = useAppTheme();
   const PURPLE = colors.primary, PURPLE_DIM = colors.accent, CYAN = theme.secondary;
   const BORDER_ACTIVE = `${theme.accent}73`;
-  const GRAD_PRIMARY = theme.primaryGradient;
   const TEXT_COLORS = ['#FFFFFF', '#000000', PURPLE, CYAN, '#F59E0B', '#10B981'];
   const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();
@@ -189,12 +188,12 @@ export default function BuyerStoryCreate() {
           style={{ opacity: isShareDisabled ? 0.4 : 1 }}
         >
           <LinearGradient
-            colors={GRAD_PRIMARY as unknown as [string, string]}
+            colors={theme.primaryGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.shareBtn}
           >
-            <Text style={styles.shareBtnText}>{isPosting ? 'Posting…' : 'Share'}</Text>
+            <Text style={[styles.shareBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>{isPosting ? 'Posting…' : 'Share'}</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>

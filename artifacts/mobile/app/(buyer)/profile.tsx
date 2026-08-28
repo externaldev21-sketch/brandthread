@@ -16,7 +16,7 @@ import {
   FONT, FS, SP, RADIUS, COMP, ICON, OVERLAY,
   RED, RED_DIM,
 } from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
   getMyProfile, getMyPosts, getMyReposts, getSavedItems,
   getPrivacySettings, archivePost, deletePost,
@@ -182,7 +182,7 @@ export default function ProfileScreen() {
   const handleSignOut = async () => {
     setMenuOpen(false);
     try { await signOut(); } catch {}
-    router.replace('/welcome' as never);
+    router.replace('/sign-in' as never);
   };
 
   // ── Post sheet ──
@@ -300,7 +300,7 @@ export default function ProfileScreen() {
                   <Image source={{ uri: avatarUri }} style={[styles.avatar, { resizeMode: 'cover', margin: 3 }]} />
                 ) : (
                   <LinearGradient colors={[...theme.primaryGradient]} style={[styles.avatar, { margin: 3 }]}>
-                    <Text style={styles.avatarText}>{avatarInitials}</Text>
+                    <Text style={[styles.avatarText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>{avatarInitials}</Text>
                   </LinearGradient>
                 )}
               </LinearGradient>
@@ -308,7 +308,7 @@ export default function ProfileScreen() {
               <Image source={{ uri: avatarUri }} style={[styles.avatar, { resizeMode: 'cover' }]} />
             ) : (
               <LinearGradient colors={[...theme.primaryGradient]} style={styles.avatar}>
-                <Text style={styles.avatarText}>{avatarInitials}</Text>
+                <Text style={[styles.avatarText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>{avatarInitials}</Text>
               </LinearGradient>
             )}
             <View style={styles.avatarBadge}>

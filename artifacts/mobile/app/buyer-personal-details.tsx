@@ -7,10 +7,9 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  ON_DARK,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields } from '@/lib/buyerProfile';
 import { updateMyProfile, getMyProfile } from '@/services/socialService';
 
@@ -43,7 +42,6 @@ function Divider() {
 export default function BuyerPersonalDetails() {
   const { theme } = useAppTheme();
   const PURPLE = theme.accent;
-  const GRAD_PRIMARY = theme.primaryGradient;
   const s = makeStyles();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -148,8 +146,8 @@ export default function BuyerPersonalDetails() {
       {hasChanges && (
         <View style={[s.saveBar, { paddingBottom: insets.bottom + SP.md }]}>
           <TouchableOpacity onPress={handleSave} activeOpacity={0.85} style={{ flex: 1 }}>
-            <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.saveBtn}>
-              <Text style={s.saveBtnText}>Save Changes</Text>
+            <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.saveBtn}>
+              <Text style={[s.saveBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Save Changes</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -173,5 +171,5 @@ const makeStyles = () => StyleSheet.create({
   noteText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, lineHeight: 17 },
   saveBar: { paddingHorizontal: SP.md, paddingTop: SP.sm, backgroundColor: BG, borderTopWidth: 1, borderTopColor: BORDER },
   saveBtn: { height: 50, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
-  saveBtnText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.base },
+  saveBtnText: { fontFamily: FONT.bold, fontSize: FS.base },
 });

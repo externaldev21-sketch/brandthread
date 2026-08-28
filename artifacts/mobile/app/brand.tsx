@@ -235,7 +235,7 @@ export default function BrandScreen() {
                     />
                     {isSelected && (
                       <View style={[styles.logoCheckBadge, { backgroundColor: colors.primary }]}>
-                        <Feather name="check" size={10} color="#FFF" />
+                        <Feather name="check" size={10} color={colors.primaryForeground} />
                       </View>
                     )}
                   </TouchableOpacity>

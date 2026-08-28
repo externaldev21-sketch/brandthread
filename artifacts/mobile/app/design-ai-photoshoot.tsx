@@ -3,7 +3,7 @@
  * Route: /design-ai-photoshoot
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert, Dimensions, Image,
@@ -398,8 +398,8 @@ export default function AIPhotoshootScreen() {
             <View style={s.stepBtns}>
               <GradientCard colors={theme.primaryGradient} style={{ flex: 1, shadowColor: theme.shadowColor }} onPress={goNext}>
                 <View style={s.nextInner}>
-                  <Text style={s.nextText}>Next</Text>
-                  <Feather name="arrow-right" size={ICON.sm} color="#fff" />
+                  <Text style={[s.nextText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Next</Text>
+                  <Feather name="arrow-right" size={ICON.sm} color={theme.onAccent} />
                 </View>
               </GradientCard>
             </View>
@@ -429,8 +429,8 @@ export default function AIPhotoshootScreen() {
             </View>
             <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={goNext}>
               <View style={s.nextInner}>
-                <Text style={s.nextText}>Next: Scene</Text>
-                <Feather name="arrow-right" size={ICON.md} color="#fff" />
+                <Text style={[s.nextText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Next: Scene</Text>
+                <Feather name="arrow-right" size={ICON.md} color={theme.onAccent} />
               </View>
             </GradientCard>
           </>
@@ -464,8 +464,8 @@ export default function AIPhotoshootScreen() {
             </ScrollView>
             <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={goNext}>
               <View style={s.nextInner}>
-                <Text style={s.nextText}>Next: Lighting</Text>
-                <Feather name="arrow-right" size={ICON.md} color="#fff" />
+                <Text style={[s.nextText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Next: Lighting</Text>
+                <Feather name="arrow-right" size={ICON.md} color={theme.onAccent} />
               </View>
             </GradientCard>
           </>
@@ -491,8 +491,8 @@ export default function AIPhotoshootScreen() {
             </View>
             <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={goNext}>
               <View style={s.nextInner}>
-                <Text style={s.nextText}>Next: Output format</Text>
-                <Feather name="arrow-right" size={ICON.md} color="#fff" />
+                <Text style={[s.nextText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Next: Output format</Text>
+                <Feather name="arrow-right" size={ICON.md} color={theme.onAccent} />
               </View>
             </GradientCard>
           </>
@@ -550,8 +550,8 @@ export default function AIPhotoshootScreen() {
 
             <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={goNext}>
               <View style={s.nextInner}>
-                <Text style={s.nextText}>Next: Review</Text>
-                <Feather name="arrow-right" size={ICON.md} color="#fff" />
+                <Text style={[s.nextText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Next: Review</Text>
+                <Feather name="arrow-right" size={ICON.md} color={theme.onAccent} />
               </View>
             </GradientCard>
           </>
@@ -583,8 +583,8 @@ export default function AIPhotoshootScreen() {
 
             <GradientCard colors={theme.primaryGradient} style={[s.nextCard, { shadowColor: theme.shadowColor }]} onPress={handleGenerate}>
               <View style={s.nextInner}>
-                <Feather name="camera" size={ICON.md} color="#fff" />
-                <Text style={s.nextText}>Generate photoshoot</Text>
+                <Feather name="camera" size={ICON.md} color={theme.onAccent} />
+                <Text style={[s.nextText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Generate photoshoot</Text>
               </View>
             </GradientCard>
           </>

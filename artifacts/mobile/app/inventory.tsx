@@ -20,6 +20,7 @@ import {
   GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader,
@@ -180,6 +181,7 @@ function eventTypeLabel(type: string): string {
 
 export default function InventoryScreen() {
   const colors = useColors();
+  const { theme } = useAppTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -279,9 +281,9 @@ export default function InventoryScreen() {
           }}
           activeOpacity={0.8}
         >
-          <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.addBtnGrad}>
-            <Feather name="plus" size={ICON.sm} color="#fff" />
-            <Text style={s.addBtnText}>Add</Text>
+          <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.addBtnGrad}>
+            <Feather name="plus" size={ICON.sm} color={theme.onAccent} />
+            <Text style={[s.addBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Add</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>

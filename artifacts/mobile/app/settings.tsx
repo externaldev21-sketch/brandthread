@@ -100,7 +100,7 @@ export default function SettingsScreen() {
           text: 'Sign out', style: 'destructive',
           onPress: async () => {
             await signOut();
-            router.replace('/welcome' as never);
+            router.replace('/sign-in' as never);
           },
         },
       ]);

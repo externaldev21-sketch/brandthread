@@ -1,8 +1,8 @@
 /**
  * Brandthread Onboarding — complete buyer + seller flows
  *
- * BUYER  steps: 0=Auth 1=Name 2=Style 3=Loading 4=Notifications 5=Success
- * SELLER steps: 0=Auth 1=Name 2=BrandName 3=Stage 4=Goals 5=Loading 6=Notifications 7=Success
+ * BUYER  steps: 0=Auth 1=AccountType 2=Name 3=Style 4=Loading 5=Notifications 6=Success
+ * SELLER steps: 0=Auth 1=AccountType 2=Name 3=BrandName 4=Stage 5=Goals 6=Loading 7=Notifications 8=Success
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -23,8 +23,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useAuth, useSSO, useSignIn, useSignUp, useUser } from '@clerk/expo';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useAuth, useSSO, useSignUp, useUser } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -32,11 +32,12 @@ import { Feather, Ionicons } from '@expo/vector-icons';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { ONBOARDING_KEY, ONBOARDING_OWNER_KEY } from './_layout';
+import { AccountTypeStep, type AccountType } from './account-type';
 
 // Required on Android so the in-app browser tab closes after OAuth redirect
 WebBrowser.maybeCompleteAuthSession();
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { hydrateMyProfileFromAccount, socialKeysForUser } from '@/services/socialService';
 import { DEFAULT_BUYER_PROFILE, saveBuyerProfileForUser } from '@/lib/buyerProfile';
@@ -80,26 +81,28 @@ const SELLER_LOADING_STEPS = ['Mapping your brand workspace', 'Preparing your pr
 
 const LEGACY_DRAFT_KEY = 'onboarding_draft';
 const DRAFT_KEY_PREFIX = 'onboarding_draft:';
-const DRAFT_VERSION = 3;
+const DRAFT_VERSION = 4;
 
 const BUYER_STEP_INDEX = {
   AUTH: 0,
-  NAME: 1,
-  STYLE: 2,
-  LOADING: 3,
-  NOTIFICATIONS: 4,
-  SUCCESS: 5,
+  ACCOUNT_TYPE: 1,
+  NAME: 2,
+  STYLE: 3,
+  LOADING: 4,
+  NOTIFICATIONS: 5,
+  SUCCESS: 6,
 } as const;
 
 const SELLER_STEP_INDEX = {
   AUTH: 0,
-  NAME: 1,
-  BRAND_NAME: 2,
-  BRAND_STAGE: 3,
-  GOALS: 4,
-  LOADING: 5,
-  NOTIFICATIONS: 6,
-  SUCCESS: 7,
+  ACCOUNT_TYPE: 1,
+  NAME: 2,
+  BRAND_NAME: 3,
+  BRAND_STAGE: 4,
+  GOALS: 5,
+  LOADING: 6,
+  NOTIFICATIONS: 7,
+  SUCCESS: 8,
 } as const;
 
 function draftKeyForUser(userId?: string | null): string | null {
@@ -113,6 +116,13 @@ type Flow = 'buyer' | 'seller';
 // screen. Version 1 seller drafts also had a removed product-model step.
 function restoreDraftStep(flow: Flow, step: number, version?: number): number {
   if (version === DRAFT_VERSION) return step;
+
+  if (version === 3) {
+    const previousStep = flow === 'buyer'
+      ? [BUYER_STEP_INDEX.AUTH, BUYER_STEP_INDEX.NAME, BUYER_STEP_INDEX.STYLE, BUYER_STEP_INDEX.LOADING, BUYER_STEP_INDEX.NOTIFICATIONS, BUYER_STEP_INDEX.SUCCESS]
+      : [SELLER_STEP_INDEX.AUTH, SELLER_STEP_INDEX.NAME, SELLER_STEP_INDEX.BRAND_NAME, SELLER_STEP_INDEX.BRAND_STAGE, SELLER_STEP_INDEX.GOALS, SELLER_STEP_INDEX.LOADING, SELLER_STEP_INDEX.NOTIFICATIONS, SELLER_STEP_INDEX.SUCCESS];
+    return previousStep[step] ?? (flow === 'buyer' ? BUYER_STEP_INDEX.AUTH : SELLER_STEP_INDEX.AUTH);
+  }
 
   if (flow === 'buyer') {
     // Previous buyer order: Name, Style, Auth, Loading, Notifications, Success.
@@ -281,15 +291,16 @@ const sr = StyleSheet.create({
 
 function PrimaryButton({ label, onPress, disabled, loading }: { label: string; onPress: () => void; disabled?: boolean; loading?: boolean }) {
   const { theme } = useAppTheme();
+  const onAccentTextStyle = getOnAccentTextStyle(theme);
   return (
     <TouchableOpacity activeOpacity={0.88} onPress={onPress} disabled={disabled || loading}>
-      {disabled || loading ? (
+      {disabled ? (
         <View style={[spb.btn, spb.btnDisabled]}>
-          {loading ? <ActivityIndicator color={theme.accentLight} size="small" /> : <Text style={[spb.text, spb.textDisabled]}>{label}</Text>}
+          {loading ? <ActivityIndicator color={MUTED} size="small" /> : <Text style={[spb.text, spb.textDisabled]}>{label}</Text>}
         </View>
       ) : (
         <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={spb.btn}>
-          <Text style={spb.text}>{label}</Text>
+          {loading ? <ActivityIndicator color={theme.onAccent} size="small" /> : <Text style={[spb.text, onAccentTextStyle]}>{label}</Text>}
         </LinearGradient>
       )}
     </TouchableOpacity>
@@ -444,7 +455,7 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
         {/* Bell icon */}
         <View style={sn.bellWrap}>
           <LinearGradient colors={theme.heroGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[sn.bellBg, { shadowColor: theme.shadowColor }]}>
-            <Feather name="bell" size={32} color={FG} />
+            <Feather name="bell" size={32} color={theme.onAccent} />
           </LinearGradient>
         </View>
 
@@ -477,7 +488,7 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
           }}
         >
           <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sn.enableBtn}>
-            <Text style={sn.enableBtnText}>Enable notifications</Text>
+            <Text style={[sn.enableBtnText, getOnAccentTextStyle(theme)]}>Enable notifications</Text>
           </LinearGradient>
         </TouchableOpacity>
 
@@ -539,7 +550,7 @@ function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { fl
         {/* Checkmark circle */}
         <View>
           <LinearGradient colors={theme.heroGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[ss.checkCircle, { shadowColor: theme.shadowColor }]}>
-            <Feather name="check" size={36} color={FG} />
+            <Feather name="check" size={36} color={theme.onAccent} />
           </LinearGradient>
         </View>
 
@@ -592,11 +603,7 @@ const ss = StyleSheet.create({
 type AuthPhase = 'form' | 'verify' | 'existing-account';
 
 interface AuthStepProps {
-  flow: Flow;
-  firstName: string;
-  brandName: string;
   signUp: ReturnType<typeof useSignUp>['signUp'];
-  signIn: ReturnType<typeof useSignIn>['signIn'];
   startGoogleOAuth: () => Promise<any>;
   startAppleOAuth: () => Promise<any>;
   onAuthComplete: () => void;
@@ -606,7 +613,7 @@ interface AuthStepProps {
   onUsernameChange: (v: string) => void;
 }
 
-function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGoogleOAuth, startAppleOAuth, onAuthComplete, onDevClear, username, onUsernameChange }: AuthStepProps) {
+function AuthStep({ signUp, startGoogleOAuth, startAppleOAuth, onAuthComplete, onDevClear, username, onUsernameChange }: AuthStepProps) {
   const { theme } = useAppTheme();
   const router = useRouter();
   const { isSignedIn, signOut } = useAuth();
@@ -659,12 +666,9 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
     setLoading(true);
     setError('');
     try {
-      const nameParts = (firstName || brandName || '').trim().split(/\s+/);
       const { error: err } = await signUp.password({
         emailAddress: email.trim().toLowerCase(),
         password,
-        firstName: nameParts[0] || undefined,
-        lastName:  nameParts.slice(1).join(' ') || undefined,
       });
 
       if (err) {
@@ -704,7 +708,7 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
       if (signUp.status === 'complete') {
         await signUp.finalize({
           navigate: ({ decorateUrl }: { decorateUrl: (url: string) => string }) => {
-            const url = decorateUrl('/onboarding');
+            const url = decorateUrl('/onboarding?postAuth=1');
             if (url.startsWith('http') && typeof window !== 'undefined') {
               window.location.href = url;
             } else {
@@ -760,8 +764,8 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
           >
             <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sa.sessionBtnGrad}>
               {clearingSession
-                ? <ActivityIndicator color={theme.accentLight} size="small" />
-                : <Text style={sa.sessionBtnText}>Sign out and create another account</Text>}
+                ? <ActivityIndicator color={theme.onAccent} size="small" />
+                : <Text style={[sa.sessionBtnText, getOnAccentTextStyle(theme)]}>Sign out and create another account</Text>}
             </LinearGradient>
           </TouchableOpacity>
 
@@ -806,7 +810,7 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
               end={{ x: 1, y: 0 }}
               style={sa.existingSignInGrad}
             >
-              <Text style={sa.existingSignInText}>Sign in</Text>
+              <Text style={[sa.existingSignInText, getOnAccentTextStyle(theme)]}>Sign in</Text>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -867,7 +871,7 @@ function AuthStep({ flow, firstName, brandName, signUp, signIn: _signIn, startGo
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
       <ScrollView contentContainerStyle={sa.scroll} keyboardShouldPersistTaps="handled">
         <Text style={sa.headline}>Create your account</Text>
-        <Text style={sa.sub}>One account for everything you build.</Text>
+         <Text style={sa.sub}>One account for everything on Brandthread.</Text>
 
         {/* Username — collected here so both OAuth and email-password paths get a handle */}
         <View style={sa.inputWrap}>
@@ -1051,16 +1055,17 @@ export default function OnboardingScreen() {
   const { isSignedIn, signOut, isLoaded: authLoaded } = useAuth();
   const { user, isLoaded: userLoaded }                = useUser();
   const { signUp }              = useSignUp();
-  const { signIn }              = useSignIn();
   const { startSSOFlow } = useSSO();
   const startGoogleOAuth = useCallback(() => startSSOFlow({ strategy: 'oauth_google', redirectUrl: AuthSession.makeRedirectUri({ scheme: 'brandthread' }) }), [startSSOFlow]);
   const startAppleOAuth  = useCallback(() => startSSOFlow({ strategy: 'oauth_apple',  redirectUrl: AuthSession.makeRedirectUri({ scheme: 'brandthread' }) }), [startSSOFlow]);
   const api = useApi();
 
   const router  = useRouter();
+  const { postAuth } = useLocalSearchParams<{ postAuth?: string }>();
   const insets  = useSafeAreaInsets();
 
   const [flow, setFlow]           = useState<Flow | null>(null);
+  const [selectedFlow, setSelectedFlow] = useState<AccountType | null>(null);
   const [step, setStep]           = useState(0);
   const [ready, setReady]         = useState(false);
 
@@ -1082,16 +1087,10 @@ export default function OnboardingScreen() {
   const restoredDraft = useRef(false);
 
   // Clerk may take longer than local storage to initialize in a web preview.
-  // Never leave a new visitor behind an indefinite spinner: the role is the
-  // only device-level hint retained here and contains no profile data.
+  // Never let that delay preselect a role before an account exists.
   useEffect(() => {
     const fallback = setTimeout(() => {
-      AsyncStorage.getItem('user_role')
-        .then((role) => {
-          if (role === 'buyer' || role === 'seller') setFlow(role);
-        })
-        .catch(() => {})
-        .finally(() => setReady(true));
+      setReady(true);
     }, 1200);
     return () => clearTimeout(fallback);
   }, []);
@@ -1115,18 +1114,16 @@ export default function OnboardingScreen() {
         // persisted after Clerk identifies the user under their own key.
         await AsyncStorage.removeItem(LEGACY_DRAFT_KEY);
         const values = draftKey
-          ? await AsyncStorage.multiGet([draftKey, 'user_role'])
-          : await AsyncStorage.multiGet(['user_role', '__no_account_draft__']);
-        const roleVal = values.find(([key]) => key === 'user_role')?.[1];
+          ? await AsyncStorage.multiGet([draftKey])
+          : [];
         const draftVal = draftKey ? values.find(([key]) => key === draftKey)?.[1] : null;
-        const role = !signedInUserId ? roleVal as Flow | null : null;
-        let restored = false;
 
         if (draftVal) {
           try {
             const draft = JSON.parse(draftVal);
             if (draft.flow && draft.ownerId === signedInUserId) {
               setFlow(draft.flow);
+              setSelectedFlow(draft.flow);
               setStep(restoreDraftStep(draft.flow, draft.step ?? 0, draft.version));
               setFirstName(draft.firstName ?? '');
               setUsername(draft.username ?? '');
@@ -1134,14 +1131,8 @@ export default function OnboardingScreen() {
               setBrandName(draft.brandName ?? '');
               setBrandStage(draft.brandStage ?? '');
               setGoals(draft.goals ?? []);
-              restored = true;
             }
           } catch { /* bad json, ignore */ }
-        }
-
-        if (!restored && role) {
-          setFlow(role);
-          setStep(0);
         }
       } catch {
         // Local persistence is optional; a storage issue must not block signup.
@@ -1172,19 +1163,30 @@ export default function OnboardingScreen() {
     saveDraft().catch(() => {});
   }, [user?.id, ready, flow, saveDraft]);
 
-  // ── Auth completion handler (OAuth without remount) ─────────────────────────
+  // ── Auth completion handler (OAuth/native without remount) ──────────────────
   const handleAuthComplete = useCallback(() => {
-    if (!flow) return;
-    setStep(flow === 'buyer' ? BUYER_STEP_INDEX.NAME : SELLER_STEP_INDEX.NAME);
+    setStep(flow
+      ? flow === 'buyer' ? BUYER_STEP_INDEX.NAME : SELLER_STEP_INDEX.NAME
+      : BUYER_STEP_INDEX.ACCOUNT_TYPE);
   }, [flow]);
+
+  // Email verification can reload the web route while Clerk finalizes. The
+  // route marker guarantees account type is still the immediate next screen.
+  useEffect(() => {
+    if (ready && isSignedIn && postAuth === '1' && !flow) {
+      setStep(BUYER_STEP_INDEX.ACCOUNT_TYPE);
+    }
+  }, [flow, isSignedIn, postAuth, ready]);
 
   // ── Watch for OAuth isSignedIn change ────────────────────────────────────────
   const prevSignedIn = useRef<boolean | null>(null);
   useEffect(() => {
-    if (!ready || !flow) return;
+    if (!ready) return;
     if (prevSignedIn.current === null) { prevSignedIn.current = isSignedIn ?? false; return; }
     if (!prevSignedIn.current && isSignedIn) {
-      setStep(flow === 'buyer' ? BUYER_STEP_INDEX.NAME : SELLER_STEP_INDEX.NAME);
+      setStep(flow
+        ? flow === 'buyer' ? BUYER_STEP_INDEX.NAME : SELLER_STEP_INDEX.NAME
+        : BUYER_STEP_INDEX.ACCOUNT_TYPE);
     }
     prevSignedIn.current = isSignedIn ?? false;
   }, [isSignedIn, ready, flow]);
@@ -1209,6 +1211,21 @@ export default function OnboardingScreen() {
     if (step === 0) { router.back(); return; }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     animateTo(step - 1, -1);
+  }
+
+  async function continueFromAccountType() {
+    if (!selectedFlow) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const next = selectedFlow === 'buyer'
+      ? BUYER_STEP_INDEX.NAME
+      : SELLER_STEP_INDEX.NAME;
+    await AsyncStorage.multiSet([
+      ['user_role', selectedFlow],
+      [ONBOARDING_KEY, 'false'],
+    ]);
+    setFlow(selectedFlow);
+    await saveDraft({ flow: selectedFlow, step: next });
+    animateTo(next, 1);
   }
 
   // ── Finish handlers ─────────────────────────────────────────────────────────
@@ -1322,14 +1339,14 @@ export default function OnboardingScreen() {
 
   // ── Validation ──────────────────────────────────────────────────────────────
   function canContinue(): boolean {
+    if (step === BUYER_STEP_INDEX.AUTH) return true;
+    if (step === BUYER_STEP_INDEX.ACCOUNT_TYPE) return !!selectedFlow;
     if (!flow) return false;
     if (flow === 'buyer') {
-      if (step === BUYER_STEP_INDEX.AUTH) return true; // AuthStep owns its form validation.
       if (step === BUYER_STEP_INDEX.NAME) return firstName.trim().length >= 2;
       if (step === BUYER_STEP_INDEX.STYLE) return true;
     }
     if (flow === 'seller') {
-      if (step === SELLER_STEP_INDEX.AUTH) return true; // AuthStep owns its form validation.
       if (step === SELLER_STEP_INDEX.NAME) return firstName.trim().length >= 2;
       if (step === SELLER_STEP_INDEX.BRAND_NAME) return brandName.trim().length >= 1;
       if (step === SELLER_STEP_INDEX.BRAND_STAGE) return !!brandStage;
@@ -1340,19 +1357,21 @@ export default function OnboardingScreen() {
 
   // ── Progress bar ────────────────────────────────────────────────────────────
   function showsProgressBar(): boolean {
-    return !!flow;
+    return true;
   }
 
   function progressFraction(): number {
-    if (!flow) return 0;
-    if (flow === 'buyer') return Math.min(1, (step + 1) / 6);
-    if (flow === 'seller') return Math.min(1, (step + 1) / 8);
-    return 0;
+    const progressFlow = flow ?? selectedFlow;
+    const total = progressFlow === 'buyer' ? 7 : 9;
+    return Math.min(1, (step + 1) / total);
   }
 
   function progressLabel(): string {
-    if (!flow) return '';
-    const total = flow === 'buyer' ? 6 : 8;
+    const progressFlow = flow ?? selectedFlow;
+    if (!progressFlow) {
+      return step === BUYER_STEP_INDEX.AUTH ? 'Step 1' : 'Step 2';
+    }
+    const total = progressFlow === 'buyer' ? 7 : 9;
     if (step >= total - 1) return 'Complete';
     if (step === total - 2) return 'Almost done';
     return `Step ${step + 1} of ${total}`;
@@ -1360,28 +1379,32 @@ export default function OnboardingScreen() {
 
   // ── Step rendering ──────────────────────────────────────────────────────────
   function renderStep() {
+    if (step === BUYER_STEP_INDEX.AUTH) return (
+      <AuthStep
+        signUp={signUp}
+        startGoogleOAuth={startGoogleOAuth}
+        startAppleOAuth={startAppleOAuth}
+        onAuthComplete={handleAuthComplete}
+        onDevClear={devReset}
+        username={username}
+        onUsernameChange={setUsername}
+      />
+    );
+
+    if (step === BUYER_STEP_INDEX.ACCOUNT_TYPE && !flow) return (
+      <AccountTypeStep
+        selected={selectedFlow}
+        onSelect={setSelectedFlow}
+        onContinue={() => { void continueFromAccountType(); }}
+        embedded
+      />
+    );
+
     if (!flow) return null;
 
     /* ─── BUYER STEPS ─── */
     if (flow === 'buyer') {
-      // Step 0: Auth
-      if (step === BUYER_STEP_INDEX.AUTH) return (
-        <AuthStep
-          flow={flow}
-          firstName={firstName}
-          brandName=""
-          signUp={signUp}
-          signIn={signIn}
-          startGoogleOAuth={startGoogleOAuth}
-          startAppleOAuth={startAppleOAuth}
-          onAuthComplete={handleAuthComplete}
-          onDevClear={devReset}
-          username={username}
-          onUsernameChange={setUsername}
-        />
-      );
-
-      // Step 1: Name
+      // Step 2: Name
       if (step === BUYER_STEP_INDEX.NAME) return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={sm.scroll} keyboardShouldPersistTaps="handled">
@@ -1404,7 +1427,7 @@ export default function OnboardingScreen() {
         </KeyboardAvoidingView>
       );
 
-      // Step 2: Style interests
+      // Step 3: Style interests
       if (step === BUYER_STEP_INDEX.STYLE) return (
         <ScrollView contentContainerStyle={sm.scroll} showsVerticalScrollIndicator={false}>
           <Text style={sm.stepHeadline}>What do you{'\n'}want to see?</Text>
@@ -1422,12 +1445,12 @@ export default function OnboardingScreen() {
         </ScrollView>
       );
 
-      // Step 3: Loading
+      // Step 4: Loading
       if (step === BUYER_STEP_INDEX.LOADING) return (
         <LoadingAnimation steps={BUYER_LOADING_STEPS} onDone={() => { setStep(BUYER_STEP_INDEX.NOTIFICATIONS); }} />
       );
 
-      // Step 4: Notifications
+      // Step 5: Notifications
       if (step === BUYER_STEP_INDEX.NOTIFICATIONS) return (
         <NotificationsStep
           flow="buyer"
@@ -1436,7 +1459,7 @@ export default function OnboardingScreen() {
         />
       );
 
-      // Step 5: Success
+      // Step 6: Success
       if (step === BUYER_STEP_INDEX.SUCCESS) return (
         <SuccessScreen flow="buyer" firstName={firstName} brandName="" onFinish={finishBuyer} finishing={finishing} />
       );
@@ -1444,24 +1467,7 @@ export default function OnboardingScreen() {
 
     /* ─── SELLER STEPS ─── */
     if (flow === 'seller') {
-      // Step 0: Auth
-      if (step === SELLER_STEP_INDEX.AUTH) return (
-        <AuthStep
-          flow={flow}
-          firstName={firstName}
-          brandName={brandName}
-          signUp={signUp}
-          signIn={signIn}
-          startGoogleOAuth={startGoogleOAuth}
-          startAppleOAuth={startAppleOAuth}
-          onAuthComplete={handleAuthComplete}
-          onDevClear={devReset}
-          username={username}
-          onUsernameChange={setUsername}
-        />
-      );
-
-      // Step 1: Name
+      // Step 2: Name
       if (step === SELLER_STEP_INDEX.NAME) return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={sm.scroll} keyboardShouldPersistTaps="handled">
@@ -1484,7 +1490,7 @@ export default function OnboardingScreen() {
         </KeyboardAvoidingView>
       );
 
-      // Step 2: Brand name
+      // Step 3: Brand name
       if (step === SELLER_STEP_INDEX.BRAND_NAME) return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={sm.scroll} keyboardShouldPersistTaps="handled">
@@ -1508,7 +1514,7 @@ export default function OnboardingScreen() {
         </KeyboardAvoidingView>
       );
 
-      // Step 3: Brand stage
+      // Step 4: Brand stage
       if (step === SELLER_STEP_INDEX.BRAND_STAGE) return (
         <ScrollView contentContainerStyle={sm.scroll} showsVerticalScrollIndicator={false}>
           <Text style={sm.stepHeadline}>Where is your{'\n'}brand today?</Text>
@@ -1527,7 +1533,7 @@ export default function OnboardingScreen() {
         </ScrollView>
       );
 
-      // Step 4: Goals
+      // Step 5: Goals
       if (step === SELLER_STEP_INDEX.GOALS) return (
         <ScrollView contentContainerStyle={sm.scroll} showsVerticalScrollIndicator={false}>
           <Text style={sm.stepHeadline}>What do you{'\n'}need help with?</Text>
@@ -1551,7 +1557,7 @@ export default function OnboardingScreen() {
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={sm.buildBtnInner}
             >
-              <Text style={sm.buildBtnText}>
+              <Text style={[sm.buildBtnText, getOnAccentTextStyle(theme)]}>
                 {goals.length > 0 ? 'Build my workspace' : 'Skip for now'}
               </Text>
             </LinearGradient>
@@ -1559,12 +1565,12 @@ export default function OnboardingScreen() {
         </ScrollView>
       );
 
-      // Step 5: Loading
+      // Step 6: Loading
       if (step === SELLER_STEP_INDEX.LOADING) return (
         <LoadingAnimation steps={SELLER_LOADING_STEPS} onDone={() => setStep(SELLER_STEP_INDEX.NOTIFICATIONS)} />
       );
 
-      // Step 6: Notifications
+      // Step 7: Notifications
       if (step === SELLER_STEP_INDEX.NOTIFICATIONS) return (
         <NotificationsStep
           flow="seller"
@@ -1573,7 +1579,7 @@ export default function OnboardingScreen() {
         />
       );
 
-      // Step 7: Success
+      // Step 8: Success
       if (step === SELLER_STEP_INDEX.SUCCESS) return (
         <SuccessScreen flow="seller" firstName={firstName} brandName={brandName} onFinish={finishSeller} finishing={finishing} />
       );
@@ -1588,10 +1594,12 @@ export default function OnboardingScreen() {
                      || (flow === 'seller' && step >= SELLER_STEP_INDEX.LOADING);
 
   const isAuthStep = step === 0;
+  const isAccountTypeStep = step === BUYER_STEP_INDEX.ACCOUNT_TYPE && !flow;
 
   // ── Show Continue button in footer (not auth, not goals, not full-screen) ───
   const showFooter = !isFullScreen
     && !isAuthStep
+    && !isAccountTypeStep
     && !(flow === 'seller' && step === SELLER_STEP_INDEX.GOALS);
 
   function footerButtonLabel(): string {
@@ -1650,7 +1658,11 @@ export default function OnboardingScreen() {
       )}
 
       {/* Step content */}
-      <Animated.View style={[sm.stepWrap, { transform: [{ translateX: slideAnim }] }]}>
+      <Animated.View style={[
+        sm.stepWrap,
+        isAccountTypeStep && sm.accountTypeStepWrap,
+        { transform: [{ translateX: slideAnim }] },
+      ]}>
         {renderStep()}
       </Animated.View>
 
@@ -1686,6 +1698,7 @@ const sm = StyleSheet.create({
   backBtn:   { width: 36, height: 36, justifyContent: 'center' },
   progressLabel: { width: 64, fontSize: 11, fontFamily: 'Inter_500Medium', color: MUTED, textAlign: 'right' },
   stepWrap:  { flex: 1, paddingHorizontal: 24 },
+  accountTypeStepWrap: { paddingHorizontal: 0 },
   footer:    { paddingHorizontal: 24, paddingTop: 12 },
 
   scroll:    { flexGrow: 1, paddingTop: 12, paddingBottom: 40 },

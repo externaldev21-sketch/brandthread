@@ -7,7 +7,7 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 
 import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
 import { getIncoming, createIncoming, updateIncomingStatus, receiveIncoming, getInventoryItems, getLocations } from '@/services/inventoryService';
 import { IncomingInventory, IncomingStatus, InventoryItem, InventoryLocation } from '@/services/inventoryTypes';
@@ -264,8 +264,8 @@ export default function IncomingInventoryScreen() {
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setMode('new'); }}
           >
             <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.addBtnGrad}>
-              <Feather name="plus" size={ICON.sm} color="#fff" />
-              <Text style={s.addBtnText}>Add</Text>
+              <Feather name="plus" size={ICON.sm} color={theme.onAccent} />
+              <Text style={[s.addBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Add</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>

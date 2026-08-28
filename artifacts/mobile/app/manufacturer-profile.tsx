@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useColors } from '@/hooks/useColors';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Alert, ActivityIndicator, Platform, Image,
@@ -37,7 +37,7 @@ import { formatCents } from '@/lib/money';
 
 // ─── Star Rating ──────────────────────────────────────────────────────────────
 
-function StarRating({ rating, size = 14 }: { rating: number; size?: number }) {
+function StarRating({ rating, size = 14, color = GOLD }: { rating: number; size?: number; color?: string }) {
   return (
     <View style={{ flexDirection: 'row', gap: 2 }}>
       {[1, 2, 3, 4, 5].map(i => (
@@ -45,7 +45,7 @@ function StarRating({ rating, size = 14 }: { rating: number; size?: number }) {
           key={i}
           name={i <= Math.round(rating) ? 'star' : 'star'}
           size={size}
-          color={i <= Math.round(rating) ? GOLD : SUBTLE}
+          color={i <= Math.round(rating) ? color : SUBTLE}
         />
       ))}
     </View>
@@ -183,7 +183,7 @@ export default function ManufacturerProfileScreen() {
 
           {/* Name + verified */}
           <View style={s.heroNameRow}>
-            <Text style={s.heroName}>{m.name}</Text>
+             <Text style={[s.heroName, getOnAccentTextStyle(theme)]}>{m.name}</Text>
             {m.isVerified && (
               <View style={[s.verifiedBadge, { backgroundColor: theme.secondaryDim }]}>
                 <Feather name="check-circle" size={14} color={theme.secondary} />
@@ -194,14 +194,14 @@ export default function ManufacturerProfileScreen() {
 
           {/* Location */}
           <View style={s.heroLocationRow}>
-            <Feather name="map-pin" size={12} color={MUTED} />
-            <Text style={s.heroLocation}>{m.city}, {m.country}</Text>
+             <Feather name="map-pin" size={12} color={theme.onAccent} />
+             <Text style={[s.heroLocation, getOnAccentTextStyle(theme)]}>{m.city}, {m.country}</Text>
           </View>
 
           {/* Rating */}
           <View style={s.heroRatingRow}>
-            <StarRating rating={m.rating} />
-            <Text style={s.heroRatingText}>{m.rating.toFixed(1)} ({m.reviewCount} reviews)</Text>
+             <StarRating rating={m.rating} color={theme.onAccent} />
+             <Text style={[s.heroRatingText, getOnAccentTextStyle(theme)]}>{m.rating.toFixed(1)} ({m.reviewCount} reviews)</Text>
           </View>
         </LinearGradient>
 

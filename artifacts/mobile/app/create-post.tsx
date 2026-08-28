@@ -28,6 +28,7 @@ import type {
   MaxVideoDuration, ContentType,
 } from '@/services/types';
 import { useColors } from '@/hooks/useColors';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -105,6 +106,7 @@ function VideoPreview({ uri }: { uri: string }) {
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function CreatePostScreen() {
   const colors = useColors();
+  const { theme } = useAppTheme();
   const PURPLE = colors.primary;
   const CYAN = colors.info;
   const PURPOSE_CHIPS = React.useMemo(() => getPurposeChips(colors.primary), [colors.primary]);
@@ -766,9 +768,9 @@ export default function CreatePostScreen() {
                 }
               }}
             >
-              <LinearGradient colors={[colors.primary, colors.accentForeground]} style={s.publishBtn}>
-                <Feather name="send" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
-                <Text style={s.publishBtnText}>Publish now</Text>
+              <LinearGradient colors={theme.primaryGradient} style={s.publishBtn}>
+                <Feather name="send" size={16} color={theme.onAccent} style={{ marginRight: 8 }} />
+                <Text style={[s.publishBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Publish now</Text>
               </LinearGradient>
             </TouchableOpacity>
           </ScrollView>
@@ -823,8 +825,8 @@ export default function CreatePostScreen() {
           activeOpacity={0.85}
           onPress={() => haptic(() => router.replace('/(tabs)/profile' as never))}
         >
-          <LinearGradient colors={[colors.primary, colors.accentForeground]} style={s.publishBtn}>
-            <Text style={s.publishBtnText}>View Profile</Text>
+          <LinearGradient colors={theme.primaryGradient} style={s.publishBtn}>
+            <Text style={[s.publishBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>View Profile</Text>
           </LinearGradient>
         </TouchableOpacity>
         <TouchableOpacity
@@ -1055,7 +1057,7 @@ function ProductModal({ visible, onClose, productSearch, setProductSearch, produ
                       style={[sm.tagBtn, isTagged && sm.tagBtnActive]}
                       onPress={() => { Haptics.selectionAsync(); onTag(p); }}
                     >
-                      <Text style={[sm.tagBtnText, isTagged && { color: '#FFFFFF' }]}>{isTagged ? 'Remove' : 'Tag'}</Text>
+                      <Text style={[sm.tagBtnText, isTagged && { color: colors.primaryForeground }]}>{isTagged ? 'Remove' : 'Tag'}</Text>
                     </TouchableOpacity>
                   </View>
                 );
@@ -1105,7 +1107,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   photoThumbImg: { width: 90, height: 90 },
   removeChip:    { position: 'absolute', top: 4, right: 4, backgroundColor: '#00000088', borderRadius: 10, width: 20, height: 20, alignItems: 'center', justifyContent: 'center' },
   coverLabel:    { position: 'absolute', bottom: 4, left: 4, backgroundColor: colors.primary, borderRadius: 4, paddingHorizontal: 5, paddingVertical: 2 },
-  coverLabelText:{ fontSize: 9, fontFamily: FONT.bold, color: '#fff' },
+  coverLabelText:{ fontSize: 9, fontFamily: FONT.bold, color: colors.primaryForeground },
   photoHint:     { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 8 },
 
   typeBadge:     { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.accent, borderRadius: 10, borderWidth: 1, borderColor: colors.accent, paddingHorizontal: 12, paddingVertical: 8, marginTop: 14 },

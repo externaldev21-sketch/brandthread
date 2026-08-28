@@ -3,7 +3,7 @@
  * Multi-seller cart with save-for-later, summary, and checkout entry.
  */
 import React, { useState, useCallback } from 'react';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Image,
   ActivityIndicator, Alert, TextInput, RefreshControl,
@@ -758,11 +758,11 @@ export default function CartScreen() {
                   style={s.checkoutGrad}
                 >
                   {validating ? (
-                    <ActivityIndicator color="#fff" size="small" />
+                    <ActivityIndicator color={theme.onAccent} size="small" />
                   ) : (
                     <>
-                      <Feather name="lock" size={16} color="#fff" />
-                      <Text style={s.checkoutText}>Checkout · {fmtPrice(displayedTotal)}</Text>
+                      <Feather name="lock" size={16} color={theme.onAccent} />
+                      <Text style={[s.checkoutText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Checkout · {fmtPrice(displayedTotal)}</Text>
                     </>
                   )}
                 </LinearGradient>
@@ -838,6 +838,6 @@ const s = StyleSheet.create({
     height: COMP.buttonH,
     borderRadius: RADIUS.lg,
   },
-  checkoutText: { fontSize: FS.base, fontFamily: FONT.bold, color: '#fff' },
+  checkoutText: { fontSize: FS.base, fontFamily: FONT.bold },
   secureNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', marginTop: SP.xs },
 });

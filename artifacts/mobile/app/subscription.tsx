@@ -23,7 +23,7 @@ import {
   BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, PURPLE_LIGHT,
   CYAN, SUCCESS, ORANGE, RED, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/hooks/useApi';
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { isManagerRole, parseRoleError } from '@/lib/roleError';
@@ -310,13 +310,13 @@ export default function SubscriptionScreen() {
             {/* Current plan summary card */}
             <LinearGradient colors={theme.primaryGradient as any} style={styles.currentPlanCard}>
               {statusLoading ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={theme.onAccent} />
               ) : (
                 <>
                   <View style={styles.currentPlanRow}>
                     <View>
-                      <Text style={styles.currentPlanLabel}>Current plan</Text>
-                      <Text style={styles.currentPlanName}>{currentPlan.name}</Text>
+                      <Text style={[styles.currentPlanLabel, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Current plan</Text>
+                      <Text style={[styles.currentPlanName, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>{currentPlan.name}</Text>
                     </View>
                     <View style={[styles.statusPill, { backgroundColor: `${statusColor}30` }]}>
                       <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
@@ -325,21 +325,21 @@ export default function SubscriptionScreen() {
 
                   {/* Trial end or renewal line */}
                   {currentPlan.trialEnd ? (
-                    <Text style={styles.currentPlanRenews}>
+                    <Text style={[styles.currentPlanRenews, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
                       Free trial ends {currentPlan.trialEnd} · then {currentPlan.price}/mo
                     </Text>
                   ) : currentPlan.status === 'active' ? (
-                    <Text style={styles.currentPlanRenews}>
+                    <Text style={[styles.currentPlanRenews, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
                       Renews {currentPlan.renewsOn} · {currentPlan.price}/mo
                     </Text>
                   ) : (
-                    <Text style={styles.currentPlanRenews}>
+                    <Text style={[styles.currentPlanRenews, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
                       Upgrade to unlock more features
                     </Text>
                   )}
 
                   {/* Commission reminder */}
-                  <Text style={[styles.currentPlanRenews, { marginTop: 8, opacity: 0.6 }]}>
+                  <Text style={[styles.currentPlanRenews, { color: theme.onAccent, marginTop: 8, opacity: 0.6 }, getOnAccentTextStyle(theme)]}>
                     + 5% platform commission on sales
                   </Text>
                 </>

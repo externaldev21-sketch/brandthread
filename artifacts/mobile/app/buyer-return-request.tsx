@@ -14,7 +14,7 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { createReturnRequest } from '@/services/cartService';
 import { RETURN_REASON_OPTIONS, BuyerReturnReason, BuyerReturnResolution } from '@/services/cartTypes';
 import { getBuyerOrder } from '@/services/orderService';
@@ -42,7 +42,6 @@ export default function BuyerReturnRequestScreen() {
   const { theme } = useAppTheme();
   const PURPLE = colors.primary, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = colors.accent, CYAN = theme.secondary, CYAN_DIM = theme.secondaryDim;
   const BORDER_ACTIVE = `${theme.accent}73`;
-  const GRAD_PRIMARY = theme.primaryGradient;
   const s = makeStyles(theme);
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const router = useRouter();
@@ -126,8 +125,8 @@ export default function BuyerReturnRequestScreen() {
         <Text style={s.successSub}>Your request has been received. The seller will review it and respond within 1–3 business days.</Text>
         <Text style={s.successNote}>Return requests will appear here once confirmed.</Text>
         <TouchableOpacity style={s.doneBtn} onPress={() => router.back()} activeOpacity={0.85}>
-          <LinearGradient colors={[...GRAD_PRIMARY]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.doneBtnGrad}>
-            <Text style={s.doneBtnText}>Back to Order</Text>
+          <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.doneBtnGrad}>
+            <Text style={[s.doneBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Back to Order</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -255,8 +254,8 @@ export default function BuyerReturnRequestScreen() {
       {/* Submit bar */}
       <View style={[s.bottomBar, { paddingBottom: insets.bottom + SP.sm }]}>
         <TouchableOpacity style={s.submitBtn} onPress={handleSubmit} activeOpacity={0.88} disabled={submitting}>
-          <LinearGradient colors={[...GRAD_PRIMARY]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.submitGrad}>
-            {submitting ? <ActivityIndicator color={ON_DARK} size="small" /> : <Text style={s.submitText}>Submit Return Request</Text>}
+          <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.submitGrad}>
+            {submitting ? <ActivityIndicator color={theme.onAccent} size="small" /> : <Text style={[s.submitText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Submit Return Request</Text>}
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -299,13 +298,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   bottomBar: { paddingHorizontal: SP.md, paddingTop: SP.md, backgroundColor: BG, borderTopWidth: 1, borderTopColor: BORDER },
   submitBtn: { borderRadius: RADIUS.lg, overflow: 'hidden' },
   submitGrad: { height: COMP.buttonH, alignItems: 'center', justifyContent: 'center' },
-  submitText: { fontSize: FS.base, fontFamily: FONT.bold, color: ON_DARK },
+   submitText: { fontSize: FS.base, fontFamily: FONT.bold },
   successIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: SUCCESS, alignItems: 'center', justifyContent: 'center', marginBottom: SP.md },
   successTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, marginBottom: SP.sm },
   successSub: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 22, marginBottom: SP.sm },
   successNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', marginBottom: SP.lg },
   doneBtn: { width: '100%', borderRadius: RADIUS.lg, overflow: 'hidden' },
   doneBtnGrad: { height: COMP.buttonH, alignItems: 'center', justifyContent: 'center' },
-  doneBtnText: { fontSize: FS.base, fontFamily: FONT.bold, color: ON_DARK },
+   doneBtnText: { fontSize: FS.base, fontFamily: FONT.bold },
   });
 };

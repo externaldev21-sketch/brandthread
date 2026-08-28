@@ -9,6 +9,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Image,
@@ -340,6 +341,7 @@ const dlgS = StyleSheet.create({
 
 export default function ManufacturerMessagesScreen() {
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
+  const { theme } = useAppTheme();
   const params = useLocalSearchParams<{
     conversationId?: string;
     threadId?: string;
@@ -649,12 +651,12 @@ export default function ManufacturerMessagesScreen() {
           />
           <TouchableOpacity
             onPress={handleSend}
-            style={[s.sendBtn, (!inputText.trim() || sending) && { opacity: 0.4 }]}
+            style={[s.sendBtn, { backgroundColor: theme.accent }, (!inputText.trim() || sending) && { opacity: 0.4 }]}
             disabled={!inputText.trim() || sending}
           >
             {sending
-              ? <ActivityIndicator size="small" color="#fff" />
-              : <Feather name="send" size={ICON.sm} color="#fff" />
+              ? <ActivityIndicator size="small" color={theme.onAccent} />
+              : <Feather name="send" size={ICON.sm} color={theme.onAccent} />
             }
           </TouchableOpacity>
         </View>
@@ -702,7 +704,6 @@ const s = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: PURPLE,
     alignItems: 'center',
     justifyContent: 'center',
   },

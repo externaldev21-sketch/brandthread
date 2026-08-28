@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
   Alert, StyleSheet, Dimensions, Share, Image,
@@ -462,7 +462,7 @@ export default function FriendsScreen() {
                     end={{ x: 1, y: 0 }}
                     style={s.findFriendsBtn}
                   >
-                    <Text style={s.findFriendsBtnText}>Find Friends</Text>
+                    <Text style={[s.findFriendsBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Find Friends</Text>
                   </LinearGradient>
                 </TouchableOpacity>
               </View>

@@ -13,7 +13,7 @@ import {
   RED, ON_DARK,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
   getFriendSuggestions, sendFriendRequest, blockUser,
 } from '@/services/socialService';
@@ -201,10 +201,10 @@ export default function BuyerFriendRequestsScreen() {
                 onPress={() => handleFollowBack(row)}
               >
                 {actionId === row.userId
-                  ? <View style={s.acceptBtn}><ActivityIndicator size="small" color="#fff" /></View>
+                  ? <View style={s.acceptBtn}><ActivityIndicator size="small" color={theme.onAccent} /></View>
                   : (
                     <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.acceptBtn}>
-                      <Text style={s.acceptBtnText}>Follow</Text>
+                      <Text style={[s.acceptBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Follow</Text>
                     </LinearGradient>
                   )
                 }
@@ -309,7 +309,7 @@ export default function BuyerFriendRequestsScreen() {
                 ) : (
                   <TouchableOpacity activeOpacity={0.85} onPress={() => handleFollowSuggestion(sug)}>
                     <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.followBtn}>
-                      <Text style={s.acceptBtnText}>Follow</Text>
+                      <Text style={[s.acceptBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Follow</Text>
                     </LinearGradient>
                   </TouchableOpacity>
                 )}
@@ -354,7 +354,7 @@ export default function BuyerFriendRequestsScreen() {
               </Text>
               {t.count != null && t.count > 0 && (
                 <View style={s.tabBadge}>
-                  <Text style={s.tabBadgeText}>{t.count}</Text>
+                   <Text style={s.tabBadgeText}>{t.count}</Text>
                 </View>
               )}
             </View>
@@ -371,7 +371,7 @@ export default function BuyerFriendRequestsScreen() {
   );
 }
 
-const makeStyles = (theme: { accent: string }) => StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   container:       { flex: 1, backgroundColor: BG },
   header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingBottom: SP.md, borderBottomWidth: 1, borderColor: BORDER },
   headerTitle:     { fontFamily: FONT.bold, fontSize: FS.lg, color: FG },
@@ -381,7 +381,7 @@ const makeStyles = (theme: { accent: string }) => StyleSheet.create({
   tabLabel:        { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
   tabLabelActive:  { color: theme.accent },
   tabBadge:        { backgroundColor: theme.accent, borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1 },
-  tabBadgeText:    { fontFamily: FONT.bold, fontSize: 10, color: ON_DARK },
+   tabBadgeText:    { fontFamily: FONT.bold, fontSize: 10, color: theme.onAccent },
   emptyState:      { alignItems: 'center', paddingVertical: SP.xl * 2, gap: SP.sm },
   emptyTitle:      { fontFamily: FONT.semibold, fontSize: FS.md, color: FG },
   emptyBody:       { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', paddingHorizontal: SP.xl },

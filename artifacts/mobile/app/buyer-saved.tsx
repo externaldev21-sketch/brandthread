@@ -11,7 +11,7 @@ import {
 
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { getSavedItems, removeSavedItem, subscribeSocial } from '@/services/socialService';
 import { SavedItem, SavedItemType } from '@/services/socialTypes';
 import { reportNetworkError } from '@/lib/networkNotice';
@@ -30,7 +30,6 @@ export default function BuyerSaved() {
   const { theme } = useAppTheme();
   const PURPLE = theme.accent;
   const PURPLE_DIM = theme.accentDim;
-  const GRAD_PRIMARY = theme.primaryGradient;
   const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -209,12 +208,12 @@ export default function BuyerSaved() {
             style={styles.discoverBtnWrap}
           >
             <LinearGradient
-              colors={GRAD_PRIMARY}
+              colors={theme.primaryGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.discoverBtn}
             >
-              <Text style={styles.discoverBtnText}>Discover</Text>
+              <Text style={[styles.discoverBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Discover</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -239,7 +238,7 @@ export default function BuyerSaved() {
   );
 }
 
-const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: BG,
@@ -320,7 +319,6 @@ const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.
     justifyContent: 'center',
   },
   discoverBtnText: {
-    color: ON_DARK,
     fontFamily: FONT.semibold,
     fontSize: FS.base,
   },

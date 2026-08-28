@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useColors } from '@/hooks/useColors';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
@@ -207,7 +207,7 @@ export default function StorePublishScreen() {
           </BrandthreadCard>
         ) : validation?.canPublish ? (
           <GradientCard colors={theme.primaryGradient} style={pub.card} glow>
-            <Text style={[pub.publishReadyTitle, { color: theme.onAccent }]}>Ready to go live.</Text>
+            <Text style={[pub.publishReadyTitle, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Ready to go live.</Text>
             <Text style={pub.publishStoreName}>{store?.settings.storeName || 'Your Store'}</Text>
             <Text style={pub.publishUrl}>https://{storeUrl}.brandthread.co</Text>
             <PrimaryButton

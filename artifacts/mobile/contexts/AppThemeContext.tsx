@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@clerk/expo';
+import type { TextStyle } from 'react-native';
 
 export type AppThemeId =
   | 'purple' | 'olive' | 'navy' | 'champagne' | 'black' | 'silver'
@@ -24,6 +25,22 @@ export type AppThemePreset = {
   glowGradient: readonly [string, string, ...string[]];
   shadowColor: string;
 };
+
+/** Foreground treatment that stays legible over every primary gradient preset. */
+export function getOnAccentTextStyle(theme: AppThemePreset): TextStyle {
+  const hex = theme.onAccent.replace('#', '');
+  const red = parseInt(hex.slice(0, 2), 16);
+  const green = parseInt(hex.slice(2, 4), 16);
+  const blue = parseInt(hex.slice(4, 6), 16);
+  const isLight = (red * 299 + green * 587 + blue * 114) / 1000 >= 128;
+
+  return {
+    color: theme.onAccent,
+    textShadowColor: isLight ? 'rgba(0,0,0,0.28)' : 'rgba(255,255,255,0.28)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  };
+}
 
 export const APP_THEME_PRESETS: readonly AppThemePreset[] = [
   { id: 'purple', name: 'Purple', accent: '#8B5CF6', accentLight: '#A78BFA', accentDim: 'rgba(139,92,246,0.18)', onAccent: '#FFFFFF', secondary: '#A78BFA', secondaryDim: 'rgba(139,92,246,0.10)', primaryGradient: ['#6D28D9', '#8B5CF6', '#A78BFA'], heroGradient: ['#4C1D95', '#8B5CF6', '#A78BFA'], glowGradient: ['rgba(139,92,246,0.24)', 'rgba(167,139,250,0.04)'], shadowColor: '#8B5CF6' },

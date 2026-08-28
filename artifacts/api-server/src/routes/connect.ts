@@ -79,7 +79,6 @@ router.post("/onboard", async (req, res) => {
  */
 router.get("/status", async (req, res) => {
   try {
-    const stripe = requireStripe();
     const clerkUserId = (req as any).clerkUserId as string;
 
     const [user] = await db
@@ -96,6 +95,7 @@ router.get("/status", async (req, res) => {
     if (!user.stripeAccountId) {
       res.json({
         connected: false,
+        stripeAccountId: null,
         chargesEnabled: false,
         payoutsEnabled: false,
         detailsSubmitted: false,
@@ -106,23 +106,48 @@ router.get("/status", async (req, res) => {
       return;
     }
 
+    const stripe = requireStripe();
     // Fetch the live account and only the external-account data needed to
     // identify the payout bank. Never return Stripe's account object itself.
-    const account = await stripe.accounts.retrieve(user.stripeAccountId, {
-      expand: ["external_accounts"],
-    });
+    const account = await stripe.accounts.retrieve(user.stripeAccountId);
     const chargesEnabled = account.charges_enabled === true;
     const payoutsEnabled = account.payouts_enabled === true;
     const detailsSubmitted = account.details_submitted === true;
     // A seller cannot receive payouts until Stripe has enabled payouts. Keep
     // this deliberately simple so an incomplete account never looks active.
-    const stripeAccountStatus = payoutsEnabled ? "active" : "pending";
-    const externalAccounts = account.external_accounts?.data ?? [];
-    const bankAccount = externalAccounts.find(
-      (externalAccount) => externalAccount.object === "bank_account",
-    );
-    const bankLast4 =
-      bankAccount?.object === "bank_account" ? bankAccount.last4 ?? null : null;
+    const stripeAccountStatus =
+      chargesEnabled && payoutsEnabled
+        ? "active"
+        : detailsSubmitted
+          ? "restricted"
+          : "pending";
+    const bankAccounts = [];
+    let startingAfter: string | undefined;
+    let hasMore = true;
+    while (hasMore) {
+      const page = await stripe.accounts.listExternalAccounts(
+        user.stripeAccountId,
+        { object: "bank_account", limit: 100, ...(startingAfter ? { starting_after: startingAfter } : {}) },
+      );
+      bankAccounts.push(...page.data);
+      hasMore = page.has_more && page.data.length > 0;
+      startingAfter = hasMore ? page.data[page.data.length - 1]?.id : undefined;
+    }
+    const defaultCurrency = account.default_currency?.toLowerCase();
+    const bankAccount =
+      bankAccounts.find((externalAccount) =>
+        externalAccount.object === "bank_account"
+        && externalAccount.default_for_currency === true
+        && (!defaultCurrency || externalAccount.currency.toLowerCase() === defaultCurrency)
+      )
+      ?? bankAccounts.find((externalAccount) =>
+        externalAccount.object === "bank_account"
+        && externalAccount.default_for_currency === true
+      )
+      ?? (bankAccounts.length === 1 ? bankAccounts[0] : undefined);
+    const bankLast4 = bankAccount?.object === "bank_account"
+      ? bankAccount.last4 ?? null
+      : null;
 
     if (stripeAccountStatus !== user.stripeAccountStatus) {
       await db
@@ -138,7 +163,7 @@ router.get("/status", async (req, res) => {
       payoutsEnabled,
       detailsSubmitted,
       status: stripeAccountStatus,
-      verified: payoutsEnabled && chargesEnabled,
+       verified: payoutsEnabled,
       bankLast4,
     });
   } catch (err: any) {

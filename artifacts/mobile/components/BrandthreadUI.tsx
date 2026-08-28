@@ -19,13 +19,13 @@ import * as Haptics from 'expo-haptics';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE, BORDER_FOCUS,
-  FG, MUTED, SUBTLE, ON_DARK,
+  FG, MUTED, SUBTLE,
   SUCCESS, SUCCESS_DIM, GREEN_BRIGHT,
   BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM,
   SHADOW_PURPLE, SHADOW_SM,
 } from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 
 // ─── BrandthreadScreen ────────────────────────────────────────────────────────
 
@@ -203,7 +203,8 @@ export function PrimaryButton({
 }: PrimaryButtonProps) {
   const { theme } = useAppTheme();
   const buttonColors = colors ?? theme.primaryGradient;
-  const foreground = colors ? ON_DARK : theme.onAccent;
+  const foreground = theme.onAccent;
+  const onAccentTextStyle = getOnAccentTextStyle(theme);
   const h = small ? COMP.buttonHSm : COMP.buttonH;
   return (
     <TouchableOpacity
@@ -222,11 +223,11 @@ export function PrimaryButton({
         style={[pbS.inner, { height: h }]}
       >
         {loading ? (
-          <ActivityIndicator color={foreground} size="small" />
+          <ActivityIndicator color={disabled ? MUTED : foreground} size="small" />
         ) : (
           <>
             {icon && <Feather name={icon} size={ICON.sm} color={disabled ? MUTED : foreground} />}
-            <Text style={[pbS.label, { color: foreground, fontSize: small ? FS.sm : FS.base, opacity: disabled ? 0.5 : 1 }]}>{label}</Text>
+            <Text style={[pbS.label, disabled ? { color: MUTED, fontSize: small ? FS.sm : FS.base, opacity: 0.5 } : [onAccentTextStyle, { fontSize: small ? FS.sm : FS.base }]]}>{label}</Text>
           </>
         )}
       </LinearGradient>

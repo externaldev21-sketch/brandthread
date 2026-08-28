@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 
 type Step = 'email' | 'code' | 'done';
 
@@ -165,8 +165,8 @@ export default function ForgotPasswordScreen() {
                   style={s.primaryBtn}
                 >
                   {isFetching
-                    ? <ActivityIndicator color={FG} size="small" />
-                    : <Text style={s.primaryBtnText}>Send reset code</Text>}
+                    ? <ActivityIndicator color={theme.onAccent} size="small" />
+                    : <Text style={[s.primaryBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Send reset code</Text>}
                 </LinearGradient>
               </TouchableOpacity>
 
@@ -243,8 +243,8 @@ export default function ForgotPasswordScreen() {
                   style={s.primaryBtn}
                 >
                   {isFetching
-                    ? <ActivityIndicator color={FG} size="small" />
-                    : <Text style={s.primaryBtnText}>Reset password</Text>}
+                    ? <ActivityIndicator color={theme.onAccent} size="small" />
+                    : <Text style={[s.primaryBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Reset password</Text>}
                 </LinearGradient>
               </TouchableOpacity>
 
@@ -299,7 +299,7 @@ export default function ForgotPasswordScreen() {
                   end={{ x: 1, y: 0 }}
                   style={s.primaryBtn}
                 >
-                  <Text style={s.primaryBtnText}>Sign in</Text>
+                  <Text style={[s.primaryBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Sign in</Text>
                 </LinearGradient>
               </TouchableOpacity>
             </>

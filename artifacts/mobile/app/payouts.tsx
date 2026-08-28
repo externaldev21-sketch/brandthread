@@ -1,18 +1,19 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { AppState, View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import * as WebBrowser from 'expo-web-browser';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM,
-  CYAN, CYAN_DIM, SUCCESS, RED, ORANGE, FONT, FS, SP, RADIUS,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE, SUCCESS, RED, ORANGE, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { isManagerRole } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
-import StripeConnectWarning from '@/components/StripeConnectWarning';
+import StripeConnectWarning, { ConnectStatus, normalizeConnectStatus } from '@/components/StripeConnectWarning';
 import { useTeamRole } from '@/hooks/useTeamRole';
 
 type PayoutStatus = 'paid' | 'pending' | 'in_transit' | 'failed';
@@ -39,16 +40,17 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-const STATUS_CONFIG: Record<PayoutStatus, { label: string; color: string; bg: string }> = {
-  paid:       { label: 'Paid',       color: SUCCESS,  bg: `${SUCCESS}20`  },
-  pending:    { label: 'Pending',    color: ORANGE,   bg: `${ORANGE}20`   },
-  in_transit: { label: 'In transit', color: CYAN,     bg: CYAN_DIM        },
-  failed:     { label: 'Failed',     color: RED,      bg: `${RED}20`      },
-};
+function statusConfig(status: PayoutStatus, theme: { secondary: string; secondaryDim: string }) {
+  return {
+    paid:       { label: 'Paid',       color: SUCCESS,        bg: `${SUCCESS}20` },
+    pending:    { label: 'Pending',    color: ORANGE,         bg: `${ORANGE}20` },
+    in_transit: { label: 'In transit', color: theme.secondary, bg: theme.secondaryDim },
+    failed:     { label: 'Failed',     color: RED,            bg: `${RED}20` },
+  }[status];
+}
 
 export default function PayoutsScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -59,6 +61,25 @@ export default function PayoutsScreen() {
   const [loading,   setLoading]   = useState(true);
   const [balance,   setBalance]   = useState<any>(null);
   const [payouts,   setPayouts]   = useState<PayoutRecord[]>([]);
+  const [connectStatus, setConnectStatus] = useState<ConnectStatus | null>(null);
+  const [connectLoading, setConnectLoading] = useState(true);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const connectRequestRef = useRef(false);
+  const onboardingOpenRef = useRef(false);
+
+  const refreshConnectStatus = useCallback(async () => {
+    if (connectRequestRef.current) return;
+    connectRequestRef.current = true;
+    try {
+      const data = await api.seller.connect.status();
+      setConnectStatus(normalizeConnectStatus(data));
+    } catch {
+      setConnectStatus(null);
+    } finally {
+      connectRequestRef.current = false;
+      setConnectLoading(false);
+    }
+  }, [api]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -80,9 +101,43 @@ export default function PayoutsScreen() {
       // Keep the empty state when payout data is unavailable.
     }
     setLoading(false);
-  }, []);
+    void refreshConnectStatus();
+  }, [api, refreshConnectStatus]);
 
   useEffect(() => { load(); }, [load]);
+
+  useFocusEffect(useCallback(() => {
+    void refreshConnectStatus();
+  }, [refreshConnectStatus]));
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void refreshConnectStatus();
+    });
+    return () => subscription.remove();
+  }, [refreshConnectStatus]);
+
+  const openConnectOnboarding = useCallback(async () => {
+    if (onboardingOpenRef.current) return;
+    onboardingOpenRef.current = true;
+    setIsConnecting(true);
+    try {
+      const data = await api.seller.connect.onboard();
+      if (!data || typeof data.url !== 'string' || !/^https:\/\//i.test(data.url)) {
+        throw new Error('Stripe did not provide a valid onboarding link.');
+      }
+      await WebBrowser.openBrowserAsync(data.url);
+      await refreshConnectStatus();
+    } catch (error: any) {
+      const message = typeof error?.message === 'string' && error.message
+        ? error.message
+        : 'Could not open Stripe onboarding. Please try again.';
+      Alert.alert('Onboarding unavailable', message);
+    } finally {
+      onboardingOpenRef.current = false;
+      setIsConnecting(false);
+    }
+  }, [api, refreshConnectStatus]);
 
   function haptic() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -105,7 +160,7 @@ export default function PayoutsScreen() {
           <View style={styles.backBtn} />
         </View>
         <View style={styles.accessLoading}>
-          <ActivityIndicator color={PURPLE} />
+            <ActivityIndicator color={theme.accent} />
         </View>
       </View>
     );
@@ -153,7 +208,11 @@ export default function PayoutsScreen() {
         </View>
       </View>
 
-      <StripeConnectWarning />
+       <StripeConnectWarning
+         connectStatus={connectStatus}
+         onConnect={openConnectOnboarding}
+         isConnecting={isConnecting}
+       />
 
       {/* Tabs */}
       <View style={styles.tabRow}>
@@ -173,7 +232,7 @@ export default function PayoutsScreen() {
       {activeTab === 'payouts' ? (
         <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + SP.xl }]}>
           {loading ? (
-            <ActivityIndicator color={PURPLE} style={{ marginTop: 40 }} />
+            <ActivityIndicator color={theme.accent} style={{ marginTop: 40 }} />
           ) : payouts.length === 0 ? (
             <View style={{ alignItems: 'center', paddingVertical: 40 }}>
               <Feather name="inbox" size={28} color={MUTED} />
@@ -183,7 +242,7 @@ export default function PayoutsScreen() {
             </View>
           ) : (
             payouts.map((p) => {
-              const cfg = STATUS_CONFIG[p.status];
+              const cfg = statusConfig(p.status, theme);
               return (
                 <View key={p.id} style={styles.payoutRow}>
                   <View style={styles.payoutLeft}>
@@ -203,15 +262,41 @@ export default function PayoutsScreen() {
         </ScrollView>
       ) : (
         <ScrollView contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + SP.xl }]}>
-          <View style={styles.bankCard}>
-            <Feather name="credit-card" size={20} color={PURPLE} />
+           <View style={styles.bankCard}>
+             <Feather name="credit-card" size={20} color={theme.accent} />
             <View style={{ flex: 1, marginLeft: SP.md }}>
-              <Text style={styles.bankLabel}>Bank account ···{balance?.bankLast4 ?? '——'}</Text>
-              <Text style={styles.bankSub}>Default payout account</Text>
+               <Text style={styles.bankLabel}>
+                 {connectStatus?.bankLast4 ? `Bank account ···${connectStatus.bankLast4}` : 'No bank account connected'}
+               </Text>
+               <Text style={styles.bankSub}>
+                 {connectLoading
+                   ? 'Checking Stripe account status…'
+                   : connectStatus?.verified
+                      ? connectStatus.chargesEnabled
+                        ? 'Default payout account'
+                        : 'Payouts enabled; payments are still restricted'
+                     : connectStatus?.connected
+                       ? 'Complete Stripe verification to receive payouts'
+                       : 'Connect Stripe to receive payouts'}
+               </Text>
             </View>
-            <View style={[styles.statusPill, { backgroundColor: `${SUCCESS}20` }]}>
-              <Text style={[styles.statusText, { color: SUCCESS }]}>Verified</Text>
-            </View>
+             {!connectLoading && connectStatus && (
+               <View style={[styles.statusPill, {
+                 backgroundColor: connectStatus.verified ? `${SUCCESS}20` : `${ORANGE}20`,
+               }]}>
+                 <Text style={[styles.statusText, {
+                   color: connectStatus.verified ? SUCCESS : ORANGE,
+                 }]}>
+                   {connectStatus.verified
+                     ? 'Verified'
+                      : connectStatus.status === 'restricted'
+                        ? 'Restricted'
+                     : connectStatus.connected
+                       ? 'Pending verification'
+                       : 'Not connected'}
+                 </Text>
+               </View>
+             )}
           </View>
 
           <View style={styles.settingsSection}>
@@ -229,9 +314,17 @@ export default function PayoutsScreen() {
           </View>
 
            {!isReadOnly && (
-             <TouchableOpacity style={styles.addBankBtn}>
-               <Feather name="plus" size={16} color={PURPLE} />
-               <Text style={styles.addBankText}>Add bank account</Text>
+             <TouchableOpacity
+               style={styles.addBankBtn}
+               onPress={() => { haptic(); void openConnectOnboarding(); }}
+               disabled={isConnecting}
+               accessibilityRole="button"
+               accessibilityLabel="Add bank account with Stripe"
+             >
+                <Feather name="plus" size={16} color={theme.accent} />
+                <Text style={styles.addBankText}>
+                  {isConnecting ? 'Opening Stripe…' : connectStatus?.connected ? 'Update bank account' : 'Add bank account'}
+                </Text>
              </TouchableOpacity>
            )}
         </ScrollView>
@@ -241,7 +334,7 @@ export default function PayoutsScreen() {
 }
 
 const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const { accent } = theme;
   return StyleSheet.create({
   root:         { flex: 1, backgroundColor: BG },
   accessLoading:{ flex: 1, alignItems: 'center', justifyContent: 'center' },
@@ -257,9 +350,9 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
   balanceSub:   { color: SUBTLE, fontSize: FS.xs, fontFamily: FONT.regular },
   tabRow:       { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, marginHorizontal: SP.md },
   tab:          { flex: 1, paddingVertical: SP.sm, alignItems: 'center' },
-  tabActive:    { borderBottomWidth: 2, borderBottomColor: PURPLE },
+   tabActive:    { borderBottomWidth: 2, borderBottomColor: accent },
   tabText:      { color: MUTED, fontSize: FS.sm, fontFamily: FONT.medium },
-  tabTextActive:{ color: PURPLE },
+   tabTextActive:{ color: accent },
   list:         { padding: SP.md },
   payoutRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   payoutLeft:   {},
@@ -280,7 +373,7 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
   settingsRow:  { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: SP.sm, borderTopWidth: 1, borderTopColor: BORDER },
   settingsLabel:{ color: MUTED, fontSize: FS.sm, fontFamily: FONT.regular },
   settingsValue:{ color: FG, fontSize: FS.sm, fontFamily: FONT.medium },
-  addBankBtn:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm, justifyContent: 'center', padding: SP.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: PURPLE, borderStyle: 'dashed' },
-  addBankText:  { color: PURPLE, fontSize: FS.sm, fontFamily: FONT.medium },
+   addBankBtn:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm, justifyContent: 'center', padding: SP.md, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: accent, borderStyle: 'dashed' },
+   addBankText:  { color: accent, fontSize: FS.sm, fontFamily: FONT.medium },
   });
 };

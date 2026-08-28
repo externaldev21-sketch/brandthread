@@ -14,7 +14,7 @@ import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { getAcceptedFriends, getCloseFriendIds, saveCloseFriendIds } from '@/services/socialService';
 import type { Friendship } from '@/services/socialTypes';
 
@@ -69,7 +69,7 @@ export default function BuyerCloseFriends() {
           <Text style={s.handle}>{item.handle}</Text>
         </View>
         <View style={[s.radio, isCF && s.radioActive]}>
-          {isCF && <Feather name="star" size={14} color={ON_DARK} />}
+           {isCF && <Feather name="star" size={14} color={theme.onAccent} />}
         </View>
       </TouchableOpacity>
     );
@@ -134,7 +134,7 @@ export default function BuyerCloseFriends() {
       <View style={[s.saveBar, { paddingBottom: insets.bottom + SP.md }]}>
         <TouchableOpacity onPress={handleSave} activeOpacity={0.85} style={{ flex: 1 }}>
           <LinearGradient colors={GRAD_PRIMARY} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.saveBtn}>
-            <Text style={s.saveBtnText}>Save</Text>
+            <Text style={[s.saveBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Save</Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -142,7 +142,7 @@ export default function BuyerCloseFriends() {
   );
 }
 
-const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   page: { flex: 1, backgroundColor: BG },
   header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
@@ -165,5 +165,5 @@ const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.
   emptyDesc: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', maxWidth: 240 },
   saveBar: { paddingHorizontal: SP.md, paddingTop: SP.sm, borderTopWidth: 1, borderTopColor: BORDER, backgroundColor: BG },
   saveBtn: { height: 50, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
-  saveBtnText: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.base },
+   saveBtnText: { fontFamily: FONT.bold, fontSize: FS.base },
 });

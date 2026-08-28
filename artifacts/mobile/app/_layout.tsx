@@ -99,7 +99,7 @@ export const ONBOARDING_OWNER_KEY = 'onboarding_owner_id';
 const DEV_FORCE_ONBOARDING_START = false;
 
 // Screens that don't require authentication
-const AUTH_SCREENS = ['welcome', 'sign-in', 'forgot-password', 'splash'];
+const AUTH_SCREENS = ['sign-in', 'forgot-password', 'splash'];
 
 // ─── Auth gate ────────────────────────────────────────────────────────────────
 function AuthGate() {
@@ -187,7 +187,6 @@ function AuthGate() {
 
     const inAuthScreen    = AUTH_SCREENS.includes(segments[0] as string);
     const inOnboarding    = segments[0] === 'onboarding';
-    const inAccountType   = segments[0] === 'account-type';
     const inPlans         = segments[0] === 'plans';
     const inBuyerGroup    = segments[0] === '(buyer)';
     const inTabsGroup     = segments[0] === '(tabs)';
@@ -196,7 +195,7 @@ function AuthGate() {
     const atRoot          = !segments[0] || (segments[0] as string) === 'index';
     // Team invite links must be viewable signed-out (deep-link entry point)
     const inInvite        = (segments[0] as string) === 'team-invite';
-    const inProtectedArea = !inAuthScreen && !inOnboarding && !inAccountType && !inInvite;
+    const inProtectedArea = !inAuthScreen && !inOnboarding && !inInvite;
 
     // Allow public access to specific buyer routes for guests
     const isGuestAllowedRoute =
@@ -224,17 +223,12 @@ function AuthGate() {
 
     if (!onboardingChecked) return; // AsyncStorage still loading — prevent loops
 
-    // No account type chosen → go to account-type screen
-    if (!storedRole && !inAccountType && !inAuthScreen && !inOnboarding) {
-      router.replace('/account-type');
-      return;
-    }
-
-    // Account type chosen but onboarding not done → go to onboarding.
+    // Account type is chosen inside onboarding after account creation.
+    // Keep all incomplete authenticated users in that single flow.
     // Exception: sellers are allowed on /plans after finishing the onboarding
     // wizard but before picking a subscription plan (onboarding_complete is
     // only written by plans.tsx after plan selection).
-    if (!onboardingDone && storedRole && !inOnboarding && !inAccountType && !inAuthScreen && !inPlans) {
+    if (!onboardingDone && !inOnboarding && !inAuthScreen && !inPlans) {
       router.replace('/onboarding');
       return;
     }
@@ -248,7 +242,7 @@ function AuthGate() {
 
     // Onboarding done → route away from auth/onboarding screens and the
     // bare "/" boot route to the correct dashboard
-    if (onboardingDone && (inAuthScreen || inOnboarding || inAccountType || atRoot)) {
+    if (onboardingDone && (inAuthScreen || inOnboarding || atRoot)) {
       const dest = storedRole === 'buyer' ? '/(buyer)/' : '/(tabs)/';
       router.replace(dest as never);
       return;
@@ -381,10 +375,8 @@ function RootLayoutNav() {
         <Stack.Screen name="index"          options={{ headerShown: false, animation: 'fade' }} />
         {/* Auth & onboarding */}
         <Stack.Screen name="splash"         options={{ headerShown: false, animation: 'fade' }} />
-        <Stack.Screen name="welcome"        options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="sign-in"        options={{ headerShown: false }} />
         <Stack.Screen name="forgot-password" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="account-type"   options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="onboarding"     options={{ headerShown: false, gestureEnabled: false }} />
         {/* Main app */}
         <Stack.Screen name="(tabs)"         options={{ headerShown: false }} />

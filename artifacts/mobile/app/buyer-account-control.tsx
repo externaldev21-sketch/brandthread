@@ -86,7 +86,7 @@ export default function BuyerAccountControl() {
     // Persist the deactivation flag locally; sign back in to reactivate.
     await requestDeactivation();
     try { await signOut(); } catch {}
-    router.replace('/welcome' as never);
+    router.replace('/sign-in' as never);
   }
 
   return (

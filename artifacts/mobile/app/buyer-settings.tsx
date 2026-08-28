@@ -92,7 +92,7 @@ export default function BuyerSettingsScreen() {
     if (row.action === 'signout') {
       Alert.alert('Sign out?', 'You can sign back in anytime.', [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign out', style: 'destructive', onPress: async () => { await signOut(); router.replace('/welcome' as never); } },
+        { text: 'Sign out', style: 'destructive', onPress: async () => { await signOut(); router.replace('/sign-in' as never); } },
       ]);
       return;
     }

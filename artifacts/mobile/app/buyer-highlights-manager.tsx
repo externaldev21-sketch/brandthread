@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE,
   SUCCESS, RED, ORANGE, GOLD,
   FONT, FS, SP, RADIUS, OVERLAY,
 } from '@/lib/theme';
@@ -263,7 +263,7 @@ export default function BuyerHighlightsManager() {
   );
 }
 
-const makeStyles = (theme: { accent: string }) => StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   page: { flex: 1, backgroundColor: BG },
   header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
@@ -279,7 +279,7 @@ const makeStyles = (theme: { accent: string }) => StyleSheet.create({
   emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.lg, color: FG },
   emptySub: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', paddingHorizontal: SP.xl },
   createBtn: { paddingHorizontal: SP.xl, paddingVertical: SP.md, borderRadius: RADIUS.pill, backgroundColor: theme.accent },
-  createBtnText: { fontFamily: FONT.bold, fontSize: FS.base, color: ON_DARK },
+   createBtnText: { fontFamily: FONT.bold, fontSize: FS.base, color: theme.onAccent },
   emojiTrigger: { alignItems: 'center', paddingVertical: SP.md, gap: 4 },
   emojiHint: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE },
   labelInput: { borderWidth: 1, borderColor: theme.accent, borderRadius: RADIUS.md, padding: SP.md, color: FG, fontFamily: FONT.regular, fontSize: FS.base, marginBottom: SP.md },
@@ -291,7 +291,7 @@ const makeStyles = (theme: { accent: string }) => StyleSheet.create({
   cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
   cancelBtnText: { fontFamily: FONT.medium, fontSize: FS.base, color: MUTED },
   saveBtn: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, backgroundColor: theme.accent, alignItems: 'center' },
-  saveBtnText: { fontFamily: FONT.bold, fontSize: FS.base, color: ON_DARK },
+   saveBtnText: { fontFamily: FONT.bold, fontSize: FS.base, color: theme.onAccent },
 });
 
 const sheet = StyleSheet.create({

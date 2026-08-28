@@ -19,7 +19,7 @@ import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, GOLD, FONT, FS, SP, RADIUS } from '@/lib/theme';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 
 interface Props {
   visible: boolean;
@@ -180,7 +180,7 @@ export default function PlanUpsellModal({
               <Feather name="lock" size={24} color={theme.accentLight} />
             </View>
 
-            <Text style={s.headerTitle}>Upgrade to {planLabel}</Text>
+            <Text style={[s.headerTitle, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Upgrade to {planLabel}</Text>
             <Text style={s.headerSubtitle}>
               <Text style={s.featureNameText}>{featureName}</Text>
               {' '}and {isGrowth ? (growthStudioTools.length - 1) + ' more tools are' : 'more features are'} available on the {planLabel} plan ({planPrice}/mo).
@@ -258,8 +258,8 @@ export default function PlanUpsellModal({
 
             {/* ── CTA ── */}
             <TouchableOpacity style={[s.upgradeBtn, { backgroundColor: theme.accent }]} onPress={handleUpgrade} activeOpacity={0.85}>
-              <Feather name="zap" size={16} color="#FFF" />
-              <Text style={s.upgradeBtnText}>Upgrade to {planLabel} — {planPrice}/mo</Text>
+              <Feather name="zap" size={16} color={theme.onAccent} />
+              <Text style={[s.upgradeBtnText, { color: theme.onAccent }]}>Upgrade to {planLabel} — {planPrice}/mo</Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={s.laterBtn} onPress={handleClose} activeOpacity={0.7}>
@@ -440,7 +440,6 @@ const s = StyleSheet.create({
     marginTop: SP.lg,
   },
   upgradeBtnText: {
-    color: '#FFFFFF',
     fontSize: FS.md,
     fontFamily: FONT.semibold,
   },

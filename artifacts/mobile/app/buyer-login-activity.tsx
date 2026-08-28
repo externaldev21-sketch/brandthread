@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ON_DARK,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -59,7 +59,7 @@ export default function BuyerLoginActivity() {
           onPress: async () => {
             await removeAllOtherSessions();
             try { await signOut(); } catch {}
-            router.replace('/welcome' as never);
+            router.replace('/sign-in' as never);
           },
         },
       ]
@@ -92,7 +92,7 @@ export default function BuyerLoginActivity() {
             <React.Fragment key={session.id}>
               <View style={s.row}>
                 <View style={[s.iconBg, session.current && s.iconBgCurrent]}>
-                  <Feather name={session.icon} size={18} color={session.current ? ON_DARK : FG} />
+                  <Feather name={session.icon} size={18} color={session.current ? theme.onAccent : FG} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -128,7 +128,7 @@ export default function BuyerLoginActivity() {
   );
 }
 
-const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   page: { flex: 1, backgroundColor: BG },
   header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },

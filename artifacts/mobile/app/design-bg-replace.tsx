@@ -4,7 +4,7 @@
  * Params: sourceUri?
  */
 import React, { useState } from 'react';
-import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, ActivityIndicator, Image, TextInput,
@@ -248,8 +248,8 @@ export default function DesignBgReplaceScreen() {
         <View style={s.ph}>
           <GradientCard colors={theme.primaryGradient} onPress={handleGenerate} glow style={[s.generateBtn, { shadowColor: theme.shadowColor }]}>
             <View style={s.generateInner}>
-              <Feather name="zap" size={ICON.md} color="#FFF" />
-              <Text style={s.generateText}>Generate</Text>
+              <Feather name="zap" size={ICON.md} color={theme.onAccent} />
+              <Text style={[s.generateText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Generate</Text>
             </View>
           </GradientCard>
         </View>
