@@ -8,9 +8,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
   BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, ON_DARK,
-  PURPLE, PURPLE_DIM, GRAD_PRIMARY,
+
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getSavedItems, removeSavedItem, subscribeSocial } from '@/services/socialService';
 import { SavedItem, SavedItemType } from '@/services/socialTypes';
 
@@ -25,6 +26,11 @@ const TABS: { key: SavedItemType; label: string; icon: string }[] = [
 ];
 
 export default function BuyerSaved() {
+  const { theme } = useAppTheme();
+  const PURPLE = theme.accent;
+  const PURPLE_DIM = theme.accentDim;
+  const GRAD_PRIMARY = [theme.accent, theme.accentLight] as const;
+  const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [items, setItems] = useState<SavedItem[]>([]);
@@ -219,7 +225,7 @@ export default function BuyerSaved() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: BG,
@@ -259,7 +265,7 @@ const styles = StyleSheet.create({
     borderColor: BORDER,
   },
   tabActive: {
-    backgroundColor: PURPLE_DIM,
+    backgroundColor: theme.accentDim,
     borderColor: BORDER_ACTIVE,
   },
   tabText: {
@@ -268,7 +274,7 @@ const styles = StyleSheet.create({
     fontSize: FS.sm,
   },
   tabTextActive: {
-    color: PURPLE,
+    color: theme.accent,
     fontFamily: FONT.semibold,
   },
   emptyContainer: {

@@ -17,6 +17,7 @@ import { useApi } from '@/lib/api';
 import {
   BG, CARD, BORDER, FG, MUTED, PURPLE, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 
 interface ConnectionUser {
   id: string;
@@ -27,6 +28,7 @@ interface ConnectionUser {
 }
 
 export default function ConnectionsScreen() {
+  const colors = useColors();
   const router   = useRouter();
   const insets   = useSafeAreaInsets();
   const api      = useApi();
@@ -102,7 +104,7 @@ export default function ConnectionsScreen() {
 
       {loading && (
         <View style={s.center}>
-          <ActivityIndicator color={PURPLE} />
+          <ActivityIndicator color={colors.primary} />
         </View>
       )}
 

@@ -13,6 +13,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useApi } from '@/lib/api';
+import { useColors } from '@/hooks/useColors';
 
 const BG     = '#07070F';
 const CARD   = '#12121F';
@@ -72,6 +73,7 @@ const INITIAL: FormData = {
 };
 
 export default function ManufacturerOnboardScreen() {
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   const router  = useRouter();
   const { token: inviteToken } = useLocalSearchParams<{ token?: string }>();
@@ -194,7 +196,7 @@ export default function ManufacturerOnboardScreen() {
 
       {/* Progress bar */}
       <View style={s.progressTrack}>
-        <View style={[s.progressFill, { width: `${pct}%` }]} />
+        <View style={[s.progressFill, { width: `${pct}%`, backgroundColor: colors.primary }]} />
       </View>
 
       <ScrollView
@@ -238,11 +240,11 @@ export default function ManufacturerOnboardScreen() {
               {SPECIALTY_OPTIONS.map((opt) => (
                 <TouchableOpacity
                   key={opt}
-                  style={[s.chip, form.specialties.includes(opt) && s.chipActive]}
+                  style={[s.chip, form.specialties.includes(opt) && [s.chipActive, { backgroundColor: colors.accent, borderColor: colors.primary }]]}
                   onPress={() => toggleArr('specialties', opt)}
                   activeOpacity={0.75}
                 >
-                  <Text style={[s.chipText, form.specialties.includes(opt) && s.chipTextActive]}>{opt}</Text>
+                  <Text style={[s.chipText, form.specialties.includes(opt) && [s.chipTextActive, { color: colors.primary }]]}>{opt}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -252,11 +254,11 @@ export default function ManufacturerOnboardScreen() {
               {PRODUCTION_MODES.map((opt) => (
                 <TouchableOpacity
                   key={opt}
-                  style={[s.chip, form.productionModes.includes(opt) && s.chipActive]}
+                  style={[s.chip, form.productionModes.includes(opt) && [s.chipActive, { backgroundColor: colors.accent, borderColor: colors.primary }]]}
                   onPress={() => toggleArr('productionModes', opt)}
                   activeOpacity={0.75}
                 >
-                  <Text style={[s.chipText, form.productionModes.includes(opt) && s.chipTextActive]}>{opt}</Text>
+                  <Text style={[s.chipText, form.productionModes.includes(opt) && [s.chipTextActive, { color: colors.primary }]]}>{opt}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -293,8 +295,8 @@ export default function ManufacturerOnboardScreen() {
               ))}
               {form.photos.length < 8 && (
                 <TouchableOpacity style={s.photoAdd} onPress={pickPhoto} activeOpacity={0.8}>
-                  <Feather name="plus" size={22} color={GREEN} />
-                  <Text style={s.photoAddText}>Add Photo</Text>
+                  <Feather name="plus" size={22} color={colors.primary} />
+                  <Text style={[s.photoAddText, { color: colors.primary }]}>Add Photo</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -310,10 +312,10 @@ export default function ManufacturerOnboardScreen() {
             <Field label="Sample Cost (optional)" value={form.sampleCost} onChange={(v) => set('sampleCost', v)} placeholder="e.g. 25.00" keyboardType="decimal-pad" />
 
             {/* Escrow notice */}
-            <View style={s.escrowNotice}>
-              <Feather name="shield" size={16} color={GREEN} />
+            <View style={[s.escrowNotice, { backgroundColor: colors.accent, borderColor: colors.primary + '44' }]}>
+              <Feather name="shield" size={16} color={colors.primary} />
               <View style={{ flex: 1 }}>
-                <Text style={s.escrowTitle}>Brandthread Escrow Protection</Text>
+                <Text style={[s.escrowTitle, { color: colors.primary }]}>Brandthread Escrow Protection</Text>
                 <Text style={s.escrowDesc}>
                   Brand payments are held in escrow and released to you only after they confirm production is complete — protecting both sides of every deal.
                 </Text>
@@ -347,12 +349,12 @@ export default function ManufacturerOnboardScreen() {
               onPress={() => { haptic('light'); set('agreeTerms', !form.agreeTerms); }}
               activeOpacity={0.8}
             >
-              <View style={[s.checkbox, form.agreeTerms && s.checkboxActive]}>
+              <View style={[s.checkbox, form.agreeTerms && [s.checkboxActive, { backgroundColor: colors.primary, borderColor: colors.primary }]]}>
                 {form.agreeTerms && <Feather name="check" size={12} color={BG} />}
               </View>
               <Text style={s.termsText}>
                 I agree to the{' '}
-                <Text style={{ color: GREEN }}>Brandthread Manufacturer Terms</Text>
+                <Text style={{ color: colors.primary }}>Brandthread Manufacturer Terms</Text>
                 {' '}and understand payments are held in escrow until delivery is confirmed.
               </Text>
             </TouchableOpacity>
@@ -363,7 +365,7 @@ export default function ManufacturerOnboardScreen() {
       {/* Bottom CTA */}
       <View style={[s.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
         <TouchableOpacity
-          style={[s.nextBtn, submitting && { opacity: 0.7 }]}
+          style={[s.nextBtn, { backgroundColor: colors.primary }, submitting && { opacity: 0.7 }]}
           onPress={next}
           activeOpacity={0.85}
           disabled={submitting}

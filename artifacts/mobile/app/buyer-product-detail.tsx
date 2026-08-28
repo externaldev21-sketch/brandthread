@@ -11,6 +11,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   addToCart, createBuyNowSession, replaceCartItemVariant,
   getCart,
@@ -18,19 +20,29 @@ import {
 import { BuyerProduct, BuyerProductOption, BuyerProductVariant, CheckoutAttribution } from '@/services/cartTypes';
 import { useApi } from '@/hooks/useApi';
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
+import { useAuth } from '@clerk/expo';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, BORDER_FOCUS,
+  BG, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE, ON_DARK,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM,
   SUCCESS, SUCCESS_DIM,
   ORANGE, ORANGE_DIM,
   RED, RED_DIM,
   GOLD,
-  GRAD_PRIMARY, GRAD_SUCCESS_G,
+  GRAD_SUCCESS_G,
   FONT, FS, SP, RADIUS, COMP, ICON,
-  SHADOW_PURPLE,
 } from '@/lib/theme';
+
+function useChrome() {
+  const colors = useColors();
+  const { theme } = useAppTheme();
+  return {
+    theme, PURPLE: colors.primary, PURPLE_LIGHT: theme.accentLight, PURPLE_DIM: colors.accent,
+    CYAN: theme.secondary, CYAN_DIM: theme.secondaryDim,
+    BORDER_ACTIVE: `${theme.accent}73`, BORDER_FOCUS: `${theme.secondary}80`,
+    GRAD_PRIMARY: [theme.accent, theme.secondary] as const,
+    SHADOW_PURPLE: { shadowColor: theme.accent, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
+  };
+}
 
 // ─── API → BuyerProduct adapter ───────────────────────────────────────────────
 // Converts a raw row from GET /api/public/products/:id to the BuyerProduct
@@ -131,6 +143,8 @@ function OptionPicker({ product, option, selections, onSelect }: {
   selections: Record<string, string>;
   onSelect: (optionId: string, valueId: string) => void;
 }) {
+  const { theme } = useAppTheme();
+  const op = makeOptionStyles(theme);
   const isColor = option.name.toLowerCase() === 'color';
   return (
     <View style={op.root}>
@@ -190,7 +204,9 @@ function OptionPicker({ product, option, selections, onSelect }: {
   );
 }
 
-const op = StyleSheet.create({
+const makeOptionStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE = theme.accent, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = theme.accentDim;
+  return StyleSheet.create({
   root: { marginBottom: SP.md },
   labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },
   optionName: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
@@ -218,7 +234,8 @@ const op = StyleSheet.create({
   unavail: { opacity: 0.4 },
   slashOverlay: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
   slash: { fontSize: 18, color: RED, fontFamily: FONT.bold },
-});
+  });
+};
 
 // ─── Quantity Selector ────────────────────────────────────────────────────────
 
@@ -251,6 +268,9 @@ const qs = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function BuyerProductDetailScreen() {
+  const { theme, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM, BORDER_ACTIVE, BORDER_FOCUS, GRAD_PRIMARY, SHADOW_PURPLE } = useChrome();
+  const s = makeStyles(theme);
+  const wl = makeWaitlistStyles(theme);
   const { productId, sourcePostId, sourceTagId, editVariantId, editCartItemId } = useLocalSearchParams<{
     productId?: string;
     sourcePostId?: string;
@@ -261,6 +281,7 @@ export default function BuyerProductDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api    = useApi();
+  const { isSignedIn } = useAuth();
 
   const [product, setProduct] = useState<BuyerProduct | null>(null);
   const [loading, setLoading] = useState(true);
@@ -307,7 +328,7 @@ export default function BuyerProductDetailScreen() {
               // is non-fatal: Buy Now performs its own safety check on tap.
               [prod, paymentStatus] = await Promise.all([
                 Promise.resolve(adaptApiProductToBuyerProduct(row)),
-                row.ownerId
+                row.ownerId && isSignedIn
                   ? api.buyer.sellerPaymentStatus(row.ownerId).catch(() => null)
                   : Promise.resolve(null),
               ]);
@@ -352,11 +373,13 @@ export default function BuyerProductDetailScreen() {
   async function handleRefresh() {
     if (!product?.sellerId) return;
     setRefreshing(true);
-    invalidateSellerPaymentStatusCache(product.sellerId);
+    if (isSignedIn) invalidateSellerPaymentStatusCache(product.sellerId);
     try {
-      const status = await api.buyer.sellerPaymentStatus(product.sellerId);
-      setSellerPaymentReady(status.ready);
-      setSellerPaymentReason(status.reason ?? null);
+      if (isSignedIn) {
+        const status = await api.buyer.sellerPaymentStatus(product.sellerId);
+        setSellerPaymentReady(status.ready);
+        setSellerPaymentReason(status.reason ?? null);
+      }
     } catch {
       // Keep the existing readiness state visible if a manual refresh loses
       // connectivity; Buy Now still performs its own check before checkout.
@@ -367,22 +390,22 @@ export default function BuyerProductDetailScreen() {
 
   // Check waitlist status when selected variant changes
   useEffect(() => {
-    if (!product) return;
+    if (!product || !isSignedIn) return;
     const v = findVariant(product, selections);
     if (!v?.id || v.isAvailable) { setWaitlistJoined(false); return; }
     (api as any).waitlist?.check?.(v.id)
       ?.then((d: any) => setWaitlistJoined(d?.joined ?? false))
       ?.catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [product?.id, JSON.stringify(selections)]);
+  }, [product?.id, JSON.stringify(selections), isSignedIn]);
 
   // Check reservation status for pre-order products
   useEffect(() => {
-    if (!product?.id || !product.isPreOrder) { setReserved(false); return; }
+    if (!product?.id || !product.isPreOrder || !isSignedIn) { setReserved(false); return; }
     (api as any).buyer?.checkReservation?.(product.id)
       ?.then((d: any) => setReserved(d?.reserved ?? false))
       ?.catch(() => {});
-  }, [product?.id, product?.isPreOrder]);
+  }, [product?.id, product?.isPreOrder, isSignedIn]);
 
   if (loading) {
     return (
@@ -435,6 +458,10 @@ export default function BuyerProductDetailScreen() {
 
   async function handleJoinWaitlist() {
     if (!product || !variant) return;
+    if (!isSignedIn) {
+      router.replace('/sign-in' as never);
+      return;
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setWaitlistLoading(true);
     try {
@@ -447,6 +474,10 @@ export default function BuyerProductDetailScreen() {
 
   async function handleReserve() {
     if (!product) return;
+    if (!isSignedIn) {
+      router.replace('/sign-in' as never);
+      return;
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setReserveLoading(true);
     try {
@@ -488,7 +519,7 @@ export default function BuyerProductDetailScreen() {
     try {
       // Check seller payment readiness before entering checkout
       const sellerId = product!.sellerId;
-      if (sellerId) {
+      if (sellerId && isSignedIn) {
         try {
           const status = await api.buyer.sellerPaymentStatus(sellerId);
           if (!status.ready) {
@@ -734,6 +765,12 @@ export default function BuyerProductDetailScreen() {
               ))}
             </>
           )}
+
+          {/* Related Products */}
+          <View style={s.divider} />
+          <Text style={s.reviewsHeader}>You Might Also Like</Text>
+          <RelatedProducts productId={product.id} />
+
         </View>
       </ScrollView>
 
@@ -825,6 +862,8 @@ export default function BuyerProductDetailScreen() {
 interface SizeChart { columns: string[]; rows: { size: string; values: string[] }[]; unit?: string; notes?: string }
 
 function SizeChartViewer({ chart }: { chart: SizeChart }) {
+  const { theme } = useAppTheme();
+  const sch = makeSizeChartStyles(theme);
   if (!chart?.columns?.length) return null;
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: SP.sm }}>
@@ -856,7 +895,93 @@ function SizeChartViewer({ chart }: { chart: SizeChart }) {
     </ScrollView>
   );
 }
-const sch = StyleSheet.create({
+
+function RelatedProducts({ productId }: { productId: string }) {
+  const { theme } = useAppTheme();
+  const api = useApi();
+  const router = useRouter();
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    api.publicProducts.related(productId, 5)
+      .then((data) => {
+        if (!cancelled) {
+          setProducts(data.filter((p: any) => p.id !== productId).slice(0, 4));
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) { setError(true); setLoading(false); }
+      });
+    return () => { cancelled = true; };
+  }, [productId, api, router]);
+
+  if (loading) {
+    return (
+      <View style={{ paddingVertical: SP.xl, alignItems: 'center' }}>
+        <ActivityIndicator color={theme.accent} size="small" />
+      </View>
+    );
+  }
+
+  if (error || products.length === 0) {
+    return (
+      <View style={{ paddingVertical: SP.md }}>
+        <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: SUBTLE }}>
+          {error ? 'Unable to load related products.' : 'No related products found.'}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -SP.md }} contentContainerStyle={{ paddingHorizontal: SP.md, gap: SP.md }}>
+      {products.map((p) => {
+        let lowestPrice = 0;
+        if (p.variants && p.variants.length > 0) {
+          lowestPrice = p.variants.reduce((min: number, v: any) => Math.min(min, (v.priceCents ?? 0) / 100), (p.variants[0].priceCents ?? 0) / 100);
+        } else if (p.priceCents) {
+          lowestPrice = p.priceCents / 100;
+        }
+
+        return (
+          <TouchableOpacity
+            key={p.id}
+            style={{ width: 140 }}
+            activeOpacity={0.8}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              router.push({ pathname: '/buyer-product-detail' as any, params: { productId: p.id } });
+            }}
+          >
+            <View style={{ width: 140, height: 180, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md, overflow: 'hidden', marginBottom: SP.sm }}>
+              {(p.images && p.images[0]) ? (
+                <Image source={{ uri: p.images[0] }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+              ) : (
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                  <Feather name="image" size={24} color={MUTED} />
+                </View>
+              )}
+            </View>
+            <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: FG }} numberOfLines={1}>{p.name}</Text>
+            <Text style={{ fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 }} numberOfLines={1}>
+              {p.sellerDisplayName || 'Independent Seller'}
+            </Text>
+            <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: FG, marginTop: 4 }}>${lowestPrice.toFixed(2)}</Text>
+          </TouchableOpacity>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+const makeSizeChartStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE_DIM = theme.accentDim, PURPLE_LIGHT = theme.accentLight;
+  return StyleSheet.create({
   row:        { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER },
   altRow:     { backgroundColor: CARD_ELEVATED },
   cell:       { width: 72, paddingVertical: 8, paddingHorizontal: 4, justifyContent: 'center' },
@@ -866,7 +991,8 @@ const sch = StyleSheet.create({
   sizeText:   { fontFamily: FONT.semibold, fontSize: FS.xs, color: FG, textAlign: 'center' },
   valueText:  { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, textAlign: 'center' },
   notes:      { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, marginTop: SP.sm, lineHeight: 17 },
-});
+  });
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -887,7 +1013,13 @@ const pr = StyleSheet.create({
   value: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginTop: 2, lineHeight: 17 },
 });
 
-const s = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const { PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM, BORDER_ACTIVE, BORDER_FOCUS, SHADOW_PURPLE } = {
+    PURPLE: theme.accent, PURPLE_LIGHT: theme.accentLight, PURPLE_DIM: theme.accentDim, CYAN: theme.secondary, CYAN_DIM: theme.secondaryDim,
+    BORDER_ACTIVE: `${theme.accent}73`, BORDER_FOCUS: `${theme.secondary}80`,
+    SHADOW_PURPLE: { shadowColor: theme.accent, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 },
+  };
+  return StyleSheet.create({
   imageArea: { height: 360, backgroundColor: CARD, position: 'relative' },
   productImage: { width: '100%', height: '100%' },
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.sm },
@@ -934,7 +1066,7 @@ const s = StyleSheet.create({
   priceSale: { color: SUCCESS },
   comparePrice: { fontSize: FS.base, fontFamily: FONT.regular, color: SUBTLE, textDecorationLine: 'line-through' },
   savings: { fontSize: FS.sm, fontFamily: FONT.semibold, color: SUCCESS },
-  preOrderCard: { backgroundColor: CYAN_DIM, borderRadius: RADIUS.md, padding: SP.md, borderWidth: 1, borderColor: 'rgba(34,211,238,0.25)', marginBottom: SP.md, gap: 4 },
+  preOrderCard: { backgroundColor: CYAN_DIM, borderRadius: RADIUS.md, padding: SP.md, borderWidth: 1, borderColor: `${CYAN}40`, marginBottom: SP.md, gap: 4 },
   preOrderRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   preOrderTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: CYAN },
   preOrderDetail: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
@@ -969,14 +1101,18 @@ const s = StyleSheet.create({
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.md },
   ratingAvg: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
   ratingCount: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-});
+  });
+};
 
 // Waitlist button styles
-const wl = StyleSheet.create({
+const makeWaitlistStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE_DIM = theme.accentDim, PURPLE_LIGHT = theme.accentLight, BORDER_ACTIVE = `${theme.accent}73`;
+  return StyleSheet.create({
   btn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, marginTop: SP.sm, paddingVertical: SP.sm, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM },
   joined: { borderColor: SUCCESS + '44', backgroundColor: 'transparent' },
   text:   { fontFamily: FONT.medium, fontSize: FS.sm, color: PURPLE_LIGHT },
-});
+  });
+};
 
 // Size chart toggle styles
 const sz = StyleSheet.create({

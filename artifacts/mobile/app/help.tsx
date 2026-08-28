@@ -9,13 +9,13 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 const BG     = '#07070F';
 const CARD   = '#12121F';
 const BORDER = 'rgba(255,255,255,0.07)';
 const FG     = '#F4F4FF';
 const MUTED  = 'rgba(244,244,255,0.50)';
-const GREEN  = '#8B5CF6';
 
 const FAQS = [
   { q: 'How do drops work?', a: 'Drops are limited-time releases from brands you follow. When a drop goes live you get a notification. Tap the drop to view it and place your order before it sells out. Pre-orders are charged immediately and shipped when production is complete.' },
@@ -34,6 +34,7 @@ export default function HelpScreen() {
   const router = useRouter();
   const api = useApi();
   const { user } = useUser();
+  const { theme } = useAppTheme();
 
   const [query, setQuery]     = useState('');
   const [openIdx, setOpenIdx] = useState<number | null>(null);
@@ -106,15 +107,15 @@ export default function HelpScreen() {
         {/* Contact shortcuts */}
         <View style={s.contactRow}>
           <TouchableOpacity style={s.contactBtn} onPress={() => Linking.openURL('mailto:support@brandthread.app')} activeOpacity={0.8}>
-            <Feather name="mail" size={18} color={GREEN} />
+            <Feather name="mail" size={18} color={theme.accent} />
             <Text style={s.contactLabel}>Email Us</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.contactBtn} onPress={() => Linking.openURL('https://brandthread.app/chat')} activeOpacity={0.8}>
-            <Feather name="message-circle" size={18} color={GREEN} />
+            <Feather name="message-circle" size={18} color={theme.accent} />
             <Text style={s.contactLabel}>Live Chat</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.contactBtn} onPress={() => Linking.openURL('https://brandthread.app/help')} activeOpacity={0.8}>
-            <Feather name="book-open" size={18} color={GREEN} />
+            <Feather name="book-open" size={18} color={theme.accent} />
             <Text style={s.contactLabel}>Full Docs</Text>
           </TouchableOpacity>
         </View>
@@ -143,9 +144,9 @@ export default function HelpScreen() {
         })}
 
         {/* Support ticket form */}
-        <View style={s.ticketSection}>
+        <View style={[s.ticketSection, { backgroundColor: theme.accentDim, borderColor: `${theme.accent}33` }]}>
           <View style={s.ticketHeader}>
-            <Feather name="life-buoy" size={18} color={GREEN} />
+            <Feather name="life-buoy" size={18} color={theme.accent} />
             <Text style={s.ticketTitle}>Still stuck? Send us a message</Text>
           </View>
           <Text style={s.ticketSub}>We typically respond within 2 hours on business days.</Text>
@@ -165,7 +166,7 @@ export default function HelpScreen() {
                 {CATEGORIES.map((c) => (
                   <TouchableOpacity
                     key={c}
-                    style={[s.catChip, category === c && s.catChipActive]}
+                    style={[s.catChip, { borderColor: `${theme.accent}4D` }, category === c && { backgroundColor: theme.accent, borderColor: theme.accent }]}
                     onPress={() => setCategory(c)}
                     activeOpacity={0.8}
                   >
@@ -194,7 +195,7 @@ export default function HelpScreen() {
                 textAlignVertical="top"
               />
               <TouchableOpacity
-                style={[s.contactFullBtn, (!subject.trim() || !ticketBody.trim() || submitting) && s.btnDisabled]}
+                style={[s.contactFullBtn, { backgroundColor: theme.accent }, (!subject.trim() || !ticketBody.trim() || submitting) && s.btnDisabled]}
                 onPress={handleSubmitTicket}
                 disabled={!subject.trim() || !ticketBody.trim() || submitting}
                 activeOpacity={0.85}
@@ -227,13 +228,12 @@ const s = StyleSheet.create({
   faqTop:     { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
   faqQ:       { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: FG, flex: 1 },
   faqA:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 20 },
-  ticketSection:   { backgroundColor: 'rgba(139,92,246,0.10)', borderRadius: 18, borderWidth: 1, borderColor: GREEN + '33', padding: 16, gap: 12 },
+  ticketSection:   { borderRadius: 18, borderWidth: 1, padding: 16, gap: 12 },
   ticketHeader:    { flexDirection: 'row', alignItems: 'center', gap: 8 },
   ticketTitle:     { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
   ticketSub:       { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 19 },
   catScroll:       { flexGrow: 0, marginBottom: -2 },
-  catChip:         { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(139,92,246,0.30)' },
-  catChipActive:   { backgroundColor: GREEN, borderColor: GREEN },
+  catChip:         { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
   catChipText:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED },
   catChipTextActive: { color: '#000' },
   ticketInput:     { backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, padding: 12, fontSize: 14, fontFamily: 'Inter_400Regular', color: FG },
@@ -241,7 +241,7 @@ const s = StyleSheet.create({
   submittedBadge:  { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, backgroundColor: 'rgba(52,211,153,0.12)', borderRadius: 10 },
   submittedText:   { flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium', color: FG },
   sendAnotherText: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, textDecorationLine: 'underline' },
-  contactFullBtn:  { backgroundColor: GREEN, borderRadius: 14, paddingHorizontal: 24, paddingVertical: 13, alignItems: 'center' },
+  contactFullBtn:  { borderRadius: 14, paddingHorizontal: 24, paddingVertical: 13, alignItems: 'center' },
   contactFullBtnText: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#000' },
   btnDisabled:     { opacity: 0.5 },
 });

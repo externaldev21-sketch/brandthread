@@ -15,6 +15,7 @@ import {
   PURPLE, PURPLE_DIM, PURPLE_LIGHT,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 
 type Review = {
@@ -160,6 +161,8 @@ function ReviewCard({ review, onReplySubmitted }: { review: Review; onReplySubmi
 }
 
 export default function SellerReviewsScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM } = theme;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();

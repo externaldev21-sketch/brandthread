@@ -8,8 +8,9 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { searchCatalogue, SEARCH_BRANDS, type SearchResult } from '@/lib/searchData';
-import { BG, CARD, BORDER, FG, MUTED, PURPLE } from '@/lib/theme';
+import { BG, CARD, BORDER, FG, MUTED } from '@/lib/theme';
 import { useApi } from '@/lib/api';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 type PersonResult = {
   userId: string; name: string; username: string | null;
@@ -27,33 +28,66 @@ export default function SearchScreen() {
   const border  = BORDER;
   const fg      = FG;
   const muted   = MUTED;
-  const primary = PURPLE;
+  const { theme } = useAppTheme();
+  const primary = theme.accent;
+  const primaryDim = theme.accentDim;
 
   const api    = useApi();
   const [query,   setQuery]   = useState('');
+  const [sort, setSort] = useState<string>(''); // '', 'relevance', 'price_asc', 'price_desc', 'newest'
+  const [minPrice, setMinPrice] = useState<string>('');
+  const [maxPrice, setMaxPrice] = useState<string>('');
+  const [category, setCategory] = useState<string>('');
+  const [showFilters, setShowFilters] = useState(false);
+
   const [results, setResults] = useState<SearchResult[]>([]);
   const [people,  setPeople]  = useState<PersonResult[]>([]);
   const [searching, setSearching] = useState(false);
   const topPad = Platform.OS === 'web' ? 24 : insets.top;
 
+  const hasActiveFilters = sort !== '' || minPrice !== '' || maxPrice !== '' || category !== '';
+
+  const clearFilters = () => {
+    setSort('');
+    setMinPrice('');
+    setMaxPrice('');
+    setCategory('');
+  };
+
   useEffect(() => {
     const q = query.trim();
-    if (q.length < 2) { setResults([]); setPeople([]); setSearching(false); return; }
+    if (q.length < 2 && !hasActiveFilters) { setResults([]); setPeople([]); setSearching(false); return; }
     let cancelled = false;
     setSearching(true);
     const timer = setTimeout(async () => {
       try {
-        const base = (process.env.EXPO_PUBLIC_API_BASE_URL ?? '').replace(/\/$/, '');
+        const minPriceCents = minPrice ? Math.floor(parseFloat(minPrice) * 100) : undefined;
+        const maxPriceCents = maxPrice ? Math.floor(parseFloat(maxPrice) * 100) : undefined;
+
         const [brandRes, peopleData] = await Promise.allSettled([
-          fetch(`${base}/api/public/search?q=${encodeURIComponent(q)}&limit=20`),
+          api.public.search({
+            q,
+            sort: sort || undefined,
+            minPriceCents: !isNaN(minPriceCents as number) ? minPriceCents : undefined,
+            maxPriceCents: !isNaN(maxPriceCents as number) ? maxPriceCents : undefined,
+            category: category || undefined,
+            limit: 20
+          }),
           api.social.search(q, 10),
         ]);
         if (!cancelled) {
-          if (brandRes.status === 'fulfilled' && brandRes.value.ok) {
-            const data = await brandRes.value.json();
-            setResults(data.results ?? []);
+          if (brandRes.status === 'fulfilled') {
+            setResults(brandRes.value.results ?? []);
           } else {
-            setResults(searchCatalogue(q));
+            let fallback = searchCatalogue(q);
+            if (sort === 'price_asc' || sort === 'price_desc') {
+               fallback.sort((a, b) => {
+                 const pa = a.kind === 'product' ? parseFloat(a.price.replace(/[^0-9.]/g, '')) : 0;
+                 const pb = b.kind === 'product' ? parseFloat(b.price.replace(/[^0-9.]/g, '')) : 0;
+                 return sort === 'price_asc' ? pa - pb : pb - pa;
+               });
+            }
+            setResults(fallback);
           }
           if (peopleData.status === 'fulfilled') {
             setPeople(peopleData.value as PersonResult[]);
@@ -67,7 +101,7 @@ export default function SearchScreen() {
       }
     }, 300);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [query]);
+  }, [query, sort, minPrice, maxPrice, category]);
 
   function goToBrand() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -84,6 +118,15 @@ export default function SearchScreen() {
       goToBrand();
     }
   }
+
+  const SortChip = ({ label, active, onPress }: { label: string, active: boolean, onPress: () => void }) => (
+    <TouchableOpacity
+      style={[styles.filterChip, { borderColor: active ? primary : border, backgroundColor: active ? primaryDim : 'transparent' }]}
+      onPress={() => { Haptics.selectionAsync(); onPress(); }}
+    >
+      <Text style={[styles.filterChipText, { color: active ? primary : fg }]}>{label}</Text>
+    </TouchableOpacity>
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
@@ -119,7 +162,59 @@ export default function SearchScreen() {
             </TouchableOpacity>
           )}
         </View>
+        <TouchableOpacity
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setShowFilters(!showFilters);
+          }}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Toggle filters"
+        >
+          <Feather name="sliders" size={20} color={hasActiveFilters ? primary : fg} />
+        </TouchableOpacity>
       </View>
+
+      {showFilters && (
+        <View style={[styles.filterPanel, { backgroundColor: card, borderBottomColor: border }]}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+            <SortChip label="Relevance" active={!sort} onPress={() => setSort('')} />
+            <SortChip label="Price: Low-High" active={sort === 'price_asc'} onPress={() => setSort('price_asc')} />
+            <SortChip label="Price: High-Low" active={sort === 'price_desc'} onPress={() => setSort('price_desc')} />
+            <SortChip label="Newest" active={sort === 'newest'} onPress={() => setSort('newest')} />
+          </ScrollView>
+          <View style={styles.filterRow}>
+            <TextInput
+              style={[styles.filterInput, { color: fg, borderColor: border }]}
+              placeholder="Min $"
+              placeholderTextColor={muted}
+              keyboardType="numeric"
+              value={minPrice}
+              onChangeText={setMinPrice}
+            />
+            <TextInput
+              style={[styles.filterInput, { color: fg, borderColor: border }]}
+              placeholder="Max $"
+              placeholderTextColor={muted}
+              keyboardType="numeric"
+              value={maxPrice}
+              onChangeText={setMaxPrice}
+            />
+            <TextInput
+              style={[styles.filterInput, { color: fg, borderColor: border }]}
+              placeholder="Category"
+              placeholderTextColor={muted}
+              value={category}
+              onChangeText={setCategory}
+            />
+          </View>
+          {hasActiveFilters && (
+            <TouchableOpacity onPress={clearFilters} style={styles.clearBtn}>
+              <Text style={[styles.clearBtnText, { color: primary }]}>Clear All</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
         {query.trim().length === 0 ? (
@@ -202,7 +297,7 @@ export default function SearchScreen() {
                     </View>
                     {p.isFollowing && (
                       <View style={styles.followingBadge}>
-                        <Text style={[styles.followingBadgeText, { color: primary }]}>Following</Text>
+                        <Text style={[styles.followingBadge, { borderColor: primary }, styles.followingBadgeText, { color: primary }]}>Following</Text>
                       </View>
                     )}
                   </TouchableOpacity>
@@ -280,9 +375,13 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   emptyLabel: { fontSize: 13.5, fontFamily: 'Inter_400Regular' },
-  followingBadge: {
-    paddingHorizontal: 8, paddingVertical: 3,
-    borderRadius: 10, borderWidth: 1, borderColor: PURPLE,
-  },
+  followingBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1 },
   followingBadgeText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  filterPanel: { padding: 16, borderBottomWidth: 1 },
+  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  filterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, marginRight: 8 },
+  filterChipText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  filterInput: { flex: 1, height: 36, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  clearBtn: { alignSelf: 'flex-end', paddingVertical: 4 },
+  clearBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
 });

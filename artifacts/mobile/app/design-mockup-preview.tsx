@@ -3,6 +3,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Alert, Dimensions, ActivityIndicator,
@@ -42,6 +43,7 @@ const SHADOW_STYLES = ['None', 'Soft', 'Hard', 'Drop'] as const;
 type ShadowStyle = typeof SHADOW_STYLES[number];
 
 export default function DesignMockupPreviewScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { projectId } = useLocalSearchParams<{ projectId?: string }>();

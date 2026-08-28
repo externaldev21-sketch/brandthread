@@ -13,9 +13,10 @@ import { useUser } from '@clerk/expo';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, BORDER_ACTIVE,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE,
   FONT, FS, SP, RADIUS, SUCCESS, SUCCESS_DIM, CARD_ELEVATED, RED, RED_DIM,
 } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -30,6 +31,7 @@ type MethodRow = {
 type OAuthProvider = 'google' | 'apple';
 
 export default function LoginMethods() {
+  const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, isLoaded } = useUser();
@@ -234,7 +236,7 @@ export default function LoginMethods() {
 
       {!isLoaded ? (
         <View style={s.loading}>
-          <ActivityIndicator color={PURPLE} />
+          <ActivityIndicator color={colors.primary} />
         </View>
       ) : (
         <ScrollView
@@ -257,7 +259,10 @@ export default function LoginMethods() {
 
               const rowContent = (
                 <View style={s.row}>
-                  <View style={[s.iconWrap, method.connected && s.iconWrapActive]}>
+                  <View style={[
+                    s.iconWrap,
+                    method.connected && [s.iconWrapActive, { backgroundColor: colors.accent, borderColor: colors.primary }],
+                  ]}>
                     {method.icon}
                   </View>
                   <View style={{ flex: 1, gap: 2 }}>
@@ -288,10 +293,10 @@ export default function LoginMethods() {
                     </View>
                   ) : isOAuth ? (
                     isLinking ? (
-                      <ActivityIndicator size="small" color={PURPLE} />
+                      <ActivityIndicator size="small" color={colors.primary} />
                     ) : (
-                      <View style={s.enableBtn}>
-                        <Text style={s.enableBtnText}>Connect</Text>
+                      <View style={[s.enableBtn, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
+                        <Text style={[s.enableBtnText, { color: colors.primary }]}>Connect</Text>
                       </View>
                     )
                   ) : (
@@ -324,8 +329,11 @@ export default function LoginMethods() {
           <Text style={s.sectionLabel}>Two-Factor Authentication</Text>
           <View style={s.card}>
             <View style={s.row}>
-              <View style={[s.iconWrap, twoFactorEnabled && s.iconWrapActive]}>
-                <Feather name="shield" size={20} color={twoFactorEnabled ? PURPLE : SUBTLE} />
+              <View style={[
+                s.iconWrap,
+                twoFactorEnabled && [s.iconWrapActive, { backgroundColor: colors.accent, borderColor: colors.primary }],
+              ]}>
+                <Feather name="shield" size={20} color={twoFactorEnabled ? colors.primary : SUBTLE} />
               </View>
               <View style={{ flex: 1, gap: 2 }}>
                 <Text style={s.methodLabel}>Authenticator app (TOTP)</Text>
@@ -334,14 +342,17 @@ export default function LoginMethods() {
                 </Text>
               </View>
               {twoFaLoading ? (
-                <ActivityIndicator size="small" color={PURPLE} />
+                <ActivityIndicator size="small" color={colors.primary} />
               ) : twoFactorEnabled ? (
                 <TouchableOpacity onPress={handleDisable2FA} style={s.disableBtn}>
                   <Text style={s.disableBtnText}>Disable</Text>
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity onPress={handleEnable2FA} style={s.enableBtn}>
-                  <Text style={s.enableBtnText}>Enable</Text>
+                <TouchableOpacity
+                  onPress={handleEnable2FA}
+                  style={[s.enableBtn, { backgroundColor: colors.accent, borderColor: colors.primary }]}
+                >
+                  <Text style={[s.enableBtnText, { color: colors.primary }]}>Enable</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -374,7 +385,7 @@ export default function LoginMethods() {
             <Text style={s.modalStep}>2. Add a new account and enter this secret key manually:</Text>
 
             <View style={s.secretBox}>
-              <Text style={s.secretText} selectable>{totpModal?.secret}</Text>
+              <Text style={[s.secretText, { color: colors.primary }]} selectable>{totpModal?.secret}</Text>
             </View>
 
             <Text style={s.modalNote}>
@@ -407,14 +418,17 @@ export default function LoginMethods() {
             )}
 
             <TouchableOpacity
-              style={[s.verifyBtn, { opacity: verifyCode.length < 6 ? 0.5 : 1 }]}
+              style={[
+                s.verifyBtn,
+                { backgroundColor: colors.primary, opacity: verifyCode.length < 6 ? 0.5 : 1 },
+              ]}
               onPress={handleVerifyTOTP}
               disabled={verifyCode.length < 6 || verifying}
             >
               {verifying ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={colors.primaryForeground} />
               ) : (
-                <Text style={s.verifyBtnText}>Verify &amp; enable 2FA</Text>
+                <Text style={[s.verifyBtnText, { color: colors.primaryForeground }]}>Verify &amp; enable 2FA</Text>
               )}
             </TouchableOpacity>
           </ScrollView>
@@ -464,7 +478,6 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: BORDER,
   },
   iconWrapActive: {
-    backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE,
   },
 
   methodLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
@@ -486,11 +499,11 @@ const s = StyleSheet.create({
   },
 
   enableBtn: {
-    backgroundColor: PURPLE_DIM, borderRadius: RADIUS.sm,
+    borderRadius: RADIUS.sm,
     paddingHorizontal: 12, paddingVertical: 6,
-    borderWidth: 1, borderColor: BORDER_ACTIVE,
+    borderWidth: 1,
   },
-  enableBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: PURPLE },
+  enableBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold },
 
   removeBtn: {
     minWidth: 56, minHeight: 30, alignItems: 'center', justifyContent: 'center',
@@ -541,7 +554,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   secretText: {
-    fontSize: FS.base, fontFamily: FONT.semibold, color: PURPLE,
+    fontSize: FS.base, fontFamily: FONT.semibold,
     letterSpacing: 2,
   },
   codeInput: {
@@ -561,8 +574,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 6, paddingVertical: 3,
   },
   verifyBtn: {
-    backgroundColor: PURPLE, borderRadius: RADIUS.md,
+    borderRadius: RADIUS.md,
     paddingVertical: 16, alignItems: 'center',
   },
-  verifyBtnText: { fontSize: FS.base, fontFamily: FONT.semibold, color: '#fff' },
+  verifyBtnText: { fontSize: FS.base, fontFamily: FONT.semibold },
 });

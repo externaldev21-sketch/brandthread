@@ -38,6 +38,7 @@ import {
   FONT, FS, SP, RADIUS, COMP, ICON,
   SHADOW_PURPLE,
 } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -151,6 +152,7 @@ interface RatingState {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function SampleDetailScreen() {
+  const colors = useColors();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -460,7 +462,7 @@ export default function SampleDetailScreen() {
           />
           {imageUploading && (
             <View style={s.uploadingRow}>
-              <ActivityIndicator size="small" color={PURPLE_LIGHT} />
+              <ActivityIndicator size="small" color={colors.accentForeground} />
               <Text style={s.uploadingText}>Uploading…</Text>
             </View>
           )}
@@ -473,7 +475,7 @@ export default function SampleDetailScreen() {
           ) : (
             <TouchableOpacity onPress={handleAddImage} disabled={imageUploading} activeOpacity={0.75}>
               <GradientCard style={[s.section, s.imagePlaceholder]}>
-                <Feather name="camera" size={ICON.xl} color={PURPLE_LIGHT} style={{ marginBottom: SP.sm }} />
+                <Feather name="camera" size={ICON.xl} color={colors.accentForeground} style={{ marginBottom: SP.sm }} />
                 <Text style={s.imagePlaceholderText}>No images yet</Text>
                 <Text style={s.imagePlaceholderSub}>Tap to add a sample progress photo</Text>
               </GradientCard>

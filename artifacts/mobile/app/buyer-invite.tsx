@@ -11,9 +11,9 @@ import * as Sharing from 'expo-sharing';
 import * as Haptics from 'expo-haptics';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_DIM,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { PrimaryButton } from '@/components/BrandthreadUI';
 
@@ -29,6 +29,10 @@ type Stats = {
 };
 
 export default function BuyerInviteScreen() {
+  const { theme } = useAppTheme();
+  const PURPLE = theme.accent;
+  const PURPLE_DIM = theme.accentDim;
+  const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router  = useRouter();
   const api     = useApi();
@@ -107,7 +111,7 @@ export default function BuyerInviteScreen() {
         <View style={styles.content}>
           {/* Hero */}
           <LinearGradient
-            colors={['#1a0d2e', '#0d0714', BG]}
+            colors={[theme.accentDim, BG]}
             style={styles.hero}
           >
             <View style={styles.giftIconWrap}>
@@ -180,7 +184,7 @@ export default function BuyerInviteScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.create({
   root:   { flex: 1, backgroundColor: BG },
   header: {
     flexDirection:  'row',
@@ -213,7 +217,7 @@ const styles = StyleSheet.create({
   giftIconWrap: {
     width:  80, height: 80,
     borderRadius: 40,
-    backgroundColor: PURPLE_DIM,
+    backgroundColor: theme.accentDim,
     alignItems: 'center', justifyContent: 'center',
     marginBottom: SP.sm,
   },
@@ -265,7 +269,7 @@ const styles = StyleSheet.create({
     flexDirection:   'row',
     alignItems:      'center',
     gap:             4,
-    backgroundColor: PURPLE_DIM,
+    backgroundColor: theme.accentDim,
     paddingHorizontal: SP.sm,
     paddingVertical:   SP.xs,
     borderRadius:    RADIUS.pill,
@@ -273,7 +277,7 @@ const styles = StyleSheet.create({
   copyPillText: {
     fontSize:   FS.xs,
     fontFamily: FONT.semibold,
-    color:      PURPLE,
+    color:      theme.accent,
   },
   codeSub: {
     marginTop:  SP.xs,
@@ -300,7 +304,7 @@ const styles = StyleSheet.create({
   statIconWrap: {
     width:  40, height: 40,
     borderRadius: 20,
-    backgroundColor: PURPLE_DIM,
+    backgroundColor: theme.accentDim,
     alignItems: 'center', justifyContent: 'center',
   },
   statContent: { flex: 1 },
@@ -329,7 +333,7 @@ const styles = StyleSheet.create({
   joinedDot: {
     width: 6, height: 6,
     borderRadius: 3,
-    backgroundColor: PURPLE,
+    backgroundColor: theme.accent,
   },
   joinedName: {
     flex:       1,

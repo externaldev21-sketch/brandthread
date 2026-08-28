@@ -5,7 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
-import { BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, RED, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { BG, CARD, BORDER, FG, MUTED, SUBTLE, RED, FONT, FS, SP, RADIUS, ICON } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { ThreadDivider } from '@/components/BrandthreadUI';
 
 type Row = { label: string; subtitle?: string; icon: keyof typeof Feather.glyphMap; route?: string; section?: string; destructive?: boolean; action?: 'signout' | 'delete' };
@@ -44,6 +45,7 @@ const GROUPS: Group[] = [
   { title: 'Shopping', rows: [
     { label: 'Shopping preferences', subtitle: 'Sizes, fit, favorite categories and recommendations', icon: 'shopping-bag', route: '/shopping-preferences' },
     { label: 'Orders and returns', icon: 'package', route: '/(buyer)/orders' },
+    { label: 'Shipping addresses', subtitle: 'Manage your saved addresses for faster checkout', icon: 'map-pin', route: '/buyer-addresses' },
     { label: 'Payment methods', subtitle: 'Cards saved to your account', icon: 'credit-card', route: '/buyer-payment-methods' },
     { label: 'Following brands', icon: 'users', route: '/(buyer)/following' },
   ]},
@@ -73,6 +75,7 @@ const GROUPS: Group[] = [
 ];
 
 export default function BuyerSettingsScreen() {
+  useAppTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { signOut } = useAuth();

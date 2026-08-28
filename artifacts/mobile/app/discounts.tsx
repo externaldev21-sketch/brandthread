@@ -21,6 +21,7 @@ import {
   CYAN, SUCCESS, SUCCESS_DIM, ORANGE, RED, GOLD,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BrandthreadCard, PrimaryButton, SecondaryButton,
   StatusBadge, SectionHeader, EmptyState,
@@ -56,6 +57,8 @@ const DEMO: DiscountCode[] = [
 ];
 
 export default function DiscountsScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN } = theme;
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
   const api     = useApi();

@@ -22,6 +22,7 @@ import {
   BG, PURPLE, PURPLE_DIM, BORDER,
   FG, MUTED, SUBTLE, CARD, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 
 // ─── Agora SDK — native only, gracefully absent on web / Expo Go ──────────────
 let AgoraModule: any = null;
@@ -65,6 +66,7 @@ const av = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function CallScreen() {
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api    = useApi();
@@ -80,7 +82,7 @@ export default function CallScreen() {
   }>();
 
   const mode             = (params.mode ?? 'voice') as 'voice' | 'video';
-  const participantColor = params.participantColor ?? PURPLE;
+  const participantColor = params.participantColor ?? colors.primary;
   const participantInit  = params.participantInitials ?? '?';
   const myColor          = params.myColor ?? '#555';
   const myInit           = params.myInitials ?? 'Me';
@@ -302,7 +304,7 @@ export default function CallScreen() {
                 <Text style={s.callingText}>{params.participantName ?? 'Unknown'}</Text>
                 <View style={s.callingDots}>
                   {status === 'connecting' || status === 'ringing' ? (
-                    <ActivityIndicator color={PURPLE} />
+                    <ActivityIndicator color={colors.primary} />
                   ) : null}
                 </View>
               </View>
@@ -383,8 +385,8 @@ export default function CallScreen() {
             onPress={toggleScreenShare}
             activeOpacity={0.8}
           >
-            <Feather name="monitor" size={24} color={screenSharing ? PURPLE : FG} />
-            <Text style={[s.ctrlLabel, screenSharing && { color: PURPLE }]}>
+            <Feather name="monitor" size={24} color={screenSharing ? colors.primary : FG} />
+            <Text style={[s.ctrlLabel, screenSharing && { color: colors.primary }]}>
               {screenSharing ? 'Stop share' : 'Share'}
             </Text>
           </TouchableOpacity>

@@ -16,11 +16,14 @@ import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, RED,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 const LIVE_RED = '#FF3B30';
 const LIVE_DIM = '#FF3B3020';
 
 export default function SellerGoLiveScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE } = theme;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();

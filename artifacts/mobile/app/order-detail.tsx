@@ -19,6 +19,7 @@ import {
   BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
   GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, StatusBadge, SectionHeader, EmptyState,
@@ -382,6 +383,8 @@ function AddressCard({ title, addr }: { title: string; addr: { name: string; lin
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function OrderDetailScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const { id, tab } = useLocalSearchParams<{ id: string; tab?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();

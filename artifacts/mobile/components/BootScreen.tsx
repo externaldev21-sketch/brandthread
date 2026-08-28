@@ -7,12 +7,14 @@
 import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 export default function BootScreen() {
+  const { theme } = useAppTheme();
   return (
     <View style={styles.root}>
       <BrandthreadLogo size={96} showGlow />
-      <ActivityIndicator size="small" color="#8B5CF6" style={styles.spinner} />
+      <ActivityIndicator size="small" color={theme.accent} style={styles.spinner} />
     </View>
   );
 }

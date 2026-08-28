@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Modal,
@@ -73,6 +74,7 @@ function ConfirmationModal({
 }
 
 export default function BuyerAccountControl() {
+  const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { signOut } = useAuth();

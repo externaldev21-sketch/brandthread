@@ -11,6 +11,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, ActivityIndicator, Image, Modal, FlatList,
@@ -73,6 +74,7 @@ interface ProcessingError {
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function DesignBgRemovalScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const { getToken } = useAuth();
   const insets = useSafeAreaInsets();

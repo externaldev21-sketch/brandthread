@@ -13,10 +13,10 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_DIM, PURPLE_LIGHT,
   SUCCESS,
   FONT, FS, SP,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 type DigestMode = 'realtime' | 'daily';
 
@@ -37,6 +37,7 @@ const ROWS: NotifRow[] = [
 export default function NotificationsSettingsScreen() {
   const insets = useSafeAreaInsets();
   const api    = useApi();
+  const { theme } = useAppTheme();
   const [email, setEmail]   = useState('store@brandthread.com');
   const [digest, setDigest] = useState<DigestMode>('realtime');
   const [loading, setLoading] = useState(true);
@@ -80,8 +81,8 @@ export default function NotificationsSettingsScreen() {
           <Text style={s.sectionSubtitle}>
             The email your store uses to send and receive emails from customers
           </Text>
-          <View style={[s.infoBox, { backgroundColor: PURPLE_DIM }]}>
-            <Feather name="info" size={15} color={PURPLE_LIGHT} style={{ marginTop: 2 }} />
+          <View style={[s.infoBox, { backgroundColor: theme.accentDim }]}>
+            <Feather name="info" size={15} color={theme.accentLight} style={{ marginTop: 2 }} />
             <Text style={[s.infoText, { color: FG }]}>
               Public domains like Gmail don't support custom sending. Customers will see your email as{' '}
               <Text style={{ fontFamily: FONT.bold }}>store+70327206006@brandthreademail.com</Text>.{' '}
@@ -110,25 +111,25 @@ export default function NotificationsSettingsScreen() {
 
           {loading ? (
             <View style={[s.digestCard, { backgroundColor: CARD, borderColor: BORDER }]}>
-              <ActivityIndicator color={PURPLE} size="small" />
+              <ActivityIndicator color={theme.accent} size="small" />
             </View>
           ) : (
             <View style={[s.digestCard, { backgroundColor: CARD, borderColor: BORDER }]}>
               {/* Real-time option */}
               <TouchableOpacity
-                style={[s.digestOption, digest === 'realtime' && s.digestOptionActive, { borderColor: digest === 'realtime' ? PURPLE : BORDER }]}
+                style={[s.digestOption, digest === 'realtime' && { backgroundColor: theme.accentDim }, { borderColor: digest === 'realtime' ? theme.accent : BORDER }]}
                 onPress={() => handleDigestToggle(false)}
                 activeOpacity={0.8}
               >
-                <View style={[s.digestIconBox, { backgroundColor: digest === 'realtime' ? PURPLE_DIM : SUBTLE + '60' }]}>
-                  <Feather name="bell" size={18} color={digest === 'realtime' ? PURPLE_LIGHT : MUTED} />
+                <View style={[s.digestIconBox, { backgroundColor: digest === 'realtime' ? theme.accentDim : SUBTLE + '60' }]}>
+                  <Feather name="bell" size={18} color={digest === 'realtime' ? theme.accentLight : MUTED} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[s.digestOptionLabel, { color: digest === 'realtime' ? FG : MUTED }]}>Real-time</Text>
                   <Text style={s.digestOptionDesc}>Get a push for every event as it happens</Text>
                 </View>
                 {digest === 'realtime' && (
-                  <Feather name="check-circle" size={18} color={PURPLE_LIGHT} />
+                  <Feather name="check-circle" size={18} color={theme.accentLight} />
                 )}
               </TouchableOpacity>
 
@@ -136,25 +137,25 @@ export default function NotificationsSettingsScreen() {
 
               {/* Daily digest option */}
               <TouchableOpacity
-                style={[s.digestOption, digest === 'daily' && s.digestOptionActive, { borderColor: digest === 'daily' ? PURPLE : BORDER }]}
+                style={[s.digestOption, digest === 'daily' && { backgroundColor: theme.accentDim }, { borderColor: digest === 'daily' ? theme.accent : BORDER }]}
                 onPress={() => handleDigestToggle(true)}
                 activeOpacity={0.8}
               >
-                <View style={[s.digestIconBox, { backgroundColor: digest === 'daily' ? PURPLE_DIM : SUBTLE + '60' }]}>
-                  <Feather name="sun" size={18} color={digest === 'daily' ? PURPLE_LIGHT : MUTED} />
+                <View style={[s.digestIconBox, { backgroundColor: digest === 'daily' ? theme.accentDim : SUBTLE + '60' }]}>
+                  <Feather name="sun" size={18} color={digest === 'daily' ? theme.accentLight : MUTED} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[s.digestOptionLabel, { color: digest === 'daily' ? FG : MUTED }]}>Daily digest</Text>
                   <Text style={s.digestOptionDesc}>One morning summary of everything from the past 24 hours</Text>
                 </View>
                 {digest === 'daily' && (
-                  <Feather name="check-circle" size={18} color={PURPLE_LIGHT} />
+                  <Feather name="check-circle" size={18} color={theme.accentLight} />
                 )}
               </TouchableOpacity>
 
               {saving && (
                 <View style={s.savingRow}>
-                  <ActivityIndicator color={PURPLE} size="small" />
+                  <ActivityIndicator color={theme.accent} size="small" />
                   <Text style={s.savingText}>Saving…</Text>
                 </View>
               )}
@@ -203,7 +204,6 @@ const s = StyleSheet.create({
 
   digestCard:        { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
   digestOption:      { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
-  digestOptionActive:{ backgroundColor: PURPLE_DIM + '30' },
   digestIconBox:     { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   digestOptionLabel: { fontSize: 14, fontFamily: FONT.semibold, marginBottom: 2 },
   digestOptionDesc:  { fontSize: 12, fontFamily: FONT.regular, color: MUTED, lineHeight: 16 },

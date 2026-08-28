@@ -155,8 +155,8 @@ export default function WebsiteScreen() {
               style={[
                 styles.layoutCard,
                 {
-                  backgroundColor: '#12121F',
-                  borderColor: isSelected ? colors.primary : 'rgba(139,92,246,0.20)',
+                  backgroundColor: colors.card,
+                  borderColor: isSelected ? colors.primary : colors.accent,
                   borderWidth: isSelected ? 2 : 1,
                 },
               ]}

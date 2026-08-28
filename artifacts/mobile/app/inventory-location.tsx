@@ -18,6 +18,7 @@ import {
   BLUE, ORANGE, RED, GOLD, GRAD_PRIMARY, GRAD_CARD_GLOW,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, StatusBadge, SectionHeader, EmptyState,
@@ -38,6 +39,9 @@ const EMPTY_FORM = {
 };
 
 export default function InventoryLocationScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const ls = React.useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -394,7 +398,9 @@ export default function InventoryLocationScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const ls = StyleSheet.create({
+const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  return StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: BG,
@@ -603,4 +609,5 @@ const ls = StyleSheet.create({
     fontFamily: FONT.regular,
     color: MUTED,
   },
-});
+  });
+};

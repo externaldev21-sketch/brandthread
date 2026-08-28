@@ -9,9 +9,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, ON_DARK,
-  PURPLE, PURPLE_DIM, GRAD_PRIMARY, SUCCESS, SUCCESS_DIM,
+  SUCCESS, SUCCESS_DIM,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { submitReport } from '@/services/socialService';
 import { serviceRequest } from '@/lib/serviceConfig';
 import { ReportReason, ReportTargetType, REPORT_REASON_LABELS } from '@/services/socialTypes';
@@ -33,6 +34,11 @@ function targetTypeIcon(targetType: string): string {
 }
 
 export default function BuyerReport() {
+  const { theme } = useAppTheme();
+  const PURPLE = theme.accent;
+  const PURPLE_DIM = theme.accentDim;
+  const GRAD_PRIMARY = [theme.accent, theme.accentLight] as const;
+  const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -232,7 +238,7 @@ export default function BuyerReport() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: { accent: string; accentLight: string; accentDim: string }) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: BG,
@@ -307,7 +313,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   reasonChipActive: {
-    backgroundColor: PURPLE_DIM,
+    backgroundColor: theme.accentDim,
     borderColor: BORDER_ACTIVE,
   },
   reasonLabel: {
@@ -317,7 +323,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   reasonLabelActive: {
-    color: PURPLE,
+    color: theme.accent,
   },
   descSection: {
     paddingHorizontal: SP.md,

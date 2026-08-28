@@ -9,11 +9,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import {
   BG, CARD, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE,
+  FG, MUTED, SUBTLE,
   RED, ON_DARK,
-  GRAD_PRIMARY,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   getFriendSuggestions, sendFriendRequest, blockUser,
 } from '@/services/socialService';
@@ -33,6 +33,10 @@ type FollowRow = {
 };
 
 export default function BuyerFriendRequestsScreen() {
+  const { theme } = useAppTheme();
+  const PURPLE = theme.accent;
+  const GRAD_PRIMARY = [theme.accent, theme.accentLight] as const;
+  const s = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api    = useApi();
@@ -367,16 +371,16 @@ export default function BuyerFriendRequestsScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (theme: { accent: string }) => StyleSheet.create({
   container:       { flex: 1, backgroundColor: BG },
   header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingBottom: SP.md, borderBottomWidth: 1, borderColor: BORDER },
   headerTitle:     { fontFamily: FONT.bold, fontSize: FS.lg, color: FG },
   tabBar:          { flexDirection: 'row', borderBottomWidth: 1, borderColor: BORDER },
   tabItem:         { flex: 1, alignItems: 'center', paddingVertical: SP.sm + 2, borderBottomWidth: 2, borderColor: 'transparent' },
-  tabItemActive:   { borderColor: PURPLE },
+  tabItemActive:   { borderColor: theme.accent },
   tabLabel:        { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
-  tabLabelActive:  { color: PURPLE },
-  tabBadge:        { backgroundColor: PURPLE, borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1 },
+  tabLabelActive:  { color: theme.accent },
+  tabBadge:        { backgroundColor: theme.accent, borderRadius: 8, paddingHorizontal: 5, paddingVertical: 1 },
   tabBadgeText:    { fontFamily: FONT.bold, fontSize: 10, color: ON_DARK },
   emptyState:      { alignItems: 'center', paddingVertical: SP.xl * 2, gap: SP.sm },
   emptyTitle:      { fontFamily: FONT.semibold, fontSize: FS.md, color: FG },
@@ -394,7 +398,7 @@ const s = StyleSheet.create({
   declineBtn:      { height: 32, paddingHorizontal: SP.sm, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   declineBtnText:  { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
   requestedPill:   { paddingHorizontal: SP.sm, paddingVertical: 4, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER_ACTIVE, borderRadius: RADIUS.pill },
-  requestedPillText: { fontFamily: FONT.medium, fontSize: FS.xs, color: PURPLE },
+  requestedPillText: { fontFamily: FONT.medium, fontSize: FS.xs, color: theme.accent },
   cancelBtn:       { height: 32, paddingHorizontal: SP.sm, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center' },
   cancelBtnText:   { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
   followBtn:       { height: 32, paddingHorizontal: SP.md, borderRadius: RADIUS.pill, alignItems: 'center', justifyContent: 'center', minWidth: 64 },

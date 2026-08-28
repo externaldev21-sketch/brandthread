@@ -4,6 +4,7 @@
  * Falls back to storeService (AsyncStorage) if API unavailable.
  */
 import React, { useState, useCallback } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
@@ -35,6 +36,7 @@ const POLICY_TYPES: { type: PolicyType; label: string; icon: keyof typeof Feathe
 ];
 
 export default function StorePoliciesScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const headerTopInset = useHeaderTopInset();
   const api = useApi();

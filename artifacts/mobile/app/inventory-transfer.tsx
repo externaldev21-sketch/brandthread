@@ -13,6 +13,7 @@ import {
   BLUE, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
   GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, StatusBadge, SectionHeader, EmptyState,
@@ -78,6 +79,9 @@ function timelineIndex(status: TransferStatus): number {
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function InventoryTransferScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -823,7 +827,9 @@ export default function InventoryTransferScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   header: {
     flexDirection: 'row',
@@ -1040,4 +1046,5 @@ const styles = StyleSheet.create({
   itemRowQty: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
   itemRowQtyLabel: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
   separator: { height: 1, backgroundColor: BORDER, marginHorizontal: SP.md },
-});
+  });
+};

@@ -14,6 +14,7 @@ import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, SUCCESS, SUCCESS_DIM,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 
 interface SessionRow {
   id: string;
@@ -44,6 +45,7 @@ function formatDate(ts: number): string {
 }
 
 export default function LoginActivityScreen() {
+  const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
@@ -77,7 +79,7 @@ export default function LoginActivityScreen() {
 
       {loading ? (
         <View style={s.center}>
-          <ActivityIndicator color={PURPLE} />
+          <ActivityIndicator color={colors.primary} />
         </View>
       ) : error ? (
         <View style={s.center}>

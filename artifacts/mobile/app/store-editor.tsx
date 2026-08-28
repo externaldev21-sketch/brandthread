@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
   TextInput, StyleSheet, Alert, Switch, Animated, RefreshControl,
@@ -153,6 +154,7 @@ const swStyles = StyleSheet.create({
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export default function StoreEditor() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ sectionId?: string }>();

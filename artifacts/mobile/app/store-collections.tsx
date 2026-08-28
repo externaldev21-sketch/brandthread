@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useColors } from '@/hooks/useColors';
 import * as ImagePicker from 'expo-image-picker';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
@@ -105,6 +106,7 @@ function defaultForm(): FormState {
 }
 
 export default function StoreCollectionsScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<Mode>('list');

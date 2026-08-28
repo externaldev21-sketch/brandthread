@@ -20,6 +20,7 @@ import {
   PURPLE, PURPLE_LIGHT, CYAN, SUCCESS, RED,
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandedLoadingState } from '@/components/BrandthreadUI';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -449,6 +450,8 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function FeedScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
   const insets = useSafeAreaInsets();
   const router = useRouter();
 

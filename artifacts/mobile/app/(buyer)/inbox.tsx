@@ -14,6 +14,7 @@ import {
   CYAN, CYAN_DIM, SURFACE, FONT, FS, SP, RADIUS, COMP, ICON,
   GRAD_PRIMARY,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   getConversations, getStories, markConversationRead, archiveConversation,
   subscribeSocial, MY_USER_ID, MY_COLOR, MY_INITIALS, MY_NAME,
@@ -62,6 +63,7 @@ export default function InboxScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
+  const { theme } = useAppTheme();
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
@@ -218,7 +220,7 @@ export default function InboxScreen() {
             {/* Accept / Decline buttons */}
             <View style={s.requestActions}>
               <TouchableOpacity
-                style={[s.requestAcceptBtn, isLoadingAction && s.requestBtnDisabled]}
+                style={[s.requestAcceptBtn, { backgroundColor: theme.accent }, isLoadingAction && s.requestBtnDisabled]}
                 onPress={() => acceptRequest(conv)}
                 disabled={isLoadingAction}
                 activeOpacity={0.8}
@@ -251,7 +253,7 @@ export default function InboxScreen() {
           <View style={[s.avatar48, { backgroundColor: participant.color }]}>
             <Text style={s.avatarInitials}>{participant.initials}</Text>
           </View>
-          {isUnread && <View style={s.unreadDot} />}
+          {isUnread && <View style={[s.unreadDot, { backgroundColor: theme.accent }]} />}
         </View>
 
         {/* Center content */}
@@ -268,8 +270,8 @@ export default function InboxScreen() {
             ) : null}
           </View>
           {conv.contextOrderNumber ? (
-            <View style={s.orderPill}>
-              <Text style={s.orderPillText}>{conv.contextOrderNumber}</Text>
+              <View style={[s.orderPill, { backgroundColor: theme.accentDim }]}>
+                <Text style={[s.orderPillText, { color: theme.accent }]}>{conv.contextOrderNumber}</Text>
             </View>
           ) : null}
           <Text
@@ -282,7 +284,7 @@ export default function InboxScreen() {
 
         {/* Trailing */}
         {isUnread ? (
-          <View style={s.unreadBadge}>
+          <View style={[s.unreadBadge, { backgroundColor: theme.accent }]}>
             <Text style={s.unreadBadgeText}>{conv.unreadCount > 99 ? '99+' : conv.unreadCount}</Text>
           </View>
         ) : (
@@ -319,7 +321,7 @@ export default function InboxScreen() {
           >
             <Feather name="bell" size={ICON.lg} color={FG} />
             {unreadNotifCount > 0 && (
-              <View style={s.notifBadge}>
+              <View style={[s.notifBadge, { backgroundColor: theme.accent }]}>
                 <Text style={s.notifBadgeText}>
                   {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
                 </Text>
@@ -352,7 +354,7 @@ export default function InboxScreen() {
         >
           <View style={[s.storyCircle, { backgroundColor: MY_COLOR }]}>
             <Text style={s.storyInitials}>{MY_INITIALS}</Text>
-            <View style={s.storyAddBadge}>
+            <View style={[s.storyAddBadge, { backgroundColor: theme.accent }]}>
               <Feather name="plus" size={10} color={FG} />
             </View>
           </View>
@@ -372,7 +374,7 @@ export default function InboxScreen() {
               }}
               activeOpacity={0.8}
             >
-              <View style={[s.storyRing, { borderColor: viewed ? MUTED : PURPLE }]}>
+              <View style={[s.storyRing, { borderColor: viewed ? MUTED : theme.accent }]}>
                 <View style={[s.storyCircleInner, { backgroundColor: story.authorColor }]}>
                   <Text style={s.storyInitials}>{story.authorInitials}</Text>
                 </View>
@@ -419,13 +421,13 @@ export default function InboxScreen() {
               style={[
                 s.tabPill,
                 isActive
-                  ? { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE }
+                  ? { backgroundColor: theme.accentDim, borderColor: theme.accent }
                   : { backgroundColor: CARD, borderColor: BORDER },
               ]}
               onPress={() => setActiveTab(tab)}
               activeOpacity={0.75}
             >
-              <Text style={[s.tabText, { color: isActive ? PURPLE : MUTED }]}>{tab}</Text>
+              <Text style={[s.tabText, { color: isActive ? theme.accent : MUTED }]}>{tab}</Text>
             </TouchableOpacity>
           );
         })}
@@ -482,7 +484,6 @@ const s = StyleSheet.create({
     minWidth: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: PURPLE,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 3,
@@ -525,7 +526,6 @@ const s = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: PURPLE,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -612,7 +612,6 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: SP.xs,
-    backgroundColor: PURPLE,
     borderRadius: RADIUS.md,
   },
   requestAcceptText: {
@@ -670,7 +669,6 @@ const s = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: PURPLE,
     borderWidth: 2,
     borderColor: BG,
   },
@@ -716,7 +714,6 @@ const s = StyleSheet.create({
     minWidth: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: PURPLE,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: SP.xs,

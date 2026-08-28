@@ -3,6 +3,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
   StyleSheet, Alert, Modal, Switch, RefreshControl, ActionSheetIOS, Platform,
@@ -128,6 +129,7 @@ function productionStatusVariant(status: ProductionOrder['status']): 'success' |
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function ManufacturerHub() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { tab } = useLocalSearchParams<{ tab?: string }>();

@@ -3,6 +3,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet,
   Alert, ActivityIndicator,
@@ -35,6 +36,7 @@ function formatDate(iso: string): string {
 }
 
 export default function DesignVersionsScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { projectId } = useLocalSearchParams<{ projectId?: string }>();

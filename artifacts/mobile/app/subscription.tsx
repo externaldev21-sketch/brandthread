@@ -23,6 +23,7 @@ import {
   BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, PURPLE_LIGHT,
   CYAN, SUCCESS, ORANGE, RED, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/hooks/useApi';
 import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { isManagerRole, parseRoleError } from '@/lib/roleError';
@@ -107,6 +108,9 @@ const USAGE: UsageStat[] = [
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function SubscriptionScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api    = useApi();
@@ -473,7 +477,9 @@ export default function SubscriptionScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  return StyleSheet.create({
   root:               { flex: 1, backgroundColor: BG },
   accessLoading:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:             { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
@@ -525,4 +531,5 @@ const styles = StyleSheet.create({
   billingValue:       { color: FG, fontSize: FS.sm, fontFamily: FONT.medium },
   manageBillingBtn:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: CARD, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: BORDER },
   manageBillingText:  { flex: 1, color: PURPLE, fontSize: FS.sm, fontFamily: FONT.medium },
-});
+  });
+};

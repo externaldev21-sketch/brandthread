@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useApi } from '@/lib/api';
+import { useColors } from '@/hooks/useColors';
 
 // ─── Design Tokens ─────────────────────────────────────────────────────────────
 const BG        = '#07070F';
@@ -85,13 +86,14 @@ interface EngagementBarProps {
 }
 
 function EngagementBar({ label, value, maxValue }: EngagementBarProps) {
+  const colors = useColors();
   const pct = maxValue > 0 ? value / maxValue : 0;
   return (
     <View style={styles.engRow}>
       <Text style={styles.engLabel}>{label}</Text>
       <View style={styles.engBarBg}>
         <LinearGradient
-          colors={[GREEN, '#00D4FF']}
+          colors={[colors.primary, colors.info]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={[styles.engBarFill, { width: `${Math.max(pct * 100, 1)}%` }]}
@@ -110,6 +112,7 @@ interface CountryBarProps {
 }
 
 function CountryBar({ country, pct }: CountryBarProps) {
+  const colors = useColors();
   return (
     <View style={styles.countryRow}>
       <View style={styles.countryInitialsCircle}>
@@ -118,7 +121,7 @@ function CountryBar({ country, pct }: CountryBarProps) {
       <Text style={styles.countryName}>{country}</Text>
       <View style={styles.engBarBg}>
         <LinearGradient
-          colors={[GREEN, '#00D4FF']}
+          colors={[colors.primary, colors.info]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={[styles.engBarFill, { width: `${Math.max(pct * 100, 1)}%` }]}
@@ -132,6 +135,7 @@ function CountryBar({ country, pct }: CountryBarProps) {
 // ─── Main Screen ───────────────────────────────────────────────────────────────
 
 export default function PostAnalyticsScreen() {
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
@@ -215,7 +219,7 @@ export default function PostAnalyticsScreen() {
               <View style={styles.typeBadge}>
                 <Text style={styles.typeBadgeText}>{String(post.mediaType ?? 'post').replace('_', ' ')}</Text>
               </View>
-              <View style={[styles.statusBadge, { backgroundColor: GREEN }]}>
+              <View style={[styles.statusBadge, { backgroundColor: colors.primary }]}>
                 <Text style={styles.statusBadgeText}>Published</Text>
               </View>
             </View>
@@ -242,7 +246,7 @@ export default function PostAnalyticsScreen() {
             activeOpacity={0.85}
             onPress={() => router.push(('/boost?targetType=post&targetId=' + encodeURIComponent(post.id)) as never)}
           >
-            <LinearGradient colors={[PURPLE, BLUE]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.quickActionGradient}>
+            <LinearGradient colors={[colors.primary, colors.info]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.quickActionGradient}>
               <Feather name="zap" size={18} color={FG} />
               <Text style={styles.quickActionText}>Boost Post</Text>
             </LinearGradient>
@@ -411,7 +415,7 @@ export default function PostAnalyticsScreen() {
         <View style={styles.quickActionsRow}>
           <TouchableOpacity style={styles.quickActionBoostWrap} activeOpacity={0.85}>
             <LinearGradient
-              colors={[PURPLE, BLUE]}
+              colors={[colors.primary, colors.info]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.quickActionGradient}

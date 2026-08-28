@@ -9,14 +9,18 @@ import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
 import {
   BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE,
-  PURPLE, ON_DARK,
+  ON_DARK,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getPrivacySettings, updatePrivacySettings } from '@/services/socialService';
 import { PrivacySettings, AudienceOption, DmPrivacy } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 
 export default function BuyerPrivacySettings() {
+  const { theme } = useAppTheme();
+  const PURPLE = theme.accent;
+  const styles = makeStyles();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api    = useApi();
@@ -329,7 +333,7 @@ export default function BuyerPrivacySettings() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: BG,

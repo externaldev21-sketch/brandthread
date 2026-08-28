@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet,
   RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -52,6 +53,7 @@ function timeAgo(dateStr: string): string {
 }
 
 export default function StoreBuilderScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [store, setStore] = useState<Storefront | null>(null);

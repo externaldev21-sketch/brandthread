@@ -3,6 +3,7 @@
  * Route: /design-canvas?id=<projectId>
  */
 import React, { useRef, useState, useCallback, useEffect } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, StyleSheet, TouchableOpacity, PanResponder,
   Alert, ScrollView, TextInput, Modal, Dimensions, Image, Share,
@@ -68,6 +69,7 @@ function uid(): string { return `uid_${Date.now()}_${++_uid}`; }
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export default function DesignCanvasScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();

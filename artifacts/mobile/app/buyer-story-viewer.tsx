@@ -9,9 +9,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, ON_DARK, PURPLE, PURPLE_DIM,
+  BG, SURFACE, CARD, CARD_ELEVATED, BORDER,
+  FG, MUTED, SUBTLE, ON_DARK,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
@@ -33,6 +35,10 @@ function timeAgo(ms: number): string {
 }
 
 export default function BuyerStoryViewer() {
+  const colors = useColors();
+  const { theme } = useAppTheme();
+  const PURPLE = colors.primary, PURPLE_DIM = colors.accent;
+  const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { storyId, allStoryIds } = useLocalSearchParams<{ storyId: string; allStoryIds: string }>();
@@ -416,7 +422,9 @@ export default function BuyerStoryViewer() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE = theme.accent, PURPLE_DIM = theme.accentDim;
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
@@ -643,7 +651,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(139,92,246,0.88)',
+    backgroundColor: `${PURPLE}E0`,
     borderRadius: 22,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -679,4 +687,5 @@ const styles = StyleSheet.create({
     fontFamily: FONT.medium,
     minWidth: 16,
   },
-});
+  });
+};

@@ -3,6 +3,7 @@
  * Route: /design-mockup-to-model
  */
 import React, { useState } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert, Image, Dimensions,
@@ -51,6 +52,7 @@ const GRAD_PALETTES: Record<number, readonly [string, string]> = {
 };
 
 export default function MockupToModelScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const [step, setStep] = useState<Step>(1);
   const [mockupUri, setMockupUri] = useState<string | null>(null);

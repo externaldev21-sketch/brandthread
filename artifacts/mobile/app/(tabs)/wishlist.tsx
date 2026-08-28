@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { useColors } from '@/hooks/useColors';
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
@@ -108,12 +109,13 @@ export default function WishlistScreen() {
   const scheme  = useColorScheme();
   const isDark  = scheme !== 'light';
   const [items, setItems] = useState(WISHLIST_ITEMS);
+  const colors = useColors();
 
   const bg     = isDark ? '#121110' : '#F2EEE3';
   const fg     = isDark ? '#F4F4FF' : '#07070F';
   const muted  = isDark ? '#8C8577' : '#6E6759';
   const border = isDark ? '#33302A' : '#DBD3C0';
-  const primary = '#8B5CF6';
+  const primary = colors.primary;
 
   function removeItem(id: string) {
     setItems(prev => prev.filter(i => i.id !== id));

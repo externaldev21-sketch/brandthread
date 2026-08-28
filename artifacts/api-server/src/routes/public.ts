@@ -4,7 +4,7 @@
  */
 import { Router } from "express";
 import { db, products, productVariants, users, drops, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, boosts } from "@workspace/db";
-import { eq, and, desc, inArray, or, ilike, sql, count, gte } from "drizzle-orm";
+import { eq, and, asc, desc, ne, inArray, or, ilike, sql, count, gte } from "drizzle-orm";
 import { computeTrendingForToday, isCacheFresh } from "../jobs/computeTrending";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -19,6 +19,48 @@ let trendingInflight: Promise<void> | null = null;
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
+
+const SEARCH_SORTS = ["relevance", "price_asc", "price_desc", "newest"] as const;
+type SearchSort = typeof SEARCH_SORTS[number];
+
+function singleQueryValue(value: unknown): string | undefined | null {
+  return value === undefined ? undefined : typeof value === "string" ? value : null;
+}
+
+function parseNonNegativeInteger(value: unknown, name: string, defaultValue?: number): number | { error: string } {
+  const raw = singleQueryValue(value);
+  if (raw === undefined && defaultValue !== undefined) return defaultValue;
+  if (raw == null || !/^\d+$/.test(raw)) return { error: `${name} must be a nonnegative integer` };
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed)) return { error: `${name} must be a nonnegative integer` };
+  return parsed;
+}
+
+function productTags(product: { tags: unknown; styleTags: unknown }): Set<string> {
+  const tags = [
+    ...(Array.isArray(product.tags) ? product.tags : []),
+    ...(Array.isArray(product.styleTags) ? product.styleTags : []),
+  ];
+  return new Set(tags.filter((tag): tag is string => typeof tag === "string").map((tag) => tag.toLowerCase()));
+}
+
+/** Stable, intentionally simple ranking for the public related-products shelf. */
+export function rankRelatedProducts<T extends {
+  id: string; ownerId: string; category: string; tags: unknown; styleTags: unknown; createdAt: Date;
+}>(current: T, candidates: T[]): T[] {
+  const currentTags = productTags(current);
+  const overlap = (candidate: T) => [...productTags(candidate)].filter((tag) => currentTags.has(tag)).length;
+  return [...candidates].sort((a, b) => {
+    const sellerDifference = Number(b.ownerId === current.ownerId) - Number(a.ownerId === current.ownerId);
+    if (sellerDifference) return sellerDifference;
+    const categoryDifference = Number(b.category === current.category) - Number(a.category === current.category);
+    if (categoryDifference) return categoryDifference;
+    const overlapDifference = overlap(b) - overlap(a);
+    if (overlapDifference) return overlapDifference;
+    const newnessDifference = b.createdAt.getTime() - a.createdAt.getTime();
+    return newnessDifference || a.id.localeCompare(b.id);
+  });
+}
 
 // GET /api/public/products
 // Optional query params: ?category=apparel&tag=streetwear&ownerId=user_xxx&limit=50&offset=0
@@ -118,6 +160,50 @@ router.get("/products", async (req, res) => {
   }
 });
 
+// GET /api/public/products/:id/related
+// This route must precede /products/:id so Express does not treat "related" as
+// a product id.
+router.get("/products/:id/related", async (req, res) => {
+  const parsedLimit = parseNonNegativeInteger(req.query.limit, "limit", 12);
+  if (typeof parsedLimit !== "number" || parsedLimit < 1) {
+    return res.status(400).json({ error: typeof parsedLimit === "number" ? "limit must be at least 1" : parsedLimit.error });
+  }
+  const lim = Math.min(parsedLimit, 24);
+
+  try {
+    const [current] = await db.select().from(products)
+      .where(and(eq(products.id, req.params.id), eq(products.status, "active"))).limit(1);
+    if (!current) return res.status(404).json({ error: "Product not found" });
+
+    // Fetch the candidate set in one query and batch its dependent records below.
+    // Ranking is application-side because tags/styleTags are JSON arrays.
+    const candidates = await db.select().from(products)
+      .where(and(eq(products.status, "active"), ne(products.id, current.id)));
+    const ranked = rankRelatedProducts(current, candidates).slice(0, lim);
+    if (ranked.length === 0) return res.json([]);
+
+    const productIds = ranked.map((product) => product.id);
+    const ownerIds = [...new Set(ranked.map((product) => product.ownerId))];
+    const [variants, sellerRows] = await Promise.all([
+      db.select().from(productVariants).where(inArray(productVariants.productId, productIds)),
+      db.select({ clerkId: users.clerkId, displayName: users.displayName })
+        .from(users).where(inArray(users.clerkId, ownerIds)),
+    ]);
+    const variantsByProduct: Record<string, typeof variants> = {};
+    for (const variant of variants) (variantsByProduct[variant.productId] ??= []).push(variant);
+    const sellerMap = new Map(sellerRows.map((seller) => [seller.clerkId, seller.displayName]));
+
+    return res.json(ranked.map((product) => ({
+      ...product,
+      sellerDisplayName: sellerMap.get(product.ownerId) ?? null,
+      variants: variantsByProduct[product.id] ?? [],
+    })));
+  } catch (err) {
+    console.error("GET /api/public/products/:id/related error:", err);
+    return res.status(500).json({ error: "Failed to fetch related products" });
+  }
+});
+
 // GET /api/public/products/:id
 router.get("/products/:id", async (req, res) => {
   try {
@@ -155,14 +241,35 @@ router.get("/products/:id", async (req, res) => {
 // Returns: { results: Array<{ id, kind:'brand'|'product', ...SearchBrand|SearchProduct fields }> }
 router.get("/search", async (req, res): Promise<void> => {
   try {
-    const { q = "", limit = "20" } = req.query as Record<string, string>;
-    const term = normalizeSearchTerm(q);
+    const q = singleQueryValue(req.query.q);
+    const sortValue = singleQueryValue(req.query.sort);
+    const category = singleQueryValue(req.query.category);
+    const parsedLimit = parseNonNegativeInteger(req.query.limit, "limit", 20);
+    const minPriceCents = req.query.minPriceCents === undefined
+      ? undefined : parseNonNegativeInteger(req.query.minPriceCents, "minPriceCents");
+    const maxPriceCents = req.query.maxPriceCents === undefined
+      ? undefined : parseNonNegativeInteger(req.query.maxPriceCents, "maxPriceCents");
+    if (q === null || sortValue === null || category === null ||
+        typeof parsedLimit !== "number" || typeof minPriceCents === "object" || typeof maxPriceCents === "object") {
+      res.status(400).json({ error: "Invalid search query values" }); return;
+    }
+    if (parsedLimit < 1) { res.status(400).json({ error: "limit must be at least 1" }); return; }
+    if (sortValue !== undefined && !SEARCH_SORTS.includes(sortValue as SearchSort)) {
+      res.status(400).json({ error: "sort must be relevance, price_asc, price_desc, or newest" }); return;
+    }
+    if (minPriceCents !== undefined && maxPriceCents !== undefined && minPriceCents > maxPriceCents) {
+      res.status(400).json({ error: "minPriceCents must not exceed maxPriceCents" }); return;
+    }
+    const sort: SearchSort = (sortValue as SearchSort | undefined) ?? "relevance";
+    const searchQuery = q ?? "";
+    const term = normalizeSearchTerm(searchQuery);
     if (!term || term.length < 2) { res.json({ results: [] }); return; }
 
-    const lim = Math.min(parseInt(limit, 10) || 20, 50);
+    const lim = Math.min(parsedLimit, 50);
     const pattern = containsSearchPattern(term);
 
-    // Parallel: search sellers + search products (with a variant join for price)
+    // Do not SQL-limit joined variants: first collapse each product to its
+    // lowest price, then filter/sort products, and only then apply the limit.
     const [sellers, prods] = await Promise.all([
       db.select({
         clerkId:     users.clerkId,
@@ -173,17 +280,19 @@ router.get("/search", async (req, res): Promise<void> => {
           eq(users.accountType, "seller"),
           or(ilike(users.displayName, pattern), ilike(users.brandName, pattern)),
         ),
-      ).limit(10),
+      ).orderBy(asc(users.displayName), asc(users.clerkId)).limit(10),
 
       db.select({
         id:         products.id,
         name:       products.name,
         ownerId:    products.ownerId,
+        category:   products.category,
+        createdAt:  products.createdAt,
         priceCents: productVariants.priceCents,
       }).from(products)
         .leftJoin(productVariants, eq(productVariants.productId, products.id))
-        .where(and(eq(products.status, "active"), ilike(products.name, pattern)))
-        .limit(lim * 2), // overfetch since we dedupe below
+        .where(and(eq(products.status, "active"), ilike(products.name, pattern),
+          category ? eq(products.category, category) : undefined)),
     ]);
 
     // Fetch seller display names for product results
@@ -229,17 +338,26 @@ router.get("/search", async (req, res): Promise<void> => {
     }
 
     // Products — collapse variants to one row with the minimum price
-    const prodMap = new Map<string, { id: string; name: string; ownerId: string; minPrice: number }>();
+    const prodMap = new Map<string, { id: string; name: string; ownerId: string; category: string; createdAt: Date; minPrice: number }>();
     for (const p of prods) {
       const price = p.priceCents ?? 0;
       const prev = prodMap.get(p.id);
       if (!prev) {
-        prodMap.set(p.id, { id: p.id, name: p.name, ownerId: p.ownerId, minPrice: price });
-      } else if (price > 0 && price < prev.minPrice) {
+        prodMap.set(p.id, { id: p.id, name: p.name, ownerId: p.ownerId, category: p.category, createdAt: p.createdAt, minPrice: price });
+      } else if (price < prev.minPrice) {
         prev.minPrice = price;
       }
     }
-    for (const p of prodMap.values()) {
+    const filteredProducts = [...prodMap.values()]
+      .filter((product) => (minPriceCents === undefined || product.minPrice >= minPriceCents) &&
+        (maxPriceCents === undefined || product.minPrice <= maxPriceCents))
+      .sort((a, b) => {
+        if (sort === "price_asc") return a.minPrice - b.minPrice || b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id);
+        if (sort === "price_desc") return b.minPrice - a.minPrice || b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id);
+        if (sort === "newest") return b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id);
+        return a.name.localeCompare(b.name) || b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id);
+      });
+    for (const p of filteredProducts) {
       if (seen.has(p.id)) continue;
       seen.add(p.id);
       const brandName = sellerMap.get(p.ownerId) ?? "Brand";
@@ -249,6 +367,9 @@ router.get("/search", async (req, res): Promise<void> => {
         brand:     brandName,
         name:      p.name,
         price:     "$" + Math.round(p.minPrice / 100),
+        priceCents: p.minPrice,
+        category: p.category,
+        createdAt: p.createdAt,
         color:     hashColor(p.ownerId),
         initials:  mkInitials(brandName),
         productId: p.id,

@@ -14,10 +14,11 @@ import * as Haptics from 'expo-haptics';
 
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_LIGHT,
-  SUCCESS, BLUE, ORANGE, RED, GOLD, ON_DARK, GRAD_PRIMARY, GRAD_CARD_GLOW,
+  FG, MUTED, SUBTLE,
+  SUCCESS, BLUE, ORANGE, RED, GOLD, ON_DARK,
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
@@ -30,6 +31,7 @@ import { ManufacturerInvitation } from '@/services/manufacturerTypes';
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function InviteManufacturerScreen() {
+  const { theme } = useAppTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -120,17 +122,17 @@ export default function InviteManufacturerScreen() {
           <Text style={s.successTitle}>Invitation Created!</Text>
           <Text style={s.successDesc}>
             Your invitation for{' '}
-            <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.semibold }}>{companyName}</Text>
+            <Text style={{ color: theme.accentLight, fontFamily: FONT.semibold }}>{companyName}</Text>
             {' '}has been created.
           </Text>
 
           <GradientCard
-            colors={['rgba(34,211,238,0.12)', 'rgba(34,211,238,0.04)'] as const}
+            colors={[theme.secondaryDim, theme.secondaryDim] as const}
             style={s.linkCard}
           >
             <View style={s.linkCardHeader}>
-              <Feather name="link" size={ICON.sm} color={CYAN} />
-              <Text style={s.linkCardTitle}>Invitation Link</Text>
+              <Feather name="link" size={ICON.sm} color={theme.secondary} />
+              <Text style={[s.linkCardTitle, { color: theme.secondary }]}>Invitation Link</Text>
             </View>
             <Text style={s.linkText} numberOfLines={2}>{inviteLink}</Text>
             <Text style={s.linkNote}>
@@ -177,12 +179,12 @@ export default function InviteManufacturerScreen() {
       >
         {/* Demo notice */}
         <GradientCard
-          colors={['rgba(34,211,238,0.12)', 'rgba(34,211,238,0.04)'] as const}
+          colors={[theme.secondaryDim, theme.secondaryDim] as const}
           style={s.demoNotice}
         >
           <View style={s.demoNoticeRow}>
-            <Feather name="info" size={ICON.md} color={CYAN} />
-            <Text style={s.demoNoticeTitle}>Invitation link</Text>
+            <Feather name="info" size={ICON.md} color={theme.secondary} />
+            <Text style={[s.demoNoticeTitle, { color: theme.secondary }]}>Invitation link</Text>
           </View>
           <Text style={s.demoNoticeText}>
             Your invitation link will be generated so you can share it directly with the manufacturer via any channel.
@@ -308,7 +310,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
   },
   demoNoticeTitle: {
-    fontSize: FS.base, fontFamily: FONT.semibold, color: CYAN,
+    fontSize: FS.base, fontFamily: FONT.semibold,
   },
   demoNoticeText: {
     fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 20,
@@ -349,7 +351,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
   },
   linkCardTitle: {
-    fontSize: FS.base, fontFamily: FONT.semibold, color: CYAN,
+    fontSize: FS.base, fontFamily: FONT.semibold,
   },
   linkText: {
     fontSize: FS.sm, fontFamily: FONT.regular, color: FG,

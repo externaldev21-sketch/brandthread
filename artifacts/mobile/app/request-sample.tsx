@@ -7,18 +7,19 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useColors } from '@/hooks/useColors';
 
 const BG    = '#07070F';
 const CARD  = '#12121F';
 const BORD  = 'rgba(255,255,255,0.07)';
 const FG    = '#F4F4FF';
 const MUTED = 'rgba(244,244,255,0.50)';
-const GREEN = '#8B5CF6';
 
 const PRODUCT_TYPES = ['T-Shirt', 'Hoodie', 'Sweatpants', 'Shorts', 'Jacket', 'Hat', 'Custom'];
 const QUANTITIES    = ['1 sample', '2–3 samples', '5 samples', '10 samples'];
 
 export default function RequestSampleScreen() {
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ name?: string }>();
@@ -65,11 +66,11 @@ export default function RequestSampleScreen() {
           <View style={s.chipRow}>
             {PRODUCT_TYPES.map((t) => (
               <TouchableOpacity
-                key={t} style={[s.chip, productType === t && s.chipActive]}
+                key={t} style={[s.chip, productType === t && [s.chipActive, { backgroundColor: colors.accent, borderColor: colors.primary }]]}
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setProductType(t); }}
                 activeOpacity={0.75}
               >
-                <Text style={[s.chipText, productType === t && s.chipTextActive]}>{t}</Text>
+                <Text style={[s.chipText, productType === t && [s.chipTextActive, { color: colors.primary }]]}>{t}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -81,11 +82,11 @@ export default function RequestSampleScreen() {
           <View style={s.chipRow}>
             {QUANTITIES.map((q) => (
               <TouchableOpacity
-                key={q} style={[s.chip, qty === q && s.chipActive]}
+                key={q} style={[s.chip, qty === q && [s.chipActive, { backgroundColor: colors.accent, borderColor: colors.primary }]]}
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setQty(q); }}
                 activeOpacity={0.75}
               >
-                <Text style={[s.chipText, qty === q && s.chipTextActive]}>{q}</Text>
+                <Text style={[s.chipText, qty === q && [s.chipTextActive, { color: colors.primary }]]}>{q}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -122,19 +123,19 @@ export default function RequestSampleScreen() {
         </View>
 
         {/* Escrow note */}
-        <View style={s.escrowNote}>
-          <Feather name="shield" size={15} color={GREEN} />
+        <View style={[s.escrowNote, { backgroundColor: colors.accent, borderColor: colors.primary + '33' }]}>
+          <Feather name="shield" size={15} color={colors.primary} />
           <Text style={s.escrowText}>
-            <Text style={{ color: GREEN, fontFamily: 'Inter_600SemiBold' }}>Payment protection: </Text>
+            <Text style={{ color: colors.primary, fontFamily: 'Inter_600SemiBold' }}>Payment protection: </Text>
             Sample costs are charged only after the manufacturer confirms your request and provides a quote.
           </Text>
         </View>
       </ScrollView>
 
       <View style={[s.bottom, { paddingBottom: insets.bottom + 12 }]}>
-        <TouchableOpacity style={[s.submitBtn, sending && { opacity: 0.7 }]} onPress={submit} activeOpacity={0.85} disabled={sending}>
-          <Feather name={sending ? 'loader' : 'send'} size={16} color="#000" />
-          <Text style={s.submitBtnText}>{sending ? 'Sending…' : 'Send Sample Request'}</Text>
+        <TouchableOpacity style={[s.submitBtn, { backgroundColor: colors.primary }, sending && { opacity: 0.7 }]} onPress={submit} activeOpacity={0.85} disabled={sending}>
+          <Feather name={sending ? 'loader' : 'send'} size={16} color={colors.primaryForeground} />
+          <Text style={[s.submitBtnText, { color: colors.primaryForeground }]}>{sending ? 'Sending…' : 'Send Sample Request'}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -151,13 +152,13 @@ const s = StyleSheet.create({
   fieldHint:  { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 16 },
   chipRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip:       { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: CARD, borderWidth: 1, borderColor: BORD },
-  chipActive: { backgroundColor: 'rgba(139,92,246,0.18)', borderColor: GREEN },
+  chipActive: {},
   chipText:   { fontSize: 13, fontFamily: 'Inter_500Medium', color: MUTED },
-  chipTextActive: { color: GREEN },
+  chipTextActive: {},
   input:      { backgroundColor: CARD, borderWidth: 1, borderColor: BORD, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, fontFamily: 'Inter_400Regular', color: FG },
-  escrowNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: 'rgba(139,92,246,0.18)', borderRadius: 12, borderWidth: 1, borderColor: GREEN + '33', padding: 14 },
+  escrowNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 12, borderWidth: 1, padding: 14 },
   escrowText: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, flex: 1, lineHeight: 18 },
   bottom:     { paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: BORD, backgroundColor: BG },
-  submitBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: GREEN, borderRadius: 16, paddingVertical: 16 },
-  submitBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#000' },
+  submitBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 16, paddingVertical: 16 },
+  submitBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold' },
 });

@@ -130,10 +130,10 @@ async function releaseCheckoutLoyaltyRedemption(session: any) {
       : eq(checkoutSessions.stripeSessionId, session.id))
     .limit(1);
 
-  if (!checkout?.loyaltyToken) return;
+  if (!checkout?.loyaltyToken || !checkout.buyerId) return;
   await db.transaction((tx) => releaseLoyaltyRedemption(
     tx,
-    checkout.buyerId,
+    checkout.buyerId!,
     checkout.loyaltyToken!,
     checkout.id,
   ));
@@ -164,7 +164,6 @@ async function releaseCheckoutLoyaltyRedemption(session: any) {
  */
 export async function handleCheckoutPaid(session: any) {
   const sessionId: string   = session.id;
-  const buyerId:   string   = session.client_reference_id ?? "";
   const piId:      string | null = session.payment_intent ?? null;
   const metadata:  Record<string, string> = session.metadata ?? {};
   const csRef:     string | undefined = metadata["csRef"];
@@ -184,11 +183,6 @@ export async function handleCheckoutPaid(session: any) {
     .limit(1);
   if (freelancerJobBySession) {
     await handleFreelancerJobPaid(session, freelancerJobBySession.id);
-    return;
-  }
-
-  if (!buyerId) {
-    console.error("checkout paid: missing client_reference_id", sessionId);
     return;
   }
 
@@ -230,6 +224,18 @@ export async function handleCheckoutPaid(session: any) {
     console.error(`checkout paid: no server-side cart record for session ${sessionId}`);
     return;
   }
+  // Do not use client_reference_id as an identity assertion: it is absent for
+  // guests and is Stripe-side mutable data. The durable cart row is authoritative.
+  if (csRecord.stripeSessionId && csRecord.stripeSessionId !== sessionId) {
+    console.error(`checkout paid: Stripe session does not match checkout record ${csRecord.id}`);
+    return;
+  }
+  const buyerId = csRecord.buyerId;
+  const guestEmail = buyerId ? null : csRecord.guestEmail;
+  if (!buyerId && !guestEmail) {
+    console.error(`checkout paid: checkout ${csRecord.id} has no buyer or guest identity`);
+    return;
+  }
 
   type CartItem = {
     variantId:    string;
@@ -268,12 +274,13 @@ export async function handleCheckoutPaid(session: any) {
   // (captured before Stripe was opened, so it always has the address).
   // Fall back to session.shipping_details if the csRecord address is missing
   // (e.g. older sessions or sessions created with shipping_address_collection).
-  let shippingAddress: { name?: string; street: string; city: string; state: string; zip: string; country: string } | undefined;
+  let shippingAddress: { name?: string; street: string; line2?: string | null; city: string; state: string; zip: string; country: string } | undefined;
   if (csRecord.shippingAddress && (csRecord.shippingAddress as any).street) {
     const sa = csRecord.shippingAddress as any;
     shippingAddress = {
       name:    sa.name    ?? undefined,
       street:  sa.street,
+      line2:   sa.line2 ?? null,
       city:    sa.city,
       state:   sa.state,
       zip:     sa.zip,
@@ -285,6 +292,7 @@ export async function handleCheckoutPaid(session: any) {
       shippingAddress = {
         name:    shipDetails.name ?? undefined,
         street:  shipDetails.address.line1 ?? "",
+        line2:   shipDetails.address.line2 ?? null,
         city:    shipDetails.address.city ?? "",
         state:   shipDetails.address.state ?? "",
         zip:     shipDetails.address.postal_code ?? "",
@@ -332,7 +340,8 @@ export async function handleCheckoutPaid(session: any) {
       .insert(orders)
       .values({
         ownerId,
-        buyerId,
+        buyerId: buyerId ?? null,
+        ...(guestEmail ? { guestEmail } : {}),
         orderNumber,
         status:                  oversoldItems.length > 0 ? "refund_pending" : "pending",
         totalCents,
@@ -349,7 +358,7 @@ export async function handleCheckoutPaid(session: any) {
     // A redemption is consumed only once a paid session has produced a valid
     // order. This transaction boundary means a webhook retry cannot spend the
     // same token twice.
-    if (csRecord.loyaltyToken) {
+    if (csRecord.loyaltyToken && buyerId) {
       if (oversoldItems.length === 0) {
         await consumeLoyaltyRedemption(
           tx,
@@ -468,7 +477,7 @@ export async function handleCheckoutPaid(session: any) {
       }
     }
   } else {
-    console.log(`Order created for buyer ${buyerId}, session ${sessionId}`);
+    console.log(`Order created for ${buyerId ? `buyer ${buyerId}` : "guest"}, session ${sessionId}`);
 
     // ── Auto-credit drop wallet (Fix #1) ───────────────────────────────────
     // If this order is part of a drop, credit the drop's escrow wallet so

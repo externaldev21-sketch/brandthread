@@ -22,6 +22,7 @@ import {
   SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -95,6 +96,7 @@ function getNumericValue(row: RowDef, q: Quote, mfg?: Manufacturer): number {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function QuoteCompareScreen() {
+  const colors = useColors();
   const { requestId } = useLocalSearchParams<{ requestId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -135,7 +137,7 @@ export default function QuoteCompareScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={PURPLE} />
+        <ActivityIndicator color={colors.primary} />
       </View>
     );
   }

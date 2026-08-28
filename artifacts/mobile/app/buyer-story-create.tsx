@@ -10,20 +10,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import {
-  BG, SURFACE, CARD, BORDER, BORDER_ACTIVE,
-  FG, MUTED, ON_DARK, PURPLE, PURPLE_DIM,
-  CYAN, FONT, FS, SP, RADIUS, ICON, GRAD_PRIMARY,
+  BG, SURFACE, CARD, BORDER,
+  FG, MUTED, ON_DARK,
+  FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { createStory, MY_USER_ID, MY_COLOR, MY_INITIALS, MY_HANDLE } from '@/services/socialService';
 import { useApi } from '@/lib/api';
 import type { StoryMedia, StoryPrivacySettings } from '@/services/socialTypes';
+import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 const { width: W } = Dimensions.get('window');
 const CANVAS_H = Math.min(W * 1.4, 400);
 
 const BG_COLORS = ['#1a1a2e', '#0d1117', '#1a0d1a', '#0d1a2e', '#1a1400', '#2e0d0d'];
-const TEXT_COLORS = ['#FFFFFF', '#000000', PURPLE, CYAN, '#F59E0B', '#10B981'];
-
 type MediaType = 'photo' | 'video' | 'text';
 type Visibility = 'public' | 'friends';
 
@@ -34,6 +34,13 @@ const TYPE_TABS: { label: string; value: MediaType; icon: string }[] = [
 ];
 
 export default function BuyerStoryCreate() {
+  const colors = useColors();
+  const { theme } = useAppTheme();
+  const PURPLE = colors.primary, PURPLE_DIM = colors.accent, CYAN = theme.secondary;
+  const BORDER_ACTIVE = `${theme.accent}73`;
+  const GRAD_PRIMARY = [theme.accent, theme.secondary] as const;
+  const TEXT_COLORS = ['#FFFFFF', '#000000', PURPLE, CYAN, '#F59E0B', '#10B981'];
+  const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router  = useRouter();
   const api     = useApi();
@@ -400,7 +407,9 @@ export default function BuyerStoryCreate() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE = theme.accent, PURPLE_DIM = theme.accentDim, BORDER_ACTIVE = `${theme.accent}73`;
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
@@ -583,10 +592,10 @@ const styles = StyleSheet.create({
     marginTop: SP.sm,
     paddingVertical: SP.sm,
     paddingHorizontal: SP.md,
-    backgroundColor: 'rgba(139,92,246,0.12)',
+    backgroundColor: PURPLE_DIM,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: 'rgba(139,92,246,0.35)',
+    borderColor: `${PURPLE}59`,
   },
   advancedBtnText: {
     color: PURPLE,
@@ -650,4 +659,5 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: BORDER,
   },
-});
+  });
+};

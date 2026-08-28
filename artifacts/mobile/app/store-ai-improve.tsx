@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Alert,
@@ -52,6 +53,7 @@ function categoryVariant(cat: StoreAISuggestion['category']): 'purple' | 'info' 
 }
 
 export default function StoreAiImproveScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const headerTopInset = useHeaderTopInset();
   const [suggestions, setSuggestions] = useState<StoreAISuggestion[]>([]);

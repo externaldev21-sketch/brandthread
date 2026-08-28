@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
@@ -25,6 +26,7 @@ const ERROR_ROUTES: Record<string, string> = {
 };
 
 export default function StorePublishScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const headerTopInset = useHeaderTopInset();
   const [store, setStore] = useState<Storefront | null>(null);

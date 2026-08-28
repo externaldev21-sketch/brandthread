@@ -15,8 +15,8 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, RED, ON_DARK,
+  BG, SURFACE, CARD, CARD_ELEVATED, BORDER,
+  FG, MUTED, SUBTLE, RED, ON_DARK,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import {
@@ -24,6 +24,8 @@ import {
   subscribeSocial, MY_USER_ID, MY_COLOR, MY_INITIALS, MY_NAME, MY_HANDLE,
 } from '@/services/socialService';
 import type { Comment } from '@/services/socialTypes';
+import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -50,6 +52,8 @@ function CommentRow({
   onReply: (comment: Comment) => void;
   onDelete: (id: string) => void;
 }) {
+  const { theme } = useAppTheme();
+  const s = makeStyles(theme);
   const isOwn = comment.authorId === MY_USER_ID;
   const isReply = !!comment.replyToId;
 
@@ -120,6 +124,11 @@ function CommentRow({
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function BuyerPostCommentsScreen() {
+  const colors = useColors();
+  const { theme } = useAppTheme();
+  const PURPLE = colors.primary, PURPLE_DIM = colors.accent;
+  const BORDER_ACTIVE = `${theme.accent}73`;
+  const s = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -351,7 +360,9 @@ export default function BuyerPostCommentsScreen() {
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE = theme.accent, PURPLE_DIM = theme.accentDim, BORDER_ACTIVE = `${theme.accent}73`;
+  return StyleSheet.create({
   container: { flex: 1 },
 
   header: {
@@ -574,4 +585,5 @@ const s = StyleSheet.create({
   },
   sendBtn: { padding: SP.xs, marginBottom: 4 },
   sendBtnDisabled: { opacity: 0.4 },
-});
+  });
+};

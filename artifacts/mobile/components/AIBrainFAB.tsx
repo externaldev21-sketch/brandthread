@@ -18,6 +18,7 @@ import { useRouter } from 'expo-router';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
 import { AIScreenContext } from '@/services/aiTypes';
 import * as Haptics from 'expo-haptics';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -53,6 +54,7 @@ export default function AIBrainFAB({
 }: AIBrainFABProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { theme } = useAppTheme();
 
   const [expanded, setExpanded] = useState(false);
   const slideX  = useRef(new Animated.Value(COLLAPSED_TX)).current; // starts collapsed
@@ -166,27 +168,26 @@ export default function AIBrainFAB({
       >
         {expanded ? (
           <>
-            {/* Purple glow ring — only shown with the expanded circle */}
-            <View style={styles.glow} />
+            <View style={[styles.glow, { backgroundColor: theme.accentDim }]} />
 
             {/* Main gradient circle */}
             <LinearGradient
-              colors={['#8B5CF6', '#6D28D9']}
+              colors={[theme.accent, theme.accentLight]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
-              style={styles.gradient}
+              style={[styles.gradient, { shadowColor: theme.accent }]}
             >
               <BrandthreadLogo size={22} opacity={1} />
             </LinearGradient>
           </>
         ) : (
           <LinearGradient
-            colors={['#8B5CF6', '#6D28D9']}
+            colors={[theme.accent, theme.accentLight]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.tab}
           >
-            <Feather name="chevron-left" size={18} color="#FFFFFF" />
+            <Feather name="chevron-left" size={18} color={theme.onAccent} />
           </LinearGradient>
         )}
       </Pressable>
@@ -219,7 +220,6 @@ const styles = StyleSheet.create({
     width: SIZE + 16,
     height: SIZE + 16,
     borderRadius: (SIZE + 16) / 2,
-    backgroundColor: 'rgba(139,92,246,0.22)',
     top: -8,
     left: -8,
   },
@@ -229,7 +229,6 @@ const styles = StyleSheet.create({
     borderRadius: SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#8B5CF6',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.55,
     shadowRadius: 14,

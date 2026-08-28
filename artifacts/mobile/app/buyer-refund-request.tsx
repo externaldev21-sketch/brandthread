@@ -12,16 +12,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { createRefundRequest } from '@/services/cartService';
 import { getBuyerOrder } from '@/services/orderService';
 import { BuyerOrderView } from '@/services/orderTypes';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
+  BG, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   SUCCESS, ON_DARK,
   RED, RED_DIM,
-  GRAD_PRIMARY,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
 
@@ -36,6 +36,12 @@ const REFUND_REASONS = [
 ];
 
 export default function BuyerRefundRequestScreen() {
+  const colors = useColors();
+  const { theme } = useAppTheme();
+  const PURPLE = colors.primary, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = colors.accent;
+  const BORDER_ACTIVE = `${theme.accent}73`;
+  const GRAD_PRIMARY = [theme.accent, theme.secondary] as const;
+  const s = makeStyles(theme);
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -225,7 +231,9 @@ export default function BuyerRefundRequestScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE = theme.accent, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = theme.accentDim, BORDER_ACTIVE = `${theme.accent}73`;
+  return StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
@@ -261,4 +269,5 @@ const s = StyleSheet.create({
   doneBtn: { width: '100%', borderRadius: RADIUS.lg, overflow: 'hidden' },
   doneBtnGrad: { height: COMP.buttonH, alignItems: 'center', justifyContent: 'center' },
   doneBtnText: { fontSize: FS.base, fontFamily: FONT.bold, color: ON_DARK },
-});
+  });
+};

@@ -9,6 +9,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useColors } from '@/hooks/useColors';
 
 // ─── Tokens ───────────────────────────────────────────────────────────────────
 const BG      = '#07070F';
@@ -17,15 +18,12 @@ const CARD2   = '#18182E';
 const BORDER  = 'rgba(255,255,255,0.07)';
 const FG      = '#F4F4FF';
 const MUTED   = 'rgba(244,244,255,0.50)';
-const GREEN   = '#8B5CF6';
-const GREEN_D = 'rgba(139,92,246,0.18)';
-
 // ─── Data ─────────────────────────────────────────────────────────────────────
 const PROD_STATS = [
-  { value: '12', label: 'In Production', icon: 'package'   as const, color: GREEN },
-  { value: '7',  label: 'Sampling',      icon: 'scissors'  as const, color: '#F97316' },
-  { value: '3',  label: 'Shipped',       icon: 'truck'     as const, color: '#0EA5E9' },
-  { value: '2',  label: 'Needs Approval',icon: 'alert-circle' as const, color: '#EF4444' },
+  { value: '12', label: 'In Production', icon: 'package'   as const, color: '',        accent: true },
+  { value: '7',  label: 'Sampling',      icon: 'scissors'  as const, color: '#F97316', accent: false },
+  { value: '3',  label: 'Shipped',       icon: 'truck'     as const, color: '#0EA5E9', accent: false },
+  { value: '2',  label: 'Needs Approval',icon: 'alert-circle' as const, color: '#EF4444', accent: false },
 ];
 
 const PIPELINE = [
@@ -71,6 +69,8 @@ const MESSAGES = [
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export default function ManufacturerScreen() {
+  const colors = useColors();
+  const s = createStyles(colors);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -109,7 +109,7 @@ export default function ManufacturerScreen() {
       {/* ── Search Bar ── */}
       <View style={s.searchRow}>
         <View style={[s.searchBox, searchFocused && s.searchBoxFocused]}>
-          <Feather name="search" size={15} color={searchFocused ? GREEN : MUTED} />
+          <Feather name="search" size={15} color={searchFocused ? colors.primary : MUTED} />
           <TextInput
             style={s.searchInput}
             placeholder="Search manufacturers by name or location…"
@@ -148,10 +148,10 @@ export default function ManufacturerScreen() {
             {PROD_STATS.map((st) => (
               <View key={st.label} style={[s.statChip, { borderColor: BORDER }]}>
                 <View style={s.statTopRow}>
-                  <View style={[s.statIconBox, { backgroundColor: st.color + '22' }]}>
-                    <Feather name={st.icon} size={13} color={st.color} />
+                  <View style={[s.statIconBox, { backgroundColor: (st.accent ? colors.primary : st.color) + '22' }]}>
+                    <Feather name={st.icon} size={13} color={st.accent ? colors.primary : st.color} />
                   </View>
-                  <Text style={[s.statValue, { color: st.color }]}>{st.value}</Text>
+                  <Text style={[s.statValue, { color: st.accent ? colors.primary : st.color }]}>{st.value}</Text>
                 </View>
                 <Text style={s.statLabel} numberOfLines={2}>{st.label}</Text>
               </View>
@@ -168,8 +168,8 @@ export default function ManufacturerScreen() {
             </View>
             <TouchableOpacity onPress={() => go('/payments')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                <Text style={[s.viewAllText, { color: GREEN }]}>View Details</Text>
-                <Feather name="chevron-right" size={13} color={GREEN} />
+                <Text style={[s.viewAllText, { color: colors.primary }]}>View Details</Text>
+                <Feather name="chevron-right" size={13} color={colors.primary} />
               </View>
             </TouchableOpacity>
           </View>
@@ -177,17 +177,17 @@ export default function ManufacturerScreen() {
           {/* Product row */}
           <View style={s.productRow}>
             <LinearGradient colors={['#1E2A1E', '#0E160E']} style={s.productThumb}>
-              <Feather name="shopping-bag" size={22} color={GREEN + '99'} />
+              <Feather name="shopping-bag" size={22} color={colors.primary + '99'} />
             </LinearGradient>
             <View style={{ flex: 1, gap: 3 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                 <Text style={s.productName}>Heavyweight Hoodie</Text>
-                <Text style={[s.productStatus, { color: GREEN }]}>In Production</Text>
+                <Text style={[s.productStatus, { color: colors.primary }]}>In Production</Text>
               </View>
               <Text style={s.productSpec}>500 GSM • Puff Print</Text>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={[s.productQty, { color: GREEN }]}>Quantity: 250</Text>
-                <Text style={[s.productPct, { color: GREEN }]}>60%</Text>
+                <Text style={[s.productQty, { color: colors.primary }]}>Quantity: 250</Text>
+                <Text style={[s.productPct, { color: colors.primary }]}>60%</Text>
               </View>
               <View style={s.progressTrack}>
                 <View style={[s.progressFill, { width: '60%' }]} />
@@ -202,14 +202,14 @@ export default function ManufacturerScreen() {
                 <View style={s.pipeStep}>
                   <View style={[
                     s.pipeCircle,
-                    step.done   && { backgroundColor: GREEN, borderColor: GREEN },
-                    step.active && { borderColor: GREEN },
+                    step.done   && { backgroundColor: colors.primary, borderColor: colors.primary },
+                    step.active && { borderColor: colors.primary },
                     !step.done && !step.active && { borderColor: BORDER },
                   ]}>
                     {step.done ? (
-                      <Feather name="check" size={10} color="#000" />
+                      <Feather name="check" size={10} color={colors.primaryForeground} />
                     ) : step.active ? (
-                      <Feather name="settings" size={10} color={GREEN} />
+                      <Feather name="settings" size={10} color={colors.primary} />
                     ) : (
                       <View style={[s.pipeDot, { backgroundColor: MUTED }]} />
                     )}
@@ -217,7 +217,7 @@ export default function ManufacturerScreen() {
                   <Text style={[s.pipeLabel, { color: step.done || step.active ? FG : MUTED }]}>{step.label}</Text>
                 </View>
                 {i < PIPELINE.length - 1 && (
-                  <View style={[s.pipeLine, { backgroundColor: step.done ? GREEN + '60' : BORDER }]} />
+                  <View style={[s.pipeLine, { backgroundColor: step.done ? colors.primary + '60' : BORDER }]} />
                 )}
               </React.Fragment>
             ))}
@@ -233,8 +233,8 @@ export default function ManufacturerScreen() {
             {!isSearching && (
               <TouchableOpacity onPress={() => go('/manufacturer-onboard')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                  <Text style={[s.viewAllText, { color: GREEN }]}>View All</Text>
-                  <Feather name="chevron-right" size={13} color={GREEN} />
+                  <Text style={[s.viewAllText, { color: colors.primary }]}>View All</Text>
+                  <Feather name="chevron-right" size={13} color={colors.primary} />
                 </View>
               </TouchableOpacity>
             )}
@@ -251,7 +251,7 @@ export default function ManufacturerScreen() {
             ) : (
               <View style={{ gap: 10 }}>
                 {filteredMfrs.map((m) => (
-                  <MfrRow key={m.id} m={m} onPress={() => go('/chat/manufacturer-' + m.id)} onSample={() => go('/request-sample?name=' + encodeURIComponent(m.name))} />
+                  <MfrRow key={m.id} m={m} colors={colors} onPress={() => go('/chat/manufacturer-' + m.id)} onSample={() => go('/request-sample?name=' + encodeURIComponent(m.name))} />
                 ))}
               </View>
             )
@@ -259,7 +259,7 @@ export default function ManufacturerScreen() {
             /* Default: horizontal scroll */
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
               {MANUFACTURERS.map((m) => (
-                <MfrCard key={m.id} m={m} onPress={() => go('/chat/manufacturer-' + m.id)} onSample={() => go('/request-sample?name=' + encodeURIComponent(m.name))} />
+                <MfrCard key={m.id} m={m} colors={colors} onPress={() => go('/chat/manufacturer-' + m.id)} onSample={() => go('/request-sample?name=' + encodeURIComponent(m.name))} />
               ))}
             </ScrollView>
           )}
@@ -271,8 +271,8 @@ export default function ManufacturerScreen() {
             <Text style={s.cardTitle}>Recent Messages</Text>
             <TouchableOpacity onPress={() => go('/chat/manufacturer-m1')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                <Text style={[s.viewAllText, { color: GREEN }]}>View All</Text>
-                <Feather name="chevron-right" size={13} color={GREEN} />
+                <Text style={[s.viewAllText, { color: colors.primary }]}>View All</Text>
+                <Feather name="chevron-right" size={13} color={colors.primary} />
               </View>
             </TouchableOpacity>
           </View>
@@ -309,7 +309,8 @@ export default function ManufacturerScreen() {
 }
 
 // ─── Manufacturer row (search results — vertical list) ────────────────────────
-function MfrRow({ m, onPress, onSample }: { m: typeof MANUFACTURERS[0]; onPress: () => void; onSample: () => void }) {
+function MfrRow({ m, colors, onPress, onSample }: { m: typeof MANUFACTURERS[0]; colors: ReturnType<typeof useColors>; onPress: () => void; onSample: () => void }) {
+  const mr = createRowStyles(colors);
   return (
     <View style={[mr.row]}>
       {/* Avatar */}
@@ -323,7 +324,7 @@ function MfrRow({ m, onPress, onSample }: { m: typeof MANUFACTURERS[0]; onPress:
           <Text style={mr.name}>{m.name}</Text>
           {m.verified && (
             <View style={mr.verifiedPill}>
-              <Feather name="check" size={8} color="#000" />
+              <Feather name="check" size={8} color={colors.primaryForeground} />
             </View>
           )}
           <Text style={mr.rating}>★ {m.rating}</Text>
@@ -338,26 +339,27 @@ function MfrRow({ m, onPress, onSample }: { m: typeof MANUFACTURERS[0]; onPress:
 
       {/* Action */}
       <TouchableOpacity style={mr.msgBtn} onPress={onPress} activeOpacity={0.8}>
-        <Feather name="message-circle" size={15} color={GREEN} />
+        <Feather name="message-circle" size={15} color={colors.primary} />
       </TouchableOpacity>
     </View>
   );
 }
 
-const mr = StyleSheet.create({
+const createRowStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   row:         { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, padding: 14 },
   avatar:      { width: 44, height: 44, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  initials:    { fontSize: 12, fontFamily: 'Inter_700Bold', color: GREEN },
+  initials:    { fontSize: 12, fontFamily: 'Inter_700Bold', color: colors.primary },
   name:        { fontSize: 13, fontFamily: 'Inter_700Bold', color: FG },
-  verifiedPill:{ width: 14, height: 14, borderRadius: 7, backgroundColor: GREEN, alignItems: 'center', justifyContent: 'center' },
+  verifiedPill:{ width: 14, height: 14, borderRadius: 7, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   rating:      { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: '#FBBF24', marginLeft: 'auto' },
   location:    { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
   spec:        { fontSize: 10, fontFamily: 'Inter_500Medium', color: MUTED },
-  msgBtn:      { width: 34, height: 34, borderRadius: 10, backgroundColor: GREEN_D, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: GREEN + '40' },
+  msgBtn:      { width: 34, height: 34, borderRadius: 10, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: colors.primary + '40' },
 });
 
 // ─── Manufacturer card (horizontal scroll) ────────────────────────────────────
-function MfrCard({ m, onPress, onSample }: { m: typeof MANUFACTURERS[0]; onPress: () => void; onSample: () => void }) {
+function MfrCard({ m, colors, onPress, onSample }: { m: typeof MANUFACTURERS[0]; colors: ReturnType<typeof useColors>; onPress: () => void; onSample: () => void }) {
+  const mc = createCardStyles(colors);
   return (
     <View style={mc.card}>
       {/* Factory photo placeholder */}
@@ -377,7 +379,7 @@ function MfrCard({ m, onPress, onSample }: { m: typeof MANUFACTURERS[0]; onPress
         </View>
         {/* Verified badge */}
         <View style={mc.verifiedBadge}>
-          <Feather name="check" size={9} color="#000" />
+          <Feather name="check" size={9} color={colors.primaryForeground} />
           <Text style={mc.verifiedText}>Verified</Text>
         </View>
       </LinearGradient>
@@ -409,7 +411,7 @@ function MfrCard({ m, onPress, onSample }: { m: typeof MANUFACTURERS[0]; onPress
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-const s = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   root:    { flex: 1, backgroundColor: BG },
 
   topNav:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: BORDER },
@@ -441,7 +443,7 @@ const s = StyleSheet.create({
   productQty:   { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   productPct:   { fontSize: 12, fontFamily: 'Inter_700Bold' },
   progressTrack:{ height: 5, backgroundColor: '#18182E', borderRadius: 3, overflow: 'hidden', marginTop: 4 },
-  progressFill: { height: 5, backgroundColor: GREEN, borderRadius: 3 },
+  progressFill: { height: 5, backgroundColor: colors.primary, borderRadius: 3 },
 
   // Pipeline
   pipeline:    { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
@@ -454,7 +456,7 @@ const s = StyleSheet.create({
   // Search bar
   searchRow:        { paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: BORDER },
   searchBox:        { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 13, paddingVertical: 10 },
-  searchBoxFocused: { borderColor: GREEN + '70' },
+  searchBoxFocused: { borderColor: colors.primary + '70' },
   searchInput:      { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: FG, padding: 0 },
 
   // Empty state
@@ -465,24 +467,24 @@ const s = StyleSheet.create({
   // Messages
   msgRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingTop: 12 },
   msgAvatar:  { width: 42, height: 42, borderRadius: 12, backgroundColor: '#18182E', alignItems: 'center', justifyContent: 'center' },
-  msgAvatarText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: GREEN },
-  onlineDot:  { position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: 5, backgroundColor: GREEN, borderWidth: 1.5, borderColor: CARD },
+  msgAvatarText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: colors.primary },
+  onlineDot:  { position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: 5, backgroundColor: colors.primary, borderWidth: 1.5, borderColor: CARD },
   msgName:    { fontSize: 13, fontFamily: 'Inter_700Bold', color: FG },
   msgTime:    { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED },
   msgPreview: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 17 },
-  unreadBadge:{ width: 20, height: 20, borderRadius: 10, backgroundColor: GREEN, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  unreadText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: '#000' },
+  unreadBadge:{ width: 20, height: 20, borderRadius: 10, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
+  unreadText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: colors.primaryForeground },
 });
 
-const mc = StyleSheet.create({
+const createCardStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   card:     { width: 160, backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
   photo:    { height: 110, overflow: 'hidden', position: 'relative', alignItems: 'center', justifyContent: 'center' },
   factoryRow: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', gap: 6, paddingHorizontal: 8 },
   factoryDesk:{ flex: 1, height: 10, borderRadius: 2 },
   ratingBadge:{ position: 'absolute', top: 8, left: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 8, paddingHorizontal: 6, paddingVertical: 3 },
   ratingText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: '#FBBF24' },
-  verifiedBadge: { position: 'absolute', bottom: 8, left: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: GREEN, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
-  verifiedText:  { fontSize: 9, fontFamily: 'Inter_700Bold', color: '#000' },
+  verifiedBadge: { position: 'absolute', bottom: 8, left: 8, flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: colors.primary, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
+  verifiedText:  { fontSize: 9, fontFamily: 'Inter_700Bold', color: colors.primaryForeground },
   body:     { padding: 10, gap: 4 },
   name:     { fontSize: 13, fontFamily: 'Inter_700Bold', color: FG },
   location: { fontSize: 10, fontFamily: 'Inter_400Regular', color: MUTED },

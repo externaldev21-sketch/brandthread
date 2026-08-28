@@ -20,10 +20,8 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE, BORDER_FOCUS,
   FG, MUTED, SUBTLE, ON_DARK,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM,
   SUCCESS, SUCCESS_DIM, GREEN_BRIGHT,
   BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_PRIMARY, GRAD_CARD_GLOW,
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM,
   SHADOW_PURPLE, SHADOW_SM,
 } from '@/lib/theme';
@@ -93,7 +91,7 @@ export function BrandthreadHeader({
         )}
         <View>
           {gradient ? (
-            <LinearGradient colors={[theme.accent, theme.secondary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={hdrS.gradTitleWrap}>
+            <LinearGradient colors={[theme.accent, theme.accentLight]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={hdrS.gradTitleWrap}>
               <Text style={[hdrS.gradTitle, { color: theme.accent }]}>{title}</Text>
             </LinearGradient>
           ) : (
@@ -116,7 +114,7 @@ const hdrS = StyleSheet.create({
   title:      { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, letterSpacing: -0.3 },
   subtitle:   { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginTop: 1 },
   gradTitleWrap: { borderRadius: 0 },
-  gradTitle:  { fontSize: FS.xl, fontFamily: FONT.bold, color: PURPLE },
+  gradTitle:  { fontSize: FS.xl, fontFamily: FONT.bold },
   right:      { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
 });
 
@@ -204,7 +202,8 @@ export function PrimaryButton({
   label, onPress, icon, loading, disabled, small, style, colors,
 }: PrimaryButtonProps) {
   const { theme } = useAppTheme();
-  const buttonColors = colors ?? [theme.accent, theme.secondary] as const;
+  const buttonColors = colors ?? [theme.accent, theme.accentLight] as const;
+  const foreground = colors ? ON_DARK : theme.onAccent;
   const h = small ? COMP.buttonHSm : COMP.buttonH;
   return (
     <TouchableOpacity
@@ -223,11 +222,11 @@ export function PrimaryButton({
         style={[pbS.inner, { height: h }]}
       >
         {loading ? (
-          <ActivityIndicator color={ON_DARK} size="small" />
+          <ActivityIndicator color={foreground} size="small" />
         ) : (
           <>
-            {icon && <Feather name={icon} size={ICON.sm} color={disabled ? MUTED : ON_DARK} />}
-            <Text style={[pbS.label, { fontSize: small ? FS.sm : FS.base, opacity: disabled ? 0.5 : 1 }]}>{label}</Text>
+            {icon && <Feather name={icon} size={ICON.sm} color={disabled ? MUTED : foreground} />}
+            <Text style={[pbS.label, { color: foreground, fontSize: small ? FS.sm : FS.base, opacity: disabled ? 0.5 : 1 }]}>{label}</Text>
           </>
         )}
       </LinearGradient>
@@ -237,7 +236,7 @@ export function PrimaryButton({
 
 const pbS = StyleSheet.create({
   inner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm },
-  label: { fontFamily: FONT.bold, color: ON_DARK, letterSpacing: 0.2 },
+  label: { fontFamily: FONT.bold, letterSpacing: 0.2 },
 });
 
 // ─── SecondaryButton ──────────────────────────────────────────────────────────
@@ -334,7 +333,7 @@ export function IconButton({ name, onPress, color = FG, size = ICON.md, badge, b
       {badge && (
         <View style={[ibS.badge, { backgroundColor: theme.accent }]}>
           {badgeCount !== undefined && badgeCount > 0
-            ? <Text style={ibS.badgeText}>{badgeCount > 9 ? '9+' : badgeCount}</Text>
+            ? <Text style={[ibS.badgeText, { color: theme.onAccent }]}>{badgeCount > 9 ? '9+' : badgeCount}</Text>
             : null}
         </View>
       )}
@@ -345,8 +344,8 @@ export function IconButton({ name, onPress, color = FG, size = ICON.md, badge, b
 const ibS = StyleSheet.create({
   root:      { width: COMP.iconBtn, height: COMP.iconBtn, borderRadius: RADIUS.sm, backgroundColor: CARD,
                borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  badge:     { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4, backgroundColor: PURPLE },
-  badgeText: { fontSize: 8, fontFamily: FONT.bold, color: ON_DARK, textAlign: 'center' },
+  badge:     { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4 },
+  badgeText: { fontSize: 8, fontFamily: FONT.bold, textAlign: 'center' },
 });
 
 // ─── SearchBar ────────────────────────────────────────────────────────────────
@@ -364,7 +363,7 @@ export function SearchBar({ value, onChange, placeholder = 'Search…', style, o
   const [focused, setFocused] = useState(false);
   const { theme } = useAppTheme();
   return (
-    <View style={[srS.root, focused && [srS.focused, { borderColor: theme.secondary }], style]}>
+    <View style={[srS.root, focused && [srS.focused, { borderColor: theme.accent }], style]}>
       <Feather name="search" size={ICON.sm} color={focused ? theme.accentLight : MUTED} />
       <TextInput
         style={srS.input}
@@ -423,13 +422,13 @@ export function FilterChip({ label, active, onPress, count }: FilterChipProps) {
 const fcS = StyleSheet.create({
   chip:         { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, height: 34,
                   borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
-  active:       { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
+  active:       { borderColor: BORDER_ACTIVE },
   label:        { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-  activeLabel:  { color: PURPLE_LIGHT, fontFamily: FONT.semibold },
+  activeLabel:  { fontFamily: FONT.semibold },
   count:        { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: RADIUS.pill, paddingHorizontal: 5, paddingVertical: 1 },
-  activeCount:  { backgroundColor: PURPLE_DIM },
+  activeCount:  {},
   countText:    { fontSize: 10, fontFamily: FONT.bold, color: MUTED },
-  activeCountText: { color: PURPLE_LIGHT },
+  activeCountText: {},
 });
 
 // ─── StatusBadge ─────────────────────────────────────────────────────────────
@@ -448,7 +447,7 @@ const STATUS_COLORS: Record<StatusVariant, { bg: string; fg: string }> = {
   warning: { bg: ORANGE_DIM,  fg: ORANGE  },
   error:   { bg: RED_DIM,     fg: RED     },
   neutral: { bg: 'rgba(255,255,255,0.06)', fg: MUTED },
-  purple:  { bg: PURPLE_DIM,  fg: PURPLE_LIGHT },
+  purple:  { bg: 'transparent', fg: FG },
 };
 
 export function StatusBadge({ label, variant = 'neutral', small = false }: StatusBadgeProps) {
@@ -537,7 +536,7 @@ const shS = StyleSheet.create({
   root:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
             paddingHorizontal: SP.md, marginBottom: SP.sm },
   title:  { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
-  action: { fontSize: FS.sm, fontFamily: FONT.medium, color: PURPLE_LIGHT },
+  action: { fontSize: FS.sm, fontFamily: FONT.medium },
 });
 
 // ─── StatCard ─────────────────────────────────────────────────────────────────
@@ -614,7 +613,7 @@ const qaS = StyleSheet.create({
   root:    { alignItems: 'center', gap: SP.sm, backgroundColor: CARD,
              borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: 14 },
   iconWrap:{ width: 44, height: 44, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
-  dot:     { position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4, backgroundColor: PURPLE },
+  dot:     { position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4 },
   label:   { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, textAlign: 'center' },
 });
 
@@ -632,8 +631,8 @@ export function GuidedTip({ id, text, dismissedIds, onDismiss, style }: GuidedTi
   const { theme } = useAppTheme();
   if (dismissedIds.includes(id)) return null;
   return (
-    <View style={[gtS.root, { backgroundColor: theme.secondaryDim, borderColor: theme.secondary + '33' }, style]}>
-      <Feather name="zap" size={ICON.xs} color={theme.secondary} style={{ marginTop: 1 }} />
+    <View style={[gtS.root, { backgroundColor: theme.accentDim, borderColor: theme.accent + '33' }, style]}>
+      <Feather name="zap" size={ICON.xs} color={theme.accentLight} style={{ marginTop: 1 }} />
       <Text style={gtS.text}>{text}</Text>
       <TouchableOpacity
         onPress={() => onDismiss(id)}
@@ -646,8 +645,8 @@ export function GuidedTip({ id, text, dismissedIds, onDismiss, style }: GuidedTi
 }
 
 const gtS = StyleSheet.create({
-  root: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, backgroundColor: CYAN_DIM,
-          borderRadius: RADIUS.sm, borderWidth: 1, borderColor: 'rgba(34,211,238,0.2)',
+  root: { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm,
+          borderRadius: RADIUS.sm, borderWidth: 1,
           paddingHorizontal: SP.md, paddingVertical: SP.sm, marginHorizontal: SP.md },
   text: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 18 },
 });
@@ -665,14 +664,14 @@ export function NewFeatureBadge({ featureId, openedIds, style }: NewFeatureBadge
   if (openedIds.includes(featureId)) return null;
   return (
     <View style={[nfS.root, { backgroundColor: theme.accent }, style]}>
-      <Text style={nfS.text}>NEW</Text>
+      <Text style={[nfS.text, { color: theme.onAccent }]}>NEW</Text>
     </View>
   );
 }
 
 const nfS = StyleSheet.create({
-  root: { backgroundColor: PURPLE, borderRadius: RADIUS.pill, paddingHorizontal: 5, paddingVertical: 2 },
-  text: { fontSize: 8, fontFamily: FONT.bold, color: ON_DARK, letterSpacing: 0.5 },
+  root: { borderRadius: RADIUS.pill, paddingHorizontal: 5, paddingVertical: 2 },
+  text: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 0.5 },
 });
 
 // ─── LockBadge ────────────────────────────────────────────────────────────────
@@ -689,8 +688,8 @@ export function LockBadge({ locked, style }: LockBadgeProps) {
   if (!locked) return null;
   return (
     <View style={[lbS.root, { backgroundColor: theme.accent }, style]}>
-      <Feather name="lock" size={9} color={ON_DARK} />
-      <Text style={lbS.text}>PRO</Text>
+      <Feather name="lock" size={9} color={theme.onAccent} />
+      <Text style={[lbS.text, { color: theme.onAccent }]}>PRO</Text>
     </View>
   );
 }
@@ -700,12 +699,11 @@ const lbS = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    backgroundColor: PURPLE,
     borderRadius: RADIUS.pill,
     paddingHorizontal: 6,
     paddingVertical: 3,
   },
-  text: { fontSize: 8, fontFamily: FONT.bold, color: ON_DARK, letterSpacing: 0.5 },
+  text: { fontSize: 8, fontFamily: FONT.bold, letterSpacing: 0.5 },
 });
 
 // ─── FormInput ────────────────────────────────────────────────────────────────
@@ -733,7 +731,7 @@ export function FormInput({
   return (
     <View style={[fiS.wrap, style]}>
       {label && <Text style={fiS.label}>{label}</Text>}
-      <View style={[fiS.inputRow, focused && [fiS.focusedRow, { borderColor: theme.secondary }], multiline && fiS.multilineRow]}>
+      <View style={[fiS.inputRow, focused && [fiS.focusedRow, { borderColor: theme.accent }], multiline && fiS.multilineRow]}>
         <TextInput
           style={[fiS.input, multiline && fiS.multilineInput]}
           value={value}
@@ -807,7 +805,7 @@ const pcS = StyleSheet.create({
   pct:   { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
   label: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
   track: { height: 4, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: RADIUS.pill, overflow: 'hidden' },
-  fill:  { height: '100%', borderRadius: RADIUS.pill, backgroundColor: PURPLE },
+  fill:  { height: '100%', borderRadius: RADIUS.pill },
   next:  { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
 });
 
@@ -841,7 +839,7 @@ export function NavigationCard({ icon, label, description, onPress, accent, badg
           <Text style={ncS.label}>{label}</Text>
           {badge !== undefined && badge !== false && (
             typeof badge === 'number'
-              ? <View style={[ncS.badgeCount, { backgroundColor: theme.accent }]}><Text style={ncS.badgeText}>{badge}</Text></View>
+              ? <View style={[ncS.badgeCount, { backgroundColor: theme.accent }]}><Text style={[ncS.badgeText, { color: theme.onAccent }]}>{badge}</Text></View>
               : <View style={[ncS.dot, { backgroundColor: theme.accent }]} />
           )}
         </View>
@@ -861,9 +859,9 @@ const ncS = StyleSheet.create({
   labelRow:   { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   label:      { fontSize: FS.base, fontFamily: FONT.medium, color: FG },
   desc:       { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
-  dot:        { width: 6, height: 6, borderRadius: 3, backgroundColor: PURPLE },
-  badgeCount: { backgroundColor: PURPLE, borderRadius: RADIUS.pill, paddingHorizontal: 6, paddingVertical: 1 },
-  badgeText:  { fontSize: 9, fontFamily: FONT.bold, color: ON_DARK },
+  dot:        { width: 6, height: 6, borderRadius: 3 },
+  badgeCount: { borderRadius: RADIUS.pill, paddingHorizontal: 6, paddingVertical: 1 },
+  badgeText:  { fontSize: 9, fontFamily: FONT.bold },
 });
 
 // ─── LoadingSkeleton ──────────────────────────────────────────────────────────
@@ -894,6 +892,7 @@ export function LoadingSkeleton({ height = 80, style }: { height?: number; style
  */
 export function BrandedLoadingState({ message, style }: { message?: string; style?: StyleProp<ViewStyle> }) {
   const pulse = useRef(new Animated.Value(0.45)).current;
+  const { theme } = useAppTheme();
   useEffect(() => {
     const anim = Animated.loop(
       Animated.sequence([
@@ -908,12 +907,12 @@ export function BrandedLoadingState({ message, style }: { message?: string; styl
     <View style={[blS.root, style]}>
       <Animated.View style={{ opacity: pulse }}>
         <LinearGradient
-          colors={GRAD_PRIMARY}
+          colors={[theme.accent, theme.accentLight]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={blS.iconWrap}
         >
-          <Feather name="loader" size={ICON.md} color={ON_DARK} />
+          <Feather name="loader" size={ICON.md} color={theme.onAccent} />
         </LinearGradient>
       </Animated.View>
       {message && <Text style={blS.msg}>{message}</Text>}
@@ -940,7 +939,7 @@ export function Toast({ message, visible, variant = 'success' }: ToastProps) {
   useEffect(() => {
     Animated.timing(opacity, { toValue: visible ? 1 : 0, duration: ANIM.fast, useNativeDriver: true }).start();
   }, [visible]);
-  const colors = { success: SUCCESS, error: RED, info: CYAN };
+  const colors = { success: SUCCESS, error: RED, info: BLUE };
   const color = colors[variant];
   return (
     <Animated.View style={[toS.root, { opacity, borderColor: color + '44' }]}>
@@ -976,7 +975,7 @@ export function SheetHandle() {
  * Usage:
  *   <ThreadDivider />                        — full-width stitch line
  *   <ThreadDivider label="or" />             — stitch line with centred label
- *   <ThreadDivider accent={CYAN_DIM} />      — coloured variant
+ *   <ThreadDivider accent={BLUE_DIM} />      — coloured variant
  */
 interface ThreadDividerProps {
   label?: string;
@@ -984,13 +983,15 @@ interface ThreadDividerProps {
   style?: StyleProp<ViewStyle>;
 }
 
-export function ThreadDivider({ label, accent = BORDER_ACTIVE, style }: ThreadDividerProps) {
+export function ThreadDivider({ label, accent, style }: ThreadDividerProps) {
+  const { theme } = useAppTheme();
+  const resolvedAccent = accent ?? theme.accent;
   const StitchLine = () => (
     <View style={{ flex: 1, height: 8 }}>
       <Svg height="8" width="100%" style={{ overflow: 'visible' }}>
         <SvgLine
           x1="0" y1="4" x2="100%" y2="4"
-          stroke={accent}
+          stroke={resolvedAccent}
           strokeWidth="1"
           strokeDasharray="8,4"
           strokeLinecap="round"
@@ -1004,7 +1005,7 @@ export function ThreadDivider({ label, accent = BORDER_ACTIVE, style }: ThreadDi
     return (
       <View style={[tdS.row, style]}>
         <StitchLine />
-        <Text style={[tdS.label, { color: accent }]}>{label}</Text>
+        <Text style={[tdS.label, { color: resolvedAccent }]}>{label}</Text>
         <StitchLine />
       </View>
     );

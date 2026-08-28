@@ -21,12 +21,11 @@ import { Feather } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { useColors } from '@/hooks/useColors';
 
-// ─── Theme (mirrors lib/theme.ts dark tokens) ─────────────────────────────────
-const PURPLE = '#8B5CF6';
-const BG     = '#07070F';
-const FG     = '#FFFFFF';
-const MUTED  = '#6B7280';
+// Static text defaults are overridden by the active palette where rendered.
+const FG = '#FFFFFF';
+const MUTED = '#6B7280';
 
 type DurationMode = 15 | 30 | 60 | 600;
 
@@ -54,9 +53,11 @@ function CameraCaptureWeb() {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function CameraCapture() {
+  const colors = useColors();
   if (Platform.OS === 'web') return <CameraCaptureWeb />;
 
   const insets = useSafeAreaInsets();
+  const { primary: PURPLE, background: BG } = colors;
   const params = useLocalSearchParams<{ maxDuration?: string }>();
 
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
@@ -150,7 +151,7 @@ export default function CameraCapture() {
   // ── Permission gate ──────────────────────────────────────────────────────────
   if (!cameraPermission?.granted || !micPermission?.granted) {
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
+      <View style={[s.root, { backgroundColor: BG, paddingTop: insets.top }]}>
         <View style={s.permBox}>
           <Feather name="camera-off" size={44} color={MUTED} />
           <Text style={s.permTitle}>Camera Access Required</Text>
@@ -158,7 +159,7 @@ export default function CameraCapture() {
             Brandthread needs camera and microphone access to record videos and take photos.
           </Text>
           <TouchableOpacity
-            style={s.permBtn}
+            style={[s.permBtn, { backgroundColor: PURPLE }]}
             onPress={async () => {
               await requestCameraPermission();
               await requestMicPermission();
@@ -177,7 +178,7 @@ export default function CameraCapture() {
   const progressPct = durationMode > 0 ? elapsed / durationMode : 0;
 
   return (
-    <View style={s.root}>
+    <View style={[s.root, { backgroundColor: BG }]}>
       {/* Camera preview fills full screen */}
       <CameraView
         ref={cameraRef}
@@ -218,7 +219,7 @@ export default function CameraCapture() {
       {/* Recording progress bar */}
       {isRecording && (
         <View style={s.progressTrack}>
-          <View style={[s.progressFill, { width: `${progressPct * 100}%` as any }]} />
+          <View style={[s.progressFill, { width: `${progressPct * 100}%` as any, backgroundColor: PURPLE }]} />
         </View>
       )}
 
@@ -231,7 +232,7 @@ export default function CameraCapture() {
             {([15, 30, 60, 600] as DurationMode[]).map((d) => (
               <TouchableOpacity
                 key={d}
-                style={[s.durationBtn, durationMode === d && s.durationBtnActive]}
+                style={[s.durationBtn, durationMode === d && [s.durationBtnActive, { backgroundColor: PURPLE, borderColor: PURPLE }]]}
                 onPress={() => { Haptics.selectionAsync(); setDurationMode(d); }}
               >
                 <Text style={[s.durationText, durationMode === d && s.durationTextActive]}>
@@ -265,7 +266,7 @@ export default function CameraCapture() {
             {isRecording ? (
               <View style={s.stopIcon} />
             ) : (
-              <View style={[s.recordInner, captureMode === 'picture' && { backgroundColor: FG }]} />
+              <View style={[s.recordInner, { backgroundColor: captureMode === 'picture' ? FG : PURPLE }]} />
             )}
           </TouchableOpacity>
 
@@ -285,7 +286,7 @@ export default function CameraCapture() {
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1 },
 
   // ── Top bar
   topBar: {
@@ -311,7 +312,7 @@ const s = StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, height: 3, zIndex: 11,
     backgroundColor: 'rgba(255,255,255,0.15)',
   },
-  progressFill: { height: 3, backgroundColor: PURPLE },
+  progressFill: { height: 3 },
 
   // ── Bottom bar
   bottomBar: {
@@ -323,7 +324,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
     backgroundColor: 'rgba(0,0,0,0.55)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)',
   },
-  durationBtnActive:   { backgroundColor: PURPLE, borderColor: PURPLE },
+  durationBtnActive:   {},
   durationText:        { color: MUTED, fontSize: 13, fontWeight: '600' },
   durationTextActive:  { color: FG },
 
@@ -340,7 +341,7 @@ const s = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   recordBtnRecording: { borderColor: '#EF4444' },
-  recordInner:        { width: 60, height: 60, borderRadius: 30, backgroundColor: PURPLE },
+  recordInner:        { width: 60, height: 60, borderRadius: 30 },
   stopIcon:           { width: 26, height: 26, borderRadius: 5, backgroundColor: '#EF4444' },
 
   // ── Permission gate
@@ -348,7 +349,7 @@ const s = StyleSheet.create({
   permTitle: { color: FG, fontSize: 20, fontWeight: '700', textAlign: 'center' },
   permSub:   { color: MUTED, fontSize: 14, textAlign: 'center', lineHeight: 22 },
   permBtn:   {
-    backgroundColor: PURPLE, paddingHorizontal: 28, paddingVertical: 13,
+    paddingHorizontal: 28, paddingVertical: 13,
     borderRadius: 12, marginTop: 8,
   },
   permBtnText: { color: FG, fontSize: 15, fontWeight: '600' },

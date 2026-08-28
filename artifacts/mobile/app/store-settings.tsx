@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, Switch, TextInput,
   StyleSheet, Alert, TouchableOpacity,
@@ -57,6 +58,7 @@ function langLabel(code: string): string {
 }
 
 export default function StoreSettingsScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const headerTopInset = useHeaderTopInset();
   const [form, setForm] = useState<StoreSettings>({

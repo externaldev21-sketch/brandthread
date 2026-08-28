@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useColors } from '@/hooks/useColors';
 import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -49,6 +50,7 @@ const DEFAULT_ANSWERS: StoreGenerationAnswers = {
 };
 
 export default function StoreGeneratingScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 

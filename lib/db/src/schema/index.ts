@@ -165,6 +165,7 @@ export const orders = pgTable('orders', {
   id: uuid('id').primaryKey().defaultRandom(),
   ownerId: text('owner_id').notNull().default(''), // Clerk user ID of brand owner / seller
   buyerId: text('buyer_id'),                        // Clerk user ID of buyer (null for seller-created)
+  guestEmail: text('guest_email'),                  // checkout email when buyerId is null
   orderNumber: text('order_number').notNull(),
   customerId: uuid('customer_id').references(() => customers.id),
   dropId: uuid('drop_id').references(() => drops.id),
@@ -176,6 +177,7 @@ export const orders = pgTable('orders', {
   shippingAddress: json('shipping_address').$type<{
     name?: string;
     street: string;
+    line2?: string | null;
     city: string;
     state: string;
     zip: string;
@@ -243,7 +245,10 @@ export const interactions = pgTable('interactions', {
 export const checkoutSessions = pgTable('checkout_sessions', {
   id:              uuid('id').primaryKey().defaultRandom(),
   stripeSessionId: text('stripe_session_id').unique(),  // set after Stripe responds
-  buyerId:         text('buyer_id').notNull(),           // Clerk user ID
+  buyerId:         text('buyer_id'),                     // Clerk user ID; null for guest checkout
+  guestEmail:      text('guest_email'),
+  // SHA-256 only. The raw high-entropy token is returned once at creation.
+  guestAccessTokenHash: text('guest_access_token_hash'),
   sellerId:        text('seller_id').notNull(),          // Clerk user ID of seller
   // Serialized cart items — single DB row replaces per-field Stripe metadata
   items: json('items').$type<Array<{
@@ -258,6 +263,7 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   shippingAddress: json('shipping_address').$type<{
     name?:    string;
     street:   string;
+    line2?:   string | null;
     city:     string;
     state:    string;
     zip:      string;
@@ -273,6 +279,29 @@ export const checkoutSessions = pgTable('checkout_sessions', {
   loyaltyDiscountCents: integer('loyalty_discount_cents').notNull().default(0),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 });
+
+// ─── Buyer address book ─────────────────────────────────────────────────────
+// Addresses belong to the Clerk buyer ID, never to a caller supplied user ID.
+// The partial unique index is also created in the SQL migration, since Drizzle's
+// schema DSL does not express a partial unique predicate consistently here.
+export const buyerAddresses = pgTable('buyer_addresses', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  buyerId:       text('buyer_id').notNull(),
+  label:         text('label').notNull().default('Shipping'),
+  recipientName: text('recipient_name').notNull(),
+  street:        text('street').notNull(),
+  line2:         text('line2'),
+  city:          text('city').notNull(),
+  state:         text('state').notNull(),
+  postalCode:    text('postal_code').notNull(),
+  country:       text('country').notNull().default('US'),
+  phone:         text('phone'),
+  isDefault:     boolean('is_default').notNull().default(false),
+  createdAt:     timestamp('created_at').defaultNow().notNull(),
+  updatedAt:     timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  buyerListIdx: index('buyer_addresses_buyer_list_idx').on(table.buyerId, table.isDefault, table.createdAt),
+}));
 
 // ─── Klaviyo Integration ────────────────────────────────────────────────────────
 

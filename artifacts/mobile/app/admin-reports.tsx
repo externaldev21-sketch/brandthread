@@ -19,12 +19,12 @@ import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_DIM, PURPLE_LIGHT,
   SUCCESS, SUCCESS_DIM,
   ORANGE, ORANGE_DIM,
   RED, RED_DIM,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 import { fmtRelative } from '@/lib/format';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -45,11 +45,11 @@ interface Report {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const STATUS_COLORS: Record<ReportStatus, { bg: string; fg: string; label: string }> = {
-  pending:    { bg: ORANGE_DIM,   fg: ORANGE,       label: 'Pending'    },
-  reviewed:   { bg: PURPLE_DIM,   fg: PURPLE_LIGHT, label: 'Reviewed'   },
-  actioned:   { bg: SUCCESS_DIM,  fg: SUCCESS,      label: 'Actioned'   },
-  dismissed:  { bg: SUBTLE + '60', fg: MUTED,       label: 'Dismissed'  },
+const STATUS_LABELS: Record<ReportStatus, string> = {
+  pending: 'Pending',
+  reviewed: 'Reviewed',
+  actioned: 'Actioned',
+  dismissed: 'Dismissed',
 };
 
 const TARGET_ICON: Record<string, keyof typeof Feather.glyphMap> = {
@@ -62,10 +62,17 @@ const TARGET_ICON: Record<string, keyof typeof Feather.glyphMap> = {
 };
 
 function StatusPill({ status }: { status: ReportStatus }) {
-  const c = STATUS_COLORS[status] ?? STATUS_COLORS.pending;
+  const colors = useColors();
+  const statusColors: Record<ReportStatus, { bg: string; fg: string }> = {
+    pending: { bg: ORANGE_DIM, fg: ORANGE },
+    reviewed: { bg: colors.accent, fg: colors.accentForeground },
+    actioned: { bg: SUCCESS_DIM, fg: SUCCESS },
+    dismissed: { bg: SUBTLE + '60', fg: MUTED },
+  };
+  const c = statusColors[status] ?? statusColors.pending;
   return (
     <View style={[pill.root, { backgroundColor: c.bg }]}>
-      <Text style={[pill.text, { color: c.fg }]}>{c.label}</Text>
+      <Text style={[pill.text, { color: c.fg }]}>{STATUS_LABELS[status]}</Text>
     </View>
   );
 }
@@ -84,6 +91,7 @@ function StatusModal({
   visible: boolean; reportId: string; current: ReportStatus;
   onClose: () => void; onSave: (id: string, status: ReportStatus) => void;
 }) {
+  const colors = useColors();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <TouchableOpacity style={mod.overlay} activeOpacity={1} onPress={onClose}>
@@ -92,14 +100,14 @@ function StatusModal({
           {NEXT_STATUSES.map(s => (
             <TouchableOpacity
               key={s}
-              style={[mod.option, s === current && mod.optionActive]}
+              style={[mod.option, s === current && { backgroundColor: colors.accent }]}
               activeOpacity={0.8}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onSave(reportId, s); }}
             >
-              <Text style={[mod.optionText, s === current && mod.optionTextActive]}>
-                {STATUS_COLORS[s].label}
+              <Text style={[mod.optionText, s === current && { color: colors.accentForeground }]}>
+                {STATUS_LABELS[s]}
               </Text>
-              {s === current && <Feather name="check" size={16} color={PURPLE_LIGHT} />}
+              {s === current && <Feather name="check" size={16} color={colors.accentForeground} />}
             </TouchableOpacity>
           ))}
         </View>
@@ -112,9 +120,7 @@ const mod = StyleSheet.create({
   sheet:           { backgroundColor: CARD, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: SP.lg, paddingBottom: SP.xl + 20 },
   title:           { fontSize: FS.base, fontFamily: FONT.bold, color: FG, marginBottom: SP.md },
   option:          { paddingVertical: 14, paddingHorizontal: SP.sm, borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
-  optionActive:    { backgroundColor: PURPLE_DIM },
   optionText:      { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
-  optionTextActive:{ color: PURPLE_LIGHT },
 });
 
 // ─── Filter tab bar ───────────────────────────────────────────────────────────
@@ -125,6 +131,7 @@ function TabBar({ active, onChange, counts }: {
   active: Filter; onChange: (f: Filter) => void;
   counts: Record<Filter, number>;
 }) {
+  const colors = useColors();
   const tabs: Filter[] = ['all', 'pending', 'reviewed', 'actioned', 'dismissed'];
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false}
@@ -135,12 +142,12 @@ function TabBar({ active, onChange, counts }: {
         return (
           <TouchableOpacity
             key={t}
-            style={[tabs_.pill, isActive && tabs_.pillActive]}
+            style={[tabs_.pill, isActive && { backgroundColor: colors.accent, borderColor: colors.accent }]}
             onPress={() => { Haptics.selectionAsync(); onChange(t); }}
             activeOpacity={0.75}
           >
-            <Text style={[tabs_.text, isActive && tabs_.textActive]}>
-              {t === 'all' ? 'All' : STATUS_COLORS[t as ReportStatus].label}
+            <Text style={[tabs_.text, isActive && { color: colors.accentForeground, fontFamily: FONT.semibold }]}>
+              {t === 'all' ? 'All' : STATUS_LABELS[t as ReportStatus]}
               {counts[t] > 0 ? ` (${counts[t]})` : ''}
             </Text>
           </TouchableOpacity>
@@ -151,9 +158,7 @@ function TabBar({ active, onChange, counts }: {
 }
 const tabs_ = StyleSheet.create({
   pill:       { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
-  pillActive: { backgroundColor: PURPLE_DIM, borderColor: PURPLE_DIM },
   text:       { fontSize: 13, fontFamily: FONT.medium, color: MUTED },
-  textActive: { color: PURPLE_LIGHT, fontFamily: FONT.semibold },
 });
 
 // ─── Report card ──────────────────────────────────────────────────────────────
@@ -203,6 +208,7 @@ const card = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function AdminReportsScreen() {
+  const colors = useColors();
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
   const api     = useApi();
@@ -264,7 +270,7 @@ export default function AdminReportsScreen() {
           <Text style={s.title}>Review Reports</Text>
           <Text style={s.sub}>{counts.pending} pending</Text>
         </View>
-        {saving && <ActivityIndicator color={PURPLE} size="small" />}
+        {saving && <ActivityIndicator color={colors.primary} size="small" />}
       </View>
 
       {/* Filter tabs */}
@@ -272,7 +278,7 @@ export default function AdminReportsScreen() {
 
       {loading ? (
         <View style={s.center}>
-          <ActivityIndicator color={PURPLE} size="large" />
+          <ActivityIndicator color={colors.primary} size="large" />
         </View>
       ) : visible.length === 0 ? (
         <View style={s.center}>
@@ -286,7 +292,7 @@ export default function AdminReportsScreen() {
           contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 40 }}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={PURPLE} />
+            <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />
           }
         >
           {visible.map(r => (

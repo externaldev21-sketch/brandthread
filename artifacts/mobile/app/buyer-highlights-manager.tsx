@@ -13,16 +13,14 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
   BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, ON_DARK,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, SUCCESS, RED, ORANGE, GOLD,
+  SUCCESS, RED, ORANGE, GOLD,
   FONT, FS, SP, RADIUS, OVERLAY,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   loadHighlights, createHighlight, updateHighlight, deleteHighlight,
   reorderHighlights, type Highlight,
 } from '@/lib/highlightsService';
-
-const COVER_COLORS = [PURPLE, CYAN, '#F472B6', ORANGE, SUCCESS, RED, PURPLE_LIGHT, GOLD];
 
 function EmojiPicker({ visible, onSelect, onClose }: {
   visible: boolean;
@@ -51,6 +49,12 @@ function EmojiPicker({ visible, onSelect, onClose }: {
 }
 
 export default function BuyerHighlightsManager() {
+  const { theme } = useAppTheme();
+  const PURPLE = theme.accent;
+  const PURPLE_LIGHT = theme.accentLight;
+  const CYAN = theme.accentLight;
+  const COVER_COLORS = [PURPLE, CYAN, '#F472B6', ORANGE, SUCCESS, RED, PURPLE_LIGHT, GOLD];
+  const s = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [highlights, setHighlights] = useState<Highlight[]>([]);
@@ -259,7 +263,7 @@ export default function BuyerHighlightsManager() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (theme: { accent: string }) => StyleSheet.create({
   page: { flex: 1, backgroundColor: BG },
   header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
@@ -274,7 +278,7 @@ const s = StyleSheet.create({
   empty: { alignItems: 'center', paddingTop: 80, gap: SP.md },
   emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.lg, color: FG },
   emptySub: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', paddingHorizontal: SP.xl },
-  createBtn: { paddingHorizontal: SP.xl, paddingVertical: SP.md, borderRadius: RADIUS.pill, backgroundColor: PURPLE },
+  createBtn: { paddingHorizontal: SP.xl, paddingVertical: SP.md, borderRadius: RADIUS.pill, backgroundColor: theme.accent },
   createBtnText: { fontFamily: FONT.bold, fontSize: FS.base, color: ON_DARK },
   emojiTrigger: { alignItems: 'center', paddingVertical: SP.md, gap: 4 },
   emojiHint: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE },
@@ -286,7 +290,7 @@ const s = StyleSheet.create({
   modalActions: { flexDirection: 'row', gap: SP.sm },
   cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
   cancelBtnText: { fontFamily: FONT.medium, fontSize: FS.base, color: MUTED },
-  saveBtn: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, backgroundColor: PURPLE, alignItems: 'center' },
+  saveBtn: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, backgroundColor: theme.accent, alignItems: 'center' },
   saveBtnText: { fontFamily: FONT.bold, fontSize: FS.base, color: ON_DARK },
 });
 

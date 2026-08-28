@@ -22,10 +22,10 @@ import {
 import { AISettings } from '../services/aiTypes';
 import { getAISettings, saveAISettings, clearSession } from '../services/aiService';
 import { clearAuditLog } from '../services/aiAuditLog';
+import { useColors } from '@/hooks/useColors';
 
 const BORDER_COLOR = 'rgba(255,255,255,0.07)';
 const TRACK_FALSE  = 'rgba(255,255,255,0.07)';
-const TRACK_TRUE   = '#8B5CF6';
 
 // ─── Local Helpers ─────────────────────────────────────────────────────────────
 
@@ -91,6 +91,7 @@ function ToggleRow({
   value: boolean;
   onValueChange: (v: boolean) => void;
 }) {
+  const colors = useColors();
   return (
     <View style={rowStyles.row}>
       <View style={rowStyles.labelWrap}>
@@ -100,7 +101,7 @@ function ToggleRow({
       <Switch
         value={value}
         onValueChange={onValueChange}
-        trackColor={{ false: TRACK_FALSE, true: TRACK_TRUE }}
+        trackColor={{ false: TRACK_FALSE, true: colors.primary }}
         thumbColor={FG}
       />
     </View>

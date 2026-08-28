@@ -19,6 +19,7 @@ import {
   SUCCESS, BLUE, ORANGE, RED, GOLD, ON_DARK, GRAD_PRIMARY, GRAD_CARD_GLOW,
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM,
 } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
@@ -61,12 +62,13 @@ function uid() { return Math.random().toString(36).slice(2, 11); }
 // ─── Progress Bar ─────────────────────────────────────────────────────────────
 
 function ProgressBar({ step, total }: { step: number; total: number }) {
+  const colors = useColors();
   const pct = ((step - 1) / (total - 1)) * 100;
   return (
     <View style={pb.wrap}>
       <View style={pb.track}>
         <LinearGradient
-          colors={GRAD_PRIMARY}
+          colors={[colors.primary, colors.accentForeground] as const}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
           style={[pb.fill, { width: `${pct}%` }]}
         />
@@ -86,14 +88,15 @@ const pb = StyleSheet.create({
 // ─── Toggle Row ───────────────────────────────────────────────────────────────
 
 function ToggleRow({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+  const colors = useColors();
   return (
     <View style={tr.row}>
       <Text style={tr.label}>{label}</Text>
       <Switch
         value={value}
         onValueChange={onChange}
-        trackColor={{ false: BORDER, true: PURPLE_DIM }}
-        thumbColor={value ? PURPLE_LIGHT : SUBTLE}
+        trackColor={{ false: BORDER, true: colors.accent }}
+        thumbColor={value ? colors.accentForeground : SUBTLE}
       />
     </View>
   );
@@ -107,6 +110,7 @@ const tr = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function QuoteRequestScreen() {
+  const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { manufacturerId, productId, requestId } = useLocalSearchParams<{
@@ -481,7 +485,7 @@ export default function QuoteRequestScreen() {
             const added = addedFiles.includes(ft.key);
             return (
               <BrandthreadCard key={ft.key} style={sc.fileCard}>
-                <View style={[sc.fileIconWrap, added && { backgroundColor: 'rgba(139,92,246,0.18)' }]}>
+                <View style={[sc.fileIconWrap, added && { backgroundColor: colors.accent }]}>
                   <Feather name={ft.icon} size={ICON.lg} color={added ? PURPLE_LIGHT : MUTED} />
                 </View>
                 <Text style={sc.fileLabel}>{ft.label}</Text>

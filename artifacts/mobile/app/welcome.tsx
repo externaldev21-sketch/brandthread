@@ -9,12 +9,10 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 const { width: W } = Dimensions.get('window');
-
-const BG     = '#07070F';
-const PURPLE = '#8B5CF6';
-const CYAN   = '#22D3EE';
 
 const FEATURE_CARDS = [
   { icon: 'star' as const, label: 'Design', sub: 'AI-powered tools' },
@@ -26,6 +24,8 @@ const FEATURE_CARDS = [
 export default function WelcomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const colors = useColors();
+  const { theme } = useAppTheme();
 
   const heroAnim  = useRef(new Animated.Value(0)).current;
   const cardsAnim = useRef(new Animated.Value(0)).current;
@@ -45,7 +45,7 @@ export default function WelcomeScreen() {
   });
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 28 }]}>
+    <View style={[styles.root, { backgroundColor: colors.background, paddingTop: insets.top + 40, paddingBottom: insets.bottom + 28 }]}>
       <StatusBar barStyle="light-content" />
       {/* Back button — visible when navigated here from within the app */}
       <TouchableOpacity
@@ -58,8 +58,8 @@ export default function WelcomeScreen() {
       </TouchableOpacity>
 
       {/* Ambient glow */}
-      <View style={styles.glowTop} />
-      <View style={styles.glowMid} />
+      <View style={[styles.glowTop, { backgroundColor: colors.accent }]} />
+      <View style={[styles.glowMid, { backgroundColor: theme.secondaryDim }]} />
 
       {/* Logo */}
       <View style={styles.logoRow}>
@@ -79,7 +79,7 @@ export default function WelcomeScreen() {
       <Animated.View style={[styles.cardsGrid, fadeUp(cardsAnim)]}>
         {FEATURE_CARDS.map((f) => (
           <View key={f.label} style={styles.featureCard}>
-            <Feather name={f.icon} size={20} color={PURPLE} />
+            <Feather name={f.icon} size={20} color={colors.primary} />
             <Text style={styles.featureLabel}>{f.label}</Text>
             <Text style={styles.featureSub}>{f.sub}</Text>
           </View>
@@ -98,7 +98,7 @@ export default function WelcomeScreen() {
           }}
         >
           <LinearGradient
-            colors={[PURPLE, CYAN]}
+            colors={[colors.primary, theme.secondary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.primaryBtn}
@@ -132,7 +132,6 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: BG,
     paddingHorizontal: 24,
   },
 
@@ -143,7 +142,7 @@ const styles = StyleSheet.create({
     width: W * 0.9,
     height: 260,
     borderRadius: 200,
-    backgroundColor: '#8B5CF615',
+    backgroundColor: 'transparent',
   },
   glowMid: {
     position: 'absolute',
@@ -152,7 +151,7 @@ const styles = StyleSheet.create({
     width: 200,
     height: 200,
     borderRadius: 100,
-    backgroundColor: '#22D3EE0A',
+    backgroundColor: 'transparent',
   },
 
   logoRow: {

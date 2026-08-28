@@ -22,6 +22,7 @@ import {
   RED, RED_DIM,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 import { BrandthreadHeader, PrimaryButton } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 
@@ -41,6 +42,7 @@ const DEFAULT_SIZES   = ['XS', 'S', 'M', 'L', 'XL'];
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function ProductSizeChartScreen() {
+  const colors = useColors();
   const { productId, productName } = useLocalSearchParams<{ productId: string; productName?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -180,7 +182,7 @@ export default function ProductSizeChartScreen() {
   if (loading) {
     return (
       <View style={[s.root, { paddingTop: insets.top, alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator color={PURPLE_LIGHT} />
+        <ActivityIndicator color={colors.accentForeground} />
       </View>
     );
   }

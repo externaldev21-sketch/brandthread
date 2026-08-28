@@ -1,21 +1,61 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Image, ImageSourcePropType } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { APP_THEME_PRESETS, useAppTheme } from '@/contexts/AppThemeContext';
+import { APP_THEME_PRESETS, AppThemeId, AppThemePreset, useAppTheme } from '@/contexts/AppThemeContext';
 import { BG, CARD, BORDER, FG, MUTED, FONT, FS, SP, RADIUS } from '@/lib/theme';
-import { LOGO_SOURCE } from '@/constants/branding';
 
-function ThemeMark({ color, shadow }: { color: string; shadow: string }) {
+type ThemeImageContext = {
+  (key: string): ImageSourcePropType;
+  keys: () => string[];
+};
+
+const themeImageContext = (require as unknown as {
+  context: (directory: string, useSubdirectories: boolean, pattern: RegExp) => ThemeImageContext;
+}).context('../assets/images/themes', false, /\.png$/);
+
+const THEME_IMAGE_PATHS: Record<AppThemeId, string> = {
+  purple: '../assets/images/themes/theme-purple.png',
+  olive: '../assets/images/themes/theme-olive.png',
+  navy: '../assets/images/themes/theme-navy.png',
+  champagne: '../assets/images/themes/theme-champagne.png',
+  black: '../assets/images/themes/theme-black.png',
+  silver: '../assets/images/themes/theme-silver.png',
+  'black-gold': '../assets/images/themes/theme-black-gold.png',
+  'emerald-gold': '../assets/images/themes/theme-emerald-gold.png',
+  'leopard-red': '../assets/images/themes/theme-leopard-red.png',
+  maroon: '../assets/images/themes/theme-maroon.png',
+  gold: '../assets/images/themes/theme-gold.png',
+};
+
+function getOptionalThemeImage(id: AppThemeId): ImageSourcePropType | null {
+  const contextKey = `./${THEME_IMAGE_PATHS[id].split('/').pop()}`;
+  return themeImageContext.keys().includes(contextKey) ? themeImageContext(contextKey) : null;
+}
+
+function ThemePreview({ option, selected }: { option: AppThemePreset; selected: boolean }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const source = getOptionalThemeImage(option.id);
+  const showImage = source !== null && !imageFailed;
+
   return (
-    <View style={styles.markWrap}>
-      <Image source={LOGO_SOURCE} style={styles.logoImage} resizeMode="contain" />
-      <View pointerEvents="none" style={[styles.finishVeil, { backgroundColor: color + '40' }]} />
-      <View pointerEvents="none" style={[styles.markSheen, { backgroundColor: shadow + '38' }]} />
-      <Text pointerEvents="none" style={[styles.markLetter, { color, textShadowColor: shadow }]}>B</Text>
+    <View style={[styles.preview, { backgroundColor: option.accent }]}>
+      {showImage && (
+        <Image
+          source={source}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+          onError={() => setImageFailed(true)}
+          accessibilityIgnoresInvertColors
+        />
+      )}
+      {selected && (
+        <View style={[styles.selected, { backgroundColor: option.accent }]}>
+          <Feather name="check" size={13} color={option.onAccent} />
+        </View>
+      )}
     </View>
   );
 }
@@ -65,15 +105,7 @@ export default function AppThemeScreen() {
                 accessibilityState={{ selected }}
                 accessibilityLabel={`${option.name} theme${selected ? ', selected' : ''}`}
               >
-                <LinearGradient colors={option.swatchBackground} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.preview}>
-                  {option.id === 'leopard-red' && (
-                    <View pointerEvents="none" style={styles.leopardPattern}>
-                      <Text style={styles.leopardText}>●   •  ●  •   ●</Text>
-                    </View>
-                  )}
-                  <ThemeMark color={option.markColor} shadow={option.markShadow} />
-                  {selected && <View style={[styles.selected, { backgroundColor: option.accent }]}><Feather name="check" size={13} color="#FFF" /></View>}
-                </LinearGradient>
+                <ThemePreview option={option} selected={selected} />
                 <Text style={[styles.name, selected && { color: option.accentLight }]} numberOfLines={1}>{option.name}</Text>
               </TouchableOpacity>
             );
@@ -99,13 +131,6 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 12 },
   tile: { width: '47.8%', borderRadius: RADIUS.lg, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
   preview: { height: 138, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  markWrap: { width: 114, height: 114, alignItems: 'center', justifyContent: 'center', borderRadius: 57, overflow: 'hidden', backgroundColor: 'rgba(0,0,0,0.24)' },
-  logoImage: { width: 114, height: 114, opacity: 0.82 },
-  finishVeil: { ...StyleSheet.absoluteFillObject, opacity: 0.38 },
-  markSheen: { position: 'absolute', width: 180, height: 24, transform: [{ rotate: '-38deg' }], top: 23, left: -31, opacity: 0.7 },
-  markLetter: { position: 'absolute', fontSize: 70, lineHeight: 76, fontFamily: FONT.extrabold, letterSpacing: -8, textShadowOffset: { width: 0, height: 3 }, textShadowRadius: 5 },
   selected: { position: 'absolute', top: 9, right: 9, width: 25, height: 25, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   name: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, paddingHorizontal: 11, paddingTop: 10, paddingBottom: 12 },
-  leopardPattern: { position: 'absolute', opacity: 0.34, transform: [{ rotate: '-18deg' }], width: '130%' },
-  leopardText: { color: '#2F160B', fontSize: 28, letterSpacing: 8, fontFamily: FONT.bold },
 });

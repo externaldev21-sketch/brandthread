@@ -3,6 +3,7 @@
  * Multi-seller cart with save-for-later, summary, and checkout entry.
  */
 import React, { useState, useCallback } from 'react';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, Image,
   ActivityIndicator, Alert, TextInput, RefreshControl,
@@ -37,6 +38,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import {
   BrandthreadScreen, BrandthreadHeader, StatusBadge, EmptyState,
 } from '@/components/BrandthreadUI';
+
+import { useAuth } from '@clerk/expo';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -354,9 +357,11 @@ const sum = StyleSheet.create({
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function CartScreen() {
+  const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
+  const { isSignedIn } = useAuth();
 
   const [cart, setCart] = useState<Cart>({ id: '', items: [], savedItems: [], updatedAt: '' });
   const [loading, setLoading] = useState(true);
@@ -400,11 +405,13 @@ export default function CartScreen() {
     let active = true;
     setLoading(true);
     void load();
-    void api.loyalty.get()
-      .then(result => { if (active) setLoyaltyBalance(Math.max(0, Number(result.balance ?? 0))); })
-      .catch(() => {});
+    if (isSignedIn) {
+      void api.loyalty.get()
+        .then(result => { if (active) setLoyaltyBalance(Math.max(0, Number(result.balance ?? 0))); })
+        .catch(() => {});
+    }
     return () => { active = false; };
-  }, [api, load]));
+  }, [api, load, isSignedIn]));
 
   const groups = groupCartBySeller(cart.items);
   const hasPreOrder = cart.items.some(i => i.isPreOrder);
@@ -514,12 +521,14 @@ export default function CartScreen() {
     if (cart.items.length === 0) return;
     setValidating(true);
     try {
-      const validation = await validateCart(cart.items);
-      if (!validation.isValid) {
-        const issues = validation.issues.map(i => `• ${i.message}`).join('\n');
-        Alert.alert('Review Your Cart', `Some items need your attention:\n\n${issues}`, [{ text: 'OK' }]);
-        setValidating(false);
-        return;
+      if (isSignedIn) {
+        const validation = await validateCart(cart.items);
+        if (!validation.isValid) {
+          const issues = validation.issues.map(i => `• ${i.message}`).join('\n');
+          Alert.alert('Review Your Cart', `Some items need your attention:\n\n${issues}`, [{ text: 'OK' }]);
+          setValidating(false);
+          return;
+        }
       }
 
       // Check each seller's payment account before entering checkout
@@ -529,23 +538,26 @@ export default function CartScreen() {
         setValidating(false);
         return;
       }
-      for (const group of currentGroups) {
-        try {
-          const status = await api.buyer.sellerPaymentStatus(group.sellerId);
-          if (!status.ready) {
-            const sellerLabel = group.sellerName || 'One of the sellers';
-            Alert.alert(
-              'Payments Unavailable',
-              `${sellerLabel} can't accept payments right now.\n\n${status.reason ?? 'Please try again later or remove their items from your cart.'}`,
-              [{ text: 'OK' }],
-            );
+
+      if (isSignedIn) {
+        for (const group of currentGroups) {
+          try {
+            const status = await api.buyer.sellerPaymentStatus(group.sellerId);
+            if (!status.ready) {
+              const sellerLabel = group.sellerName || 'One of the sellers';
+              Alert.alert(
+                'Payments Unavailable',
+                `${sellerLabel} can't accept payments right now.\n\n${status.reason ?? 'Please try again later or remove their items from your cart.'}`,
+                [{ text: 'OK' }],
+              );
+              setValidating(false);
+              return;
+            }
+          } catch {
+            Alert.alert('Unable to verify payments', `We could not confirm ${group.sellerName} can accept payments. Check your connection and try again.`);
             setValidating(false);
             return;
           }
-        } catch {
-          Alert.alert('Unable to verify payments', `We could not confirm ${group.sellerName} can accept payments. Check your connection and try again.`);
-          setValidating(false);
-          return;
         }
       }
 
@@ -565,7 +577,7 @@ export default function CartScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={PURPLE} size="large" />
+        <ActivityIndicator color={theme.accent} size="large" />
       </View>
     );
   }
@@ -579,7 +591,7 @@ export default function CartScreen() {
       <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
         <Text style={s.headerTitle}>Cart</Text>
         {hasItems && (
-          <View style={s.headerBadge}>
+          <View style={[s.headerBadge, { backgroundColor: theme.accent }]}>
             <Text style={s.headerBadgeText}>{cart.items.reduce((s, i) => s + i.quantity, 0)}</Text>
           </View>
         )}
@@ -605,7 +617,7 @@ export default function CartScreen() {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
-                tintColor={PURPLE}
+                tintColor={theme.accent}
               />
             }
             contentContainerStyle={{
@@ -636,6 +648,7 @@ export default function CartScreen() {
                   <Text style={s.multiSellerText}>Items from {groups.length} sellers require a separate secure Stripe payment for each seller.</Text>
                 </View>
               )}
+              {isSignedIn && (
               <View style={s.loyaltyCard}>
                 <View style={s.loyaltyHeading}>
                   <View style={s.loyaltyIcon}>
@@ -692,6 +705,7 @@ export default function CartScreen() {
                   </>
                 )}
               </View>
+              )}
               <SummaryCard
                 subtotal={summary.subtotal}
                 discountTotal={displayedDiscount}
@@ -729,7 +743,7 @@ export default function CartScreen() {
 
           {/* Checkout button */}
           {hasItems && (
-            <View style={[s.checkoutBar, { paddingBottom: insets.bottom + SP.md }]}>
+          <View style={[s.checkoutBar, { paddingBottom: insets.bottom + SP.md }]}>
               <TouchableOpacity
                 style={s.checkoutBtn}
                 onPress={handleCheckout}
@@ -737,7 +751,7 @@ export default function CartScreen() {
                 disabled={validating}
               >
                 <LinearGradient
-                  colors={[...GRAD_PRIMARY]}
+                  colors={[theme.accent, theme.secondary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={s.checkoutGrad}
@@ -775,7 +789,6 @@ const s = StyleSheet.create({
   },
   headerTitle: { fontSize: FS.xl, fontFamily: FONT.bold, color: FG },
   headerBadge: {
-    backgroundColor: PURPLE,
     borderRadius: RADIUS.pill,
     paddingHorizontal: 8,
     paddingVertical: 2,

@@ -14,6 +14,7 @@ import {
   BLUE, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
   GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, StatusBadge, SectionHeader, EmptyState,
@@ -24,6 +25,9 @@ import {
 } from '@/services/inventoryTypes';
 
 export default function InventoryAdjustScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentDim: PURPLE_DIM, secondary: CYAN } = theme;
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
   const { itemId } = useLocalSearchParams<{ itemId?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -528,7 +532,9 @@ export default function InventoryAdjustScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: { accent: string; accentDim: string; secondary: string }) => {
+  const { accent: PURPLE, accentDim: PURPLE_DIM, secondary: CYAN } = theme;
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   header: {
     flexDirection: 'row',
@@ -763,4 +769,5 @@ const styles = StyleSheet.create({
   successLabel: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED },
   successValue: { fontSize: FS.base, fontFamily: FONT.bold },
   successActions: { width: '100%', gap: SP.sm },
-});
+  });
+};

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
   Alert, StyleSheet, Dimensions, Share,
@@ -211,6 +212,7 @@ function PostCard({
 // ─── Screen ──────────────────────────────────────────────────────────────────
 
 export default function FriendsScreen() {
+  const { theme } = useAppTheme();
   const insets  = useSafeAreaInsets();
   const router  = useRouter();
   const api     = useApi();
@@ -393,7 +395,7 @@ export default function FriendsScreen() {
           <View>
             <Feather name="user-plus" size={ICON.lg} color={MUTED} />
             {pendingCount > 0 && (
-              <View style={s.badge}>
+                <View style={[s.badge, { backgroundColor: theme.accent }]}>
                 <Text style={s.badgeText}>{pendingCount}</Text>
               </View>
             )}
@@ -529,7 +531,7 @@ export default function FriendsScreen() {
                   activeOpacity={0.85}
                 >
                   <LinearGradient
-                    colors={GRAD_PRIMARY}
+                    colors={[theme.accent, theme.secondary]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={s.findFriendsBtn}

@@ -14,11 +14,16 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, CYAN, ON_DARK, FONT, FS, SP, RADIUS, OVERLAY } from '@/lib/theme';
+import { BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK, FONT, FS, SP, RADIUS, OVERLAY } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getRestrictedUsers, unrestrictUser } from '@/services/socialService';
 import type { RestrictRecord } from '@/services/socialTypes';
 
 export default function RestrictedAccountsScreen() {
+  const { theme } = useAppTheme();
+  const PURPLE = theme.accent;
+  const CYAN = theme.accentLight;
+  const styles = makeStyles(theme);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [restricted, setRestricted] = useState<RestrictRecord[]>([]);
@@ -135,7 +140,7 @@ export default function RestrictedAccountsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: { accent: string }) => StyleSheet.create({
   page: { flex: 1, backgroundColor: BG },
   header: {
     height: 58, flexDirection: 'row', alignItems: 'center',
@@ -178,6 +183,6 @@ const styles = StyleSheet.create({
   sheetActions: { flexDirection: 'row', gap: SP.sm },
   cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, alignItems: 'center' },
   cancelText: { fontFamily: FONT.medium, fontSize: FS.base, color: MUTED },
-  confirmBtn: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, backgroundColor: PURPLE, alignItems: 'center' },
+  confirmBtn: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, backgroundColor: theme.accent, alignItems: 'center' },
   confirmText: { fontFamily: FONT.bold, fontSize: FS.base, color: ON_DARK },
 });

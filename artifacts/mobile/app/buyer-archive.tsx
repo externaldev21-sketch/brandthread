@@ -13,9 +13,10 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  BG, SURFACE, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM,
+  BG, SURFACE, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE,
   FONT, FS, SP, RADIUS, ICON, OVERLAY, RED,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getMyPosts, unarchivePost, deletePost } from '@/services/socialService';
 import type { BuyerPost } from '@/services/socialTypes';
 
@@ -26,6 +27,10 @@ const CELL = (width - SP.md * 2 - GAP * 2) / 3;
 type ArchiveTab = 'posts' | 'stories';
 
 export default function BuyerArchive() {
+  const { theme } = useAppTheme();
+  const PURPLE = theme.accent;
+  const PURPLE_DIM = theme.accentDim;
+  const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [tab, setTab] = useState<ArchiveTab>('posts');
@@ -198,16 +203,16 @@ export default function BuyerArchive() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.create({
   page: { flex: 1, backgroundColor: BG },
   header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   title: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
   tabRow: { flexDirection: 'row', paddingHorizontal: SP.md, paddingVertical: SP.sm, gap: SP.sm },
   tabPill: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: SP.sm, backgroundColor: CARD, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER },
-  tabPillActive: { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
+  tabPillActive: { backgroundColor: theme.accentDim, borderColor: BORDER_ACTIVE },
   tabText: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
-  tabTextActive: { color: PURPLE },
+  tabTextActive: { color: theme.accent },
   grid: { paddingHorizontal: SP.md, paddingTop: SP.sm, gap: GAP, paddingBottom: 80 },
   cell: { width: CELL, height: CELL, borderRadius: RADIUS.sm, overflow: 'hidden' },
   cellInner: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xs },

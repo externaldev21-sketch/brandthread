@@ -14,12 +14,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi, type Freelancer } from '@/lib/api';
 import { FREELANCER_SERVICE_TYPES, serviceLabel, formatHourlyRate, ratingLabel } from '@/lib/freelancer';
+import { useColors } from '@/hooks/useColors';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN,
   GOLD, SUCCESS, ORANGE, FONT, FS, SP, RADIUS, GRAD_PRIMARY, ON_DARK,
 } from '@/lib/theme';
 
 export default function CommunityScreen() {
+  const colors = useColors();
   const api = useApi();
   const router = useRouter();
   const [freelancers, setFreelancers] = useState<Freelancer[]>([]);
@@ -68,7 +70,7 @@ export default function CommunityScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScreenHeader
         title="Community"
         subtitle="Hire vetted creatives for your brand"
@@ -88,7 +90,7 @@ export default function CommunityScreen() {
         contentContainerStyle={{ paddingTop: SP.md, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={PURPLE} />
+          <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />
         }
       >
         {/* Own status / become-a-freelancer CTA */}
@@ -99,8 +101,8 @@ export default function CommunityScreen() {
               activeOpacity={0.85}
               onPress={() => openProfile(me.id)}
             >
-              <View style={[styles.ownIcon, { backgroundColor: PURPLE_DIM }]}>
-                <Feather name="user-check" size={18} color={PURPLE} />
+              <View style={[styles.ownIcon, { backgroundColor: colors.accent }]}>
+                <Feather name="user-check" size={18} color={colors.primary} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.ownTitle}>Your freelancer profile</Text>
@@ -126,7 +128,7 @@ export default function CommunityScreen() {
               }}
             >
               <LinearGradient
-                colors={GRAD_PRIMARY}
+                colors={[colors.primary, colors.accentForeground]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.ctaCard}
@@ -155,20 +157,20 @@ export default function CommunityScreen() {
         >
           <TouchableOpacity
             onPress={() => selectFilter(null)}
-            style={[styles.chip, filter === null && styles.chipActive]}
+            style={[styles.chip, filter === null && [styles.chipActive, { backgroundColor: colors.accent, borderColor: colors.primary }]]}
             activeOpacity={0.8}
           >
-            <Text style={[styles.chipText, filter === null && styles.chipTextActive]}>All</Text>
+            <Text style={[styles.chipText, filter === null && [styles.chipTextActive, { color: colors.primary }]]}>All</Text>
           </TouchableOpacity>
           {FREELANCER_SERVICE_TYPES.map((t) => (
             <TouchableOpacity
               key={t.value}
               onPress={() => selectFilter(filter === t.value ? null : t.value)}
-              style={[styles.chip, filter === t.value && styles.chipActive]}
+              style={[styles.chip, filter === t.value && [styles.chipActive, { backgroundColor: colors.accent, borderColor: colors.primary }]]}
               activeOpacity={0.8}
             >
-              <Feather name={t.icon} size={12} color={filter === t.value ? PURPLE : MUTED} />
-              <Text style={[styles.chipText, filter === t.value && styles.chipTextActive]}>
+              <Feather name={t.icon} size={12} color={filter === t.value ? colors.primary : MUTED} />
+              <Text style={[styles.chipText, filter === t.value && [styles.chipTextActive, { color: colors.primary }]]}>
                 {t.label}
               </Text>
             </TouchableOpacity>
@@ -179,7 +181,7 @@ export default function CommunityScreen() {
         <View style={{ paddingHorizontal: SP.md + 4, marginTop: SP.md }}>
           {loading ? (
             <View style={styles.centerBox}>
-              <ActivityIndicator color={PURPLE} />
+              <ActivityIndicator color={colors.primary} />
             </View>
           ) : error ? (
             <View style={styles.centerBox}>
@@ -211,8 +213,8 @@ export default function CommunityScreen() {
                   {f.avatarUrl ? (
                     <Image source={{ uri: f.avatarUrl }} style={styles.avatar} />
                   ) : (
-                    <View style={[styles.avatar, styles.avatarFallback]}>
-                      <Text style={styles.avatarInitial}>{(f.name || 'F')[0].toUpperCase()}</Text>
+                    <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: colors.accent }]}>
+                      <Text style={[styles.avatarInitial, { color: colors.primary }]}>{(f.name || 'F')[0].toUpperCase()}</Text>
                     </View>
                   )}
                   <View style={{ flex: 1, gap: 2 }}>
@@ -231,7 +233,7 @@ export default function CommunityScreen() {
                         </>
                       ) : (
                         <View style={styles.newBadge}>
-                          <Text style={styles.newBadgeText}>NEW</Text>
+                         <Text style={[styles.newBadgeText, { color: colors.info }]}>NEW</Text>
                         </View>
                       )}
                       {f.totalJobsCompleted > 0 && (
@@ -243,8 +245,8 @@ export default function CommunityScreen() {
                   </View>
                   <View style={{ alignItems: 'flex-end', gap: SP.sm }}>
                     <Text style={styles.rate}>{formatHourlyRate(f.hourlyRateCents)}</Text>
-                    <View style={styles.hireBtn}>
-                      <Text style={styles.hireBtnText}>{me?.id === f.id ? 'View' : 'Hire'}</Text>
+                    <View style={[styles.hireBtn, { backgroundColor: colors.accent }]}>
+                      <Text style={[styles.hireBtnText, { color: colors.primary }]}>{me?.id === f.id ? 'View' : 'Hire'}</Text>
                     </View>
                   </View>
                 </TouchableOpacity>

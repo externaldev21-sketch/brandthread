@@ -22,6 +22,7 @@ import {
   BLUE, ORANGE, RED, ON_DARK,
   GRAD_PRIMARY, FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BrandthreadCard, PrimaryButton, SecondaryButton,
   StatusBadge, FilterChip, SectionHeader,
@@ -89,6 +90,8 @@ function AccordionText({ text }: { text: string }) {
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function ProductStoreScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const router = useRouter();
   const { id, variantId } = useLocalSearchParams<{ id: string; variantId?: string }>();
   const insets = useSafeAreaInsets();

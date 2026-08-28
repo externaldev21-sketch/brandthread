@@ -19,6 +19,7 @@ import {
   BG, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 const LIVE_RED = '#FF3B30';
 const { width: W, height: H } = Dimensions.get('window');
@@ -32,6 +33,8 @@ try {
 interface Comment { id: string; display_name: string; message: string; created_at: string; }
 
 export default function SellerLiveScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE } = theme;
   const params = useLocalSearchParams<{
     streamId: string; channelName: string; agoraUid: string;
     agoraAppId: string; token: string; title: string;

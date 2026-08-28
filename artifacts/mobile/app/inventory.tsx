@@ -19,6 +19,7 @@ import {
   ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
   GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader,
@@ -178,6 +179,7 @@ function eventTypeLabel(type: string): string {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function InventoryScreen() {
+  const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -978,7 +980,7 @@ const s = StyleSheet.create({
   locRow:           { marginTop: SP.md, flexDirection: 'row' },
   locChip:          { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: CYAN_DIM,
                       borderRadius: RADIUS.pill, paddingHorizontal: SP.md, paddingVertical: 7,
-                      borderWidth: 1, borderColor: 'rgba(34,211,238,0.2)' },
+                      borderWidth: 1 },
   locChipText:      { fontSize: FS.sm, fontFamily: FONT.medium, color: CYAN },
 
   // Quick actions

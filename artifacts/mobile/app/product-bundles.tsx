@@ -24,6 +24,7 @@ import {
 } from '@/lib/theme';
 import { BrandthreadHeader, BrandedEmptyState } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
+import { useColors } from '@/hooks/useColors';
 
 function fmtCents(cents: number): string {
   return '$' + (cents / 100).toFixed(2);
@@ -61,6 +62,7 @@ function BundleRow({ bundle, onPress }: { bundle: any; onPress: () => void }) {
 }
 
 export default function ProductBundlesScreen() {
+  const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api    = useApi();
@@ -99,7 +101,7 @@ export default function ProductBundlesScreen() {
 
       {loading ? (
         <View style={s.center}>
-          <ActivityIndicator color={PURPLE_LIGHT} />
+          <ActivityIndicator color={colors.accentForeground} />
         </View>
       ) : bundles.length === 0 ? (
         <BrandedEmptyState
@@ -111,7 +113,7 @@ export default function ProductBundlesScreen() {
       ) : (
         <ScrollView
           contentContainerStyle={[s.list, { paddingBottom: insets.bottom + 24 }]}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PURPLE_LIGHT} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accentForeground} />}
           showsVerticalScrollIndicator={false}
         >
           <Text style={s.hint}>

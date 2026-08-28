@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, Alert,
@@ -32,6 +33,7 @@ function formatDate(iso: string): string {
 }
 
 export default function StoreVersionsScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const headerTopInset = useHeaderTopInset();
   const [versions, setVersions] = useState<StoreVersion[]>([]);

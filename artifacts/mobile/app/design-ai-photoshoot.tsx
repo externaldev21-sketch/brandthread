@@ -3,6 +3,7 @@
  * Route: /design-ai-photoshoot
  */
 import React, { useState, useEffect, useRef } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert, Dimensions, Image,
@@ -63,6 +64,7 @@ const GRAD_PALETTES: Record<number, readonly [string, string]> = {
 };
 
 export default function AIPhotoshootScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const [step, setStep] = useState<Step>(1);
 

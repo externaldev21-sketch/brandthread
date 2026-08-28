@@ -26,6 +26,7 @@ import {
   CYAN, SUCCESS, BLUE, ORANGE, RED, GOLD,
   FONT, FS, SP,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BrandthreadCard, GradientCard, SecondaryButton, NavigationCard,
   StatusBadge,
@@ -115,6 +116,9 @@ const SECTIONS: { key: string; title: string; icon: keyof typeof Feather.glyphMa
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function MoreScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
   const router   = useRouter();
   const insets   = useSafeAreaInsets();
   const { user } = useUser();
@@ -241,7 +245,7 @@ export default function MoreScreen() {
         {/* USER HEADER */}
         <GradientCard
           glow
-          colors={['rgba(139,92,246,0.18)', 'rgba(34,211,238,0.06)']}
+          colors={[theme.accentDim, theme.secondaryDim]}
           style={styles.userCard}
         >
           <View style={styles.userRow}>
@@ -411,7 +415,9 @@ export default function MoreScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  return StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: BG,
@@ -584,5 +590,6 @@ const styles = StyleSheet.create({
     marginTop: SP.sm,
     marginBottom: 32,
   },
-});
+  });
+};
 

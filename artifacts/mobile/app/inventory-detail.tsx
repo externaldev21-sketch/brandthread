@@ -19,6 +19,7 @@ import {
   ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
   GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, StatusBadge, SectionHeader, EmptyState,
@@ -106,6 +107,9 @@ function eventTypeColor(type: string): string {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function InventoryDetailScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const d = React.useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ id: string }>();
@@ -533,7 +537,9 @@ export default function InventoryDetailScreen() {
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
-const d = StyleSheet.create({
+const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  return StyleSheet.create({
   root:             { flex: 1 },
   loadingWrap:      { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', gap: SP.md },
   loadingText:      { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
@@ -640,4 +646,5 @@ const d = StyleSheet.create({
   actionsRow:       { flexDirection: 'row', gap: SP.sm, padding: SP.md, paddingTop: SP.sm,
                       backgroundColor: SURFACE, borderTopWidth: 1, borderTopColor: BORDER },
   actionBtn:        { flex: 1 },
-});
+  });
+};

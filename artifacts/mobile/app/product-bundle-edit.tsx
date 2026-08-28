@@ -27,6 +27,7 @@ import {
   SUCCESS, SUCCESS_DIM,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 import {
   BrandthreadHeader, PrimaryButton, SecondaryButton,
   BrandedLoadingState,
@@ -42,6 +43,7 @@ function parseDollars(s: string): number {
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function ProductBundleEditScreen() {
+  const colors = useColors();
   const { bundleId } = useLocalSearchParams<{ bundleId?: string }>();
   const isNew = !bundleId;
   const router = useRouter();
@@ -296,7 +298,7 @@ export default function ProductBundleEditScreen() {
           <View style={s.pickerCard}>
             <Text style={s.sectionTitle}>Your products</Text>
             {catalogLoading ? (
-              <ActivityIndicator color={PURPLE_LIGHT} style={{ marginVertical: SP.md }} />
+              <ActivityIndicator color={colors.accentForeground} style={{ marginVertical: SP.md }} />
             ) : catalog.length === 0 ? (
               <Text style={s.emptyText}>No active products found.</Text>
             ) : (

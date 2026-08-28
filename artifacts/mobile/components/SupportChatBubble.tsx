@@ -21,14 +21,10 @@ import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import {
   BG, CARD, SURFACE, BORDER, FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_DIM,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
-// ─── Teal brand color for support (distinct from AI Brain purple) ─────────────
-const TEAL        = '#22D3EE';
-const TEAL_DIM    = 'rgba(34,211,238,0.15)';
-const TEAL_BORDER = 'rgba(34,211,238,0.30)';
 const SUCCESS_GRN = '#34D399';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -43,7 +39,7 @@ interface ChatMsg {
 }
 
 // ─── Streaming Dots ───────────────────────────────────────────────────────────
-function StreamingDots() {
+function StreamingDots({ color }: { color: string }) {
   const d = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current];
   useEffect(() => {
     const anims = d.map((dot, i) =>
@@ -59,24 +55,24 @@ function StreamingDots() {
   }, []);
   return (
     <View style={s.dotsRow}>
-      {d.map((dot, i) => <Animated.View key={i} style={[s.dot, { opacity: dot }]} />)}
+      {d.map((dot, i) => <Animated.View key={i} style={[s.dot, { opacity: dot, backgroundColor: color }]} />)}
     </View>
   );
 }
 
 // ─── Message bubble ───────────────────────────────────────────────────────────
-const MessageBubble = memo(({ msg }: { msg: ChatMsg }) => {
+const MessageBubble = memo(({ msg, accent, accentDim, accentBorder }: { msg: ChatMsg; accent: string; accentDim: string; accentBorder: string }) => {
   const isUser = msg.role === 'user';
   return (
     <View style={[s.msgRow, isUser && s.msgRowUser]}>
       {!isUser && (
-        <View style={s.aiBadge}>
-          <Feather name="headphones" size={12} color={TEAL} />
+        <View style={[s.aiBadge, { backgroundColor: accentDim, borderColor: accentBorder }]}>
+          <Feather name="headphones" size={12} color={accent} />
         </View>
       )}
       <View style={[
         s.bubble,
-        isUser ? s.bubbleUser : s.bubbleAI,
+        isUser ? [s.bubbleUser, { backgroundColor: accent }] : s.bubbleAI,
         msg.isError && s.bubbleError,
       ]}>
         <Text style={[s.bubbleText, isUser ? s.bubbleTextUser : s.bubbleTextAI]}>
@@ -101,6 +97,10 @@ const QUICK_REPLIES = [
 function SupportChatModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const insets = useSafeAreaInsets();
   const api    = useApi();
+  const { theme } = useAppTheme();
+  const accent = theme.secondary;
+  const accentDim = theme.secondaryDim;
+  const accentBorder = `${theme.secondary}4D`;
   const flatRef = useRef<FlatList>(null);
 
   const [msgs, setMsgs]           = useState<ChatMsg[]>([]);
@@ -202,8 +202,8 @@ function SupportChatModal({ visible, onClose }: { visible: boolean; onClose: () 
         {/* Header */}
         <View style={s.modalHeader}>
           <View style={s.headerLeft}>
-            <View style={s.headerIcon}>
-              <Feather name="headphones" size={16} color={TEAL} />
+            <View style={[s.headerIcon, { backgroundColor: accentDim, borderColor: accentBorder }]}>
+              <Feather name="headphones" size={16} color={accent} />
             </View>
             <View>
               <Text style={s.headerTitle}>Brandthread Support</Text>
@@ -213,14 +213,14 @@ function SupportChatModal({ visible, onClose }: { visible: boolean; onClose: () 
           <View style={s.headerActions}>
             {!escalated && (
               <TouchableOpacity
-                style={s.escalateBtn}
+                style={[s.escalateBtn, { borderColor: accentBorder, backgroundColor: accentDim }]}
                 onPress={() => handleEscalate()}
                 disabled={escalating}
                 activeOpacity={0.8}
               >
                 {escalating
-                  ? <ActivityIndicator size="small" color={TEAL} />
-                  : <><Feather name="user" size={13} color={TEAL} /><Text style={s.escalateBtnText}>Human</Text></>
+                  ? <ActivityIndicator size="small" color={accent} />
+                  : <><Feather name="user" size={13} color={accent} /><Text style={[s.escalateBtnText, { color: accent }]}>Human</Text></>
                 }
               </TouchableOpacity>
             )}
@@ -243,17 +243,17 @@ function SupportChatModal({ visible, onClose }: { visible: boolean; onClose: () 
           ref={flatRef}
           data={msgs}
           keyExtractor={m => m.id}
-          renderItem={({ item }) => <MessageBubble msg={item} />}
+          renderItem={({ item }) => <MessageBubble msg={item} accent={accent} accentDim={accentDim} accentBorder={accentBorder} />}
           contentContainerStyle={s.msgList}
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => flatRef.current?.scrollToEnd({ animated: false })}
           ListFooterComponent={loading ? (
             <View style={[s.msgRow]}>
-              <View style={s.aiBadge}>
-                <Feather name="headphones" size={12} color={TEAL} />
+              <View style={[s.aiBadge, { backgroundColor: accentDim, borderColor: accentBorder }]}>
+                <Feather name="headphones" size={12} color={accent} />
               </View>
               <View style={[s.bubble, s.bubbleAI, { paddingVertical: 14 }]}>
-                <StreamingDots />
+                <StreamingDots color={accent} />
               </View>
             </View>
           ) : null}
@@ -270,12 +270,12 @@ function SupportChatModal({ visible, onClose }: { visible: boolean; onClose: () 
               contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={s.quickChip}
+                  style={[s.quickChip, { borderColor: accentBorder, backgroundColor: accentDim }]}
                   onPress={() => sendMessage(item.label)}
                   activeOpacity={0.8}
                 >
-                  <Feather name={item.icon} size={12} color={TEAL} />
-                  <Text style={s.quickChipText}>{item.label}</Text>
+                  <Feather name={item.icon} size={12} color={accent} />
+                  <Text style={[s.quickChipText, { color: accent }]}>{item.label}</Text>
                 </TouchableOpacity>
               )}
             />
@@ -301,7 +301,7 @@ function SupportChatModal({ visible, onClose }: { visible: boolean; onClose: () 
               blurOnSubmit={false}
             />
             <TouchableOpacity
-              style={[s.sendBtn, (!input.trim() || loading) && s.sendBtnDisabled]}
+              style={[s.sendBtn, { backgroundColor: accent }, (!input.trim() || loading) && s.sendBtnDisabled]}
               onPress={() => sendMessage(input)}
               disabled={!input.trim() || loading}
               activeOpacity={0.85}
@@ -325,6 +325,7 @@ interface SupportChatBubbleProps {
 
 export default function SupportChatBubble({ bottomOffset = 0, side = 'left' }: SupportChatBubbleProps) {
   const insets  = useSafeAreaInsets();
+  const { theme } = useAppTheme();
   const scale   = useRef(new Animated.Value(1)).current;
   const [open, setOpen] = useState(false);
 
@@ -364,7 +365,7 @@ export default function SupportChatBubble({ bottomOffset = 0, side = 'left' }: S
         ]}
         pointerEvents="box-none"
       >
-        <Pressable onPress={handlePress} style={s.fabInner}>
+        <Pressable onPress={handlePress} style={[s.fabInner, { backgroundColor: theme.secondary, shadowColor: theme.secondary }]}>
           <Feather name="headphones" size={22} color="#000" />
         </Pressable>
       </Animated.View>
@@ -380,9 +381,8 @@ const s = StyleSheet.create({
   fab:        { position: 'absolute', zIndex: 999 },
   fabInner:   {
     width: 52, height: 52, borderRadius: 26,
-    backgroundColor: TEAL,
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: TEAL, shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
     elevation: 8,
   },
 
@@ -396,7 +396,7 @@ const s = StyleSheet.create({
   headerLeft:  { flexDirection: 'row', alignItems: 'center', gap: 12 },
   headerIcon:  {
     width: 38, height: 38, borderRadius: 12,
-    backgroundColor: TEAL_DIM, borderWidth: 1, borderColor: TEAL_BORDER,
+    borderWidth: 1,
     alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
@@ -405,9 +405,9 @@ const s = StyleSheet.create({
   escalateBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8,
-    borderWidth: 1, borderColor: TEAL_BORDER, backgroundColor: TEAL_DIM,
+    borderWidth: 1,
   },
-  escalateBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: TEAL },
+  escalateBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold },
 
   escalatedBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16,
@@ -422,11 +422,11 @@ const s = StyleSheet.create({
   msgRowUser:  { flexDirection: 'row-reverse' },
   aiBadge:    {
     width: 28, height: 28, borderRadius: 14,
-    backgroundColor: TEAL_DIM, borderWidth: 1, borderColor: TEAL_BORDER,
+    borderWidth: 1,
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   bubble:      { maxWidth: '78%', borderRadius: 16, padding: 12 },
-  bubbleUser:  { backgroundColor: TEAL, borderBottomRightRadius: 4 },
+  bubbleUser:  { borderBottomRightRadius: 4 },
   bubbleAI:    { backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderBottomLeftRadius: 4 },
   bubbleError: { borderColor: 'rgba(239,68,68,0.40)', backgroundColor: 'rgba(239,68,68,0.08)' },
   bubbleText:  { fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
@@ -435,16 +435,16 @@ const s = StyleSheet.create({
 
   // Streaming dots
   dotsRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  dot:       { width: 7, height: 7, borderRadius: 3.5, backgroundColor: TEAL },
+  dot:       { width: 7, height: 7, borderRadius: 3.5 },
 
   // Quick replies
   quickReplies: { paddingVertical: 10 },
   quickChip:    {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20,
-    backgroundColor: TEAL_DIM, borderWidth: 1, borderColor: TEAL_BORDER,
+    borderWidth: 1,
   },
-  quickChipText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: TEAL },
+  quickChipText: { fontSize: FS.xs, fontFamily: FONT.semibold },
 
   // Input
   inputRow:    {
@@ -459,7 +459,7 @@ const s = StyleSheet.create({
     maxHeight: 100,
   },
   sendBtn:       {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: TEAL,
+    width: 40, height: 40, borderRadius: 20,
     alignItems: 'center', justifyContent: 'center',
   },
   sendBtnDisabled: { backgroundColor: SURFACE },

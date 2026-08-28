@@ -26,6 +26,7 @@ import {
   GRAD_PRIMARY,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BrandthreadHeader,
   PrimaryButton,
@@ -94,6 +95,8 @@ const BENEFITS = [
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function SellerVerificationScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM } = theme;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();

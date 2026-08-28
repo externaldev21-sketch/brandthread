@@ -28,6 +28,7 @@ import {
 } from '@/components/BrandthreadUI';
 
 import { useApi } from '@/lib/api';
+import { useColors } from '@/hooks/useColors';
 
 // ─── Import History Demo Data ─────────────────────────────────────────────────
 
@@ -46,6 +47,7 @@ function methodIcon(method: string): keyof typeof Feather.glyphMap {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function ProductImportScreen() {
+  const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
@@ -140,8 +142,8 @@ export default function ProductImportScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {/* ── Guided Tip ── */}
-        <View style={s.tip}>
-          <Feather name="zap" size={ICON.xs} color={CYAN} style={{ marginTop: 1 }} />
+        <View style={[s.tip, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
+          <Feather name="zap" size={ICON.xs} color={colors.primary} style={{ marginTop: 1 }} />
           <Text style={s.tipText}>
             Import your existing products into Brandthread from another platform or a CSV spreadsheet.
           </Text>
@@ -378,10 +380,8 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: SP.sm,
-    backgroundColor: 'rgba(34,211,238,0.08)',
     borderRadius: RADIUS.sm,
     borderWidth: 1,
-    borderColor: CYAN,
     paddingHorizontal: SP.md,
     paddingVertical: SP.sm,
     marginBottom: SP.xs,

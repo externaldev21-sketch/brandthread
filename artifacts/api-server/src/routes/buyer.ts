@@ -4,7 +4,7 @@
  */
 import { Router } from "express";
 import {
-  db, checkoutSessions, orders, orderItems, productVariants, products, users, shippingRates, discountCodes,
+  db, checkoutSessions, orders, orderItems, productVariants, products, users, shippingRates, discountCodes, buyerAddresses,
 } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -25,6 +25,152 @@ import {
 
 const router = Router();
 router.use(requireAuth);
+
+type AddressInput = {
+  label?: unknown; recipientName?: unknown; street?: unknown; line2?: unknown;
+  city?: unknown; state?: unknown; postalCode?: unknown; country?: unknown; phone?: unknown;
+};
+
+const cleanAddressText = (value: unknown, field: string, required = true): string | null => {
+  if (value == null && !required) return null;
+  if (typeof value !== "string") throw Object.assign(new Error(`${field} must be a string`), { status: 400 });
+  const cleaned = value.trim().replace(/\s+/g, " ");
+  if (required && !cleaned) throw Object.assign(new Error(`${field} is required`), { status: 400 });
+  if (cleaned.length > 160) throw Object.assign(new Error(`${field} is too long`), { status: 400 });
+  return cleaned || null;
+};
+
+function normalizeAddress(input: AddressInput) {
+  const countryRaw = cleanAddressText(input.country ?? "US", "country")!;
+  const country = countryRaw.toUpperCase();
+  if (!/^[A-Z]{2}$/.test(country)) throw Object.assign(new Error("country must be an ISO 3166-1 alpha-2 code"), { status: 400 });
+  const postalCode = cleanAddressText(input.postalCode, "postalCode")!.toUpperCase();
+  if (!/^[A-Z0-9][A-Z0-9 -]{1,15}$/.test(postalCode)) {
+    throw Object.assign(new Error("postalCode is invalid"), { status: 400 });
+  }
+  const phone = cleanAddressText(input.phone, "phone", false);
+  if (phone && !/^[0-9+(). -]{7,32}$/.test(phone)) {
+    throw Object.assign(new Error("phone is invalid"), { status: 400 });
+  }
+  return {
+    label: cleanAddressText(input.label ?? "Shipping", "label")!,
+    recipientName: cleanAddressText(input.recipientName, "recipientName")!,
+    street: cleanAddressText(input.street, "street")!,
+    line2: cleanAddressText(input.line2, "line2", false),
+    city: cleanAddressText(input.city, "city")!,
+    state: cleanAddressText(input.state, "state")!,
+    postalCode, country, phone,
+  };
+}
+
+async function lockBuyerAddressBook(tx: any, buyerId: string) {
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${buyerId}))`);
+}
+
+// ─── Address book ────────────────────────────────────────────────────────────
+router.get("/addresses", async (req, res) => {
+  const buyerId = (req as any).clerkUserId as string;
+  const rows = await db.select().from(buyerAddresses)
+    .where(eq(buyerAddresses.buyerId, buyerId))
+    .orderBy(desc(buyerAddresses.isDefault), desc(buyerAddresses.updatedAt));
+  res.json(rows);
+});
+
+router.post("/addresses", async (req, res) => {
+  try {
+    const buyerId = (req as any).clerkUserId as string;
+    const address = normalizeAddress(req.body ?? {});
+    const requestedDefault = req.body?.isDefault === true;
+    const created = await db.transaction(async (tx) => {
+      await lockBuyerAddressBook(tx, buyerId);
+      const [currentDefault] = await tx.select({ id: buyerAddresses.id }).from(buyerAddresses)
+        .where(and(eq(buyerAddresses.buyerId, buyerId), eq(buyerAddresses.isDefault, true))).limit(1);
+      const isDefault = requestedDefault || !currentDefault;
+      if (isDefault) await tx.update(buyerAddresses).set({ isDefault: false, updatedAt: new Date() })
+        .where(and(eq(buyerAddresses.buyerId, buyerId), eq(buyerAddresses.isDefault, true)));
+      const [row] = await tx.insert(buyerAddresses).values({ buyerId, ...address, isDefault }).returning();
+      return row;
+    });
+    res.status(201).json(created);
+  } catch (err: any) {
+    res.status(err.status ?? 500).json({ error: err.status ? err.message : "Failed to create address" });
+  }
+});
+
+router.patch("/addresses/:id", async (req, res) => {
+  try {
+    const buyerId = (req as any).clerkUserId as string;
+    const updated = await db.transaction(async (tx) => {
+      await lockBuyerAddressBook(tx, buyerId);
+      const [existing] = await tx.select().from(buyerAddresses)
+        .where(and(eq(buyerAddresses.id, req.params.id), eq(buyerAddresses.buyerId, buyerId))).limit(1);
+      if (!existing) throw Object.assign(new Error("Address not found"), { status: 404 });
+      // Body values are allowed only for address fields; buyerId is deliberately ignored.
+      const address = normalizeAddress({ ...existing, ...(req.body ?? {}) });
+      const requestedDefault = req.body?.isDefault;
+      if (requestedDefault === true) await tx.update(buyerAddresses).set({ isDefault: false, updatedAt: new Date() })
+        .where(and(eq(buyerAddresses.buyerId, buyerId), eq(buyerAddresses.isDefault, true)));
+      const [row] = await tx.update(buyerAddresses).set({
+        ...address, ...(typeof requestedDefault === "boolean" ? { isDefault: requestedDefault } : {}),
+        updatedAt: new Date(),
+      }).where(and(eq(buyerAddresses.id, existing.id), eq(buyerAddresses.buyerId, buyerId))).returning();
+      // Never leave an owner with addresses but no default.
+      if (existing.isDefault && requestedDefault === false) {
+        const [replacement] = await tx.select({ id: buyerAddresses.id }).from(buyerAddresses)
+          .where(eq(buyerAddresses.buyerId, buyerId)).orderBy(desc(buyerAddresses.updatedAt)).limit(1);
+        if (replacement) await tx.update(buyerAddresses).set({ isDefault: true, updatedAt: new Date() })
+          .where(eq(buyerAddresses.id, replacement.id));
+      }
+      return row;
+    });
+    res.json(updated);
+  } catch (err: any) {
+    res.status(err.status ?? 500).json({ error: err.status ? err.message : "Failed to update address" });
+  }
+});
+
+router.post("/addresses/:id/default", async (req, res) => {
+  const buyerId = (req as any).clerkUserId as string;
+  const result = await db.transaction(async (tx) => {
+    await lockBuyerAddressBook(tx, buyerId);
+    const [target] = await tx.select({ id: buyerAddresses.id }).from(buyerAddresses)
+      .where(and(eq(buyerAddresses.id, req.params.id), eq(buyerAddresses.buyerId, buyerId))).limit(1);
+    if (!target) return null;
+    await tx.update(buyerAddresses).set({ isDefault: false, updatedAt: new Date() })
+      .where(and(eq(buyerAddresses.buyerId, buyerId), eq(buyerAddresses.isDefault, true)));
+    const [row] = await tx.update(buyerAddresses).set({ isDefault: true, updatedAt: new Date() })
+      .where(and(eq(buyerAddresses.id, target.id), eq(buyerAddresses.buyerId, buyerId))).returning();
+    return row;
+  });
+  if (!result) {
+    res.status(404).json({ error: "Address not found" });
+    return;
+  }
+  res.json(result);
+});
+
+router.delete("/addresses/:id", async (req, res) => {
+  const buyerId = (req as any).clerkUserId as string;
+  const deleted = await db.transaction(async (tx) => {
+    await lockBuyerAddressBook(tx, buyerId);
+    const [target] = await tx.select().from(buyerAddresses)
+      .where(and(eq(buyerAddresses.id, req.params.id), eq(buyerAddresses.buyerId, buyerId))).limit(1);
+    if (!target) return null;
+    await tx.delete(buyerAddresses).where(and(eq(buyerAddresses.id, target.id), eq(buyerAddresses.buyerId, buyerId)));
+    if (target.isDefault) {
+      const [replacement] = await tx.select({ id: buyerAddresses.id }).from(buyerAddresses)
+        .where(eq(buyerAddresses.buyerId, buyerId)).orderBy(desc(buyerAddresses.updatedAt)).limit(1);
+      if (replacement) await tx.update(buyerAddresses).set({ isDefault: true, updatedAt: new Date() })
+        .where(eq(buyerAddresses.id, replacement.id));
+    }
+    return target;
+  });
+  if (!deleted) {
+    res.status(404).json({ error: "Address not found" });
+    return;
+  }
+  res.status(204).end();
+});
 
 // ─── Startup migration — add tracking_status + estimated_delivery to orders ───
 (async () => {

@@ -4,6 +4,7 @@
  * Params: sourceUri?
  */
 import React, { useState } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, ActivityIndicator, Image, TextInput,
@@ -61,6 +62,7 @@ const BG_TABS: { key: BgTab; label: string }[] = [
 ];
 
 export default function DesignBgReplaceScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const params = useLocalSearchParams<{ sourceUri?: string }>();
   const [imageUri, setImageUri] = useState<string | null>(params.sourceUri ?? null);

@@ -18,6 +18,7 @@ import {
   RED, ORANGE, SUCCESS,
   FONT, FS, SP, RADIUS, OVERLAY,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 const GENDER_OPTIONS = ['Woman', 'Man', 'Non-binary', 'Prefer not to say', 'Custom'] as const;
 
@@ -61,6 +62,7 @@ function GenderPicker({
   onClose: () => void;
 }) {
   const insets = useSafeAreaInsets();
+  const { theme } = useAppTheme();
   return (
     <Modal transparent animationType="fade" visible={visible} onRequestClose={onClose}>
       <TouchableOpacity style={styles.pickerBackdrop} activeOpacity={1} onPress={onClose}>
@@ -70,11 +72,11 @@ function GenderPicker({
           {GENDER_OPTIONS.map(option => (
             <TouchableOpacity
               key={option}
-              style={[styles.pickerRow, current === option && styles.pickerRowActive]}
+              style={[styles.pickerRow, current === option && [styles.pickerRowActive, { backgroundColor: theme.accentDim }]]}
               onPress={() => { onSelect(option); onClose(); }}
             >
-              <Text style={[styles.pickerRowText, current === option && { color: PURPLE }]}>{option}</Text>
-              {current === option && <Feather name="check" size={16} color={PURPLE} />}
+              <Text style={[styles.pickerRowText, current === option && { color: theme.accent }]}>{option}</Text>
+              {current === option && <Feather name="check" size={16} color={theme.accent} />}
             </TouchableOpacity>
           ))}
         </TouchableOpacity>
@@ -86,6 +88,7 @@ function GenderPicker({
 export default function BuyerEditProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { theme } = useAppTheme();
 
   const [badge, setBadge] = useState<StyleBadgeState>({ ...DEFAULT_STYLE_BADGE, enabled: true });
   const [fields, setFields] = useState<BuyerProfileFields>({ ...DEFAULT_BUYER_PROFILE });
@@ -257,7 +260,7 @@ export default function BuyerEditProfileScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit profile</Text>
         <TouchableOpacity onPress={handleSave} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Text style={styles.saveText}>Save</Text>
+          <Text style={[styles.saveText, { color: theme.accent }]}>Save</Text>
         </TouchableOpacity>
       </View>
 
@@ -285,7 +288,7 @@ export default function BuyerEditProfileScreen() {
             </TouchableOpacity>
           </View>
           <TouchableOpacity activeOpacity={0.7} onPress={pickAvatar}>
-            <Text style={styles.editPhotoLink}>Edit picture or avatar</Text>
+            <Text style={[styles.editPhotoLink, { color: theme.secondary }]}>Edit picture or avatar</Text>
           </TouchableOpacity>
         </View>
 
@@ -330,7 +333,7 @@ export default function BuyerEditProfileScreen() {
                 returnKeyType="done"
               />
               {usernameStatus === 'checking' && (
-                <ActivityIndicator size="small" color={PURPLE} style={{ marginLeft: 6 }} />
+                <ActivityIndicator size="small" color={theme.accent} style={{ marginLeft: 6 }} />
               )}
               {usernameStatus === 'ok' && (
                 <Feather name="check-circle" size={17} color={SUCCESS} style={{ marginLeft: 6 }} />
@@ -384,13 +387,13 @@ export default function BuyerEditProfileScreen() {
               <Text style={styles.rowLabel}>AI creator</Text>
               <Text style={styles.rowHint}>Add this label if your content often uses AI.</Text>
             </View>
-            <View style={[styles.newPill, { backgroundColor: CYAN }]}>
+            <View style={[styles.newPill, { backgroundColor: theme.secondary }]}>
               <Text style={styles.newPillText}>New</Text>
             </View>
             <Switch
               value={fields.aiCreator}
               onValueChange={v => { Haptics.selectionAsync(); setFields(prev => ({ ...prev, aiCreator: v })); }}
-              trackColor={{ false: BORDER, true: PURPLE }}
+              trackColor={{ false: BORDER, true: theme.accent }}
               thumbColor="#FFFFFF"
             />
           </View>
@@ -406,7 +409,7 @@ export default function BuyerEditProfileScreen() {
             <Switch
               value={badge.enabled}
               onValueChange={v => { Haptics.selectionAsync(); setBadge(b => ({ ...b, enabled: v })); }}
-              trackColor={{ false: BORDER, true: PURPLE }}
+              trackColor={{ false: BORDER, true: theme.accent }}
               thumbColor="#FFFFFF"
             />
           </View>
@@ -440,9 +443,9 @@ export default function BuyerEditProfileScreen() {
         {badge.enabled && (
           <View style={{ paddingHorizontal: 20, paddingTop: 14 }}>
             <Text style={styles.previewLabel}>Preview</Text>
-            <View style={styles.previewBadge}>
+            <View style={[styles.previewBadge, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
               <Text style={styles.previewEmoji}>{badge.emoji}</Text>
-              <Text style={styles.previewText}>{badge.label || 'Your style'}</Text>
+              <Text style={[styles.previewText, { color: theme.accent }]}>{badge.label || 'Your style'}</Text>
             </View>
           </View>
         )}
@@ -463,7 +466,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingBottom: 16 },
   headerTitle: { fontSize: 17, fontFamily: FONT.bold, color: FG },
-  saveText: { fontSize: 15, fontFamily: FONT.semibold, color: PURPLE },
+  saveText: { fontSize: 15, fontFamily: FONT.semibold },
   sectionLabel: { fontSize: 13, fontFamily: FONT.semibold, color: MUTED, paddingHorizontal: 20, paddingTop: 16 },
   sectionHint: { fontSize: 12.5, fontFamily: FONT.regular, color: MUTED, paddingHorizontal: 20, paddingTop: 4, paddingBottom: 12 },
   card: { marginHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: BORDER, overflow: 'hidden', backgroundColor: CARD },
@@ -478,11 +481,11 @@ const styles = StyleSheet.create({
   avatar: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: 28, color: '#FFF', fontFamily: FONT.bold },
   avatarOutline: { width: 84, height: 84, borderRadius: 42, borderWidth: 1.5, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  editPhotoLink: { fontSize: 14, fontFamily: FONT.medium, color: CYAN },
+  editPhotoLink: { fontSize: 14, fontFamily: FONT.medium },
   previewLabel: { fontSize: 12, fontFamily: FONT.medium, color: MUTED, marginBottom: 8 },
   previewBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', borderRadius: 20, borderWidth: 1, borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM, paddingHorizontal: 12, paddingVertical: 6 },
   previewEmoji: { fontSize: 14 },
-  previewText: { fontSize: 12, fontFamily: FONT.semibold, color: PURPLE },
+  previewText: { fontSize: 12, fontFamily: FONT.semibold },
 
   // Username availability hint
   usernameHint: {

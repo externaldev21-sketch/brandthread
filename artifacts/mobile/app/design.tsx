@@ -14,11 +14,11 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_SUBTLE,
   FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM,
   SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM,
-  GOLD, GRAD_PRIMARY, GRAD_CARD_GLOW,
+  GOLD,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
   PrimaryButton, SecondaryButton, FilterChip, StatusBadge,
@@ -40,12 +40,19 @@ type CreationCard = {
   route: string;
 };
 
+// These are authored tool and template identities, rather than app-chrome accents.
+const AUTHORED_DESIGN_ACCENTS = {
+  purple: '#8B5CF6',
+  purpleLight: '#A78BFA',
+  cyan: '#22D3EE',
+} as const;
+
 const CREATION_CARDS: CreationCard[] = [
-  { icon: 'edit-2',      label: 'Blank Canvas',        desc: 'Start from scratch',              accent: PURPLE,       route: '/design-project?type=canvas' },
-  { icon: 'layers',      label: 'Garment Design',       desc: 'Design any apparel piece',        accent: CYAN,         route: '/design-project?type=garment' },
+  { icon: 'edit-2',      label: 'Blank Canvas',        desc: 'Start from scratch',              accent: AUTHORED_DESIGN_ACCENTS.purple,       route: '/design-project?type=canvas' },
+  { icon: 'layers',      label: 'Garment Design',       desc: 'Design any apparel piece',        accent: AUTHORED_DESIGN_ACCENTS.cyan,         route: '/design-project?type=garment' },
   { icon: 'zap',         label: 'AI Design',            desc: 'Generate from a prompt',          accent: BLUE,         route: '/design-text-to-design' },
   { icon: 'box',         label: 'Product Mockup',        desc: 'Realistic product visuals',       accent: ORANGE,       route: '/design-project?type=mockup' },
-  { icon: 'camera',      label: 'AI Photoshoot',        desc: 'AI model & scene photography',    accent: PURPLE_LIGHT, route: '/design-ai-photoshoot' },
+  { icon: 'camera',      label: 'AI Photoshoot',        desc: 'AI model & scene photography',    accent: AUTHORED_DESIGN_ACCENTS.purpleLight, route: '/design-ai-photoshoot' },
   { icon: 'trending-up', label: 'Campaign',             desc: 'Multi-format content kit',        accent: SUCCESS,      route: '/design-campaign' },
   { icon: 'scissors',    label: 'Background Removal',   desc: 'Clean cutouts instantly',         accent: GOLD,         route: '/design-bg-removal' },
 ];
@@ -56,8 +63,8 @@ type AITool = { icon: string; label: string; route: string; accent: string };
 
 const AI_TOOLS: AITool[] = [
   { icon: 'zap',         label: 'Text to Design',     route: '/design-text-to-design',   accent: BLUE },
-  { icon: 'upload',      label: 'Upload Sketch',       route: '/design-sketch-upload',    accent: PURPLE },
-  { icon: 'image',       label: 'Mockup to Model',     route: '/design-mockup-model',     accent: CYAN },
+  { icon: 'upload',      label: 'Upload Sketch',       route: '/design-sketch-upload',    accent: AUTHORED_DESIGN_ACCENTS.purple },
+  { icon: 'image',       label: 'Mockup to Model',     route: '/design-mockup-model',     accent: AUTHORED_DESIGN_ACCENTS.cyan },
   { icon: 'edit',        label: 'Edit with Prompt',    route: '/design-prompt-edit',      accent: ORANGE },
   { icon: 'refresh-cw',  label: 'Replace BG',          route: '/design-bg-replace',       accent: SUCCESS },
 ];
@@ -78,14 +85,14 @@ const FILTERS: { key: FilterKind; label: string }[] = [
 // ─── Template quick cards ─────────────────────────────────────────────────────
 
 const QUICK_TEMPLATES = [
-  { label: 'T-Shirt',      garmentType: 'tshirt',     accent: PURPLE,      route: '/design-project?type=garment&garmentType=tshirt' },
-  { label: 'Hoodie',       garmentType: 'hoodie',     accent: CYAN,        route: '/design-project?type=garment&garmentType=hoodie' },
+  { label: 'T-Shirt',      garmentType: 'tshirt',     accent: AUTHORED_DESIGN_ACCENTS.purple,      route: '/design-project?type=garment&garmentType=tshirt' },
+  { label: 'Hoodie',       garmentType: 'hoodie',     accent: AUTHORED_DESIGN_ACCENTS.cyan,        route: '/design-project?type=garment&garmentType=hoodie' },
   { label: 'Sweatshirt',   garmentType: 'sweatshirt', accent: BLUE,        route: '/design-project?type=garment&garmentType=sweatshirt' },
   { label: 'Hat',          garmentType: 'hat',        accent: GOLD,        route: '/design-project?type=garment&garmentType=hat' },
   { label: 'Bag',          garmentType: 'bag',        accent: SUCCESS,     route: '/design-project?type=garment&garmentType=bag' },
   { label: 'Product Card', garmentType: null,         accent: ORANGE,      route: '/design-project?type=mockup' },
-  { label: 'Social Post',  garmentType: null,         accent: PURPLE_LIGHT,route: '/design-project?type=social' },
-  { label: 'Story',        garmentType: null,         accent: CYAN,        route: '/design-project?type=social' },
+  { label: 'Social Post',  garmentType: null,         accent: AUTHORED_DESIGN_ACCENTS.purpleLight,route: '/design-project?type=social' },
+  { label: 'Story',        garmentType: null,         accent: AUTHORED_DESIGN_ACCENTS.cyan,        route: '/design-project?type=social' },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -100,15 +107,15 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
-function typeAccent(type: DesignProjectType): string {
+function typeAccent(type: DesignProjectType, theme: ReturnType<typeof useAppTheme>['theme']): string {
   switch (type) {
-    case 'garment':   return PURPLE;
-    case 'canvas':    return CYAN;
+    case 'garment':   return theme.accent;
+    case 'canvas':    return theme.secondary;
     case 'mockup':    return ORANGE;
     case 'campaign':  return BLUE;
-    case 'social':    return PURPLE_LIGHT;
+    case 'social':    return theme.accentLight;
     case 'packaging': return GOLD;
-    default:          return PURPLE;
+    default:          return theme.accent;
   }
 }
 
@@ -143,7 +150,8 @@ interface ProjectCardProps {
 }
 
 function ProjectCard({ project, onOpen, onMore }: ProjectCardProps) {
-  const accent = typeAccent(project.type);
+  const { theme } = useAppTheme();
+  const accent = typeAccent(project.type, theme);
   return (
     <TouchableOpacity style={styles.projectCard} onPress={onOpen} activeOpacity={0.82}>
       <LinearGradient
@@ -180,6 +188,7 @@ function ProjectCard({ project, onOpen, onMore }: ProjectCardProps) {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function DesignScreen() {
+  const { theme } = useAppTheme();
   const router = useRouter();
   const [projects, setProjects] = useState<DesignProject[]>([]);
   const [loading, setLoading] = useState(true);
@@ -329,7 +338,7 @@ export default function DesignScreen() {
         {/* Project list */}
         {loading ? (
           <View style={styles.loadingBox}>
-            <ActivityIndicator color={PURPLE} size="large" />
+            <ActivityIndicator color={theme.accent} size="large" />
           </View>
         ) : filtered.length === 0 ? (
           <EmptyState

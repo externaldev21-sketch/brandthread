@@ -36,6 +36,7 @@ import {
   GRAD_CARD_GLOW,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -70,6 +71,7 @@ function paymentStatusVariant(s: string): 'success' | 'warning' | 'error' | 'neu
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function ProductionDetailScreen() {
+  const colors = useColors();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -115,7 +117,7 @@ export default function ProductionDetailScreen() {
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color={PURPLE} />
+        <ActivityIndicator color={colors.primary} />
       </View>
     );
   }
@@ -253,7 +255,7 @@ export default function ProductionDetailScreen() {
       >
 
         {/* ── 1. Stage Progress ─────────────────────────────────────────── */}
-        <GradientCard glow colors={GRAD_CARD_GLOW}>
+        <GradientCard glow colors={[colors.accent, colors.accent] as const}>
           <Text style={styles.cardTitle}>Stage Progress</Text>
           <View style={styles.progressTrack}>
             <View style={[styles.progressFill, { width: `${progressPct}%` }]} />

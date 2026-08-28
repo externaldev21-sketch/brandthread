@@ -16,6 +16,7 @@ import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM,
   ON_DARK, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 
 interface Participant {
@@ -47,6 +48,9 @@ function previewText(lastMessage?: string): string {
 }
 
 export default function SellerInboxScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const s = React.useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
@@ -183,7 +187,9 @@ export default function SellerInboxScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
   header: {
     flexDirection: 'row', alignItems: 'center',
@@ -228,4 +234,5 @@ const s = StyleSheet.create({
     backgroundColor: PURPLE, alignItems: 'center', justifyContent: 'center', marginLeft: SP.sm,
   },
   unreadText: { fontSize: 11, fontFamily: FONT.bold, color: ON_DARK },
-});
+  });
+};

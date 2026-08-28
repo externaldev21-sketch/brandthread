@@ -17,13 +17,12 @@ import { useRouter, type Href } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 WebBrowser.maybeCompleteAuthSession();
 
 // ─── Design tokens (exact match to onboarding / splash / welcome) ────────────
 const BG       = '#07070F';
-const PURPLE   = '#8B5CF6';
-const CYAN     = '#22D3EE';
 const FG       = '#FFFFFF';
 const MUTED    = 'rgba(255,255,255,0.5)';
 const MUTED2   = 'rgba(255,255,255,0.28)';
@@ -41,6 +40,7 @@ export default function SignInScreen() {
 
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { theme } = useAppTheme();
 
   // Warm up the browser on Android for faster OAuth sheet presentation
   useEffect(() => {
@@ -135,7 +135,7 @@ export default function SignInScreen() {
     return (
       <View style={[s.root, { paddingTop: insets.top }]}>
         <StatusBar barStyle="light-content" />
-        <View style={s.glowTop} />
+        <View style={[s.glowTop, { backgroundColor: theme.accentDim }]} />
 
         <ScrollView
           contentContainerStyle={[s.scroll, s.sessionScroll, { paddingBottom: insets.bottom + 36 }]}
@@ -167,7 +167,7 @@ export default function SignInScreen() {
           {/* Info card */}
           <View style={s.sessionCard}>
             <View style={s.sessionAvatarRow}>
-              <LinearGradient colors={[PURPLE, CYAN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.sessionAvatar}>
+              <LinearGradient colors={[theme.accent, theme.secondary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.sessionAvatar}>
                 <Text style={s.sessionAvatarText}>
                   {(currentEmail[0] ?? 'B').toUpperCase()}
                 </Text>
@@ -187,7 +187,7 @@ export default function SignInScreen() {
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.replace('/' as never); }}
             activeOpacity={0.88}
           >
-            <LinearGradient colors={[PURPLE, CYAN]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.primaryBtn}>
+            <LinearGradient colors={[theme.accent, theme.secondary]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.primaryBtn}>
               <Text style={s.primaryBtnText}>Continue with this account</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -213,8 +213,8 @@ export default function SignInScreen() {
       <StatusBar barStyle="light-content" />
 
       {/* Ambient glow */}
-      <View style={s.glowTop} />
-      <View style={s.glowMid} />
+      <View style={[s.glowTop, { backgroundColor: theme.accentDim }]} />
+      <View style={[s.glowMid, { backgroundColor: theme.secondaryDim }]} />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -308,7 +308,7 @@ export default function SignInScreen() {
             <View style={s.pwLabelRow}>
               <Text style={s.label}>Password</Text>
               <TouchableOpacity onPress={() => router.push('/forgot-password' as never)}>
-                <Text style={s.forgotLink}>Forgot password?</Text>
+                <Text style={[s.forgotLink, { color: theme.accent }]}>Forgot password?</Text>
               </TouchableOpacity>
             </View>
             <View style={s.pwRow}>
@@ -343,7 +343,7 @@ export default function SignInScreen() {
             activeOpacity={0.88}
           >
             <LinearGradient
-              colors={[PURPLE, CYAN]}
+                colors={[theme.accent, theme.secondary]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={s.primaryBtn}
@@ -361,6 +361,15 @@ export default function SignInScreen() {
             activeOpacity={0.85}
           >
             <Text style={s.secondaryBtnText}>Create an account</Text>
+          </TouchableOpacity>
+
+          {/* ── Guest checkout / Browse ────────────────────────────────────────── */}
+          <TouchableOpacity
+            style={s.guestBtn}
+            onPress={() => { Haptics.selectionAsync(); router.replace('/(buyer)/discover' as never); }}
+            activeOpacity={0.85}
+          >
+            <Text style={s.guestBtnText}>Continue as guest</Text>
           </TouchableOpacity>
 
           <View nativeID="clerk-captcha" />
@@ -405,12 +414,10 @@ const s = StyleSheet.create({
   glowTop: {
     position: 'absolute', top: -80, left: '10%',
     width: '80%', height: 220, borderRadius: 150,
-    backgroundColor: '#8B5CF612',
   },
   glowMid: {
     position: 'absolute', top: 260, right: -60,
     width: 180, height: 180, borderRadius: 90,
-    backgroundColor: '#22D3EE08',
   },
 
   scroll: { paddingHorizontal: 24, paddingTop: 16 },
@@ -454,7 +461,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', justifyContent: 'space-between',
     alignItems: 'center', marginBottom: 6,
   },
-  forgotLink: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: PURPLE },
+  forgotLink: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   pwRow: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: INPUT_BG, borderWidth: 1, borderColor: INPUT_BD, borderRadius: 12,
@@ -479,6 +486,11 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: BORDER,
   },
   secondaryBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+
+  guestBtn: {
+    marginTop: 16, paddingVertical: 12, alignItems: 'center',
+  },
+  guestBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: MUTED },
 
   // Active session screen
   sessionScroll: { justifyContent: 'flex-start' },

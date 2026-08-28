@@ -13,9 +13,10 @@ export function useColors() {
     ...colors.dark,
     tint: theme.accent,
     primary: theme.accent,
+    primaryForeground: theme.onAccent,
     accent: theme.accentDim,
     accentForeground: theme.accentLight,
-    info: theme.secondary,
+    info: colors.dark.info,
     radius: colors.radius,
   };
 }

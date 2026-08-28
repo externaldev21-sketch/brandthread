@@ -3,6 +3,7 @@
  * Route: /design-brand-assets
  */
 import React, { useState, useEffect, useMemo } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList,
   Alert, Image, Modal,
@@ -39,6 +40,7 @@ function formatDate(iso: string): string {
 }
 
 export default function DesignBrandAssetsScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [assets, setAssets] = useState<BrandAsset[]>([]);

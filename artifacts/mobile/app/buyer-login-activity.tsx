@@ -6,13 +6,17 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ON_DARK,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE, RED, RED_DIM, SUCCESS, SUCCESS_DIM, ON_DARK,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getSessions, removeSession, removeAllOtherSessions } from '@/lib/accountService';
 import type { AccountSession } from '@/lib/accountService';
 
 export default function BuyerLoginActivity() {
+  const { theme } = useAppTheme();
+  const PURPLE = theme.accent;
+  const s = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { signOut } = useAuth();
@@ -124,19 +128,19 @@ export default function BuyerLoginActivity() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.create({
   page: { flex: 1, backgroundColor: BG },
   header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   title: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
-  noticeBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: 'rgba(139,92,246,0.08)', borderRadius: RADIUS.md, borderWidth: 1, borderColor: 'rgba(139,92,246,0.2)', padding: SP.sm, marginBottom: SP.md },
+  noticeBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, backgroundColor: theme.accentDim, borderRadius: RADIUS.md, borderWidth: 1, borderColor: theme.accent, padding: SP.sm, marginBottom: SP.md },
   noticeText: { flex: 1, color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, lineHeight: 18 },
   groupLabel: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SP.sm },
   card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: 14, gap: 12 },
   divider: { height: 1, backgroundColor: BORDER, marginLeft: SP.md },
-  iconBg: { width: 40, height: 40, borderRadius: 12, backgroundColor: 'rgba(139,92,246,0.12)', alignItems: 'center', justifyContent: 'center' },
-  iconBgCurrent: { backgroundColor: PURPLE },
+  iconBg: { width: 40, height: 40, borderRadius: 12, backgroundColor: theme.accentDim, alignItems: 'center', justifyContent: 'center' },
+  iconBgCurrent: { backgroundColor: theme.accent },
   deviceName: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG },
   deviceOs: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
   deviceMeta: { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, marginTop: 1 },

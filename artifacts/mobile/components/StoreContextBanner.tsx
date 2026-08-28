@@ -25,11 +25,9 @@ import {
   FS,
   FG,
   MUTED,
-  PURPLE,
-  PURPLE_DIM,
-  PURPLE_LIGHT,
   SP,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 const STORE_CTX_KEY = '@brandthread/store_context';
 const NON_SELLER_ROOT_ROUTES = new Set([
@@ -73,6 +71,7 @@ export default function StoreContextBanner() {
   const segments = useSegments();
   const { isOwner } = useGlobalSearchParams<{ isOwner?: string }>();
   const insets = useSafeAreaInsets();
+  const { theme } = useAppTheme();
   const sellerRoute = isSellerRoute(segments, isOwner === 'true');
   const [ownerName, setOwnerName] = useState<string | null>(null);
   const [context, setContext] = useState(getStoreContext());
@@ -114,8 +113,8 @@ export default function StoreContextBanner() {
     <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <View style={styles.root} accessibilityRole="summary">
         <View style={styles.message}>
-          <View style={styles.iconWrap}>
-            <Feather name="users" size={13} color={PURPLE_LIGHT} />
+          <View style={[styles.iconWrap, { backgroundColor: theme.accentDim }]}>
+            <Feather name="users" size={13} color={theme.accentLight} />
           </View>
           <Text style={styles.label} numberOfLines={1}>
             Acting on: <Text style={styles.ownerName}>{ownerName}</Text>
@@ -128,7 +127,7 @@ export default function StoreContextBanner() {
           accessibilityRole="button"
           accessibilityLabel="Switch back to my store"
         >
-          <Text style={styles.switchText}>My store</Text>
+          <Text style={[styles.switchText, { color: theme.accentLight }]}>My store</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -167,7 +166,6 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: PURPLE_DIM,
   },
   label: {
     flex: 1,
@@ -180,7 +178,6 @@ const styles = StyleSheet.create({
     fontFamily: FONT.bold,
   },
   switchText: {
-    color: PURPLE_LIGHT,
     fontSize: FS.xs,
     fontFamily: FONT.bold,
   },

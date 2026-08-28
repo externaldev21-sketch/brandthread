@@ -30,6 +30,7 @@ import {
   GRAD_PRIMARY, GRAD_CARD_GLOW,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   SectionHeader, EmptyState, GuidedTip, NewFeatureBadge, StatusBadge, LockBadge,
@@ -186,6 +187,8 @@ const DISMISSED_TIPS_KEY = '@brandthread/dismissed_tips';
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function StudioScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const router   = useRouter();
   const insets   = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();

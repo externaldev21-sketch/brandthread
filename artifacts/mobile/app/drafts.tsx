@@ -21,10 +21,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 import {
-  BG, BORDER, CARD, FG, MUTED, ORANGE, PURPLE, PURPLE_DIM,
-  PURPLE_LIGHT, RED, SUBTLE, SUCCESS,
+  BG, BORDER, CARD, FG, MUTED, ORANGE, RED, SUBTLE, SUCCESS,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 import { EmptyState, SearchBar } from '@/components/BrandthreadUI';
 import { deleteDraft, listDrafts } from '@/services/productService';
 import { ProductDraft } from '@/services/productTypes';
@@ -51,6 +51,8 @@ function DraftRow({
   onResume: () => void;
   onDiscard: () => void;
 }) {
+  const colors = useColors();
+  const styles = createStyles(colors);
   const step = Math.min(Math.max(draft.currentStep ?? 1, 1), 10);
   const name = draft.name?.trim() || 'Untitled product';
 
@@ -98,6 +100,8 @@ function DraftRow({
 }
 
 export default function DraftsScreen() {
+  const colors = useColors();
+  const styles = createStyles(colors);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [drafts, setDrafts] = useState<ProductDraft[]>([]);
@@ -203,7 +207,7 @@ export default function DraftsScreen() {
             accessibilityRole="radio"
             accessibilityState={{ selected: sort === 'lastSaved' }}
           >
-            <Feather name="clock" size={14} color={sort === 'lastSaved' ? PURPLE_LIGHT : MUTED} />
+            <Feather name="clock" size={14} color={sort === 'lastSaved' ? colors.accentForeground : MUTED} />
             <Text style={[styles.sortOptionLabel, sort === 'lastSaved' && styles.sortOptionLabelActive]}>
               Last saved
             </Text>
@@ -215,7 +219,7 @@ export default function DraftsScreen() {
             accessibilityRole="radio"
             accessibilityState={{ selected: sort === 'name' }}
           >
-            <Feather name="type" size={14} color={sort === 'name' ? PURPLE_LIGHT : MUTED} />
+            <Feather name="type" size={14} color={sort === 'name' ? colors.accentForeground : MUTED} />
             <Text style={[styles.sortOptionLabel, sort === 'name' && styles.sortOptionLabelActive]}>
               Product name
             </Text>
@@ -258,14 +262,14 @@ export default function DraftsScreen() {
 
       {loading && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator color={PURPLE} size="large" />
+          <ActivityIndicator color={colors.primary} size="large" />
         </View>
       )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: BG,
@@ -342,8 +346,8 @@ const styles = StyleSheet.create({
     backgroundColor: CARD,
   },
   sortOptionActive: {
-    borderColor: PURPLE,
-    backgroundColor: PURPLE_DIM,
+    borderColor: colors.primary,
+    backgroundColor: colors.accent,
   },
   sortOptionLabel: {
     fontSize: FS.xs,
@@ -351,7 +355,7 @@ const styles = StyleSheet.create({
     color: MUTED,
   },
   sortOptionLabelActive: {
-    color: PURPLE_LIGHT,
+    color: colors.accentForeground,
   },
   listContent: {
     paddingHorizontal: SP.md,
@@ -427,12 +431,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     borderRadius: RADIUS.sm,
-    backgroundColor: PURPLE,
+    backgroundColor: colors.primary,
   },
   resumeLabel: {
     fontSize: FS.xs,
     fontFamily: FONT.bold,
-    color: BG,
+    color: colors.primaryForeground,
   },
   discardButton: {
     minHeight: 38,

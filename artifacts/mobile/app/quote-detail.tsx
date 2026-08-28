@@ -34,6 +34,7 @@ import {
   FONT, FS, SP, RADIUS, COMP, ICON,
   SHADOW_PURPLE,
 } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -170,6 +171,7 @@ function CounterOfferForm({
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function QuoteDetailScreen() {
+  const colors = useColors();
   const { quoteId, mode } = useLocalSearchParams<{ quoteId: string; mode?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();

@@ -9,29 +9,19 @@ import {
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import {
-  BG, CARD, BORDER, FG, MUTED, PURPLE, PURPLE_DIM, PURPLE_LIGHT,
-  FONT, FS, SP, RADIUS,
+  CARD, FG, MUTED, FONT, FS, RADIUS,
 } from '@/lib/theme';
 import { PrimaryButton } from '@/components/BrandthreadUI';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 interface Props {
   visible: boolean;
   onDismiss: () => void;
 }
 
-const HIGHLIGHTS: { icon: keyof typeof Feather.glyphMap; title: string; desc: string; color: string }[] = [
-  {
-    icon:  'package',
-    title: 'Products',
-    desc:  'Add, edit, and manage your inventory — sizes, variants, images, and pricing.',
-    color: '#8B5CF6',
-  },
-  {
-    icon:  'shopping-bag',
-    title: 'Orders',
-    desc:  'Track, fulfill, and ship customer orders. See real-time status updates.',
-    color: '#22D3EE',
-  },
+const HIGHLIGHTS: { icon: keyof typeof Feather.glyphMap; title: string; desc: string; color?: string }[] = [
+  { icon: 'package', title: 'Products', desc: 'Add, edit, and manage your inventory — sizes, variants, images, and pricing.' },
+  { icon: 'shopping-bag', title: 'Orders', desc: 'Track, fulfill, and ship customer orders. See real-time status updates.' },
   {
     icon:  'bar-chart-2',
     title: 'Analytics',
@@ -47,6 +37,11 @@ const HIGHLIGHTS: { icon: keyof typeof Feather.glyphMap; title: string; desc: st
 ];
 
 export default function SellerTutorialOverlay({ visible, onDismiss }: Props) {
+  const { theme } = useAppTheme();
+  const highlights = HIGHLIGHTS.map((highlight, index) => ({
+    ...highlight,
+    color: index === 0 ? theme.accent : index === 1 ? theme.secondary : highlight.color!,
+  }));
   return (
     <Modal
       visible={visible}
@@ -56,11 +51,11 @@ export default function SellerTutorialOverlay({ visible, onDismiss }: Props) {
       onRequestClose={onDismiss}
     >
       <View style={s.backdrop}>
-        <View style={s.card}>
+        <View style={[s.card, { borderColor: `${theme.accent}33` }]}>
           {/* Header */}
           <View style={s.headerRow}>
-            <View style={s.iconWrap}>
-              <Feather name="zap" size={22} color={PURPLE} />
+            <View style={[s.iconWrap, { backgroundColor: theme.accentDim }]}>
+              <Feather name="zap" size={22} color={theme.accent} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.title}>Welcome to your workspace 👋</Text>
@@ -70,7 +65,7 @@ export default function SellerTutorialOverlay({ visible, onDismiss }: Props) {
 
           {/* Highlights */}
           <View style={s.list}>
-            {HIGHLIGHTS.map((h) => (
+            {highlights.map((h) => (
               <View key={h.title} style={s.item}>
                 <View style={[s.itemIcon, { backgroundColor: h.color + '22' }]}>
                   <Feather name={h.icon} size={18} color={h.color} />
@@ -112,7 +107,6 @@ const s = StyleSheet.create({
     backgroundColor: CARD,
     borderRadius: RADIUS.xl ?? 20,
     borderWidth: 1,
-    borderColor: PURPLE + '33',
     padding: 20,
     width: '100%',
     maxWidth: 440,
@@ -127,7 +121,6 @@ const s = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: PURPLE_DIM,
     alignItems: 'center',
     justifyContent: 'center',
   },

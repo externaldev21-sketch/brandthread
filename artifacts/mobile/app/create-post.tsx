@@ -27,6 +27,7 @@ import type {
   Sound, PostProductTag, PostHashtag, PostVisibility,
   MaxVideoDuration, ContentType,
 } from '@/services/types';
+import { useColors } from '@/hooks/useColors';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const BG     = '#07070F';
@@ -104,6 +105,7 @@ function VideoPreview({ uri }: { uri: string }) {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 export default function CreatePostScreen() {
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ accountType?: string }>();
@@ -308,7 +310,7 @@ export default function CreatePostScreen() {
             <View style={s.pickRow}>
               <TouchableOpacity style={s.pickCard} activeOpacity={0.8} onPress={pickFromLibrary}>
                 <View style={[s.pickIconCircle, { backgroundColor: PURPLE + '22' }]}>
-                  <Feather name="image" size={28} color={PURPLE} />
+                  <Feather name="image" size={28} color={colors.primary} />
                 </View>
                 <Text style={s.pickCardTitle}>Camera Roll</Text>
                 <Text style={s.pickCardSub}>Photos or video</Text>
@@ -367,7 +369,7 @@ export default function CreatePostScreen() {
                   {slidePhotos.length === 1 ? 'Photo selected' : `Slideshow · ${slidePhotos.length} photos`}
                 </Text>
                 <TouchableOpacity style={s.swapBtn} onPress={pickFromLibrary} activeOpacity={0.8}>
-                  <Feather name="plus" size={13} color={PURPLE} />
+                  <Feather name="plus" size={13} color={colors.primary} />
                   <Text style={[s.swapBtnText, { color: PURPLE }]}>Add more</Text>
                 </TouchableOpacity>
               </View>
@@ -400,7 +402,7 @@ export default function CreatePostScreen() {
             <View style={s.typeBadge}>
               <Feather
                 name={videoClips.length > 0 ? 'video' : slidePhotos.length > 1 ? 'layers' : 'image'}
-                size={14} color={PURPLE}
+                size={14} color={colors.primary}
               />
               <Text style={s.typeBadgeText}>
                 {videoClips.length > 0
@@ -445,7 +447,7 @@ export default function CreatePostScreen() {
             onPress={() => haptic(() => setStep('post-details'))}
           >
             <LinearGradient
-              colors={canProceed ? [PURPLE, '#6D28D9'] : [BORDER, BORDER]}
+              colors={canProceed ? [colors.primary, colors.accentForeground] : [BORDER, BORDER]}
               style={s.nextBtnGrad}
             >
               <Text style={[s.nextBtnText, !canProceed && { color: MUTED }]}>Next →</Text>
@@ -564,7 +566,7 @@ export default function CreatePostScreen() {
                 {hashtags.map((h) => (
                   <TouchableOpacity key={h.tag} style={s.tagChip} onPress={() => setHashtags(prev => prev.filter(hh => hh.tag !== h.tag))}>
                     <Text style={s.tagChipText}>{h.tag}</Text>
-                    <Feather name="x" size={11} color={PURPLE} style={{ marginLeft: 4 }} />
+                    <Feather name="x" size={11} color={colors.primary} style={{ marginLeft: 4 }} />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -627,7 +629,7 @@ export default function CreatePostScreen() {
             {!isBuyer && (
               selectedSound ? (
                 <View style={[s.soundStrip, { marginTop: 16 }]}>
-                  <Feather name="music" size={14} color={PURPLE} />
+                  <Feather name="music" size={14} color={colors.primary} />
                   <Text style={s.soundStripText} numberOfLines={1}>{selectedSound.soundTitle} – {selectedSound.artist}</Text>
                   <TouchableOpacity onPress={() => setSelectedSound(null)}>
                     <Feather name="x" size={16} color={MUTED} />
@@ -683,7 +685,7 @@ export default function CreatePostScreen() {
                   style={[s.schedulePill, scheduleMode === mode && s.schedulePillActive]}
                   onPress={() => setScheduleMode(mode)}
                 >
-                  {scheduleMode === mode && <Feather name="check" size={12} color={PURPLE} style={{ marginRight: 4 }} />}
+                  {scheduleMode === mode && <Feather name="check" size={12} color={colors.primary} style={{ marginRight: 4 }} />}
                   <Text style={[s.schedulePillText, scheduleMode === mode && { color: PURPLE }]}>
                     {mode === 'now' ? 'Publish now' : 'Schedule'}
                   </Text>
@@ -761,7 +763,7 @@ export default function CreatePostScreen() {
                 }
               }}
             >
-              <LinearGradient colors={[PURPLE, '#6D28D9']} style={s.publishBtn}>
+              <LinearGradient colors={[colors.primary, colors.accentForeground]} style={s.publishBtn}>
                 <Feather name="send" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
                 <Text style={s.publishBtnText}>Publish now</Text>
               </LinearGradient>
@@ -793,13 +795,13 @@ export default function CreatePostScreen() {
     return (
       <View style={[s.root, s.center, { paddingTop: topPad, paddingBottom: botPad }]}>
         <Animated.View style={[s.bigCircle, { transform: [{ scale: pulseAnim }] }]}>
-          <LinearGradient colors={[PURPLE + '44', PURPLE + '22']} style={s.bigCircleGrad}>
-            <Feather name="upload-cloud" size={36} color={PURPLE} />
+          <LinearGradient colors={[colors.accent, colors.accent]} style={s.bigCircleGrad}>
+            <Feather name="upload-cloud" size={36} color={colors.primary} />
           </LinearGradient>
         </Animated.View>
         <Text style={[s.doneTitle, { marginTop: 24 }]}>Publishing...</Text>
         <Text style={s.doneSub}>Your content is being prepared for Thread.</Text>
-        <ActivityIndicator color={PURPLE} style={{ marginTop: 24 }} />
+        <ActivityIndicator color={colors.primary} style={{ marginTop: 24 }} />
       </View>
     );
   }
@@ -808,8 +810,8 @@ export default function CreatePostScreen() {
   if (step === 'done') {
     return (
       <View style={[s.root, s.center, { paddingTop: topPad, paddingBottom: botPad }]}>
-        <LinearGradient colors={[PURPLE + '44', PURPLE + '22']} style={s.bigCircleGrad}>
-          <Feather name="check" size={44} color={PURPLE} />
+        <LinearGradient colors={[colors.accent, colors.accent]} style={s.bigCircleGrad}>
+          <Feather name="check" size={44} color={colors.primary} />
         </LinearGradient>
         <Text style={s.doneTitle}>Posted!</Text>
         <Text style={s.doneSub}>Your post has been saved and will appear on your profile.</Text>
@@ -818,7 +820,7 @@ export default function CreatePostScreen() {
           activeOpacity={0.85}
           onPress={() => haptic(() => router.replace('/(tabs)/profile' as never))}
         >
-          <LinearGradient colors={[PURPLE, '#6D28D9']} style={s.publishBtn}>
+          <LinearGradient colors={[colors.primary, colors.accentForeground]} style={s.publishBtn}>
             <Text style={s.publishBtnText}>View Profile</Text>
           </LinearGradient>
         </TouchableOpacity>

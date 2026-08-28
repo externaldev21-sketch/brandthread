@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { useColors } from '@/hooks/useColors';
 import {
   AIScreenContext,
   AIMessage,
@@ -110,6 +111,7 @@ interface ActionCardProps {
 }
 
 function ActionCardView({ msg, onApply, onDismiss, onUndo }: ActionCardProps) {
+  const colors = useColors();
   const card = msg.actionCard;
   if (!card) return null;
 
@@ -137,7 +139,7 @@ function ActionCardView({ msg, onApply, onDismiss, onUndo }: ActionCardProps) {
             activeOpacity={0.8}
           >
             <LinearGradient
-              colors={['#8B5CF6', '#6D28D9']}
+               colors={[colors.primary, colors.accentForeground]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.actionApplyGrad}
@@ -189,11 +191,12 @@ interface MessageBubbleProps {
 }
 
 function MessageBubble({ msg, onLongPress, onRetry, onApply, onDismiss, onUndo }: MessageBubbleProps) {
+  const colors = useColors();
   if (msg.role === 'user') {
     return (
       <View style={styles.userRow}>
         <LinearGradient
-          colors={['#8B5CF6', '#6D28D9']}
+           colors={[colors.primary, colors.accentForeground]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={styles.userBubble}
@@ -260,6 +263,7 @@ interface EmptyStateProps {
 }
 
 function EmptyState({ context, onPillPress }: EmptyStateProps) {
+  const colors = useColors();
   const prompts =
     SCREEN_PROMPTS[context.screen as keyof typeof SCREEN_PROMPTS] ??
     SCREEN_PROMPTS['home'] ??
@@ -268,7 +272,7 @@ function EmptyState({ context, onPillPress }: EmptyStateProps) {
 
   return (
     <View style={styles.emptyState}>
-      <BrandthreadLogo size={48} showGlow glowColor={PURPLE} animated />
+      <BrandthreadLogo size={48} showGlow glowColor={colors.primary} animated />
       <Text style={styles.emptyTitle}>Ask Brandthread AI</Text>
       <Text style={styles.emptySubtitle}>
         Ask about your brand, products, content, store, or performance.
@@ -293,6 +297,7 @@ function EmptyState({ context, onPillPress }: EmptyStateProps) {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function AiBrainScreen() {
+  const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { getToken } = useAuth();
@@ -599,7 +604,7 @@ export default function AiBrainScreen() {
             <Feather
               name="send"
               size={20}
-              color={inputText.trim().length > 0 ? PURPLE : MUTED}
+              color={inputText.trim().length > 0 ? colors.primary : MUTED}
             />
           </TouchableOpacity>
         )}

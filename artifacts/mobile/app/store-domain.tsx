@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, Alert,
@@ -20,6 +21,7 @@ import { StoreDomain } from '@/services/storeTypes';
 type MergedDomain = StoreDomain & { dnsToken?: string };
 
 export default function StoreDomainScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const headerTopInset = useHeaderTopInset();
   const api = useApi();

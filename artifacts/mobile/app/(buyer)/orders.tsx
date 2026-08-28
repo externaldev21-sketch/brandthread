@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef } from 'react';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native';
@@ -231,6 +232,7 @@ function BuyerOrderCard({ order, onPress }: { order: BuyerOrderView; onPress: ()
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function BuyerOrdersScreen() {
+  const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
@@ -314,7 +316,7 @@ export default function BuyerOrdersScreen() {
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={PURPLE} size="large" />
+          <ActivityIndicator color={theme.accent} size="large" />
         </View>
       ) : loadError ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>

@@ -2,6 +2,7 @@
  * Sales Analytics — Brandthread Seller App
  */
 import React, { useState, useEffect, useCallback } from 'react';
+import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl, Platform, Alert, ActivityIndicator } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -45,6 +46,7 @@ function StatRow({ m, isDeduction = false }: { m: AnalyticsMetric; isDeduction?:
 }
 
 export default function AnalyticsSalesScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;

@@ -5,12 +5,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, PURPLE, ON_DARK,
+  BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, ON_DARK,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { loadBuyerSettings, patchBuyerSettings } from '@/lib/buyerSettings';
 
 export default function BuyerSecurity() {
+  const { theme } = useAppTheme();
+  const PURPLE = theme.accent;
+  const s = makeStyles();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [loginAlerts, setLoginAlerts] = useState(true);
@@ -136,7 +140,7 @@ export default function BuyerSecurity() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   page: { flex: 1, backgroundColor: BG },
   header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },

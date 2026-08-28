@@ -9,10 +9,9 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, ORANGE, RED, ON_DARK, FONT, FS, SP, RADIUS, COMP, ICON,
-  GRAD_PRIMARY,
+  BG, CARD, CARD_ELEVATED, BORDER,
+  FG, MUTED, SUBTLE,
+  ORANGE, RED, ON_DARK, FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
 import {
   getConversation, createOrGetConversation, getMessages,
@@ -26,6 +25,8 @@ import type {
 import { useApi } from '@/lib/api';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
+import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -107,6 +108,12 @@ const BUBBLE_MAX = SCREEN_W * 0.75;
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function BuyerConversationScreen() {
+  const colors = useColors();
+  const { theme } = useAppTheme();
+  const PURPLE = colors.primary, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = colors.accent, CYAN = theme.secondary, CYAN_DIM = theme.secondaryDim;
+  const BORDER_ACTIVE = `${theme.accent}73`;
+  const GRAD_PRIMARY = [theme.accent, theme.secondary] as const;
+  const s = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -1200,7 +1207,10 @@ export default function BuyerConversationScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE = theme.accent, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = theme.accentDim, CYAN = theme.secondary, CYAN_DIM = theme.secondaryDim;
+  const BORDER_ACTIVE = `${theme.accent}73`;
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
 
   // Header
@@ -1664,4 +1674,5 @@ const s = StyleSheet.create({
     color: SUBTLE,
     textAlign: 'center',
   },
-});
+  });
+};

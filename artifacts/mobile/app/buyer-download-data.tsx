@@ -6,9 +6,10 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, PURPLE, SUCCESS, SUCCESS_DIM,
-  ON_DARK, GRAD_PRIMARY, FONT, FS, SP, RADIUS,
+  BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM,
+  ON_DARK, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { requestDataExport, getDataExportStatus } from '@/lib/accountService';
 
 type DataCategory = { key: string; label: string; sub: string; icon: keyof typeof Feather.glyphMap; selected: boolean };
@@ -23,6 +24,10 @@ const DEFAULT_CATEGORIES: DataCategory[] = [
 ];
 
 export default function BuyerDownloadData() {
+  const { theme } = useAppTheme();
+  const PURPLE = theme.accent;
+  const GRAD_PRIMARY = [theme.accent, theme.accentLight] as const;
+  const s = makeStyles();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [requested, setRequested] = useState(false);
@@ -140,7 +145,7 @@ export default function BuyerDownloadData() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   page: { flex: 1, backgroundColor: BG },
   header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },

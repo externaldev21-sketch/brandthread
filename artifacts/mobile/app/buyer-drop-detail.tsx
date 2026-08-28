@@ -12,8 +12,10 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
+import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, BORDER_ACTIVE,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE,
   SUCCESS, SUCCESS_DIM, RED,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
@@ -60,6 +62,8 @@ function useCountdown(releaseAt?: string | null): CountdownParts {
 // ─── Countdown display ────────────────────────────────────────────────────────
 
 function CountdownBlock({ releaseAt, dropType }: { releaseAt?: string | null; dropType?: string }) {
+  const { theme } = useAppTheme();
+  const cd = makeCountdownStyles(theme);
   const { days, hours, minutes, seconds, isLive, isPast } = useCountdown(releaseAt);
 
   if (!releaseAt) return null;
@@ -100,7 +104,9 @@ function CountdownBlock({ releaseAt, dropType }: { releaseAt?: string | null; dr
   );
 }
 
-const cd = StyleSheet.create({
+const makeCountdownStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE = theme.accent, PURPLE_DIM = theme.accentDim;
+  return StyleSheet.create({
   container: {
     borderRadius: RADIUS.lg, borderWidth: 1, borderColor: `${PURPLE}40`,
     backgroundColor: PURPLE_DIM, padding: 16, marginHorizontal: 20, marginBottom: 16,
@@ -113,7 +119,8 @@ const cd = StyleSheet.create({
   unitLabel: { fontSize: 10, fontFamily: FONT.regular, color: MUTED, textTransform: 'uppercase' },
   liveDot: { width: 8, height: 8, borderRadius: 4, marginRight: 8 },
   liveText: { fontSize: FS.sm, fontFamily: FONT.semibold, textAlign: 'center' },
-});
+  });
+};
 
 // ─── Product card ─────────────────────────────────────────────────────────────
 
@@ -127,6 +134,8 @@ interface DropProduct {
 }
 
 function ProductCard({ product, onPress }: { product: DropProduct; onPress: () => void }) {
+  const { theme } = useAppTheme();
+  const pc = makeProductCardStyles(theme);
   const img = product.images?.[0];
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.82} style={pc.card}>
@@ -150,7 +159,9 @@ function ProductCard({ product, onPress }: { product: DropProduct; onPress: () =
   );
 }
 
-const pc = StyleSheet.create({
+const makeProductCardStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE = theme.accent;
+  return StyleSheet.create({
   card: { width: (W - 20 * 2 - 12) / 2, backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, overflow: 'hidden' },
   imgBox: { position: 'relative' },
   img: { width: '100%', height: (W - 20 * 2 - 12) / 2, backgroundColor: '#1a1a2a' },
@@ -159,7 +170,8 @@ const pc = StyleSheet.create({
   badgeText: { fontSize: 10, fontFamily: FONT.semibold, color: '#fff' },
   name: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, paddingHorizontal: 10, paddingTop: 10, paddingBottom: 2 },
   cat: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, paddingHorizontal: 10, paddingBottom: 10 },
-});
+  });
+};
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -178,6 +190,11 @@ interface DropDetail {
 }
 
 export default function BuyerDropDetail() {
+  const colors = useColors();
+  const { theme } = useAppTheme();
+  const PURPLE = colors.primary, PURPLE_DIM = colors.accent;
+  const BORDER_ACTIVE = `${theme.accent}73`;
+  const s = makeStyles(theme);
   const { dropId, dropName } = useLocalSearchParams<{ dropId: string; dropName?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -301,7 +318,9 @@ export default function BuyerDropDetail() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE = theme.accent, PURPLE_DIM = theme.accentDim, BORDER_ACTIVE = `${theme.accent}73`;
+  return StyleSheet.create({
   root:   { flex: 1, backgroundColor: BG },
   header: {
     height: 56, flexDirection: 'row', alignItems: 'center',
@@ -334,4 +353,5 @@ const s = StyleSheet.create({
   emptyProducts: { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 40 },
   emptyText:    { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, textAlign: 'center', marginBottom: 6 },
   emptySubtext: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', lineHeight: 18 },
-});
+  });
+};

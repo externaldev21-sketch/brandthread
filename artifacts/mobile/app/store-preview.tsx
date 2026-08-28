@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Dimensions, Animated, ActivityIndicator, Alert,
@@ -44,6 +45,7 @@ const PAGE_LABELS: { value: PageType; label: string }[] = [
 ];
 
 export default function StorePreview() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();

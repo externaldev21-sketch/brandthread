@@ -133,7 +133,7 @@ export default function AutomationScreen() {
           activeOpacity={0.75}
           style={[styles.templateRow, { backgroundColor: colors.card, borderColor: colors.border }]}
         >
-          <View style={[styles.templateIcon, { backgroundColor: 'rgba(139,92,246,0.13)' }]}>
+          <View style={[styles.templateIcon, { backgroundColor: colors.accent }]}>
             <Feather name="cpu" size={16} color={colors.primary} />
           </View>
           <View style={styles.templateInfo}>

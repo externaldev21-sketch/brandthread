@@ -18,6 +18,7 @@ import {
   BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, RED,
   PURPLE, PURPLE_DIM, ON_DARK, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
@@ -98,6 +99,8 @@ function groupByDate(msgs: Msg[]): ListRow[] {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function SellerConversationScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();

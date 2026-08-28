@@ -14,8 +14,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useApi } from '@/lib/api';
 import { useUser } from '@clerk/expo';
+import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
-  BG, BORDER, FG, MUTED, SUBTLE, PURPLE, RED,
+  BG, BORDER, FG, MUTED, SUBTLE, RED,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 
@@ -30,6 +32,10 @@ interface Comment { id: string; display_name: string; message: string; created_a
 interface ProductTag { productId: string; productName: string; price: number; }
 
 export default function BuyerLiveScreen() {
+  const colors = useColors();
+  const { theme } = useAppTheme();
+  const PURPLE = colors.primary;
+  const s = makeStyles(theme);
   const params = useLocalSearchParams<{ streamId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -291,7 +297,9 @@ export default function BuyerLiveScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE = theme.accent;
+  return StyleSheet.create({
   root:             { flex: 1, backgroundColor: '#000' },
   center:           { alignItems: 'center', justifyContent: 'center', gap: 12 },
   overlay:          { backgroundColor: 'rgba(0,0,0,0.2)' },
@@ -330,4 +338,5 @@ const s = StyleSheet.create({
   endedSub:         { fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', paddingHorizontal: 40, lineHeight: 20 },
   backBtn:          { marginTop: 24, borderRadius: RADIUS.pill, paddingHorizontal: 28, paddingVertical: 12 },
   backBtnText:      { color: '#fff', fontFamily: FONT.semibold, fontSize: FS.sm },
-});
+  });
+};

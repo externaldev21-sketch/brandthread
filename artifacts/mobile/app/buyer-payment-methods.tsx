@@ -14,10 +14,11 @@ import { useFocusEffect } from 'expo-router';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE,
   SUCCESS, SUCCESS_DIM, RED,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 interface PaymentMethod {
   id: string;
@@ -40,19 +41,21 @@ const BRAND_ICONS: Record<string, string> = {
 };
 
 function CardBrand({ brand }: { brand: string }) {
+  const { theme } = useAppTheme();
   const upper = brand.charAt(0).toUpperCase() + brand.slice(1);
   return (
-    <View style={cb.wrap}>
-      <Text style={cb.text}>{upper}</Text>
+    <View style={[cb.wrap, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
+      <Text style={[cb.text, { color: theme.accent }]}>{upper}</Text>
     </View>
   );
 }
 const cb = StyleSheet.create({
-  wrap: { backgroundColor: `${PURPLE}20`, borderRadius: RADIUS.xs, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: `${PURPLE}30` },
-  text: { fontSize: 11, fontFamily: FONT.bold, color: PURPLE, textTransform: 'uppercase', letterSpacing: 0.5 },
+  wrap: { borderRadius: RADIUS.xs, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1 },
+  text: { fontSize: 11, fontFamily: FONT.bold, textTransform: 'uppercase', letterSpacing: 0.5 },
 });
 
 export default function BuyerPaymentMethodsScreen() {
+  const { theme } = useAppTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
@@ -112,7 +115,7 @@ export default function BuyerPaymentMethodsScreen() {
       </View>
 
       {loading ? (
-        <View style={s.center}><ActivityIndicator color={PURPLE} /></View>
+        <View style={s.center}><ActivityIndicator color={theme.accent} /></View>
       ) : error ? (
         <View style={s.center}>
           <Feather name="alert-circle" size={30} color={MUTED} style={{ marginBottom: 12 }} />

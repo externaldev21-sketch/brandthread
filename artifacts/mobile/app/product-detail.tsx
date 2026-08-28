@@ -23,6 +23,7 @@ import {
   GOLD, GRAD_PRIMARY, GRAD_CARD_GLOW,
   FONT, FS, SP, RADIUS, COMP, ICON, SHADOW_PURPLE,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
@@ -54,6 +55,9 @@ const TABS: { key: Tab; label: string }[] = [
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function ProductDetailScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const s = React.useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ id: string; tab?: string }>();
@@ -1300,7 +1304,9 @@ const st = StyleSheet.create({
 
 // ─── Root Styles ──────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
+const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  return StyleSheet.create({
   root:         { flex: 1, backgroundColor: BG },
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md,
                   paddingVertical: SP.sm, minHeight: COMP.headerH, gap: SP.sm,
@@ -1325,4 +1331,5 @@ const s = StyleSheet.create({
   fab:          { position: 'absolute', right: SP.lg, width: 56, height: 56, borderRadius: 28,
                   overflow: 'hidden', ...SHADOW_PURPLE },
   fabGrad:      { width: 56, height: 56, alignItems: 'center', justifyContent: 'center' },
-});
+  });
+};

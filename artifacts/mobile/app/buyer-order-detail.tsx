@@ -7,22 +7,20 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
+import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { Feather } from '@expo/vector-icons';
 import { BuyerOrderView, OrderStatus, TrackingStatus } from '@/services/orderTypes';
 import { useApi } from '@/hooks/useApi';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, BORDER_FOCUS,
+  BG, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE, ON_DARK,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, CYAN_LIGHT,
   SUCCESS, SUCCESS_DIM,
   BLUE, BLUE_DIM,
   ORANGE, ORANGE_DIM,
   RED, RED_DIM,
   GOLD,
-  GRAD_PRIMARY, GRAD_CARD_GLOW,
   FONT, FS, SP, RADIUS, COMP, ICON,
-  SHADOW_PURPLE,
 } from '@/lib/theme';
 import {
   BrandthreadScreen, BrandthreadHeader, BrandthreadCard,
@@ -215,6 +213,13 @@ function cancellationReasonLabel(reason: string | null | undefined): string {
 }
 
 export default function BuyerOrderDetailScreen() {
+  const colors = useColors();
+  const { theme } = useAppTheme();
+  const PURPLE = colors.primary, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = colors.accent, CYAN = theme.secondary, CYAN_DIM = theme.secondaryDim, CYAN_LIGHT = theme.secondary;
+  const BORDER_ACTIVE = `${theme.accent}73`;
+  const GRAD_PRIMARY = [theme.accent, theme.secondary] as const;
+  const GRAD_CARD_GLOW = [theme.accentDim, theme.secondaryDim] as const;
+  const styles = makeStyles(theme);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -644,8 +649,8 @@ export default function BuyerOrderDetailScreen() {
           <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
             <Text style={[sc.title, { paddingHorizontal: 0, marginBottom: SP.sm }]}>Pre-order Status</Text>
             <GradientCard
-              colors={['rgba(34,211,238,0.12)', 'rgba(34,211,238,0.04)']}
-              style={{ borderColor: 'rgba(34,211,238,0.35)' }}
+              colors={[theme.secondaryDim, `${theme.secondary}0A`]}
+              style={{ borderColor: `${theme.secondary}59` }}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm }}>
                 <Feather name="clock" size={ICON.sm} color={CYAN} />
@@ -829,7 +834,10 @@ export default function BuyerOrderDetailScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE = theme.accent, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = theme.accentDim, CYAN = theme.secondary, CYAN_DIM = theme.secondaryDim, CYAN_LIGHT = theme.secondary;
+  const BORDER_ACTIVE = `${theme.accent}73`;
+  return StyleSheet.create({
   fulfillmentStatus: {
     fontSize: FS.sm,
     fontFamily: FONT.medium,
@@ -969,4 +977,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 18,
   },
-});
+  });
+};

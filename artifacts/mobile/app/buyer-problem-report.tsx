@@ -20,15 +20,20 @@ import { BuyerOrderView } from '@/services/orderTypes';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   SUCCESS, ON_DARK,
   ORANGE, ORANGE_DIM,
   RED, RED_DIM,
-  GRAD_PRIMARY,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 export default function BuyerProblemReportScreen() {
+  const { theme } = useAppTheme();
+  const PURPLE = theme.accent;
+  const PURPLE_LIGHT = theme.accentLight;
+  const PURPLE_DIM = theme.accentDim;
+  const GRAD_PRIMARY = [theme.accent, theme.accentLight] as const;
+  const s = makeStyles(theme);
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -231,7 +236,7 @@ export default function BuyerProblemReportScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (theme: { accent: string; accentLight: string; accentDim: string }) => StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
@@ -244,7 +249,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: BORDER, backgroundColor: CARD_ELEVATED,
     alignItems: 'center', gap: 6, minHeight: 80, justifyContent: 'center',
   },
-  typeCardSelected: { borderColor: PURPLE, backgroundColor: PURPLE_DIM },
+  typeCardSelected: { borderColor: theme.accent, backgroundColor: theme.accentDim },
   typeLabel: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, textAlign: 'center', lineHeight: 16 },
   textarea: { minHeight: 120, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: SP.md, fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 },
   evidenceNote: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, padding: SP.sm, marginBottom: SP.md },
@@ -252,8 +257,8 @@ const s = StyleSheet.create({
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
   switchLabel: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginBottom: 2 },
   switchSub: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  contactBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: SP.sm, padding: SP.sm, backgroundColor: PURPLE_DIM, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER_ACTIVE, alignSelf: 'flex-start' },
-  contactBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
+  contactBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: SP.sm, padding: SP.sm, backgroundColor: theme.accentDim, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER_ACTIVE, alignSelf: 'flex-start' },
+  contactBtnText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: theme.accentLight },
   disputeNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: ORANGE_DIM, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: 'rgba(249,115,22,0.3)', padding: SP.sm, marginBottom: SP.md },
   disputeNoteText: { fontSize: FS.xs, fontFamily: FONT.regular, color: ORANGE, flex: 1, lineHeight: 17 },
   disclaimer: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', lineHeight: 17, marginBottom: SP.lg },

@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, TextInput, Switch,
   StyleSheet, Alert, TouchableOpacity,
@@ -17,6 +18,7 @@ import { getStorefront, updateSEO } from '@/services/storeService';
 import { Storefront, StoreSEO } from '@/services/storeTypes';
 
 export default function StoreSEOScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const headerTopInset = useHeaderTopInset();
   const [store, setStore] = useState<Storefront | null>(null);

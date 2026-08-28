@@ -13,9 +13,9 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_DIM,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 export interface StyleTag {
   key:   string;   // stored value (lowercase, stable)
@@ -52,6 +52,7 @@ interface Props {
 }
 
 export default function StyleTagsPicker({ selected, onChange, label, max }: Props) {
+  const { theme } = useAppTheme();
   function toggle(key: string) {
     const isOn = selected.includes(key);
     if (isOn) {
@@ -76,7 +77,7 @@ export default function StyleTagsPicker({ selected, onChange, label, max }: Prop
           return (
             <TouchableOpacity
               key={tag.key}
-              style={[styles.chip, active && styles.chipActive]}
+              style={[styles.chip, active && { borderColor: theme.accent, backgroundColor: theme.accentDim }]}
               onPress={() => toggle(tag.key)}
               activeOpacity={0.75}
             >
@@ -125,10 +126,6 @@ const styles = StyleSheet.create({
     borderWidth:       1,
     borderColor:       BORDER,
     backgroundColor:   CARD,
-  },
-  chipActive: {
-    borderColor:     PURPLE,
-    backgroundColor: PURPLE_DIM,
   },
   chipEmoji: {
     fontSize: 13,

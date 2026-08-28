@@ -17,6 +17,7 @@ import {
   GRAD_PRIMARY, GRAD_CARD_GLOW, GRAD_DARK_FADE,
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState,
@@ -444,6 +445,8 @@ function SortModal({
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function OrdersScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const router = useRouter();
   const insets = useSafeAreaInsets();
 

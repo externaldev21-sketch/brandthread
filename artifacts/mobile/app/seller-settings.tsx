@@ -25,6 +25,7 @@ import {
   CYAN, SUCCESS, BLUE, ORANGE, RED, GOLD,
   FONT, FS, SP,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { NavigationCard } from '@/components/BrandthreadUI';
 import { SecondaryButton } from '@/components/BrandthreadUI';
 
@@ -111,6 +112,9 @@ const SECTIONS: {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function SellerSettingsScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const s = React.useMemo(() => createStyles(theme), [theme]);
   const router     = useRouter();
   const insets     = useSafeAreaInsets();
   const { signOut } = useAuth();
@@ -236,7 +240,9 @@ export default function SellerSettingsScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
+const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  return StyleSheet.create({
   root:        { flex: 1, backgroundColor: BG },
   scrollContent: { paddingBottom: 120, paddingTop: SP.sm },
 
@@ -320,4 +326,5 @@ const s = StyleSheet.create({
     marginTop: SP.sm,
     marginBottom: 32,
   },
-});
+  });
+};

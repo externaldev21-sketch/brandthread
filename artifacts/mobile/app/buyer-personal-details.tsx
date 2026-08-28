@@ -6,10 +6,11 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, GRAD_PRIMARY,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE,
   ON_DARK,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerProfileFields } from '@/lib/buyerProfile';
 import { updateMyProfile, getMyProfile } from '@/services/socialService';
 
@@ -40,6 +41,10 @@ function Divider() {
 }
 
 export default function BuyerPersonalDetails() {
+  const { theme } = useAppTheme();
+  const PURPLE = theme.accent;
+  const GRAD_PRIMARY = [theme.accent, theme.accentLight] as const;
+  const s = makeStyles();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [fields, setFields] = useState<BuyerProfileFields>({ ...DEFAULT_BUYER_PROFILE });
@@ -153,7 +158,7 @@ export default function BuyerPersonalDetails() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   page: { flex: 1, backgroundColor: BG },
   header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },

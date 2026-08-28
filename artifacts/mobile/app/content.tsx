@@ -11,16 +11,18 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import type { ContentPost, ContentType, ContentStatus } from '@/services/types';
 import { getSellerPosts } from '@/services/socialService';
+import { useColors } from '@/hooks/useColors';
 
 const BG     = '#07070F';
 const CARD   = '#12121F';
 const BORDER = 'rgba(255,255,255,0.07)';
 const FG     = '#F4F4FF';
 const MUTED  = 'rgba(244,244,255,0.50)';
-const GREEN  = '#8B5CF6';
-const PURPLE = '#8B5CF6';
+const GREEN  = '#22C55E';
 const BLUE   = '#3B82F6';
 const ORANGE = '#F97316';
+// Content-type hues are intentionally stable metadata colors rather than app chrome.
+const PURPLE = '#8B5CF6';
 const CYAN   = '#22D3EE';
 
 type FilterTab = 'all' | 'draft' | 'scheduled' | 'published';
@@ -53,6 +55,7 @@ function typeIcon(t: ContentType): keyof typeof Feather.glyphMap {
 }
 
 export default function ContentScreen() {
+  const colors = useColors();
   const insets  = useSafeAreaInsets();
   const router  = useRouter();
   const topPad  = Platform.OS === 'web' ? 20 : insets.top;
@@ -124,7 +127,7 @@ export default function ContentScreen() {
             <Feather name="bar-chart-2" size={17} color={FG} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={s.createBtn}
+            style={[s.createBtn, { backgroundColor: colors.primary }]}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/create-post' as never); }}
             activeOpacity={0.85}
           >
@@ -178,11 +181,11 @@ export default function ContentScreen() {
           {(['all', 'published', 'scheduled', 'draft'] as FilterTab[]).map(t => (
             <TouchableOpacity
               key={t}
-              style={[s.filterTab, tab === t && s.filterTabActive]}
+              style={[s.filterTab, tab === t && [s.filterTabActive, { backgroundColor: colors.accent, borderColor: colors.primary }]]}
               onPress={() => { setTab(t); Haptics.selectionAsync(); }}
               activeOpacity={0.8}
             >
-              <Text style={[s.filterText, tab === t && s.filterTextActive]}>
+              <Text style={[s.filterText, tab === t && [s.filterTextActive, { color: colors.primary }]]}>
                 {t.charAt(0).toUpperCase() + t.slice(1)}
               </Text>
             </TouchableOpacity>
@@ -194,7 +197,7 @@ export default function ContentScreen() {
           <Text style={s.sectionTitle}>Content library</Text>
           {loading ? (
             <View style={s.loading}>
-              <ActivityIndicator color={PURPLE} />
+              <ActivityIndicator color={colors.primary} />
               <Text style={s.loadingText}>Loading your content…</Text>
             </View>
           ) : loadError ? (
@@ -202,7 +205,7 @@ export default function ContentScreen() {
               <Feather name="wifi-off" size={32} color={ORANGE} />
               <Text style={s.emptyTitle}>Couldn’t load content</Text>
               <Text style={s.emptyDesc}>{loadError}</Text>
-              <TouchableOpacity style={s.retryBtn} onPress={loadContent}>
+              <TouchableOpacity style={[s.retryBtn, { backgroundColor: colors.primary }]} onPress={loadContent}>
                 <Feather name="refresh-cw" size={14} color="#FFFFFF" />
                 <Text style={s.retryText}>Try again</Text>
               </TouchableOpacity>

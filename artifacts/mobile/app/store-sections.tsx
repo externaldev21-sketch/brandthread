@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useColors } from '@/hooks/useColors';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -70,6 +71,7 @@ const SECTION_CATALOG = [
 ];
 
 export default function StoreSectionsScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [adding, setAdding] = useState<string | null>(null);

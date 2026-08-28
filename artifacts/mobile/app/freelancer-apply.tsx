@@ -17,13 +17,15 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi } from '@/lib/api';
 import { FREELANCER_SERVICE_TYPES, apiErrorMessage } from '@/lib/freelancer';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM,
-  FONT, FS, SP, RADIUS, GRAD_PRIMARY, ON_DARK, RED,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE,
+  FONT, FS, SP, RADIUS, RED,
 } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 
 const STEPS = ['Service', 'Rate & Bio', 'Portfolio'];
 
 export default function FreelancerApplyScreen() {
+  const colors = useColors();
   const api = useApi();
   const router = useRouter();
 
@@ -134,7 +136,7 @@ export default function FreelancerApplyScreen() {
   if (loading) {
     return (
       <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
-        <ActivityIndicator color={PURPLE} />
+        <ActivityIndicator color={colors.primary} />
       </View>
     );
   }
@@ -148,7 +150,7 @@ export default function FreelancerApplyScreen() {
       {/* Step dots */}
       <View style={styles.dotsRow}>
         {STEPS.map((_, i) => (
-          <View key={i} style={[styles.stepDot, i <= step && { backgroundColor: PURPLE }]} />
+          <View key={i} style={[styles.stepDot, i <= step && { backgroundColor: colors.primary }]} />
         ))}
       </View>
 
@@ -171,14 +173,14 @@ export default function FreelancerApplyScreen() {
                   return (
                     <TouchableOpacity
                       key={t.value}
-                      style={[styles.typeCard, active && styles.typeCardActive]}
+                      style={[styles.typeCard, active && { backgroundColor: colors.accent, borderColor: colors.primary }]}
                       activeOpacity={0.8}
                       onPress={() => {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                         setServiceType(t.value);
                       }}
                     >
-                      <Feather name={t.icon} size={18} color={active ? PURPLE : MUTED} />
+                      <Feather name={t.icon} size={18} color={active ? colors.primary : MUTED} />
                       <Text style={[styles.typeLabel, active && { color: FG }]}>{t.label}</Text>
                     </TouchableOpacity>
                   );
@@ -286,15 +288,15 @@ export default function FreelancerApplyScreen() {
             onPress={step === 2 ? submit : next}
           >
             <LinearGradient
-              colors={GRAD_PRIMARY}
+              colors={[colors.primary, colors.accentForeground] as const}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={[styles.nextBtn, (!stepValid || submitting) && { opacity: 0.4 }]}
             >
               {submitting ? (
-                <ActivityIndicator color={ON_DARK} size="small" />
+                <ActivityIndicator color={colors.primaryForeground} size="small" />
               ) : (
-                <Text style={styles.nextBtnText}>
+                <Text style={[styles.nextBtnText, { color: colors.primaryForeground }]}>
                   {step === 2 ? (isEdit ? 'Save Profile' : 'Submit Application') : 'Continue'}
                 </Text>
               )}
@@ -318,7 +320,6 @@ const styles = StyleSheet.create({
     backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
     borderRadius: RADIUS.sm, paddingHorizontal: SP.sm + 4, paddingVertical: SP.md - 2,
   },
-  typeCardActive: { backgroundColor: PURPLE_DIM, borderColor: 'rgba(139,92,246,0.45)' },
   typeLabel: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium, flexShrink: 1 },
   input: {
     backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm,
@@ -348,5 +349,5 @@ const styles = StyleSheet.create({
   },
   backBtnText: { color: FG, fontSize: FS.sm, fontFamily: FONT.semibold },
   nextBtn: { borderRadius: RADIUS.sm, alignItems: 'center', paddingVertical: SP.md - 2 },
-  nextBtnText: { color: ON_DARK, fontSize: FS.sm, fontFamily: FONT.bold },
+  nextBtnText: { fontSize: FS.sm, fontFamily: FONT.bold },
 });

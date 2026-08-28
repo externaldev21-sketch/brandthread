@@ -13,11 +13,12 @@ import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   BG, CARD, SURFACE, BORDER, FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_DIM, PURPLE_LIGHT, SUCCESS,
+  SUCCESS,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useApi } from '@/lib/api';
 import { StatusBadge } from '@/components/BrandthreadUI';
+import { useColors } from '@/hooks/useColors';
 
 type Customer = {
   id: string;
@@ -55,6 +56,7 @@ function cents(c: number) {
 }
 
 export default function CustomerOrdersScreen() {
+  const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
@@ -100,7 +102,7 @@ export default function CustomerOrdersScreen() {
 
       {loading ? (
         <View style={s.center}>
-          <ActivityIndicator size="large" color={PURPLE} />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : error ? (
         <View style={s.center}>
@@ -119,8 +121,8 @@ export default function CustomerOrdersScreen() {
           {customer && (
             <View style={s.custCard}>
               <View style={s.custAvatarRow}>
-                <View style={s.avatar}>
-                  <Text style={s.avatarText}>
+                <View style={[s.avatar, { backgroundColor: colors.accent }]}>
+                  <Text style={[s.avatarText, { color: colors.accentForeground }]}>
                     {customer.name.split(' ').map((p) => p[0] ?? '').join('').slice(0, 2).toUpperCase()}
                   </Text>
                 </View>
@@ -157,8 +159,8 @@ export default function CustomerOrdersScreen() {
               {customer.tags && customer.tags.length > 0 && (
                 <View style={s.tagsRow}>
                   {customer.tags.map((tag) => (
-                    <View key={tag} style={s.tag}>
-                      <Text style={s.tagText}>{tag}</Text>
+                    <View key={tag} style={[s.tag, { backgroundColor: colors.accent }]}>
+                      <Text style={[s.tagText, { color: colors.accentForeground }]}>{tag}</Text>
                     </View>
                   ))}
                 </View>
@@ -228,8 +230,8 @@ const s = StyleSheet.create({
 
   custCard:     { backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, padding: 16, gap: 14 },
   custAvatarRow:{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  avatar:       { width: 48, height: 48, borderRadius: 24, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
-  avatarText:   { fontSize: 16, fontFamily: 'Inter_700Bold', color: PURPLE_LIGHT },
+  avatar:       { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+  avatarText:   { fontSize: 16, fontFamily: 'Inter_700Bold' },
   custName:     { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
   custEmail:    { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED },
   statsRow:     { flexDirection: 'row', backgroundColor: SURFACE, borderRadius: 10, padding: 12 },
@@ -238,8 +240,8 @@ const s = StyleSheet.create({
   statLabel:    { fontSize: 10, fontFamily: 'Inter_400Regular', color: MUTED },
   statDiv:      { width: 1, backgroundColor: BORDER, marginVertical: 4 },
   tagsRow:      { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  tag:          { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, backgroundColor: PURPLE_DIM },
-  tagText:      { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: PURPLE_LIGHT },
+  tag:          { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  tagText:      { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   notes:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 18 },
 
   sectionTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.5 },

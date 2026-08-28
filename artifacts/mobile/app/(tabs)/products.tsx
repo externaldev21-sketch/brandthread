@@ -22,6 +22,7 @@ import {
   GRAD_PRIMARY, GRAD_CARD_GLOW,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, SearchBar, FilterChip, StatusBadge,
@@ -355,6 +356,8 @@ function FilterModal({ visible, current, onApply, onClose }: FilterModalProps) {
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function ProductsScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const insets = useSafeAreaInsets();
   const router = useRouter();
 

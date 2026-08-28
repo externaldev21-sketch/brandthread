@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, Image, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
@@ -107,6 +108,7 @@ async function resizeToBase64(uri: string, maxPx = 800): Promise<string> {
 }
 
 export default function StoreFromMoodboardScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const { user, isLoaded: isUserLoaded } = useUser();
   const headerTopInset = useHeaderTopInset();

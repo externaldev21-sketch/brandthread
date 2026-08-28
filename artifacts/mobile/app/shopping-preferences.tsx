@@ -13,9 +13,10 @@ import { useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, PURPLE, PURPLE_DIM,
+  BG, CARD, BORDER, FG, MUTED,
   FONT, FS, SP, RADIUS, GRAD_PRIMARY,
 } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 import { loadBuyerSettings, patchBuyerSettings, type BuyerSettingsState } from '@/lib/buyerSettings';
 
 const TOPS = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL+'];
@@ -49,6 +50,8 @@ function SizeSelector({
   selected: string;
   onSelect: (v: string) => void;
 }) {
+  const colors = useColors();
+  const s = createStyles(colors);
   return (
     <View style={s.sizeBlock}>
       <Text style={s.sizeLabel}>{label}</Text>
@@ -68,6 +71,8 @@ function SizeSelector({
 }
 
 export default function ShoppingPreferences() {
+  const colors = useColors();
+  const s = createStyles(colors);
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [settings, setSettings] = useState<BuyerSettingsState | null>(null);
@@ -187,7 +192,7 @@ export default function ShoppingPreferences() {
           ]).map((item, i, arr) => (
             <React.Fragment key={item.key}>
               <View style={s.alertRow}>
-                <Feather name={item.icon as any} size={19} color={PURPLE} style={{ width: 28 }} />
+                <Feather name={item.icon as any} size={19} color={colors.primary} style={{ width: 28 }} />
                 <View style={{ flex: 1 }}>
                   <Text style={s.alertLabel}>{item.label}</Text>
                   <Text style={s.alertSub}>{item.sub}</Text>
@@ -195,7 +200,7 @@ export default function ShoppingPreferences() {
                 <Switch
                   value={Boolean(settings[item.key])}
                   onValueChange={v => { Haptics.selectionAsync(); patch({ [item.key]: v }); }}
-                  trackColor={{ false: '#333344', true: PURPLE }}
+                  trackColor={{ false: '#333344', true: colors.primary }}
                   thumbColor="#fff"
                 />
               </View>
@@ -207,7 +212,7 @@ export default function ShoppingPreferences() {
         {/* Shopping activity */}
         <View style={[s.card, { marginTop: SP.sm }]}>
           <View style={s.alertRow}>
-            <Feather name="eye" size={19} color={PURPLE} style={{ width: 28 }} />
+            <Feather name="eye" size={19} color={colors.primary} style={{ width: 28 }} />
             <View style={{ flex: 1 }}>
               <Text style={s.alertLabel}>Shopping activity</Text>
               <Text style={s.alertSub}>Let brands see what you've viewed and saved</Text>
@@ -215,13 +220,13 @@ export default function ShoppingPreferences() {
             <Switch
               value={Boolean(settings.showShoppingActivity)}
               onValueChange={v => { Haptics.selectionAsync(); patch({ showShoppingActivity: v }); }}
-              trackColor={{ false: '#333344', true: PURPLE }}
+              trackColor={{ false: '#333344', true: colors.primary }}
               thumbColor="#fff"
             />
           </View>
           <View style={s.divider} />
           <View style={s.alertRow}>
-            <Feather name="sliders" size={19} color={PURPLE} style={{ width: 28 }} />
+            <Feather name="sliders" size={19} color={colors.primary} style={{ width: 28 }} />
             <View style={{ flex: 1 }}>
               <Text style={s.alertLabel}>Personalized recommendations</Text>
               <Text style={s.alertSub}>Use your activity to surface relevant products</Text>
@@ -229,7 +234,7 @@ export default function ShoppingPreferences() {
             <Switch
               value={Boolean(settings.personalizedRecommendations)}
               onValueChange={v => { Haptics.selectionAsync(); patch({ personalizedRecommendations: v }); }}
-              trackColor={{ false: '#333344', true: PURPLE }}
+              trackColor={{ false: '#333344', true: colors.primary }}
               thumbColor="#fff"
             />
           </View>
@@ -248,7 +253,7 @@ export default function ShoppingPreferences() {
   );
 }
 
-const s = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   page: { flex: 1, backgroundColor: BG },
   header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
@@ -265,24 +270,24 @@ const s = StyleSheet.create({
   sizeLabel: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED, marginBottom: 10 },
   sizeRow: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   sizeBubble: { minWidth: 44, height: 36, borderRadius: RADIUS.md, backgroundColor: BG, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 },
-  sizeBubbleActive: { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
+  sizeBubbleActive: { backgroundColor: colors.accent, borderColor: colors.primary },
   sizeBubbleText: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
-  sizeBubbleTextActive: { color: PURPLE },
+  sizeBubbleTextActive: { color: colors.primary },
 
   // Fit
   fitRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: 14, gap: 12 },
-  fitRadio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: PURPLE, alignItems: 'center', justifyContent: 'center' },
-  fitRadioFill: { width: 10, height: 10, borderRadius: 5, backgroundColor: PURPLE },
+  fitRadio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  fitRadioFill: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.primary },
   fitLabel: { fontFamily: FONT.medium, fontSize: FS.base, color: FG },
   fitDesc: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },
 
   // Categories
   catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   catChip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: RADIUS.pill, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
-  catChipActive: { backgroundColor: PURPLE_DIM, borderColor: BORDER_ACTIVE },
+  catChipActive: { backgroundColor: colors.accent, borderColor: colors.primary },
   catEmoji: { fontSize: 14 },
   catLabel: { fontFamily: FONT.medium, fontSize: FS.sm, color: MUTED },
-  catLabelActive: { color: PURPLE },
+  catLabelActive: { color: colors.primary },
 
   // Alerts
   alertRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: 14, gap: 12 },

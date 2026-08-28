@@ -3,6 +3,7 @@
  * Route: /boost?targetType=post|product&targetId=<uuid>
  */
 import React, { useState, useEffect, useCallback } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
   Alert, ActivityIndicator,
@@ -50,6 +51,7 @@ function daysRemaining(endsAt: string): number {
 }
 
 export default function BoostScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
   const api     = useApi();

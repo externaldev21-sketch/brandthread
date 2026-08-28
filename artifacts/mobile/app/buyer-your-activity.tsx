@@ -10,14 +10,15 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM,
-  CYAN, ORANGE,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE, ORANGE,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getMyPosts, getSavedItems, getMyReposts } from '@/services/socialService';
 
 // Simple inline bar chart using plain Views — no chart library
 function BarChart({ data, maxVal }: { data: number[]; maxVal: number }) {
+  const { theme } = useAppTheme();
   const days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, height: 88, paddingTop: 8 }}>
@@ -30,11 +31,11 @@ function BarChart({ data, maxVal }: { data: number[]; maxVal: number }) {
               style={{
                 height: h,
                 borderRadius: 4,
-                backgroundColor: isToday ? PURPLE : PURPLE_DIM,
+                backgroundColor: isToday ? theme.accent : theme.accentDim,
                 width: '100%',
               }}
             />
-            <Text style={{ fontFamily: FONT.regular, fontSize: 10, color: isToday ? PURPLE : MUTED }}>
+            <Text style={{ fontFamily: FONT.regular, fontSize: 10, color: isToday ? theme.accent : MUTED }}>
               {days[i]}
             </Text>
           </View>
@@ -45,6 +46,11 @@ function BarChart({ data, maxVal }: { data: number[]; maxVal: number }) {
 }
 
 export default function BuyerYourActivity() {
+  const { theme } = useAppTheme();
+  const PURPLE = theme.accent;
+  const PURPLE_DIM = theme.accentDim;
+  const CYAN = theme.accentLight;
+  const s = makeStyles();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [postCount, setPostCount] = useState(0);
@@ -119,7 +125,7 @@ export default function BuyerYourActivity() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = () => StyleSheet.create({
   page: { flex: 1, backgroundColor: BG },
   header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },

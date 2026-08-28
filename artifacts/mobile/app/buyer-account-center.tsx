@@ -1,4 +1,5 @@
 import React from 'react';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -29,6 +30,7 @@ const ROWS: Row[] = [
 ];
 
 export default function BuyerAccountCenter() {
+  const { theme } = useAppTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -44,8 +46,8 @@ export default function BuyerAccountCenter() {
 
       <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + 40 }}>
         {/* Hero */}
-        <LinearGradient colors={['rgba(139,92,246,0.15)', 'rgba(34,211,238,0.06)']} style={s.hero}>
-          <View style={s.logo}>
+        <LinearGradient colors={[theme.accentDim, theme.secondaryDim]} style={s.hero}>
+          <View style={[s.logo, { backgroundColor: theme.accent }]}>
             <Text style={s.logoText}>B</Text>
           </View>
           <View style={{ flex: 1 }}>
@@ -63,7 +65,7 @@ export default function BuyerAccountCenter() {
               activeOpacity={0.7}
               onPress={() => row.route && router.push(row.route as never)}
             >
-              <Feather name={row.icon} size={19} color={PURPLE} />
+              <Feather name={row.icon} size={19} color={theme.accent} />
               <View style={{ flex: 1 }}>
                 <Text style={s.label}>{row.label}</Text>
                 <Text style={s.sub}>{row.sub}</Text>

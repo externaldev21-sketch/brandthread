@@ -26,6 +26,7 @@ import aiRouter from "./ai";
 // New: buyer-facing, public browsing, Stripe Connect, webhooks
 import publicRouter from "./public";
 import buyerRouter from "./buyer";
+import guestCheckoutRouter from "./guest-checkout";
 import connectRouter from "./connect";
 import subscriptionRouter from "./subscription";
 import webhooksRouter from "./webhooks";
@@ -79,6 +80,7 @@ const router = Router();
 
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
 router.use("/public",          publicRouter);
+router.use("/guest/checkout",  guestCheckoutRouter);
 router.use("/webhooks",        webhooksRouter);
 router.use("/support",         supportRouter);
 router.use("/support-chat",    supportChatRouter);

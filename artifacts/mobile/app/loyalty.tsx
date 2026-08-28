@@ -14,9 +14,10 @@ import * as Haptics from 'expo-haptics';
 import { useApi } from '@/hooks/useApi';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, SUCCESS, SUCCESS_DIM,
-  ORANGE, RED, GOLD, FONT, FS, SP, RADIUS, ICON,
+  SUCCESS, SUCCESS_DIM,
+  ORANGE, GOLD, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 type PointEntry = {
   id: string;
@@ -27,16 +28,6 @@ type PointEntry = {
   createdAt: string;
 };
 
-const SOURCE_META: Record<string, { icon: string; label: string; color: string }> = {
-  purchase:   { icon: 'shopping-bag', label: 'Purchase',  color: PURPLE_LIGHT },
-  order_earn: { icon: 'shopping-bag', label: 'Purchase',  color: PURPLE_LIGHT },
-  referral:   { icon: 'users',        label: 'Referral',  color: CYAN         },
-  signup:     { icon: 'gift',         label: 'Welcome',   color: GOLD         },
-  bonus:      { icon: 'star',         label: 'Bonus',     color: GOLD         },
-  redemption: { icon: 'tag',          label: 'Redeemed',  color: ORANGE       },
-  purchase_reversal: { icon: 'corner-up-left', label: 'Purchase refunded', color: ORANGE },
-};
-
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
@@ -45,6 +36,16 @@ export default function LoyaltyScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api    = useApi();
+  const { theme } = useAppTheme();
+  const sourceMeta: Record<string, { icon: string; label: string; color: string }> = {
+    purchase: { icon: 'shopping-bag', label: 'Purchase', color: theme.accentLight },
+    order_earn: { icon: 'shopping-bag', label: 'Purchase', color: theme.accentLight },
+    referral: { icon: 'users', label: 'Referral', color: theme.secondary },
+    signup: { icon: 'gift', label: 'Welcome', color: GOLD },
+    bonus: { icon: 'star', label: 'Bonus', color: GOLD },
+    redemption: { icon: 'tag', label: 'Redeemed', color: ORANGE },
+    purchase_reversal: { icon: 'corner-up-left', label: 'Purchase refunded', color: ORANGE },
+  };
 
   const [loading,    setLoading]    = useState(true);
   const [balance,    setBalance]    = useState(0);
@@ -85,7 +86,7 @@ export default function LoyaltyScreen() {
   if (loading) {
     return (
       <View style={[s.root, { alignItems: 'center', justifyContent: 'center', paddingTop: insets.top }]}>
-        <ActivityIndicator color={PURPLE} />
+        <ActivityIndicator color={theme.accent} />
       </View>
     );
   }
@@ -104,13 +105,13 @@ export default function LoyaltyScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
 
         {/* Balance hero */}
-        <View style={s.heroCard}>
-          <Text style={s.heroLabel}>YOUR BALANCE</Text>
+        <View style={[s.heroCard, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
+          <Text style={[s.heroLabel, { color: theme.accentLight }]}>YOUR BALANCE</Text>
           <Text style={s.heroBalance}>{balance.toLocaleString()}</Text>
-          <Text style={s.heroUnit}>points</Text>
+          <Text style={[s.heroUnit, { color: theme.accentLight }]}>points</Text>
           {balance > 0 && (
-            <View style={s.heroValuePill}>
-              <Text style={s.heroValueText}>≈ ${(valueCents / 100).toFixed(2)} off your next order</Text>
+            <View style={[s.heroValuePill, { backgroundColor: theme.accentDim }]}>
+              <Text style={[s.heroValueText, { color: theme.accentLight }]}>≈ ${(valueCents / 100).toFixed(2)} off your next order</Text>
             </View>
           )}
           {balance === 0 && (
@@ -154,7 +155,7 @@ export default function LoyaltyScreen() {
             )}
           </View>
           <TouchableOpacity
-            style={[s.redeemBtn, (redeeming || balance < 100) && { opacity: 0.5 }]}
+            style={[s.redeemBtn, { backgroundColor: theme.accent }, (redeeming || balance < 100) && { opacity: 0.5 }]}
             onPress={handleRedeem}
             disabled={redeeming || balance < 100}
             activeOpacity={0.85}
@@ -175,11 +176,11 @@ export default function LoyaltyScreen() {
           <>
             <Text style={[s.sectionLabel, { marginTop: SP.lg }]}>POINTS HISTORY</Text>
             {history.map(entry => {
-              const meta = SOURCE_META[entry.source] ?? { icon: 'circle', label: entry.source, color: MUTED };
+              const meta = sourceMeta[entry.source] ?? { icon: 'circle', label: entry.source, color: MUTED };
               const isPositive = entry.points > 0;
               return (
                 <View key={entry.id} style={s.historyRow}>
-                  <View style={[s.historyIcon, { backgroundColor: isPositive ? PURPLE_DIM : 'rgba(249,115,22,0.1)' }]}>
+                  <View style={[s.historyIcon, { backgroundColor: isPositive ? theme.accentDim : 'rgba(249,115,22,0.1)' }]}>
                     <Feather name={meta.icon as any} size={14} color={meta.color} />
                   </View>
                   <View style={{ flex: 1 }}>
@@ -216,12 +217,12 @@ const s = StyleSheet.create({
   headerBack: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle:{ fontSize: FS.md, fontFamily: FONT.bold, color: FG },
 
-  heroCard:       { margin: SP.md, padding: SP.xl, backgroundColor: PURPLE_DIM, borderWidth: 1, borderColor: PURPLE, borderRadius: RADIUS.xl, alignItems: 'center' },
-  heroLabel:      { fontSize: FS.xs, fontFamily: FONT.semibold, color: PURPLE_LIGHT, letterSpacing: 2, textTransform: 'uppercase', marginBottom: SP.xs },
+  heroCard:       { margin: SP.md, padding: SP.xl, borderWidth: 1, borderRadius: RADIUS.xl, alignItems: 'center' },
+  heroLabel:      { fontSize: FS.xs, fontFamily: FONT.semibold, letterSpacing: 2, textTransform: 'uppercase', marginBottom: SP.xs },
   heroBalance:    { fontSize: 64, fontFamily: FONT.bold, color: FG, lineHeight: 72 },
-  heroUnit:       { fontSize: FS.base, fontFamily: FONT.medium, color: PURPLE_LIGHT, marginBottom: SP.sm },
-  heroValuePill:  { backgroundColor: 'rgba(139,92,246,0.2)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6, marginTop: SP.xs },
-  heroValueText:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
+  heroUnit:       { fontSize: FS.base, fontFamily: FONT.medium, marginBottom: SP.sm },
+  heroValuePill:  { borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6, marginTop: SP.xs },
+  heroValueText:  { fontSize: FS.sm, fontFamily: FONT.semibold },
   heroEmpty:      { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 18 },
 
   sectionLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, letterSpacing: 1, textTransform: 'uppercase', marginHorizontal: SP.md, marginTop: SP.xs, marginBottom: SP.xs },
@@ -237,7 +238,7 @@ const s = StyleSheet.create({
   redeemInput:        { flex: 1, backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm, paddingHorizontal: SP.sm, paddingVertical: 12, color: FG, fontFamily: FONT.regular, fontSize: FS.base },
   discountPreview:    { backgroundColor: SUCCESS_DIM, borderRadius: RADIUS.sm, paddingHorizontal: 10, paddingVertical: 8 },
   discountPreviewText:{ fontSize: FS.sm, fontFamily: FONT.bold, color: SUCCESS },
-  redeemBtn:          { backgroundColor: PURPLE, borderRadius: RADIUS.sm, alignItems: 'center', paddingVertical: 14 },
+  redeemBtn:          { borderRadius: RADIUS.sm, alignItems: 'center', paddingVertical: 14 },
   redeemBtnText:      { fontSize: FS.base, fontFamily: FONT.bold, color: '#fff' },
   redeemDisabledNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', marginTop: SP.xs },
 

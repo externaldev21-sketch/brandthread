@@ -38,6 +38,7 @@ import {
   BG, CARD, BORDER, FG, MUTED, PURPLE, CYAN, SUCCESS, ORANGE,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 // ─── Local palette constants ──────────────────────────────────────────────────
 // (plans.tsx predates the theme migration; keep these local so the screen is
@@ -131,6 +132,9 @@ const STAGE_TO_PLAN: Record<string, PlanDef['id']> = {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function PlansScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
   const insets    = useSafeAreaInsets();
   const router    = useRouter();
   const api       = useApi();
@@ -459,7 +463,9 @@ function capitalize(s: string) { return s ? s.charAt(0).toUpperCase() + s.slice(
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG },
 
   // Header
@@ -557,4 +563,5 @@ const styles = StyleSheet.create({
   awaitRoot: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', gap: 20, padding: 40 },
   awaitTitle: { fontSize: FS.xl, fontFamily: FONT.semibold, color: FG, textAlign: 'center' },
   awaitSub:   { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' },
-});
+  });
+};

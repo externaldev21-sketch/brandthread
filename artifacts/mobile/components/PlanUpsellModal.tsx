@@ -22,10 +22,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM, SUCCESS, SUCCESS_DIM,
-  CYAN, CYAN_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, GOLD,
+  PURPLE, PURPLE_DIM, SUCCESS, SUCCESS_DIM,
+  BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, GOLD,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 interface Props {
   visible: boolean;
@@ -138,6 +139,7 @@ export default function PlanUpsellModal({
   featureName,
   requiredPlan = 'growth',
 }: Props) {
+  const { theme } = useAppTheme();
   const planLabel = requiredPlan === 'pro' ? 'Pro' : 'Growth';
   const planPrice = requiredPlan === 'pro' ? '$79' : '$29';
 
@@ -169,7 +171,7 @@ export default function PlanUpsellModal({
 
           {/* ── Gradient header ── */}
           <LinearGradient
-            colors={['#3B1FA3', '#6D28D9']}
+            colors={[theme.accent, theme.accentLight]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={s.header}
@@ -180,8 +182,8 @@ export default function PlanUpsellModal({
             </TouchableOpacity>
 
             {/* Lock icon */}
-            <View style={s.lockCircle}>
-              <Feather name="lock" size={24} color={PURPLE_LIGHT} />
+            <View style={[s.lockCircle, { backgroundColor: theme.accentDim }]}>
+              <Feather name="lock" size={24} color={theme.accentLight} />
             </View>
 
             <Text style={s.headerTitle}>Upgrade to {planLabel}</Text>
@@ -209,7 +211,7 @@ export default function PlanUpsellModal({
                   return (
                     <View
                       key={tool.id}
-                      style={[s.toolRow, isTapped && s.toolRowHighlighted]}
+                      style={[s.toolRow, isTapped && { backgroundColor: theme.accentDim, borderColor: `${theme.accent}40` }]}
                     >
                       {/* Colored icon */}
                       <View style={[s.toolIconBg, { backgroundColor: tool.accentDim }]}>
@@ -221,8 +223,8 @@ export default function PlanUpsellModal({
                         <View style={s.toolTitleRow}>
                           <Text style={s.toolTitle}>{tool.title}</Text>
                           {isTapped && (
-                            <View style={s.tappedBadge}>
-                              <Text style={s.tappedBadgeText}>You tapped this</Text>
+                            <View style={[s.tappedBadge, { backgroundColor: `${theme.accent}30` }]}>
+                              <Text style={[s.tappedBadgeText, { color: theme.accentLight }]}>You tapped this</Text>
                             </View>
                           )}
                         </View>
@@ -261,7 +263,7 @@ export default function PlanUpsellModal({
             )}
 
             {/* ── CTA ── */}
-            <TouchableOpacity style={s.upgradeBtn} onPress={handleUpgrade} activeOpacity={0.85}>
+            <TouchableOpacity style={[s.upgradeBtn, { backgroundColor: theme.accent }]} onPress={handleUpgrade} activeOpacity={0.85}>
               <Feather name="zap" size={16} color="#FFF" />
               <Text style={s.upgradeBtnText}>Upgrade to {planLabel} — {planPrice}/mo</Text>
             </TouchableOpacity>
@@ -312,7 +314,6 @@ const s = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: 'rgba(139,92,246,0.25)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SP.md,
@@ -364,11 +365,6 @@ const s = StyleSheet.create({
     paddingHorizontal: SP.xs,
     borderRadius: RADIUS.sm,
   },
-  toolRowHighlighted: {
-    backgroundColor: `${PURPLE}18`,
-    borderWidth: 1,
-    borderColor: `${PURPLE}40`,
-  },
   toolIconBg: {
     width: 36,
     height: 36,
@@ -393,13 +389,11 @@ const s = StyleSheet.create({
     fontFamily: FONT.semibold,
   },
   tappedBadge: {
-    backgroundColor: `${PURPLE}30`,
     borderRadius: RADIUS.xs,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
   tappedBadgeText: {
-    color: PURPLE_LIGHT,
     fontSize: 10,
     fontFamily: FONT.medium,
   },
@@ -447,7 +441,6 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: SP.sm,
-    backgroundColor: PURPLE,
     borderRadius: RADIUS.md,
     paddingVertical: SP.md,
     marginTop: SP.lg,

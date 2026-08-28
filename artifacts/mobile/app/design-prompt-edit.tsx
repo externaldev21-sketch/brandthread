@@ -3,6 +3,7 @@
  * Route: /design-prompt-edit
  */
 import React, { useState } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Switch, Alert, ActivityIndicator, Image,
@@ -46,6 +47,7 @@ const RECENT_PROJECTS = [
 const CARD_ELEVATED_HEX = '#18182E';
 
 export default function DesignPromptEditScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [prompt, setPrompt] = useState('');

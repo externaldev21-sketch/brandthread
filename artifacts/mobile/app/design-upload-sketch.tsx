@@ -3,6 +3,7 @@
  * Route: /design-upload-sketch
  */
 import React, { useState, useEffect, useRef } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, ActivityIndicator, Alert, Image, Animated, Dimensions,
@@ -47,6 +48,7 @@ const GRAD_PALETTES: Record<number, readonly [string, string]> = {
 };
 
 export default function UploadSketchScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const [step, setStep] = useState<Step>('upload');
   const [sketchUri, setSketchUri] = useState<string | null>(null);

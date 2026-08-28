@@ -12,39 +12,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/api';
 import {
-  BG, CARD, BORDER, FG, MUTED, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, FONT, FS, SP, RADIUS, ICON,
+  BG, CARD, BORDER, FG, MUTED, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 
 type AccountType = 'seller' | 'buyer';
 
-const ACCOUNT_INFO: Record<AccountType, { icon: keyof typeof Feather.glyphMap; color: string; title: string; bullets: string[] }> = {
-  seller: {
-    icon: 'shopping-bag',
-    color: PURPLE,
-    title: 'Seller',
-    bullets: [
-      'List products and collections',
-      'Receive orders and payments',
-      'Access analytics and insights',
-      'Design studio and AI tools',
-      'Brand storefront',
-    ],
-  },
-  buyer: {
-    icon: 'user',
-    color: CYAN,
-    title: 'Buyer',
-    bullets: [
-      'Browse seller storefronts',
-      'Purchase products',
-      'Follow sellers and friends',
-      'Save and share items',
-    ],
-  },
-};
-
 export default function AccountTypeSettingsScreen() {
+  const colors = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
@@ -54,6 +29,20 @@ export default function AccountTypeSettingsScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const accountInfo: Record<AccountType, { icon: keyof typeof Feather.glyphMap; color: string; title: string; bullets: string[] }> = {
+    seller: {
+      icon: 'shopping-bag',
+      color: colors.primary,
+      title: 'Seller',
+      bullets: ['List products and collections', 'Receive orders and payments', 'Access analytics and insights', 'Design studio and AI tools', 'Brand storefront'],
+    },
+    buyer: {
+      icon: 'user',
+      color: colors.accentForeground,
+      title: 'Buyer',
+      bullets: ['Browse seller storefronts', 'Purchase products', 'Follow sellers and friends', 'Save and share items'],
+    },
+  };
 
   function fetchProfile() {
     setLoading(true);
@@ -80,7 +69,7 @@ export default function AccountTypeSettingsScreen() {
     if (!selectedType || !isDirty) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert(
-      `Switch to ${ACCOUNT_INFO[selectedType].title}?`,
+      `Switch to ${accountInfo[selectedType].title}?`,
       'Switching account type will change the features available to you. You can switch back at any time.',
       [
         { text: 'Cancel', style: 'cancel' },
@@ -93,7 +82,7 @@ export default function AccountTypeSettingsScreen() {
               setCurrentType(selectedType);
               Alert.alert(
                 'Account type updated',
-                `You are now a ${ACCOUNT_INFO[selectedType].title}. Restart the app to apply all changes.`,
+                `You are now a ${accountInfo[selectedType].title}. Restart the app to apply all changes.`,
                 [{ text: 'OK', onPress: () => router.back() }],
               );
             } catch {
@@ -120,21 +109,21 @@ export default function AccountTypeSettingsScreen() {
 
       {loading ? (
         <View style={s.loadingWrap}>
-          <ActivityIndicator color={PURPLE} />
+          <ActivityIndicator color={colors.primary} />
         </View>
       ) : loadError ? (
         /* Do NOT silently open with a seller default — show retryable error */
         <View style={s.errorWrap}>
-          <Feather name="alert-circle" size={36} color={PURPLE} style={{ marginBottom: 12 }} />
+          <Feather name="alert-circle" size={36} color={colors.primary} style={{ marginBottom: 12 }} />
           <Text style={s.errorTitle}>Couldn't load account type</Text>
           <Text style={s.errorBody}>{loadError}</Text>
           <TouchableOpacity
-            style={s.retryBtn}
+            style={[s.retryBtn, { backgroundColor: colors.primary }]}
             activeOpacity={0.8}
             onPress={() => fetchProfile()}
           >
-            <Feather name="refresh-cw" size={14} color="#fff" style={{ marginRight: 6 }} />
-            <Text style={s.retryBtnText}>Try again</Text>
+            <Feather name="refresh-cw" size={14} color={colors.primaryForeground} style={{ marginRight: 6 }} />
+            <Text style={[s.retryBtnText, { color: colors.primaryForeground }]}>Try again</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -143,9 +132,9 @@ export default function AccountTypeSettingsScreen() {
           {/* Current badge */}
           {currentType && (
             <View style={s.currentBadge}>
-              <Feather name={ACCOUNT_INFO[currentType].icon} size={ICON.sm} color={ACCOUNT_INFO[currentType].color} />
-              <Text style={[s.currentBadgeText, { color: ACCOUNT_INFO[currentType].color }]}>
-                Current: {ACCOUNT_INFO[currentType].title}
+              <Feather name={accountInfo[currentType].icon} size={ICON.sm} color={accountInfo[currentType].color} />
+              <Text style={[s.currentBadgeText, { color: accountInfo[currentType].color }]}>
+                Current: {accountInfo[currentType].title}
               </Text>
             </View>
           )}
@@ -154,7 +143,7 @@ export default function AccountTypeSettingsScreen() {
 
           {/* Type cards */}
           {(['seller', 'buyer'] as AccountType[]).map((type) => {
-            const info = ACCOUNT_INFO[type];
+            const info = accountInfo[type];
             const isSelected = selectedType === type;
             const isCurrent = currentType === type;
             return (
@@ -192,16 +181,16 @@ export default function AccountTypeSettingsScreen() {
 
           {/* Save button */}
           <TouchableOpacity
-            style={[s.saveBtn, !isDirty && s.saveBtnDisabled]}
+            style={[s.saveBtn, { backgroundColor: colors.primary }, !isDirty && s.saveBtnDisabled]}
             activeOpacity={0.85}
             disabled={!isDirty || saving}
             onPress={handleSave}
           >
             {saving ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator color={colors.primaryForeground} />
             ) : (
-              <Text style={[s.saveBtnText, !isDirty && { color: MUTED }]}>
-                {isDirty ? `Switch to ${selectedType ? ACCOUNT_INFO[selectedType].title : ''}` : 'No changes'}
+              <Text style={[s.saveBtnText, { color: colors.primaryForeground }, !isDirty && { color: MUTED }]}>
+                {isDirty ? `Switch to ${selectedType ? accountInfo[selectedType].title : ''}` : 'No changes'}
               </Text>
             )}
           </TouchableOpacity>
@@ -226,8 +215,8 @@ const s = StyleSheet.create({
   errorWrap:  { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl },
   errorTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG, marginBottom: SP.sm, textAlign: 'center' },
   errorBody:  { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20, marginBottom: SP.lg },
-  retryBtn:   { flexDirection: 'row', alignItems: 'center', backgroundColor: PURPLE, borderRadius: RADIUS.md, paddingVertical: 12, paddingHorizontal: SP.lg },
-  retryBtnText: { fontSize: FS.sm, fontFamily: FONT.bold, color: '#fff' },
+  retryBtn:   { flexDirection: 'row', alignItems: 'center', borderRadius: RADIUS.md, paddingVertical: 12, paddingHorizontal: SP.lg },
+  retryBtnText: { fontSize: FS.sm, fontFamily: FONT.bold },
 
   currentBadge:    { flexDirection: 'row', alignItems: 'center', gap: SP.xs, backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, paddingHorizontal: SP.sm, paddingVertical: SP.xs, alignSelf: 'flex-start', marginBottom: SP.md },
   currentBadgeText:{ fontSize: FS.sm, fontFamily: FONT.semibold },
@@ -245,9 +234,9 @@ const s = StyleSheet.create({
   bulletRow:       { flexDirection: 'row', alignItems: 'flex-start' },
   bulletText:      { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, flex: 1 },
 
-  saveBtn:        { backgroundColor: PURPLE, borderRadius: RADIUS.md, paddingVertical: 14, alignItems: 'center', marginTop: SP.md },
+  saveBtn:        { borderRadius: RADIUS.md, paddingVertical: 14, alignItems: 'center', marginTop: SP.md },
   saveBtnDisabled:{ backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
-  saveBtnText:    { fontSize: FS.base, fontFamily: FONT.bold, color: '#fff' },
+  saveBtnText:    { fontSize: FS.base, fontFamily: FONT.bold },
 
   disclaimer: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', marginTop: SP.md, lineHeight: 18 },
 });

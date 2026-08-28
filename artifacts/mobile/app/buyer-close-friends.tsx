@@ -11,13 +11,18 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, ON_DARK,
-  FONT, FS, SP, RADIUS, GRAD_PRIMARY,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK,
+  FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getAcceptedFriends, getCloseFriendIds, saveCloseFriendIds } from '@/services/socialService';
 import type { Friendship } from '@/services/socialTypes';
 
 export default function BuyerCloseFriends() {
+  const { theme } = useAppTheme();
+  const PURPLE = theme.accent;
+  const GRAD_PRIMARY = [theme.accent, theme.accentLight] as const;
+  const s = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [friends, setFriends] = useState<Friendship[]>([]);
@@ -137,23 +142,23 @@ export default function BuyerCloseFriends() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.create({
   page: { flex: 1, backgroundColor: BG },
   header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   title: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },
-  banner: { flexDirection: 'row', gap: 10, padding: SP.md, backgroundColor: 'rgba(139,92,246,0.08)', borderBottomWidth: 1, borderBottomColor: BORDER, alignItems: 'flex-start' },
+  banner: { flexDirection: 'row', gap: 10, padding: SP.md, backgroundColor: theme.accentDim, borderBottomWidth: 1, borderBottomColor: BORDER, alignItems: 'flex-start' },
   bannerText: { flex: 1, fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, lineHeight: 17 },
   searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, margin: SP.md, paddingHorizontal: SP.md, height: 40, backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER },
   searchInput: { flex: 1, color: FG, fontFamily: FONT.regular, fontSize: FS.base },
-  countBadge: { fontFamily: FONT.medium, fontSize: FS.xs, color: PURPLE, paddingHorizontal: SP.md, marginBottom: SP.xs },
+  countBadge: { fontFamily: FONT.medium, fontSize: FS.xs, color: theme.accent, paddingHorizontal: SP.md, marginBottom: SP.xs },
   row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: 12, gap: 12 },
   avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: ON_DARK },
   name: { fontFamily: FONT.semibold, fontSize: FS.base, color: FG },
   handle: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, marginTop: 2 },
   radio: { width: 28, height: 28, borderRadius: 14, borderWidth: 2, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  radioActive: { backgroundColor: PURPLE, borderColor: PURPLE },
+  radioActive: { backgroundColor: theme.accent, borderColor: theme.accent },
   separator: { height: 1, backgroundColor: BORDER, marginLeft: 68 },
   empty: { alignItems: 'center', paddingVertical: SP.xxl, gap: SP.sm },
   emptyTitle: { fontFamily: FONT.semibold, fontSize: FS.md, color: FG },

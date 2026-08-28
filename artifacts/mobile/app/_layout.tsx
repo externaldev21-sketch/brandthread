@@ -196,6 +196,11 @@ function AuthGate() {
     const inInvite        = (segments[0] as string) === 'team-invite';
     const inProtectedArea = !inAuthScreen && !inOnboarding && !inAccountType && !inInvite;
 
+    // Allow public access to specific buyer routes for guests
+    const isGuestAllowedRoute =
+      (inBuyerGroup && ['discover', 'search', 'cart'].includes(segments[1] as string)) ||
+      ['buyer-product-detail', 'buyer-checkout'].includes(segments[0] as string);
+
     // DEV bypass (all platforms): skip auth and go straight to dashboard.
     const devRole = PREVIEW_ROLE ?? DEV_BYPASS_ROLE;
     if (devRole) {
@@ -209,11 +214,11 @@ function AuthGate() {
     if (splashSeen === null) return; // still reading AsyncStorage
 
     // Unauthenticated: show splash first time, then sign-in
-    if (!isSignedIn && inProtectedArea) {
+    if (!isSignedIn && inProtectedArea && !isGuestAllowedRoute) {
       router.replace(splashSeen ? '/sign-in' : '/splash');
       return;
     }
-    if (!isSignedIn) return; // stay on auth screen
+    if (!isSignedIn) return; // stay on auth screen or guest-allowed route
 
     if (!onboardingChecked) return; // AsyncStorage still loading — prevent loops
 
@@ -495,6 +500,7 @@ function RootLayoutNav() {
         <Stack.Screen name="buyer-muted"               options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-restricted"          options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-settings"        options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="buyer-addresses"       options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="app-theme"             options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-settings-detail" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-account-center"  options={{ headerShown: false, animation: 'slide_from_right' }} />

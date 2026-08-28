@@ -4,7 +4,8 @@ import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, PURPLE, ON_DARK, FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, ON_DARK, FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BuyerSettingsState, loadBuyerSettings, patchBuyerSettings } from '@/lib/buyerSettings';
 
 type ToggleKey = keyof { [K in keyof BuyerSettingsState as BuyerSettingsState[K] extends boolean ? K : never]: true };
@@ -41,6 +42,9 @@ const CONFIG: Record<string, Config> = {
 };
 
 export default function BuyerSettingsDetail() {
+  const { theme } = useAppTheme();
+  const PURPLE = theme.accent;
+  const styles = makeStyles();
   const { section = 'content' } = useLocalSearchParams<{ section?: string }>();
   const router = useRouter(); const insets = useSafeAreaInsets();
   const [settings, setSettings] = useState<BuyerSettingsState | null>(null);
@@ -61,4 +65,4 @@ export default function BuyerSettingsDetail() {
     </ScrollView>
   </View>;
 }
-const styles = StyleSheet.create({ page:{flex:1,backgroundColor:BG}, header:{height:58,flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:SP.md,borderBottomWidth:1,borderBottomColor:BORDER},back:{width:40,height:40,alignItems:'center',justifyContent:'center'},title:{color:FG,fontFamily:FONT.bold,fontSize:FS.md},intro:{color:MUTED,fontFamily:FONT.regular,fontSize:13,lineHeight:19,marginBottom:SP.md},card:{backgroundColor:CARD,borderWidth:1,borderColor:BORDER,borderRadius:RADIUS.lg,overflow:'hidden'},row:{minHeight:60,paddingHorizontal:14,paddingVertical:12,flexDirection:'row',alignItems:'center',gap:10},divider:{borderBottomWidth:1,borderBottomColor:BORDER},itemIcon:{width:28,alignItems:'center'},label:{color:FG,fontFamily:FONT.medium,fontSize:14},sub:{color:MUTED,fontFamily:FONT.regular,fontSize:11.5,marginTop:3,lineHeight:16},value:{color:MUTED,fontFamily:FONT.regular,fontSize:12,textTransform:'capitalize',maxWidth:110},});
+const makeStyles = () => StyleSheet.create({ page:{flex:1,backgroundColor:BG}, header:{height:58,flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:SP.md,borderBottomWidth:1,borderBottomColor:BORDER},back:{width:40,height:40,alignItems:'center',justifyContent:'center'},title:{color:FG,fontFamily:FONT.bold,fontSize:FS.md},intro:{color:MUTED,fontFamily:FONT.regular,fontSize:13,lineHeight:19,marginBottom:SP.md},card:{backgroundColor:CARD,borderWidth:1,borderColor:BORDER,borderRadius:RADIUS.lg,overflow:'hidden'},row:{minHeight:60,paddingHorizontal:14,paddingVertical:12,flexDirection:'row',alignItems:'center',gap:10},divider:{borderBottomWidth:1,borderBottomColor:BORDER},itemIcon:{width:28,alignItems:'center'},label:{color:FG,fontFamily:FONT.medium,fontSize:14},sub:{color:MUTED,fontFamily:FONT.regular,fontSize:11.5,marginTop:3,lineHeight:16},value:{color:MUTED,fontFamily:FONT.regular,fontSize:12,textTransform:'capitalize',maxWidth:110},});

@@ -8,6 +8,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { useColors } from '@/hooks/useColors';
 import {
   FRIENDS, Message,
   getMessages, getUnread, isTyping, markRead, sendMessage, subscribe,
@@ -39,6 +40,7 @@ function Bubble({ msg, prevMsg, isDark, friendColor }: {
   isDark: boolean;
   friendColor: string;
 }) {
+  const colors = useColors();
   const fg       = isDark ? '#F4F4FF' : '#07070F';
   const cardBg   = isDark ? '#1D1A15' : '#EDE7D9';
   const mutedFg  = isDark ? '#8C8577' : '#8080A0';
@@ -64,7 +66,7 @@ function Bubble({ msg, prevMsg, isDark, friendColor }: {
       <View style={[bub.row, isMe ? bub.rowMe : bub.rowThem]}>
         {isMe ? (
           <LinearGradient
-            colors={['#1A0A2E', '#8B5CF6']}
+            colors={[colors.accent, colors.primary]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[bub.bubble, bub.bubbleMe]}
@@ -109,6 +111,7 @@ const bub = StyleSheet.create({
 // ─── Typing indicator ─────────────────────────────────────────────────────────
 
 function TypingIndicator({ isDark }: { isDark: boolean }) {
+  const colors = useColors();
   const [dots, setDots] = useState('•');
   useEffect(() => {
     const id = setInterval(() => setDots(d => d.length >= 3 ? '•' : d + '•'), 400);
@@ -116,7 +119,7 @@ function TypingIndicator({ isDark }: { isDark: boolean }) {
   }, []);
   return (
     <View style={[ty.wrap, { backgroundColor: isDark ? '#1D1A15' : '#EDE7D9' }]}>
-      <Text style={[ty.dots, { color: isDark ? '#A78BFA' : '#8B5CF6' }]}>{dots}</Text>
+      <Text style={[ty.dots, { color: colors.accentForeground }]}>{dots}</Text>
     </View>
   );
 }
@@ -134,6 +137,7 @@ export default function ChatScreen() {
   const isDark  = scheme !== 'light';
   const insets  = useSafeAreaInsets();
   const router  = useRouter();
+  const colors = useColors();
 
   const friend = FRIENDS[id ?? ''];
 
@@ -190,7 +194,7 @@ export default function ChatScreen() {
       {/* Header */}
       <View style={[s.header, { backgroundColor: headerBg, borderBottomColor: border, paddingTop: insets.top + 8 }]}>
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
-          <Feather name="chevron-left" size={26} color={isDark ? '#A78BFA' : '#8B5CF6'} />
+          <Feather name="chevron-left" size={26} color={colors.primary} />
         </TouchableOpacity>
 
         <TouchableOpacity style={s.headerCenter} activeOpacity={0.85}>
@@ -263,7 +267,7 @@ export default function ChatScreen() {
           disabled={!text.trim()}
         >
           <LinearGradient
-            colors={text.trim() ? ['#1A0A2E', '#8B5CF6'] : [isDark ? '#2A261E' : '#E8E1CF', isDark ? '#2A261E' : '#E8E1CF']}
+            colors={text.trim() ? [colors.accent, colors.primary] : [isDark ? '#2A261E' : '#E8E1CF', isDark ? '#2A261E' : '#E8E1CF']}
             style={s.sendBtn}
           >
             <Feather name="send" size={17} color={text.trim() ? '#FFFFFF' : muted} />

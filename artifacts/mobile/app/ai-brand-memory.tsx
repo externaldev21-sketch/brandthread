@@ -3,6 +3,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View,
   Text,
@@ -34,6 +35,7 @@ import {
 const BORDER_COLOR = 'rgba(255,255,255,0.07)';
 
 export default function AiBrandMemoryScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const { getToken } = useAuth();
   const [localMemory, setLocalMemory] = useState<BrandMemory | null>(null);

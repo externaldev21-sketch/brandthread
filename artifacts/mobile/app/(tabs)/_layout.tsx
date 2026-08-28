@@ -11,7 +11,6 @@ import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 
 import {
-  PURPLE,
   BORDER,
   BG,
   MUTED,
@@ -255,7 +254,6 @@ const styles = StyleSheet.create({
     width:           28,
     height:          3,
     borderRadius:    1.5,
-    backgroundColor: PURPLE,
   },
   label: {
     fontSize:   10,
@@ -272,7 +270,6 @@ const styles = StyleSheet.create({
     minWidth:        16,
     height:          16,
     borderRadius:    8,
-    backgroundColor: PURPLE,
     alignItems:      'center',
     justifyContent:  'center',
     paddingHorizontal: 3,

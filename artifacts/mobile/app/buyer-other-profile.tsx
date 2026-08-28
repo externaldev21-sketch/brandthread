@@ -4,14 +4,16 @@ import {
   StyleSheet, Dimensions, Modal, ActivityIndicator,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import {
-  BG, CARD, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, ON_DARK, PURPLE, PURPLE_DIM, RED, OVERLAY,
-  GRAD_PRIMARY, FONT, FS, SP, RADIUS, COMP, ICON,
+  BG, CARD, BORDER,
+  FG, MUTED, SUBTLE, ON_DARK, RED, OVERLAY,
+  FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
 import { PrimaryButton, SecondaryButton } from '@/components/BrandthreadUI';
 import {
@@ -41,6 +43,12 @@ type RemoteProfile = {
 };
 
 export default function BuyerOtherProfileScreen() {
+  const colors = useColors();
+  const { theme } = useAppTheme();
+  const PURPLE = colors.primary, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = colors.accent, CYAN = theme.secondary, CYAN_DIM = theme.secondaryDim;
+  const BORDER_ACTIVE = `${theme.accent}73`;
+  const GRAD_PRIMARY = [theme.accent, theme.secondary] as const;
+  const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router  = useRouter();
   const api     = useApi();
@@ -333,7 +341,10 @@ export default function BuyerOtherProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE = theme.accent, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = theme.accentDim, CYAN = theme.secondary, CYAN_DIM = theme.secondaryDim;
+  const BORDER_ACTIVE = `${theme.accent}73`;
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: BG },
   backBtn: {
     position: 'absolute', left: SP.md, zIndex: 10,
@@ -415,4 +426,5 @@ const styles = StyleSheet.create({
   moreRow: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14 },
   moreRowText: { fontFamily: FONT.medium, fontSize: FS.base, color: FG },
   moreDivider: { height: 1, backgroundColor: BORDER },
-});
+  });
+};

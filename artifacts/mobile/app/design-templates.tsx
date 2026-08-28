@@ -3,6 +3,7 @@
  * Route: /design-templates
  */
 import React, { useState, useMemo } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList,
 } from 'react-native';
@@ -69,6 +70,7 @@ const TEMPLATES: DesignTemplate[] = [
 const CATEGORIES: TemplateCategory[] = ['Garments', 'Social', 'Product', 'Packaging'];
 
 export default function DesignTemplatesScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [search, setSearch] = useState('');

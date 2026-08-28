@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, Image, TouchableOpacity,
   StyleSheet, Alert, TextInput, ActivityIndicator,
@@ -58,6 +59,7 @@ async function resizeToBase64(uri: string, maxPx = 800): Promise<string> {
 }
 
 export default function StoreFromSocialScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const headerTopInset = useHeaderTopInset();
   const api = useApi();

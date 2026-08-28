@@ -10,10 +10,10 @@ import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, PURPLE_LIGHT,
-  CYAN, SUCCESS, ORANGE, BLUE, RED, ON_DARK,
+  FG, MUTED, SUBTLE, SUCCESS, ORANGE, BLUE, RED, ON_DARK,
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   getNotifications, markNotificationRead, markNotificationUnread,
   deleteNotification, muteNotificationCategory, clearAllReadNotifications,
@@ -90,10 +90,10 @@ function notifIcon(type: Notification['type']): string {
   }
 }
 
-function notifIconColor(cat: NotificationCategory): string {
+function notifIconColor(cat: NotificationCategory, accent: string, accentLight: string): string {
   switch (cat) {
-    case 'social': return PURPLE;
-    case 'orders': return CYAN;
+    case 'social': return accent;
+    case 'orders': return accentLight;
     case 'messages': return BLUE;
     case 'seller_updates': return SUCCESS;
     case 'products': return ORANGE;
@@ -173,6 +173,11 @@ type ListItem =
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function BuyerNotifications() {
+  const { theme } = useAppTheme();
+  const PURPLE = theme.accent;
+  const PURPLE_DIM = theme.accentDim;
+  const CYAN = theme.accentLight;
+  const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -282,13 +287,13 @@ export default function BuyerNotifications() {
 
     const { notif } = item;
     const iconName = notifIcon(notif.type);
-    const iconColor = notifIconColor(notif.category);
+    const iconColor = notifIconColor(notif.category, theme.accent, theme.accentLight);
 
     return (
       <TouchableOpacity
         style={[
           styles.notifRow,
-          !notif.isRead && { backgroundColor: 'rgba(139,92,246,0.04)' },
+          !notif.isRead && { backgroundColor: theme.accentDim },
         ]}
         onPress={() => handleTap(notif)}
         onLongPress={() => handleLongPress(notif)}
@@ -420,7 +425,7 @@ export default function BuyerNotifications() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: BG,
@@ -471,7 +476,7 @@ const styles = StyleSheet.create({
     marginBottom: SP.xs,
   },
   unreadBarText: {
-    color: PURPLE,
+    color: theme.accent,
     fontSize: FS.sm,
     fontFamily: FONT.medium,
   },
@@ -543,7 +548,7 @@ const styles = StyleSheet.create({
     fontFamily: FONT.regular,
   },
   notifCta: {
-    color: PURPLE,
+    color: theme.accent,
     fontSize: FS.xs,
     fontFamily: FONT.medium,
   },
@@ -551,7 +556,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: PURPLE,
+    backgroundColor: theme.accent,
     marginTop: SP.xs,
   },
   emptyState: {

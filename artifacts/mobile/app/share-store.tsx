@@ -16,15 +16,7 @@ import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import QRCode from 'react-native-qrcode-svg';
 import { useApi } from '@/lib/api';
-
-const BG       = '#07070F';
-const CARD     = '#0F0F1A';
-const BORDER   = '#1E1E2E';
-const FG       = '#F2F0FF';
-const MUTED    = '#6B6880';
-const PURPLE   = '#8B5CF6';
-const PURPLE_DIM = '#1A1030';
-const PURPLE_LIGHT = '#C4B5FD';
+import { useColors } from '@/hooks/useColors';
 
 const BASE_URL = 'https://brandthread.app/store';
 
@@ -32,6 +24,7 @@ export default function ShareStoreScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api    = useApi();
+  const colors = useColors();
 
   const [copied,    setCopied]    = useState(false);
   const [profile,   setProfile]   = useState<{ username?: string | null; brandName?: string | null; displayName?: string | null } | null>(null);
@@ -73,11 +66,11 @@ export default function ShareStoreScreen() {
   }
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <View style={[s.root, { backgroundColor: colors.background, paddingTop: insets.top }]}>
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()} activeOpacity={0.75}>
-          <Feather name="arrow-left" size={20} color={FG} />
+          <Feather name="arrow-left" size={20} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={s.headerTitle}>Share Store</Text>
         <View style={{ width: 38 }} />
@@ -94,7 +87,7 @@ export default function ShareStoreScreen() {
             </View>
             <View>
               {loading ? (
-                <ActivityIndicator color={PURPLE_LIGHT} size="small" />
+                <ActivityIndicator color={colors.accentForeground} size="small" />
               ) : (
                 <>
                   <Text style={s.storeName} numberOfLines={1}>{brandName}</Text>
@@ -120,7 +113,7 @@ export default function ShareStoreScreen() {
 
         {/* Copy link button */}
         <TouchableOpacity
-          style={[s.copyBtn, copied && s.copyBtnDone]}
+          style={[s.copyBtn, { backgroundColor: copied ? '#22C55E' : colors.primary }]}
           activeOpacity={0.85}
           onPress={copyLink}
         >
@@ -130,7 +123,7 @@ export default function ShareStoreScreen() {
 
         {/* Share button */}
         <TouchableOpacity style={s.shareBtn} activeOpacity={0.8} onPress={shareLink}>
-          <Feather name="share-2" size={17} color={FG} />
+          <Feather name="share-2" size={17} color={colors.foreground} />
           <Text style={s.shareBtnText}>Share via…</Text>
         </TouchableOpacity>
 
@@ -145,28 +138,28 @@ export default function ShareStoreScreen() {
 }
 
 const s = StyleSheet.create({
-  root:        { flex: 1, backgroundColor: BG },
-  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
-  backBtn:     { width: 38, height: 38, borderRadius: 10, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
+  root:        { flex: 1 },
+  header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1 },
+  backBtn:     { width: 38, height: 38, borderRadius: 10, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { fontSize: 16, fontFamily: 'Inter_700Bold' },
 
   body:        { flex: 1, alignItems: 'center', paddingHorizontal: 24, paddingTop: 36 },
 
-  qrCard:      { width: '100%', backgroundColor: CARD, borderRadius: 24, borderWidth: 1, borderColor: BORDER, alignItems: 'center', padding: 28, marginBottom: 20 },
+  qrCard:      { width: '100%', borderRadius: 24, borderWidth: 1, alignItems: 'center', padding: 28, marginBottom: 20 },
   storeBadge:  { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 28, alignSelf: 'flex-start' },
-  storeLogoBox:{ width: 42, height: 42, borderRadius: 12, backgroundColor: PURPLE_DIM, borderWidth: 1, borderColor: PURPLE + '44', alignItems: 'center', justifyContent: 'center' },
-  storeName:   { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG, maxWidth: 180 },
-  storeHandle: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 1 },
+  storeLogoBox:{ width: 42, height: 42, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  storeName:   { fontSize: 15, fontFamily: 'Inter_700Bold', maxWidth: 180 },
+  storeHandle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 1 },
 
   qrWrapper:   { padding: 16, backgroundColor: '#FFFFFF', borderRadius: 16, marginBottom: 20 },
-  urlLabel:    { fontSize: 12, fontFamily: 'Inter_500Medium', color: MUTED, textAlign: 'center' },
+  urlLabel:    { fontSize: 12, fontFamily: 'Inter_500Medium', textAlign: 'center' },
 
-  copyBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', backgroundColor: PURPLE, borderRadius: 16, paddingVertical: 16, marginBottom: 12 },
-  copyBtnDone: { backgroundColor: '#22C55E' },
+  copyBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', borderRadius: 16, paddingVertical: 16, marginBottom: 12 },
+  copyBtnDone: {},
   copyBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#07070F' },
 
-  shareBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, paddingVertical: 16, marginBottom: 24 },
-  shareBtnText:{ fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
+  shareBtn:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%', borderRadius: 16, borderWidth: 1, paddingVertical: 16, marginBottom: 24 },
+  shareBtnText:{ fontSize: 15, fontFamily: 'Inter_600SemiBold' },
 
-  hint:        { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center', lineHeight: 18, paddingHorizontal: 16 },
+  hint:        { fontSize: 12, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 18, paddingHorizontal: 16 },
 });

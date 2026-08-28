@@ -18,6 +18,7 @@ import {
   BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM,
   GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, StatusBadge, SectionHeader,
@@ -43,6 +44,9 @@ function usd(n: number) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function ShippingLabelScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  const s = React.useMemo(() => createStyles(theme), [theme]);
   const { orderId, groupId } = useLocalSearchParams<{ orderId: string; groupId?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -504,7 +508,9 @@ export default function ShippingLabelScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
+const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
+  return StyleSheet.create({
   root:               { flex: 1, backgroundColor: BG },
   centered:           { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: BG },
   errorText:          { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED },
@@ -590,4 +596,5 @@ const s = StyleSheet.create({
   voidedCard:         { alignItems: 'center', gap: SP.md, padding: SP.xl, borderColor: RED + '44' },
   voidedTitle:        { fontSize: FS.xl, fontFamily: FONT.bold, color: RED },
   voidedSub:          { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' },
-});
+  });
+};

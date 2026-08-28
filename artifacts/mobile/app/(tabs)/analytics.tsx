@@ -16,11 +16,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, CYAN_DIM, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
+  FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
   ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
-  GRAD_PRIMARY, FONT, FS,
+  FONT, FS,
 } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 import {
   getOverview, getFilterState, saveFilterState,
   dismissInsight, completeInsight, exportAnalytics,
@@ -80,7 +80,8 @@ function insightBg(type: AnalyticsInsight['type']): string {
   }
 }
 
-function Sparkline({ points, color = PURPLE }: { points: AnalyticsPoint[]; color?: string }) {
+function Sparkline({ points, color }: { points: AnalyticsPoint[]; color?: string }) {
+  const colors = useColors();
   const safePoints = Array.isArray(points) ? points : [];
   if (!safePoints.length) return null;
   const max = Math.max(...safePoints.map(p => p.value), 1);
@@ -92,7 +93,7 @@ function Sparkline({ points, color = PURPLE }: { points: AnalyticsPoint[]; color
           style={{
             flex: 1, borderRadius: 2,
             height: Math.max(3, (p.value / max) * 18),
-            backgroundColor: color,
+            backgroundColor: color ?? colors.primary,
             opacity: 0.55,
           }}
         />
@@ -126,6 +127,7 @@ function MetricCard({ m, width }: { m: AnalyticsMetric; width: number }) {
 }
 
 export default function AnalyticsScreen() {
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
@@ -234,7 +236,7 @@ export default function AnalyticsScreen() {
   if (loading) {
     return (
       <View style={[styles.loadWrap, { paddingTop: topPad + 48 }]}>
-        <ActivityIndicator size="large" color={PURPLE} />
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadText}>Loading analytics…</Text>
       </View>
     );
@@ -249,7 +251,7 @@ export default function AnalyticsScreen() {
       contentContainerStyle={[styles.content, { paddingTop: topPad + 12 }]}
       showsVerticalScrollIndicator={false}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={PURPLE} />
+        <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />
       }
     >
       {/* ── Header ── */}
@@ -260,7 +262,7 @@ export default function AnalyticsScreen() {
         </View>
         <View style={styles.headerActions}>
           <TouchableOpacity onPress={handleExport} style={styles.iconBtn}>
-            <Feather name="share" size={18} color={PURPLE} />
+            <Feather name="share" size={18} color={colors.primary} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => load(true)} style={styles.iconBtn}>
             <Feather name="refresh-cw" size={16} color={MUTED} />
@@ -277,9 +279,9 @@ export default function AnalyticsScreen() {
             <TouchableOpacity
               key={key}
               onPress={() => setDateRange(key)}
-              style={[styles.pill, active && styles.pillActive]}
+              style={[styles.pill, active && { backgroundColor: colors.primary, borderColor: colors.primary }]}
             >
-              <Text style={[styles.pillText, active && styles.pillTextActive]}>{opt.label}</Text>
+              <Text style={[styles.pillText, active && { color: colors.primaryForeground }]}>{opt.label}</Text>
             </TouchableOpacity>
           );
         })}
@@ -298,9 +300,9 @@ export default function AnalyticsScreen() {
                 setFilter(newFilter);
                 saveFilterState(newFilter);
               }}
-              style={[styles.pillSm, active && styles.pillActive]}
+              style={[styles.pillSm, active && { backgroundColor: colors.primary, borderColor: colors.primary }]}
             >
-              <Text style={[styles.pillSmText, active && styles.pillTextActive]}>{opt.label}</Text>
+              <Text style={[styles.pillSmText, active && { color: colors.primaryForeground }]}>{opt.label}</Text>
             </TouchableOpacity>
           );
         })}
@@ -319,10 +321,10 @@ export default function AnalyticsScreen() {
                   router.push(SECTION_ROUTES[s.key] as never);
                 }
               }}
-              style={[styles.sectionPill, isOverview && styles.sectionPillActive]}
+              style={[styles.sectionPill, isOverview && { backgroundColor: colors.primary, borderColor: colors.primary }]}
             >
-              <Feather name={s.icon} size={12} color={isOverview ? '#FFF' : MUTED} />
-              <Text style={[styles.sectionPillText, isOverview && styles.sectionPillTextActive]}>{s.label}</Text>
+                <Feather name={s.icon} size={12} color={isOverview ? colors.primaryForeground : MUTED} />
+                <Text style={[styles.sectionPillText, isOverview && { color: colors.primaryForeground }]}>{s.label}</Text>
             </TouchableOpacity>
           );
         })}
@@ -336,15 +338,15 @@ export default function AnalyticsScreen() {
             <TouchableOpacity
               key={cm.key}
               onPress={() => { setChartMetric(cm.key); setTappedBar(null); }}
-              style={[styles.chartTab, chartMetric === cm.key && styles.chartTabActive]}
+              style={[styles.chartTab, chartMetric === cm.key && { backgroundColor: colors.accent, borderWidth: 1, borderColor: colors.primary }]}
             >
-              <Text style={[styles.chartTabText, chartMetric === cm.key && styles.chartTabTextActive]}>{cm.label}</Text>
+              <Text style={[styles.chartTabText, chartMetric === cm.key && { color: colors.accentForeground }]}>{cm.label}</Text>
             </TouchableOpacity>
           ))}
           <View style={{ flex: 1 }} />
           {(['daily','weekly','monthly'] as const).map(g => (
-            <TouchableOpacity key={g} onPress={() => setGroupBy(g)} style={[styles.groupTab, groupBy === g && styles.groupTabActive]}>
-              <Text style={[styles.groupTabText, groupBy === g && styles.groupTabTextActive]}>{g[0].toUpperCase()}</Text>
+            <TouchableOpacity key={g} onPress={() => setGroupBy(g)} style={[styles.groupTab, groupBy === g && { backgroundColor: colors.accent }]}>
+              <Text style={[styles.groupTabText, groupBy === g && { color: colors.accentForeground }]}>{g[0].toUpperCase()}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -370,7 +372,7 @@ export default function AnalyticsScreen() {
                 onPress={() => { setTappedBar(tapped ? null : i); }}
                 style={styles.barWrap}
               >
-                <View style={[styles.bar, { height: h, backgroundColor: tapped ? PURPLE : PURPLE_DIM }]} />
+                <View style={[styles.bar, { height: h, backgroundColor: tapped ? colors.primary : colors.accent }]} />
               </TouchableOpacity>
             );
           })}
@@ -411,7 +413,7 @@ export default function AnalyticsScreen() {
         <>
           <View style={styles.insightHeader}>
             <Text style={styles.sectionTitle}>Brandthread Insights</Text>
-            <TouchableOpacity><Text style={styles.viewAll}>View all</Text></TouchableOpacity>
+            <TouchableOpacity><Text style={[styles.viewAll, { color: colors.primary }]}>View all</Text></TouchableOpacity>
           </View>
           {insights.map(insight => (
             <View key={insight.id} style={[styles.insightCard, { borderLeftColor: insightColor(insight.type) }]}>
@@ -428,7 +430,7 @@ export default function AnalyticsScreen() {
                       onPress={() => { Haptics.selectionAsync(); router.push(insight.route! as never); }}
                       style={styles.insightBtn}
                     >
-                      <Text style={styles.insightBtnText}>Take action</Text>
+                      <Text style={[styles.insightBtnText, { color: colors.primary }]}>Take action</Text>
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity onPress={() => handleDismiss(insight.id)} style={styles.insightDismiss}>
@@ -461,26 +463,18 @@ const styles = StyleSheet.create({
   iconBtn:       { width: 36, height: 36, borderRadius: 18, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
 
   pill:          { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER },
-  pillActive:    { backgroundColor: PURPLE, borderColor: PURPLE },
   pillText:      { fontSize: 13, fontFamily: FONT.medium, color: MUTED },
-  pillTextActive:{ color: '#FFF' },
   pillSm:        { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER },
   pillSmText:    { fontSize: 11, fontFamily: FONT.medium, color: MUTED },
 
   sectionPill:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
-  sectionPillActive: { backgroundColor: PURPLE, borderColor: PURPLE },
   sectionPillText:   { fontSize: 12, fontFamily: FONT.medium, color: MUTED },
-  sectionPillTextActive: { color: '#FFF' },
 
   chartCard:     { backgroundColor: CARD, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: BORDER, marginBottom: 24 },
   chartTab:      { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, backgroundColor: SURFACE },
-  chartTabActive:{ backgroundColor: PURPLE_DIM, borderWidth: 1, borderColor: PURPLE },
   chartTabText:  { fontSize: 11, fontFamily: FONT.medium, color: MUTED },
-  chartTabTextActive: { color: PURPLE_LIGHT },
   groupTab:      { width: 24, height: 24, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: SURFACE },
-  groupTabActive:{ backgroundColor: PURPLE_DIM },
   groupTabText:  { fontSize: 10, fontFamily: FONT.semibold, color: MUTED },
-  groupTabTextActive: { color: PURPLE_LIGHT },
 
   chartAmountRow:{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
   chartAmount:   { fontSize: 32, fontFamily: FONT.bold, color: FG },
@@ -506,7 +500,7 @@ const styles = StyleSheet.create({
   metricVs:      { fontSize: 10, fontFamily: FONT.regular, color: SUBTLE, flex: 1 },
 
   insightHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  viewAll:       { fontSize: 13, fontFamily: FONT.medium, color: PURPLE },
+  viewAll:       { fontSize: 13, fontFamily: FONT.medium },
   insightCard:   { flexDirection: 'row', gap: 12, backgroundColor: CARD_ELEVATED, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: BORDER, borderLeftWidth: 3, marginBottom: 10 },
   insightIconWrap:{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 },
   insightTitle:  { fontSize: 14, fontFamily: FONT.semibold, color: FG, marginBottom: 4 },
@@ -514,7 +508,7 @@ const styles = StyleSheet.create({
   insightAction: { fontSize: 12, fontFamily: FONT.medium, color: SUBTLE, marginBottom: 10 },
   insightActions:{ flexDirection: 'row', gap: 12 },
   insightBtn:    { paddingVertical: 4 },
-  insightBtnText:{ fontSize: 13, fontFamily: FONT.semibold, color: PURPLE },
+  insightBtnText:{ fontSize: 13, fontFamily: FONT.semibold },
   insightDismiss:{ paddingVertical: 4 },
   insightDismissText:{ fontSize: 13, fontFamily: FONT.medium, color: SUBTLE },
 });

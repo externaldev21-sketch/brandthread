@@ -20,14 +20,18 @@ import {
   apiErrorMessage, apiErrorCode,
 } from '@/lib/freelancer';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM,
   GOLD, SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, RED, OVERLAY,
-  FONT, FS, SP, RADIUS, GRAD_PRIMARY, ON_DARK,
+  FONT, FS, SP, RADIUS, ON_DARK,
 } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 const PLATFORM_FEE_RATE = 0.05; // display only — server computes the real fee
 
 export default function FreelancerProfileScreen() {
+  const colors = useColors();
+  const { theme } = useAppTheme();
   const api = useApi();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -159,7 +163,7 @@ export default function FreelancerProfileScreen() {
   if (loading) {
     return (
       <View style={[styles.container, styles.center]}>
-        <ActivityIndicator color={PURPLE} />
+        <ActivityIndicator color={colors.primary} />
       </View>
     );
   }
@@ -200,8 +204,8 @@ export default function FreelancerProfileScreen() {
           <Text style={styles.name}>{freelancer.name}</Text>
           {freelancer.username && <Text style={styles.username}>@{freelancer.username}</Text>}
           <View style={styles.serviceRow}>
-            <Feather name={serviceIcon(freelancer.serviceType)} size={13} color={CYAN} />
-            <Text style={styles.serviceText}>{serviceLabel(freelancer.serviceType)}</Text>
+            <Feather name={serviceIcon(freelancer.serviceType)} size={13} color={theme.secondary} />
+            <Text style={[styles.serviceText, { color: theme.secondary }]}>{serviceLabel(freelancer.serviceType)}</Text>
           </View>
 
           <View style={styles.statsRow}>
@@ -253,8 +257,8 @@ export default function FreelancerProfileScreen() {
             <Text style={styles.sectionTitle}>Skills</Text>
             <View style={styles.tagsRow}>
               {freelancer.skillTags.map((t) => (
-                <View key={t} style={styles.tag}>
-                  <Text style={styles.tagText}>{t}</Text>
+                <View key={t} style={[styles.tag, { backgroundColor: theme.accentDim }]}>
+                  <Text style={[styles.tagText, { color: theme.accent }]}>{t}</Text>
                 </View>
               ))}
             </View>
@@ -272,7 +276,7 @@ export default function FreelancerProfileScreen() {
                 activeOpacity={0.7}
                 onPress={() => Linking.openURL(u).catch(() => {})}
               >
-                <Feather name="external-link" size={14} color={CYAN} />
+                <Feather name="external-link" size={14} color={theme.secondary} />
                 <Text style={styles.linkText} numberOfLines={1}>{u.replace(/^https?:\/\//, '')}</Text>
               </TouchableOpacity>
             ))}
@@ -287,7 +291,7 @@ export default function FreelancerProfileScreen() {
             {!connectReady && (
               <TouchableOpacity activeOpacity={0.9} onPress={startConnectOnboarding}>
                 <LinearGradient
-                  colors={GRAD_PRIMARY}
+                  colors={[theme.accent, theme.secondary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 1 }}
                   style={styles.connectBtn}
@@ -305,7 +309,7 @@ export default function FreelancerProfileScreen() {
               activeOpacity={0.7}
               onPress={() => router.push('/freelancer-apply' as any)}
             >
-              <Feather name="edit-3" size={16} color={PURPLE} />
+              <Feather name="edit-3" size={16} color={colors.primary} />
               <Text style={styles.manageText}>Edit Profile</Text>
               <Feather name="chevron-right" size={16} color={SUBTLE} />
             </TouchableOpacity>
@@ -315,7 +319,7 @@ export default function FreelancerProfileScreen() {
               activeOpacity={0.7}
               onPress={() => router.push('/freelancer-jobs' as any)}
             >
-              <Feather name="briefcase" size={16} color={CYAN} />
+              <Feather name="briefcase" size={16} color={theme.secondary} />
               <Text style={styles.manageText}>My Gigs</Text>
               <Feather name="chevron-right" size={16} color={SUBTLE} />
             </TouchableOpacity>
@@ -343,7 +347,7 @@ export default function FreelancerProfileScreen() {
               }}
             >
               <LinearGradient
-                colors={GRAD_PRIMARY}
+                  colors={[theme.accent, theme.secondary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.hireBtn}
@@ -428,7 +432,7 @@ export default function FreelancerProfileScreen() {
               onPress={submitHire}
             >
               <LinearGradient
-                colors={GRAD_PRIMARY}
+                  colors={[theme.accent, theme.secondary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={[styles.hireBtn, (!hireValid || hiring) && { opacity: 0.4 }]}
@@ -469,12 +473,13 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg, padding: SP.lg,
   },
   avatar: { width: 72, height: 72, borderRadius: 36 },
+  // Preserved identity accent: only the generated profile avatar remains brand purple.
   avatarFallback: { backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },
   avatarInitial: { color: PURPLE, fontSize: FS.xl, fontFamily: FONT.bold },
   name: { color: FG, fontSize: FS.lg, fontFamily: FONT.bold, marginTop: SP.sm + 2 },
   username: { color: SUBTLE, fontSize: FS.xs, fontFamily: FONT.regular, marginTop: 2 },
   serviceRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: SP.xs + 2 },
-  serviceText: { color: CYAN, fontSize: FS.xs, fontFamily: FONT.semibold },
+  serviceText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   statsRow: {
     flexDirection: 'row', alignItems: 'center', marginTop: SP.md,
     borderTopWidth: 1, borderTopColor: BORDER, paddingTop: SP.md, alignSelf: 'stretch',
@@ -496,10 +501,10 @@ const styles = StyleSheet.create({
   bio: { color: MUTED, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 21 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   tag: {
-    backgroundColor: PURPLE_DIM, paddingHorizontal: SP.sm + 2, paddingVertical: 5,
+    paddingHorizontal: SP.sm + 2, paddingVertical: 5,
     borderRadius: RADIUS.pill,
   },
-  tagText: { color: PURPLE, fontSize: FS.xs, fontFamily: FONT.medium },
+  tagText: { fontSize: FS.xs, fontFamily: FONT.medium },
   linkRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
     backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.sm,

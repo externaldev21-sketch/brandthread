@@ -3,6 +3,7 @@
  * Route: /design-campaign
  */
 import React, { useState } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   Alert, ActivityIndicator, TextInput,
@@ -48,6 +49,7 @@ const FORMAT_GRAD: Record<string, readonly [string, string]> = {
 };
 
 export default function DesignCampaignScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const [productName, setProductName] = useState('');
   const [style, setStyle] = useState<AIStyleKind>('streetwear');

@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
@@ -34,6 +35,7 @@ const CATEGORIES: { value: ThemeCategory | 'all'; label: string }[] = [
 ];
 
 export default function StoreThemePicker() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [themes, setThemes] = useState<StoreTheme[]>([]);

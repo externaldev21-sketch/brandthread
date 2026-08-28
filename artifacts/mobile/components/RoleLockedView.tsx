@@ -5,7 +5,8 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { BG, CARD, BORDER, FG, MUTED, SUBTLE, FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 interface Props {
   screenTitle: string;
@@ -20,11 +21,12 @@ function roleLabel(role?: string): string {
 }
 
 export function RoleLockedView({ screenTitle, currentRole }: Props) {
+  const { theme } = useAppTheme();
   return (
     <View style={styles.root}>
       <View style={styles.card}>
-        <View style={styles.iconWrap}>
-          <Feather name="lock" size={28} color={PURPLE} />
+        <View style={[styles.iconWrap, { backgroundColor: theme.accentDim }]}>
+          <Feather name="lock" size={28} color={theme.accent} />
         </View>
         <Text style={styles.title}>Owner access required</Text>
         <Text style={styles.body}>
@@ -64,7 +66,6 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: `${PURPLE}18`,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: SP.lg,

@@ -15,13 +15,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 type Step = 'email' | 'code' | 'done';
 
 // ─── Design tokens (exact match to onboarding / splash / welcome) ────────────
 const BG       = '#07070F';
-const PURPLE   = '#8B5CF6';
-const CYAN     = '#22D3EE';
 const FG       = '#FFFFFF';
 const MUTED    = 'rgba(255,255,255,0.5)';
 const MUTED2   = 'rgba(255,255,255,0.28)';
@@ -36,6 +35,7 @@ export default function ForgotPasswordScreen() {
   const { signIn, fetchStatus } = useSignIn();
   const router  = useRouter();
   const insets  = useSafeAreaInsets();
+  const { theme } = useAppTheme();
 
   const [step, setStep]         = useState<Step>('email');
   const [email, setEmail]       = useState('');
@@ -91,7 +91,7 @@ export default function ForgotPasswordScreen() {
       <StatusBar barStyle="light-content" />
 
       {/* Ambient glow */}
-      <View style={s.glowTop} />
+      <View style={[s.glowTop, { backgroundColor: theme.accentDim }]} />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -159,7 +159,7 @@ export default function ForgotPasswordScreen() {
                 activeOpacity={0.88}
               >
                 <LinearGradient
-                  colors={[PURPLE, CYAN]}
+                  colors={[theme.accent, theme.secondary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={s.primaryBtn}
@@ -237,7 +237,7 @@ export default function ForgotPasswordScreen() {
                 activeOpacity={0.88}
               >
                 <LinearGradient
-                  colors={[PURPLE, CYAN]}
+                  colors={[theme.accent, theme.secondary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={s.primaryBtn}
@@ -256,7 +256,7 @@ export default function ForgotPasswordScreen() {
               >
                 <Text style={s.resendText}>
                   {"Didn't get it? "}
-                  <Text style={{ color: PURPLE, fontFamily: 'Inter_600SemiBold' }}>Resend code</Text>
+                  <Text style={{ color: theme.accent, fontFamily: 'Inter_600SemiBold' }}>Resend code</Text>
                 </Text>
               </TouchableOpacity>
             </>
@@ -294,7 +294,7 @@ export default function ForgotPasswordScreen() {
                 activeOpacity={0.88}
               >
                 <LinearGradient
-                  colors={[PURPLE, CYAN]}
+                  colors={[theme.accent, theme.secondary]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={s.primaryBtn}
@@ -351,7 +351,6 @@ const s = StyleSheet.create({
   glowTop: {
     position: 'absolute', top: -80, left: '10%',
     width: '80%', height: 220, borderRadius: 150,
-    backgroundColor: '#8B5CF612',
   },
 
   scroll: { paddingHorizontal: 24, paddingTop: 16 },

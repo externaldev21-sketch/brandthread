@@ -15,15 +15,14 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { useApi, type FreelancerJob } from '@/lib/api';
 import { serviceLabel, formatPrice, apiErrorMessage } from '@/lib/freelancer';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, CYAN, CYAN_DIM,
+  BG, CARD, BORDER, FG, MUTED, SUBTLE,
   SUCCESS, SUCCESS_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM,
-  FONT, FS, SP, RADIUS, ON_DARK,
+  FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
   pending:     { label: 'Pending',     color: ORANGE,  bg: ORANGE_DIM },
-  accepted:    { label: 'Accepted',    color: CYAN,    bg: CYAN_DIM },
-  in_progress: { label: 'In Progress', color: PURPLE,  bg: PURPLE_DIM },
   completed:   { label: 'Completed',   color: SUCCESS, bg: SUCCESS_DIM },
   cancelled:   { label: 'Cancelled',   color: RED,     bg: RED_DIM },
 };
@@ -31,6 +30,7 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
 type JobsData = { isFreelancer: boolean; asHirer: FreelancerJob[]; asFreelancer: FreelancerJob[] };
 
 export default function FreelancerJobsScreen() {
+  const colors = useColors();
   const api = useApi();
   const router = useRouter();
   const [data, setData] = useState<JobsData | null>(null);
@@ -39,6 +39,11 @@ export default function FreelancerJobsScreen() {
   const [tab, setTab] = useState<'hiring' | 'gigs'>('hiring');
   const [busyId, setBusyId] = useState<string | null>(null);
   const defaultedTab = useRef(false);
+  const statusMeta: Record<string, { label: string; color: string; bg: string }> = {
+    ...STATUS_META,
+    accepted: { label: 'Accepted', color: colors.primary, bg: colors.accent },
+    in_progress: { label: 'In Progress', color: colors.primary, bg: colors.accent },
+  };
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -131,7 +136,7 @@ export default function FreelancerJobsScreen() {
   };
 
   const renderJob = (job: FreelancerJob, role: 'hirer' | 'freelancer') => {
-    const meta = STATUS_META[job.status] ?? STATUS_META.pending;
+    const meta = statusMeta[job.status] ?? statusMeta.pending;
     const busy = busyId === job.id;
     const counterpart = role === 'hirer' ? job.freelancerName : job.hirerName;
     const unpaid = job.paymentStatus === 'unpaid' && job.status === 'pending';
@@ -173,7 +178,7 @@ export default function FreelancerJobsScreen() {
         {/* Actions */}
         {busy ? (
           <View style={styles.actionsRow}>
-            <ActivityIndicator color={PURPLE} size="small" />
+            <ActivityIndicator color={colors.primary} size="small" />
           </View>
         ) : (
           <View style={styles.actionsRow}>
@@ -228,7 +233,10 @@ export default function FreelancerJobsScreen() {
           ] as const).map((t) => (
             <TouchableOpacity
               key={t.key}
-              style={[styles.tabBtn, tab === t.key && styles.tabBtnActive]}
+              style={[
+                styles.tabBtn,
+                tab === t.key && [styles.tabBtnActive, { backgroundColor: colors.accent, borderColor: colors.primary }],
+              ]}
               activeOpacity={0.8}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -246,12 +254,12 @@ export default function FreelancerJobsScreen() {
         contentContainerStyle={{ padding: SP.md + 4, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={PURPLE} />
+          <RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={colors.primary} />
         }
       >
         {loading ? (
           <View style={styles.centerBox}>
-            <ActivityIndicator color={PURPLE} />
+            <ActivityIndicator color={colors.primary} />
           </View>
         ) : !data ? (
           <View style={styles.centerBox}>
@@ -271,11 +279,11 @@ export default function FreelancerJobsScreen() {
             </Text>
             {tab === 'hiring' && (
               <TouchableOpacity
-                style={styles.browseBtn}
+                style={[styles.browseBtn, { backgroundColor: colors.accent }]}
                 activeOpacity={0.85}
                 onPress={() => router.push('/community' as any)}
               >
-                <Text style={styles.browseBtnText}>Browse Freelancers</Text>
+                <Text style={[styles.browseBtnText, { color: colors.primary }]}>Browse Freelancers</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -288,13 +296,14 @@ export default function FreelancerJobsScreen() {
 }
 
 function ActionBtn({ label, primary, onPress }: { label: string; primary?: boolean; onPress: () => void }) {
+  const colors = useColors();
   return (
     <TouchableOpacity
-      style={[styles.actionBtn, primary && styles.actionBtnPrimary]}
+      style={[styles.actionBtn, primary && [styles.actionBtnPrimary, { backgroundColor: colors.primary, borderColor: colors.primary }]]}
       activeOpacity={0.85}
       onPress={onPress}
     >
-      <Text style={[styles.actionBtnText, primary && { color: ON_DARK }]}>{label}</Text>
+      <Text style={[styles.actionBtnText, primary && { color: colors.primaryForeground }]}>{label}</Text>
     </TouchableOpacity>
   );
 }
@@ -308,7 +317,7 @@ const styles = StyleSheet.create({
     flex: 1, alignItems: 'center', paddingVertical: SP.sm + 2,
     borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
   },
-  tabBtnActive: { backgroundColor: PURPLE_DIM, borderColor: 'rgba(139,92,246,0.45)' },
+  tabBtnActive: {},
   tabText: { color: MUTED, fontSize: FS.sm, fontFamily: FONT.semibold },
   centerBox: { alignItems: 'center', gap: SP.sm, paddingVertical: SP.xl + 16 },
   emptyTitle: { color: FG, fontSize: FS.base, fontFamily: FONT.semibold },
@@ -317,10 +326,10 @@ const styles = StyleSheet.create({
     textAlign: 'center', paddingHorizontal: SP.xl,
   },
   browseBtn: {
-    marginTop: SP.sm, backgroundColor: PURPLE_DIM, paddingHorizontal: SP.lg,
+    marginTop: SP.sm, paddingHorizontal: SP.lg,
     paddingVertical: SP.sm + 2, borderRadius: RADIUS.sm,
   },
-  browseBtnText: { color: PURPLE, fontSize: FS.sm, fontFamily: FONT.semibold },
+  browseBtnText: { fontSize: FS.sm, fontFamily: FONT.semibold },
   card: {
     backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md,
     padding: SP.md - 2, marginBottom: SP.sm + 2,
@@ -347,7 +356,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SP.md, paddingVertical: 8, borderRadius: RADIUS.sm,
     backgroundColor: BG, borderWidth: 1, borderColor: BORDER,
   },
-  actionBtnPrimary: { backgroundColor: PURPLE, borderColor: PURPLE },
+  actionBtnPrimary: {},
   actionBtnText: { color: FG, fontSize: FS.xs, fontFamily: FONT.semibold },
   waitingText: { color: SUBTLE, fontSize: FS.xs, fontFamily: FONT.regular, fontStyle: 'italic' },
 });

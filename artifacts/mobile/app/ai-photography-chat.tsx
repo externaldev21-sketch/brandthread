@@ -272,7 +272,7 @@ export default function AIPhotographyChatScreen() {
         title="AI Product Photography"
         subtitle="Powered by Nano Banana 3"
         rightElement={
-          <View style={[styles.statusBadge, { backgroundColor: 'rgba(139,92,246,0.13)' }]}>
+          <View style={[styles.statusBadge, { backgroundColor: colors.accent }]}>
             <Text style={[styles.statusText, { color: colors.success }]}>Online</Text>
           </View>
         }

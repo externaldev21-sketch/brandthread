@@ -17,13 +17,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 import {
-  BG, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
+  BG, CARD, BORDER,
   FG, MUTED, SUBTLE, ON_DARK,
-  PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, SUCCESS, SUCCESS_DIM,
-  GRAD_PRIMARY, GRAD_CARD_GLOW,
+  SUCCESS, SUCCESS_DIM,
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM,
-  SHADOW_PURPLE,
 } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 import {
   getSetupState, completeTask, skipTask,
   SetupState, SetupTask, SetupTaskId,
@@ -45,6 +44,8 @@ function TaskCard({
   onSkip: (id: SetupTaskId) => void;
   onPress: (task: SetupTask) => void;
 }) {
+  const colors = useColors();
+  const ts = createTaskStyles(colors);
   const scale = useRef(new Animated.Value(1)).current;
 
   function handleComplete() {
@@ -102,13 +103,13 @@ function TaskCard({
   );
 }
 
-const ts = StyleSheet.create({
+const createTaskStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   card:       { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: CARD,
                 borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,
                 paddingHorizontal: SP.md, paddingVertical: 14, marginBottom: SP.sm },
-  cardActive: { borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM },
+  cardActive: { borderColor: colors.primary, backgroundColor: colors.accent },
   cardDone:   { opacity: 0.6 },
-  check:      { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: PURPLE,
+  check:      { width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: colors.primary,
                 alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   checkDone:  { backgroundColor: SUCCESS, borderColor: SUCCESS },
   body:       { flex: 1 },
@@ -116,14 +117,16 @@ const ts = StyleSheet.create({
   label:      { fontSize: FS.base, fontFamily: FONT.medium, color: FG },
   labelDone:  { textDecorationLine: 'line-through', color: MUTED },
   desc:       { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  activePill: { backgroundColor: PURPLE, borderRadius: RADIUS.pill, paddingHorizontal: 6, paddingVertical: 2 },
-  activePillText: { fontSize: 9, fontFamily: FONT.bold, color: ON_DARK },
+  activePill: { backgroundColor: colors.primary, borderRadius: RADIUS.pill, paddingHorizontal: 6, paddingVertical: 2 },
+  activePillText: { fontSize: 9, fontFamily: FONT.bold, color: colors.primaryForeground },
   skip:       { fontSize: FS.xs, fontFamily: FONT.medium, color: SUBTLE },
 });
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function SetupScreen() {
+  const colors = useColors();
+  const s = createStyles(colors);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [state, setState] = useState<SetupState | null>(null);
@@ -195,7 +198,7 @@ export default function SetupScreen() {
         contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: insets.bottom + 80 }}
       >
         {/* Progress bar */}
-        <GradientCard colors={GRAD_CARD_GLOW} style={s.progressCard} glow>
+        <GradientCard colors={[colors.accent, colors.card]} style={s.progressCard} glow>
           <View style={s.progressTrack}>
             <Animated.View
               style={[
@@ -211,7 +214,7 @@ export default function SetupScreen() {
           </View>
           {!allDone && next && (
             <Text style={s.progressNext}>
-              Next: <Text style={{ color: PURPLE_LIGHT }}>{next.label}</Text>
+              Next: <Text style={{ color: colors.accentForeground }}>{next.label}</Text>
             </Text>
           )}
           {allDone && (
@@ -273,18 +276,18 @@ export default function SetupScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const s = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   header:       { flexDirection: 'row', alignItems: 'center', gap: SP.md,
                   paddingHorizontal: SP.md, paddingBottom: SP.md },
   back:         { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD,
                   borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   title:        { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, letterSpacing: -0.3 },
   subtitle:     { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
-  pctBadge:     { backgroundColor: PURPLE_DIM, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 4, borderWidth: 1, borderColor: BORDER_ACTIVE },
-  pctText:      { fontSize: FS.base, fontFamily: FONT.bold, color: PURPLE_LIGHT },
+  pctBadge:     { backgroundColor: colors.accent, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm, paddingVertical: 4, borderWidth: 1, borderColor: colors.primary },
+  pctText:      { fontSize: FS.base, fontFamily: FONT.bold, color: colors.accentForeground },
   progressCard: { marginBottom: SP.md },
   progressTrack:{ height: 6, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: RADIUS.pill, overflow: 'hidden', marginBottom: SP.sm },
-  progressFill: { height: '100%', backgroundColor: PURPLE, borderRadius: RADIUS.pill },
+  progressFill: { height: '100%', backgroundColor: colors.primary, borderRadius: RADIUS.pill },
   progressNext: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
   doneIcon:     { width: 48, height: 48, borderRadius: RADIUS.md, backgroundColor: SUCCESS_DIM, alignItems: 'center', justifyContent: 'center' },
 });

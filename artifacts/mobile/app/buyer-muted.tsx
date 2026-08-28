@@ -12,11 +12,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BG, CARD, BORDER, FG, MUTED, SUBTLE, PURPLE, CYAN, ON_DARK, FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK, FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import { getMutedUsers, unmuteUser } from '@/services/socialService';
 import type { MuteRecord } from '@/services/socialTypes';
 
 export default function MutedAccountsScreen() {
+  const { theme } = useAppTheme();
+  const PURPLE = theme.accent;
+  const CYAN = theme.accentLight;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [muted, setMuted] = useState<MuteRecord[]>([]);

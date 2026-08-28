@@ -31,9 +31,9 @@ import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   CYAN, CYAN_DIM, SUCCESS, GREEN_BRIGHT, BLUE, ORANGE, RED, GOLD,
-  GRAD_PRIMARY, GRAD_CARD_GLOW, GRAD_DARK_FADE,
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM, SHADOW_PURPLE,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -113,6 +113,8 @@ const DEFAULT_SETUP: SetupState = {
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function SellerHomeScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -477,7 +479,7 @@ export default function SellerHomeScreen() {
         {showWelcome && (
           <View style={{ paddingHorizontal: SP.md, paddingTop: SP.md, marginBottom: SP.md }}>
             <GradientCard
-              colors={['rgba(139,92,246,0.25)', 'rgba(34,211,238,0.08)']}
+              colors={[theme.accentDim, theme.secondaryDim]}
               glow
             >
               <Text style={s.welcomeTitle}>Your brand workspace is ready.</Text>
@@ -610,7 +612,7 @@ export default function SellerHomeScreen() {
               // Loading placeholders
               Array.from({ length: 7 }).map((_, i) => (
                 <View key={i} style={s.trendBarWrap}>
-                  <View style={[s.trendBar, { height: 8 + i * 3, opacity: 0.18, backgroundColor: PURPLE }]} />
+                  <View style={[s.trendBar, { height: 8 + i * 3, opacity: 0.18, backgroundColor: BLUE }]} />
                   <Text style={s.trendDay}>—</Text>
                 </View>
               ))
@@ -632,10 +634,10 @@ export default function SellerHomeScreen() {
                   <View key={d.day} style={s.trendBarWrap}>
                     <View style={[s.trendBar, {
                       height: barH,
-                      backgroundColor: isToday ? CYAN : PURPLE,
+                      backgroundColor: isToday ? GREEN_BRIGHT : BLUE,
                       opacity: isToday ? 1 : 0.55,
                     }]} />
-                    <Text style={[s.trendDay, isToday && { color: CYAN }]}>{dayLbl}</Text>
+                    <Text style={[s.trendDay, isToday && { color: GREEN_BRIGHT }]}>{dayLbl}</Text>
                   </View>
                 );
               });
@@ -698,7 +700,7 @@ export default function SellerHomeScreen() {
               <LoadingSkeleton height={68} />
             ) : recentOrders.length === 0 ? (
               <GradientCard
-                colors={['rgba(139,92,246,0.22)', 'rgba(34,211,238,0.07)', 'rgba(139,92,246,0.12)']}
+                colors={[theme.accentDim, theme.secondaryDim, theme.accentDim]}
                 glow
                 style={{ marginBottom: 0 }}
               >
@@ -706,8 +708,8 @@ export default function SellerHomeScreen() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm }}>
                   <View style={{
                     width: 40, height: 40, borderRadius: RADIUS.md,
-                    backgroundColor: 'rgba(139,92,246,0.18)',
-                    borderWidth: 1, borderColor: 'rgba(139,92,246,0.35)',
+                    backgroundColor: theme.accentDim,
+                    borderWidth: 1, borderColor: theme.accent + '59',
                     alignItems: 'center', justifyContent: 'center',
                   }}>
                     <Feather name="zap" size={ICON.md} color={PURPLE_LIGHT} />

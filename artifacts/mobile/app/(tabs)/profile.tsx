@@ -11,6 +11,8 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { getSellerPosts, subscribeSocial, type SellerThreadPost } from '@/services/socialService';
 import { useApi } from '@/lib/api';
+import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 // ─── Profile data shape ──────────────────────────────────────────────────────
 
@@ -43,8 +45,6 @@ const CARD   = '#12121F';
 const BORDER = 'rgba(255,255,255,0.07)';
 const FG     = '#F4F4FF';
 const MUTED  = 'rgba(244,244,255,0.50)';
-const GREEN  = '#8B5CF6';
-const GREEN_DIM = 'rgba(139,92,246,0.18)';
 
 const QUICK_ACTIONS: { icon: keyof typeof Feather.glyphMap; label: string; route: string }[] = [
   { icon: 'video',      label: 'Create Post',   route: '/create-post' },
@@ -62,6 +62,8 @@ export default function ProfileScreen() {
   const insets  = useSafeAreaInsets();
   const router  = useRouter();
   const api = useApi();
+  const colors = useColors();
+  const { theme } = useAppTheme();
   const [activeTab, setActiveTab] = useState(0);
   const [sellerPosts, setSellerPosts] = useState<SellerThreadPost[]>([]);
   const [myStoryIds, setMyStoryIds] = useState<string[]>([]);
@@ -213,7 +215,7 @@ export default function ProfileScreen() {
   return (
     <>
     <ScrollView
-      style={[s.root, { backgroundColor: BG }]}
+      style={[s.root, { backgroundColor: colors.background }]}
       contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 120 }}
       showsVerticalScrollIndicator={false}
     >
@@ -267,29 +269,29 @@ export default function ProfileScreen() {
             {/* Gradient ring when active story */}
             {myStoryIds.length > 0 ? (
               <LinearGradient
-                colors={['#A855F7', '#8B5CF6', '#6D28D9']}
+                colors={[theme.accentLight, theme.accent, theme.secondary]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={s.avatarGlow}
+                style={[s.avatarGlow, { shadowColor: theme.accent }]}
               >
                 <View style={s.avatarRing}>
                   <View style={s.avatar}>
                     {profile?.profileImageUrl ? (
                       <Image source={{ uri: profile.profileImageUrl }} style={s.avatarImage} accessibilityLabel="Brand avatar" />
                     ) : (
-                      <Text style={s.avatarText}>{avatarInitials}</Text>
+                      <Text style={[s.avatarText, { color: theme.accentLight }]}>{avatarInitials}</Text>
                     )}
                   </View>
                 </View>
               </LinearGradient>
             ) : (
-              <View style={s.avatarGlow}>
+              <View style={[s.avatarGlow, { backgroundColor: theme.accentDim, shadowColor: theme.accent }]}>
                 <View style={s.avatarRing}>
                   <View style={s.avatar}>
                     {profile?.profileImageUrl ? (
                       <Image source={{ uri: profile.profileImageUrl }} style={s.avatarImage} accessibilityLabel="Brand avatar" />
                     ) : (
-                      <Text style={s.avatarText}>{avatarInitials}</Text>
+                      <Text style={[s.avatarText, { color: theme.accentLight }]}>{avatarInitials}</Text>
                     )}
                   </View>
                 </View>
@@ -329,14 +331,14 @@ export default function ProfileScreen() {
 
           {/* Add Story "+" badge */}
           <TouchableOpacity
-            style={s.addStoryBtn}
+            style={[s.addStoryBtn, { backgroundColor: theme.accent }]}
             activeOpacity={0.85}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               router.push('/create-post' as any);
             }}
           >
-            <Feather name="plus" size={12} color={FG} />
+            <Feather name="plus" size={12} color={theme.onAccent} />
           </TouchableOpacity>
         </View>
 
@@ -354,9 +356,9 @@ export default function ProfileScreen() {
             <Text style={s.brandName} numberOfLines={1}>
               {profile?.brandName || profile?.displayName || 'My Brand'}
             </Text>
-            <Feather name="check-circle" size={17} color={GREEN} />
-            <View style={s.editProfileIcon}>
-              <Feather name="edit-3" size={13} color={GREEN} />
+            <Feather name="check-circle" size={17} color={colors.primary} />
+            <View style={[s.editProfileIcon, { backgroundColor: theme.accentDim }]}>
+              <Feather name="edit-3" size={13} color={colors.primary} />
             </View>
           </TouchableOpacity>
           {profile?.brandName && profile?.displayName && profile.brandName !== profile.displayName && (
@@ -365,16 +367,16 @@ export default function ProfileScreen() {
             </Text>
           )}
           {profile?.subscriptionPlanId || profile?.subscriptionStatus === 'active' ? (
-            <View style={s.planPill}>
-              <Text style={s.planText}>
+            <View style={[s.planPill, { backgroundColor: theme.accentDim }]}>
+              <Text style={[s.planText, { color: theme.accentLight }]}>
                 {profile?.subscriptionPlanId
                   ? `${profile.subscriptionPlanId.charAt(0).toUpperCase()}${profile.subscriptionPlanId.slice(1)} Plan`
                   : 'Active Plan'}
               </Text>
             </View>
           ) : (
-            <View style={s.planPill}>
-              <Text style={s.planText}>Free Plan</Text>
+            <View style={[s.planPill, { backgroundColor: theme.accentDim }]}>
+              <Text style={[s.planText, { color: theme.accentLight }]}>Free Plan</Text>
             </View>
           )}
 
@@ -401,8 +403,8 @@ export default function ProfileScreen() {
       <View style={s.quickRow}>
         {QUICK_ACTIONS.map((qa) => (
           <TouchableOpacity key={qa.label} style={s.quickItem} activeOpacity={0.75} onPress={() => nav(qa.route)}>
-            <View style={s.quickIconBox}>
-              <Feather name={qa.icon} size={18} color={GREEN} />
+            <View style={[s.quickIconBox, { backgroundColor: theme.accentDim }]}>
+              <Feather name={qa.icon} size={18} color={colors.primary} />
             </View>
             <Text style={s.quickLabel}>{qa.label}</Text>
           </TouchableOpacity>
@@ -417,12 +419,12 @@ export default function ProfileScreen() {
           return (
             <TouchableOpacity
               key={tab}
-              style={[s.tabItem, active && s.tabItemActive]}
+              style={[s.tabItem, active && [s.tabItemActive, { borderBottomColor: theme.accent }]]}
               activeOpacity={0.75}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setActiveTab(i); }}
             >
-              <Feather name={icons[i]} size={13} color={active ? GREEN : MUTED} />
-              <Text style={[s.tabLabel, active && s.tabLabelActive]}>{tab}</Text>
+              <Feather name={icons[i]} size={13} color={active ? colors.primary : MUTED} />
+              <Text style={[s.tabLabel, active && [s.tabLabelActive, { color: theme.accentLight }]]}>{tab}</Text>
             </TouchableOpacity>
           );
         })}
@@ -588,13 +590,13 @@ export default function ProfileScreen() {
                 <Text style={s.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[s.saveButton, savingProfile && s.saveButtonDisabled]}
+                style={[s.saveButton, { backgroundColor: theme.accent }, savingProfile && s.saveButtonDisabled]}
                 onPress={saveProfileDetails}
                 disabled={savingProfile}
                 activeOpacity={0.8}
                 testID="profile-edit-save"
               >
-                <Text style={s.saveButtonText}>{savingProfile ? 'Saving…' : 'Save changes'}</Text>
+                <Text style={[s.saveButtonText, { color: theme.onAccent }]}>{savingProfile ? 'Saving…' : 'Save changes'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -622,22 +624,22 @@ const s = StyleSheet.create({
 
   // Avatar
   avatarSection:  { position: 'relative' },
-  avatarGlow:     { width: 88, height: 88, borderRadius: 44, padding: 3, backgroundColor: GREEN, shadowColor: GREEN, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 14, elevation: 12 },
+  avatarGlow:     { width: 88, height: 88, borderRadius: 44, padding: 3, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 14, elevation: 12 },
   avatarRing:     { flex: 1, borderRadius: 42, overflow: 'hidden', backgroundColor: BG, padding: 3 },
   avatar:         { flex: 1, borderRadius: 39, backgroundColor: '#18182E', alignItems: 'center', justifyContent: 'center' },
-  avatarText:     { fontSize: 30, fontFamily: 'Inter_700Bold', color: GREEN },
+  avatarText:     { fontSize: 30, fontFamily: 'Inter_700Bold' },
    avatarImage:    { width: '100%', height: '100%', borderRadius: 39 },
   cameraBtn:      { position: 'absolute', bottom: 0, right: -2, width: 26, height: 26, borderRadius: 13, backgroundColor: '#333', borderWidth: 2, borderColor: BG, alignItems: 'center', justifyContent: 'center' },
-  addStoryBtn:    { position: 'absolute', bottom: 0, left: -2, width: 26, height: 26, borderRadius: 13, backgroundColor: '#8B5CF6', borderWidth: 2, borderColor: BG, alignItems: 'center', justifyContent: 'center' },
+  addStoryBtn:    { position: 'absolute', bottom: 0, left: -2, width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: BG, alignItems: 'center', justifyContent: 'center' },
 
   // Name
   nameBlock:      { flex: 1, paddingTop: 4 },
   nameRow:        { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 },
   brandName:      { fontSize: 18, fontFamily: 'Inter_700Bold', color: FG },
-  editProfileIcon:{ width: 24, height: 24, borderRadius: 12, backgroundColor: GREEN_DIM, alignItems: 'center', justifyContent: 'center', marginLeft: 2 },
+  editProfileIcon:{ width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginLeft: 2 },
   brandHandle:    { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 8 },
-  planPill:       { alignSelf: 'flex-start', backgroundColor: GREEN_DIM, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 14 },
-  planText:       { fontSize: 11, fontFamily: 'Inter_700Bold', color: GREEN },
+  planPill:       { alignSelf: 'flex-start', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 14 },
+  planText:       { fontSize: 11, fontFamily: 'Inter_700Bold' },
 
   // Stats
   statsRow:       { flexDirection: 'row', alignItems: 'center', gap: 0 },
@@ -649,7 +651,7 @@ const s = StyleSheet.create({
   // Quick actions
   quickRow:       { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 16, paddingVertical: 4, backgroundColor: CARD, borderTopWidth: 1, borderBottomWidth: 1, borderColor: BORDER, marginBottom: 24 },
   quickItem:      { alignItems: 'center', paddingVertical: 14, gap: 6 },
-  quickIconBox:   { width: 44, height: 44, borderRadius: 12, backgroundColor: GREEN_DIM, alignItems: 'center', justifyContent: 'center' },
+  quickIconBox:   { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   quickLabel:     { fontSize: 11, fontFamily: 'Inter_500Medium', color: FG, textAlign: 'center' },
 
   // Performance grid
@@ -667,7 +669,7 @@ const s = StyleSheet.create({
   // Content tabs
   tabsBar:        { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: BORDER, marginBottom: 1 },
   tabItem:        { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, paddingVertical: 12, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabItemActive:  { borderBottomColor: GREEN },
+  tabItemActive:  {},
   tabLabel:       { fontSize: 12, fontFamily: 'Inter_500Medium', color: MUTED },
   tabLabelActive: { color: FG, fontFamily: 'Inter_600SemiBold' },
 
@@ -703,7 +705,7 @@ const s = StyleSheet.create({
   sheetActions:     { flexDirection: 'row', gap: 10, marginTop: 24 },
   cancelButton:     { flex: 1, minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   cancelButtonText: { color: FG, fontFamily: 'Inter_600SemiBold', fontSize: 14 },
-  saveButton:       { flex: 1.45, minHeight: 48, borderRadius: 12, backgroundColor: GREEN, alignItems: 'center', justifyContent: 'center' },
+  saveButton:       { flex: 1.45, minHeight: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   saveButtonDisabled: { opacity: 0.6 },
-  saveButtonText:   { color: FG, fontFamily: 'Inter_700Bold', fontSize: 14 },
+  saveButtonText:   { fontFamily: 'Inter_700Bold', fontSize: 14 },
 });

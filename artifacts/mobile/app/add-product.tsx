@@ -24,11 +24,11 @@ import * as ImagePicker from 'expo-image-picker';
 
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
-  FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
-  CYAN, SUCCESS, BLUE, ORANGE, RED, GOLD, ON_DARK,
+  FG, MUTED, SUBTLE, SUCCESS, BLUE, ORANGE, RED, GOLD, ON_DARK,
   GRAD_PRIMARY, GRAD_CARD_GLOW,
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
@@ -85,12 +85,13 @@ interface CollapsibleSectionProps {
 }
 
 function CollapsibleSection({ title, icon, expanded, onToggle, children, hint }: CollapsibleSectionProps) {
+  const { theme } = useAppTheme();
   return (
     <View style={s.collapsibleBlock}>
       <TouchableOpacity style={s.collapsibleHeader} onPress={onToggle} activeOpacity={0.75}>
         <View style={s.collapsibleHeaderLeft}>
-          <View style={s.collapsibleIconWrap}>
-            <Feather name={icon} size={15} color={PURPLE_LIGHT} />
+          <View style={[s.collapsibleIconWrap, { backgroundColor: theme.accentDim }]}>
+            <Feather name={icon} size={15} color={theme.accentLight} />
           </View>
           <View style={{ gap: 1 }}>
             <Text style={s.collapsibleTitle}>{title}</Text>
@@ -132,6 +133,8 @@ function uid() { return Math.random().toString(36).slice(2, 11); }
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function AddProductScreen() {
+  const { theme } = useAppTheme();
+  const { accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM } = theme;
   const router = useRouter();
   const navigation = useNavigation();
   const params = useLocalSearchParams();
@@ -910,7 +913,7 @@ export default function AddProductScreen() {
               updateUnsavedState(setTrackInventory, v);
               patchDraft({ inventory: { ...(draftData.inventory!), trackQuantity: v } });
             }}
-            trackColor={{ false: BORDER, true: PURPLE }}
+            trackColor={{ false: BORDER, true: theme.accent }}
             thumbColor={ON_DARK}
           />
         </View>
@@ -940,7 +943,7 @@ export default function AddProductScreen() {
               updateUnsavedState(setAllowOversell, v);
               patchDraft({ inventory: { ...(draftData.inventory!), allowOverselling: v, policy: v ? 'continue' : 'deny' } });
             }}
-            trackColor={{ false: BORDER, true: PURPLE }}
+            trackColor={{ false: BORDER, true: theme.accent }}
             thumbColor={ON_DARK}
           />
         </View>
@@ -1044,7 +1047,7 @@ export default function AddProductScreen() {
                           updated[idx] = { ...opt, values: already ? opt.values.filter(v => v.value !== c.name) : [...opt.values, { id: uid(), value: c.name, colorHex: c.hex }] };
                           updateUnsavedState(setLocalOptions, updated);
                         }}
-                        style={[s.colorSwatch, { backgroundColor: c.hex, borderColor: selected ? PURPLE : BORDER, borderWidth: selected ? 2 : 1 }]}
+                        style={[s.colorSwatch, { backgroundColor: c.hex, borderColor: selected ? theme.accent : BORDER, borderWidth: selected ? 2 : 1 }]}
                       >
                         {selected && <Feather name="check" size={12} color={c.hex === '#FFFFFF' || c.hex === '#F5F0E8' ? '#000' : '#fff'} />}
                       </TouchableOpacity>
@@ -1066,7 +1069,7 @@ export default function AddProductScreen() {
                     }}
                   >
                     {v.colorHex && <View style={[s.valueDot, { backgroundColor: v.colorHex }]} />}
-                    <Text style={s.valueChipText}>{v.value}</Text>
+                    <Text style={[s.valueChipText, { color: theme.accentLight }]}>{v.value}</Text>
                     <Feather name="x" size={10} color={MUTED} />
                   </TouchableOpacity>
                 ))}
@@ -1284,7 +1287,7 @@ export default function AddProductScreen() {
           <Switch
             value={featuredHome}
             onValueChange={v => { setFeaturedHome(v); patchDraft({ storeSettings: { ...ss, featuredOnHomepage: v } }); }}
-            trackColor={{ false: BORDER, true: PURPLE }}
+            trackColor={{ false: BORDER, true: theme.accent }}
             thumbColor={ON_DARK}
           />
         </View>
@@ -1317,7 +1320,7 @@ export default function AddProductScreen() {
         </TouchableOpacity>
         <Text style={s.headerTitle}>{isEditMode ? 'Edit Product' : 'Add Product'}</Text>
         <TouchableOpacity onPress={handleSaveDraftInPlace} style={s.headerSave}>
-          <Text style={s.headerSaveText}>Save draft</Text>
+          <Text style={[s.headerSaveText, { color: theme.accentLight }]}>Save draft</Text>
         </TouchableOpacity>
       </View>
 
@@ -1492,7 +1495,6 @@ const s = StyleSheet.create({
   headerSaveText: {
     fontSize: FS.sm,
     fontFamily: FONT.semibold,
-    color: PURPLE_LIGHT,
   },
 
   // Scroll
@@ -1540,7 +1542,6 @@ const s = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: RADIUS.sm,
-    backgroundColor: PURPLE_DIM,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1655,7 +1656,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: BORDER_ACTIVE,
   },
   valueDot: { width: 10, height: 10, borderRadius: 5, borderWidth: 1, borderColor: BORDER },
-  valueChipText: { fontSize: FS.xs, fontFamily: FONT.medium, color: PURPLE_LIGHT },
+  valueChipText: { fontSize: FS.xs, fontFamily: FONT.medium },
   customValueRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
     backgroundColor: CARD, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER,

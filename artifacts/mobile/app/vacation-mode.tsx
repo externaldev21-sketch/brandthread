@@ -17,8 +17,11 @@ import {
   PURPLE, PURPLE_LIGHT, PURPLE_DIM, SUCCESS, SUCCESS_DIM,
   ORANGE, RED, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 export default function VacationModeScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentLight: PURPLE_LIGHT } = theme;
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api    = useApi();

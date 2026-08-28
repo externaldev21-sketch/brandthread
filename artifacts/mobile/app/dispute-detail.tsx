@@ -11,6 +11,7 @@ import {
   BLUE, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
   GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   BrandthreadCard, BrandthreadHeader, GradientCard, PrimaryButton,
   SecondaryButton, StatusBadge, FormInput,
@@ -76,6 +77,9 @@ function mapStatus(s: string): string {
 }
 
 export default function DisputeDetailScreen() {
+  const { theme } = useAppTheme();
+  const { accent: PURPLE, accentDim: PURPLE_DIM, secondary: CYAN } = theme;
+  const styles = React.useMemo(() => createStyles(theme), [theme]);
   const { orderId, disputeId } = useLocalSearchParams<{ orderId: string; disputeId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -476,7 +480,9 @@ export default function DisputeDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (theme: { accent: string; accentDim: string; secondary: string }) => {
+  const { accent: PURPLE, accentDim: PURPLE_DIM, secondary: CYAN } = theme;
+  return StyleSheet.create({
   centered:           { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
   loadingText:        { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED },
   section:            { gap: SP.sm },
@@ -535,4 +541,5 @@ const styles = StyleSheet.create({
     borderColor: BORDER, padding: SP.sm, marginBottom: SP.xs,
   },
   noteText:           { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, flex: 1, lineHeight: 18 },
-});
+  });
+};

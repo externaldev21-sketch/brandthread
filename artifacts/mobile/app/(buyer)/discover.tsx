@@ -20,6 +20,8 @@ import {
   CYAN, SUCCESS, RED,
   FONT, FS, SP, RADIUS
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useAuth } from '@clerk/expo';
 
 // ─── Mock data ────────────────────────────────────────────────────────────────
 
@@ -358,7 +360,8 @@ function TrendingRow({ item }: { item: TrendingItem }) {
   const border  = BORDER;
   const fg      = FG;
   const muted   = MUTED;
-  const primary = PURPLE;
+  const { theme } = useAppTheme();
+  const primary = theme.accent;
 
   function handlePress() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -387,7 +390,7 @@ function TrendingRow({ item }: { item: TrendingItem }) {
       </View>
       <View style={{ alignItems: 'flex-end', gap: 4 }}>
         <Text style={[tr.price, { color: item.color }]}>{item.price}</Text>
-        <Text style={tr.hype}>{item.hype}</Text>
+        <Text style={[tr.hype, { color: primary }]}>{item.hype}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -401,7 +404,7 @@ const tr = StyleSheet.create({
   name:     { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   brand:    { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
   price:    { fontSize: 13, fontFamily: 'Inter_700Bold' },
-  hype:     { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: PURPLE },
+  hype:     { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
 });
 
 // ─── Section header ───────────────────────────────────────────────────────────
@@ -409,7 +412,8 @@ const tr = StyleSheet.create({
 function SectionHead({ title, sub, action, onAction }: { title: string; sub?: string; action?: string; onAction?: () => void }) {
   const fg       = FG;
   const muted    = MUTED;
-  const primary  = PURPLE;
+  const { theme } = useAppTheme();
+  const primary  = theme.accent;
 
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 14 }}>
@@ -432,12 +436,14 @@ export default function DiscoverScreen() {
   const insets  = useSafeAreaInsets();
   const router  = useRouter();
   const api     = useApi();
+  const { theme } = useAppTheme();
+  const { isSignedIn } = useAuth();
 
   const bg      = BG;
   const fg      = FG;
   const muted   = MUTED;
   const border  = BORDER;
-  const primary = PURPLE;
+  const primary = theme.accent;
   const topPad  = Platform.OS === 'web' ? 67 : insets.top;
 
   const [discoverItems, setDiscoverItems] = useState<ForYouItem[]>(() => shuffle(UNFOLLOWED_BRAND_POOL).slice(0, 4));
@@ -459,7 +465,7 @@ export default function DiscoverScreen() {
           brandId:  t.brandId,   // seller clerkId — used for correct navigation
           name:     t.caption ? t.caption.slice(0, 60) : 'Trending Post',
           price:    `${t.likesCount} ♥`,
-          color:    PURPLE,
+          color:    theme.accent,
           initials: (t.brand ?? 'B').slice(0, 2).toUpperCase(),
           hype:     t.hype ?? '✨ Fresh',
         }));
@@ -487,7 +493,7 @@ export default function DiscoverScreen() {
             name:          row.name,
             price:         `$${priceDollars}`,
             originalPrice: null,
-            color:         PURPLE,
+            color:         theme.accent,
             initials:      (row.name ?? 'P')[0].toUpperCase(),
             tag:           (row.tags as string[] | undefined)?.[0] ?? 'New',
           };
@@ -536,14 +542,16 @@ export default function DiscoverScreen() {
           >
             <Feather name="search" size={18} color={muted} />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.headerBtn, { backgroundColor: CARD, borderColor: border }]}
-            activeOpacity={0.75}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/inbox' as never); }}
-          >
-            <Feather name="bell" size={18} color={muted} />
-            <View style={[s.notifDot, { backgroundColor: RED }]} />
-          </TouchableOpacity>
+          {isSignedIn && (
+            <TouchableOpacity
+              style={[s.headerBtn, { backgroundColor: CARD, borderColor: border }]}
+              activeOpacity={0.75}
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/inbox' as never); }}
+            >
+              <Feather name="bell" size={18} color={muted} />
+              <View style={[s.notifDot, { backgroundColor: RED }]} />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -563,7 +571,7 @@ export default function DiscoverScreen() {
       </View>
       {forYouLoading ? (
         <View style={{ paddingHorizontal: 20, height: 180, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color={PURPLE} size="small" />
+          <ActivityIndicator color={primary} size="small" />
         </View>
       ) : (
         <ScrollView

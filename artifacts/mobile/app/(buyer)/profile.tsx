@@ -16,6 +16,7 @@ import {
   GRAD_PRIMARY, FONT, FS, SP, RADIUS, COMP, ICON, OVERLAY,
   RED, RED_DIM,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   getMyProfile, getMyPosts, getMyReposts, getSavedItems,
   getPrivacySettings, archivePost, deletePost,
@@ -101,6 +102,7 @@ export default function ProfileScreen() {
   const { signOut } = useAuth();
   const { user } = useUser();
   const api     = useApi();
+  const { theme } = useAppTheme();
 
   const [profile, setProfile] = useState<BuyerSocialProfile | null>(null);
   const [hasActiveStory, setHasActiveStory] = useState(false);
@@ -269,7 +271,7 @@ export default function ProfileScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PURPLE} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.accent} />}
       >
         {/* Hero Row */}
         <View style={styles.heroRow}>
@@ -277,14 +279,14 @@ export default function ProfileScreen() {
             {/* Purple ring when user has an active story */}
             {hasActiveStory ? (
               <LinearGradient
-                colors={GRAD_PRIMARY as unknown as [string, string, ...string[]]}
+                colors={[theme.accent, theme.secondary] as [string, string]}
                 start={{ x: 0, y: 1 }} end={{ x: 1, y: 0 }}
                 style={styles.storyRing}
               >
                 {avatarUri ? (
                   <Image source={{ uri: avatarUri }} style={[styles.avatar, { resizeMode: 'cover', margin: 3 }]} />
                 ) : (
-                  <LinearGradient colors={GRAD_PRIMARY} style={[styles.avatar, { margin: 3 }]}>
+                  <LinearGradient colors={[theme.accent, theme.secondary] as [string, string]} style={[styles.avatar, { margin: 3 }]}>
                     <Text style={styles.avatarText}>{avatarInitials}</Text>
                   </LinearGradient>
                 )}
@@ -292,12 +294,12 @@ export default function ProfileScreen() {
             ) : avatarUri ? (
               <Image source={{ uri: avatarUri }} style={[styles.avatar, { resizeMode: 'cover' }]} />
             ) : (
-              <LinearGradient colors={GRAD_PRIMARY} style={styles.avatar}>
+              <LinearGradient colors={[theme.accent, theme.secondary] as [string, string]} style={styles.avatar}>
                 <Text style={styles.avatarText}>{avatarInitials}</Text>
               </LinearGradient>
             )}
             <View style={styles.avatarBadge}>
-              <Feather name="plus-circle" size={20} color={PURPLE} />
+              <Feather name="plus-circle" size={20} color={theme.accent} />
             </View>
           </TouchableOpacity>
 
@@ -338,9 +340,9 @@ export default function ProfileScreen() {
               <Text style={styles.locationText}>{profile.location}</Text>
             </View>
           ) : null}
-          <View style={styles.privacyBadge}>
-            <Feather name={isPrivate ? 'lock' : 'globe'} size={12} color={PURPLE} />
-            <Text style={styles.privacyBadgeText}>{isPrivate ? 'Private' : 'Public'}</Text>
+          <View style={[styles.privacyBadge, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
+            <Feather name={isPrivate ? 'lock' : 'globe'} size={12} color={theme.accent} />
+            <Text style={[styles.privacyBadgeText, { color: theme.accent }]}>{isPrivate ? 'Private' : 'Public'}</Text>
           </View>
         </View>
 
@@ -365,7 +367,7 @@ export default function ProfileScreen() {
             onPress={() => router.push('/buyer-highlights-manager' as any)}
           >
             <View style={styles.highlightCircle}>
-              <Feather name="plus" size={22} color={PURPLE} />
+              <Feather name="plus" size={22} color={theme.accent} />
             </View>
             <Text style={styles.highlightLabel}>New</Text>
           </TouchableOpacity>
@@ -389,10 +391,10 @@ export default function ProfileScreen() {
           {TABS.map(tab => (
             <TouchableOpacity
               key={tab}
-              style={[styles.tabPill, activeTab === tab && styles.tabPillActive]}
+              style={[styles.tabPill, activeTab === tab && [styles.tabPillActive, { backgroundColor: theme.accentDim, borderColor: theme.accent }]]}
               onPress={() => setActiveTab(tab)}
             >
-              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
+              <Text style={[styles.tabText, activeTab === tab && [styles.tabTextActive, { color: theme.accent }]]}>{tab}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -405,8 +407,8 @@ export default function ProfileScreen() {
                 <Feather name="image" size={32} color={MUTED} />
                 <Text style={styles.emptyTitle}>No posts yet</Text>
                 <Text style={styles.emptyDesc}>Your posts will appear here.</Text>
-                <TouchableOpacity style={styles.emptyAction} onPress={() => router.push('/create-post?accountType=buyer' as any)}>
-                  <Text style={styles.emptyActionText}>Create Post</Text>
+                <TouchableOpacity style={[styles.emptyAction, { borderColor: theme.accent }]} onPress={() => router.push('/create-post?accountType=buyer' as any)}>
+                  <Text style={[styles.emptyActionText, { color: theme.accent }]}>Create Post</Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -439,8 +441,8 @@ export default function ProfileScreen() {
             <Feather name="tag" size={32} color={MUTED} />
             <Text style={styles.emptyTitle}>No tagged posts</Text>
             <Text style={styles.emptyDesc}>Posts that tag you will appear here.</Text>
-            <TouchableOpacity style={styles.emptyAction} onPress={() => router.push('/(buyer)/discover')}>
-              <Text style={styles.emptyActionText}>Discover</Text>
+            <TouchableOpacity style={[styles.emptyAction, { borderColor: theme.accent }]} onPress={() => router.push('/(buyer)/discover')}>
+              <Text style={[styles.emptyActionText, { color: theme.accent }]}>Discover</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -476,8 +478,8 @@ export default function ProfileScreen() {
                 <Feather name="bookmark" size={32} color={MUTED} />
                 <Text style={styles.emptyTitle}>Nothing saved yet</Text>
                 <Text style={styles.emptyDesc}>Items you save will appear here.</Text>
-                <TouchableOpacity style={styles.emptyAction} onPress={() => router.push('/buyer-saved' as any)}>
-                  <Text style={styles.emptyActionText}>View Saved</Text>
+                <TouchableOpacity style={[styles.emptyAction, { borderColor: theme.accent }]} onPress={() => router.push('/buyer-saved' as any)}>
+              <Text style={[styles.emptyActionText, { color: theme.accent }]}>View Saved</Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -488,7 +490,7 @@ export default function ProfileScreen() {
                     style={styles.savedTile}
                     onPress={() => router.push('/buyer-saved' as any)}
                   >
-                    <Feather name={savedTypeIcon(item.type)} size={ICON.md} color={item.accentColor || PURPLE} />
+                    <Feather name={savedTypeIcon(item.type)} size={ICON.md} color={item.accentColor || theme.accent} />
                     <Text style={styles.savedTitle} numberOfLines={2}>{item.title}</Text>
                     {item.subtitle ? <Text style={styles.savedSubtitle} numberOfLines={1}>{item.subtitle}</Text> : null}
                   </TouchableOpacity>

@@ -3,6 +3,7 @@
  * Route: /design-garment?projectId=<id>&garmentType=tshirt&garmentColor=#FFFFFF
  */
 import React, { useState, useEffect } from 'react';
+import { useColors } from '@/hooks/useColors';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert,
 } from 'react-native';
@@ -67,6 +68,7 @@ const ZONE_RECTS: Record<string, { x: number; y: number; w: number; h: number }>
 };
 
 export default function DesignGarmentScreen() {
+  const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ projectId?: string; garmentType?: string; garmentColor?: string }>();

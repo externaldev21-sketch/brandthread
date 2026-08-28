@@ -177,9 +177,15 @@ export interface CheckoutSession {
    * Durably tracks which seller groups have already been charged this session.
    * Persisted to AsyncStorage after each successful payment so the ref is
    * restored correctly if the component remounts before the loop finishes.
-   * Maps sellerId → { stripeSessionId, orderNumber, amountTotalCents }.
+   * Guest access tokens remain device-local and are needed only to verify the
+   * corresponding Stripe session after the browser returns.
    */
-  paidGroups?: Record<string, { stripeSessionId: string; orderNumber: string; amountTotalCents: number }>;
+  paidGroups?: Record<string, {
+    stripeSessionId: string;
+    orderNumber?: string;
+    amountTotalCents?: number;
+    guestAccessToken?: string;
+  }>;
 }
 
 export interface CheckoutAcknowledgment {

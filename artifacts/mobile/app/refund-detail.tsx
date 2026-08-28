@@ -11,6 +11,7 @@ import {
   BLUE, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
   GRAD_PRIMARY, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
+import { useColors } from '@/hooks/useColors';
 import {
   BrandthreadCard, BrandthreadHeader, GradientCard, PrimaryButton,
   SecondaryButton, StatusBadge, FormInput,
@@ -60,6 +61,7 @@ const qtyS = StyleSheet.create({
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function RefundDetailScreen() {
+  const colors = useColors();
   const { orderId, returnId } = useLocalSearchParams<{ orderId: string; returnId?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();

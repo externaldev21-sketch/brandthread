@@ -8,9 +8,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 import {
   BG, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE,
-  PURPLE, PURPLE_DIM, ON_DARK, GRAD_PRIMARY,
+  ON_DARK,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   getMutedUsers, unmuteUser, subscribeSocial,
 } from '@/services/socialService';
@@ -23,6 +24,11 @@ type ApiBlockRecord = {
 };
 
 export default function BuyerBlocked() {
+  const { theme } = useAppTheme();
+  const PURPLE = theme.accent;
+  const PURPLE_DIM = theme.accentDim;
+  const GRAD_PRIMARY = [theme.accent, theme.accentLight] as const;
+  const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
@@ -192,7 +198,7 @@ export default function BuyerBlocked() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: BG,
@@ -232,7 +238,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   tabActive: {
-    backgroundColor: PURPLE_DIM,
+    backgroundColor: theme.accentDim,
     borderColor: BORDER_ACTIVE,
   },
   tabText: {
@@ -241,7 +247,7 @@ const styles = StyleSheet.create({
     fontSize: FS.sm,
   },
   tabTextActive: {
-    color: PURPLE,
+    color: theme.accent,
     fontFamily: FONT.semibold,
   },
   row: {
@@ -289,7 +295,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   actionBtnText: {
-    color: PURPLE,
+    color: theme.accent,
     fontSize: FS.sm,
     fontFamily: FONT.medium,
   },

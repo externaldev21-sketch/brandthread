@@ -23,6 +23,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import type { SellerPost } from '@/services/types';
 import type { Product } from '@/services/productTypes';
 import { useApi } from '@/hooks/useApi';
+import { useColors } from '@/hooks/useColors';
 
 // ─── Design Tokens ─────────────────────────────────────────────────────────────
 const BG        = '#07070F';
@@ -300,6 +301,7 @@ function EmptyState({ icon, title, subtitle }: { icon: keyof typeof Feather.glyp
 // ─── Main Screen ───────────────────────────────────────────────────────────────
 
 export default function SellerProfileScreen() {
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string; isOwner?: string }>();
@@ -452,7 +454,7 @@ export default function SellerProfileScreen() {
   if (profileLoading) {
     return (
       <View style={[styles.root, { alignItems: 'center', justifyContent: 'center', gap: 12 }]}>
-        <ActivityIndicator color={GREEN} />
+        <ActivityIndicator color={colors.primary} />
         <Text style={{ color: MUTED }}>Loading seller profile…</Text>
       </View>
     );
@@ -549,7 +551,7 @@ export default function SellerProfileScreen() {
                     <Text style={styles.outlineBtnText}>Messages</Text>
                   </TouchableOpacity>
                   <LinearGradient
-                    colors={[GREEN, '#00D4FF']}
+                    colors={[colors.primary, colors.accentForeground] as const}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.gradientBtnWrap}
@@ -590,7 +592,7 @@ export default function SellerProfileScreen() {
           <View style={styles.brandNameRow}>
             <Text style={styles.brandName}>{profile.brandName}</Text>
             {profile.verified && (
-              <Feather name="check-circle" size={14} color={GREEN} style={{ marginLeft: 6 }} />
+              <Feather name="check-circle" size={14} color={colors.primary} style={{ marginLeft: 6 }} />
             )}
           </View>
 
@@ -617,7 +619,7 @@ export default function SellerProfileScreen() {
               }}
               activeOpacity={0.7}
             >
-              <Feather name="link" size={12} color={GREEN} />
+              <Feather name="link" size={12} color={colors.primary} />
               <Text style={styles.websiteText}>{profile.website}</Text>
             </TouchableOpacity>
           )}
@@ -686,7 +688,7 @@ export default function SellerProfileScreen() {
         {!isOwner && (
           <View style={styles.shopBtnWrapper}>
             <LinearGradient
-              colors={[GREEN, '#00D4FF']}
+              colors={[colors.primary, colors.accentForeground] as const}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.shopBtnGradient}
@@ -745,7 +747,7 @@ export default function SellerProfileScreen() {
           {activeTab === 1 && (
             <View style={styles.productsGrid}>
               {productsLoading ? (
-                <ActivityIndicator color={GREEN} style={{ marginTop: 40, alignSelf: 'center' }} />
+                <ActivityIndicator color={colors.primary} style={{ marginTop: 40, alignSelf: 'center' }} />
               ) : displayProducts.length === 0 ? (
                 <EmptyState icon="shopping-bag" title="No products available" />
               ) : (

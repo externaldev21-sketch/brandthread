@@ -477,6 +477,13 @@ export function createApi(getToken: GetToken) {
       klaviyoDisconnect:  () => del<any>('/api/integrations/klaviyo'),
     },
     buyer: {
+      addresses: {
+        list:   () => get<any[]>('/api/buyer/addresses'),
+        create: (body: any) => post<any>('/api/buyer/addresses', body),
+        update: (id: string, body: any) => patch<any>(`/api/buyer/addresses/${encodeURIComponent(id)}`, body),
+        delete: (id: string) => del<void>(`/api/buyer/addresses/${encodeURIComponent(id)}`),
+        setDefault: (id: string) => post<any>(`/api/buyer/addresses/${encodeURIComponent(id)}/default`, {}),
+      },
       checkout: {
         /** Create a Stripe Checkout Session. Returns { sessionId, url }. */
         createSession: (
@@ -484,7 +491,7 @@ export function createApi(getToken: GetToken) {
           opts: {
             contactEmail?: string;
             shippingAddress?: {
-              name?: string; street: string; city: string;
+              name?: string; street: string; line2?: string; city: string;
               state: string; zip: string; country?: string;
             };
             /** Per-seller idempotency key (format: {checkoutSessionId}_{sellerId}).
@@ -557,6 +564,35 @@ export function createApi(getToken: GetToken) {
           ),
         ),
     },
+    guest: {
+      checkout: {
+        createSession: (
+          items: { variantId: string; productId: string; quantity: number }[],
+          opts: {
+            contactEmail?: string;
+            shippingAddress?: {
+              name?: string; street: string; line2?: string; city: string;
+              state: string; zip: string; country?: string;
+            };
+            clientIdempotencyKey?: string;
+          } = {},
+        ) => post<{ sessionId: string; url: string; guestAccessToken: string }>('/api/guest/checkout/session', {
+          items,
+          successUrl: 'mobile://checkout/return?session_id={CHECKOUT_SESSION_ID}',
+          cancelUrl:  'mobile://checkout/cancel',
+          ...opts,
+        }),
+        verifySession: (sessionId: string, guestAccessToken: string) =>
+          post<{
+            status: string;
+            paymentStatus: string;
+            amountTotal: number | null;
+            orderId: string | null;
+            orderNumber: string | null;
+            orderStatus: string | null;
+          }>(`/api/guest/checkout/session/${encodeURIComponent(sessionId)}/verify`, { guestAccessToken }),
+      }
+    },
     /** DM conversations between buyers and sellers. */
     conversations: {
       list:    () => get<any[]>('/api/conversations'),
@@ -603,6 +639,20 @@ export function createApi(getToken: GetToken) {
         return get<any[]>(`/api/public/products${q ? `?${q}` : ''}`);
       },
       get: (id: string) => get<any>(`/api/public/products/${encodeURIComponent(id)}`),
+      related: (productId: string, limit?: number) =>
+        get<any[]>(`/api/public/products/${encodeURIComponent(productId)}/related${limit ? `?limit=${limit}` : ''}`),
+    },
+    public: {
+      search: (opts: { q: string; sort?: string; minPriceCents?: number; maxPriceCents?: number; category?: string; limit?: number }) => {
+        const params = new URLSearchParams();
+        if (opts.q) params.set('q', opts.q);
+        if (opts.sort) params.set('sort', opts.sort);
+        if (opts.minPriceCents !== undefined) params.set('minPriceCents', String(opts.minPriceCents));
+        if (opts.maxPriceCents !== undefined) params.set('maxPriceCents', String(opts.maxPriceCents));
+        if (opts.category) params.set('category', opts.category);
+        if (opts.limit) params.set('limit', String(opts.limit));
+        return get<{ results: any[] }>(`/api/public/search?${params.toString()}`);
+      }
     },
     reviews: {
       /** List reviews for a product (public). Returns { reviews, avgRating, totalCount }. */

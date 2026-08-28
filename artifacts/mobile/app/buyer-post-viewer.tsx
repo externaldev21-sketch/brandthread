@@ -13,9 +13,11 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { useColors } from '@/hooks/useColors';
+import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
-  BG, SURFACE, CARD, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, PURPLE, PURPLE_DIM, ON_DARK,
-  GRAD_PRIMARY, FONT, FS, SP, RADIUS, ICON, OVERLAY, RED,
+  BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK,
+  FONT, FS, SP, RADIUS, ICON, OVERLAY, RED,
 } from '@/lib/theme';
 import {
   getComments, likePost, repostPost, saveItem, getMyPosts, updatePost, deletePost,
@@ -24,6 +26,13 @@ import {
 import type { BuyerPost, Comment } from '@/services/socialTypes';
 
 export default function BuyerPostViewer() {
+  const colors = useColors();
+  const { theme } = useAppTheme();
+  const PURPLE = colors.primary, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = colors.accent, CYAN = theme.secondary, CYAN_DIM = theme.secondaryDim;
+  const BORDER_ACTIVE = `${theme.accent}73`, BORDER_FOCUS = `${theme.secondary}80`;
+  const GRAD_PRIMARY = [theme.accent, theme.secondary] as const;
+  const SHADOW_PURPLE = { shadowColor: theme.accent, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 };
+  const s = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{
@@ -314,7 +323,11 @@ export default function BuyerPostViewer() {
   );
 }
 
-const s = StyleSheet.create({
+const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
+  const PURPLE = theme.accent, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = theme.accentDim, CYAN = theme.secondary, CYAN_DIM = theme.secondaryDim;
+  const BORDER_ACTIVE = `${theme.accent}73`, BORDER_FOCUS = `${theme.secondary}80`;
+  const SHADOW_PURPLE = { shadowColor: theme.accent, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 };
+  return StyleSheet.create({
   page: { flex: 1, backgroundColor: BG },
   header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
@@ -352,4 +365,5 @@ const s = StyleSheet.create({
   modalCancelText: { fontFamily: FONT.medium, fontSize: FS.base, color: MUTED },
   modalSave: { flex: 1, paddingVertical: 14, borderRadius: RADIUS.md, backgroundColor: PURPLE, alignItems: 'center' },
   modalSaveText: { fontFamily: FONT.bold, fontSize: FS.base, color: ON_DARK },
-});
+  });
+};

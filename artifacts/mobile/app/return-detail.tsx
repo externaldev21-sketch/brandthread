@@ -17,6 +17,7 @@ import {
 } from '@/components/BrandthreadUI';
 import { getOrder, updateReturnStatus } from '@/services/orderService';
 import { Order, ReturnRequest, RETURN_REASONS } from '@/services/orderTypes';
+import { useColors } from '@/hooks/useColors';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -94,6 +95,7 @@ const tlS = StyleSheet.create({
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function ReturnDetailScreen() {
+  const colors = useColors();
   const { orderId, returnId } = useLocalSearchParams<{ orderId: string; returnId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -343,7 +345,7 @@ export default function ReturnDetailScreen() {
               label="Mark Inspected"
               onPress={() => doAction('inspected')}
               loading={actionLoading}
-              colors={[PURPLE, CYAN]}
+              colors={[colors.primary, colors.accentForeground] as const}
             />
           )}
 
