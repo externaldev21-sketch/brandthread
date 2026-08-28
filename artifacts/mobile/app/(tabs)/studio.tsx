@@ -120,7 +120,7 @@ export default function StudioScreen() {
   const toolCardWidth = cardWidth(windowWidth, cols);
 
   const api = useApi();
-  const { hasPlan } = useSubscriptionPlan();
+  const { hasPlan, loading: planLoading, error: planError, retry: retryPlan } = useSubscriptionPlan();
 
   const [dismissedTips,  setDismissedTips]  = useState<string[]>([]);
   const [openedFeatures, setOpenedFeatures] = useState<string[]>([]);
@@ -193,6 +193,13 @@ export default function StudioScreen() {
   const handleToolPress = useCallback(async (tool: StudioTool) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
+    if (planError) {
+      retryPlan();
+      return;
+    }
+
+    if (planLoading) return;
+
     // Gate Growth-only tools for Starter sellers
     if (GROWTH_REQUIRED_TOOLS.has(tool.id) && !hasPlan('growth')) {
       setUpsellFeature(tool.title);
@@ -205,7 +212,7 @@ export default function StudioScreen() {
       setOpenedFeatures(prev => [...prev, tool.id]);
     }
     router.push(tool.route as never);
-  }, [router, hasPlan]);
+  }, [router, hasPlan, planError, planLoading, retryPlan]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -227,6 +234,20 @@ export default function StudioScreen() {
             <Text style={s.myProjectsBtnText}>My Projects</Text>
           </TouchableOpacity>
         </View>
+
+        {planError && (
+          <TouchableOpacity
+            style={s.planErrorBanner}
+            onPress={retryPlan}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Could not load plan. Tap to retry."
+          >
+            <Feather name="alert-circle" size={ICON.sm} color={ORANGE} />
+            <Text style={s.planErrorText}>Could not load plan — tap to retry</Text>
+            <Feather name="refresh-cw" size={ICON.sm} color={ORANGE} />
+          </TouchableOpacity>
+        )}
 
         {/* ── INFO BANNER ── */}
         <LinearGradient
@@ -261,7 +282,7 @@ export default function StudioScreen() {
         {/* Responsive grid — pixel widths, no percentages */}
         <View style={[s.toolGrid, { paddingHorizontal: H_PAD }]}>
           {STUDIO_TOOLS.map((tool) => {
-            const isLocked = GROWTH_REQUIRED_TOOLS.has(tool.id) && !hasPlan('growth');
+            const isLocked = !planLoading && !planError && GROWTH_REQUIRED_TOOLS.has(tool.id) && !hasPlan('growth');
             const toolAccent = tool.id === 'ai-design' ? theme.accentLight : tool.accent;
             const toolAccentDim = tool.id === 'ai-design' ? theme.accentDim : tool.accentDim;
             return (
@@ -466,6 +487,25 @@ const s = StyleSheet.create({
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
     color: PURPLE_LIGHT,
+  },
+  planErrorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    marginHorizontal: H_PAD,
+    marginBottom: SP.sm,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+    borderRadius: RADIUS.md,
+    backgroundColor: '#2B1E0F',
+    borderWidth: 1,
+    borderColor: ORANGE,
+  },
+  planErrorText: {
+    flex: 1,
+    fontSize: FS.sm,
+    fontFamily: FONT.medium,
+    color: ORANGE,
   },
 
   // Banner

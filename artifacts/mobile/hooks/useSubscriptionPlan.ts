@@ -56,6 +56,7 @@ export function useSubscriptionPlan() {
   const api = useApi();
   const [plan, setPlan] = useState<PlanId | null>(_cache);
   const [loading, setLoading] = useState(_cache === null);
+  const [error, setError] = useState(false);
 
   /**
    * Keep a ref to the latest fetch function so the stable listener callback
@@ -70,10 +71,12 @@ export function useSubscriptionPlan() {
       if (_cache !== null) {
         setPlan(_cache);
         setLoading(false);
+        setError(false);
         return;
       }
 
       setLoading(true);
+      setError(false);
 
       if (!_promise) {
         _promise = api.seller.subscription
@@ -86,17 +89,20 @@ export function useSubscriptionPlan() {
             _cache = p;
             return p;
           })
-          .catch(() => {
-            // Default to starter on failure; allow retry next time
-            _cache = 'starter';
+          .catch((requestError) => {
+            // Do not turn a temporary outage into a cached downgrade.
             _promise = null;
-            return 'starter' as PlanId;
+            throw requestError;
           });
       }
 
       _promise.then((p) => {
         setPlan(p);
         setLoading(false);
+        setError(false);
+      }).catch(() => {
+        setLoading(false);
+        setError(true);
       });
     };
   }, [api]);
@@ -124,5 +130,9 @@ export function useSubscriptionPlan() {
     return (order[plan ?? 'starter'] ?? 0) >= (order[minPlan] ?? 1);
   }
 
-  return { plan: plan ?? 'starter', loading, hasPlan };
+  const retry = useCallback(() => {
+    invalidatePlanCache();
+  }, []);
+
+  return { plan: plan ?? 'starter', loading, error, hasPlan, retry };
 }

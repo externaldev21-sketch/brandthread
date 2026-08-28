@@ -137,7 +137,7 @@ export default function ManufacturerHub() {
   const { tab } = useLocalSearchParams<{ tab?: string }>();
   const [activeTab, setActiveTab] = useState<Tab>(tab === 'messages' ? 'messages' : 'discover');
 
-  const { hasPlan, loading: planLoading } = useSubscriptionPlan();
+  const { hasPlan, loading: planLoading, error: planError, retry: retryPlan } = useSubscriptionPlan();
   const [upsellVisible, setUpsellVisible] = useState(false);
 
   useEffect(() => {
@@ -146,10 +146,10 @@ export default function ManufacturerHub() {
 
   // Show upsell immediately if the seller doesn't have Growth access
   useEffect(() => {
-    if (!planLoading && !hasPlan('growth')) {
+    if (!planLoading && !planError && !hasPlan('growth')) {
       setUpsellVisible(true);
     }
-  }, [planLoading]);
+  }, [planLoading, planError, hasPlan]);
 
   const handleTabPress = (tab: Tab) => {
     Haptics.selectionAsync();
@@ -190,6 +190,20 @@ export default function ManufacturerHub() {
           ))}
         </ScrollView>
       </View>
+
+      {planError && (
+        <TouchableOpacity
+          style={s.planErrorBanner}
+          onPress={retryPlan}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Could not load plan. Tap to retry."
+        >
+          <Feather name="alert-circle" size={ICON.sm} color={ORANGE} />
+          <Text style={s.planErrorText}>Could not load plan — tap to retry</Text>
+          <Feather name="refresh-cw" size={ICON.sm} color={ORANGE} />
+        </TouchableOpacity>
+      )}
 
       {/* Tab content */}
       <View style={s.content}>
@@ -1312,6 +1326,8 @@ const s = StyleSheet.create({
   tabLabel:     { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   tabLabelActive:{ color: PURPLE_LIGHT, fontFamily: FONT.semibold },
   tabUnderline: { height: 2, width: '100%', backgroundColor: PURPLE, borderRadius: RADIUS.pill },
+  planErrorBanner: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginHorizontal: SP.md, marginTop: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm, borderRadius: RADIUS.md, backgroundColor: '#2B1E0F', borderWidth: 1, borderColor: ORANGE },
+  planErrorText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: ORANGE },
   content:      { flex: 1 },
   listContent:  { paddingTop: SP.md, paddingBottom: SP.xxl + COMP.tabBarH },
   sectionHeader:{ marginBottom: SP.xs },
