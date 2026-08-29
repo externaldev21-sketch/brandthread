@@ -24,8 +24,13 @@ import {
   MY_USER_ID, MY_COLOR, MY_INITIALS, MY_NAME, MY_HANDLE,
 } from '@/services/socialService';
 import type { BuyerPost, Comment } from '@/services/socialTypes';
+import { useAuth } from '@clerk/expo';
+import { useApi } from '@/lib/api';
+import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 
 export default function BuyerPostViewer() {
+  const { userId } = useAuth();
+  const api = useApi();
   const colors = useColors();
   const { theme } = useAppTheme();
   const PURPLE = colors.primary, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = colors.accent, CYAN = theme.secondary, CYAN_DIM = theme.secondaryDim;
@@ -219,7 +224,10 @@ export default function BuyerPostViewer() {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               if (!saved && params.postId) {
                 setSaved(true);
-                await saveItem({ type: 'post', targetId: params.postId, title: caption || 'Post', accentColor: mediaColor1 });
+                await saveItem(
+                  { type: 'post', targetId: params.postId, title: caption || 'Post', accentColor: mediaColor1 },
+                  { onRemoteSaved: () => { void requestContextualPushPermission(userId, api); } },
+                );
               }
             }}
           >

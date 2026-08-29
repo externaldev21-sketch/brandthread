@@ -64,6 +64,9 @@ export const users = pgTable('users', {
     .$type<Record<string, boolean>>()
     .notNull()
     .default({}),
+  // A tombstone is retained after an account erasure request.  Keeping the
+  // Clerk subject prevents a delayed client sync from creating a fresh profile.
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

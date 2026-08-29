@@ -13,6 +13,7 @@ import { BG, CARD, BORDER, FG, MUTED, SUBTLE, ON_DARK, FONT, FS, SP, RADIUS, ICO
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { reportNetworkError } from '@/lib/networkNotice';
+import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 
 interface Participant {
   userId: string; name: string; handle: string;
@@ -74,6 +75,13 @@ export default function SellerInboxScreen() {
         (c) => c.type !== 'buyer_to_buyer',
       );
       setConvs(relevant);
+      // Only a buyer-originated unread thread is an inbound buyer message.
+      // This list is server-backed, not the manufacturer/demo conversation data.
+      if (relevant.some((c) =>
+        c.unreadCount > 0 && c.participants.some((p) => p.userId !== myId && p.accountType === 'buyer'),
+      )) {
+        void requestContextualPushPermission(myId, api);
+      }
       setLoadError(false);
       consecutiveFailuresRef.current = 0;
     } catch (e) {

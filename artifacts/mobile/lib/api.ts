@@ -308,6 +308,12 @@ export function createApi(getToken: GetToken) {
         username?:    string;
         accountType?: 'buyer' | 'seller';
       }) => patch<any>('/api/auth/profile', body),
+      /** Permanently erase this account after the explicit DELETE confirmation. */
+      deleteAccount: () => request<{ ok: true }>(
+        '/api/auth/account',
+        { method: 'DELETE', body: JSON.stringify({ confirmation: 'DELETE' }) },
+        getToken,
+      ),
     },
     products: {
       list:           ()                       => get('/api/products'),

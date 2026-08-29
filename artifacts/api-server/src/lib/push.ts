@@ -12,6 +12,14 @@ export interface PushPayload {
   body: string;
   data?: Record<string, unknown>;
   badge?: number;
+  /**
+   * Expo notification sound filename. The file must be registered in the
+   * mobile app's expo-notifications config. Messages and all other categories
+   * use the platform default unless a caller opts into a named sound.
+   */
+  sound?: string | null;
+  /** Android notification channel, which must be configured in the app. */
+  channelId?: string;
 }
 
 /**
@@ -27,7 +35,17 @@ export type PushEventCategory =
   | "payout"
   | "dispute";
 
-function preferenceKey(accountType: string | null, category: PushEventCategory): string | null {
+export interface ExpoPushMessage {
+  to: string;
+  title: string;
+  body: string;
+  data: Record<string, unknown>;
+  sound: string | null;
+  badge?: number;
+  channelId?: string;
+}
+
+export function preferenceKey(accountType: string | null, category: PushEventCategory): string | null {
   if (accountType === "seller") {
     const sellerPreferences: Partial<Record<PushEventCategory, string>> = {
       order: "new_orders",
@@ -45,6 +63,21 @@ function preferenceKey(accountType: string | null, category: PushEventCategory):
     social: "friend_activity",
   };
   return buyerPreferences[category] ?? null;
+}
+
+export function buildExpoPushMessages(
+  tokens: { token: string }[],
+  payload: PushPayload,
+): ExpoPushMessage[] {
+  return tokens.map((token) => ({
+    to: token.token,
+    title: payload.title,
+    body: payload.body,
+    data: payload.data ?? {},
+    sound: payload.sound ?? "default",
+    badge: payload.badge,
+    channelId: payload.channelId,
+  }));
 }
 
 export async function sendPushToUser(
@@ -72,14 +105,7 @@ export async function sendPushToUser(
 
     if (!tokens.length) return;
 
-    const messages = tokens.map((t) => ({
-      to: t.token,
-      title: payload.title,
-      body: payload.body,
-      data: payload.data ?? {},
-      sound: "default",
-      badge: payload.badge,
-    }));
+    const messages = buildExpoPushMessages(tokens, payload);
 
     // Expo Push Service accepts up to 100 messages per request
     const chunks: typeof messages[] = [];

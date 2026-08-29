@@ -128,6 +128,17 @@ export async function getDeletionStatus(): Promise<DeletionRequest | null> {
   } catch { return null; }
 }
 
+/** Remove account-scoped lifecycle flags after a server-confirmed erasure. */
+export async function clearAccountLifecycleState(): Promise<void> {
+  await AsyncStorage.multiRemove([
+    K.deactivation,
+    K.deletion,
+    K.dataExport,
+    K.sessions,
+    '@brandthread/onboarding_complete',
+  ]);
+}
+
 // ─── Data Export ──────────────────────────────────────────────────────────────
 
 /**

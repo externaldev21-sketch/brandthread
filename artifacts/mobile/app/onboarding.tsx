@@ -26,7 +26,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth, useSSO, useSignUp, useUser } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
-import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather, Ionicons } from '@expo/vector-icons';
 import * as AuthSession from 'expo-auth-session';
@@ -45,6 +44,7 @@ import { DEFAULT_BUYER_PROFILE, saveBuyerProfileForUser } from '@/lib/buyerProfi
 import { SellerPlanRecommendationStep } from '@/components/onboarding/SellerPlanRecommendationStep';
 import { recommendSellerPlan } from '@/lib/sellerPlans';
 import type { SellerPlanId } from '@/lib/sellerBilling';
+import { registerGrantedPushToken } from '@/lib/contextualPushPermission';
 
 // ─── Palette ────────────────────────────────────────────────────────────────
 const BG      = '#07070F';
@@ -428,14 +428,13 @@ const sl = StyleSheet.create({
 
 
 // ─── Notifications step ────────────────────────────────────────────────────────
-// onEnable receives whether the OS permission was actually granted.
-// This is stored in AsyncStorage so downstream code (push service) can check it.
-function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (granted: boolean) => void; onSkip: () => void }) {
+// This is an explanatory consent screen only. The native dialog is intentionally
+// deferred until the user has received value from a real action in the app.
+function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: () => void; onSkip: () => void }) {
   const { theme } = useAppTheme();
   const insets  = useSafeAreaInsets();
   const opacity = useRef(new Animated.Value(0)).current;
   const slideY  = useRef(new Animated.Value(30)).current;
-  const [requesting, setRequesting] = useState(false);
 
   useEffect(() => {
     Animated.parallel([
@@ -485,24 +484,11 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
       <Animated.View style={[sn.btns, { opacity }]}>
         <TouchableOpacity
           activeOpacity={0.88}
-          disabled={requesting}
-          onPress={async () => {
-            if (Platform.OS === 'web') {
-              onEnable(false);
-              return;
-            }
-            setRequesting(true);
-            let granted = false;
-            try {
-              const result = await Notifications.requestPermissionsAsync();
-              granted = result.status === 'granted';
-            } catch { /* permission request is best-effort on native */ }
-            onEnable(granted);
-          }}
+          onPress={onEnable}
         >
           <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sn.enableBtn}>
               <Text style={[sn.enableBtnText, getOnAccentTextStyle(theme)]}>
-                {Platform.OS === 'web' ? 'Continue in browser' : 'Enable notifications'}
+                Continue
               </Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -1090,8 +1076,6 @@ export default function OnboardingScreen() {
   const [goals, setGoals]                 = useState<string[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState<SellerPlanId>('starter');
 
-  // Shared post-questionnaire state
-  const [notificationsGranted, setNotificationsGranted] = useState<boolean>(false);
   const [finishing, setFinishing]         = useState(false);
 
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -1271,9 +1255,11 @@ export default function OnboardingScreen() {
         ['user_role', 'buyer'],
         ['onboarding_first_name', firstName],
         ['onboarding_style_interests', JSON.stringify(styleInterests)],
-        ['notifications_granted', notificationsGranted ? 'true' : 'false'],
       ]);
       await AsyncStorage.multiRemove([draftKeyForUser(profile.clerkId)!, LEGACY_DRAFT_KEY]);
+      // Preserve registration for people who granted access in a prior install
+      // or device setting without showing a prompt during onboarding.
+      void registerGrantedPushToken(profile.clerkId, api);
       // Style interest preferences — non-critical for buyer
       if (styleInterests.length > 0) {
         api.seller.saveOnboardingData({ styleInterests }).catch(() => {});
@@ -1321,9 +1307,10 @@ export default function OnboardingScreen() {
         ['onboarding_brand_stage', brandStage],   // read by plans.tsx for tier recommendation
         ['onboarding_goals', JSON.stringify(goals)],
         ['onboarding_selected_plan', selectedPlanId],
-        ['notifications_granted', notificationsGranted ? 'true' : 'false'],
       ]);
       await AsyncStorage.multiRemove([draftKeyForUser(profile.clerkId)!, LEGACY_DRAFT_KEY]);
+      // This only registers an existing grant; it never asks the OS here.
+      void registerGrantedPushToken(profile.clerkId, api);
       // Seed the AI brand memory in the background so the assistant has real
       // context on the seller's stage/goals from day one — non-blocking
       api.ai.brandMemoryRebuild().catch(() => {});
@@ -1469,7 +1456,7 @@ export default function OnboardingScreen() {
       if (step === BUYER_STEP_INDEX.NOTIFICATIONS) return (
         <NotificationsStep
           flow="buyer"
-          onEnable={(granted) => { setNotificationsGranted(granted); setStep(BUYER_STEP_INDEX.SUCCESS); }}
+          onEnable={() => { setStep(BUYER_STEP_INDEX.SUCCESS); }}
           onSkip={() => setStep(BUYER_STEP_INDEX.SUCCESS)}
         />
       );
@@ -1600,7 +1587,7 @@ export default function OnboardingScreen() {
       if (step === SELLER_STEP_INDEX.NOTIFICATIONS) return (
         <NotificationsStep
           flow="seller"
-          onEnable={(granted) => { setNotificationsGranted(granted); setStep(SELLER_STEP_INDEX.SUCCESS); }}
+          onEnable={() => { setStep(SELLER_STEP_INDEX.SUCCESS); }}
           onSkip={() => setStep(SELLER_STEP_INDEX.SUCCESS)}
         />
       );

@@ -23,6 +23,7 @@ import {
   isOrderConfirmationEligibleStatus,
   sendOrderConfirmationEmail,
 } from "../lib/brandthreadEmail";
+import { publishNotification } from "./notifications-feed";
 
 const router = Router();
 
@@ -606,6 +607,36 @@ export async function handleCheckoutPaid(session: any) {
     logger.info({ orderId: createdOrderId, buyerId: buyerId ?? undefined, isGuest: !buyerId, stripeSessionId: sessionId }, "Order created from paid checkout");
 
     if (createdOrderId) {
+      const [createdOrder] = await db
+        .select({
+          ownerId: orders.ownerId,
+          orderNumber: orders.orderNumber,
+          totalCents: orders.totalCents,
+        })
+        .from(orders)
+        .where(eq(orders.id, createdOrderId))
+        .limit(1);
+
+      if (createdOrder) {
+        try {
+          await publishNotification({
+            userId: createdOrder.ownerId,
+            category: "orders",
+            type: "new_order_received",
+            title: "New order received",
+            body: `Order #${createdOrder.orderNumber} for $${(createdOrder.totalCents / 100).toFixed(2)} is ready to review.`,
+            targetId: createdOrderId,
+            targetType: "order",
+            pushCategory: "order",
+            pushSound: "order-received.wav",
+            pushChannelId: "orders",
+          });
+        } catch (err) {
+          // The order is committed even if notification delivery is unavailable.
+          logger.error({ err, orderId: createdOrderId }, "New order notification delivery failed");
+        }
+      }
+
       try {
         await sendOrderConfirmationForOrder(createdOrderId);
       } catch (err) {

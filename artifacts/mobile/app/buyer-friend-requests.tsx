@@ -19,6 +19,8 @@ import {
 } from '@/services/socialService';
 import type { FriendSuggestion } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
+import { useAuth } from '@clerk/expo';
+import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 
 type Tab = 'incoming' | 'sent' | 'suggested';
 
@@ -40,6 +42,7 @@ export default function BuyerFriendRequestsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api    = useApi();
+  const { userId } = useAuth();
 
   const [tab,      setTab]      = useState<Tab>('incoming');
   const [incoming, setIncoming] = useState<FollowRow[]>([]);   // followers I haven't followed back
@@ -103,6 +106,7 @@ export default function BuyerFriendRequestsScreen() {
     try {
       await api.social.follow(row.userId);
       setIncoming(prev => prev.filter(r => r.userId !== row.userId));
+      void requestContextualPushPermission(userId, api);
     } catch {
       Alert.alert('Error', 'Could not follow back.');
     } finally {

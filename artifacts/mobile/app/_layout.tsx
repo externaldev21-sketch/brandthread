@@ -30,6 +30,7 @@ import StoreContextBanner from '@/components/StoreContextBanner';
 import NetworkNoticeBanner from '@/components/NetworkNoticeBanner';
 import { dismissNetworkNotice } from '@/lib/networkNotice';
 import { RevenueCatProvider } from '@/lib/revenueCat';
+import { registerGrantedPushToken } from '@/lib/contextualPushPermission';
 
 // Push notifications are native-only. Importing the package is safe for the
 // web bundle, but registering a handler/listener there produces unsupported
@@ -46,6 +47,14 @@ if (Platform.OS !== 'web') {
       name:       'Brandthread',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#DDE2E8',
+    });
+    Notifications.setNotificationChannelAsync('orders', {
+      name:       'Orders',
+      description: 'New order alerts for your Brandthread store.',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      sound: 'order-received.wav',
       lightColor: '#DDE2E8',
     });
   }
@@ -356,25 +365,16 @@ function ServiceConfigurer() {
 // ─── Register Expo push token once per session ────────────────────────────────
 function PushRegistrar() {
   const api = useApi();
-  const registered = useRef(false);
+  const { isSignedIn, userId } = useAuth();
+  const registeredUserRef = useRef<string | null>(null);
   useEffect(() => {
-    // Browser push is not configured for this app. Keep registration out of the
-    // web path so a web session never requests native permissions or tokens.
-    if (Platform.OS === 'web') return;
-    if (registered.current) return;
-    registered.current = true;
-    (async () => {
-      try {
-        const { status: existing } = await Notifications.getPermissionsAsync();
-        const { status } = existing === 'granted'
-          ? { status: existing }
-          : await Notifications.requestPermissionsAsync();
-        if (status !== 'granted') return;
-        const tokenData = await Notifications.getExpoPushTokenAsync();
-        await api.push.register({ token: tokenData.data, platform: 'expo' });
-      } catch { /* non-fatal — push is best-effort */ }
-    })();
-  }, []);
+    if (!isSignedIn) return;
+    if (!userId || registeredUserRef.current === userId) return;
+    registeredUserRef.current = userId;
+    // This checks/registers an existing grant only. Native prompting belongs to
+    // the contextual value events below, never launch or onboarding.
+    void registerGrantedPushToken(userId, api);
+  }, [api, isSignedIn, userId]);
   return null;
 }
 

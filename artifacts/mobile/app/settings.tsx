@@ -107,9 +107,7 @@ export default function SettingsScreen() {
       return;
     }
     if (item.action === 'delete-account') {
-      Alert.alert('Delete account', 'This is permanent and cannot be undone. Contact support to delete your account.', [
-        { text: 'OK' },
-      ]);
+      router.push('/buyer-account-control' as never);
       return;
     }
     if (item.route) router.push(item.route as never);

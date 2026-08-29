@@ -84,6 +84,8 @@ export async function publishNotification(n: {
   targetType?:  string;
   cta?:         string;
   pushCategory?: PushEventCategory;
+  pushSound?: string | null;
+  pushChannelId?: string;
 }): Promise<void> {
   await db.insert(notificationsFeed).values({
     userId:       n.userId,
@@ -118,6 +120,8 @@ export async function publishNotification(n: {
         targetType: n.targetType,
         cta: n.cta,
       },
+      sound: n.pushSound,
+      channelId: n.pushChannelId,
     }, inferredCategory);
   }
 }

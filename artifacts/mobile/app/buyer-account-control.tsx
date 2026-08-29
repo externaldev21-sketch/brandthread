@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert,
   TextInput, Modal,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -9,14 +9,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
+import { useApi } from '@/lib/api';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE, RED, OVERLAY,
   BORDER_SUBTLE, ON_DARK,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
-import { requestDeactivation } from '@/lib/accountService';
+import { clearAccountLifecycleState, requestDeactivation } from '@/lib/accountService';
 
-type ConfirmModal = 'deactivate' | null;
+type ConfirmModal = 'deactivate' | 'delete' | null;
 
 function ConfirmationModal({
   type,
@@ -29,7 +30,7 @@ function ConfirmationModal({
 }) {
   const insets = useSafeAreaInsets();
   const [input, setInput] = useState('');
-  const expected = 'DEACTIVATE';
+  const expected = type === 'delete' ? 'DELETE' : 'DEACTIVATE';
   const valid = input.trim().toUpperCase() === expected;
 
   if (!type) return null;
@@ -39,11 +40,13 @@ function ConfirmationModal({
       <View style={m.backdrop}>
         <View style={[m.sheet, { paddingBottom: insets.bottom + SP.md }]}>
           <View style={m.iconCircle}>
-            <Feather name="pause-circle" size={28} color={RED} />
+            <Feather name={type === 'delete' ? 'trash-2' : 'pause-circle'} size={28} color={RED} />
           </View>
-          <Text style={m.title}>Deactivate Account?</Text>
+          <Text style={m.title}>{type === 'delete' ? 'Delete Account Permanently?' : 'Deactivate Account?'}</Text>
           <Text style={m.desc}>
-            Your deactivation request will be saved on this device. You will be signed out now. Sign back in at any time to reactivate.
+            {type === 'delete'
+              ? 'This cannot be undone. Your profile, social content, device data and private data will be removed. Required transaction records are retained in anonymized form.'
+              : 'Your deactivation request will be saved on this device. You will be signed out now. Sign back in at any time to reactivate.'}
           </Text>
           <Text style={m.typeHint}>Type <Text style={{ color: RED }}>{expected}</Text> to confirm</Text>
           <TextInput
@@ -78,9 +81,28 @@ export default function BuyerAccountControl() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { signOut } = useAuth();
+  const api = useApi();
   const [confirmType, setConfirmType] = useState<ConfirmModal>(null);
+  const [deleting, setDeleting] = useState(false);
 
   async function handleConfirm() {
+    const type = confirmType;
+    if (type === 'delete') {
+      setDeleting(true);
+      try {
+        await api.auth.deleteAccount();
+        await clearAccountLifecycleState();
+        await signOut();
+        router.replace('/sign-in' as never);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Please try again or contact support.';
+        // Keep the dialog open so the user has an explicit, visible failure.
+        Alert.alert('Account deletion failed', message);
+      } finally {
+        setDeleting(false);
+      }
+      return;
+    }
     setConfirmType(null);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     // Persist the deactivation flag locally; sign back in to reactivate.
@@ -136,14 +158,18 @@ export default function BuyerAccountControl() {
           </TouchableOpacity>
         </View>
 
-        {/* Account deletion — requires contacting support */}
-        <View style={[s.infoNote, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
-          <Feather name="info" size={16} color={theme.accent} />
+        <View style={[s.infoNote, { borderColor: RED + '70' }]}>
+          <Feather name="trash-2" size={16} color={RED} />
           <View style={{ flex: 1 }}>
-            <Text style={s.infoTitle}>Want to delete your account?</Text>
-            <Text style={s.infoDesc}>
-              Account deletion requires server-side processing. Contact support@brandthread.com and our team will permanently remove your data.
-            </Text>
+            <Text style={[s.infoTitle, { color: RED }]}>Delete account permanently</Text>
+            <Text style={s.infoDesc}>Your profile and private data will be erased. Legally required purchase and payment records are retained anonymously.</Text>
+            <TouchableOpacity
+              style={s.deleteBtn}
+              disabled={deleting}
+              onPress={() => { Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); setConfirmType('delete'); }}
+            >
+              <Text style={s.deleteBtnText}>{deleting ? 'Deleting…' : 'Delete account'}</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -185,6 +211,8 @@ const s = StyleSheet.create({
   infoNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, padding: SP.md, borderRadius: RADIUS.md, borderWidth: 1, marginTop: SP.sm, marginBottom: SP.sm },
   infoTitle: { fontFamily: FONT.medium, fontSize: FS.sm, color: FG, marginBottom: 2 },
   infoDesc: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, lineHeight: 17 },
+  deleteBtn: { alignSelf: 'flex-start', marginTop: SP.sm, paddingHorizontal: SP.md, paddingVertical: 9, borderColor: RED, borderWidth: 1, borderRadius: RADIUS.md },
+  deleteBtnText: { fontFamily: FONT.semibold, fontSize: FS.sm, color: RED },
   downloadNote: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: SP.md, borderRadius: RADIUS.md, borderWidth: 1, marginTop: SP.sm },
   downloadTitle: { fontFamily: FONT.medium, fontSize: FS.sm, color: FG },
   downloadDesc: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, marginTop: 2 },

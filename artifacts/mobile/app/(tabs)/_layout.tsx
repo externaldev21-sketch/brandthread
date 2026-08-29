@@ -29,6 +29,7 @@ import {
   subscribe,
   initFromStorage,
 } from '@/lib/orderBadgeStore';
+import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 
 // ─── Tab definitions ──────────────────────────────────────────────────────────
 
@@ -90,7 +91,6 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
       try {
         const rows = await api.orders.list();
         if (cancelled || generationRef.current !== generation) return;
-
         // Count orders placed after the seller last viewed the Orders screen.
         const lastViewed = getLastViewedAt(userId);
         const count = Array.isArray(rows)
@@ -100,6 +100,11 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
                 new Date(r.createdAt).getTime() > lastViewed,
             ).length
           : 0;
+        // Prompt only when the server reports a newly received pending order,
+        // not merely because the seller has historical orders on the account.
+        if (count > 0) {
+          void requestContextualPushPermission(userId, api);
+        }
 
         // setBadgeCount discards this result if lastViewedAt advanced past
         // pollStartMs (i.e. the seller opened Orders mid-flight).

@@ -20,6 +20,8 @@ import {
   muteUser, restrictUser, createOrGetConversation,
 } from '@/services/socialService';
 import { useApi } from '@/lib/api';
+import { useAuth } from '@clerk/expo';
+import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 
 const { width } = Dimensions.get('window');
 const GRID_GAP  = 2;
@@ -45,6 +47,7 @@ export default function BuyerOtherProfileScreen() {
   const insets = useSafeAreaInsets();
   const router  = useRouter();
   const api     = useApi();
+  const { userId: currentUserId } = useAuth();
   const params  = useLocalSearchParams<{
     userId: string; name: string; handle: string; initials: string; color: string;
   }>();
@@ -118,6 +121,9 @@ export default function BuyerOtherProfileScreen() {
       } else {
         await api.social.follow(userId);
         setProfile(prev => prev ? { ...prev, isFollowing: true, isMutual: prev.isFollowedBy, followersCount: prev.followersCount + 1 } : prev);
+        // This API call has completed successfully for a non-demo profile, so
+        // it is an appropriate first-value moment to ask about native push.
+        void requestContextualPushPermission(currentUserId, api);
       }
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     } catch {

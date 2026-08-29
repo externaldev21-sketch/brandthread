@@ -188,7 +188,9 @@
         {
           "icon": "./assets/images/icon.png",
           "color": "#8B5CF6",
-          "sounds": [],
+          "sounds": [
+            "./assets/sounds/order-received.wav"
+          ],
           "iosDisplayInForeground": true
         }
       ]

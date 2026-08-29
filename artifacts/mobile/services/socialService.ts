@@ -1164,10 +1164,14 @@ export async function getSavedItems(k: SocialKeys = K()): Promise<SavedItem[]> {
   if (_socialUserId === k.userId) await save(k.saved, authoritative);
   return authoritative;
 }
-export async function saveItem(params: { type: SavedItemType; targetId: string; title: string; subtitle?: string; accentColor?: string; }): Promise<SavedItem> {
+export async function saveItem(
+  params: { type: SavedItemType; targetId: string; title: string; subtitle?: string; accentColor?: string; },
+  options?: { onRemoteSaved?: () => void },
+): Promise<SavedItem> {
   const k = K();
   try {
     const saved = await serviceRequest<SavedItem>('/api/buyer/saved', { method: 'POST', body: JSON.stringify(params) });
+    options?.onRemoteSaved?.();
     notify();
     return saved;
   } catch { /* fall through to existing local logic */ }

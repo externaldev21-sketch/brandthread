@@ -9,6 +9,7 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import {
   BG, CARD, CARD_ELEVATED, BORDER,
@@ -19,6 +20,7 @@ import {
   MY_USER_ID, MY_COLOR, MY_INITIALS,
   getStories, subscribeSocial, saveItem, createOrGetConversation,
 } from '@/services/socialService';
+import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import type { Friendship, Story, BuyerPost } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 import { reportNetworkError } from '@/lib/networkNotice';
@@ -178,6 +180,7 @@ export default function FriendsScreen() {
   const insets  = useSafeAreaInsets();
   const router  = useRouter();
   const api     = useApi();
+  const { userId } = useAuth();
 
   const [friends,      setFriends]      = useState<Friendship[]>([]);
   const [apiFollowing, setApiFollowing] = useState<ApiFollowing[]>([]);
@@ -258,6 +261,8 @@ export default function FriendsScreen() {
       targetId: post.id,
       title: post.authorName + '\'s post',
       accentColor: post.authorColor,
+    }, {
+      onRemoteSaved: () => { void requestContextualPushPermission(userId, api); },
     });
   }
 
