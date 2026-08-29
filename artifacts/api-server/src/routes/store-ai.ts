@@ -89,14 +89,14 @@ router.post("/generate", async (req, res): Promise<void> => {
   res.json({ config });
 });
 
-// POST /api/store/ai/from-logo — extract palette from logo using GPT-4o vision
+// POST /api/store/ai/from-logo — extract palette from logo using GPT-5 vision
 router.post("/from-logo", async (req, res): Promise<void> => {
   const { base64, answers } = req.body;
   if (!base64) { res.status(400).json({ error: "base64 image required" }); return; }
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-5",
       messages: [
         { role: "system", content: SYSTEM },
         {
@@ -113,7 +113,7 @@ router.post("/from-logo", async (req, res): Promise<void> => {
           ] as any,
         },
       ],
-      max_tokens: 1500,
+      max_completion_tokens: 1500,
     });
     const config = parseStoreJson(response.choices[0]?.message?.content ?? "{}");
     res.json({ config });
@@ -122,7 +122,7 @@ router.post("/from-logo", async (req, res): Promise<void> => {
   }
 });
 
-// POST /api/store/ai/from-moodboard — generate from moodboard images using GPT-4o vision
+// POST /api/store/ai/from-moodboard — generate from moodboard images using GPT-5 vision
 router.post("/from-moodboard", async (req, res): Promise<void> => {
   const { base64List, answers } = req.body;
   if (!base64List?.length) { res.status(400).json({ error: "base64List required" }); return; }
@@ -135,7 +135,7 @@ router.post("/from-moodboard", async (req, res): Promise<void> => {
     }));
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-5",
       messages: [
         { role: "system", content: SYSTEM },
         {
@@ -149,7 +149,7 @@ router.post("/from-moodboard", async (req, res): Promise<void> => {
           ] as any,
         },
       ],
-      max_tokens: 1500,
+      max_completion_tokens: 1500,
     });
     const config = parseStoreJson(response.choices[0]?.message?.content ?? "{}");
     res.json({ config });
@@ -171,7 +171,7 @@ router.post("/from-social", async (req, res): Promise<void> => {
         image_url: { url: dataUrl(b64), detail: "low" as const },
       }));
       const response = await openai.chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-5",
         messages: [
           { role: "system", content: SYSTEM },
           {
@@ -185,7 +185,7 @@ router.post("/from-social", async (req, res): Promise<void> => {
             ] as any,
           },
         ],
-        max_tokens: 1500,
+        max_completion_tokens: 1500,
       });
       const config = parseStoreJson(response.choices[0]?.message?.content ?? "{}");
       res.json({ config }); return;

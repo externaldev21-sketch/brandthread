@@ -209,7 +209,7 @@ export default function StoreFromSocialScreen() {
           <View style={ss.bannerRow}>
             <Feather name="zap" size={ICON.sm} color={PURPLE_LIGHT} />
             <Text style={[ss.bannerText, { color: PURPLE_LIGHT }]}>
-              Powered by GPT-4o — screenshots are analyzed visually; URL and posts use brand context.
+              Powered by GPT-5 — screenshots are analyzed visually; URL and posts use brand context.
             </Text>
           </View>
         </BrandthreadCard>

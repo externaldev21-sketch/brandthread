@@ -196,7 +196,7 @@ export default function StoreFromLogoScreen() {
       void clearCachedAnalysis();
       const uri = res.assets[0].uri;
       // Resize to ≤1024 px before encoding — keeps payload well under the 10 MB
-      // server limit and reduces GPT-4o vision latency (detail:"low" only needs ~512 px).
+      // server limit and reduces GPT-5 vision latency (detail:"low" only needs ~512 px).
       setResult(null);
       setApplyFailure(null);
       setPreparingLogo(true);
