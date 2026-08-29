@@ -356,7 +356,7 @@ export default function SellerHomeScreen() {
         {/* ── Hero Card: Available Balance + Next Payout ───────────────── */}
         <View style={{ paddingHorizontal: SP.md, paddingTop: SP.md, marginBottom: SP.sm }}>
           <LinearGradient
-            colors={['#1E0A3C', '#5B21B6', '#0C4A6E']}
+            colors={theme.heroGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={s.heroCard}
@@ -1130,7 +1130,7 @@ const s = StyleSheet.create({
     borderRadius: RADIUS.lg,
     padding: SP.lg,
     gap: 14,
-    shadowColor: '#5B21B6',
+    shadowColor: theme.shadowColor,
     shadowOpacity: 0.45,
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 8 },
