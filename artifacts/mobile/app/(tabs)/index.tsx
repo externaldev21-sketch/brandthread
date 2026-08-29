@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
-import { View, Text, ScrollView, StyleSheet, Animated, Modal, TextInput, FlatList, Alert, Pressable } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Animated, Modal, TextInput, FlatList, Alert, Pressable, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -16,6 +16,8 @@ import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUB
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { reportNetworkError } from '@/lib/networkNotice';
+import { useRevenueCat } from '@/lib/revenueCat';
+import { getBillingRecoveryTarget, isSubscriptionPaymentRecoveryRequired } from '@/lib/subscriptionRecovery';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -100,6 +102,7 @@ export default function SellerHomeScreen() {
   const router = useRouter();
 
   const api = useApi();
+  const { managementURL } = useRevenueCat();
   const [loading, setLoading] = useState(true);
   const [statsError, setStatsError] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
@@ -138,6 +141,9 @@ export default function SellerHomeScreen() {
   const [searchOrders, setSearchOrders] = useState<any[]>([]);
   const [payoutInfo,   setPayoutInfo]   = useState<any | null>(null);
   const [salesTrend,   setSalesTrend]   = useState<Array<{ day: string; totalCents: number }> | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
+  const [subscriptionProvider, setSubscriptionProvider] = useState<'stripe' | 'revenuecat' | 'none'>('none');
+  const [billingPortalLoading, setBillingPortalLoading] = useState(false);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const dashboardScrollY = useRef(new Animated.Value(0)).current;
 
@@ -239,6 +245,29 @@ export default function SellerHomeScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retryKey]);
 
+  // Subscription status is checked whenever the seller returns to the home
+  // screen so a renewal failure is visible without requiring a full reload.
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      setSubscriptionStatus(null);
+      setSubscriptionProvider('none');
+      api.seller.subscription.status()
+        .then((data) => {
+          if (active) {
+            setSubscriptionStatus(data?.status ?? null);
+            setSubscriptionProvider(data?.effectiveProvider ?? 'none');
+          }
+        })
+        .catch(() => {
+          // Keep the current banner state when the status check is transiently unavailable.
+        });
+      return () => {
+        active = false;
+      };
+    }, [api]),
+  );
+
   // ── Derived values ────────────────────────────────────────────────────────
   const pct = completionPercent(setupState);
   const nextT = nextTask(setupState);
@@ -262,6 +291,32 @@ export default function SellerHomeScreen() {
   function nav(route: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(route as never);
+  }
+
+  async function handleOpenBillingPortal() {
+    if (billingPortalLoading) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setBillingPortalLoading(true);
+    try {
+      const target = getBillingRecoveryTarget(subscriptionProvider, managementURL);
+      if (target === 'revenuecat') {
+        await Linking.openURL(managementURL!);
+        return;
+      }
+      if (target === 'subscription') {
+        router.push('/subscription' as never);
+        return;
+      }
+      const { url } = await api.seller.subscription.portal();
+      await Linking.openURL(url);
+    } catch (error: any) {
+      Alert.alert(
+        'Billing portal unavailable',
+        error?.message ?? 'Could not open the billing portal. Please try again.',
+      );
+    } finally {
+      setBillingPortalLoading(false);
+    }
   }
 
   async function handleStartSetup() {
@@ -443,6 +498,34 @@ export default function SellerHomeScreen() {
 
         {/* ── Stripe Connect Warning Banner ────────────────────────────── */}
         <StripeConnectWarning />
+
+        {/* ── Subscription payment failure ─────────────────────────────── */}
+        {isSubscriptionPaymentRecoveryRequired(subscriptionStatus) && (
+          <Pressable
+            style={s.paymentFailureBanner}
+            onPress={handleOpenBillingPortal}
+            disabled={billingPortalLoading}
+            accessibilityRole="button"
+            accessibilityLabel="Payment failed. Update your card to keep your features."
+            testID="seller-payment-failure-banner"
+          >
+            <View style={s.paymentFailureIcon}>
+              <Feather name="credit-card" size={16} color={RED} />
+            </View>
+            <View style={s.paymentFailureCopy}>
+              <Text style={s.paymentFailureTitle}>Payment failed</Text>
+              <Text style={s.paymentFailureBody}>Payment failed — update your card to keep your features.</Text>
+            </View>
+            {billingPortalLoading ? (
+              <Text style={s.paymentFailureAction}>Opening…</Text>
+            ) : (
+              <>
+                <Text style={s.paymentFailureAction}>Update card</Text>
+                <Feather name="chevron-right" size={16} color={RED} />
+              </>
+            )}
+          </Pressable>
+        )}
 
         {/* ── Stats Error Banner ────────────────────────────────────────── */}
         {statsError && (
@@ -1116,6 +1199,46 @@ const s = StyleSheet.create({
   },
   statChipWarn: {
     borderColor: 'rgba(249,115,22,0.4)',
+  },
+  paymentFailureBanner: {
+    marginHorizontal: SP.md,
+    marginBottom: SP.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    backgroundColor: 'rgba(239,68,68,0.12)',
+    borderRadius: RADIUS.md,
+    padding: SP.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(239,68,68,0.45)',
+  },
+  paymentFailureIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(239,68,68,0.16)',
+  },
+  paymentFailureCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  paymentFailureTitle: {
+    color: RED,
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+  },
+  paymentFailureBody: {
+    color: FG,
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    lineHeight: 16,
+  },
+  paymentFailureAction: {
+    color: RED,
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
   },
   statChipVal: {
     fontSize: FS.xl,

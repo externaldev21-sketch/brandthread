@@ -27,6 +27,7 @@ const REQUIRED_EVENTS = [
   "customer.subscription.created",
   "customer.subscription.updated",
   "customer.subscription.trial_will_end",
+  "invoice.payment_failed",
   "customer.subscription.deleted",
   "identity.verification_session.verified",
   "identity.verification_session.requires_input",

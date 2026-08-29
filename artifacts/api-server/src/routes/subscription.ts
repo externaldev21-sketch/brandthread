@@ -189,7 +189,10 @@ router.get("/status", requireRole("owner"), async (req, res) => {
       trialEnd:           trialEndFmt,
       amountCents,
       paymentMethodLabel: pmLabel,
-      effectiveProvider: effective.provider,
+      // Reaching this branch means the persisted Stripe subscription was
+      // retrieved successfully. Keep billing recovery pointed at Stripe even
+      // when an unpaid subscription no longer grants an effective entitlement.
+      effectiveProvider: "stripe",
       native: nativeMetadata,
     });
   } catch (err: any) {

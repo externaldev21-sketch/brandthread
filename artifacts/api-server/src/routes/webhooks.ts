@@ -146,6 +146,10 @@ router.post("/stripe", async (req: Request, res: Response) => {
         await handleSubscriptionTrialWillEnd(event.data.object);
         break;
 
+      case "invoice.payment_failed":
+        await handleInvoicePaymentFailed(event.data.object);
+        break;
+
       case "customer.subscription.deleted":
         await handleSubscriptionDeleted(event.data.object);
         break;
@@ -843,6 +847,102 @@ export async function handleSubscriptionTrialWillEnd(sub: any): Promise<void> {
   logger.info(
     { subscriptionId: sub.id, customerId, clerkId: seller.clerkId, trialEnd, amountCents },
     "Seller trial-ending push notification sent",
+  );
+}
+
+/**
+ * Handles a failed invoice for a seller's Stripe-billed platform subscription.
+ * Stripe will emit subscription.updated with the authoritative subscription
+ * status; this event is responsible for making the recovery path visible.
+ */
+async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
+  const customerId: string | undefined =
+    typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+  const invoiceSubscriptionId: string | undefined =
+    typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
+  if (!customerId) {
+    logger.warn({ invoiceId: invoice.id }, "Failed subscription invoice missing customer ID");
+    return;
+  }
+  if (!invoiceSubscriptionId) {
+    logger.info(
+      { invoiceId: invoice.id, customerId },
+      "Ignoring failed invoice because it is not subscription-backed",
+    );
+    return;
+  }
+
+  const [seller] = await db
+    .select({ clerkId: users.clerkId, subscriptionId: users.subscriptionId })
+    .from(users)
+    .where(eq(users.stripeCustomerId, customerId))
+    .limit(1);
+  if (!seller) {
+    logger.warn(
+      { invoiceId: invoice.id, customerId },
+      "Failed subscription invoice received for an unknown seller",
+    );
+    return;
+  }
+  if (!seller.subscriptionId || seller.subscriptionId !== invoiceSubscriptionId) {
+    logger.info(
+      {
+        invoiceId: invoice.id,
+        customerId,
+        invoiceSubscriptionId,
+        storedSubscriptionId: seller.subscriptionId,
+      },
+      "Ignoring failed invoice because it does not match the seller platform subscription",
+    );
+    return;
+  }
+
+  const notificationType = "subscription_payment_failed";
+  const existing = await db
+    .select({ id: notificationsFeed.id })
+    .from(notificationsFeed)
+    .where(and(
+      eq(notificationsFeed.userId, seller.clerkId),
+      eq(notificationsFeed.type, notificationType),
+      eq(notificationsFeed.targetId, invoice.id),
+    ))
+    .limit(1);
+
+  if (existing.length === 0) {
+    await db.insert(notificationsFeed).values({
+      userId: seller.clerkId,
+      category: "system",
+      type: notificationType,
+      title: "Payment failed",
+      body: "Payment failed — update your card to keep your features.",
+      targetId: invoice.id ?? null,
+      targetType: "subscription_invoice",
+      cta: "Update card",
+    });
+
+    await sendPushToUser(seller.clerkId, {
+      title: "Payment failed",
+      body: "Update your card to keep your Brandthread features.",
+      data: {
+        type: notificationType,
+        route: "/subscription",
+        invoiceId: invoice.id ?? null,
+      },
+    });
+  }
+
+  logger.info(
+    {
+      event: "invoice.payment_failed",
+      invoiceId: invoice.id,
+      customerId,
+      clerkId: seller.clerkId,
+      subscriptionId: invoiceSubscriptionId,
+      attemptCount: invoice.attempt_count,
+      nextPaymentAttempt: invoice.next_payment_attempt,
+      notificationSent: existing.length === 0,
+    },
+    "Seller subscription payment failed",
   );
 }
 

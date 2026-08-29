@@ -34,6 +34,11 @@ import { useTeamRole } from '@/hooks/useTeamRole';
 import { getGrowthStudioTools, GROWTH_EXTRAS } from '@/lib/growthTools';
 import { useRevenueCat } from '@/lib/revenueCat';
 import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
+import {
+  getBillingRecoveryTarget,
+  isSubscriptionPaymentRecoveryRequired,
+  type SubscriptionBillingProvider,
+} from '@/lib/subscriptionRecovery';
 
 // ─── Static plan catalogue ────────────────────────────────────────────────────
 
@@ -133,6 +138,7 @@ export default function SubscriptionScreen() {
     renewsOn:           '—',
     trialEnd:           null as string | null,
     status:             'none',
+    effectiveProvider:  'none' as SubscriptionBillingProvider,
     amountCents:        0,
     paymentMethodLabel: null as string | null,
   });
@@ -163,6 +169,7 @@ export default function SubscriptionScreen() {
       renewsOn:           data.renewsOn ?? '—',
       trialEnd:           data.trialEnd ?? null,
       status:             data.status,
+      effectiveProvider:  data.effectiveProvider,
       amountCents:        data.amountCents,
       paymentMethodLabel: data.paymentMethodLabel,
     });
@@ -265,10 +272,13 @@ export default function SubscriptionScreen() {
   async function handleOpenPortal() {
     haptic();
     try {
-      if (Platform.OS !== 'web') {
-        if (!managementURL) throw new Error('Subscription management is not available yet.');
-        await Linking.openURL(managementURL);
+      const target = getBillingRecoveryTarget(currentPlan.effectiveProvider, managementURL);
+      if (target === 'revenuecat') {
+        await Linking.openURL(managementURL!);
         return;
+      }
+      if (target === 'subscription') {
+        throw new Error('Subscription management is not available yet.');
       }
       const { url } = await api.seller.subscription.portal();
       externalSessionOpenedRef.current = { kind: 'portal' };
@@ -583,6 +593,19 @@ export default function SubscriptionScreen() {
               <ActivityIndicator color={PURPLE} style={{ marginTop: SP.lg }} />
             ) : (
               <>
+                  {isSubscriptionPaymentRecoveryRequired(currentPlan.status) && (
+                    <View style={styles.pastDueAlert} testID="seller-subscription-past-due-alert">
+                      <View style={styles.pastDueIcon}>
+                        <Feather name="alert-circle" size={18} color={RED} />
+                      </View>
+                      <View style={styles.pastDueCopy}>
+                        <Text style={styles.pastDueTitle}>Payment failed</Text>
+                        <Text style={styles.pastDueBody}>
+                          Your last payment didn’t go through. Update your card to keep your features.
+                        </Text>
+                      </View>
+                    </View>
+                  )}
                 <View style={styles.billingCard}>
                   {currentPlan.trialEnd && (
                     <View style={[styles.billingRow, { backgroundColor: `${CYAN}11` }]}>
@@ -703,6 +726,11 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
   progressTrack:      { height: 4, backgroundColor: BORDER, borderRadius: 2, overflow: 'hidden' },
   progressFill:       { height: 4, borderRadius: 2 },
   billingCard:        { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginBottom: SP.md, overflow: 'hidden' },
+  pastDueAlert:       { flexDirection: 'row', alignItems: 'flex-start', gap: SP.sm, backgroundColor: 'rgba(239,68,68,0.12)', borderRadius: RADIUS.lg, borderWidth: 1, borderColor: 'rgba(239,68,68,0.45)', padding: SP.md, marginBottom: SP.md },
+  pastDueIcon:        { width: 32, height: 32, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(239,68,68,0.16)' },
+  pastDueCopy:        { flex: 1, gap: 3 },
+  pastDueTitle:       { color: RED, fontSize: FS.sm, fontFamily: FONT.semibold },
+  pastDueBody:        { color: FG, fontSize: FS.xs, fontFamily: FONT.regular, lineHeight: 17 },
   billingRow:         { flexDirection: 'row', justifyContent: 'space-between', padding: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   billingLabel:       { color: MUTED, fontSize: FS.sm, fontFamily: FONT.regular },
   billingValue:       { color: FG, fontSize: FS.sm, fontFamily: FONT.medium },

@@ -929,6 +929,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           renewsOn: string | null;    // e.g. "Aug 14, 2026"
           amountCents: number;        // monthly charge in cents (0 for starter)
           paymentMethodLabel: string | null; // e.g. "Visa ···4242"
+          effectiveProvider: 'stripe' | 'revenuecat' | 'none';
         }>('/api/seller/subscription/status'),
         /** Read-only invoice summaries for the active seller store. */
         invoices: () => get<{
