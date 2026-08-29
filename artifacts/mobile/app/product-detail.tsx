@@ -6,17 +6,17 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert, Animated, Image, FlatList } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert, Animated, Image, FlatList } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
-import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, COMP, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, ORANGE, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, COMP, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
-import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SectionHeader, StatusBadge, StatCard, NavigationCard, LoadingSkeleton, EmptyState, FilterChip } from '@/components/BrandthreadUI';
+import { AnimatedEntrance, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SectionHeader, StatusBadge, StatCard, NavigationCard, LoadingSkeleton, EmptyState, FilterChip, PressableScale } from '@/components/BrandthreadUI';
 
 import { getProduct, updateProduct, getProductAnalytics, archiveProduct, publishProduct, adjustInventory } from '@/services/productService';
 import { Product, ProductVariant, ProductStatus } from '@/services/productTypes';
@@ -44,7 +44,6 @@ const TABS: { key: Tab; label: string }[] = [
 
 export default function ProductDetailScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const s = React.useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -154,25 +153,25 @@ export default function ProductDetailScreen() {
       {/* ── Fixed Header ── */}
       <View style={s.header}>
         {/* Fix 3: back button uses router.back() */}
-        <TouchableOpacity
+        <PressableScale
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
           style={s.backBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
           <Feather name="arrow-left" size={ICON.md} color={FG} />
-        </TouchableOpacity>
+        </PressableScale>
 
         <Text style={s.headerTitle} numberOfLines={1}>{product.name}</Text>
 
         <View style={s.headerRight}>
           {/* Fix 7: edit button navigates to /add-product with editId param */}
-          <TouchableOpacity
+          <PressableScale
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(('/add-product?editId=' + id) as never); }}
             style={s.headerBtn}
           >
             <Text style={s.editBtnText}>Edit</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
+          </PressableScale>
+          <PressableScale
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               Alert.alert('Product Options', '', [
@@ -201,7 +200,7 @@ export default function ProductDetailScreen() {
             style={s.iconBtnSmall}
           >
             <Feather name="more-horizontal" size={ICON.md} color={FG} />
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       </View>
 
@@ -216,17 +215,16 @@ export default function ProductDetailScreen() {
           {TABS.map((tab, idx) => {
             const active = activeTab === tab.key;
             return (
-              <TouchableOpacity
+              <PressableScale
                 key={tab.key}
                 onPress={() => handleTabPress(tab.key, idx)}
                 style={s.tabItem}
-                activeOpacity={0.7}
               >
                 <Text style={[s.tabLabel, active && s.tabLabelActive]}>
                   {tab.label}
                 </Text>
                 {active && <View style={s.tabUnderline} />}
-              </TouchableOpacity>
+              </PressableScale>
             );
           })}
         </ScrollView>
@@ -249,15 +247,14 @@ export default function ProductDetailScreen() {
       </ScrollView>
 
       {/* ── Floating Action Button ── */}
-      <TouchableOpacity
+      <PressableScale
         style={[s.fab, { bottom: insets.bottom + SP.lg }]}
         onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push(('/add-product?editId=' + id) as never); }}
-        activeOpacity={0.85}
       >
         <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.fabGrad}>
           <Feather name="edit-2" size={ICON.md} color={theme.onAccent} />
         </LinearGradient>
-      </TouchableOpacity>
+      </PressableScale>
       <AIBrainFAB context={{ screen: 'product_detail' as const, productId: String(id ?? ''), productName: String(product.name ?? '') }} bottomOffset={0} />
     </View>
   );
@@ -281,46 +278,48 @@ function OverviewTab({ product, pricing, coverImage }: {
   return (
     <View style={{ gap: SP.md, paddingTop: SP.md }}>
       {/* Hero card */}
-      <GradientCard glow style={{ marginHorizontal: SP.md, padding: 0, overflow: 'hidden' }}>
-        {coverImage ? (
-          <Image source={{ uri: coverImage.uri }} style={ov.heroImage} resizeMode="cover" />
-        ) : (
-          <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={ov.heroPlaceholder}>
-            <Feather name="package" size={ICON.xxl} color="rgba(255,255,255,0.4)" />
-          </LinearGradient>
-        )}
-        <View style={ov.heroBadgeRow}>
-          <StatusBadge label={product.status.toUpperCase()} variant={statusVariant} />
-          <StatusBadge
-            label={product.salesModel === 'pre-order' ? 'PRE-ORDER' : product.salesModel === 'both' ? 'PRE-ORDER + STOCK' : 'IN STOCK'}
-            variant={product.salesModel === 'pre-order' ? 'info' : 'purple'}
-          />
-        </View>
-        <View style={ov.heroPriceSection}>
-          <View style={ov.heroPriceRow}>
-            <Text style={ov.heroPrice}>{priceDisplay}</Text>
-            {pricing.compareAtPriceCents && (
-              <Text style={ov.heroCompare}>{formatCurrency(pricing.compareAtPriceCents)}</Text>
-            )}
-            {pricing.discountPercent && (
-              <StatusBadge label={`-${pricing.discountPercent}%`} variant="error" small />
-            )}
+      <AnimatedEntrance>
+        <GradientCard glow style={{ marginHorizontal: SP.md, padding: 0, overflow: 'hidden' }}>
+          {coverImage ? (
+            <Image source={{ uri: coverImage.uri }} style={ov.heroImage} resizeMode="cover" />
+          ) : (
+            <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={ov.heroPlaceholder}>
+              <Feather name="package" size={ICON.xxl} color="rgba(255,255,255,0.4)" />
+            </LinearGradient>
+          )}
+          <View style={ov.heroBadgeRow}>
+            <StatusBadge label={product.status.toUpperCase()} variant={statusVariant} />
+            <StatusBadge
+              label={product.salesModel === 'pre-order' ? 'PRE-ORDER' : product.salesModel === 'both' ? 'PRE-ORDER + STOCK' : 'IN STOCK'}
+              variant={product.salesModel === 'pre-order' ? 'info' : 'purple'}
+            />
           </View>
-          {pricing.marginPercent !== undefined ? (
-            <Text style={ov.heroMargin}>
-              Profit: {profitDisplay} · Margin: {pricing.marginPercent.toFixed(1)}%
-            </Text>
-          ) : pricing.costCents === undefined ? (
-            <Text style={ov.heroMargin}>Margin: — (add cost to calculate)</Text>
-          ) : null}
-        </View>
-      </GradientCard>
+          <View style={ov.heroPriceSection}>
+            <View style={ov.heroPriceRow}>
+              <Text style={ov.heroPrice}>{priceDisplay}</Text>
+              {pricing.compareAtPriceCents && (
+                <Text style={ov.heroCompare}>{formatCurrency(pricing.compareAtPriceCents)}</Text>
+              )}
+              {pricing.discountPercent && (
+                <StatusBadge label={`-${pricing.discountPercent}%`} variant="error" small />
+              )}
+            </View>
+            {pricing.marginPercent !== undefined ? (
+              <Text style={ov.heroMargin}>
+                Profit: {profitDisplay} · Margin: {pricing.marginPercent.toFixed(1)}%
+              </Text>
+            ) : pricing.costCents === undefined ? (
+              <Text style={ov.heroMargin}>Margin: — (add cost to calculate)</Text>
+            ) : null}
+          </View>
+        </GradientCard>
+      </AnimatedEntrance>
 
       {/* Stat strip */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={ov.statStrip}>
         <StatCard label="Revenue" value={formatCurrency(product.totalRevenueCents)} icon="dollar-sign" accent={GOLD} style={ov.statCard} />
-        <StatCard label="Sold" value={String(product.totalSales)} icon="shopping-bag" accent={PURPLE} style={ov.statCard} />
-        <StatCard label="Stock" value={String(product.inventory.totalStock)} icon="layers" accent={CYAN} style={ov.statCard} />
+        <StatCard label="Sold" value={String(product.totalSales)} icon="shopping-bag" accent={theme.accent} style={ov.statCard} />
+        <StatCard label="Stock" value={String(product.inventory.totalStock)} icon="layers" accent={theme.secondary} style={ov.statCard} />
         <StatCard
           label="Margin"
           value={marginDisplay}
@@ -413,13 +412,14 @@ const ov = StyleSheet.create({
   infoValue:       { fontSize: FS.sm, fontFamily: FONT.medium, color: FG, textAlign: 'right' },
   divider:         { height: 1, backgroundColor: BORDER, marginHorizontal: SP.md },
   tagRow:          { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm },
-  tag:             { backgroundColor: PURPLE_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 12, paddingVertical: 4, borderWidth: 1, borderColor: BORDER_ACTIVE },
+  tag:             { backgroundColor: PURPLE_DIM, borderRadius: RADIUS.pill, paddingHorizontal: SP.sm + SP.xs, paddingVertical: SP.xs, borderWidth: 1, borderColor: BORDER_ACTIVE },
   tagText:         { fontSize: FS.xs, fontFamily: FONT.medium, color: PURPLE_LIGHT },
 });
 
 // ─── Variants Tab ─────────────────────────────────────────────────────────────
 
 function VariantsTab({ product, setProduct, id }: { product: Product; setProduct: (p: Product) => void; id: string }) {
+  const { theme } = useAppTheme();
   // Fix 2: bulk edit price handler
   const handleBulkPrice = () => {
     const currentPrice = product.pricing.priceCents;
@@ -499,18 +499,18 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
       <BrandthreadCard style={{ marginHorizontal: SP.md }}>
         <Text style={vt.bulkTitle}>Bulk Edit</Text>
         <View style={vt.bulkRow}>
-          <TouchableOpacity style={vt.bulkBtn} onPress={handleBulkPrice}>
-            <Feather name="dollar-sign" size={ICON.sm} color={PURPLE_LIGHT} />
+          <PressableScale style={vt.bulkBtn} onPress={handleBulkPrice}>
+            <Feather name="dollar-sign" size={ICON.sm} color={theme.accentLight} />
             <Text style={vt.bulkBtnText}>Price</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={vt.bulkBtn} onPress={handleBulkInventory}>
-            <Feather name="layers" size={ICON.sm} color={CYAN} />
+          </PressableScale>
+          <PressableScale style={vt.bulkBtn} onPress={handleBulkInventory}>
+            <Feather name="layers" size={ICON.sm} color={theme.secondary} />
             <Text style={vt.bulkBtnText}>Inventory</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={vt.bulkBtn} onPress={() => Alert.alert('Bulk Status Edit', 'Set status for all variants.')}>
+          </PressableScale>
+          <PressableScale style={vt.bulkBtn} onPress={() => Alert.alert('Bulk Status Edit', 'Set status for all variants.')}>
             <Feather name="toggle-right" size={ICON.sm} color={SUCCESS} />
             <Text style={vt.bulkBtnText}>Status</Text>
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       </BrandthreadCard>
 
@@ -553,14 +553,14 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
                   )}
                 </View>
                 <View style={vt.variantActions}>
-                  <TouchableOpacity
+                  <PressableScale
                     style={vt.actionBtn}
                     onPress={() => Alert.alert('Edit Variant', `Edit ${variant.title}`)}
                   >
-                    <Feather name="edit-2" size={12} color={PURPLE_LIGHT} />
+                    <Feather name="edit-2" size={12} color={theme.accentLight} />
                     <Text style={vt.actionBtnText}>Edit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
+                  </PressableScale>
+                  <PressableScale
                     style={[vt.actionBtn, { borderColor: RED_DIM }]}
                     onPress={() => Alert.alert('Delete Variant', `Delete ${variant.title}?`, [
                       { text: 'Cancel', style: 'cancel' },
@@ -569,7 +569,7 @@ function VariantsTab({ product, setProduct, id }: { product: Product; setProduct
                   >
                     <Feather name="trash-2" size={12} color={RED} />
                     <Text style={[vt.actionBtnText, { color: RED }]}>Delete</Text>
-                  </TouchableOpacity>
+                  </PressableScale>
                 </View>
               </BrandthreadCard>
             );
@@ -604,6 +604,7 @@ const vt = StyleSheet.create({
 // ─── Inventory Tab ────────────────────────────────────────────────────────────
 
 function InventoryTab({ product, setProduct, id }: { product: Product; setProduct: (p: Product) => void; id: string }) {
+  const { theme } = useAppTheme();
   const router = useRouter();
   const inv = product.inventory;
   const [invItems, setInvItems] = useState<InventoryItem[]>([]);
@@ -682,7 +683,7 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
 
       {/* Stat strip */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: SP.sm, paddingHorizontal: SP.md }}>
-        <StatCard label="On Hand"   value={String(invOnHand)}        icon="layers"       accent={CYAN}    style={{ minWidth: 100 }} />
+        <StatCard label="On Hand"   value={String(invOnHand)}        icon="layers"       accent={theme.secondary}    style={{ minWidth: 100 }} />
         <StatCard label="Available" value={String(invAvail)}          icon="check-circle" accent={SUCCESS} style={{ minWidth: 100 }} />
         <StatCard label="Reserved"  value={String(invReserved)}       icon="lock"         accent={ORANGE}  style={{ minWidth: 100 }} />
         <StatCard label="Incoming"  value={String(inv.incomingStock)} icon="truck"        accent={BLUE}    style={{ minWidth: 100 }} />
@@ -727,12 +728,12 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
                     <Text style={invS.variantSku}>SKU: {item.sku}</Text>
                   </View>
                   <StatusBadge label={invItemStatusLabel(item)} variant={invItemStatusVariant(item)} small />
-                  <TouchableOpacity
+                  <PressableScale
                     style={[invS.adjBtn, { marginLeft: SP.sm }]}
                     onPress={() => router.push(('/inventory-adjust?itemId=' + item.id) as never)}
                   >
-                    <Feather name="sliders" size={12} color={PURPLE} />
-                  </TouchableOpacity>
+                    <Feather name="sliders" size={12} color={theme.accent} />
+                  </PressableScale>
                 </View>
                 <View style={invS.itemStatsRow}>
                   <Text style={invS.itemStat}>{item.available} avail</Text>
@@ -770,19 +771,19 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
                     <Text style={invS.variantName}>{variant.title}</Text>
                     {variant.sku ? <Text style={invS.variantSku}>{variant.sku}</Text> : null}
                   </View>
-                  <TouchableOpacity
+                  <PressableScale
                     style={invS.adjBtn}
                     onPress={() => doAdjust(-1, `Decrease ${variant.title}`)}
                   >
                     <Feather name="minus" size={12} color={RED} />
-                  </TouchableOpacity>
+                  </PressableScale>
                   <Text style={invS.qty}>{variant.inventoryQuantity}</Text>
-                  <TouchableOpacity
+                  <PressableScale
                     style={invS.adjBtn}
                     onPress={() => doAdjust(1, `Increase ${variant.title}`)}
                   >
                     <Feather name="plus" size={12} color={SUCCESS} />
-                  </TouchableOpacity>
+                  </PressableScale>
                 </View>
               </View>
             ))}
@@ -909,7 +910,7 @@ function ProductionTab({ product, router }: { product: Product; router: ReturnTy
           label="View Manufacturer"
           description={mfg.manufacturerName ?? 'Find a manufacturer'}
           onPress={() => Alert.alert('Manufacturer', 'Navigate to manufacturer profile.')}
-          accent={PURPLE}
+          accent={theme.accent}
         />
       </View>
 
@@ -1017,15 +1018,15 @@ function AnalyticsTab({
       {/* 2-row stat grid */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: SP.sm, paddingHorizontal: SP.md }}>
         <StatCard label="Revenue" value={formatCurrency(analytics.revenueCents)} icon="dollar-sign" accent={GOLD} style={{ minWidth: 120 }} />
-        <StatCard label="Units Sold" value={String(analytics.unitsSold)} icon="shopping-bag" accent={PURPLE} style={{ minWidth: 120 }} />
-        <StatCard label="Page Views" value={String(analytics.pageViews)} icon="eye" accent={CYAN} style={{ minWidth: 120 }} />
+        <StatCard label="Units Sold" value={String(analytics.unitsSold)} icon="shopping-bag" accent={theme.accent} style={{ minWidth: 120 }} />
+        <StatCard label="Page Views" value={String(analytics.pageViews)} icon="eye" accent={theme.secondary} style={{ minWidth: 120 }} />
         <StatCard label="Add to Cart" value={String(analytics.addToCartCount)} icon="shopping-cart" accent={BLUE} style={{ minWidth: 120 }} />
       </ScrollView>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: SP.sm, paddingHorizontal: SP.md }}>
         <StatCard label="Conversion" value={`${(analytics.conversionRate * 100).toFixed(1)}%`} icon="trending-up" accent={SUCCESS} style={{ minWidth: 120 }} />
         <StatCard label="Refund Rate" value={`${(analytics.refundRate * 100).toFixed(1)}%`} icon="refresh-cw" accent={ORANGE} style={{ minWidth: 120 }} />
         <StatCard label="Return Rate" value={`${(analytics.returnRate * 100).toFixed(1)}%`} icon="rotate-ccw" accent={RED} style={{ minWidth: 120 }} />
-        <StatCard label="Sell-Through" value={`${(analytics.sellThroughRate * 100).toFixed(0)}%`} icon="bar-chart-2" accent={CYAN} style={{ minWidth: 120 }} />
+        <StatCard label="Sell-Through" value={`${(analytics.sellThroughRate * 100).toFixed(0)}%`} icon="bar-chart-2" accent={theme.secondary} style={{ minWidth: 120 }} />
       </ScrollView>
 
       {/* Bar chart — Fix 5: bars scaled by maxRev, height = (day.revenue / maxRev) * 60 */}
@@ -1072,7 +1073,7 @@ function AnalyticsTab({
             <>
               <View style={an.perfDivider} />
               <View style={an.perfRow}>
-                <Feather name="maximize" size={14} color={PURPLE_LIGHT} />
+                <Feather name="maximize" size={14} color={theme.accentLight} />
                 <Text style={an.perfLabel}>Best Size</Text>
                 <Text style={an.perfValue}>{analytics.bestSize}</Text>
               </View>
@@ -1082,7 +1083,7 @@ function AnalyticsTab({
             <>
               <View style={an.perfDivider} />
               <View style={an.perfRow}>
-                <Feather name="droplet" size={14} color={CYAN} />
+                <Feather name="droplet" size={14} color={theme.secondary} />
                 <Text style={an.perfLabel}>Best Color</Text>
                 <Text style={an.perfValue}>{analytics.bestColor}</Text>
               </View>
@@ -1243,13 +1244,13 @@ function StoreTab({
           </View>
 
           {/* Description accordion */}
-          <TouchableOpacity
+          <PressableScale
             onPress={() => { Haptics.selectionAsync(); setDescOpen(o => !o); }}
             style={st.descHeader}
           >
             <Text style={st.descTitle}>Description</Text>
             <Feather name={descOpen ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={MUTED} />
-          </TouchableOpacity>
+          </PressableScale>
           {descOpen && product.description ? (
             <Text style={st.descText}>{product.description}</Text>
           ) : null}
@@ -1260,7 +1261,7 @@ function StoreTab({
             label="Seller"
             description={product.vendor ?? 'View seller profile'}
             onPress={() => Alert.alert('Seller', 'Navigate to seller profile.')}
-            accent={PURPLE}
+            accent={theme.accent}
           />
         </View>
       </BrandthreadCard>
@@ -1301,7 +1302,6 @@ const st = StyleSheet.create({
 // ─── Root Styles ──────────────────────────────────────────────────────────────
 
 const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string; shadowColor: string }) => {
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   return StyleSheet.create({
   root:         { flex: 1, backgroundColor: BG },
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md,
@@ -1311,9 +1311,9 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
                   borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { flex: 1, fontSize: FS.base, fontFamily: FONT.bold, color: FG, letterSpacing: -0.2 },
   headerRight:  { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-  headerBtn:    { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: PURPLE_DIM,
+  headerBtn:    { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: theme.accentDim,
                   borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER_ACTIVE },
-  editBtnText:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
+  editBtnText:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.accentLight },
   iconBtnSmall: { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD,
                   borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   tabBarWrap:   { borderBottomWidth: 1, borderBottomColor: BORDER, backgroundColor: SURFACE },
@@ -1322,7 +1322,7 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
   tabLabel:     { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   tabLabelActive:{ color: FG, fontFamily: FONT.semibold },
   tabUnderline: { position: 'absolute', bottom: 0, left: SP.md, right: SP.md, height: 2,
-                  backgroundColor: PURPLE, borderRadius: RADIUS.pill },
+                  backgroundColor: theme.accent, borderRadius: RADIUS.pill },
   tabContent:   { flex: 1 },
   fab:          { position: 'absolute', right: SP.lg, width: 56, height: 56, borderRadius: 28,
                   overflow: 'hidden', shadowColor: theme.shadowColor, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 16, elevation: 8 },

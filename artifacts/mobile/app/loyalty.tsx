@@ -124,7 +124,7 @@ export default function LoyaltyScreen() {
         <Text style={s.sectionLabel}>HOW TO EARN</Text>
         {[
           { icon: '🛍', title: '1 point per $1 spent',        sub: 'Automatically earned on every completed purchase' },
-          { icon: '👋', title: '500 pts per referral',         sub: 'When a friend joins via your invite link and places their first order' },
+          { icon: '👋', title: '500 pts per referral',         sub: 'When a new friend joins using your invite link or code' },
           { icon: '🎁', title: '100 pts on sign-up',           sub: 'One-time welcome bonus for new members' },
         ].map((item, i) => (
           <View key={i} style={s.earnCard}>

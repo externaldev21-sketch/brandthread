@@ -67,3 +67,6 @@
 - [Account-bound screen state](account-bound-screen-state.md) — Clerk can switch active sessions without unmounting routes; render guards and request generations must prevent prior-user data exposure.
 - [Account erasure boundary](account-erasure-boundary.md) — self-service deletion removes private/social data, anonymizes retained commerce, tombstones the subject, then deletes Clerk.
 - [Contextual push permission](contextual-push-permission.md) — never request native push at launch/onboarding; ask once per user only after a real follow/save/order/inbound-message event.
+- [Referral reward boundary](referral-reward-boundary.md) — referral attribution rewards 500 points when the invitee joins; attribution and reward must commit atomically and remain retry-safe.
+- [Buyer cancellation boundary](buyer-cancellation-boundary.md) — the 60-minute buyer cancellation is a locked terminal transition that must beat fulfillment, refund idempotently, and restore reserved stock once.
+- [Runtime infrastructure controls](runtime-infrastructure-controls.md) — current clients use API v1; legacy /api remains compatible, flags fail open to safe defaults, and offline caches are account-scoped.

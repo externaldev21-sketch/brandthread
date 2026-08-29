@@ -6,9 +6,10 @@
  * POST /api/referrals/apply     — apply an invite code (call once after signup)
  */
 import { Router } from "express";
-import { db, users, referrals, loyaltyPoints } from "@workspace/db";
+import { db, users, referrals } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { awardLoyaltyPointsOnce } from "./loyalty";
 
 const router = Router();
 router.use(requireAuth);
@@ -23,7 +24,7 @@ function generateCode(len = 6): string {
 }
 
 function inviteLink(code: string): string {
-  return `https://brandthread.app/invite?code=${code}`;
+  return `https://brandthread.app/onboarding?referralCode=${code}`;
 }
 
 // ─── GET /api/referrals/code ──────────────────────────────────────────────────
@@ -89,7 +90,7 @@ router.get("/stats", async (req, res) => {
     .where(eq(referrals.inviterId, myId));
 
   if (rows.length === 0) {
-    res.json({ total: 0, referrals: [] });
+    res.json({ total: 0, pointsEarned: 0, referrals: [] });
     return;
   }
 
@@ -104,6 +105,7 @@ router.get("/stats", async (req, res) => {
 
   res.json({
     total: rows.length,
+    pointsEarned: rows.length * 500,
     referrals: rows.map((r) => {
       const p = profileMap.get(r.inviteeId);
       return {
@@ -154,28 +156,33 @@ router.post("/apply", async (req, res) => {
     return;
   }
 
-  // Record relationship + tag the invitee's row
-  await Promise.all([
-    db.insert(referrals).values({
-      inviterId:  inviter.clerkId,
-      inviteeId:  myId,
+  // Attribution and reward issuance commit together. The unique invitee row
+  // plus awardLoyaltyPointsOnce make concurrent/retried applies idempotent.
+  const applied = await db.transaction(async (tx) => {
+    const [created] = await tx.insert(referrals).values({
+      inviterId: inviter.clerkId,
+      inviteeId: myId,
       inviteCode: normalizedCode,
-    }).onConflictDoNothing(),
-    db.update(users)
-      .set({ referredByCode: normalizedCode, updatedAt: new Date() })
-      .where(eq(users.clerkId, myId)),
-  ]);
+    }).onConflictDoNothing().returning({ inviteeId: referrals.inviteeId });
+    if (!created) return false;
 
-  // Award 500 loyalty points to the inviter for the successful referral (fire-and-forget)
-  db.insert(loyaltyPoints)
-    .values({
-      buyerId:     inviter.clerkId,
-      points:      500,
-      source:      "referral",
+    await tx.update(users)
+      .set({ referredByCode: normalizedCode, updatedAt: new Date() })
+      .where(eq(users.clerkId, myId));
+    await awardLoyaltyPointsOnce({
+      buyerId: inviter.clerkId,
+      points: 500,
+      source: "referral",
       referenceId: myId,
-      note:        "Referral bonus — friend joined",
-    })
-    .catch((err) => req.log.error({ err, inviterId: inviter.clerkId, inviteeId: myId }, "Failed to award referral loyalty points"));
+      note: "Referral bonus — friend joined",
+    }, tx);
+    return true;
+  });
+
+  if (!applied) {
+    res.status(409).json({ error: "Referral already recorded.", code: "ALREADY_APPLIED" });
+    return;
+  }
 
   res.json({ ok: true, inviterId: inviter.clerkId });
 });

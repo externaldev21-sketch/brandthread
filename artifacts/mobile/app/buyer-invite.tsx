@@ -25,6 +25,7 @@ type InviteData = {
 
 type Stats = {
   total: number;
+  pointsEarned: number;
   referrals: Array<{ inviteeId: string; name: string | null; joinedAt: string }>;
 };
 
@@ -56,7 +57,7 @@ export default function BuyerInviteScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [api]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -119,7 +120,7 @@ export default function BuyerInviteScreen() {
             </View>
             <Text style={styles.heroTitle}>Invite to Brandthread</Text>
             <Text style={styles.heroSub}>
-              Share your invite code with friends. When they join, they're linked to your account.
+              Share your invite code with friends. Earn 500 points when a new friend joins with your code.
             </Text>
           </LinearGradient>
 
@@ -156,6 +157,10 @@ export default function BuyerInviteScreen() {
                 <Text style={styles.statLabel}>
                   {stats?.total === 1 ? 'friend joined' : 'friends joined'}
                 </Text>
+              </View>
+              <View style={styles.pointsPill}>
+                <Text style={styles.pointsValue}>{stats?.pointsEarned ?? 0}</Text>
+                <Text style={styles.pointsLabel}>points earned</Text>
               </View>
             </View>
 
@@ -308,6 +313,15 @@ const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.
     alignItems: 'center', justifyContent: 'center',
   },
   statContent: { flex: 1 },
+  pointsPill: {
+    alignItems: 'flex-end',
+    backgroundColor: theme.accentDim,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SP.sm,
+    paddingVertical: SP.xs,
+  },
+  pointsValue: { fontSize: FS.base, fontFamily: FONT.bold, color: theme.accent },
+  pointsLabel: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
   statValue: {
     fontSize:   FS.xl,
     fontFamily: FONT.bold,

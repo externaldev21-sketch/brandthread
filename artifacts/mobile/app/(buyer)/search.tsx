@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Platform, TextInput, Image,
+  Platform, TextInput, Image as RNImage,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -15,7 +15,8 @@ import { useApi } from '@/lib/api';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { reportNetworkError } from '@/lib/networkNotice';
-import { BrandedLoader, EmptyState } from '@/components/BrandthreadUI';
+import { EmptyState, SearchResultsSkeleton } from '@/components/BrandthreadUI';
+import { CachedImage } from '@/components/CachedImage';
 
 type PersonResult = {
   userId: string; name: string; username: string | null;
@@ -34,7 +35,7 @@ function MasonryCard({ item, accent, onPress }: {
 
   useEffect(() => {
     if (!item.imageUri) return;
-    Image.getSize(item.imageUri, (width, height) => {
+    RNImage.getSize(item.imageUri, (width, height) => {
       if (width > 0 && height > 0) setAspectRatio(Math.max(0.62, Math.min(1.24, width / height)));
     });
   }, [item.imageUri]);
@@ -43,7 +44,7 @@ function MasonryCard({ item, accent, onPress }: {
     <TouchableOpacity style={styles.masonryCard} onPress={onPress} activeOpacity={0.88}>
       <View style={[styles.masonryMedia, { aspectRatio, backgroundColor: item.color }]}>
         {item.imageUri ? (
-          <Image source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <CachedImage source={{ uri: item.imageUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
         ) : (
           <View style={styles.masonryFallback}>
             <Text style={styles.masonryInitials}>{item.initials}</Text>
@@ -374,7 +375,7 @@ export default function SearchScreen() {
               </>
             ) : null}
             {searching && results.length === 0 && people.length === 0 ? (
-              <BrandedLoader label="Finding something you’ll love…" style={{ minHeight: 300 }} />
+              <SearchResultsSkeleton />
             ) : !searching && results.length === 0 && people.length === 0 ? (
               <EmptyState
                 icon="search"

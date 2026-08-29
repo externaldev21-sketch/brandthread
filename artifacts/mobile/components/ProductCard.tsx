@@ -2,6 +2,7 @@ import React from 'react';
 import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { Badge } from './Badge';
+import { CachedImage } from './CachedImage';
 
 interface ProductCardProps {
   name: string;
@@ -10,9 +11,10 @@ interface ProductCardProps {
   stock: number;
   colorDot?: string;
   onPress?: () => void;
+  imageUri?: string | null;
 }
 
-export function ProductCard({ name, category, price, stock, colorDot = '#39FF88', onPress }: ProductCardProps) {
+export function ProductCard({ name, category, price, stock, colorDot = '#39FF88', onPress, imageUri }: ProductCardProps) {
   const colors = useColors();
   const stockVariant = stock === 0 ? 'error' : stock < 10 ? 'warning' : 'success';
   const stockLabel = stock === 0 ? 'Out of stock' : stock < 10 ? `Low: ${stock}` : `In stock: ${stock}`;
@@ -24,7 +26,9 @@ export function ProductCard({ name, category, price, stock, colorDot = '#39FF88'
       style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}
     >
       <View style={[styles.image, { backgroundColor: colorDot + '33' }]}>
-        <View style={[styles.dot, { backgroundColor: colorDot }]} />
+        {imageUri
+          ? <CachedImage source={{ uri: imageUri }} style={StyleSheet.absoluteFill} />
+          : <View style={[styles.dot, { backgroundColor: colorDot }]} />}
       </View>
       <View style={styles.info}>
         <Text style={[styles.name, { color: colors.foreground }]} numberOfLines={1}>{name}</Text>

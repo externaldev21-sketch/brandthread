@@ -4,7 +4,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import {
-  ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, Switch, ActivityIndicator,
+  ScrollView, View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/hooks/useApi';
@@ -17,6 +17,7 @@ import {
   FONT, FS, SP,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { HapticSwitch } from '@/components/BrandthreadUI';
 
 type DigestMode = 'realtime' | 'daily';
 
@@ -192,7 +193,7 @@ export default function NotificationsSettingsScreen() {
                   <Text style={[s.rowLabel, { color: FG }]}>{row.label}</Text>
                   <Text style={[s.rowDescription, { color: MUTED }]}>{row.description}</Text>
                 </View>
-                <Switch
+                <HapticSwitch
                   value={categories[row.key] ?? true}
                   onValueChange={(value) => handleCategory(row.key, value)}
                   trackColor={{ false: SUBTLE, true: theme.accent }}

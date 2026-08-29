@@ -178,7 +178,7 @@ function adaptOrderDetail(row: any): BuyerOrderView {
     sellerId:          row.ownerId ?? '',
     sellerName:        row.sellerDisplayName ?? 'Seller',
     sellerHandle:      '',
-    status:            (row.status ?? 'new') as OrderStatus,
+    status:            (row.status === 'pending' ? 'new' : (row.status ?? 'new')) as OrderStatus,
     paymentStatus:     row.stripePaymentIntentId ? 'paid' : 'pending',
     fulfillmentStatus: 'unfulfilled',
     lineItems: items.map((item: any) => ({

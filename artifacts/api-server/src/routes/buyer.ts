@@ -1035,98 +1035,113 @@ router.post("/orders/:id/cancel", async (req, res) => {
   try {
     const buyerId = (req as any).clerkUserId as string;
     const CANCEL_WINDOW_MS = 60 * 60 * 1000; // 60 minutes
+    const result = await db.transaction(async (tx) => {
+      // Lock the order before checking eligibility. Seller fulfillment updates
+      // must wait, so exactly one side wins the race.
+      const lockedResult = await tx.execute(sql`
+        SELECT id, order_number, status, created_at, total_cents, stripe_payment_intent_id
+        FROM orders
+        WHERE id = ${id}::uuid AND buyer_id = ${buyerId}
+        FOR UPDATE
+      `);
+      const order = (lockedResult as any).rows?.[0] as {
+        id: string;
+        order_number: string;
+        status: string;
+        created_at: Date | string;
+        total_cents: number;
+        stripe_payment_intent_id: string | null;
+      } | undefined;
 
-    // ── Fetch order — must belong to this buyer ─────────────────────────────
-    const [order] = await db
-      .select({
-        id:                    orders.id,
-        orderNumber:           orders.orderNumber,
-        status:                orders.status,
-        createdAt:             orders.createdAt,
-        totalCents:            orders.totalCents,
-        stripePaymentIntentId: orders.stripePaymentIntentId,
-      })
-      .from(orders)
-      .where(and(eq(orders.id, id), eq(orders.buyerId, buyerId)))
-      .limit(1);
-
-    if (!order) {
-      res.status(404).json({ error: "Order not found" }); return;
-    }
-
-    // ── Only pending orders are cancellable ────────────────────────────────
-    if (order.status !== "pending") {
-      res.status(409).json({
-        error: "Order cannot be cancelled",
-        detail: `Only pending orders can be cancelled. Current status: ${order.status}.`,
-      }); return;
-    }
-
-    // ── Enforce the 60-minute window ────────────────────────────────────────
-    const ageMs = Date.now() - new Date(order.createdAt!).getTime();
-    if (ageMs > CANCEL_WINDOW_MS) {
-      res.status(409).json({
-        error: "Cancellation window has closed",
-        detail: "Orders can only be cancelled within 60 minutes of placement. Contact the seller to request a cancellation.",
-      }); return;
-    }
-
-    // ── Refund via Stripe (fail loudly — don't cancel without refunding) ───
-    let refunded = false;
-    if (order.stripePaymentIntentId) {
-      try {
-        const stripe = requireStripe();
-        const refund = await stripe.refunds.create({
-          payment_intent: order.stripePaymentIntentId,
-          reason: "requested_by_customer",
-        });
-        refunded = true;
-
-        await db.transaction(async (tx) => {
-          await tx
-            .update(orders)
-            .set({
-              status:              "cancelled",
-              cancellationReason:  "buyer_requested",
-              cancellationNotes:   "Cancelled by buyer within the 60-minute cancellation window.",
-              updatedAt:           new Date(),
-            })
-            .where(eq(orders.id, id));
-
-          await reversePurchasePointsOnce({
-            buyerId,
-            orderId: id,
-            referenceId: `${id}:refund:${refund.id}`,
-            requestedPoints: Math.floor(order.totalCents / 100),
-            note: `Purchase reward reversed after cancellation of order ${order.orderNumber}`,
-          }, tx);
-        });
-      } catch (stripeErr: any) {
-        req.log.error({ err: stripeErr, orderId: id }, "Stripe refund failed for buyer cancellation");
-        res.status(502).json({
-          error: "Refund could not be processed. Please contact support to cancel this order.",
-        });
-        return;
+      if (!order) {
+        throw Object.assign(new Error("Order not found"), { status: 404 });
       }
-    }
+      if (order.status === "cancelled") {
+        return { cancelled: true, refunded: Boolean(order.stripe_payment_intent_id), orderNumber: order.order_number };
+      }
+      if (order.status !== "pending") {
+        throw Object.assign(new Error(`Only pending orders can be cancelled. Current status: ${order.status}.`), { status: 409 });
+      }
 
-    // Orders without a payment intent cannot have earned a purchase reward.
-    if (!order.stripePaymentIntentId) {
-      await db
-        .update(orders)
+      const ageMs = Date.now() - new Date(order.created_at).getTime();
+      if (ageMs > CANCEL_WINDOW_MS) {
+        throw Object.assign(
+          new Error("Orders can only be cancelled within 60 minutes of placement. Contact the seller to request a cancellation."),
+          { status: 409 },
+        );
+      }
+
+      let refundId: string | null = null;
+      if (order.stripe_payment_intent_id) {
+        try {
+          const stripe = requireStripe();
+          const refund = await stripe.refunds.create({
+            payment_intent: order.stripe_payment_intent_id,
+            reason: "requested_by_customer",
+          }, {
+            idempotencyKey: `buyer-cancel/${order.id}`,
+          });
+          refundId = refund.id;
+        } catch (stripeErr) {
+          req.log.error({ err: stripeErr, orderId: id }, "Stripe refund failed for buyer cancellation");
+          throw Object.assign(
+            new Error("Refund could not be processed. Please contact support to cancel this order."),
+            { status: 502 },
+          );
+        }
+      }
+
+      const items = await tx
+        .select({ variantId: orderItems.variantId, quantity: orderItems.quantity })
+        .from(orderItems)
+        .where(eq(orderItems.orderId, id));
+
+      await tx.update(orders)
         .set({
-          status:              "cancelled",
-          cancellationReason:  "buyer_requested",
-          cancellationNotes:   "Cancelled by buyer within the 60-minute cancellation window.",
-          updatedAt:           new Date(),
+          status: "cancelled",
+          cancellationReason: "buyer_requested",
+          cancellationNotes: "Cancelled by buyer within the 60-minute cancellation window.",
+          updatedAt: new Date(),
         })
-        .where(eq(orders.id, id));
-    }
+        .where(and(eq(orders.id, id), eq(orders.status, "pending")));
 
-    res.json({ cancelled: true, refunded, orderNumber: order.orderNumber });
-  } catch (err) {
+      // Checkout fulfillment reserves stock when the paid order is created.
+      // A grace-period cancellation releases that reservation exactly once
+      // because the locked status transition above is single-use.
+      for (const item of items) {
+        if (item.variantId) {
+          await tx.update(productVariants)
+            .set({ stock: sql`${productVariants.stock} + ${item.quantity}` })
+            .where(eq(productVariants.id, item.variantId));
+        }
+      }
+
+      if (order.stripe_payment_intent_id) {
+        await reversePurchasePointsOnce({
+          buyerId,
+          orderId: id,
+          referenceId: `${id}:refund:${refundId}`,
+          requestedPoints: Math.floor(order.total_cents / 100),
+          note: `Purchase reward reversed after cancellation of order ${order.order_number}`,
+        }, tx);
+      }
+
+      return {
+        cancelled: true,
+        refunded: Boolean(order.stripe_payment_intent_id),
+        orderNumber: order.order_number,
+      };
+    });
+
+    res.json(result);
+  } catch (err: any) {
+    const status = Number(err?.status) || 500;
+    if (status < 500) {
+      res.status(status).json({ error: status === 404 ? err.message : "Order cannot be cancelled", detail: err.message });
+      return;
+    }
     req.log.error({ err, orderId: id }, "Failed to cancel buyer order");
-    res.status(500).json({ error: "Failed to cancel order" });
+    res.status(status).json({ error: err?.message || "Failed to cancel order" });
   }
 });
 

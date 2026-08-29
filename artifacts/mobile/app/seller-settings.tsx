@@ -84,6 +84,8 @@ const ACCOUNT_ITEMS: NavItem[] = [
   { icon: 'link',        label: 'Integrations',   desc: 'Connect third-party services',  accent: PURPLE, route: '/integrations/klaviyo' },
   { icon: 'bell',        label: 'Notifications',  desc: 'Push and email preferences',    accent: ORANGE, route: '/notifications-settings' },
   { icon: 'droplet',     label: 'App Theme',      desc: 'Choose your Brandthread finish', accent: PURPLE, route: '/app-theme' },
+  { icon: 'gift',        label: 'Invite Friends', desc: 'Share your referral code and see rewards', accent: GOLD, route: '/buyer-invite' },
+  { icon: 'download',    label: 'Download My Data', desc: 'Export your profile, orders and messages', accent: BLUE, route: '/buyer-download-data' },
   { icon: 'settings',    label: 'Settings',       desc: 'App and account settings',      accent: MUTED,  route: '/settings' },
   { icon: 'trash-2',     label: 'Delete Account', desc: 'Permanently erase your account', accent: RED, route: '/buyer-account-control' },
   { icon: 'help-circle', label: 'Help & Support', desc: 'Guides, FAQs and contact us',  accent: CYAN,   route: '/help' },

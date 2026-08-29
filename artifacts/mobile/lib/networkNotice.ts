@@ -110,6 +110,7 @@ export function classifyNetworkError(error: unknown): NetworkNoticeKind | null {
 export function reportNetworkError(
   error: unknown,
   retry?: () => void | Promise<unknown>,
+  usingCachedContent = false,
 ): void {
   const kind = classifyNetworkError(error);
   if (!kind) return;
@@ -118,7 +119,9 @@ export function reportNetworkError(
     kind,
     title: kind === 'offline' ? "You're offline" : 'Server unavailable',
     message: kind === 'offline'
-      ? 'Check your connection and try again.'
+      ? usingCachedContent
+        ? 'Showing saved content until your connection returns.'
+        : 'Check your connection and try again.'
       : 'Brandthread could not load this right now.',
     retry,
     retrying: false,

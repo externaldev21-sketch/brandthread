@@ -21,6 +21,7 @@ import {
 } from '@/services/socialService';
 import type { Notification, NotificationCategory } from '@/services/socialTypes';
 import { BrandedLoadingState, EmptyState, ThreadDivider } from '@/components/BrandthreadUI';
+import SwipeActionRow from '@/components/SwipeActionRow';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -273,6 +274,17 @@ export default function BuyerNotifications() {
     ]);
   };
 
+  const toggleRead = async (notif: Notification) => {
+    if (notif.isRead) {
+      await markNotificationUnread(notif.id);
+    } else {
+      await markNotificationRead(notif.id);
+    }
+    setNotifs(prev => prev.map(item =>
+      item.id === notif.id ? { ...item, isRead: !notif.isRead } : item
+    ));
+  };
+
   const renderItem = ({ item, index }: { item: ListItem; index: number }) => {
     if (item.type === 'header') {
       return (
@@ -290,15 +302,22 @@ export default function BuyerNotifications() {
     const iconColor = notifIconColor(notif.category, theme.accent, theme.accentLight);
 
     return (
-      <TouchableOpacity
-        style={[
-          styles.notifRow,
-          !notif.isRead && { backgroundColor: theme.accentDim },
-        ]}
-        onPress={() => handleTap(notif)}
-        onLongPress={() => handleLongPress(notif)}
-        activeOpacity={0.75}
+      <SwipeActionRow
+        label={notif.isRead ? 'Unread' : 'Read'}
+        icon={notif.isRead ? 'mail' : 'check'}
+        color={notif.isRead ? BLUE : SUCCESS}
+        onAction={() => toggleRead(notif)}
+        accessibilityLabel={`Mark notification ${notif.isRead ? 'unread' : 'read'}`}
       >
+        <TouchableOpacity
+          style={[
+            styles.notifRow,
+            !notif.isRead && { backgroundColor: theme.accentDim },
+          ]}
+          onPress={() => handleTap(notif)}
+          onLongPress={() => handleLongPress(notif)}
+          activeOpacity={0.75}
+        >
         {/* Left Icon */}
         {notif.actorInitials ? (
           <View style={[styles.avatarCircle, { backgroundColor: notif.actorColor || PURPLE }]}>
@@ -336,7 +355,8 @@ export default function BuyerNotifications() {
         ) : notif.cta ? (
           <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />
         ) : null}
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </SwipeActionRow>
     );
   };
 

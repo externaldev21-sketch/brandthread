@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated, Modal, TextInput, FlatList, Alert, Pressable } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Animated, Modal, TextInput, FlatList, Alert, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -11,8 +11,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApi } from '@/hooks/useApi';
 import { getSetupState, markSetupStarted, dismissWelcome, completionPercent, nextTask, nextBestAction, dismissTip, markFeatureOpened, type SetupState } from '@/lib/setupStore';
 import { deriveHubStats, deriveInventoryStats, deriveOrderStats } from '@/lib/sellerDashboardStats';
-import { BrandthreadScreen, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SearchBar, StatCard, QuickActionCard, SectionHeader, ProgressCard, NavigationCard, GuidedTip, NewFeatureBadge, LoadingSkeleton, EmptyState, StatusBadge } from '@/components/BrandthreadUI';
-import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, GREEN_BRIGHT, BLUE, ORANGE, RED, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { AnimatedEntrance, BrandthreadScreen, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SearchBar, StatCard, QuickActionCard, SectionHeader, ProgressCard, NavigationCard, GuidedTip, NewFeatureBadge, LoadingSkeleton, EmptyState, StatusBadge, PressableScale } from '@/components/BrandthreadUI';
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, GREEN_BRIGHT, BLUE, ORANGE, RED, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { reportNetworkError } from '@/lib/networkNotice';
@@ -96,7 +96,6 @@ const DEFAULT_SETUP: SetupState = {
 
 export default function SellerHomeScreen() {
   const { theme } = useAppTheme();
-  const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -140,6 +139,7 @@ export default function SellerHomeScreen() {
   const [payoutInfo,   setPayoutInfo]   = useState<any | null>(null);
   const [salesTrend,   setSalesTrend]   = useState<Array<{ day: string; totalCents: number }> | null>(null);
   const progressAnim = useRef(new Animated.Value(0)).current;
+  const dashboardScrollY = useRef(new Animated.Value(0)).current;
 
   // ── Load setup state ──────────────────────────────────────────────────────
   const loadSetup = useCallback(async () => {
@@ -341,16 +341,57 @@ export default function SellerHomeScreen() {
         </View>
       </View>
 
+      {/* The full balance hero scrolls naturally; this compact summary takes
+          over beneath the app header once the hero leaves the viewport. */}
+      <Animated.View
+        pointerEvents="box-none"
+        style={[
+          s.compactBalanceWrap,
+          {
+            height: dashboardScrollY.interpolate({
+              inputRange: [72, 132],
+              outputRange: [0, 52],
+              extrapolate: 'clamp',
+            }),
+            opacity: dashboardScrollY.interpolate({
+              inputRange: [84, 126],
+              outputRange: [0, 1],
+              extrapolate: 'clamp',
+            }),
+          },
+        ]}
+      >
+        <PressableScale
+          style={[s.compactBalance, { borderColor: theme.accentDim }]}
+          onPress={() => nav('/payouts')}
+          accessibilityLabel={`Available balance ${payoutInfo?.available?.formatted ?? 'loading'}. Open payouts`}
+        >
+          <View style={[s.compactBalanceIcon, { backgroundColor: theme.accentDim }]}>
+            <Feather name="credit-card" size={15} color={theme.accent} />
+          </View>
+          <Text style={s.compactBalanceLabel}>Available</Text>
+          <Text style={s.compactBalanceValue}>
+            {payoutInfo === null ? '· · ·' : (payoutInfo?.available?.formatted ?? '$0.00')}
+          </Text>
+          <Feather name="chevron-right" size={16} color={MUTED} />
+        </PressableScale>
+      </Animated.View>
+
       {/* ── Scrollable Content ───────────────────────────────────────────── */}
-      <ScrollView
+      <Animated.ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 160 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        scrollEventThrottle={16}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: dashboardScrollY } } }],
+          { useNativeDriver: false },
+        )}
       >
 
         {/* ── Hero Card: Available Balance + Next Payout ───────────────── */}
-        <View style={{ paddingHorizontal: SP.md, paddingTop: SP.md, marginBottom: SP.sm }}>
+        <AnimatedEntrance style={{ paddingHorizontal: SP.md, paddingTop: SP.md, marginBottom: SP.sm }}>
           <LinearGradient
             colors={theme.heroGradient}
             start={{ x: 0, y: 0 }}
@@ -366,14 +407,13 @@ export default function SellerHomeScreen() {
                     : (payoutInfo?.available?.formatted ?? '$0.00')}
                 </Text>
               </View>
-              <TouchableOpacity
+              <PressableScale
                 style={s.heroPayoutsBtn}
                 onPress={() => nav('/payouts')}
-                activeOpacity={0.8}
               >
                 <Text style={s.heroPayoutsBtnTxt}>Payouts</Text>
                 <Feather name="arrow-right" size={11} color="rgba(255,255,255,0.75)" />
-              </TouchableOpacity>
+              </PressableScale>
             </View>
             <View style={s.heroBottom}>
               <Feather
@@ -399,26 +439,25 @@ export default function SellerHomeScreen() {
               </Text>
             </View>
           </LinearGradient>
-        </View>
+        </AnimatedEntrance>
 
         {/* ── Stripe Connect Warning Banner ────────────────────────────── */}
         <StripeConnectWarning />
 
         {/* ── Stats Error Banner ────────────────────────────────────────── */}
         {statsError && (
-          <TouchableOpacity
+          <PressableScale
             style={{ marginHorizontal: SP.md, marginBottom: SP.sm, flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: 'rgba(249,115,22,0.1)', borderRadius: RADIUS.md, padding: SP.sm, borderWidth: 1, borderColor: 'rgba(249,115,22,0.25)' }}
             onPress={() => { setRetryKey(key => key + 1); }}
-            activeOpacity={0.8}
           >
             <Feather name="alert-triangle" size={14} color={ORANGE} />
             <Text style={{ flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: ORANGE }}>Some live data is unavailable — tap to retry</Text>
-          </TouchableOpacity>
+          </PressableScale>
         )}
 
         {/* ── Welcome Card ──────────────────────────────────────────────── */}
         {showWelcome && (
-          <View style={{ paddingHorizontal: SP.md, paddingTop: SP.md, marginBottom: SP.md }}>
+          <AnimatedEntrance delay={ANIM.fast} style={{ paddingHorizontal: SP.md, paddingTop: SP.md, marginBottom: SP.md }}>
             <GradientCard
               colors={[theme.accentDim, theme.secondaryDim]}
               glow
@@ -442,7 +481,7 @@ export default function SellerHomeScreen() {
                 />
               </View>
             </GradientCard>
-          </View>
+          </AnimatedEntrance>
         )}
 
 
@@ -468,10 +507,9 @@ export default function SellerHomeScreen() {
               {/* Checklist rows */}
               <View style={{ marginTop: SP.sm }}>
                 {setupState.tasks.map((task, idx) => (
-                  <TouchableOpacity
+                  <PressableScale
                     key={task.id}
                     style={[s.checkRow, idx < setupState.tasks.length - 1 && s.checkRowBorder]}
-                    activeOpacity={task.completed ? 1 : 0.72}
                     onPress={() => {
                       if (!task.completed) {
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -500,7 +538,7 @@ export default function SellerHomeScreen() {
                     {!task.completed && (
                       <Feather name="chevron-right" size={15} color={MUTED} />
                     )}
-                  </TouchableOpacity>
+                  </PressableScale>
                 ))}
               </View>
             </BrandthreadCard>
@@ -593,7 +631,7 @@ export default function SellerHomeScreen() {
             <QuickActionCard
               label="Create Post"
               icon="video"
-              accent={PURPLE}
+              accent={theme.accent}
               badge={!setupState.openedFeatures.includes('create-post')}
               onPress={() => {
                 markFeatureOpened('create-post');
@@ -604,7 +642,7 @@ export default function SellerHomeScreen() {
             <QuickActionCard
               label="Add Product"
               icon="plus-circle"
-              accent={CYAN}
+              accent={theme.secondary}
               onPress={() => nav('/(tabs)/products')}
               style={{ width: '48.5%' }}
             />
@@ -652,7 +690,7 @@ export default function SellerHomeScreen() {
                     borderWidth: 1, borderColor: theme.accent + '59',
                     alignItems: 'center', justifyContent: 'center',
                   }}>
-                    <Feather name="zap" size={ICON.md} color={PURPLE_LIGHT} />
+                    <Feather name="zap" size={ICON.md} color={theme.accentLight} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontSize: FS.base, fontFamily: FONT.bold, color: FG, letterSpacing: -0.2 }}>
@@ -706,7 +744,7 @@ export default function SellerHomeScreen() {
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm }}>
                     <View style={s.orderIconCircle}>
-                      <Feather name="shopping-bag" size={ICON.sm} color={PURPLE_LIGHT} />
+                      <Feather name="shopping-bag" size={ICON.sm} color={theme.accentLight} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -786,7 +824,7 @@ export default function SellerHomeScreen() {
               <NavigationCard
                 label={`${hubStats.unreadMessages} new manufacturer message${hubStats.unreadMessages > 1 ? 's' : ''}`}
                 icon="message-circle"
-                accent={CYAN}
+                accent={theme.secondary}
                 description="Tap to reply"
                 badge
                 onPress={() => nav('/manufacturer-hub')}
@@ -807,7 +845,7 @@ export default function SellerHomeScreen() {
           style={{ marginHorizontal: SP.md, marginBottom: SP.lg }}
         />
 
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* ── Command Menu Modal ────────────────────────────────────────────── */}
       <Modal
@@ -822,10 +860,9 @@ export default function SellerHomeScreen() {
           <Text style={s.commandTitle}>Go to</Text>
           <View style={s.commandGrid}>
             {COMMAND_ITEMS.map((item) => (
-              <TouchableOpacity
+              <PressableScale
                 key={item.label}
                 style={s.commandItem}
-                activeOpacity={0.8}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   closeCommand();
@@ -833,10 +870,10 @@ export default function SellerHomeScreen() {
                 }}
               >
                 <View style={s.commandIconWrap}>
-                  <Feather name={item.icon} size={ICON.md} color={PURPLE_LIGHT} />
+                  <Feather name={item.icon} size={ICON.md} color={theme.accentLight} />
                 </View>
                 <Text style={s.commandLabel} numberOfLines={2}>{item.label}</Text>
-              </TouchableOpacity>
+              </PressableScale>
             ))}
           </View>
         </View>
@@ -858,13 +895,13 @@ export default function SellerHomeScreen() {
                 placeholder="Search products, orders…"
               />
             </View>
-            <TouchableOpacity
+            <PressableScale
               onPress={() => setSearchModal(false)}
               style={s.searchClose}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Text style={{ fontSize: FS.sm, fontFamily: FONT.medium, color: PURPLE_LIGHT }}>Cancel</Text>
-            </TouchableOpacity>
+              <Text style={{ fontSize: FS.sm, fontFamily: FONT.medium, color: theme.accentLight }}>Cancel</Text>
+            </PressableScale>
           </View>
 
           <ScrollView
@@ -876,8 +913,8 @@ export default function SellerHomeScreen() {
               /* Empty state: show categories */
               <View style={{ gap: 8, marginTop: SP.md }}>
                 <Text style={s.searchSectionTitle}>Browse</Text>
-                <NavigationCard label="Products" icon="package" onPress={() => { setSearchModal(false); nav('/(tabs)/products'); }} accent={CYAN} />
-                <NavigationCard label="Orders" icon="shopping-bag" onPress={() => { setSearchModal(false); nav('/(tabs)/orders'); }} accent={PURPLE} />
+                <NavigationCard label="Products" icon="package" onPress={() => { setSearchModal(false); nav('/(tabs)/products'); }} accent={theme.secondary} />
+                <NavigationCard label="Orders" icon="shopping-bag" onPress={() => { setSearchModal(false); nav('/(tabs)/orders'); }} accent={theme.accent} />
                 <NavigationCard label="Studio" icon="zap" onPress={() => { setSearchModal(false); nav('/(tabs)/studio'); }} accent={ORANGE} />
                 <NavigationCard label="Analytics" icon="bar-chart-2" onPress={() => { setSearchModal(false); nav('/(tabs)/analytics'); }} accent={BLUE} />
               </View>
@@ -892,7 +929,7 @@ export default function SellerHomeScreen() {
                         label={p.name}
                         icon="package"
                         description={`${p.status}${typeof p.priceCents === 'number' ? ` · ${formatCents(p.priceCents)}` : ''}`}
-                        accent={CYAN}
+                        accent={theme.secondary}
                         onPress={() => { setSearchModal(false); nav('/(tabs)/products'); }}
                       />
                     ))}
@@ -907,7 +944,7 @@ export default function SellerHomeScreen() {
                         label={o.orderNumber}
                         icon="shopping-bag"
                         description={`${o.customer.name} · ${formatCents(o.totalCents)}`}
-                        accent={PURPLE}
+                        accent={theme.accent}
                         onPress={() => { setSearchModal(false); nav('/(tabs)/orders'); }}
                       />
                     ))}
@@ -1175,6 +1212,41 @@ const s = StyleSheet.create({
     fontFamily: FONT.regular,
     color: 'rgba(255,255,255,0.6)',
     flex: 1,
+  },
+  compactBalanceWrap: {
+    overflow: 'hidden',
+    backgroundColor: BG,
+    zIndex: 20,
+  },
+  compactBalance: {
+    height: 44,
+    marginHorizontal: SP.md,
+    marginTop: 4,
+    paddingHorizontal: SP.sm,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    backgroundColor: CARD,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+  },
+  compactBalanceIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  compactBalanceLabel: {
+    flex: 1,
+    color: MUTED,
+    fontFamily: FONT.medium,
+    fontSize: FS.xs,
+  },
+  compactBalanceValue: {
+    color: FG,
+    fontFamily: FONT.bold,
+    fontSize: FS.md,
   },
 
   // ── 7-day trend chart ────────────────────────────────────────────────────

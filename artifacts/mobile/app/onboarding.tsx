@@ -607,9 +607,14 @@ interface AuthStepProps {
   /** The @username the user typed above the auth form. */
   username: string;
   onUsernameChange: (v: string) => void;
+  referralCode: string;
+  onReferralCodeChange: (v: string) => void;
 }
 
-function AuthStep({ signUp, startGoogleOAuth, startAppleOAuth, onAuthComplete, onDevClear, username, onUsernameChange }: AuthStepProps) {
+function AuthStep({
+  signUp, startGoogleOAuth, startAppleOAuth, onAuthComplete, onDevClear,
+  username, onUsernameChange, referralCode, onReferralCodeChange,
+}: AuthStepProps) {
   const { theme } = useAppTheme();
   const router = useRouter();
   const { isSignedIn, signOut } = useAuth();
@@ -704,7 +709,10 @@ function AuthStep({ signUp, startGoogleOAuth, startAppleOAuth, onAuthComplete, o
       if (signUp.status === 'complete') {
         await signUp.finalize({
           navigate: ({ decorateUrl }: { decorateUrl: (url: string) => string }) => {
-            const url = decorateUrl('/onboarding?postAuth=1');
+            const referralQuery = referralCode
+              ? `&referralCode=${encodeURIComponent(referralCode)}`
+              : '';
+            const url = decorateUrl(`/onboarding?postAuth=1${referralQuery}`);
             if (url.startsWith('http') && typeof window !== 'undefined') {
               window.location.href = url;
             } else {
@@ -899,6 +907,21 @@ function AuthStep({ signUp, startGoogleOAuth, startAppleOAuth, onAuthComplete, o
           }
         </View>
 
+        <View style={sa.inputWrap}>
+          <Text style={sa.label}>Referral code (optional)</Text>
+          <TextInput
+            style={sa.input}
+            placeholder="e.g. FASHION"
+            placeholderTextColor={MUTED2}
+            value={referralCode}
+            onChangeText={v => onReferralCodeChange(v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12))}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            maxLength={12}
+          />
+          <Text style={sa.hint}>Enter the code from the friend who invited you.</Text>
+        </View>
+
         {/* OAuth — disabled until a valid username is entered */}
         <TouchableOpacity
           style={[sa.oauthBtn, !isUsernameValid && { opacity: 0.45 }]}
@@ -1057,7 +1080,7 @@ export default function OnboardingScreen() {
   const api = useApi();
 
   const router  = useRouter();
-  const { postAuth } = useLocalSearchParams<{ postAuth?: string }>();
+  const { postAuth, referralCode: referralCodeParam } = useLocalSearchParams<{ postAuth?: string; referralCode?: string }>();
   const insets  = useSafeAreaInsets();
 
   const [flow, setFlow]           = useState<Flow | null>(null);
@@ -1068,6 +1091,11 @@ export default function OnboardingScreen() {
   // Buyer data
   const [firstName, setFirstName]         = useState('');
   const [username, setUsername]           = useState('');
+  const [referralCode, setReferralCode]   = useState(
+    typeof referralCodeParam === 'string'
+      ? referralCodeParam.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12)
+      : '',
+  );
   const [styleInterests, setStyleArr]     = useState<string[]>([]);
 
   // Seller data
@@ -1249,6 +1277,11 @@ export default function OnboardingScreen() {
         name: updated.displayName || updated.name || name,
         username: updated.username ?? uname,
       });
+      if (referralCode.trim()) {
+        await api.referrals.apply(referralCode.trim()).catch(() => {
+          // Referral attribution is optional and must not strand account setup.
+        });
+      }
       await AsyncStorage.multiSet([
         [ONBOARDING_KEY, 'true'],
         [ONBOARDING_OWNER_KEY, profile.clerkId],
@@ -1294,6 +1327,11 @@ export default function OnboardingScreen() {
         displayName: name,
         accountType: 'seller',
       });
+      if (referralCode.trim()) {
+        await api.referrals.apply(referralCode.trim()).catch(() => {
+          // The server makes valid referral application atomic and idempotent.
+        });
+      }
       // Brand profile data — critical; surface error if it fails
       if (goals.length > 0 || brandStage) {
         await api.seller.saveOnboardingData({ goals, brandStage });
@@ -1390,6 +1428,8 @@ export default function OnboardingScreen() {
         onDevClear={devReset}
         username={username}
         onUsernameChange={setUsername}
+        referralCode={referralCode}
+        onReferralCodeChange={setReferralCode}
       />
     );
 

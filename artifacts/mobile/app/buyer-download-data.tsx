@@ -1,26 +1,25 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import {
   BG, CARD, CARD_ELEVATED, BORDER, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM,
   ON_DARK, FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
-import { requestDataExport, getDataExportStatus } from '@/lib/accountService';
+import { useApi } from '@/lib/api';
 
 type DataCategory = { key: string; label: string; sub: string; icon: keyof typeof Feather.glyphMap; selected: boolean };
 
 const DEFAULT_CATEGORIES: DataCategory[] = [
   { key: 'profile', label: 'Profile & account', sub: 'Name, bio, settings', icon: 'user', selected: true },
-  { key: 'posts', label: 'Posts & reposts', sub: 'All your content', icon: 'image', selected: true },
-  { key: 'friends', label: 'Friends & follows', sub: 'Friend list, requests, blocks', icon: 'users', selected: true },
   { key: 'messages', label: 'Messages', sub: 'Conversation history', icon: 'message-circle', selected: true },
-  { key: 'orders', label: 'Orders & shopping', sub: 'Purchase history, saved items', icon: 'shopping-bag', selected: true },
-  { key: 'activity', label: 'Activity & search', sub: 'Likes, searches, links visited', icon: 'activity', selected: false },
+  { key: 'orders', label: 'Order history', sub: 'Purchases and seller orders', icon: 'shopping-bag', selected: true },
 ];
 
 export default function BuyerDownloadData() {
@@ -29,20 +28,11 @@ export default function BuyerDownloadData() {
   const s = makeStyles();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const api = useApi();
   const [requested, setRequested] = useState(false);
   const [requestedAt, setRequestedAt] = useState<string | null>(null);
   const [categories, setCategories] = useState<DataCategory[]>(DEFAULT_CATEGORIES);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    getDataExportStatus().then(status => {
-      if (status?.requested) {
-        setRequested(true);
-        setRequestedAt(status.requestedAt);
-      }
-      setLoading(false);
-    });
-  }, []);
+  const [loading, setLoading] = useState(false);
 
   function toggleCat(key: string) {
     Haptics.selectionAsync();
@@ -50,12 +40,30 @@ export default function BuyerDownloadData() {
   }
 
   async function handleRequest() {
-    const selected = categories.filter(c => c.selected).map(c => c.key);
+    const selected = categories.filter(c => c.selected).map(c => c.key) as Array<'profile' | 'orders' | 'messages'>;
     if (selected.length === 0) return;
-    const record = await requestDataExport(selected);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setRequestedAt(record.requestedAt);
-    setRequested(true);
+    setLoading(true);
+    try {
+      const data = await api.auth.exportData(selected);
+      const file = new File(Paths.cache, `brandthread-my-data-${Date.now()}.json`);
+      file.write(JSON.stringify(data, null, 2));
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(file.uri, {
+          mimeType: 'application/json',
+          dialogTitle: 'Download my Brandthread data',
+        });
+      } else {
+        Alert.alert('Export ready', `Your export was saved to ${file.uri}`);
+      }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setRequestedAt(data.exportedAt);
+      setRequested(true);
+    } catch (err: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert('Export failed', err?.message ?? 'Could not generate your data export. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   const selectedCount = categories.filter(c => c.selected).length;
@@ -63,8 +71,6 @@ export default function BuyerDownloadData() {
   const formattedDate = requestedAt
     ? new Date(requestedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
     : null;
-
-  if (loading) return <View style={[s.page, { paddingTop: insets.top }]} />;
 
   return (
     <View style={[s.page, { paddingTop: insets.top }]}>
@@ -80,17 +86,19 @@ export default function BuyerDownloadData() {
         {requested ? (
           <View style={s.successCard}>
             <Feather name="check-circle" size={40} color={SUCCESS} />
-            <Text style={s.successTitle}>Request saved</Text>
-            {formattedDate && <Text style={s.successDate}>Submitted {formattedDate}</Text>}
+            <Text style={s.successTitle}>Export ready</Text>
+            {formattedDate && <Text style={s.successDate}>Generated {formattedDate}</Text>}
             <Text style={s.successDesc}>
-              Your data export request has been saved on this device. Data export requires a server endpoint that is not yet available — you'll be notified when your archive is ready to download. In the meantime, contact{' '}
-              <Text style={{ color: PURPLE }}>support@brandthread.com</Text> to request your data.
+              Your JSON archive was generated from your authenticated Brandthread account and opened in your device's share sheet.
             </Text>
+            <TouchableOpacity onPress={() => setRequested(false)} style={s.againBtn}>
+              <Text style={[s.againText, { color: PURPLE }]}>Generate another export</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <>
             <Text style={s.intro}>
-              Select the categories you want to export, then tap Request Export. Your request is saved locally and processed when the export service is available.
+              Select the categories to include. Brandthread will generate a JSON archive immediately and open your device's download/share options.
             </Text>
 
             <Text style={s.groupLabel}>Select what to include</Text>
@@ -118,7 +126,7 @@ export default function BuyerDownloadData() {
             <View style={s.note}>
               <Feather name="info" size={14} color={MUTED} />
               <Text style={s.noteText}>
-                Your request will be queued and you'll be notified when the archive is ready. Contact support@brandthread.com for immediate assistance.
+                The server uses your signed-in identity and only exports records your account owns or can access.
               </Text>
             </View>
           </>
@@ -135,7 +143,9 @@ export default function BuyerDownloadData() {
           >
             <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.requestBtn}>
               <Feather name="download" size={18} color={theme.onAccent} />
-              <Text style={[s.requestBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Request Export</Text>
+              <Text style={[s.requestBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
+                {loading ? 'Generating…' : 'Download My Data'}
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -166,4 +176,6 @@ const makeStyles = () => StyleSheet.create({
   successTitle: { fontFamily: FONT.bold, fontSize: FS.lg, color: FG },
   successDate: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
   successDesc: { fontFamily: FONT.regular, fontSize: FS.sm, color: MUTED, textAlign: 'center', lineHeight: 20, maxWidth: 300 },
+  againBtn: { paddingHorizontal: SP.md, paddingVertical: SP.sm },
+  againText: { fontFamily: FONT.semibold, fontSize: FS.sm },
 });

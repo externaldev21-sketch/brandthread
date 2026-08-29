@@ -5,7 +5,7 @@
 import React, { useState, useCallback } from 'react';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, Image,
+  View, Text, ScrollView, StyleSheet, Image,
   ActivityIndicator, Alert, TextInput, RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,7 +32,7 @@ import {
 } from '@/lib/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  BrandthreadScreen, BrandthreadHeader, StatusBadge, EmptyState, BrandedLoader,
+  BrandthreadScreen, BrandthreadHeader, StatusBadge, EmptyState, BrandedLoader, PressableScale,
 } from '@/components/BrandthreadUI';
 
 import { useAuth } from '@clerk/expo';
@@ -49,13 +49,13 @@ function QuantityControl({ value, max, onDec, onInc }: {
 }) {
   return (
     <View style={qc.root}>
-      <TouchableOpacity style={qc.btn} onPress={onDec} activeOpacity={0.7}>
+      <PressableScale style={qc.btn} onPress={onDec} >
         <Feather name="minus" size={13} color={FG} />
-      </TouchableOpacity>
+      </PressableScale>
       <Text style={qc.val}>{value}</Text>
-      <TouchableOpacity style={[qc.btn, value >= max && qc.btnDisabled]} onPress={onInc} activeOpacity={0.7} disabled={value >= max}>
+      <PressableScale style={[qc.btn, value >= max && qc.btnDisabled]} onPress={onInc} disabled={value >= max}>
         <Feather name="plus" size={13} color={value >= max ? SUBTLE : FG} />
-      </TouchableOpacity>
+      </PressableScale>
     </View>
   );
 }
@@ -93,10 +93,10 @@ function CartItemRow({
       {/* Details */}
       <View style={{ flex: 1 }}>
         <Text style={ir.name} numberOfLines={2}>{item.productName}</Text>
-        <TouchableOpacity style={ir.variantRow} onPress={onEditVariant} activeOpacity={0.7}>
+        <PressableScale style={ir.variantRow} onPress={onEditVariant} >
           <Text style={ir.variant}>{item.variantTitle}</Text>
           <Feather name="edit-2" size={11} color={theme.accentLight} />
-        </TouchableOpacity>
+        </PressableScale>
 
         {item.isPreOrder && (
           <View style={ir.preOrderBadge}>
@@ -135,15 +135,15 @@ function CartItemRow({
 
         {/* Actions */}
         <View style={ir.actions}>
-          <TouchableOpacity style={ir.actionBtn} onPress={onSaveForLater} activeOpacity={0.7}>
+          <PressableScale style={ir.actionBtn} onPress={onSaveForLater} >
             <Feather name="bookmark" size={12} color={MUTED} />
             <Text style={ir.actionText}>Save</Text>
-          </TouchableOpacity>
+          </PressableScale>
           <View style={ir.actionDivider} />
-          <TouchableOpacity style={ir.actionBtn} onPress={onRemove} activeOpacity={0.7}>
+          <PressableScale style={ir.actionBtn} onPress={onRemove} >
             <Feather name="trash-2" size={12} color={RED} />
             <Text style={[ir.actionText, { color: RED }]}>Remove</Text>
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       </View>
     </View>
@@ -202,13 +202,12 @@ function SellerGroup({
           <Text style={sg.sellerName}>{group.sellerName}</Text>
           <Text style={sg.sellerHandle}>{group.sellerHandle}</Text>
         </View>
-        <TouchableOpacity
+        <PressableScale
           onPress={() => router.push(('/seller-profile?id=' + group.sellerId) as never)}
-          activeOpacity={0.7}
           style={[sg.visitBtn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}
         >
           <Text style={[sg.visitBtnText, { color: theme.accentLight }]}>Visit Store</Text>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
 
       {/* Items */}
@@ -281,12 +280,12 @@ function SavedItemRow({ item, onMove, onRemove }: {
           <Text style={si.unavail}>No longer available</Text>
         )}
         <View style={si.actions}>
-          <TouchableOpacity style={[si.btn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]} onPress={onMove} activeOpacity={0.7} disabled={!item.isAvailable}>
+          <PressableScale style={[si.btn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]} onPress={onMove} >
             <Text style={[si.btnText, { color: theme.accentLight }, !item.isAvailable && { color: SUBTLE }]}>Move to Cart</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={si.btnGhost} onPress={onRemove} activeOpacity={0.7}>
+          </PressableScale>
+          <PressableScale style={si.btnGhost} onPress={onRemove} >
             <Text style={si.btnGhostText}>Remove</Text>
-          </TouchableOpacity>
+          </PressableScale>
         </View>
       </View>
     </View>
@@ -685,16 +684,15 @@ export default function CartScreen() {
                         placeholderTextColor={SUBTLE}
                         style={s.pointsInput}
                       />
-                      <TouchableOpacity
+                      <PressableScale
                         style={[s.pointsApply, { backgroundColor: theme.accentDim, borderColor: theme.accent }, (redeemingPoints || groups.length !== 1) && s.pointsApplyDisabled]}
                         onPress={handleApplyPoints}
                         disabled={redeemingPoints || groups.length !== 1}
-                        activeOpacity={0.75}
                       >
                         {redeemingPoints
                           ? <ActivityIndicator color={theme.accentLight} size="small" />
                           : <Text style={[s.pointsApplyText, { color: theme.accentLight }]}>Apply</Text>}
-                      </TouchableOpacity>
+                      </PressableScale>
                     </View>
                     <Text style={s.pointsPreview}>
                       {groups.length !== 1
@@ -745,10 +743,9 @@ export default function CartScreen() {
           {/* Checkout button */}
           {hasItems && (
           <View style={[s.checkoutBar, { paddingBottom: insets.bottom + SP.md }]}>
-              <TouchableOpacity
+              <PressableScale
                 style={[s.checkoutBtn, { shadowColor: theme.shadowColor }]}
                 onPress={handleCheckout}
-                activeOpacity={0.88}
                 disabled={validating}
               >
                 <LinearGradient
@@ -766,7 +763,7 @@ export default function CartScreen() {
                     </>
                   )}
                 </LinearGradient>
-              </TouchableOpacity>
+              </PressableScale>
               <Text style={s.secureNote}>
                 <Feather name="shield" size={11} color={SUBTLE} /> Secured by Brandthread
               </Text>

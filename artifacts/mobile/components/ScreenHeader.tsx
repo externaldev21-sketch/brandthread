@@ -1,9 +1,11 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { COMP, FONT, FS, ICON, RADIUS, SP } from '@/lib/theme';
+import { PressableScale } from '@/components/BrandthreadUI';
 
 interface ScreenHeaderProps {
   title: string;
@@ -15,17 +17,18 @@ export function ScreenHeader({ title, subtitle, rightElement }: ScreenHeaderProp
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const topPad = Platform.OS === 'web'
+    ? SP.xxl + SP.md + SP.xs
+    : insets.top + SP.sm;
 
   return (
-    <View style={[styles.container, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
-      <TouchableOpacity
+    <View style={[styles.container, { paddingTop: topPad, borderBottomColor: colors.border }]}>
+      <PressableScale
         onPress={() => router.back()}
-        activeOpacity={0.7}
         style={[styles.backBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
       >
-        <Feather name="arrow-left" size={18} color={colors.foreground} />
-      </TouchableOpacity>
+        <Feather name="arrow-left" size={ICON.md} color={colors.foreground} />
+      </PressableScale>
 
       <View style={styles.titleBlock}>
         <Text style={[styles.title, { color: colors.foreground }]}>{title}</Text>
@@ -35,7 +38,7 @@ export function ScreenHeader({ title, subtitle, rightElement }: ScreenHeaderProp
       </View>
 
       <View style={styles.rightSlot}>
-        {rightElement ?? <View style={{ width: 40 }} />}
+        {rightElement ?? <View style={{ width: COMP.iconBtn }} />}
       </View>
     </View>
   );
@@ -45,15 +48,16 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    minHeight: COMP.headerH,
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.md,
     borderBottomWidth: 1,
-    gap: 12,
+    gap: SP.sm,
   },
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: COMP.iconBtn,
+    height: COMP.iconBtn,
+    borderRadius: RADIUS.md,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -62,17 +66,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontSize: 20,
-    fontFamily: 'Inter_700Bold',
+    fontSize: FS.xl,
+    fontFamily: FONT.bold,
     letterSpacing: -0.3,
   },
   subtitle: {
-    fontSize: 12,
-    fontFamily: 'Inter_400Regular',
-    marginTop: 2,
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    marginTop: SP.xs,
   },
   rightSlot: {
-    width: 40,
+    width: COMP.iconBtn,
     alignItems: 'flex-end',
   },
 });

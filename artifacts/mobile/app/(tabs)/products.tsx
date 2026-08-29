@@ -5,27 +5,28 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
-import { View, Text, ScrollView, FlatList, TouchableOpacity, StyleSheet, Alert, Share, Modal, Pressable, Image, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, FlatList, StyleSheet, Alert, Share, Modal, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, COMP, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, COMP, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SearchBar, FilterChip, StatusBadge, EmptyState, SectionHeader, StatCard, GuidedTip } from '@/components/BrandthreadUI';
+import { AnimatedEntrance, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SearchBar, FilterChip, StatusBadge, EmptyState, SectionHeader, StatCard, GuidedTip, ProductGridSkeleton, PressableScale } from '@/components/BrandthreadUI';
+import { CachedImage } from '@/components/CachedImage';
 import { getProducts, getProductStats, archiveProduct, unarchiveProduct, deleteProduct, duplicateProduct, listDrafts, deleteDraft } from '@/services/productService';
 import { Product, ProductDraft, ProductFilter, ProductCategory } from '@/services/productTypes';
 import { formatCents, integerPercent } from '@/lib/money';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function categoryGradient(category: string): [string, string] {
-  if (category === 'T-shirt' || category === 'Sweatshirt') return ['#8B5CF6', '#22D3EE'];
-  if (category === 'Hoodie' || category === 'Sweatpants') return ['#3B82F6', '#8B5CF6'];
-  if (category === 'Jacket' || category === 'Shorts') return ['#F97316', '#F59E0B'];
-  if (category === 'Denim' || category === 'Dress' || category === 'Skirt') return ['#22D3EE', '#3B82F6'];
-  return ['#8B5CF6', '#3B82F6'];
+function getCategoryColors(category: string, theme: any): readonly [string, string] {
+  if (category === 'T-shirt' || category === 'Sweatshirt') return [theme.accent, theme.secondary];
+  if (category === 'Hoodie' || category === 'Sweatpants') return [theme.secondary, theme.accentLight];
+  if (category === 'Jacket' || category === 'Shorts') return [theme.accentLight, theme.secondaryDim];
+  if (category === 'Denim' || category === 'Dress' || category === 'Skirt') return [theme.accentDim, theme.accent];
+  return [theme.accent, theme.secondary];
 }
 
 function statusVariant(status: string): 'success' | 'warning' | 'purple' | 'neutral' {
@@ -60,8 +61,9 @@ interface ProductCardProps {
 }
 
 function ProductCard({ product, onEdit, onDuplicate, onMore }: ProductCardProps) {
+  const { theme } = useAppTheme();
   const coverUri = product.media.find(m => m.isCover)?.uri ?? product.media[0]?.uri;
-  const gradColors = categoryGradient(product.category);
+  const gradColors = getCategoryColors(product.category, theme);
 
   const stock = product.inventory.totalStock;
   const threshold = product.inventory.lowStockThreshold;
@@ -81,7 +83,7 @@ function ProductCard({ product, onEdit, onDuplicate, onMore }: ProductCardProps)
         {/* Thumbnail */}
         <View style={s.thumbWrap}>
           {coverUri ? (
-            <Image source={{ uri: coverUri }} style={s.thumb} resizeMode="cover" />
+            <CachedImage source={{ uri: coverUri }} style={s.thumb} contentFit="cover" />
           ) : (
             <LinearGradient colors={gradColors} style={s.thumb} />
           )}
@@ -139,20 +141,20 @@ function ProductCard({ product, onEdit, onDuplicate, onMore }: ProductCardProps)
 
       {/* Action row */}
       <View style={s.actionRow}>
-        <TouchableOpacity style={s.actionBtn} onPress={onEdit} activeOpacity={0.7}>
-          <Feather name="edit-2" size={13} color={PURPLE_LIGHT} />
-          <Text style={[s.actionLabel, { color: PURPLE_LIGHT }]}>Edit</Text>
-        </TouchableOpacity>
+        <PressableScale style={s.actionBtn} onPress={onEdit}>
+          <Feather name="edit-2" size={13} color={theme.accentLight} />
+          <Text style={[s.actionLabel, { color: theme.accentLight }]}>Edit</Text>
+        </PressableScale>
         <View style={s.actionDivider} />
-        <TouchableOpacity style={s.actionBtn} onPress={onDuplicate} activeOpacity={0.7}>
+        <PressableScale style={s.actionBtn} onPress={onDuplicate}>
           <Feather name="copy" size={13} color={MUTED} />
           <Text style={s.actionLabel}>Duplicate</Text>
-        </TouchableOpacity>
+        </PressableScale>
         <View style={s.actionDivider} />
-        <TouchableOpacity style={s.actionBtn} onPress={onMore} activeOpacity={0.7}>
+        <PressableScale style={s.actionBtn} onPress={onMore}>
           <Feather name="more-horizontal" size={13} color={MUTED} />
           <Text style={s.actionLabel}>More</Text>
-        </TouchableOpacity>
+        </PressableScale>
       </View>
     </BrandthreadCard>
   );
@@ -246,6 +248,8 @@ function ActionSheet({ product, visible, onClose, onRefresh }: ActionSheetProps)
     { label: 'Delete', icon: 'trash-2', accent: RED, onPress: handleDelete },
   ];
 
+  const { theme } = useAppTheme();
+
   return (
     <Modal
       visible={visible}
@@ -260,13 +264,13 @@ function ActionSheet({ product, visible, onClose, onRefresh }: ActionSheetProps)
         <Text style={as.sheetTitle} numberOfLines={1}>{p.name}</Text>
         <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
           {actions.map((item, idx) => (
-            <TouchableOpacity key={idx} style={as.actionItem} onPress={item.onPress} activeOpacity={0.7}>
-              <View style={[as.actionIcon, { backgroundColor: (item.accent ?? PURPLE) + '18' }]}>
+            <PressableScale key={idx} style={as.actionItem} onPress={item.onPress}>
+              <View style={[as.actionIcon, { backgroundColor: (item.accent ?? theme.accent) + '18' }]}>
                 <Feather name={item.icon} size={ICON.sm} color={item.accent ?? MUTED} />
               </View>
               <Text style={[as.actionLabel, item.accent ? { color: item.accent } : {}]}>{item.label}</Text>
               <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />
-            </TouchableOpacity>
+            </PressableScale>
           ))}
         </ScrollView>
       </View>
@@ -483,21 +487,20 @@ export default function ProductsScreen() {
             style={{ marginBottom: SP.md }}
           >
             {inProgressDrafts.slice(0, 3).map(draft => (
-              <TouchableOpacity
+              <PressableScale
                 key={draft.id}
                 style={s.draftCard}
                 onPress={() => router.push(('/add-product?editId=' + draft.id) as never)}
-                activeOpacity={0.75}
               >
                 <View style={s.draftCardTop}>
                   <Feather name="edit-3" size={14} color={ORANGE} />
                   <Text style={[s.draftStep, { flex: 1 }]}>Step {draft.currentStep ?? 1}/10</Text>
-                  <TouchableOpacity
+                  <PressableScale
                     hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
                     onPress={() => handleDiscardDraft(draft.id, draft.name ?? '')}
                   >
                     <Feather name="x" size={13} color={MUTED} />
-                  </TouchableOpacity>
+                  </PressableScale>
                 </View>
                 <Text style={s.draftName} numberOfLines={1}>
                   {draft.name || 'Untitled product'}
@@ -506,43 +509,44 @@ export default function ProductsScreen() {
                   Saved {draft.lastSavedAt ? new Date(draft.lastSavedAt).toLocaleDateString() : '—'}
                 </Text>
                 <View style={s.draftResume}>
-                  <Text style={s.draftResumeLabel}>Resume →</Text>
+                  <Text style={[s.draftResumeLabel, { color: theme.accentLight }]}>Resume →</Text>
                 </View>
-              </TouchableOpacity>
+              </PressableScale>
             ))}
             {inProgressDrafts.length > 3 && (
-              <TouchableOpacity
-                style={s.seeAllDraftsCard}
+              <PressableScale
+                style={[s.seeAllDraftsCard, { backgroundColor: theme.accentDim, borderColor: theme.accent + '55' }]}
                 onPress={() => router.push('/drafts' as never)}
-                activeOpacity={0.75}
                 accessibilityRole="button"
                 accessibilityLabel={`See all ${inProgressDrafts.length} drafts`}
               >
-                <View style={s.seeAllDraftsIcon}>
-                  <Feather name="list" size={16} color={PURPLE_LIGHT} />
+                <View style={[s.seeAllDraftsIcon, { backgroundColor: theme.accent + '22' }]}>
+                  <Feather name="list" size={16} color={theme.accentLight} />
                 </View>
-                <Text style={s.seeAllDraftsLabel}>See all ({inProgressDrafts.length})</Text>
-                <Feather name="chevron-right" size={14} color={PURPLE_LIGHT} />
-              </TouchableOpacity>
+                <Text style={[s.seeAllDraftsLabel, { color: theme.accentLight }]}>See all ({inProgressDrafts.length})</Text>
+                <Feather name="chevron-right" size={14} color={theme.accentLight} />
+              </PressableScale>
             )}
           </ScrollView>
         </>
       )}
 
       {/* Summary stats */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.statsRow}
-        style={{ marginBottom: SP.md }}
-      >
-        <StatCard label="Active" value={String(statsForDisplay.active)} icon="check-circle" accent={SUCCESS} style={s.statCard} />
-        <StatCard label="Draft" value={String(statsForDisplay.draft)} icon="edit-3" accent={ORANGE} style={s.statCard} />
-        <StatCard label="Low Stock" value={String(statsForDisplay.lowStock)} icon="alert-triangle" accent={RED} style={s.statCard} />
-        <StatCard label="Out of Stock" value={String(statsForDisplay.outOfStock)} icon="x-circle" accent={RED} style={s.statCard} />
-        <StatCard label="Pre-orders" value={String(statsForDisplay.preOrder)} icon="clock" accent={PURPLE} style={s.statCard} />
-        <StatCard label="Value" value={formatCents(statsForDisplay.totalInventoryValueCents)} icon="dollar-sign" accent={GOLD} style={s.statCard} />
-      </ScrollView>
+      <AnimatedEntrance>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={s.statsRow}
+          style={{ marginBottom: SP.md }}
+        >
+          <StatCard label="Active" value={String(statsForDisplay.active)} icon="check-circle" accent={SUCCESS} style={s.statCard} />
+          <StatCard label="Draft" value={String(statsForDisplay.draft)} icon="edit-3" accent={ORANGE} style={s.statCard} />
+          <StatCard label="Low Stock" value={String(statsForDisplay.lowStock)} icon="alert-triangle" accent={RED} style={s.statCard} />
+          <StatCard label="Out of Stock" value={String(statsForDisplay.outOfStock)} icon="x-circle" accent={RED} style={s.statCard} />
+          <StatCard label="Pre-orders" value={String(statsForDisplay.preOrder)} icon="clock" accent={theme.accent} style={s.statCard} />
+          <StatCard label="Value" value={formatCents(statsForDisplay.totalInventoryValueCents)} icon="dollar-sign" accent={GOLD} style={s.statCard} />
+        </ScrollView>
+      </AnimatedEntrance>
 
       {/* Filter chips */}
       <ScrollView
@@ -655,8 +659,8 @@ export default function ProductsScreen() {
       />
       <AIBrainFAB context={{ screen: 'products' as const }} bottomOffset={72} />
       {loading && (
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(7,7,15,0.6)', zIndex: 10 }}>
-          <ActivityIndicator color={PURPLE} size="large" />
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: BG, zIndex: 10 }}>
+          <ProductGridSkeleton />
         </View>
       )}
     </View>

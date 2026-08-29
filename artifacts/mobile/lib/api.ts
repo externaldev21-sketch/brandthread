@@ -5,6 +5,7 @@
  */
 import { useAuth } from '@clerk/expo';
 import { useMemo } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ApiError,
   dismissNetworkNotice,
@@ -16,6 +17,60 @@ const BASE =
   `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
 
 type GetToken = () => Promise<string | null>;
+type GetCacheScope = () => string | Promise<string>;
+
+const API_CACHE_PREFIX = 'bt:api-cache:v1:';
+const API_CACHE_MAX_AGE_MS = 7 * 24 * 60 * 60_000;
+
+type ApiCacheEntry<T> = { savedAt: number; data: T };
+
+export function versionApiPath(path: string): string {
+  if (path === '/api') return '/api/v1';
+  if (path.startsWith('/api/v')) return path;
+  return path.startsWith('/api/') ? `/api/v1/${path.slice(5)}` : path;
+}
+
+async function apiCacheKey(path: string, getCacheScope: GetCacheScope): Promise<string> {
+  const scope = (await getCacheScope()) || 'anonymous';
+  const store = _storeContext ?? 'joined';
+  return `${API_CACHE_PREFIX}${encodeURIComponent(scope)}:${store}:${encodeURIComponent(path)}`;
+}
+
+async function readApiCache<T>(key: string): Promise<T | null> {
+  try {
+    const stored = await AsyncStorage.getItem(key);
+    if (!stored) return null;
+    const entry = JSON.parse(stored) as ApiCacheEntry<T>;
+    if (!entry.savedAt || Date.now() - entry.savedAt > API_CACHE_MAX_AGE_MS) {
+      await AsyncStorage.removeItem(key);
+      return null;
+    }
+    return entry.data;
+  } catch {
+    return null;
+  }
+}
+
+async function writeApiCache<T>(key: string, data: T): Promise<void> {
+  try {
+    await AsyncStorage.setItem(key, JSON.stringify({ savedAt: Date.now(), data }));
+  } catch {
+    // Cache persistence is best-effort.
+  }
+}
+
+export async function clearApiCache(cacheScope?: string): Promise<void> {
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const prefix = cacheScope
+      ? `${API_CACHE_PREFIX}${encodeURIComponent(cacheScope)}:`
+      : API_CACHE_PREFIX;
+    const matches = keys.filter((key) => key.startsWith(prefix));
+    if (matches.length > 0) await AsyncStorage.multiRemove(matches);
+  } catch {
+    // Cache cleanup must not block a mutation or account switch.
+  }
+}
 
 // Seller payment readiness changes infrequently, but product browsing and
 // checkout can ask for it repeatedly in a short window. Keep this cache in
@@ -138,7 +193,13 @@ async function request<T = any>(
   options: RequestInit,
   getToken: GetToken,
   asText = false,
+  getCacheScope: GetCacheScope = () => 'anonymous',
 ): Promise<T> {
+  const resolvedPath = versionApiPath(path);
+  const isRead = (options.method ?? 'GET').toUpperCase() === 'GET';
+  const cacheKey = isRead && !asText
+    ? await apiCacheKey(resolvedPath, getCacheScope)
+    : null;
   const token = await getToken();
   // Build a plain Record so TypeScript is happy with every HeadersInit variant.
   const headers: Record<string, string> = {
@@ -156,32 +217,43 @@ async function request<T = any>(
   };
   let res: Response;
   try {
-    res = await fetch(`${BASE}${path}`, { ...options, headers });
+    res = await fetch(`${BASE}${resolvedPath}`, { ...options, headers });
   } catch (error) {
-    const retry = options.method === 'GET'
-      ? () => request<T>(path, options, getToken, asText)
+    const retry = isRead
+      ? () => request<T>(path, options, getToken, asText, getCacheScope)
       : undefined;
-    reportNetworkError(error, retry);
+    const cached = cacheKey ? await readApiCache<T>(cacheKey) : null;
+    reportNetworkError(error, retry, cached !== null);
+    if (cached !== null) return cached;
     throw error;
   }
   if (!res.ok) {
     const body = await res.text();
     const error = new ApiError(res.status, body);
-    const retry = options.method === 'GET'
-      ? () => request<T>(path, options, getToken, asText)
+    const retry = isRead
+      ? () => request<T>(path, options, getToken, asText, getCacheScope)
       : undefined;
-    reportNetworkError(error, retry);
+    const cached = cacheKey && res.status >= 500 ? await readApiCache<T>(cacheKey) : null;
+    reportNetworkError(error, retry, cached !== null);
+    if (cached !== null) return cached;
     throw error;
   }
   dismissNetworkNotice();
   if (asText) return res.text() as Promise<T>;
-  return res.json() as Promise<T>;
+  const data = await res.json() as T;
+  if (cacheKey) {
+    await writeApiCache(cacheKey, data);
+  } else if (!isRead) {
+    await clearApiCache(await getCacheScope());
+  }
+  return data;
 }
 
 async function uploadImage<T = any>(
   path: string,
   image: { uri: string; mimeType?: string | null },
   getToken: GetToken,
+  getCacheScope: GetCacheScope = () => 'anonymous',
 ): Promise<T> {
   const source = await fetch(image.uri);
   if (!source.ok) {
@@ -192,7 +264,7 @@ async function uploadImage<T = any>(
   const token = await getToken();
   let res: Response;
   try {
-    res = await fetch(`${BASE}${path}`, {
+    res = await fetch(`${BASE}${versionApiPath(path)}`, {
       method: "POST",
       headers: {
         "Content-Type": contentType,
@@ -211,7 +283,9 @@ async function uploadImage<T = any>(
     throw error;
   }
   dismissNetworkNotice();
-  return res.json() as Promise<T>;
+  const data = await res.json() as T;
+  await clearApiCache(await getCacheScope());
+  return data;
 }
 
 // ─── Freelancer marketplace types ────────────────────────────────────────────
@@ -274,15 +348,19 @@ export interface LocalUserProfile {
   brandName: string | null;
 }
 
-export function createApi(getToken: GetToken) {
-  const get     = <T>(path: string) => request<T>(path, { method: 'GET' }, getToken);
-  const getText  = (path: string)   => request<string>(path, { method: 'GET' }, getToken, true);
-  const post  = <T>(path: string, body: unknown) => request<T>(path, { method: 'POST',  body: JSON.stringify(body) }, getToken);
-  const put   = <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT',   body: JSON.stringify(body) }, getToken);
-  const patch = <T>(path: string, body: unknown) => request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }, getToken);
-  const del   = <T>(path: string) => request<T>(path, { method: 'DELETE' }, getToken);
+export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () => 'anonymous') {
+  const get     = <T>(path: string) => request<T>(path, { method: 'GET' }, getToken, false, getCacheScope);
+  const getText  = (path: string)   => request<string>(path, { method: 'GET' }, getToken, true, getCacheScope);
+  const post  = <T>(path: string, body: unknown) => request<T>(path, { method: 'POST',  body: JSON.stringify(body) }, getToken, false, getCacheScope);
+  const put   = <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT',   body: JSON.stringify(body) }, getToken, false, getCacheScope);
+  const patch = <T>(path: string, body: unknown) => request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }, getToken, false, getCacheScope);
+  const del   = <T>(path: string) => request<T>(path, { method: 'DELETE' }, getToken, false, getCacheScope);
 
   return {
+    config: {
+      featureFlags: () =>
+        get<{ flags: Record<string, boolean>; updatedAt: string | null }>('/api/config/features'),
+    },
     auth: {
       /** Create the matching local user record after Clerk authentication.
        * During onboarding, pass the name that the person explicitly entered so
@@ -313,7 +391,18 @@ export function createApi(getToken: GetToken) {
         '/api/auth/account',
         { method: 'DELETE', body: JSON.stringify({ confirmation: 'DELETE' }) },
         getToken,
+        false,
+        getCacheScope,
       ),
+      /** Download an authenticated portability export for the active account. */
+      exportData: (include: Array<'profile' | 'orders' | 'messages'>) =>
+        post<{
+          exportedAt: string;
+          include: string[];
+          profile?: unknown;
+          orders?: unknown[];
+          messages?: { conversations: unknown[]; messages: unknown[] };
+        }>('/api/auth/data-export', { include }),
     },
     products: {
       list:           ()                       => get('/api/products'),
@@ -773,7 +862,7 @@ export function createApi(getToken: GetToken) {
         }>('/api/seller/profile'),
       /** Upload a seller-owned brand avatar after the server validates its bytes. */
       uploadAvatar: (image: { uri: string; mimeType?: string | null }) =>
-        uploadImage<{ profileImageUrl: string }>('/api/seller/profile/avatar/upload', image, getToken),
+        uploadImage<{ profileImageUrl: string }>('/api/seller/profile/avatar/upload', image, getToken, getCacheScope),
       /** Update return / cancellation policy text. */
       updatePolicy: (body: { returnPolicy?: string; cancellationPolicy?: string }) =>
         patch<{ returnPolicy: string | null; cancellationPolicy: string | null }>(
@@ -1043,7 +1132,7 @@ export function createApi(getToken: GetToken) {
         get<{ code: string; link: string; shareText: string }>('/api/referrals/code'),
       /** How many people signed up using my code */
       stats: () =>
-        get<{ total: number; referrals: Array<{ inviteeId: string; name: string | null; joinedAt: string }> }>(
+        get<{ total: number; pointsEarned: number; referrals: Array<{ inviteeId: string; name: string | null; joinedAt: string }> }>(
           '/api/referrals/stats'
         ),
       /** Attribute a referral to the current user — call once after signup with the code they entered */
@@ -1385,8 +1474,11 @@ export type BrandthreadApi = ReturnType<typeof createApi>;
  * Memoised — identity is stable as long as getToken doesn't change.
  */
 export function useApi(): BrandthreadApi {
-  const { getToken } = useAuth();
-  return useMemo(() => createApi(async () => getToken()), [getToken]);
+  const { getToken, userId } = useAuth();
+  return useMemo(
+    () => createApi(async () => getToken(), () => userId ?? 'anonymous'),
+    [getToken, userId],
+  );
 }
 
 // ─── Module-level singleton ───────────────────────────────────────────────────
@@ -1397,5 +1489,9 @@ export function useApi(): BrandthreadApi {
  * for public endpoints if never configured.
  */
 let _globalGetter: GetToken = async () => null;
-export function configureApi(getter: GetToken): void { _globalGetter = getter; }
-export const api = createApi(() => _globalGetter());
+let _globalCacheScope: GetCacheScope = () => 'anonymous';
+export function configureApi(getter: GetToken, getCacheScope: GetCacheScope = () => 'anonymous'): void {
+  _globalGetter = getter;
+  _globalCacheScope = getCacheScope;
+}
+export const api = createApi(() => _globalGetter(), () => _globalCacheScope());

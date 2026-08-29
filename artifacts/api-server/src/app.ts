@@ -15,8 +15,10 @@ import {
   jsonNotFound,
   normalizeErrorResponses,
 } from "./middlewares/errorHandling";
+import { appRateLimiter } from "./middlewares/rateLimit";
 
 const app: Express = express();
+app.set("trust proxy", 1);
 
 app.use(
   pinoHttp({
@@ -44,11 +46,16 @@ app.use(
   "/api/webhooks/stripe",
   express.raw({ type: "application/json" }),
 );
+app.use(
+  "/api/v1/webhooks/stripe",
+  express.raw({ type: "application/json" }),
+);
 
 // Tighter limit for every store AI route that can receive visual references
 // (logo, moodboard, and social screenshots). Clients pre-resize images before
 // uploading; a 10 MB ceiling keeps vision requests within a safe token budget.
 app.use("/api/store/ai", express.json({ limit: "10mb" }));
+app.use("/api/v1/store/ai", express.json({ limit: "10mb" }));
 
 // Raised from the default 100kb so requests carrying base64-encoded reference
 // photos (e.g. AI product photography uploads) don't get rejected.
@@ -65,7 +72,26 @@ app.use(
   })),
 );
 
+app.use(appRateLimiter);
+app.use("/api/v1", (_req, res, next) => {
+  res.setHeader("X-Brandthread-API-Version", "1");
+  next();
+});
+app.use("/api", (req, res, next) => {
+  if (req.path === "/v1" || req.path.startsWith("/v1/")) {
+    next();
+    return;
+  }
+  res.setHeader("X-Brandthread-API-Version", "1");
+  res.setHeader("Deprecation", "true");
+  res.setHeader("Sunset", "Wed, 31 Dec 2027 23:59:59 GMT");
+  res.setHeader("Link", `</api/v1${req.path}>; rel="successor-version"`);
+  next();
+});
+
+app.use("/api/v1", router);
 app.use("/api", router);
+app.use("/api/v1", jsonNotFound);
 app.use("/api", jsonNotFound);
 app.use(apiErrorHandler);
 

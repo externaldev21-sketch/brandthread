@@ -1,7 +1,9 @@
 import { Router } from "express";
 import { clerkClient } from "@clerk/express";
-import { db, users } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import {
+  db, users, orders, orderItems, conversationParticipants, conversations, messages,
+} from "@workspace/db";
+import { eq, sql, inArray, or, asc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { awardLoyaltyPointsOnce } from "./loyalty";
 import { sendWelcomeEmail } from "../lib/brandthreadEmail";
@@ -132,6 +134,99 @@ router.post("/sync", requireAuth, async (req, res) => {
     }
     req.log.error({ err, clerkUserId }, "Failed to sync user");
     res.status(500).json({ error: "Failed to sync user" });
+  }
+});
+
+// ─── POST /api/auth/data-export ─────────────────────────────────────────────
+// Immediate authenticated portability export. The server derives ownership
+// from Clerk and never accepts a user ID from the client.
+router.post("/data-export", requireAuth, async (req, res) => {
+  const clerkUserId = (req as any).clerkUserId as string;
+  const requested = Array.isArray(req.body?.include) ? req.body.include : ["profile", "orders", "messages"];
+  const allowed = new Set(["profile", "orders", "messages"]);
+  const include = [...new Set(requested.filter((key: unknown): key is string => typeof key === "string" && allowed.has(key)))];
+  if (include.length === 0) {
+    res.status(400).json({ error: "Select at least one export category." });
+    return;
+  }
+
+  try {
+    const result: Record<string, unknown> = {};
+    if (include.includes("profile")) {
+      const [profile] = await db.select({
+        clerkId: users.clerkId,
+        email: users.email,
+        name: users.name,
+        displayName: users.displayName,
+        accountType: users.accountType,
+        username: users.username,
+        bio: users.bio,
+        website: users.website,
+        brandName: users.brandName,
+        brandType: users.brandType,
+        brandStage: users.brandStage,
+        notificationPreferences: users.notificationPreferences,
+        createdAt: users.createdAt,
+        updatedAt: users.updatedAt,
+      }).from(users).where(eq(users.clerkId, clerkUserId)).limit(1);
+      result.profile = profile ?? null;
+    }
+
+    if (include.includes("orders")) {
+      const ownedOrders = await db.select().from(orders)
+        .where(or(eq(orders.buyerId, clerkUserId), eq(orders.ownerId, clerkUserId)))
+        .orderBy(asc(orders.createdAt));
+      const orderIds = ownedOrders.map((order) => order.id);
+      const items = orderIds.length
+        ? await db.select().from(orderItems).where(inArray(orderItems.orderId, orderIds))
+        : [];
+      const itemsByOrder = new Map<string, typeof items>();
+      for (const item of items) {
+        const group = itemsByOrder.get(item.orderId) ?? [];
+        group.push(item);
+        itemsByOrder.set(item.orderId, group);
+      }
+      result.orders = ownedOrders.map((order) => ({
+        ...order,
+        items: itemsByOrder.get(order.id) ?? [],
+        relationship: order.buyerId === clerkUserId ? "buyer" : "seller",
+      }));
+    }
+
+    if (include.includes("messages")) {
+      const memberships = await db.select({
+        conversationId: conversationParticipants.conversationId,
+      }).from(conversationParticipants).where(eq(conversationParticipants.userId, clerkUserId));
+      const conversationIds = memberships.map((membership) => membership.conversationId);
+      const conversationRows = conversationIds.length
+        ? await db.select().from(conversations).where(inArray(conversations.id, conversationIds)).orderBy(asc(conversations.createdAt))
+        : [];
+      const messageRows = conversationIds.length
+        ? await db.select({
+            id: messages.id,
+            conversationId: messages.conversationId,
+            senderId: messages.senderId,
+            senderName: messages.senderName,
+            body: messages.body,
+            attachment: messages.attachment,
+            attachments: messages.attachments,
+            replyToId: messages.replyToId,
+            status: messages.status,
+            deliveredAt: messages.deliveredAt,
+            readAt: messages.readAt,
+            deletedAt: messages.deletedAt,
+            createdAt: messages.createdAt,
+          }).from(messages).where(inArray(messages.conversationId, conversationIds)).orderBy(asc(messages.createdAt))
+        : [];
+      result.messages = { conversations: conversationRows, messages: messageRows };
+    }
+
+    const exportedAt = new Date().toISOString();
+    res.setHeader("Content-Disposition", `attachment; filename="brandthread-my-data-${Date.now()}.json"`);
+    res.json({ exportedAt, include, ...result });
+  } catch (err) {
+    req.log.error({ err, clerkUserId }, "Failed to export account data");
+    res.status(500).json({ error: "Could not generate your data export." });
   }
 });
 

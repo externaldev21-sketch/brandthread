@@ -341,6 +341,7 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
       .where(and(
         eq(orders.id, req.params.id),
         eq(orders.ownerId, ownerId),
+        ne(orders.status, "cancelled"),        // buyer/seller cancellation is terminal
         ne(orders.status, status),           // skip the write if already at target status
       ))
       .returning();

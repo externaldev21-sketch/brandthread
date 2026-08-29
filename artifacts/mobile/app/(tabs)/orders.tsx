@@ -15,6 +15,7 @@ import { useApi } from '@/hooks/useApi';
 import { useAuth } from '@clerk/expo';
 import { clearBadge } from '@/lib/orderBadgeStore';
 import { formatCents } from '@/lib/money';
+import SwipeActionRow from '@/components/SwipeActionRow';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -696,18 +697,38 @@ export default function OrdersScreen() {
 
   // ─── Render item ───────────────────────────────────────────────────────────
 
-  const renderItem = useCallback(({ item }: { item: Order }) => (
-    <OrderCard
-      order={item}
-      selected={selectedIds.includes(item.id)}
-      selectionMode={selectedIds.length > 0}
-      onPress={() => handleCardPress(item)}
-      onLongPress={() => handleLongPress(item.id)}
-      onMarkProcessing={() => handleMarkProcessing(item.id)}
-      onMarkReady={() => handleMarkReady(item.id)}
-      onShip={() => handleShip(item.id)}
-    />
-  ), [selectedIds, handleCardPress, handleLongPress, handleMarkProcessing, handleMarkReady, handleShip]);
+  const renderItem = useCallback(({ item }: { item: Order }) => {
+    const swipeAction =
+      item.status === 'new'
+        ? { label: 'Accept', icon: 'check-circle' as const, color: theme.accent, run: () => handleMarkProcessing(item.id) }
+        : item.status === 'processing'
+          ? { label: 'Ready', icon: 'package' as const, color: BLUE, run: () => handleMarkReady(item.id) }
+          : item.status === 'ready_to_ship'
+            ? { label: 'Ship', icon: 'send' as const, color: SUCCESS, run: () => handleShip(item.id) }
+            : { label: 'Open', icon: 'arrow-right' as const, color: theme.accent, run: () => handleCardPress(item) };
+
+    return (
+      <SwipeActionRow
+        label={swipeAction.label}
+        icon={swipeAction.icon}
+        color={swipeAction.color}
+        onAction={swipeAction.run}
+        disabled={selectedIds.length > 0}
+        accessibilityLabel={`${swipeAction.label} order ${item.orderNumber}`}
+      >
+        <OrderCard
+          order={item}
+          selected={selectedIds.includes(item.id)}
+          selectionMode={selectedIds.length > 0}
+          onPress={() => handleCardPress(item)}
+          onLongPress={() => handleLongPress(item.id)}
+          onMarkProcessing={() => handleMarkProcessing(item.id)}
+          onMarkReady={() => handleMarkReady(item.id)}
+          onShip={() => handleShip(item.id)}
+        />
+      </SwipeActionRow>
+    );
+  }, [selectedIds, handleCardPress, handleLongPress, handleMarkProcessing, handleMarkReady, handleShip, theme.accent]);
 
   const keyExtractor = useCallback((o: Order) => o.id, []);
 

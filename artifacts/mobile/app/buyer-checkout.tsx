@@ -5,8 +5,8 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView,
-  StyleSheet, Switch, Text, TextInput, TouchableOpacity, View, Animated, Image,
+  ActivityIndicator, Alert, Platform, ScrollView,
+  StyleSheet, Text, TextInput, TouchableOpacity, View, Animated, Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -31,6 +31,8 @@ import {
   SP, SUCCESS, SUCCESS_DIM, SUBTLE, COMP, ICON
 } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
+import { CheckoutSkeleton, HapticSwitch } from '@/components/BrandthreadUI';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 
 const STEPS: CheckoutStep[] = ['information', 'delivery', 'review', 'confirmation'];
 const money = formatCents;
@@ -100,7 +102,7 @@ function Information({ contact, address, onContact, onAddress, savedAddresses, o
           onChange={phone => onContact({ ...contact, phone })} />
         <View style={styles.toggleRow}>
           <View style={{ flex: 1 }}><Text style={styles.toggleTitle}>Order updates</Text><Text style={styles.muted}>Email updates about your order</Text></View>
-          <Switch value={contact.orderUpdates !== 'none'} onValueChange={enabled => onContact({ ...contact, orderUpdates: enabled ? 'email' : 'none' })} trackColor={{ true: PURPLE }} />
+          <HapticSwitch value={contact.orderUpdates !== 'none'} onValueChange={enabled => onContact({ ...contact, orderUpdates: enabled ? 'email' : 'none' })} trackColor={{ true: PURPLE }} />
         </View>
       </Card>
       <Card>
@@ -171,13 +173,13 @@ function Information({ contact, address, onContact, onAddress, savedAddresses, o
             {isSignedIn && (
               <View style={styles.toggleRow}>
                 <View style={{ flex: 1 }}><Text style={styles.toggleTitle}>Save this address</Text><Text style={styles.muted}>Save to your address book</Text></View>
-                <Switch value={address.saveAddress !== false} onValueChange={enabled => onAddress({ ...address, saveAddress: enabled })} trackColor={{ true: PURPLE }} />
+                <HapticSwitch value={address.saveAddress !== false} onValueChange={enabled => onAddress({ ...address, saveAddress: enabled })} trackColor={{ true: PURPLE }} />
               </View>
             )}
             {isSignedIn && address.saveAddress !== false && (
               <View style={styles.toggleRow}>
                 <View style={{ flex: 1 }}><Text style={styles.toggleTitle}>Set as default</Text></View>
-                <Switch value={address.isDefault === true} onValueChange={enabled => onAddress({ ...address, isDefault: enabled })} trackColor={{ true: PURPLE }} />
+                <HapticSwitch value={address.isDefault === true} onValueChange={enabled => onAddress({ ...address, isDefault: enabled })} trackColor={{ true: PURPLE }} />
               </View>
             )}
           </>
@@ -624,6 +626,7 @@ export default function BuyerCheckoutScreen() {
       }
 
       await persist({ ...current, paidGroups, step: 'confirmation' });
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch { setError('We could not start secure checkout. Please try again.'); }
     setPlacing(false);
   };
@@ -660,15 +663,18 @@ export default function BuyerCheckoutScreen() {
     }
     setOrders(found); setPendingSessionIds(remaining);
     await persist({ ...current, paidGroups, step: 'confirmation' });
+    if (!remaining.length) {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
     if (!remaining.length) await clearCart();
     setPlacing(false);
   }, [api, current, orders, pendingSessionIds]);
-  if (loading || !session) return <View style={styles.loading}><ActivityIndicator color={PURPLE} size="large" /></View>;
+  if (loading || !session) return <CheckoutSkeleton />;
   const label = current.step === 'review'
     ? canRetryPayment ? 'Try a different card' : `Continue to Stripe · ${money(current.summary.totalCents)}`
     : 'Continue';
   return (
-    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={styles.root} behavior="padding" keyboardVerticalOffset={0}>
       {current.step !== 'confirmation' && <View style={[styles.header, { paddingTop: insets.top + SP.xs }]}><TouchableOpacity style={styles.back} onPress={() => { const index = STEPS.indexOf(current.step); if (index <= 0) router.back(); else void persist({ ...current, step: STEPS[index - 1] }); }}><Feather name="chevron-left" size={ICON.md} color={FG} /></TouchableOpacity><View style={{ flex: 1, alignItems: 'center' }}><Text style={styles.stepLabel}>{current.step === 'information' ? 'Information' : current.step === 'delivery' ? 'Delivery' : 'Review & Pay'}</Text><Progress step={current.step} /></View><View style={styles.back} /></View>}
       <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + (current.step === 'confirmation' ? 30 : 105) }} keyboardShouldPersistTaps="handled">
         {current.step === 'information' && <Information contact={contact} address={address} onContact={setContact} onAddress={setAddress} savedAddresses={savedAddresses} onSelectAddress={handleSelectAddress} />}
@@ -686,7 +692,7 @@ export default function BuyerCheckoutScreen() {
            </View>
          </View>}
       </ScrollView>
-       {current.step !== 'confirmation' && <View style={[styles.bottom, { paddingBottom: insets.bottom + SP.sm }]}><TouchableOpacity style={styles.continue} disabled={placing} onPress={canRetryPayment ? retryPayment : handleContinue}><LinearGradient colors={theme.primaryGradient} style={styles.continueGradient}>{placing ? <ActivityIndicator color={theme.onAccent} /> : <Text style={[styles.continueText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>{label}</Text>}</LinearGradient></TouchableOpacity></View>}
+       {current.step !== 'confirmation' && <View style={[styles.bottom, { paddingBottom: insets.bottom + SP.sm }]}><TouchableOpacity style={styles.continue} disabled={placing} onPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); void (canRetryPayment ? retryPayment() : handleContinue()); }}><LinearGradient colors={theme.primaryGradient} style={styles.continueGradient}>{placing ? <ActivityIndicator color={theme.onAccent} /> : <Text style={[styles.continueText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>{label}</Text>}</LinearGradient></TouchableOpacity></View>}
     </KeyboardAvoidingView>
   );
 }

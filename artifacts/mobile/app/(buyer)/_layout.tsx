@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { Platform, Pressable, StyleSheet, View, useColorScheme } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Platform, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
@@ -8,6 +8,7 @@ import { SymbolView } from 'expo-symbols';
 import { BORDER, SUBTLE } from '@/lib/theme';
 import { getDeactivationStatus, reactivate } from '@/lib/accountService';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { getConversations, getNotifications, subscribeSocial } from '@/services/socialService';
 
 // ─── Buyer tab layout ─────────────────────────────────────────────────────────
 // Tabs: Thread · Discover · Friends · Inbox · Profile
@@ -18,10 +19,35 @@ function BuyerTabLayout() {
   const isIOS   = Platform.OS === 'ios';
   const insets  = useSafeAreaInsets();
   const { theme } = useAppTheme();
+  const [inboxBadgeCount, setInboxBadgeCount] = useState(0);
 
   const pillBg       = 'rgba(12,12,23,0.96)'; // SURFACE with opacity
   const activeTint   = theme.accent;
   const inactiveTint = SUBTLE;
+
+  const loadBadgeCount = useCallback(async () => {
+    try {
+      const [conversations, notifications] = await Promise.all([
+        getConversations(),
+        getNotifications(),
+      ]);
+      const unreadMessages = conversations.reduce((sum, conversation) => sum + (conversation.unreadCount ?? 0), 0);
+      const unreadNotifications = notifications.filter(notification => !notification.isRead && !notification.isMuted).length;
+      setInboxBadgeCount(unreadMessages + unreadNotifications);
+    } catch {
+      // Badges are non-critical and retain their last known count while offline.
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadBadgeCount();
+    const unsubscribe = subscribeSocial(() => { void loadBadgeCount(); });
+    const timer = setInterval(() => { void loadBadgeCount(); }, 30_000);
+    return () => {
+      unsubscribe();
+      clearInterval(timer);
+    };
+  }, [loadBadgeCount]);
 
   const tabBarStyle = {
     position: 'relative' as const,
@@ -110,12 +136,15 @@ function BuyerTabLayout() {
         name="inbox"
         options={{
           title: 'Inbox',
-          tabBarIcon: ({ color, focused }) =>
-            isIOS ? (
-              <SymbolView name={focused ? 'message.fill' : 'message'} tintColor={color} size={20} />
-            ) : (
-              <TabIcon name="message-circle" color={color} focused={focused} accent={theme.accent} />
-            ),
+          tabBarIcon: ({ color, focused }) => (
+            <TabBadge count={inboxBadgeCount} accent={theme.accent} onAccent={theme.onAccent}>
+              {isIOS ? (
+                <SymbolView name={focused ? 'message.fill' : 'message'} tintColor={color} size={20} />
+              ) : (
+                <TabIcon name="message-circle" color={color} focused={focused} accent={theme.accent} />
+              )}
+            </TabBadge>
+          ),
         }}
       />
 
@@ -143,6 +172,45 @@ function BuyerTabLayout() {
     </Tabs>
   );
 }
+
+function TabBadge({
+  count,
+  accent,
+  onAccent,
+  children,
+}: {
+  count: number;
+  accent: string;
+  onAccent: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={badgeStyles.wrap}>
+      {children}
+      {count > 0 && (
+        <View style={[badgeStyles.badge, { backgroundColor: accent }]}>
+          <Text style={[badgeStyles.text, { color: onAccent }]}>{count > 99 ? '99+' : count}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const badgeStyles = StyleSheet.create({
+  wrap: { position: 'relative' },
+  badge: {
+    position: 'absolute',
+    top: -7,
+    right: -11,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 9,
+    paddingHorizontal: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  text: { fontSize: 9, fontFamily: 'Inter_700Bold', lineHeight: 11 },
+});
 
 // ─── Regular tab icon ─────────────────────────────────────────────────────────
 

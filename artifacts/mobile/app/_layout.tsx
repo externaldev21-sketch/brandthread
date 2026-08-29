@@ -11,7 +11,7 @@ import {
   Inter_700Bold,
   useFonts,
 } from '@expo-google-fonts/inter';
-import { Platform, View } from 'react-native';
+import { Keyboard, Platform, Pressable, Text, View } from 'react-native';
 import { Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useUser } from '@clerk/expo';
@@ -22,7 +22,7 @@ import { AppThemeProvider } from '@/contexts/AppThemeContext';
 import BootScreen from '@/components/BootScreen';
 import * as Notifications from 'expo-notifications';
 import { configureServices } from '@/lib/serviceConfig';
-import { configureApi, setStoreContext, useApi } from '@/lib/api';
+import { clearApiCache, configureApi, setStoreContext, useApi } from '@/lib/api';
 import { clearSocialCache, hydrateMyProfileFromAccount, initSocialService, socialKeysForUser } from '@/services/socialService';
 import { clearCartCache, initCartService } from '@/services/cartService';
 import { initBuyerProfile } from '@/lib/buyerProfile';
@@ -31,6 +31,7 @@ import NetworkNoticeBanner from '@/components/NetworkNoticeBanner';
 import { dismissNetworkNotice } from '@/lib/networkNotice';
 import { RevenueCatProvider } from '@/lib/revenueCat';
 import { registerGrantedPushToken } from '@/lib/contextualPushPermission';
+import { FeatureFlagProvider, FeatureFlagKey, useFeatureFlags } from '@/contexts/FeatureFlagContext';
 
 // Push notifications are native-only. Importing the package is safe for the
 // web bundle, but registering a handler/listener there produces unsupported
@@ -292,9 +293,8 @@ function ServiceConfigurer() {
 
   useEffect(() => {
     configureServices(() => getToken());
-    configureApi(() => getToken());
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    configureApi(() => getToken(), () => user?.id ?? 'anonymous');
+  }, [getToken, user?.id]);
 
   useEffect(() => {
     if (isLoaded && !isSignedIn) dismissNetworkNotice();
@@ -312,6 +312,7 @@ function ServiceConfigurer() {
       // using the explicit userId argument to avoid an 'anon' prefix race.
       clearSocialCache(oldUserId).catch(() => {});
       clearCartCache(oldUserId).catch(() => {});
+      clearApiCache(oldUserId).catch(() => {});
     }
     prevUserIdRef.current = newUserId;
     initSocialService(newUserId);
@@ -379,11 +380,43 @@ function PushRegistrar() {
 }
 
 function RootLayoutNav() {
+  const segments = useSegments();
+  const router = useRouter();
+  const { isEnabled } = useFeatureFlags();
+  const route = segments[segments.length - 1] ?? '';
+  const gatedRoutes: Partial<Record<string, FeatureFlagKey>> = {
+    'design-ai-photoshoot': 'aiPhotoShoot',
+    boost: 'boosts',
+    'manufacturer-hub': 'manufacturerHub',
+  };
+  const feature = gatedRoutes[route];
+
+  if (feature && !isEnabled(feature)) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#07070F', alignItems: 'center', justifyContent: 'center', padding: 28, gap: 12 }}>
+        <Text style={{ color: '#F5F5F7', fontFamily: 'Inter_700Bold', fontSize: 22, textAlign: 'center' }}>
+          Temporarily unavailable
+        </Text>
+        <Text style={{ color: '#9898A6', fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 21, textAlign: 'center' }}>
+          This feature is paused while we make improvements. Your existing work is still safe.
+        </Text>
+        <Pressable
+          onPress={() => router.back()}
+          style={{ marginTop: 8, minHeight: 44, paddingHorizontal: 22, borderRadius: 10, backgroundColor: '#F5F5F7', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Text style={{ color: '#07070F', fontFamily: 'Inter_600SemiBold', fontSize: 14 }}>Go back</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1 }}>
       <StoreContextBanner />
       <NetworkNoticeBanner />
-      <Stack screenOptions={{ headerShown: false }}>
+      <Pressable onPress={Keyboard.dismiss} accessible={false} style={{ flex: 1 }}>
+        <View style={{ flex: 1 }}>
+      <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right', animationDuration: 220, gestureEnabled: true }}>
         {/* Boot: "/" renders BootScreen until AuthGate redirects */}
         <Stack.Screen name="index"          options={{ headerShown: false, animation: 'fade' }} />
         {/* Auth & onboarding */}
@@ -594,6 +627,8 @@ function RootLayoutNav() {
         <Stack.Screen name="account-type-settings"   options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="login-methods"           options={{ headerShown: false, animation: 'slide_from_right' }} />
       </Stack>
+        </View>
+      </Pressable>
       <AuthGate />
       <ServiceConfigurer />
       <PushRegistrar />
@@ -633,9 +668,11 @@ export default function RootLayout() {
             <AppThemeProvider>
               <RoleProvider>
                 <RevenueCatProvider>
-                  <KeyboardProvider>
-                    <RootLayoutNav />
-                  </KeyboardProvider>
+                  <FeatureFlagProvider>
+                    <KeyboardProvider>
+                      <RootLayoutNav />
+                    </KeyboardProvider>
+                  </FeatureFlagProvider>
                 </RevenueCatProvider>
               </RoleProvider>
             </AppThemeProvider>

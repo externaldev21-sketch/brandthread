@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
-  Dimensions, Animated, Alert, Share, TextInput, Modal, Image,
-  KeyboardAvoidingView, Platform, ScrollView, RefreshControl, ActivityIndicator,
+  Dimensions, Animated, Alert, Share, TextInput, Modal,
+  Platform, ScrollView, RefreshControl, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -21,7 +21,9 @@ import {
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { BrandedLoadingState } from '@/components/BrandthreadUI';
+import { FeedSkeleton } from '@/components/BrandthreadUI';
+import { CachedImage } from '@/components/CachedImage';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { formatCents } from '@/lib/money';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -210,7 +212,7 @@ function PhotoVisual({ uris }: { uris: string[] }) {
       nestedScrollEnabled
       renderItem={({ item: uri }) => (
         <View style={{ width: SCREEN_W, height: SCREEN_H }}>
-          {uri ? <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : (
+          {uri ? <CachedImage source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" /> : (
             <View style={[StyleSheet.absoluteFill, styles.mediaPlaceholder]}>
               <Feather name="image" size={42} color="#FFFFFF99" />
             </View>
@@ -756,7 +758,7 @@ export default function FeedScreen() {
   return (
     <View style={styles.container}>
       {feedLoading && (
-        <BrandedLoadingState
+        <FeedSkeleton
           style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 5 }}
         />
       )}

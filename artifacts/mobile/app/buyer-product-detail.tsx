@@ -707,7 +707,7 @@ export default function BuyerProductDetailScreen() {
             tintColor={PURPLE}
           />
         }
-        contentContainerStyle={{ paddingBottom: insets.bottom + 130 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 144 }}
       >
         {/* Immersive product gallery */}
         <View style={s.imageArea}>
@@ -925,8 +925,12 @@ export default function BuyerProductDetailScreen() {
         </View>
       </ScrollView>
 
-      {/* Bottom action bar */}
-      <View style={[s.actionBar, { paddingBottom: insets.bottom + SP.sm }]}>
+      {/* Persistent purchase bar remains visible while product content scrolls. */}
+      <View
+        style={[s.actionBar, { paddingBottom: insets.bottom + SP.sm }]}
+        accessibilityRole="toolbar"
+        accessibilityLabel="Product purchase actions"
+      >
         {addedToCart ? (
           <TouchableOpacity
             style={s.viewCartBtn}

@@ -10,6 +10,7 @@ import {
   View, Text, TouchableOpacity, TextInput, ScrollView,
   StyleSheet, ActivityIndicator, Animated, Platform,
   ViewStyle, TextStyle, StyleProp, Pressable,
+  Switch, SwitchProps, PressableProps,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -26,6 +27,102 @@ import {
   SHADOW_PURPLE, SHADOW_SM,
 } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics';
+import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
+
+// ─── Reusable Motion Primitives ───────────────────────────────────────────────
+
+interface PressableScaleProps extends Omit<PressableProps, 'style'> {
+  children: React.ReactNode | ((state: { pressed: boolean }) => React.ReactNode);
+  style?: StyleProp<ViewStyle> | ((state: { pressed: boolean }) => StyleProp<ViewStyle>);
+  activeScale?: number;
+  activeOpacity?: number;
+}
+
+export function PressableScale({ children, onPress, style, disabled, hitSlop, activeScale = 0.97, activeOpacity = 0.85, ...rest }: PressableScaleProps) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  return (
+    <Pressable
+      {...rest}
+      onPress={onPress}
+      disabled={disabled}
+      hitSlop={hitSlop}
+      onPressIn={(e) => {
+        Animated.parallel([
+          Animated.spring(scale, { toValue: activeScale, useNativeDriver: true, tension: 100, friction: 15 }),
+          Animated.timing(opacity, { toValue: activeOpacity, duration: 50, useNativeDriver: true }),
+        ]).start();
+        rest.onPressIn?.(e);
+      }}
+      onPressOut={(e) => {
+        Animated.parallel([
+          Animated.spring(scale, { toValue: 1, useNativeDriver: true, tension: 100, friction: 15 }),
+          Animated.timing(opacity, { toValue: 1, duration: 150, useNativeDriver: true }),
+        ]).start();
+        rest.onPressOut?.(e);
+      }}
+      style={typeof style === 'function' ? style : undefined}
+    >
+      {(state) => (
+        <Animated.View style={[typeof style === 'function' ? undefined : style, { transform: [{ scale }], opacity }]}>
+          {typeof children === 'function' ? children(state) : children}
+        </Animated.View>
+      )}
+    </Pressable>
+  );
+}
+
+interface AnimatedEntranceProps {
+  children: React.ReactNode;
+  delay?: number;
+  distance?: number;
+  disabled?: boolean;
+  style?: StyleProp<ViewStyle>;
+}
+
+export function AnimatedEntrance({
+  children,
+  delay = 0,
+  distance = SP.sm,
+  disabled = false,
+  style,
+}: AnimatedEntranceProps) {
+  const progress = useRef(new Animated.Value(disabled ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (disabled) {
+      progress.setValue(1);
+      return;
+    }
+    Animated.timing(progress, {
+      toValue: 1,
+      delay,
+      duration: ANIM.normal,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  }, [delay, disabled, progress]);
+
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: progress,
+          transform: [{
+            translateY: progress.interpolate({
+              inputRange: [0, 1],
+              outputRange: [distance, 0],
+            }),
+          }],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
 
 // ─── BrandthreadScreen ────────────────────────────────────────────────────────
 
@@ -50,13 +147,15 @@ export function BrandthreadScreen({
   if (scrollable) {
     return (
       <View style={[containerStyle, style]}>
-        <ScrollView
+        <KeyboardAwareScrollViewCompat
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, SP.md) + COMP.tabBarH + SP.md }}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          bottomOffset={24}
         >
           {children}
-        </ScrollView>
+        </KeyboardAwareScrollViewCompat>
       </View>
     );
   }
@@ -81,13 +180,13 @@ export function BrandthreadHeader({
     <View style={hdrS.root}>
       <View style={hdrS.left}>
         {onBack && (
-          <TouchableOpacity
+          <PressableScale
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onBack(); }}
             style={hdrS.back}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             <Feather name="arrow-left" size={ICON.md} color={FG} />
-          </TouchableOpacity>
+          </PressableScale>
         )}
         <View>
           {gradient ? (
@@ -140,9 +239,9 @@ export function BrandthreadCard({ children, style, onPress, glow = false, elevat
   };
   if (onPress) {
     return (
-      <TouchableOpacity activeOpacity={0.8} onPress={onPress} style={[s, style]}>
+      <PressableScale onPress={onPress} style={[s, style]}>
         {children}
-      </TouchableOpacity>
+      </PressableScale>
     );
   }
   return <View style={[s, style]}>{children}</View>;
@@ -173,9 +272,9 @@ export function GradientCard({ children, style, onPress, colors, glow = false }:
   );
   if (onPress) {
     return (
-      <TouchableOpacity activeOpacity={0.82} onPress={onPress}>
+      <PressableScale onPress={onPress}>
         {inner}
-      </TouchableOpacity>
+      </PressableScale>
     );
   }
   return inner;
@@ -207,11 +306,10 @@ export function PrimaryButton({
   const onAccentTextStyle = getOnAccentTextStyle(theme);
   const h = small ? COMP.buttonHSm : COMP.buttonH;
   return (
-    <TouchableOpacity
-      activeOpacity={disabled || loading ? 1 : 0.85}
+    <PressableScale
       onPress={() => {
         if (disabled || loading) return;
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        hapticMedium();
         onPress();
       }}
       style={[{ borderRadius: RADIUS.md, overflow: 'hidden' }, style]}
@@ -231,7 +329,7 @@ export function PrimaryButton({
           </>
         )}
       </LinearGradient>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -257,18 +355,17 @@ export function SecondaryButton({ label, onPress, icon, disabled, small, style, 
   const resolvedAccent = accent ?? theme.accent;
   const h = small ? COMP.buttonHSm : COMP.buttonH;
   return (
-    <TouchableOpacity
-      activeOpacity={disabled ? 1 : 0.8}
+    <PressableScale
       onPress={() => {
         if (disabled) return;
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        hapticLight();
         onPress();
       }}
       style={[sbS.root, { height: h, borderColor: resolvedAccent + '55', backgroundColor: resolvedAccent + '14', opacity: disabled ? 0.5 : 1 }, style]}
     >
       {icon && <Feather name={icon} size={ICON.sm} color={resolvedAccent} />}
       <Text style={[sbS.label, { fontSize: small ? FS.sm : FS.base, color: resolvedAccent }]}>{label}</Text>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -295,8 +392,7 @@ export function TertiaryButton({ label, onPress, icon, disabled, small, style, a
   const resolvedAccent = accent ?? theme.accentLight;
   const h = small ? COMP.buttonHSm : COMP.buttonH;
   return (
-    <TouchableOpacity
-      activeOpacity={disabled ? 1 : 0.65}
+    <PressableScale
       onPress={() => {
         if (disabled) return;
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -306,7 +402,7 @@ export function TertiaryButton({ label, onPress, icon, disabled, small, style, a
     >
       {icon && <Feather name={icon} size={ICON.sm} color={resolvedAccent} />}
       <Text style={{ fontFamily: FONT.semibold, fontSize: small ? FS.sm : FS.base, color: resolvedAccent }}>{label}</Text>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -325,8 +421,8 @@ interface IconButtonProps {
 export function IconButton({ name, onPress, color = FG, size = ICON.md, badge, badgeCount, style }: IconButtonProps) {
   const { theme } = useAppTheme();
   return (
-    <TouchableOpacity
-      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
+    <PressableScale
+      onPress={() => { hapticLight(); onPress(); }}
       style={[ibS.root, style]}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
     >
@@ -338,7 +434,7 @@ export function IconButton({ name, onPress, color = FG, size = ICON.md, badge, b
             : null}
         </View>
       )}
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -377,9 +473,9 @@ export function SearchBar({ value, onChange, placeholder = 'Search…', style, o
         returnKeyType="search"
       />
       {value.length > 0 && (
-        <TouchableOpacity onPress={() => onChange('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <PressableScale onPress={() => onChange('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Feather name="x" size={ICON.sm} color={MUTED} />
-        </TouchableOpacity>
+        </PressableScale>
       )}
     </View>
   );
@@ -405,10 +501,9 @@ interface FilterChipProps {
 export function FilterChip({ label, active, onPress, count }: FilterChipProps) {
   const { theme } = useAppTheme();
   return (
-    <TouchableOpacity
+    <PressableScale
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
       style={[fcS.chip, active && [fcS.active, { backgroundColor: theme.accentDim, borderColor: theme.accent + '88' }]]}
-      activeOpacity={0.8}
     >
       <Text style={[fcS.label, active && [fcS.activeLabel, { color: theme.accentLight }]]}>{label}</Text>
       {count !== undefined && (
@@ -416,7 +511,7 @@ export function FilterChip({ label, active, onPress, count }: FilterChipProps) {
           <Text style={[fcS.countText, active && [fcS.activeCountText, { color: theme.accentLight }]]}>{count}</Text>
         </View>
       )}
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -579,9 +674,9 @@ export function SectionHeader({ title, action, style }: SectionHeaderProps) {
     <View style={[shS.root, style]}>
       <Text style={shS.title}>{title}</Text>
       {action && (
-        <TouchableOpacity onPress={action.onPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <PressableScale onPress={action.onPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Text style={[shS.action, { color: theme.accentLight }]}>{action.label}</Text>
-        </TouchableOpacity>
+        </PressableScale>
       )}
     </View>
   );
@@ -650,17 +745,16 @@ export function QuickActionCard({ icon, label, onPress, accent, badge, style }: 
   const { theme } = useAppTheme();
   const resolvedAccent = accent ?? theme.accent;
   return (
-    <TouchableOpacity
+    <PressableScale
       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
       style={[qaS.root, style]}
-      activeOpacity={0.8}
     >
       <View style={[qaS.iconWrap, { backgroundColor: resolvedAccent + '18' }]}>
         <Feather name={icon} size={ICON.md} color={resolvedAccent} />
         {badge && <View style={[qaS.dot, { backgroundColor: theme.accent }]} />}
       </View>
       <Text style={qaS.label} numberOfLines={1}>{label}</Text>
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -689,12 +783,12 @@ export function GuidedTip({ id, text, dismissedIds, onDismiss, style }: GuidedTi
     <View style={[gtS.root, { backgroundColor: theme.accentDim, borderColor: theme.accent + '33' }, style]}>
       <Feather name="zap" size={ICON.xs} color={theme.accentLight} style={{ marginTop: 1 }} />
       <Text style={gtS.text}>{text}</Text>
-      <TouchableOpacity
+      <PressableScale
         onPress={() => onDismiss(id)}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
         <Feather name="x" size={ICON.xs} color={MUTED} />
-      </TouchableOpacity>
+      </PressableScale>
     </View>
   );
 }
@@ -881,10 +975,9 @@ export function NavigationCard({ icon, label, description, onPress, accent, badg
   const { theme } = useAppTheme();
   const resolvedAccent = accent ?? theme.accent;
   return (
-    <TouchableOpacity
-      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
+    <PressableScale
+      onPress={() => { hapticLight(); onPress(); }}
       style={[ncS.root, style]}
-      activeOpacity={0.8}
     >
       <View style={[ncS.iconWrap, { backgroundColor: resolvedAccent + '18' }]}>
         <Feather name={icon} size={ICON.md} color={resolvedAccent} />
@@ -901,7 +994,7 @@ export function NavigationCard({ icon, label, description, onPress, accent, badg
         {description && <Text style={ncS.desc} numberOfLines={1}>{description}</Text>}
       </View>
       {right ?? <Feather name="chevron-right" size={ICON.sm} color={SUBTLE} />}
-    </TouchableOpacity>
+    </PressableScale>
   );
 }
 
@@ -921,7 +1014,7 @@ const ncS = StyleSheet.create({
 
 // ─── LoadingSkeleton ──────────────────────────────────────────────────────────
 
-export function LoadingSkeleton({ height = 80, style }: { height?: number; style?: ViewStyle }) {
+export function LoadingSkeleton({ height = 80, style }: { height?: number; style?: StyleProp<ViewStyle> }) {
   const anim = useRef(new Animated.Value(0.4)).current;
   useEffect(() => {
     const loop = Animated.loop(
@@ -939,6 +1032,112 @@ export function LoadingSkeleton({ height = 80, style }: { height?: number; style
     />
   );
 }
+
+export function SkeletonText({ width = '70%', height = 12, style }: { width?: number | `${number}%`; height?: number; style?: StyleProp<ViewStyle> }) {
+  return <LoadingSkeleton height={height} style={[{ width }, style]} />;
+}
+
+export function FeedSkeleton({ style }: { style?: StyleProp<ViewStyle> } = {}) {
+  return (
+    <View style={[skS.feed, style]}>
+      <LoadingSkeleton height={COMP.headerH} style={skS.feedHeader} />
+      <LoadingSkeleton height={420} style={skS.feedMedia} />
+      <View style={skS.feedMeta}>
+        <View style={skS.feedAvatar} />
+        <View style={skS.feedLines}>
+          <SkeletonText width="42%" height={14} />
+          <SkeletonText width="68%" height={11} />
+        </View>
+      </View>
+      <SkeletonText width="86%" height={12} />
+      <SkeletonText width="54%" height={12} />
+    </View>
+  );
+}
+
+export function ProductGridSkeleton({ columns = 2, count = 6 }: { columns?: number; count?: number }) {
+  return (
+    <View style={skS.grid}>
+      {Array.from({ length: count }).map((_, index) => (
+        <View key={index} style={[skS.productCard, { width: `${100 / columns - 2}%` }]}>
+          <LoadingSkeleton height={150} style={skS.productImage} />
+          <SkeletonText width="82%" height={13} />
+          <SkeletonText width="46%" height={11} />
+          <SkeletonText width="38%" height={13} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+export function SearchResultsSkeleton() {
+  return (
+    <View style={skS.searchList}>
+      {Array.from({ length: 5 }).map((_, index) => (
+        <View key={index} style={skS.searchRow}>
+          <LoadingSkeleton height={60} style={skS.searchThumb} />
+          <View style={skS.searchLines}>
+            <SkeletonText width="64%" height={14} />
+            <SkeletonText width="44%" height={11} />
+            <SkeletonText width="30%" height={11} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+export function CheckoutSkeleton() {
+  return (
+    <View style={skS.checkout}>
+      <View style={skS.checkoutHeader}>
+        <LoadingSkeleton height={36} style={{ width: 36, borderRadius: 18 }} />
+        <SkeletonText width="34%" height={16} />
+        <View style={{ width: 36 }} />
+      </View>
+      <View style={skS.checkoutBody}>
+        <SkeletonText width="46%" height={18} />
+        <LoadingSkeleton height={132} />
+        <SkeletonText width="38%" height={18} />
+        <LoadingSkeleton height={88} />
+        <LoadingSkeleton height={56} />
+      </View>
+      <LoadingSkeleton height={54} style={skS.checkoutButton} />
+    </View>
+  );
+}
+
+export function HapticSwitch({ onValueChange, ...props }: SwitchProps) {
+  return (
+    <Switch
+      {...props}
+      onValueChange={(value) => {
+        hapticSelection();
+        onValueChange?.(value);
+      }}
+    />
+  );
+}
+
+const skS = StyleSheet.create({
+  feed: { padding: SP.md, gap: SP.sm, backgroundColor: BG },
+  feedHeader: { width: '100%', borderRadius: 0 },
+  feedMedia: { width: '100%', borderRadius: RADIUS.lg },
+  feedMeta: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.sm },
+  feedAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: CARD },
+  feedLines: { flex: 1, gap: 7 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: SP.sm, padding: SP.md },
+  productCard: { gap: 8, marginBottom: SP.md },
+  productImage: { width: '100%', borderRadius: RADIUS.md },
+  searchList: { padding: SP.md, gap: SP.sm },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
+  searchThumb: { width: 60, borderRadius: RADIUS.md },
+  searchLines: { flex: 1, gap: 8 },
+  checkout: { flex: 1, backgroundColor: BG },
+  checkoutHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: SP.md },
+  checkoutBody: { flex: 1, padding: SP.md, gap: SP.md },
+  checkoutButton: { marginHorizontal: SP.md, marginBottom: SP.lg },
+});
 
 // ─── BrandedLoadingState ──────────────────────────────────────────────────────
 /**

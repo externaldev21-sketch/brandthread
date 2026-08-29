@@ -75,10 +75,12 @@ import boostsRouter    from "./boosts";
 import vacationRouter  from "./vacation";
 import loyaltyRouter   from "./loyalty";
 import callRouter      from "./call";
+import featureFlagsRouter from "./feature-flags";
 
 const router = Router();
 
 // ─── Unauthenticated / special-body routes first ──────────────────────────────
+router.use("/config/features", featureFlagsRouter);
 router.use("/public",          publicRouter);
 router.use("/guest/checkout",  guestCheckoutRouter);
 router.use("/webhooks",        webhooksRouter);

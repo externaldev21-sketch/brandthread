@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { useApi } from '@/hooks/useApi';
+import { useFeatureFlag } from '@/contexts/FeatureFlagContext';
 
 interface UploadedPhoto {
   id: string;
@@ -54,6 +55,7 @@ export default function AIPhotographyChatScreen() {
   const api = useApi();
   const [messages, setMessages] = useState<Message[]>([INITIAL_MSG]);
   const [mode, setMode] = useState<PhotographyMode>('free');
+  const outfitSwapEnabled = useFeatureFlag('outfitSwap');
   const [input, setInput] = useState('');
   const [photos, setPhotos] = useState<UploadedPhoto[]>([]);
   const [heroPhoto, setHeroPhoto] = useState<UploadedPhoto | null>(null);
@@ -62,6 +64,10 @@ export default function AIPhotographyChatScreen() {
   const flatRef = useRef<FlatList>(null);
 
   const bottomPad = Platform.OS === 'web' ? 34 : insets.bottom;
+
+  useEffect(() => {
+    if (!outfitSwapEnabled && mode === 'outfitSwap') setMode('free');
+  }, [mode, outfitSwapEnabled]);
 
   async function pickPhotos() {
     const remaining = mode === 'outfitSwap'
@@ -282,7 +288,7 @@ export default function AIPhotographyChatScreen() {
 
       {/* Chat mode switch — both modes share the same thread and composer. */}
       <View style={[styles.modeSwitch, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
-        <TouchableOpacity
+        {outfitSwapEnabled && <TouchableOpacity
           activeOpacity={0.82}
           onPress={() => setMode('free')}
           style={[styles.modeChip, mode === 'free' && { backgroundColor: colors.primary }]}
@@ -291,7 +297,7 @@ export default function AIPhotographyChatScreen() {
           <Text style={[styles.modeChipText, { color: mode === 'free' ? colors.primaryForeground : colors.mutedForeground }]}>
             Product Photography
           </Text>
-        </TouchableOpacity>
+        </TouchableOpacity>}
         <TouchableOpacity
           activeOpacity={0.82}
           onPress={() => setMode('outfitSwap')}

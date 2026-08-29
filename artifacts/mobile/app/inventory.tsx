@@ -380,9 +380,9 @@ export default function InventoryScreen() {
         <View style={s.quickActions}>
           {[
             { label: '+ Adjust Stock', icon: 'edit-3' as const, route: '/inventory-adjust', color: PURPLE },
-            { label: '↕ Transfer',     icon: 'shuffle'  as const, route: '/inventory-transfer', color: CYAN },
-            { label: '📦 Incoming',    icon: 'package'  as const, route: '/inventory-incoming', color: BLUE },
-            { label: '📋 Count',       icon: 'clipboard' as const, route: '/inventory-count',   color: ORANGE },
+            { label: 'Transfer',     icon: 'shuffle'  as const, route: '/inventory-transfer', color: CYAN },
+            { label: 'Incoming',    icon: 'package'  as const, route: '/inventory-incoming', color: BLUE },
+            { label: 'Count',       icon: 'clipboard' as const, route: '/inventory-count',   color: ORANGE },
           ].map(action => (
             <TouchableOpacity
               key={action.label}

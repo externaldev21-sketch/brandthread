@@ -146,7 +146,7 @@ export default function AddProductScreen() {
       locationStock: [],
       variantStock: [],
     },
-    salesModel: 'pre-made',
+    salesModel: params.intent === 'drop' ? 'pre-order' : 'pre-made',
     preorderSettings: {
       unitsOrdered: 0,
       isFunded: false,

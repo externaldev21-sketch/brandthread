@@ -21,6 +21,7 @@ const GROUPS: Group[] = [
     { label: 'Saved', subtitle: 'Posts, products and collections', icon: 'bookmark', route: '/buyer-saved' },
     { label: 'QR code', subtitle: 'Share your Brandthread profile', icon: 'grid', route: '/buyer-qr-code' },
     { label: 'Invite friends', subtitle: 'Share your invite code and earn rewards', icon: 'gift', route: '/buyer-invite' },
+    { label: 'Download my data', subtitle: 'Export your profile, orders and messages', icon: 'download', route: '/buyer-download-data' },
   ]},
   { title: 'Who can see your content', rows: [
     { label: 'Account privacy', icon: 'lock', route: '/buyer-privacy-settings' },

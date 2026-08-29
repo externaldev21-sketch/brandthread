@@ -10,7 +10,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
   BG, CARD, CARD_ELEVATED, BORDER,
-  FG, MUTED, SUBTLE,
+  FG, MUTED, SUBTLE, RED,
   SURFACE, FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -22,6 +22,7 @@ import {
 import type { Conversation, Story } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 import { reportNetworkError } from '@/lib/networkNotice';
+import SwipeActionRow from '@/components/SwipeActionRow';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -187,6 +188,13 @@ export default function InboxScreen() {
     ]);
   }
 
+  async function swipeArchiveConversation(conv: Conversation) {
+    await archiveConversation(conv.id);
+    setConversations(prev => prev.map(item =>
+      item.id === conv.id ? { ...item, isArchived: true } : item
+    ));
+  }
+
   function openCompose() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Alert.alert(
@@ -248,12 +256,19 @@ export default function InboxScreen() {
     }
 
     return (
-      <TouchableOpacity
-        style={s.convRow}
-        onPress={() => openConversation(conv)}
-        onLongPress={() => longPressConversation(conv)}
-        activeOpacity={0.75}
+      <SwipeActionRow
+        label="Archive"
+        icon="archive"
+        color={RED}
+        onAction={() => swipeArchiveConversation(conv)}
+        accessibilityLabel={`Archive conversation with ${participant.name}`}
       >
+        <TouchableOpacity
+          style={s.convRow}
+          onPress={() => openConversation(conv)}
+          onLongPress={() => longPressConversation(conv)}
+          activeOpacity={0.75}
+        >
         {/* Avatar with unread dot */}
         <View style={s.avatarContainer}>
           <View style={[s.avatar48, { backgroundColor: participant.color }]}>
@@ -296,7 +311,8 @@ export default function InboxScreen() {
         ) : (
           <Feather name="camera" size={ICON.sm} color={MUTED} />
         )}
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </SwipeActionRow>
     );
   }
 
