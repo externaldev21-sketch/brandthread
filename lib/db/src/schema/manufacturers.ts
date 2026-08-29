@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, integer, timestamp, json, boolean, index } from 'drizzle-orm/pg-core';
+import { pgTable, uuid, text, integer, timestamp, json, boolean, index, uniqueIndex } from 'drizzle-orm/pg-core';
 
 // ─── Manufacturers ────────────────────────────────────────────────────────────
 
@@ -33,6 +33,20 @@ export const manufacturers = pgTable('manufacturers', {
   createdAt:          timestamp('created_at').defaultNow().notNull(),
   updatedAt:          timestamp('updated_at').defaultNow().notNull(),
 });
+
+// ─── Seller Favorite Manufacturers ───────────────────────────────────────────
+
+export const savedManufacturers = pgTable('saved_manufacturers', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  sellerId:       text('seller_id').notNull(),
+  manufacturerId: uuid('manufacturer_id').notNull().references(() => manufacturers.id, { onDelete: 'cascade' }),
+  createdAt:      timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  sellerManufacturerUnique: uniqueIndex('saved_manufacturers_seller_manufacturer_unique')
+    .on(table.sellerId, table.manufacturerId),
+  sellerIdx: index('saved_manufacturers_seller_idx').on(table.sellerId),
+  manufacturerIdx: index('saved_manufacturers_manufacturer_idx').on(table.manufacturerId),
+}));
 
 // ─── Manufacturer Payment Info (legacy bank/PayPal/Wise — kept for non-Stripe markets)
 

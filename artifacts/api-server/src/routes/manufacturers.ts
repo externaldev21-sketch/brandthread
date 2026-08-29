@@ -8,6 +8,7 @@ import {
   manufacturerMessages,
   manufacturerOrders,
   manufacturerInviteTokens,
+  savedManufacturers,
 } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import crypto from "crypto";
@@ -33,6 +34,11 @@ function isSupportedImage(buffer: Buffer): boolean {
   );
 }
 
+function isUuid(value: unknown): value is string {
+  return typeof value === "string"
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 // ── Helper ─────────────────────────────────────────────────────────────────────
 
 async function resolveManufacturer(clerkId: string) {
@@ -43,6 +49,90 @@ async function resolveManufacturer(clerkId: string) {
     .limit(1);
   return mfr ?? null;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FAVORITES — seller-scoped saved manufacturers, separate from relationships
+// ═══════════════════════════════════════════════════════════════════════════════
+
+router.get("/favorites", requireAuth, async (req, res) => {
+  const sellerId = (req as any).clerkUserId as string;
+  const rows = await db
+    .select({
+      manufacturerId: savedManufacturers.manufacturerId,
+      createdAt: savedManufacturers.createdAt,
+    })
+    .from(savedManufacturers)
+    .where(eq(savedManufacturers.sellerId, sellerId))
+    .orderBy(desc(savedManufacturers.createdAt));
+
+  res.json(rows.map((row) => ({
+    manufacturerId: row.manufacturerId,
+    createdAt: row.createdAt.toISOString(),
+  })));
+});
+
+router.post("/favorites", requireAuth, async (req, res) => {
+  const sellerId = (req as any).clerkUserId as string;
+  const { manufacturerId } = req.body ?? {};
+  if (!isUuid(manufacturerId)) {
+    res.status(400).json({ error: "A valid manufacturerId is required" });
+    return;
+  }
+
+  const [manufacturer] = await db
+    .select({ id: manufacturers.id })
+    .from(manufacturers)
+    .where(and(
+      eq(manufacturers.id, manufacturerId),
+      eq(manufacturers.status, "active"),
+      eq(manufacturers.isPublicDirectory, true),
+    ))
+    .limit(1);
+
+  if (!manufacturer) {
+    res.status(404).json({ error: "Manufacturer not found" });
+    return;
+  }
+
+  await db.insert(savedManufacturers)
+    .values({ sellerId, manufacturerId })
+    .onConflictDoNothing({
+      target: [savedManufacturers.sellerId, savedManufacturers.manufacturerId],
+    });
+
+  const [saved] = await db
+    .select({
+      manufacturerId: savedManufacturers.manufacturerId,
+      createdAt: savedManufacturers.createdAt,
+    })
+    .from(savedManufacturers)
+    .where(and(
+      eq(savedManufacturers.sellerId, sellerId),
+      eq(savedManufacturers.manufacturerId, manufacturerId),
+    ))
+    .limit(1);
+
+  res.status(201).json({
+    manufacturerId: saved.manufacturerId,
+    createdAt: saved.createdAt.toISOString(),
+  });
+});
+
+router.delete("/favorites/:manufacturerId", requireAuth, async (req, res) => {
+  const sellerId = (req as any).clerkUserId as string;
+  const { manufacturerId } = req.params;
+  if (!isUuid(manufacturerId)) {
+    res.status(400).json({ error: "A valid manufacturerId is required" });
+    return;
+  }
+
+  await db.delete(savedManufacturers).where(and(
+    eq(savedManufacturers.sellerId, sellerId),
+    eq(savedManufacturers.manufacturerId, manufacturerId),
+  ));
+
+  res.json({ ok: true });
+});
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // INVITE TOKENS — seller creates private invite links for manufacturers

@@ -389,6 +389,13 @@ export function createApi(getToken: GetToken) {
       },
       registerViaInvite: (token: string, body: any) =>
         post<any>(`/api/manufacturers/register-via-invite/${encodeURIComponent(token)}`, body),
+      favorites: {
+        list: () => get<Array<{ manufacturerId: string; createdAt: string }>>('/api/manufacturers/favorites'),
+        add: (manufacturerId: string) =>
+          post<{ manufacturerId: string; createdAt: string }>('/api/manufacturers/favorites', { manufacturerId }),
+        remove: (manufacturerId: string) =>
+          del<{ ok: boolean }>(`/api/manufacturers/favorites/${encodeURIComponent(manufacturerId)}`),
+      },
       threads: {
         list:   () => get<any[]>('/api/manufacturers/threads'),
         create: (body: { manufacturerId: string; subject?: string }) =>

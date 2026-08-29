@@ -28,11 +28,11 @@ import {
 } from '@/components/BrandthreadUI';
 
 import {
-  getManufacturer, getRelationship, saveManufacturer, unsaveManufacturer,
+  getManufacturer, getFavoriteManufacturerIds, favoriteManufacturer, unfavoriteManufacturer,
   getOrCreateConversation,
 } from '@/services/manufacturerService';
 
-import { Manufacturer, ManufacturerRelationship } from '@/services/manufacturerTypes';
+import { Manufacturer } from '@/services/manufacturerTypes';
 import { formatCents } from '@/lib/money';
 
 // ─── Star Rating ──────────────────────────────────────────────────────────────
@@ -91,19 +91,17 @@ export default function ManufacturerProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const [manufacturer, setManufacturer] = useState<Manufacturer | null>(null);
-  const [relationship, setRelationship] = useState<ManufacturerRelationship | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     if (!id) return;
-    Promise.all([getManufacturer(id), getRelationship(id)]).then(([mfg, rel]) => {
+    Promise.all([getManufacturer(id), getFavoriteManufacturerIds()]).then(([mfg, favoriteIds]) => {
       setManufacturer(mfg ?? null);
-      setRelationship(rel);
-      setSaved(!!rel);
+      setSaved(favoriteIds.includes(id));
       setLoading(false);
-    });
+    }).catch(() => setLoading(false));
   }, [id]);
 
   async function handleSave() {
@@ -112,10 +110,10 @@ export default function ManufacturerProfileScreen() {
     setActionLoading(true);
     try {
       if (saved) {
-        await unsaveManufacturer(id);
+        await unfavoriteManufacturer(id);
         setSaved(false);
       } else {
-        await saveManufacturer(id);
+        await favoriteManufacturer(id);
         setSaved(true);
       }
     } finally {

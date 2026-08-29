@@ -31,6 +31,7 @@ import {
 import {
   searchManufacturers, getRelationships, getRelationship,
   saveManufacturer, unsaveManufacturer, updateRelationshipStatus,
+  getFavoriteManufacturerIds, favoriteManufacturer, unfavoriteManufacturer,
   getQuoteRequests, getQuotes, acceptQuote, declineQuote,
   getSamples, getProductionOrders, advanceProductionStage,
   getConversations, getOrCreateConversation,
@@ -305,27 +306,34 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
+  const [loadError, setLoadError] = useState('');
+  const [mutationError, setMutationError] = useState('');
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async (query = searchQuery, f = filters) => {
     try {
-      const results = await searchManufacturers({
-        query: query || undefined,
-        country: f.country || undefined,
-        category: f.category || undefined,
-        moqMax: f.moqMax,
-        unitPriceMaxCents: f.unitPriceMaxCents,
-        leadTimeDaysMax: f.leadTimeDaysMax,
-        verifiedOnly: f.verifiedOnly || undefined,
-        ratingMin: f.ratingMin,
-      });
+      setLoadError('');
+      const [results, favoriteIds] = await Promise.all([
+        searchManufacturers({
+          query: query || undefined,
+          country: f.country || undefined,
+          category: f.category || undefined,
+          moqMax: f.moqMax,
+          unitPriceMaxCents: f.unitPriceMaxCents,
+          leadTimeDaysMax: f.leadTimeDaysMax,
+          verifiedOnly: f.verifiedOnly || undefined,
+          ratingMin: f.ratingMin,
+        }),
+        getFavoriteManufacturerIds(),
+      ]);
       setManufacturers(Array.isArray(results) ? results : []);
-      // Load saved state
-      const rels = await getRelationships();
-      const safeRels = Array.isArray(rels) ? rels : [];
-      setSavedIds(new Set(safeRels.map(r => r.manufacturerId)));
+      setSavedIds(new Set(favoriteIds));
     } catch (e) {
       setManufacturers([]);
+      setSavedIds(new Set());
+      setLoadError('Could not load manufacturers or favorites.');
       console.error(e);
     } finally {
       setLoading(false);
@@ -348,19 +356,29 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
   };
 
   const toggleSave = async (mfg: Manufacturer) => {
+    if (savingIds.has(mfg.id)) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setMutationError('');
+    setSavingIds(prev => new Set(prev).add(mfg.id));
     try {
       if (savedIds.has(mfg.id)) {
-        await unsaveManufacturer(mfg.id);
+        await unfavoriteManufacturer(mfg.id);
         setSavedIds(prev => { const s = new Set(prev); s.delete(mfg.id); return s; });
       } else {
-        await saveManufacturer(mfg.id);
+        await favoriteManufacturer(mfg.id);
         setSavedIds(prev => new Set(prev).add(mfg.id));
       }
     } catch (e) {
+      setMutationError('Could not update this favorite. Try again.');
       console.error(e);
+    } finally {
+      setSavingIds(prev => { const s = new Set(prev); s.delete(mfg.id); return s; });
     }
   };
+
+  const visibleManufacturers = favoritesOnly
+    ? manufacturers.filter(mfg => savedIds.has(mfg.id))
+    : manufacturers;
 
   const onMessage = async (mfg: Manufacturer) => {
     try {
@@ -401,13 +419,32 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
         </TouchableOpacity>
       </View>
 
+      <View style={s.discoverModeRow}>
+        <FilterChip label="All" active={!favoritesOnly} onPress={() => setFavoritesOnly(false)} />
+        <FilterChip label={`Favorites (${savedIds.size})`} active={favoritesOnly} onPress={() => setFavoritesOnly(true)} />
+      </View>
+
+      {!!(loadError || mutationError) && (
+        <TouchableOpacity
+          style={s.inlineError}
+          onPress={() => load()}
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading favorite manufacturers"
+        >
+          <Feather name="alert-circle" size={ICON.sm} color={ORANGE} />
+          <Text style={s.inlineErrorText}>{loadError || mutationError}</Text>
+          <Text style={s.inlineErrorAction}>Retry</Text>
+        </TouchableOpacity>
+      )}
+
       <FlatList
-        data={manufacturers}
+        data={visibleManufacturers}
         keyExtractor={item => item.id}
         renderItem={({ item }) => (
           <ManufacturerCard
             mfg={item}
             saved={savedIds.has(item.id)}
+            saving={savingIds.has(item.id)}
             onSave={() => toggleSave(item)}
             onMessage={() => onMessage(item)}
             onProfile={() => router.push((`/manufacturer-profile?id=${item.id}`) as never)}
@@ -420,10 +457,14 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
         ListEmptyComponent={
           loading ? null : (
             <EmptyState
-              icon="search"
-              title="No manufacturers found"
-              description="Try adjusting your search or filters."
-              action={{ label: 'Clear filters', onPress: () => applyFilters(DEFAULT_FILTERS) }}
+              icon={favoritesOnly ? 'heart' : 'search'}
+              title={loadError ? 'Could not load manufacturers' : favoritesOnly ? 'No favorite manufacturers yet' : 'No manufacturers found'}
+              description={loadError ? 'Check your connection and try again.' : favoritesOnly ? 'Save manufacturers from Discover and they will appear here.' : 'Try adjusting your search or filters.'}
+              action={loadError
+                ? { label: 'Try again', onPress: () => load() }
+                : favoritesOnly
+                  ? { label: 'Browse manufacturers', onPress: () => setFavoritesOnly(false) }
+                  : { label: 'Clear filters', onPress: () => applyFilters(DEFAULT_FILTERS) }}
             />
           )
         }
@@ -444,13 +485,14 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
 interface ManufacturerCardProps {
   mfg: Manufacturer;
   saved: boolean;
+  saving: boolean;
   onSave: () => void;
   onMessage: () => void;
   onProfile: () => void;
   onQuote: () => void;
 }
 
-function ManufacturerCard({ mfg, saved, onSave, onMessage, onProfile, onQuote }: ManufacturerCardProps) {
+function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, onQuote }: ManufacturerCardProps) {
   const { theme } = useAppTheme();
   return (
     <View style={card.root}>
@@ -506,9 +548,16 @@ function ManufacturerCard({ mfg, saved, onSave, onMessage, onProfile, onQuote }:
 
       {/* Actions */}
       <View style={card.actionRow}>
-        <TouchableOpacity style={card.heartBtn} onPress={onSave} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={[card.heartBtn, saving && { opacity: 0.55 }]}
+          onPress={onSave}
+          disabled={saving}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+          accessibilityLabel={saved ? `Remove ${mfg.name} from favorites` : `Add ${mfg.name} to favorites`}
+        >
           <Feather name={saved ? 'heart' : 'heart'} size={ICON.sm} color={saved ? RED : MUTED} />
-          <Text style={[card.actionLabel, saved && { color: RED }]}>{saved ? 'Saved' : 'Save'}</Text>
+          <Text style={[card.actionLabel, saved && { color: RED }]}>{saving ? 'Saving…' : saved ? 'Saved' : 'Save'}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[card.actionBtn, { borderColor: theme.secondary }]} onPress={onMessage} activeOpacity={0.7}>
           <Feather name="mail" size={ICON.sm} color={theme.secondary} />
@@ -1336,5 +1385,9 @@ const s = StyleSheet.create({
   searchInput:  { flex: 1, height: 36, backgroundColor: CARD, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER_ACTIVE, paddingHorizontal: SP.md, fontSize: FS.sm, fontFamily: FONT.regular, color: FG },
   filterBtn:    { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   filterBtnActive:{ borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM },
+  discoverModeRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, paddingBottom: SP.sm },
+  inlineError: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginHorizontal: SP.md, marginBottom: SP.sm, padding: SP.sm, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: ORANGE, backgroundColor: '#2B1E0F' },
+  inlineErrorText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: ORANGE },
+  inlineErrorAction: { fontSize: FS.sm, fontFamily: FONT.semibold, color: ORANGE },
   emptyState:   { flex: 1, justifyContent: 'center' },
 });

@@ -446,6 +446,27 @@ export async function getManufacturer(id: string): Promise<Manufacturer | undefi
   }
 }
 
+// ─── Favorite Manufacturers (server-authoritative, seller-scoped) ─────────────
+
+export async function getFavoriteManufacturerIds(): Promise<string[]> {
+  const rows = await serviceRequest<Array<{ manufacturerId: string }>>('/api/manufacturers/favorites');
+  if (!Array.isArray(rows)) throw new Error('Invalid favorite manufacturers response');
+  return rows.map(row => row.manufacturerId);
+}
+
+export async function favoriteManufacturer(manufacturerId: string): Promise<void> {
+  await serviceRequest('/api/manufacturers/favorites', {
+    method: 'POST',
+    body: JSON.stringify({ manufacturerId }),
+  });
+}
+
+export async function unfavoriteManufacturer(manufacturerId: string): Promise<void> {
+  await serviceRequest(`/api/manufacturers/favorites/${encodeURIComponent(manufacturerId)}`, {
+    method: 'DELETE',
+  });
+}
+
 // ─── Relationships ────────────────────────────────────────────────────────────
 
 export async function getRelationships(): Promise<ManufacturerRelationship[]> {

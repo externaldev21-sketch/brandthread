@@ -12,6 +12,7 @@ import {
   dismissNetworkNotice,
   reportNetworkError,
 } from '@/lib/networkNotice';
+import { getStoreContext } from '@/lib/api';
 
 type GetToken = () => Promise<string | null>;
 
@@ -43,6 +44,7 @@ export async function serviceRequest<T = unknown>(
       headers: {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(getStoreContext() === 'own' ? { 'X-Store-Context': 'own' } : {}),
         ...(options.headers ?? {}),
       },
     });
