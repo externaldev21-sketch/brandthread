@@ -1007,7 +1007,14 @@ router.get("/orders/:id", async (req, res) => {
       .from(orderItems)
       .where(eq(orderItems.orderId, row.id));
 
-    res.json({ ...row, items });
+    // Cancellation reasons are customer-visible when present. Seller
+    // cancellations currently always notify the buyer, while buyer-initiated
+    // cancellations store their own reason for the same order-history view.
+    res.json({
+      ...row,
+      isCustomerVisible: Boolean(row.cancellationReason),
+      items,
+    });
   } catch (err) {
     req.log.error({ err, orderId: req.params.id }, "Failed to fetch buyer order");
     res.status(500).json({ error: "Failed to fetch order" });

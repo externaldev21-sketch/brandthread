@@ -463,6 +463,7 @@ export interface BuyerOrderView {
   hasReturnRequest: boolean;
   cancellationReason?: string | null;
   cancellationNotes?: string | null;
+  isCustomerVisible?: boolean;
   createdAt: string;
 }
 

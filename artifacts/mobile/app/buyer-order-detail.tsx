@@ -10,7 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { Feather } from '@expo/vector-icons';
-import { BuyerOrderView, OrderStatus, TrackingStatus } from '@/services/orderTypes';
+import { BuyerOrderView, CANCELLATION_REASONS, OrderStatus, TrackingStatus } from '@/services/orderTypes';
 import { useApi } from '@/hooks/useApi';
 import {
   BG, CARD, CARD_ELEVATED, BORDER,
@@ -189,27 +189,20 @@ function adaptOrderDetail(row: any): BuyerOrderView {
     hasReturnRequest:     false,
     cancellationReason:  row.cancellationReason ?? null,
     cancellationNotes:   row.cancellationNotes ?? null,
+    isCustomerVisible:   row.isCustomerVisible === true,
     createdAt:            row.createdAt ?? new Date().toISOString(),
   };
 }
 
 // ─── Cancellation reason → human-friendly label ───────────────────────────────
 
-const CANCELLATION_REASON_LABELS: Record<string, string> = {
-  customer_request:      'You requested the cancellation',
-  out_of_stock:          'Out of stock',
-  production_issue:      'Production issue',
-  fraud_risk:            'Flagged for security review',
-  shipping_restriction:  'Cannot ship to your address',
-  duplicate_order:       'Duplicate order',
-  seller_decision:       'Seller decision',
-  buyer_requested:       'You requested the cancellation',
-  other:                 'Other',
-};
-
 function cancellationReasonLabel(reason: string | null | undefined): string {
   if (!reason) return 'No reason provided';
-  return CANCELLATION_REASON_LABELS[reason] ?? reason.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  // buyer_requested is the server's legacy value for a buyer-initiated
+  // cancellation; the shared list contains the seller-facing equivalent.
+  if (reason === 'buyer_requested') return 'You requested the cancellation';
+  return CANCELLATION_REASONS.find(item => item.key === reason)?.label
+    ?? reason.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
 export default function BuyerOrderDetailScreen() {
@@ -571,7 +564,7 @@ export default function BuyerOrderDetailScreen() {
         )}
 
         {/* ── Cancellation Reason ───────────────────────────────────────────── */}
-        {order.status === 'cancelled' && (
+        {order.status === 'cancelled' && order.isCustomerVisible && order.cancellationReason && (
           <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
             <GradientCard
               colors={['rgba(239,68,68,0.14)', 'rgba(239,68,68,0.05)']}
