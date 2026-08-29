@@ -155,10 +155,10 @@ export default function StoreDomainScreen() {
                 placeholderTextColor={SUBTLE}
                 autoCapitalize="none"
               />
-              <Text style={dm.urlSuffix}>.brandthread.co</Text>
+              <Text style={dm.urlSuffix}>.brandthread.app</Text>
             </View>
             {subdomainInput ? (
-              <Text style={dm.urlPreview}>https://{subdomainInput}.brandthread.co</Text>
+              <Text style={dm.urlPreview}>https://{subdomainInput}.brandthread.app</Text>
             ) : null}
             <View style={dm.badgeRow}>
               {verificationBadge(btDomain.verificationStatus)}
@@ -200,7 +200,7 @@ export default function StoreDomainScreen() {
                 ) : null}
                 <View style={dm.dnsRow}>
                   <Text style={dm.dnsType}>CNAME</Text>
-                  <Text style={dm.dnsHost}>www → cname.brandthread.co</Text>
+                  <Text style={dm.dnsHost}>www → cname.brandthread.app</Text>
                 </View>
                 <Text style={dm.dnsNote}>DNS changes can take up to 48 hours to propagate.</Text>
                 <SecondaryButton

@@ -15,6 +15,7 @@ import { Router } from "express";
 import { db, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { getWebOrigin } from "../lib/webOrigin";
 import { requireStripe } from "../lib/stripe";
 
 const router = Router();
@@ -98,7 +99,7 @@ router.post("/start", async (req, res) => {
   // In mobile the WebBrowser intercepts this URL to close the browser tab.
   const returnUrl =
     process.env.STRIPE_IDENTITY_RETURN_URL ??
-    `${process.env.REPLIT_DEV_DOMAIN ? `https://${process.env.REPLIT_DEV_DOMAIN}` : "https://brandthread.app"}/verification-complete`;
+    `${getWebOrigin()}/verification-complete`;
 
   let session: any;
   try {

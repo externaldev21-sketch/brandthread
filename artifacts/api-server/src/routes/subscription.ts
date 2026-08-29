@@ -23,6 +23,7 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 import { requireStripe } from "../lib/stripe";
 import { logger } from "../lib/logger";
+import { getWebOrigin } from "../lib/webOrigin";
 
 const router = Router();
 router.use(requireAuth);
@@ -250,8 +251,7 @@ router.post("/checkout", requireRole("owner"), async (req, res) => {
       return;
     }
 
-    const devDomain = process.env.REPLIT_DEV_DOMAIN ?? "localhost:3000";
-    const returnBase = `https://${devDomain}/api-server`;
+    const returnBase = `${getWebOrigin("https://localhost:3000")}/api-server`;
 
     // Check for an existing active or trialing subscription so we don't create a duplicate.
     const [user] = await db
@@ -334,8 +334,7 @@ router.post("/portal", requireRole("owner"), async (req, res) => {
       return;
     }
 
-    const devDomain = process.env.REPLIT_DEV_DOMAIN ?? "localhost:3000";
-    const returnUrl = `https://${devDomain}/api-server/seller/subscription/portal/return`;
+    const returnUrl = `${getWebOrigin("https://localhost:3000")}/api-server/seller/subscription/portal/return`;
 
     const session = await stripe.billingPortal.sessions.create({
       customer:   user.stripeCustomerId,

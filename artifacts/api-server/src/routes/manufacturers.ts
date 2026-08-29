@@ -20,6 +20,7 @@ import {
   SetupManufacturerPaymentBody,
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
+import { getWebOrigin } from "../lib/webOrigin";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { sendManufacturerSignupEmail } from "../lib/brandthreadEmail";
 import { logger } from "../lib/logger";
@@ -166,9 +167,7 @@ router.post("/invite-tokens", requireAuth, async (req, res) => {
     .values({ sellerId, token, companyName, contactName, contactEmail, notes })
     .returning();
 
-  const inviteUrl = `${process.env.REPLIT_DEV_DOMAIN
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : "https://brandthread.app"}/manufacturer-onboard?token=${inv.token}`;
+  const inviteUrl = `${getWebOrigin()}/manufacturer-onboard?token=${inv.token}`;
 
   res.status(201).json({ ...inv, inviteUrl, createdAt: inv.createdAt.toISOString() });
 });
@@ -182,9 +181,7 @@ router.get("/invite-tokens", requireAuth, async (req, res) => {
     .where(eq(manufacturerInviteTokens.sellerId, sellerId))
     .orderBy(desc(manufacturerInviteTokens.createdAt));
 
-  const domain = process.env.REPLIT_DEV_DOMAIN
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : "https://brandthread.app";
+  const domain = getWebOrigin();
 
   res.json(rows.map(inv => ({
     ...inv,

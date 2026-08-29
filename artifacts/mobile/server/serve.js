@@ -11,6 +11,8 @@ const fs = require('fs');
 const path = require('path');
 
 const STATIC_ROOT = path.resolve(__dirname, '..', 'static-build');
+const GENERATED_HOST = 'brandthread.replit.app';
+const CANONICAL_ORIGIN = 'https://brandthread.app';
 const basePath = (process.env.BASE_PATH || '/').replace(/\/+$/, '');
 
 const MIME_TYPES = {
@@ -58,12 +60,35 @@ function serveFile(filePath, res) {
   return true;
 }
 
+function canonicalRedirectLocation(req, requestUrl) {
+  const forwardedHost = req.headers?.['x-forwarded-host'];
+  const hostHeader = String(forwardedHost || req.headers?.host || '')
+    .split(',')[0]
+    .trim()
+    .replace(/:\d+$/, '')
+    .toLowerCase();
+  if (hostHeader !== GENERATED_HOST) return null;
+  return `${CANONICAL_ORIGIN}${requestUrl.pathname}${requestUrl.search}`;
+}
+
 const server = http.createServer((req, res) => {
   let pathname;
+  let requestUrl;
   try {
-    pathname = new URL(req.url || '/', 'http://localhost').pathname;
+    requestUrl = new URL(req.url || '/', 'http://localhost');
+    pathname = requestUrl.pathname;
   } catch {
     send(res, 400, 'Bad Request');
+    return;
+  }
+
+  const redirectLocation = canonicalRedirectLocation(req, requestUrl);
+  if (redirectLocation) {
+    res.writeHead(301, {
+      location: redirectLocation,
+      'cache-control': 'public, max-age=31536000, immutable',
+    });
+    res.end();
     return;
   }
 
@@ -94,6 +119,10 @@ const server = http.createServer((req, res) => {
 });
 
 const port = parseInt(process.env.PORT || '3000', 10);
-server.listen(port, '0.0.0.0', () => {
-  console.log(`Serving Brandthread web export on port ${port}`);
-});
+if (require.main === module) {
+  server.listen(port, '0.0.0.0', () => {
+    console.log(`Serving Brandthread web export on port ${port}`);
+  });
+}
+
+module.exports = { CANONICAL_ORIGIN, GENERATED_HOST, canonicalRedirectLocation, server };

@@ -142,7 +142,7 @@ export default function StoreSettingsScreen() {
                 placeholderTextColor={SUBTLE}
                 autoCapitalize="none"
               />
-              <Text style={ss.urlSuffix}>.brandthread.co</Text>
+              <Text style={ss.urlSuffix}>.brandthread.app</Text>
             </View>
           </FieldRow>
           <View style={ss.divider} />

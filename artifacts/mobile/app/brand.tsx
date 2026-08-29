@@ -288,7 +288,7 @@ export default function BrandScreen() {
           <Text style={[styles.cardTitle, { color: colors.foreground }]}>Domain & Trademark</Text>
         </View>
         <View style={[styles.domainRow, { backgroundColor: colors.secondary, borderColor: colors.border }]}>
-          <Text style={[styles.domainText, { color: colors.mutedForeground }]}>brandthread.com</Text>
+          <Text style={[styles.domainText, { color: colors.mutedForeground }]}>brandthread.app</Text>
           <View style={[styles.availBadge, { backgroundColor: theme.accentDim }]}>
             <Text style={[styles.availText, { color: colors.success }]}>Available</Text>
           </View>

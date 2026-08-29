@@ -225,7 +225,7 @@ export default function WebsiteScreen() {
       <View style={[styles.domainCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Feather name="globe" size={16} color={colors.success} />
         <View style={{ flex: 1 }}>
-          <Text style={[styles.domainName, { color: colors.foreground }]}>brandthread.com</Text>
+          <Text style={[styles.domainName, { color: colors.foreground }]}>brandthread.app</Text>
           <Text style={[styles.domainStatus, { color: colors.success }]}>Connected · SSL Active</Text>
         </View>
         <Feather name="settings" size={16} color={colors.mutedForeground} />

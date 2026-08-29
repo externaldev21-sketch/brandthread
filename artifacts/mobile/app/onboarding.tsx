@@ -995,9 +995,9 @@ function AuthStep({ signUp, startGoogleOAuth, startAppleOAuth, onAuthComplete, o
 
         <Text style={sa.legal}>
           By continuing you agree to our{' '}
-          <Text style={{ color: theme.accentLight }} onPress={() => Linking.openURL('https://brandthread.com/terms')}>Terms</Text>
+          <Text style={{ color: theme.accentLight }} onPress={() => Linking.openURL('https://brandthread.app/terms')}>Terms</Text>
           {' and '}
-          <Text style={{ color: theme.accentLight }} onPress={() => Linking.openURL('https://brandthread.com/privacy')}>Privacy Policy</Text>.
+          <Text style={{ color: theme.accentLight }} onPress={() => Linking.openURL('https://brandthread.app/privacy')}>Privacy Policy</Text>.
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>

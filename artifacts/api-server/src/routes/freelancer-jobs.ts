@@ -17,6 +17,7 @@ import { Router } from "express";
 import { db, freelancers, freelancerJobs, users } from "@workspace/db";
 import { and, eq, desc, inArray, isNull, ne, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { getWebOrigin } from "../lib/webOrigin";
 import { requireStripe, computeApplicationFeeCents } from "../lib/stripe";
 import { payoutIdempotencyKey, refundJobPayment } from "../lib/freelancerEscrow";
 import { logger } from "../lib/logger";
@@ -194,9 +195,8 @@ router.post("/", async (req, res) => {
       })
       .returning();
 
-    const devDomain = process.env.REPLIT_DEV_DOMAIN ?? "localhost:3000";
     // Domain root + /api/... — matches the dev proxy's verbatim path forwarding.
-    const baseUrl = `https://${devDomain}`;
+    const baseUrl = getWebOrigin("https://localhost:3000");
 
     let session;
     try {

@@ -9,6 +9,7 @@ import { db } from "@workspace/db";
 import { manufacturers } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireStripe } from "../lib/stripe";
+import { getWebOrigin } from "../lib/webOrigin";
 
 const router = Router();
 
@@ -29,8 +30,7 @@ router.post("/onboard", async (req, res) => {
     const { userId } = getAuth(req);
     if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-    const devDomain = process.env.REPLIT_DEV_DOMAIN ?? "localhost:3000";
-    const baseUrl = `https://${devDomain}/api-server`;
+    const baseUrl = `${getWebOrigin("https://localhost:3000")}/api-server`;
     const {
       refreshUrl = `${baseUrl}/manufacturers/connect/onboard/refresh`,
       returnUrl  = `${baseUrl}/manufacturers/connect/onboard/return`,

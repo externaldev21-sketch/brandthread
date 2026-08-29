@@ -56,7 +56,7 @@ export default function StorePublishScreen() {
     const storeUrl = store.settings.storeUrl || 'yourstore';
     Alert.alert(
       'Publish your store?',
-      `Your store will be live at https://${storeUrl}.brandthread.co`,
+      `Your store will be live at https://${storeUrl}.brandthread.app`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -198,9 +198,9 @@ export default function StorePublishScreen() {
                 <Feather name="check-circle" size={ICON.xxl} color={SUCCESS} />
               </View>
               <Text style={pub.successTitle}>Your store is live!</Text>
-              <Text style={pub.successUrl}>https://{storeUrl}.brandthread.co</Text>
+              <Text style={pub.successUrl}>https://{storeUrl}.brandthread.app</Text>
               <View style={pub.successActions}>
-                <SecondaryButton label="View Store" onPress={() => Alert.alert('View Store', `Open https://${storeUrl}.brandthread.co in browser.`)} icon="external-link" style={{ flex: 1 }} />
+                <SecondaryButton label="View Store" onPress={() => Alert.alert('View Store', `Open https://${storeUrl}.brandthread.app in browser.`)} icon="external-link" style={{ flex: 1 }} />
                 <PrimaryButton label="Continue Editing" onPress={() => router.back()} style={{ flex: 1 }} />
               </View>
             </View>
@@ -209,7 +209,7 @@ export default function StorePublishScreen() {
           <GradientCard colors={theme.primaryGradient} style={pub.card} glow>
             <Text style={[pub.publishReadyTitle, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Ready to go live.</Text>
             <Text style={pub.publishStoreName}>{store?.settings.storeName || 'Your Store'}</Text>
-            <Text style={pub.publishUrl}>https://{storeUrl}.brandthread.co</Text>
+              <Text style={pub.publishUrl}>https://{storeUrl}.brandthread.app</Text>
             <PrimaryButton
               label={publishing ? 'Publishing...' : 'Publish Store →'}
               onPress={handlePublish}

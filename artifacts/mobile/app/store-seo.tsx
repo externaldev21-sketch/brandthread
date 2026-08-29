@@ -121,7 +121,7 @@ export default function StoreSEOScreen() {
           <Text style={se.previewTitle} numberOfLines={1}>
             {seo.homepageTitle || 'Your Store Name'}
           </Text>
-          <Text style={se.previewUrl}>brandthread.co/{storeUrl}</Text>
+          <Text style={se.previewUrl}>brandthread.app/{storeUrl}</Text>
           <Text style={se.previewDesc} numberOfLines={2}>
             {seo.homepageDescription || 'Add a description to appear in search results...'}
           </Text>

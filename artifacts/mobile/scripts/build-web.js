@@ -12,17 +12,51 @@ const path = require('path');
 
 const projectRoot = path.resolve(__dirname, '..');
 const outputDir = path.join(projectRoot, 'static-build');
+const CANONICAL_ORIGIN = 'https://brandthread.app';
 
 function domainFromEnvironment() {
+  const isPublishedBuild =
+    process.env.NODE_ENV === 'production' ||
+    Boolean(process.env.REPLIT_DEPLOYMENT_DOMAIN || process.env.REPLIT_INTERNAL_APP_DOMAIN);
+  if (isPublishedBuild) return 'brandthread.app';
+
   const candidates = [
-    process.env.REPLIT_DEPLOYMENT_DOMAIN,
-    process.env.REPLIT_INTERNAL_APP_DOMAIN,
     process.env.REPLIT_DEV_DOMAIN,
     process.env.EXPO_PUBLIC_DOMAIN,
   ];
   const value = candidates.find(Boolean);
   if (!value) return 'localhost:18115';
   return value.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+}
+
+function htmlFilesIn(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const fullPath = path.join(directory, entry.name);
+    return entry.isDirectory() ? htmlFilesIn(fullPath) : entry.name.endsWith('.html') ? [fullPath] : [];
+  });
+}
+
+function routePathForHtml(filePath) {
+  const relativePath = path.relative(outputDir, filePath).split(path.sep).join('/');
+  if (relativePath === 'index.html') return '/';
+  if (relativePath.endsWith('/index.html')) {
+    return `/${relativePath.slice(0, -'index.html'.length)}`;
+  }
+  return `/${relativePath.replace(/\.html$/, '')}`;
+}
+
+function addCanonicalMetadata() {
+  for (const filePath of htmlFilesIn(outputDir)) {
+    const routePath = routePathForHtml(filePath);
+    const canonicalUrl = `${CANONICAL_ORIGIN}${routePath}`;
+    const html = fs.readFileSync(filePath, 'utf8');
+    const metadata = [
+      `<link rel="canonical" href="${canonicalUrl}" />`,
+      `<meta property="og:url" content="${canonicalUrl}" />`,
+    ].join('');
+    const updated = html.replace('</head>', `${metadata}</head>`);
+    if (updated !== html) fs.writeFileSync(filePath, updated);
+  }
 }
 
 const env = {
@@ -68,4 +102,5 @@ if (!fs.existsSync(path.join(outputDir, 'index.html'))) {
   process.exit(1);
 }
 
+addCanonicalMetadata();
 console.log('Web export complete.');

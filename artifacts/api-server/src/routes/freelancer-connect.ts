@@ -7,6 +7,7 @@ import { Router } from "express";
 import { db, freelancers, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { getWebOrigin } from "../lib/webOrigin";
 import { requireStripe } from "../lib/stripe";
 
 const router = Router();
@@ -42,10 +43,9 @@ router.post("/onboard", async (req, res) => {
     const stripe = requireStripe();
     const clerkUserId = (req as any).clerkUserId as string;
 
-    const devDomain = process.env.REPLIT_DEV_DOMAIN ?? "localhost:3000";
     // Dev proxy forwards /api/* verbatim to this server (previewPath /api);
     // the domain root is the correct public base for building /api/... URLs.
-    const baseUrl = `https://${devDomain}`;
+    const baseUrl = getWebOrigin("https://localhost:3000");
     const {
       refreshUrl = `${baseUrl}/api/freelancers/connect/onboard/refresh`,
       returnUrl = `${baseUrl}/api/freelancers/connect/onboard/return`,

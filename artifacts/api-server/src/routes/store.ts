@@ -3,6 +3,7 @@ import { Router } from "express";
 import { db, storefronts, storefrontVersions, storefrontCustomDomains } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { getWebOrigin } from "../lib/webOrigin";
 import crypto from "crypto";
 
 const router = Router();
@@ -742,10 +743,7 @@ router.post("/share-preview", async (req, res): Promise<void> => {
       updatedAt: new Date(),
     })
     .where(eq(storefronts.id, sf.id));
-  // Construct canonical HTTPS origin — same pattern as other routes in this codebase
-  const origin = process.env.REPLIT_DEV_DOMAIN
-    ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-    : "https://brandthread.app";
+  const origin = getWebOrigin();
   const url = `${origin}/api/store/preview/${token}`;
   res.json({ token, url, expiresAt: new Date(expiresAt).toISOString(), ttlSeconds: 86400 });
 });

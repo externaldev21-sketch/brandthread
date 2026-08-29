@@ -13,6 +13,7 @@
 import type Stripe from "stripe";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "./stripe";
 import { logger } from "./logger";
+import { getWebOrigin } from "./webOrigin";
 
 /**
  * Full set of event types the /api/webhooks/stripe handler processes.
@@ -42,11 +43,7 @@ const MANAGED_METADATA = {
 };
 
 function getCurrentWebhookUrl(): string | null {
-  const domain =
-    process.env.REPLIT_DEV_DOMAIN ??
-    process.env.REPLIT_DOMAINS?.split(",")[0]?.trim();
-
-  return domain ? `https://${domain}${WEBHOOK_PATH}` : null;
+  return `${getWebOrigin()}${WEBHOOK_PATH}`;
 }
 
 function isBrandthreadWebhook(endpoint: Stripe.WebhookEndpoint): boolean {

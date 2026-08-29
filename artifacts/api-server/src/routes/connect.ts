@@ -7,6 +7,7 @@ import { db, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireStripe } from "../lib/stripe";
+import { getWebOrigin } from "../lib/webOrigin";
 
 const router = Router();
 router.use(requireAuth);
@@ -22,8 +23,7 @@ router.post("/onboard", async (req, res) => {
     const stripe = requireStripe();
     const clerkUserId = (req as any).clerkUserId as string;
 
-    const devDomain = process.env.REPLIT_DEV_DOMAIN ?? "localhost:3000";
-    const baseUrl = `https://${devDomain}/api-server`;
+    const baseUrl = `${getWebOrigin("https://localhost:3000")}/api-server`;
     const {
       refreshUrl = `${baseUrl}/seller/connect/onboard/refresh`,
       returnUrl = `${baseUrl}/seller/connect/onboard/return`,
