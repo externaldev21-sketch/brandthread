@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAuth } from '@clerk/expo';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
@@ -27,6 +28,7 @@ import {
   GradientCard, StatusBadge, PrimaryButton, SecondaryButton,
 } from '@/components/BrandthreadUI';
 import { formatCents } from '@/lib/money';
+import { visibleOrderForBuyer } from '@/lib/buyerOrdersVisibility';
 
 // 60-minute cancellation window (mirrors server enforcement)
 const CANCEL_WINDOW_MS = 60 * 60 * 1000;
@@ -206,8 +208,10 @@ export default function BuyerOrderDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const api = useApi();
+  const { userId } = useAuth();
 
-  const [order, setOrder] = useState<BuyerOrderView | null>(null);
+  const [storedOrder, setOrder] = useState<BuyerOrderView | null>(null);
+  const [orderOwnerId, setOrderOwnerId] = useState<string | null | undefined>(userId);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -222,6 +226,20 @@ export default function BuyerOrderDetailScreen() {
   // Backoff: stop polling after 3 consecutive failures; resume on next focus.
   const consecutiveFailuresRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const accountGenerationRef = useRef(0);
+
+  useEffect(() => {
+    accountGenerationRef.current += 1;
+    consecutiveFailuresRef.current = 0;
+    setOrder(null);
+    setOrderOwnerId(userId);
+    setReturnRequest(null);
+    setFetchError(false);
+    setRefreshing(false);
+    setLoading(true);
+    setShowReviewModal(false);
+    setShowCancelModal(false);
+  }, [userId]);
 
   // Poll every 15 s while this screen is focused so status updates
   // (paid → processing → shipped → delivered) appear without manual refresh.
@@ -230,19 +248,23 @@ export default function BuyerOrderDetailScreen() {
   useFocusEffect(useCallback(() => {
     if (!id) return;
     let cancelled = false;
+    const accountGeneration = accountGenerationRef.current;
     consecutiveFailuresRef.current = 0;
 
     function fetchOrder() {
       api.buyer.orders.get(id!).then(row => {
-        if (!cancelled) {
+        if (!cancelled && accountGenerationRef.current === accountGeneration) {
           setOrder(adaptOrderDetail(row));
+          setOrderOwnerId(userId);
           setFetchError(false);
           setLoading(false);
           setRefreshing(false);
           consecutiveFailuresRef.current = 0;
         }
       }).catch(() => {
-        if (!cancelled) {
+        if (!cancelled && accountGenerationRef.current === accountGeneration) {
+          setOrder(null);
+          setOrderOwnerId(userId);
           setLoading(false);
           setRefreshing(false);
           setFetchError(true);
@@ -255,7 +277,9 @@ export default function BuyerOrderDetailScreen() {
       });
       api.returns.listBuyer()
         .then(rows => {
-          if (!cancelled) setReturnRequest(rows.find((request: any) => request.orderId === id) ?? null);
+          if (!cancelled && accountGenerationRef.current === accountGeneration) {
+            setReturnRequest(rows.find((request: any) => request.orderId === id) ?? null);
+          }
         })
         .catch(() => {});
     }
@@ -269,10 +293,11 @@ export default function BuyerOrderDetailScreen() {
         timerRef.current = null;
       }
     };
-  }, [id]));
+  }, [api, id, userId]));
 
   function handleRetry() {
     if (!id) return;
+    const accountGeneration = accountGenerationRef.current;
     setLoading(true);
     setFetchError(false);
     setOrder(null);
@@ -283,14 +308,28 @@ export default function BuyerOrderDetailScreen() {
       timerRef.current = null;
     }
     api.buyer.orders.get(id).then(row => {
+      if (accountGenerationRef.current !== accountGeneration) return;
       setOrder(adaptOrderDetail(row));
+      setOrderOwnerId(userId);
       setFetchError(false);
       setLoading(false);
       timerRef.current = setInterval(() => {
-        api.buyer.orders.get(id).then(r => setOrder(adaptOrderDetail(r))).catch(() => {});
-        api.returns.listBuyer().then(rows => setReturnRequest(rows.find((request: any) => request.orderId === id) ?? null)).catch(() => {});
+        api.buyer.orders.get(id).then(r => {
+          if (accountGenerationRef.current === accountGeneration) {
+            setOrder(adaptOrderDetail(r));
+            setOrderOwnerId(userId);
+          }
+        }).catch(() => {});
+        api.returns.listBuyer().then(rows => {
+          if (accountGenerationRef.current === accountGeneration) {
+            setReturnRequest(rows.find((request: any) => request.orderId === id) ?? null);
+          }
+        }).catch(() => {});
       }, 15_000);
     }).catch(() => {
+      if (accountGenerationRef.current !== accountGeneration) return;
+      setOrder(null);
+      setOrderOwnerId(userId);
       setLoading(false);
       setFetchError(true);
     });
@@ -298,17 +337,30 @@ export default function BuyerOrderDetailScreen() {
 
   function handlePullRefresh() {
     if (!id || refreshing) return;
+    const accountGeneration = accountGenerationRef.current;
     setRefreshing(true);
     api.buyer.orders.get(id).then(row => {
+      if (accountGenerationRef.current !== accountGeneration) return;
       setOrder(adaptOrderDetail(row));
+      setOrderOwnerId(userId);
       setFetchError(false);
       setRefreshing(false);
     }).catch(() => {
+      if (accountGenerationRef.current !== accountGeneration) return;
+      setOrder(null);
+      setOrderOwnerId(userId);
       setRefreshing(false);
       setFetchError(true);
     });
-    api.returns.listBuyer().then(rows => setReturnRequest(rows.find((request: any) => request.orderId === id) ?? null)).catch(() => {});
+    api.returns.listBuyer().then(rows => {
+      if (accountGenerationRef.current === accountGeneration) {
+        setReturnRequest(rows.find((request: any) => request.orderId === id) ?? null);
+      }
+    }).catch(() => {});
   }
+
+  const order = visibleOrderForBuyer(storedOrder, orderOwnerId, userId);
+  const visibleLoading = loading || orderOwnerId !== userId;
 
   function handleCopyTracking() {
     if (!order?.trackingNumber) return;
@@ -418,7 +470,7 @@ export default function BuyerOrderDetailScreen() {
     );
   }
 
-  if (loading) {
+  if (visibleLoading) {
     return (
       <View style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color={PURPLE} size="large" />

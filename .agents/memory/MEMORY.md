@@ -64,3 +64,4 @@
 - [Stripe Connect payout truth](stripe-connect-payout-truth.md) — seller bank and verification UI must come from live Connect account state, never finance balances or cached labels.
 - [Expo web production boundary](expo-web-production-boundary.md) — browser hosting uses an Expo Router static export, same-origin Clerk/API routing, and explicit mobile-only fallbacks.
 - [Seller billing provider boundary](seller-billing-provider-boundary.md) — native seller plans use RevenueCat; web seller plans and all physical commerce remain Stripe; server computes access across both.
+- [Account-bound screen state](account-bound-screen-state.md) — Clerk can switch active sessions without unmounting routes; render guards and request generations must prevent prior-user data exposure.

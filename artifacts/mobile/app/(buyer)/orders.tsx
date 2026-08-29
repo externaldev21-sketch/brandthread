@@ -1,15 +1,17 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
-  View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator,
+  View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
+import { useAuth } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { BuyerOrderView, cancellationReasonLabel, TrackingStatus, OrderStatus } from '@/services/orderTypes';
-import { useApi } from '@/hooks/useApi';
+import { getBuyerOrdersWithStatus } from '@/services/orderService';
+import { visibleOrdersForBuyer } from '@/lib/buyerOrdersVisibility';
 import { formatCents } from '@/lib/money';
 import {
   BG, CARD, CARD_ELEVATED, BORDER,
@@ -24,63 +26,6 @@ import {
   BrandthreadScreen, BrandthreadHeader, FilterChip,
   StatusBadge, EmptyState, PrimaryButton, BrandedLoader,
 } from '@/components/BrandthreadUI';
-
-// ─── API → BuyerOrderView adapter ─────────────────────────────────────────────
-
-function adaptOrder(row: any): BuyerOrderView {
-  const dbAddr = row.shippingAddress;
-  const shippingAddress: import('@/services/orderTypes').OrderAddress = dbAddr
-    ? {
-        name:    dbAddr.name ?? '',
-        line1:   dbAddr.street ?? '',
-        line2:   '',
-        city:    dbAddr.city ?? '',
-        state:   dbAddr.state ?? '',
-        zip:     dbAddr.zip ?? '',
-        country: dbAddr.country ?? 'US',
-        phone:   '',
-      }
-    : { name: '', line1: '', city: '', state: '', zip: '', country: 'US' };
-
-  return {
-    id:                row.id,
-    orderNumber:       row.orderNumber,
-    sellerId:          row.ownerId ?? '',
-    sellerName:        row.sellerDisplayName ?? 'Seller',
-    sellerHandle:      '',
-    status:            (row.status ?? 'new') as OrderStatus,
-    paymentStatus:     row.stripePaymentIntentId ? 'paid' : 'pending',
-    fulfillmentStatus: 'unfulfilled',
-    lineItems:         [],
-    shippingAddress,
-    payment: {
-      subtotalCents:      row.subtotalCents ?? 0,
-      shippingTotalCents: row.shippingCents ?? 0,
-      taxTotalCents:      0,
-      totalCents:         row.totalCents ?? 0,
-    },
-    trackingNumber:  row.trackingNumber ?? undefined,
-    trackingCarrier: row.carrier ?? undefined,
-    cancellationReason: row.cancellationReason ?? null,
-    isPreOrder:       false,
-    hasReturnRequest: false,
-    createdAt:        row.createdAt ?? new Date().toISOString(),
-  };
-}
-
-function adaptOrderDetail(row: any): BuyerOrderView {
-  const base = adaptOrder(row);
-  const items = Array.isArray(row.items) ? row.items : [];
-  return {
-    ...base,
-    lineItems: items.map((item: any) => ({
-      productName: item.productName,
-      variant:     item.variantLabel ?? '',
-      quantity:    item.quantity,
-      unitPriceCents: item.priceCents ?? 0,
-    })),
-  };
-}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -247,11 +192,13 @@ export default function BuyerOrdersScreen() {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const api = useApi();
+  const { userId } = useAuth();
 
   const [orders, setOrders] = useState<BuyerOrderView[]>([]);
+  const [ordersOwnerId, setOrdersOwnerId] = useState<string | null | undefined>(userId);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<BuyerFilterKey>('all');
   // Track whether the very first load has completed so re-focuses and
   // polling intervals don't flash the full-screen spinner.
@@ -264,16 +211,22 @@ export default function BuyerOrdersScreen() {
   const generationRef = useRef(0);
 
   const load = useCallback(async (generation: number) => {
-    setLoadError(false);
     try {
-      const rows = await api.buyer.orders.list();
+      const result = await getBuyerOrdersWithStatus(userId);
       if (generationRef.current !== generation) return; // stale focus cycle
-      const orderRows = Array.isArray(rows) ? rows : [];
-      setOrders(orderRows.map(adaptOrder));
-      consecutiveFailuresRef.current = 0;
+      setOrders(result.orders);
+      setOrdersOwnerId(userId);
+      setLoadError(Boolean(result.error));
+      if (!result.error) consecutiveFailuresRef.current = 0;
+      else consecutiveFailuresRef.current += 1;
+      if (result.error && consecutiveFailuresRef.current >= 3 && timerRef.current !== null) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
     } catch {
       if (generationRef.current !== generation) return; // stale focus cycle
       setOrders([]);
+      setOrdersOwnerId(userId);
       setLoadError(true);
       consecutiveFailuresRef.current += 1;
       if (consecutiveFailuresRef.current >= 3 && timerRef.current !== null) {
@@ -283,8 +236,28 @@ export default function BuyerOrdersScreen() {
     }
     if (generationRef.current !== generation) return;
     setLoading(false);
+    setRefreshing(false);
     hasLoadedRef.current = true;
-  }, [api]);
+  }, [userId]);
+
+  const retry = useCallback(() => {
+    if (refreshing) return;
+    consecutiveFailuresRef.current = 0;
+    setRefreshing(true);
+    if (orders.length === 0) setLoading(true);
+    void load(generationRef.current);
+  }, [load, orders.length, refreshing]);
+
+  React.useEffect(() => {
+    generationRef.current += 1;
+    hasLoadedRef.current = false;
+    consecutiveFailuresRef.current = 0;
+    setOrders([]);
+    setOrdersOwnerId(userId);
+    setLoadError(false);
+    setRefreshing(false);
+    setLoading(true);
+  }, [userId]);
 
   // Refresh immediately on focus, then poll every 30 s while on this screen.
   // Spinner only shows on the very first load; subsequent refreshes are silent.
@@ -304,7 +277,14 @@ export default function BuyerOrdersScreen() {
     };
   }, [load]));
 
-  const filtered = applyFilter(orders, filter);
+  // Clerk can switch active sessions without unmounting this route. Guard the
+  // render synchronously so the previous account's rows disappear before the
+  // reset effect or the new account's request has completed.
+  const ownsRenderedOrders = ordersOwnerId === userId;
+  const visibleOrders = visibleOrdersForBuyer(orders, ordersOwnerId, userId);
+  const filtered = applyFilter(visibleOrders, filter);
+  const visibleLoading = loading || !ownsRenderedOrders;
+  const visibleLoadError = ownsRenderedOrders && loadError;
 
   return (
     <BrandthreadScreen noSafeBottom>
@@ -326,52 +306,66 @@ export default function BuyerOrdersScreen() {
         )}
       />
 
-      {loading ? (
+      {visibleLoading ? (
         <BrandedLoader label="Checking in with your orders…" />
-      ) : loadError ? (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
+      ) : filtered.length === 0 && visibleLoadError ? (
+        <View style={styles.loadErrorState}>
           <Feather name="wifi-off" size={ICON.xxl} color={MUTED} />
-          <Text style={{ marginTop: SP.md, fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' }}>
-            Couldn't load your orders
+          <Text style={styles.loadErrorTitle}>Couldn't load your orders</Text>
+          <Text style={styles.loadErrorText}>
+            Check your connection and try again. Your orders will appear here when we can reach the server.
           </Text>
-          <TouchableOpacity
-            style={{ marginTop: SP.md, paddingHorizontal: SP.lg, paddingVertical: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER }}
-            onPress={() => { setLoading(true); load(generationRef.current); }}
-            activeOpacity={0.8}
-          >
-            <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED }}>Try again</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={retry} activeOpacity={0.8} testID="buyer-orders-retry">
+            <Text style={styles.retryButtonText}>Try again</Text>
           </TouchableOpacity>
         </View>
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          icon="shopping-bag"
-          title="Your first find is still out there."
-          description="When something catches your eye, every update from checkout to doorstep will live here."
-          action={{
-            label: 'Discover Products',
-            icon: 'compass',
-            onPress: () => router.push('/(buyer)/discover' as never),
-          }}
-          style={{ flex: 1 }}
-        />
       ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={o => o.id}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingHorizontal: SP.md,
-            paddingTop: SP.sm,
-            paddingBottom: Math.max(insets.bottom, SP.md) + COMP.tabBarH + SP.md,
-            gap: SP.md,
-          }}
-          renderItem={({ item }) => (
-            <BuyerOrderCard
-              order={item}
-              onPress={() => router.push(('/buyer-order-detail?id=' + item.id) as never)}
+        <>
+          {visibleLoadError && (
+            <View style={styles.loadErrorBanner} accessibilityRole="alert">
+              <Feather name="wifi-off" size={ICON.sm} color={ORANGE} />
+              <View style={styles.loadErrorCopy}>
+                <Text style={styles.loadErrorBannerTitle}>Couldn't refresh your orders</Text>
+                <Text style={styles.loadErrorBannerText}>Showing your saved orders. Pull to refresh and try again.</Text>
+              </View>
+              <TouchableOpacity onPress={retry} disabled={refreshing} activeOpacity={0.8} testID="buyer-orders-banner-retry">
+                <Text style={styles.bannerRetryText}>{refreshing ? 'Retrying…' : 'Retry'}</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          {filtered.length === 0 ? (
+            <EmptyState
+              icon="shopping-bag"
+              title="Your first find is still out there."
+              description="When something catches your eye, every update from checkout to doorstep will live here."
+              action={{
+                label: 'Discover Products',
+                icon: 'compass',
+                onPress: () => router.push('/(buyer)/discover' as never),
+              }}
+              style={{ flex: 1 }}
+            />
+          ) : (
+            <FlatList
+              data={filtered}
+              keyExtractor={o => o.id}
+              showsVerticalScrollIndicator={false}
+              refreshControl={<RefreshControl refreshing={refreshing} onRefresh={retry} tintColor={theme.accent} />}
+              contentContainerStyle={{
+                paddingHorizontal: SP.md,
+                paddingTop: SP.sm,
+                paddingBottom: Math.max(insets.bottom, SP.md) + COMP.tabBarH + SP.md,
+                gap: SP.md,
+              }}
+              renderItem={({ item }) => (
+                <BuyerOrderCard
+                  order={item}
+                  onPress={() => router.push(('/buyer-order-detail?id=' + item.id) as never)}
+                />
+              )}
             />
           )}
-        />
+        </>
       )}
     </BrandthreadScreen>
   );
@@ -519,5 +513,74 @@ const styles = StyleSheet.create({
     fontSize: FS.xs,
     fontFamily: FONT.semibold,
     color: FG,
+  },
+  loadErrorState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: SP.xl,
+  },
+  loadErrorTitle: {
+    marginTop: SP.md,
+    fontSize: FS.base,
+    fontFamily: FONT.semibold,
+    color: FG,
+    textAlign: 'center',
+  },
+  loadErrorText: {
+    marginTop: SP.xs,
+    maxWidth: 320,
+    fontSize: FS.sm,
+    fontFamily: FONT.regular,
+    color: MUTED,
+    lineHeight: 20,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: SP.md,
+    paddingHorizontal: SP.lg,
+    paddingVertical: SP.sm,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  retryButtonText: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    color: FG,
+  },
+  loadErrorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    marginHorizontal: SP.md,
+    marginBottom: SP.sm,
+    paddingHorizontal: SP.sm,
+    paddingVertical: SP.sm,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: ORANGE,
+    backgroundColor: ORANGE_DIM,
+  },
+  loadErrorCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  loadErrorBannerTitle: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: FG,
+  },
+  loadErrorBannerText: {
+    marginTop: 2,
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: MUTED,
+    lineHeight: 16,
+  },
+  bannerRetryText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    color: ORANGE,
   },
 });

@@ -804,6 +804,7 @@ function mapBuyerFulfillmentStatus(dbStatus: string): FulfillmentStatus {
 }
 
 function mapApiBuyerOrder(o: any): BuyerOrderView {
+  const address = o.shippingAddress;
   return {
     id:                o.id,
     orderNumber:       o.orderNumber,
@@ -811,7 +812,7 @@ function mapApiBuyerOrder(o: any): BuyerOrderView {
     sellerName:        o.sellerDisplayName ?? o.sellerName ?? 'Seller',
     sellerHandle:      o.sellerHandle     ?? `@seller`,
     status:            mapBuyerOrderStatus(o.status ?? 'pending'),
-    paymentStatus:     'paid' as PaymentStatus,
+    paymentStatus:     o.stripePaymentIntentId ? 'paid' : 'pending',
     fulfillmentStatus: mapBuyerFulfillmentStatus(o.status ?? 'pending'),
     lineItems:         (o.items ?? []).map((item: any) => ({
       productName: item.productName ?? item.name ?? '',
@@ -820,7 +821,18 @@ function mapApiBuyerOrder(o: any): BuyerOrderView {
       unitPriceCents: item.priceCents ?? 0,
       imageUri:    item.imageUri     ?? undefined,
     })),
-    shippingAddress: o.shippingAddress ?? { street: '', city: '', state: '', zip: '', country: 'US' },
+    shippingAddress: address
+      ? {
+          name: address.name ?? '',
+          line1: address.line1 ?? address.street ?? '',
+          line2: address.line2 ?? '',
+          city: address.city ?? '',
+          state: address.state ?? '',
+          zip: address.zip ?? '',
+          country: address.country ?? 'US',
+          phone: address.phone ?? '',
+        }
+      : { name: '', line1: '', city: '', state: '', zip: '', country: 'US' },
     payment: {
       subtotalCents: o.subtotalCents ?? 0,
       shippingTotalCents: o.shippingCents ?? 0,
@@ -833,25 +845,68 @@ function mapApiBuyerOrder(o: any): BuyerOrderView {
     estimatedDelivery: o.estimatedDelivery ?? undefined,
     isPreOrder:        false,
     hasReturnRequest: false,
-    createdAt:       o.createdAt      ?? now(),
+    cancellationReason: o.cancellationReason ?? null,
+    createdAt:          o.createdAt ?? now(),
   };
 }
 
 export async function getBuyerOrders(): Promise<BuyerOrderView[]> {
-  // Try real API first so buyers see their actual orders
+  const result = await getBuyerOrdersWithStatus(null);
+  return result.orders;
+}
+
+export interface BuyerOrdersLoadResult {
+  orders: BuyerOrderView[];
+  fromCache: boolean;
+  error?: unknown;
+}
+
+function buyerOrdersCacheKey(userId: string): string {
+  return `buyer_orders:${userId}:v2`;
+}
+
+/**
+ * Load buyer orders while preserving the last known list when the API is
+ * unavailable. Consumers that need to distinguish an empty account from a
+ * failed refresh can inspect `error` and `fromCache`.
+ */
+export async function getBuyerOrdersWithStatus(
+  userId: string | null | undefined,
+): Promise<BuyerOrdersLoadResult> {
   try {
-    const apiOrders = await serviceRequest('/api/buyer/orders') as any[];
-    if (Array.isArray(apiOrders) && apiOrders.length > 0) {
-      const mapped = apiOrders.map(mapApiBuyerOrder);
-      _buyerOrders = mapped;
-      await AsyncStorage.setItem(KEYS.buyer, JSON.stringify(mapped));
-      return [...mapped].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    const apiOrders = await serviceRequest('/api/buyer/orders') as unknown;
+    if (!Array.isArray(apiOrders)) {
+      throw new Error('Unexpected buyer orders response');
     }
-  } catch {
-    // Fall through to local cache
+    const mapped = apiOrders.map(mapApiBuyerOrder);
+    if (userId) {
+      try {
+        await AsyncStorage.setItem(buyerOrdersCacheKey(userId), JSON.stringify(mapped));
+      } catch {
+        // A persistence failure must not hide a successful server response.
+      }
+    }
+    return {
+      orders: [...mapped].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+      fromCache: false,
+    };
+  } catch (error) {
+    let cached: BuyerOrderView[] = [];
+    if (userId) {
+      try {
+        const raw = await AsyncStorage.getItem(buyerOrdersCacheKey(userId));
+        const parsed = raw ? JSON.parse(raw) : [];
+        cached = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        cached = [];
+      }
+    }
+    return {
+      orders: [...cached].sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+      fromCache: true,
+      error,
+    };
   }
-  await ensureInitialized();
-  return [..._buyerOrders].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function getBuyerOrder(id: string): Promise<BuyerOrderView | undefined> {
