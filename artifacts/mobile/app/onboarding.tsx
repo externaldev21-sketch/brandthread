@@ -37,6 +37,7 @@ import { AccountTypeStep, type AccountType } from './account-type';
 // Required on Android so the in-app browser tab closes after OAuth redirect
 WebBrowser.maybeCompleteAuthSession();
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import AnimatedGradientBackground from '@/components/branding/AnimatedGradientBackground';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { hydrateMyProfileFromAccount, socialKeysForUser } from '@/services/socialService';
@@ -353,14 +354,11 @@ function LoadingAnimation({ steps, onDone }: { steps: string[]; onDone: () => vo
 
   return (
     <View style={[sl.root, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 40 }]}>
-      <LinearGradient colors={[BG, theme.secondaryDim, BG]} style={StyleSheet.absoluteFill} />
-
-      {/* Glow */}
-      <LinearGradient colors={theme.glowGradient} style={sl.glow} />
+      <AnimatedGradientBackground />
 
       {/* Logo */}
       <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }], marginBottom: 52 }}>
-        <BrandthreadLogo size={72} showGlow glowColor={theme.shadowColor} />
+        <BrandthreadLogo size={72} />
       </Animated.View>
 
       {/* Steps */}
@@ -402,9 +400,6 @@ function LoadingAnimation({ steps, onDone }: { steps: string[]; onDone: () => vo
 }
 const sl = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
-  glow: {
-    position: 'absolute', width: 300, height: 300, borderRadius: 150,
-  },
   stepsList: { width: '100%', gap: 18, marginBottom: 48 },
   stepRow:   { flexDirection: 'row', alignItems: 'center', gap: 14 },
   stepIcon:  {
@@ -452,8 +447,7 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
 
   return (
     <View style={[sn.root, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 32 }]}>
-      <LinearGradient colors={[BG, theme.secondaryDim, BG]} style={StyleSheet.absoluteFill} />
-      <LinearGradient colors={theme.glowGradient} style={sn.glow} />
+      <AnimatedGradientBackground />
 
       <Animated.View style={[sn.body, { opacity, transform: [{ translateY: slideY }] }]}>
         {/* Bell icon */}
@@ -511,7 +505,6 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
 }
 const sn = StyleSheet.create({
   root: { flex: 1, backgroundColor: BG, paddingHorizontal: 24 },
-  glow: { position: 'absolute', top: 0, width: '80%', height: 250, borderRadius: 150, alignSelf: 'center' },
   body: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 40 },
   bellWrap: { marginBottom: 32 },
   bellBg:   { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center', shadowOpacity: 0.5, shadowRadius: 20, shadowOffset: { width: 0, height: 0 }, elevation: 12 },
@@ -552,9 +545,7 @@ function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { fl
 
   return (
     <View style={[ss.root, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 32 }]}>
-      <LinearGradient colors={[BG, theme.secondaryDim, BG]} style={StyleSheet.absoluteFill} />
-      <LinearGradient colors={theme.glowGradient} style={ss.glowTop} />
-      <LinearGradient colors={theme.glowGradient} style={ss.glowBottom} />
+      <AnimatedGradientBackground />
 
       <Animated.View style={[ss.body, { opacity, transform: [{ scale }, { translateY: slideY }] }]}>
         {/* Checkmark circle */}
@@ -596,8 +587,6 @@ function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { fl
 }
 const ss = StyleSheet.create({
   root:       { flex: 1, backgroundColor: BG, paddingHorizontal: 24 },
-  glowTop:    { position: 'absolute', top: -60, width: '80%', height: 250, borderRadius: 150, alignSelf: 'center' },
-  glowBottom: { position: 'absolute', bottom: -60, width: '80%', height: 200, borderRadius: 120, alignSelf: 'center' },
   body:       { flex: 1, justifyContent: 'center' },
   checkCircle:{ width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 28, shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 0 }, elevation: 12 },
   headline:   { fontSize: 36, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -1, lineHeight: 42, marginBottom: 12 },

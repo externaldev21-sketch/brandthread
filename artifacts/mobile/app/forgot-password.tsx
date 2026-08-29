@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import AnimatedGradientBackground from '@/components/branding/AnimatedGradientBackground';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 
 type Step = 'email' | 'code' | 'done';
@@ -90,8 +91,7 @@ export default function ForgotPasswordScreen() {
     <View style={[s.root, { paddingTop: insets.top }]}>
       <StatusBar barStyle="light-content" />
 
-      {/* Ambient glow */}
-      <View style={[s.glowTop, { backgroundColor: theme.accentDim }]} />
+      <AnimatedGradientBackground />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -347,11 +347,6 @@ function mapError(err: any): string {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   root:    { flex: 1, backgroundColor: BG },
-
-  glowTop: {
-    position: 'absolute', top: -80, left: '10%',
-    width: '80%', height: 220, borderRadius: 150,
-  },
 
   scroll: { paddingHorizontal: 24, paddingTop: 16 },
 

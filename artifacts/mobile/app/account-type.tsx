@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { getOnAccentTextStyle, useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
+import AnimatedGradientBackground from '@/components/branding/AnimatedGradientBackground';
 
 const BG     = '#07070F';
 const getCards = (theme: AppThemePreset): {
@@ -69,9 +70,7 @@ export function AccountTypeStep({
     <View style={[styles.root, { paddingTop: embedded ? 0 : insets.top }]}>
       <StatusBar barStyle="light-content" />
 
-      {/* Ambient glow */}
-      <View style={styles.glow} />
-      <View style={styles.glowSecondary} />
+      <AnimatedGradientBackground />
 
       {/* Header */}
       <View style={styles.header}>
@@ -205,17 +204,6 @@ export default function AccountTypeScreen() {
 
 const createStyles = (theme: AppThemePreset) => StyleSheet.create({
   root:  { flex: 1, backgroundColor: BG },
-  glow: {
-    position: 'absolute', top: -60, left: '10%',
-    width: '80%', height: 220, borderRadius: 150,
-    backgroundColor: theme.accentDim,
-  },
-  glowSecondary: {
-    position: 'absolute', top: 260, right: -100,
-    width: 240, height: 240, borderRadius: 140,
-    backgroundColor: theme.secondaryDim,
-  },
-
   header: { paddingHorizontal: 20, paddingBottom: 16 },
   headerText: { gap: 8 },
   headline: {

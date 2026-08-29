@@ -1,18 +1,15 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Dimensions, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LinearGradient } from 'expo-linear-gradient';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import AnimatedGradientBackground from '@/components/branding/AnimatedGradientBackground';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAppTheme, type AppThemePreset } from '@/contexts/AppThemeContext';
-
-const { width: W } = Dimensions.get('window');
+import { useAppTheme } from '@/contexts/AppThemeContext';
 
 const BG       = '#07070F';
 export default function SplashScreen() {
   const { theme } = useAppTheme();
-  const styles = React.useMemo(() => createStyles(theme), [theme]);
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -20,10 +17,6 @@ export default function SplashScreen() {
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const textOpacity = useRef(new Animated.Value(0)).current;
   const ctaOpacity  = useRef(new Animated.Value(0)).current;
-  const glowScale   = useRef(new Animated.Value(0.2)).current;
-  const glowOpacity = useRef(new Animated.Value(0)).current;
-  const ringScale   = useRef(new Animated.Value(0.6)).current;
-  const ringOpacity = useRef(new Animated.Value(0)).current;
   const continuing  = useRef(false);
 
   const continueForward = () => {
@@ -35,12 +28,7 @@ export default function SplashScreen() {
   };
 
   useEffect(() => {
-    // Glow + ring + logo all come in together
     Animated.parallel([
-      Animated.timing(glowOpacity,  { toValue: 1,   duration: 600,  useNativeDriver: true }),
-      Animated.spring(glowScale,    { toValue: 1.6, damping: 20, stiffness: 60,  useNativeDriver: true }),
-      Animated.timing(ringOpacity,  { toValue: 0.35, duration: 700, useNativeDriver: true }),
-      Animated.spring(ringScale,    { toValue: 1.2, damping: 18, stiffness: 70,  useNativeDriver: true }),
       Animated.spring(logoScale,    { toValue: 1,   damping: 14, stiffness: 100, useNativeDriver: true }),
       Animated.timing(logoOpacity,  { toValue: 1,   duration: 400,  useNativeDriver: true }),
     ]).start(() => {
@@ -56,20 +44,11 @@ export default function SplashScreen() {
 
   return (
     <View style={styles.root}>
-      <LinearGradient
-        colors={[BG, theme.accentDim, BG]}
-        style={StyleSheet.absoluteFill}
-      />
-
-      {/* Soft purple glow */}
-      <Animated.View style={[styles.glow, { opacity: glowOpacity, transform: [{ scale: glowScale }] }]} />
-
-      {/* Outer ring */}
-      <Animated.View style={[styles.ring, { opacity: ringOpacity, transform: [{ scale: ringScale }] }]} />
+      <AnimatedGradientBackground />
 
       {/* Logo mark */}
       <Animated.View style={[styles.logoWrap, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
-        <BrandthreadLogo size={110} showGlow glowColor={theme.shadowColor} />
+        <BrandthreadLogo size={110} />
       </Animated.View>
 
       {/* Wordmark + tagline */}
@@ -92,27 +71,12 @@ export default function SplashScreen() {
   );
 }
 
-const createStyles = (theme: AppThemePreset) => StyleSheet.create({
+const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: BG,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  glow: {
-    position: 'absolute',
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: theme.accentDim,
-  },
-  ring: {
-    position: 'absolute',
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    borderWidth: 1,
-    borderColor: theme.accent,
   },
   logoWrap: { alignItems: 'center', marginBottom: 36 },
   textWrap: { alignItems: 'center', gap: 8 },

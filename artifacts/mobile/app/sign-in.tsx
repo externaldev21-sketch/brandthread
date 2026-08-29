@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
+import AnimatedGradientBackground from '@/components/branding/AnimatedGradientBackground';
 import { useSignIn, useSSO, useAuth, useUser } from '@clerk/expo';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
@@ -135,7 +136,7 @@ export default function SignInScreen() {
     return (
       <View style={[s.root, { paddingTop: insets.top }]}>
         <StatusBar barStyle="light-content" />
-        <View style={[s.glowTop, { backgroundColor: theme.accentDim }]} />
+        <AnimatedGradientBackground />
 
         <ScrollView
           contentContainerStyle={[s.scroll, s.sessionScroll, { paddingBottom: insets.bottom + 36 }]}
@@ -211,10 +212,7 @@ export default function SignInScreen() {
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
       <StatusBar barStyle="light-content" />
-
-      {/* Ambient glow */}
-      <View style={[s.glowTop, { backgroundColor: theme.accentDim }]} />
-      <View style={[s.glowMid, { backgroundColor: theme.secondaryDim }]} />
+      <AnimatedGradientBackground />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -410,15 +408,6 @@ function mapError(err: any): string {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   root:    { flex: 1, backgroundColor: BG },
-
-  glowTop: {
-    position: 'absolute', top: -80, left: '10%',
-    width: '80%', height: 220, borderRadius: 150,
-  },
-  glowMid: {
-    position: 'absolute', top: 260, right: -60,
-    width: 180, height: 180, borderRadius: 90,
-  },
 
   scroll: { paddingHorizontal: 24, paddingTop: 16 },
 
