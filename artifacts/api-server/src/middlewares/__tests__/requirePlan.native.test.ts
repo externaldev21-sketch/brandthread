@@ -1,9 +1,17 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 
-const state = vi.hoisted(() => ({ planId: "growth" as "growth" | "scale" }));
+const state = vi.hoisted(() => {
+  // The Replit development workflow enables this convenience override. The
+  // middleware behavior under test must exercise the real plan lookup path.
+  process.env.ENABLE_TEST_SUBSCRIPTION_BYPASS = "false";
+  return {
+    planId: "growth" as "growth" | "scale",
+    lookupError: false,
+  };
+});
 
 vi.mock("@clerk/express", () => ({
   getAuth: () => ({ userId: "native-seller" }),
@@ -11,12 +19,15 @@ vi.mock("@clerk/express", () => ({
 vi.mock("@workspace/db", () => ({ db: {}, users: {} }));
 vi.mock("drizzle-orm", () => ({ eq: vi.fn() }));
 vi.mock("../../lib/nativeEntitlements", () => ({
-  getEffectiveEntitlement: async () => ({
-    planId: state.planId,
-    status: "active",
-    provider: "revenuecat",
-    native: null,
-  }),
+  getEffectiveEntitlement: async () => {
+    if (state.lookupError) throw new Error("database unavailable");
+    return {
+      planId: state.planId,
+      status: "active",
+      provider: "revenuecat",
+      native: null,
+    };
+  },
 }));
 
 import { requirePlan } from "../requireAuth";
@@ -39,6 +50,10 @@ afterAll(async () => {
 });
 
 describe("requirePlan native entitlements", () => {
+  beforeEach(() => {
+    state.lookupError = false;
+  });
+
   it("grants Growth endpoints from a server-verified native Growth entitlement", async () => {
     state.planId = "growth";
     expect((await fetch(`${base}/growth`)).status).toBe(200);
@@ -47,5 +62,18 @@ describe("requirePlan native entitlements", () => {
   it("grants Scale endpoints from a server-verified native Scale entitlement", async () => {
     state.planId = "scale";
     expect((await fetch(`${base}/scale`)).status).toBe(200);
+  });
+
+  it("denies access with 503 when the subscription plan lookup fails", async () => {
+    state.lookupError = true;
+    const response = await fetch(`${base}/growth`);
+    const body = await response.json();
+
+    expect(response.status).toBe(503);
+    expect(body).toMatchObject({
+      error: "Unable to verify subscription plan",
+      code: "PLAN_LOOKUP_UNAVAILABLE",
+      requiredPlan: "growth",
+    });
   });
 });

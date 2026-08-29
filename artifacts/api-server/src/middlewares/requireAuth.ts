@@ -69,7 +69,8 @@ const ALLOW_TEST_SUBSCRIPTION_BYPASS =
  * Apply AFTER requireAuth (or standalone — it re-reads Clerk auth internally).
  *
  * Returns 403 with `{ error, code, requiredPlan, currentPlan, message }` when
- * the authenticated seller's plan is below `minPlan`.
+ * the authenticated seller's plan is below `minPlan`. If the server cannot
+ * verify the plan, it returns 503 rather than granting paid access.
  */
 export function requirePlan(minPlan: "growth" | "scale" | "pro") {
   return async (req: Request, res: Response, next: NextFunction) => {
@@ -86,8 +87,8 @@ export function requirePlan(minPlan: "growth" | "scale" | "pro") {
 
     try {
       // This reads the server-verified native entitlement cache alongside the
-      // existing Stripe fields. It deliberately retains the historical
-      // fail-open catch below; task #248 owns any broader policy change.
+      // existing Stripe fields. Access must remain denied if this verification
+      // cannot complete.
       const entitlement = await getEffectiveEntitlement(userId);
       const plan = entitlement.planId;
       const currentLevel = PLAN_ORDER[plan] ?? 0;
@@ -108,9 +109,14 @@ export function requirePlan(minPlan: "growth" | "scale" | "pro") {
 
       next();
     } catch (err) {
-      req.log.error({ err, requiredPlan: minPlan }, "Subscription plan lookup failed");
-      // Fail open — don't block the user if we can't check the plan
-      next();
+      (req as Request & { log?: { error: (details: unknown, message: string) => void } })
+        .log?.error({ err, requiredPlan: minPlan }, "Subscription plan lookup failed");
+      res.status(503).json({
+        error: "Unable to verify subscription plan",
+        code: "PLAN_LOOKUP_UNAVAILABLE",
+        requiredPlan: minPlan === "pro" ? "scale" : minPlan,
+        message: "Subscription access could not be verified. Please try again.",
+      });
     }
   };
 }

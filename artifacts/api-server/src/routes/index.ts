@@ -106,7 +106,7 @@ router.use("/mockup",          tc, requirePlan("growth"), mockupRouter);
 router.use("/photography",     tc, requirePlan("growth"), photographyRouter);
 router.use("/bg-removal",      tc, requirePlan("growth"), bgRemovalRouter);
 router.use("/lifestyle",       tc, requirePlan("growth"), lifestyleRouter);
-router.use("/techpack",        tc, techpackRouter);
+router.use("/techpack",        tc, requirePlan("growth"), techpackRouter);
 // Specific manufacturer sub-paths BEFORE the catch-all manufacturersRouter
 router.use("/manufacturers/public",          manufacturerPublicRouter);
 router.use("/manufacturers/connect",         tc, manufacturerConnectRouter);
