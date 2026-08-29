@@ -1,5 +1,5 @@
 import express, { Router } from "express";
-import { getAuth } from "@clerk/express";
+import { clerkClient, getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
 import {
   manufacturers,
@@ -21,6 +21,8 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { sendManufacturerSignupEmail } from "../lib/brandthreadEmail";
+import { logger } from "../lib/logger";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -48,6 +50,20 @@ async function resolveManufacturer(clerkId: string) {
     .where(eq(manufacturers.clerkId, clerkId))
     .limit(1);
   return mfr ?? null;
+}
+
+async function resolveManufacturerEmail(clerkId: string, suppliedEmail?: string | null): Promise<string | null> {
+  const normalized = suppliedEmail?.trim();
+  if (normalized) return normalized;
+  try {
+    const clerkUser = await clerkClient.users.getUser(clerkId);
+    return clerkUser.primaryEmailAddress?.emailAddress
+      ?? clerkUser.emailAddresses[0]?.emailAddress
+      ?? null;
+  } catch (err) {
+    logger.warn({ err, clerkId }, "Unable to resolve manufacturer signup email recipient");
+    return null;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -237,6 +253,21 @@ router.post("/register-via-invite/:token", async (req, res) => {
     .set({ usedAt: new Date(), manufacturerId: mfr.id })
     .where(eq(manufacturerInviteTokens.id, inv.id));
 
+  const signupEmail = await resolveManufacturerEmail(
+    userId,
+    parsed.data.contactEmail ?? inv.contactEmail,
+  );
+  if (signupEmail) {
+    void sendManufacturerSignupEmail({
+      to: signupEmail,
+      businessName: mfr.businessName,
+      invited: true,
+      idempotencyKey: `manufacturer-signup/${mfr.id}`,
+    }).catch((err) => {
+      req.log.error({ err, manufacturerId: mfr.id }, "Manufacturer signup email delivery failed");
+    });
+  }
+
   res.status(201).json({
     ...mfr,
     invitedBySellerId: inv.sellerId,
@@ -337,6 +368,17 @@ router.post("/register", async (req, res) => {
     .insert(manufacturers)
     .values({ clerkId: userId, isPublicDirectory: true, status: "active", ...parsed.data })
     .returning();
+
+  const signupEmail = await resolveManufacturerEmail(userId, parsed.data.contactEmail);
+  if (signupEmail) {
+    void sendManufacturerSignupEmail({
+      to: signupEmail,
+      businessName: mfr.businessName,
+      idempotencyKey: `manufacturer-signup/${mfr.id}`,
+    }).catch((err) => {
+      req.log.error({ err, manufacturerId: mfr.id }, "Manufacturer signup email delivery failed");
+    });
+  }
 
   return res.status(201).json({
     ...mfr,

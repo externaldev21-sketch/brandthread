@@ -1,4 +1,5 @@
 import { Router } from "express";
+import crypto from "node:crypto";
 import { db, orders, orderItems, customers, drops, productVariants, products, notificationsFeed, users, dropWallets, dropWalletTransactions } from "@workspace/db";
 import { eq, desc, sql, and, ne } from "drizzle-orm";
 import { stripe, PLATFORM_COMMISSION_RATE } from "../lib/stripe";
@@ -8,12 +9,51 @@ import { logActivity, reqActor } from "../lib/activityLog";
 import { publishNotification } from "./notifications-feed";
 import { reversePurchasePointsOnce } from "./loyalty";
 import { logger } from "../lib/logger";
+import { sendOrderShippingEmail } from "../lib/brandthreadEmail";
 
 const router = Router();
 router.use(requireAuth);
 // Resolve team membership: managers/staff act on the owner's store while the
 // audit log keeps track of who actually performed each action.
 router.use(teamContext());
+
+type ShipmentEmailOrder = {
+  id: string;
+  buyerId: string | null;
+  guestEmail: string | null;
+  orderNumber: string;
+  trackingNumber: string | null;
+  carrier: string | null;
+};
+
+async function notifyOrderShipped(
+  order: ShipmentEmailOrder,
+  idempotencyKey = `order-shipped/${order.id}`,
+  trackingUpdate = false,
+): Promise<void> {
+  let recipient = order.guestEmail;
+  if (order.buyerId) {
+    const [buyer] = await db
+      .select({ email: users.email })
+      .from(users)
+      .where(eq(users.clerkId, order.buyerId))
+      .limit(1);
+    recipient = buyer?.email ?? recipient;
+  }
+  if (!recipient) {
+    logger.warn({ orderId: order.id }, "Shipping email skipped because recipient is missing");
+    return;
+  }
+
+  await sendOrderShippingEmail({
+    to: recipient,
+    orderNumber: order.orderNumber,
+    carrier: order.carrier,
+    trackingNumber: order.trackingNumber,
+    trackingUpdate,
+    idempotencyKey,
+  });
+}
 
 // GET /api/orders
 router.get("/", async (req, res) => {
@@ -344,6 +384,11 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
       targetType: "order",
     }).catch(() => { /* non-critical */ });
   }
+  if (status === "shipped") {
+    void notifyOrderShipped(transitioned).catch((err) => {
+      logger.error({ err, orderId: transitioned!.id }, "Shipping email delivery failed");
+    });
+  }
 
   res.json(transitioned);
 });
@@ -365,11 +410,24 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
     ))
     .returning({ id: orders.id, buyerId: orders.buyerId, orderNumber: orders.orderNumber, dropId: orders.dropId, ownerId: orders.ownerId, subtotalCents: orders.subtotalCents });
 
-  // Step 2: Always update tracking fields (idempotent for repeated calls)
-  const [updated] = await db.update(orders)
+  const normalizedCarrier = carrier ?? null;
+  // Step 2: Update only when tracking values materially change. PostgreSQL
+  // re-checks this predicate after row locking, so concurrent identical
+  // requests produce one tracking-update email.
+  const [trackingChange] = await db.update(orders)
     .set({ trackingNumber, carrier: carrier ?? null, updatedAt: new Date() })
-    .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId)))
+    .where(and(
+      eq(orders.id, req.params.id),
+      eq(orders.ownerId, ownerId),
+      sql`(${orders.trackingNumber} IS DISTINCT FROM ${trackingNumber} OR ${orders.carrier} IS DISTINCT FROM ${normalizedCarrier})`,
+    ))
     .returning();
+  const [current] = trackingChange
+    ? [trackingChange]
+    : await db.select().from(orders)
+      .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId)))
+      .limit(1);
+  const updated = trackingChange ?? current;
   if (!updated) { res.status(404).json({ error: "Not found" }); return; }
 
   // Audit log: which team member added tracking
@@ -394,6 +452,23 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
       targetId:   statusTransition.id,
       targetType: "order",
     }).catch(() => { /* non-critical */ });
+  }
+  if (statusTransition) {
+    void notifyOrderShipped(updated).catch((err) => {
+      logger.error({ err, orderId: statusTransition!.id }, "Shipping email delivery failed");
+    });
+  } else if (trackingChange) {
+    // Each committed material change is its own event. The atomic IS DISTINCT
+    // FROM predicate suppresses identical retries, while a fresh event ID keeps
+    // A → B → A changes distinct inside Resend's idempotency window.
+    const trackingEventId = crypto.randomUUID();
+    void notifyOrderShipped(
+      updated,
+      `order-tracking/${updated.id}/${trackingEventId}`,
+      true,
+    ).catch((err) => {
+      logger.error({ err, orderId: updated.id }, "Tracking update email delivery failed");
+    });
   }
 
   // Auto-release drop wallet share when order ships

@@ -5,9 +5,36 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { requireStripe } from "../lib/stripe";
 import crypto from "crypto";
 import { reversePurchasePointsOnce } from "./loyalty";
+import { sendReturnStatusEmail } from "../lib/brandthreadEmail";
 
 const router = Router();
 router.use(requireAuth);
+
+async function notifyReturnStatus(returnId: string, status: "pending" | "approved" | "denied" | "refunded", refundAmountCents?: number | null, sellerResponse?: string | null): Promise<void> {
+  const [row] = await db
+    .select({
+      buyerEmail: users.email,
+      orderNumber: orders.orderNumber,
+    })
+    .from(returns)
+    .innerJoin(orders, eq(orders.id, returns.orderId))
+    .innerJoin(users, eq(users.clerkId, returns.buyerId))
+    .where(eq(returns.id, returnId))
+    .limit(1);
+
+  if (!row?.buyerEmail) {
+    return;
+  }
+
+  await sendReturnStatusEmail({
+    to: row.buyerEmail,
+    orderNumber: row.orderNumber,
+    status,
+    refundAmountCents,
+    sellerResponse,
+    idempotencyKey: `return-status/${returnId}/${status}`,
+  });
+}
 
 // ─── BUYER ENDPOINTS ──────────────────────────────────────────────────────────
 
@@ -100,6 +127,9 @@ router.post("/", async (req, res) => {
       .returning();
 
     // 7. Return created row
+    void notifyReturnStatus(created.id, "pending").catch((err) => {
+      req.log.error({ err, returnId: created.id }, "Return request email delivery failed");
+    });
     return res.status(201).json(created);
   } catch (err: any) {
     const status = err.status ?? 500;
@@ -331,6 +361,14 @@ router.patch("/:id/status", async (req, res) => {
           return updatedReturn;
         });
 
+        void notifyReturnStatus(
+          id,
+          updated.status as "approved" | "refunded",
+          updated.refundAmountCents,
+          updated.sellerResponse,
+        ).catch((err) => {
+          req.log.error({ err, returnId: id }, "Return status email delivery failed");
+        });
         return res.json(updated);
       } catch (stripeErr: any) {
         // f. If Stripe fails, set status = 'approved' (not refunded yet)
@@ -344,6 +382,9 @@ router.patch("/:id/status", async (req, res) => {
           .where(eq(returns.id, id))
           .returning();
 
+        void notifyReturnStatus(id, "approved", null, updated.sellerResponse).catch((err) => {
+          req.log.error({ err, returnId: id }, "Return status email delivery failed");
+        });
         return res.json(updated);
       }
     } else {
@@ -359,6 +400,9 @@ router.patch("/:id/status", async (req, res) => {
         .where(eq(returns.id, id))
         .returning();
 
+      void notifyReturnStatus(id, "denied", null, updated.sellerResponse).catch((err) => {
+        req.log.error({ err, returnId: id }, "Return status email delivery failed");
+      });
       return res.json(updated);
     }
   } catch (err: any) {

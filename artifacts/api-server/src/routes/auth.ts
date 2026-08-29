@@ -4,6 +4,7 @@ import { db, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { awardLoyaltyPointsOnce } from "./loyalty";
+import { sendWelcomeEmail } from "../lib/brandthreadEmail";
 
 const router = Router();
 
@@ -105,6 +106,18 @@ router.post("/sync", requireAuth, async (req, res) => {
       if (!updated) throw new Error("User record disappeared during sync");
       return { user: updated, created: false };
     });
+    if (created) {
+      void sendWelcomeEmail({
+        to: user.email,
+        name: user.displayName ?? user.name,
+        accountType: user.accountType === "buyer" || user.accountType === "seller"
+          ? user.accountType
+          : null,
+        idempotencyKey: `welcome/${clerkUserId}`,
+      }).catch((err) => {
+        req.log.warn({ err, clerkUserId }, "Welcome email delivery failed");
+      });
+    }
     res.status(created ? 201 : 200).json(user);
   } catch (err) {
     req.log.error({ err, clerkUserId }, "Failed to sync user");

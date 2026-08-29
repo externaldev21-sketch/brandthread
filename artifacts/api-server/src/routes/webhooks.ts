@@ -17,8 +17,63 @@ import {
   consumeLoyaltyRedemption,
   releaseLoyaltyRedemption,
 } from "./loyalty";
+import {
+  isOrderConfirmationEligibleStatus,
+  sendOrderConfirmationEmail,
+} from "../lib/brandthreadEmail";
 
 const router = Router();
+
+async function sendOrderConfirmationForOrder(orderId: string): Promise<boolean> {
+  const [order] = await db
+    .select({
+      id: orders.id,
+      orderNumber: orders.orderNumber,
+      guestEmail: orders.guestEmail,
+      buyerEmail: users.email,
+      subtotalCents: orders.subtotalCents,
+      shippingCents: orders.shippingCents,
+      totalCents: orders.totalCents,
+      status: orders.status,
+    })
+    .from(orders)
+    .leftJoin(users, eq(users.clerkId, orders.buyerId))
+    .where(eq(orders.id, orderId))
+    .limit(1);
+
+  const recipient = order?.buyerEmail ?? order?.guestEmail;
+  if (!order || !recipient) {
+    logger.warn({ orderId }, "Order confirmation email skipped because recipient is missing");
+    return false;
+  }
+  if (!isOrderConfirmationEligibleStatus(order.status)) {
+    logger.info(
+      { orderId, status: order.status },
+      "Order confirmation email skipped because order is not fulfillment eligible",
+    );
+    return false;
+  }
+
+  const items = await db
+    .select({
+      productName: orderItems.productName,
+      variantLabel: orderItems.variantLabel,
+      quantity: orderItems.quantity,
+      priceCents: orderItems.priceCents,
+    })
+    .from(orderItems)
+    .where(eq(orderItems.orderId, orderId));
+
+  return sendOrderConfirmationEmail({
+    to: recipient,
+    orderNumber: order.orderNumber,
+    items,
+    subtotalCents: order.subtotalCents,
+    shippingCents: order.shippingCents,
+    totalCents: order.totalCents,
+    idempotencyKey: `order-confirmation/${order.id}`,
+  });
+}
 
 // POST /api/webhooks/stripe — raw body, no Clerk auth
 router.post("/stripe", async (req: Request, res: Response) => {
@@ -200,6 +255,11 @@ export async function handleCheckoutPaid(session: any) {
     .limit(1);
   if (existing) {
     await awardPurchasePoints(existing);
+    try {
+      await sendOrderConfirmationForOrder(existing.id);
+    } catch (err) {
+      logger.error({ err, orderId: existing.id }, "Order confirmation email delivery failed");
+    }
     logger.info({ stripeSessionId: sessionId, orderId: existing.id }, "Order already exists for checkout session; skipping");
     return;
   }
@@ -480,6 +540,14 @@ export async function handleCheckoutPaid(session: any) {
     }
   } else {
     logger.info({ orderId: createdOrderId, buyerId: buyerId ?? undefined, isGuest: !buyerId, stripeSessionId: sessionId }, "Order created from paid checkout");
+
+    if (createdOrderId) {
+      try {
+        await sendOrderConfirmationForOrder(createdOrderId);
+      } catch (err) {
+        logger.error({ err, orderId: createdOrderId }, "Order confirmation email delivery failed");
+      }
+    }
 
     // ── Auto-credit drop wallet (Fix #1) ───────────────────────────────────
     // If this order is part of a drop, credit the drop's escrow wallet so

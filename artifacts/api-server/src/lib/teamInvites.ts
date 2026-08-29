@@ -1,5 +1,6 @@
 /** Shared team invite link and email helpers. */
 import { logger } from "./logger";
+import { sendTeamInviteEmail as sendBrandedTeamInviteEmail } from "./brandthreadEmail";
 
 /** Shareable invite links: web URL (expo web serves the domain root) + native deep link. */
 export function inviteUrls(token: string) {
@@ -32,35 +33,15 @@ export async function sendTeamInviteEmail(
   inviteUrl: string,
   options: TeamInviteEmailOptions = {},
 ): Promise<boolean> {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) return false;
-
-  const subject = options.reminder
-    ? `Reminder: your Brandthread team invite expires soon`
-    : `${ownerName} invited you to join their team on Brandthread`;
-  const html = options.reminder
-    ? `<p>This is a reminder that ${ownerName} invited you to join their Brandthread team as <b>${role}</b>.</p><p>Your invite link expires in approximately 24 hours.</p><p><a href="${inviteUrl}">Accept the invite</a></p><p>Or paste this link into your browser:<br/>${inviteUrl}</p>`
-    : `<p>${ownerName} invited you to join their Brandthread team as <b>${role}</b>.</p><p><a href="${inviteUrl}">Accept the invite</a></p><p>Or paste this link into your browser:<br/>${inviteUrl}</p>`;
-
   try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-        ...(options.idempotencyKey ? { "Idempotency-Key": options.idempotencyKey } : {}),
-      },
-      body: JSON.stringify({
-        from: process.env.RESEND_FROM_EMAIL ?? "Brandthread <onboarding@resend.dev>",
-        to: [to],
-        subject,
-        html,
-      }),
+    return await sendBrandedTeamInviteEmail({
+      to,
+      ownerName,
+      role,
+      inviteUrl,
+      reminder: options.reminder,
+      idempotencyKey: options.idempotencyKey,
     });
-    if (!response.ok) {
-      logger.error({ statusCode: response.status }, "Team invite email provider request failed");
-    }
-    return response.ok;
   } catch (err) {
     logger.error({ err }, "Team invite email request failed");
     return false;
