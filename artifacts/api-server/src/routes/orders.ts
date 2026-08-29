@@ -17,6 +17,16 @@ router.use(requireAuth);
 // audit log keeps track of who actually performed each action.
 router.use(teamContext());
 
+const TRACKING_STATUSES = [
+  "label_created",
+  "accepted",
+  "in_transit",
+  "out_for_delivery",
+  "delivered",
+  "exception",
+  "returned_to_sender",
+] as const;
+
 type ShipmentEmailOrder = {
   id: string;
   buyerId: string | null;
@@ -397,30 +407,112 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
 // PATCH /api/orders/:id/tracking — fulfillment (staff+)
 router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const { trackingNumber, carrier } = req.body;
-  if (!trackingNumber) { res.status(400).json({ error: "trackingNumber required" }); return; }
+  const {
+    trackingNumber: rawTrackingNumber,
+    carrier: rawCarrier,
+    trackingStatus,
+    estimatedDelivery: rawEstimatedDelivery,
+  } = req.body;
+
+  const hasTrackingNumber = rawTrackingNumber !== undefined;
+  const trackingNumber = hasTrackingNumber
+    ? (typeof rawTrackingNumber === "string" ? rawTrackingNumber.trim() : "")
+    : undefined;
+  if (hasTrackingNumber && !trackingNumber) {
+    res.status(400).json({ error: "trackingNumber must be a non-empty string" }); return;
+  }
+
+  let carrier: string | null | undefined;
+  if (rawCarrier !== undefined) {
+    if (rawCarrier !== null && typeof rawCarrier !== "string") {
+      res.status(400).json({ error: "carrier must be a string" }); return;
+    }
+    carrier = typeof rawCarrier === "string" ? rawCarrier.trim() || null : null;
+  }
+
+  if (
+    trackingStatus !== undefined
+    && (typeof trackingStatus !== "string" || !TRACKING_STATUSES.includes(trackingStatus as typeof TRACKING_STATUSES[number]))
+  ) {
+    res.status(400).json({ error: `trackingStatus must be one of: ${TRACKING_STATUSES.join(", ")}` }); return;
+  }
+
+  let estimatedDelivery: string | null | undefined;
+  if (rawEstimatedDelivery !== undefined) {
+    if (rawEstimatedDelivery === null || rawEstimatedDelivery === "") {
+      estimatedDelivery = null;
+    } else if (
+      typeof rawEstimatedDelivery !== "string"
+      || !/^\d{4}-\d{2}-\d{2}$/.test(rawEstimatedDelivery)
+      || Number.isNaN(Date.parse(`${rawEstimatedDelivery}T00:00:00.000Z`))
+    ) {
+      res.status(400).json({ error: "estimatedDelivery must be an ISO date (YYYY-MM-DD)" }); return;
+    } else {
+      estimatedDelivery = rawEstimatedDelivery;
+    }
+  }
+
+  if (
+    trackingNumber === undefined
+    && carrier === undefined
+    && trackingStatus === undefined
+    && estimatedDelivery === undefined
+  ) {
+    res.status(400).json({ error: "trackingNumber, carrier, trackingStatus, or estimatedDelivery required" }); return;
+  }
 
   // Step 1: Atomically transition to shipped only when status isn't already shipped.
   // This prevents duplicate ship notifications on repeated tracking updates.
-  const [statusTransition] = await db.update(orders)
-    .set({ status: "shipped", shippedAt: new Date(), updatedAt: new Date() })
-    .where(and(
-      eq(orders.id, req.params.id),
-      eq(orders.ownerId, ownerId),
-      ne(orders.status, "shipped"),        // skip write if already shipped
-    ))
-    .returning({ id: orders.id, buyerId: orders.buyerId, orderNumber: orders.orderNumber, dropId: orders.dropId, ownerId: orders.ownerId, subtotalCents: orders.subtotalCents });
+  // A status/date-only update must not change the order's fulfillment status.
+  // Supplying a new tracking number retains the existing add-tracking behavior.
+  let statusTransition: {
+    id: string;
+    buyerId: string | null;
+    orderNumber: string;
+    dropId: string | null;
+    ownerId: string;
+    subtotalCents: number;
+  } | undefined;
+  if (trackingNumber !== undefined) {
+    [statusTransition] = await db.update(orders)
+      .set({ status: "shipped", shippedAt: new Date(), updatedAt: new Date() })
+      .where(and(
+        eq(orders.id, req.params.id),
+        eq(orders.ownerId, ownerId),
+        ne(orders.status, "shipped"),        // skip write if already shipped
+      ))
+      .returning({ id: orders.id, buyerId: orders.buyerId, orderNumber: orders.orderNumber, dropId: orders.dropId, ownerId: orders.ownerId, subtotalCents: orders.subtotalCents });
+  }
 
-  const normalizedCarrier = carrier ?? null;
+  const trackingNumberChanged = trackingNumber === undefined
+    ? sql`FALSE`
+    : sql`${orders.trackingNumber} IS DISTINCT FROM ${trackingNumber}`;
+  const carrierChanged = carrier === undefined
+    ? sql`FALSE`
+    : sql`${orders.carrier} IS DISTINCT FROM ${carrier}`;
+  const trackingStatusChanged = trackingStatus === undefined
+    ? sql`FALSE`
+    : sql`${orders.trackingStatus} IS DISTINCT FROM ${trackingStatus}`;
+  const estimatedDeliveryChanged = estimatedDelivery === undefined
+    ? sql`FALSE`
+    : sql`${orders.estimatedDelivery} IS DISTINCT FROM ${estimatedDelivery}`;
+
+  const updatePayload: Record<string, unknown> = { updatedAt: new Date() };
+  if (trackingNumber !== undefined) updatePayload.trackingNumber = trackingNumber;
+  if (carrier !== undefined) updatePayload.carrier = carrier;
+  if (trackingStatus !== undefined) updatePayload.trackingStatus = trackingStatus;
+  if (estimatedDelivery !== undefined) updatePayload.estimatedDelivery = estimatedDelivery;
+
   // Step 2: Update only when tracking values materially change. PostgreSQL
   // re-checks this predicate after row locking, so concurrent identical
-  // requests produce one tracking-update email.
+  // requests produce one tracking-update email. This also makes retries for
+  // status/date updates idempotent.
   const [trackingChange] = await db.update(orders)
-    .set({ trackingNumber, carrier: carrier ?? null, updatedAt: new Date() })
+    .set(updatePayload)
     .where(and(
       eq(orders.id, req.params.id),
       eq(orders.ownerId, ownerId),
-      sql`(${orders.trackingNumber} IS DISTINCT FROM ${trackingNumber} OR ${orders.carrier} IS DISTINCT FROM ${normalizedCarrier})`,
+      sql`(${trackingNumberChanged} OR ${carrierChanged} OR ${trackingStatusChanged} OR ${estimatedDeliveryChanged})`,
     ))
     .returning();
   const [current] = trackingChange
@@ -434,10 +526,16 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
   // Audit log: which team member added tracking
   {
     const actor = reqActor(req);
+    const changes = [
+      trackingNumber !== undefined ? "tracking number" : null,
+      carrier !== undefined ? "carrier" : null,
+      trackingStatus !== undefined ? "status" : null,
+      estimatedDelivery !== undefined ? "estimated delivery" : null,
+    ].filter((change): change is string => change !== null);
     void logActivity(
       actor.ownerClerkId, actor.actorClerkId, actor.actorRole,
-      `Added tracking ${trackingNumber} to order #${updated.orderNumber}`,
-      "order", updated.id, { trackingNumber, carrier: carrier ?? null },
+      `${trackingNumber !== undefined ? "Added tracking" : "Updated tracking"} for order #${updated.orderNumber}`,
+      "order", updated.id, { changes, trackingNumber, carrier, trackingStatus, estimatedDelivery },
     );
   }
 
@@ -458,7 +556,7 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
     void notifyOrderShipped(updated).catch((err) => {
       logger.error({ err, orderId: statusTransition!.id }, "Shipping email delivery failed");
     });
-  } else if (trackingChange) {
+  } else if (trackingChange && (trackingNumber !== undefined || carrier !== undefined)) {
     // Each committed material change is its own event. The atomic IS DISTINCT
     // FROM predicate suppresses identical retries, while a fresh event ID keeps
     // A → B → A changes distinct inside Resend's idempotency window.

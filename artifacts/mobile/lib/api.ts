@@ -330,6 +330,10 @@ export function createApi(getToken: GetToken) {
       updateStatus:   (id: string, status: string, opts?: { reason?: string; notes?: string }) =>
         patch(`/api/orders/${id}/status`, { status, ...opts }),
       addTracking:    (id: string, body: unknown)  => patch(`/api/orders/${id}/tracking`, body),
+      updateTracking: (id: string, body: {
+        trackingStatus: 'label_created' | 'accepted' | 'in_transit' | 'out_for_delivery' | 'delivered' | 'exception' | 'returned_to_sender';
+        estimatedDelivery?: string | null;
+      }) => patch(`/api/orders/${id}/tracking`, body),
     },
     customers: {
       list:    (search?: string) => get(`/api/customers${search ? `?search=${encodeURIComponent(search)}` : ''}`),

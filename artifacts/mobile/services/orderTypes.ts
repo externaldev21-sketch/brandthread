@@ -417,6 +417,8 @@ export interface Order {
   payment: PaymentSummary;
   heldFunds?: HeldFundsRecord;
   shipments: Shipment[];
+  trackingStatus?: TrackingStatus;
+  estimatedDelivery?: string;
   labels: ShippingLabel[];
   returns: ReturnRequest[];
   refunds: Refund[];

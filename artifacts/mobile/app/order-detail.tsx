@@ -15,7 +15,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader, EmptyState } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
-import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, ReturnStatus, RETURN_REASONS, OrderStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent, PaymentSummary } from '@/services/orderTypes';
+import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, ReturnStatus, RETURN_REASONS, OrderStatus, TrackingStatus, FulfillmentType, FulfillmentStatus, OrderAddress, OrderLineItem, Fulfillment, Shipment, OrderTimelineEvent, PaymentSummary } from '@/services/orderTypes';
 
 // ─── API → Order adapter ──────────────────────────────────────────────────────
 
@@ -161,6 +161,8 @@ function adaptApiOrder(raw: any): Order {
         trackingEvents:    [],
         isDemo:            false,
         shippedAt:         raw.shippedAt ?? undefined,
+        trackingStatus:    raw.trackingStatus ?? undefined,
+        estimatedDelivery: raw.estimatedDelivery ?? undefined,
       }]
     : [];
 
@@ -264,6 +266,8 @@ function adaptApiOrder(raw: any): Order {
       payoutStatus:            isRefundPending ? 'held' : uiStatus === 'refunded' ? 'paid' : 'pending',
     },
     shipments,
+    trackingStatus: raw.trackingStatus ?? undefined,
+    estimatedDelivery: raw.estimatedDelivery ?? undefined,
     labels:    [],
     returns:   [],
     refunds:   [],
@@ -368,6 +372,20 @@ function cancellationReasonLabel(key: string): string {
   return CANCELLATION_REASONS.find(r => r.key === key)?.label ?? key;
 }
 
+const TRACKING_STATUS_OPTIONS: { key: TrackingStatus; label: string }[] = [
+  { key: 'label_created', label: 'Label Created' },
+  { key: 'accepted', label: 'Accepted' },
+  { key: 'in_transit', label: 'In Transit' },
+  { key: 'out_for_delivery', label: 'Out for Delivery' },
+  { key: 'delivered', label: 'Delivered' },
+  { key: 'exception', label: 'Exception' },
+  { key: 'returned_to_sender', label: 'Returned to Sender' },
+];
+
+function trackingStatusLabel(status: TrackingStatus): string {
+  return TRACKING_STATUS_OPTIONS.find(option => option.key === status)?.label ?? status;
+}
+
 // ─── InfoRow ─────────────────────────────────────────────────────────────────
 
 function InfoRow({ label, value, valueColor, bold }: { label: string; value: string; valueColor?: string; bold?: boolean }) {
@@ -422,6 +440,7 @@ export default function OrderDetailScreen() {
 
   // Tracking form per group
   const [trackingForms, setTrackingForms] = useState<Record<string, { carrier: string; tracking: string; visible: boolean }>>({});
+  const [updatingTracking, setUpdatingTracking] = useState(false);
 
   // Tracking events modal
   const [trackingModalShipmentId, setTrackingModalShipmentId] = useState<string | null>(null);
@@ -596,6 +615,22 @@ export default function OrderDetailScreen() {
     }
   }
 
+  async function handleUpdateTracking(status: TrackingStatus, estimatedDelivery: string | null) {
+    setUpdatingTracking(true);
+    try {
+      await api.orders.updateTracking(id, {
+        trackingStatus: status,
+        estimatedDelivery,
+      });
+      await load(generationRef.current);
+    } catch (e: any) {
+      Alert.alert('Error', e.message);
+      throw e;
+    } finally {
+      setUpdatingTracking(false);
+    }
+  }
+
   async function handlePinNote(noteId: string, current: boolean) {
     if (!order) return;
     // Toggle pin locally (no API endpoint)
@@ -725,7 +760,7 @@ export default function OrderDetailScreen() {
         {activeTab === 'overview'    && <OverviewTab order={order} onMarkProcessing={handleMarkProcessing} onMarkReadyToShip={handleMarkReadyToShip} onMarkShipped={handleMarkShipped} onMarkDelivered={handleMarkDelivered} onCancelPress={() => setShowCancelModal(true)} router={router} reload={() => load(generationRef.current)} onAddTrackingQuick={handleAddTrackingQuick} />}
         {activeTab === 'customer'    && <CustomerTab order={order} />}
         {activeTab === 'payment'     && <PaymentTab order={order} />}
-        {activeTab === 'fulfillment' && <FulfillmentTab order={order} trackingForms={trackingForms} setTrackingForms={setTrackingForms} onAddTracking={handleAddTracking} onMarkShipped={handleMarkShipped} onShowTracking={(sid) => setTrackingModalShipmentId(sid)} router={router} />}
+        {activeTab === 'fulfillment' && <FulfillmentTab order={order} trackingForms={trackingForms} setTrackingForms={setTrackingForms} onAddTracking={handleAddTracking} onMarkShipped={handleMarkShipped} onUpdateTracking={handleUpdateTracking} updatingTracking={updatingTracking} onShowTracking={(sid) => setTrackingModalShipmentId(sid)} router={router} />}
         {activeTab === 'timeline'    && <TimelineTab order={order} noteText={noteText} setNoteText={setNoteText} onAddNote={handleAddNote} addingNote={addingNote} />}
         {activeTab === 'returns'     && <ReturnsTab order={order} onAction={handleReturnAction} router={router} />}
         {activeTab === 'disputes'    && <DisputesTab order={order} router={router} />}
@@ -1118,16 +1153,34 @@ function PaymentTab({ order }: { order: Order }) {
 // TAB: FULFILLMENT
 // ═══════════════════════════════════════════════════════
 
-function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking, onMarkShipped, onShowTracking, router }: {
+function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking, onMarkShipped, onUpdateTracking, updatingTracking, onShowTracking, router }: {
   order: Order;
   trackingForms: Record<string, { carrier: string; tracking: string; visible: boolean }>;
   setTrackingForms: React.Dispatch<React.SetStateAction<Record<string, { carrier: string; tracking: string; visible: boolean }>>>;
   onAddTracking: (groupId: string) => void;
   onMarkShipped: () => void;
+  onUpdateTracking: (status: TrackingStatus, estimatedDelivery: string | null) => Promise<void>;
+  updatingTracking: boolean;
   onShowTracking: (shipmentId: string) => void;
   router: ReturnType<typeof useRouter>;
 }) {
   const { fulfillment, shipments } = order;
+  const [trackingStatus, setTrackingStatus] = useState<TrackingStatus>(
+    order.trackingStatus ?? shipments[0]?.trackingStatus ?? 'label_created',
+  );
+  const [estimatedDelivery, setEstimatedDelivery] = useState(order.estimatedDelivery ?? '');
+  const [trackingFormDirty, setTrackingFormDirty] = useState(false);
+
+  useEffect(() => {
+    if (trackingFormDirty) return;
+    setTrackingStatus(order.trackingStatus ?? shipments[0]?.trackingStatus ?? 'label_created');
+    setEstimatedDelivery(order.estimatedDelivery ?? shipments[0]?.estimatedDelivery ?? '');
+  }, [order.trackingStatus, order.estimatedDelivery, shipments, trackingFormDirty]);
+
+  async function saveTrackingUpdate() {
+    await onUpdateTracking(trackingStatus, estimatedDelivery.trim() || null);
+    setTrackingFormDirty(false);
+  }
 
   function getForm(groupId: string) {
     return trackingForms[groupId] ?? { carrier: '', tracking: '', visible: false };
@@ -1141,6 +1194,62 @@ function FulfillmentTab({ order, trackingForms, setTrackingForms, onAddTracking,
 
   return (
     <View style={s.tabContent}>
+      <View style={s.section}>
+        <SectionHeader title="Tracking Status" />
+        <BrandthreadCard style={s.trackingStatusCard}>
+          <Text style={s.trackingStatusHint}>
+            Keep buyers up to date as this order moves through delivery.
+          </Text>
+          <View style={s.trackingStatusOptions}>
+            {TRACKING_STATUS_OPTIONS.map(option => {
+              const selected = trackingStatus === option.key;
+              return (
+                <TouchableOpacity
+                  key={option.key}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setTrackingStatus(option.key);
+                    setTrackingFormDirty(true);
+                  }}
+                  style={[s.trackingStatusOption, selected && s.trackingStatusOptionSelected]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  accessibilityLabel={`Set tracking status to ${option.label}`}
+                  testID={`tracking-status-${option.key}`}
+                >
+                  <Text style={[s.trackingStatusOptionText, selected && s.trackingStatusOptionTextSelected]}>
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text style={s.estimatedDeliveryLabel}>Estimated delivery (optional)</Text>
+          <TextInput
+            style={s.inlineInput}
+            value={estimatedDelivery}
+            onChangeText={value => {
+              setEstimatedDelivery(value);
+              setTrackingFormDirty(true);
+            }}
+            placeholder="YYYY-MM-DD"
+            placeholderTextColor={SUBTLE}
+            autoCapitalize="none"
+            autoCorrect={false}
+            accessibilityLabel="Estimated delivery date"
+            testID="estimated-delivery-input"
+          />
+          <PrimaryButton
+            label="Save Tracking Update"
+            icon="check"
+            small
+            loading={updatingTracking}
+            disabled={updatingTracking || !trackingFormDirty}
+            onPress={saveTrackingUpdate}
+          />
+        </BrandthreadCard>
+      </View>
+
       {fulfillment.groups.map((group, idx) => {
         const groupItems = order.lineItems.filter(li => group.lineItemIds.includes(li.id));
         const form = getForm(group.id);
@@ -1612,6 +1721,14 @@ const s = StyleSheet.create({
   demoTag:          { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE },
 
   // Fulfillment
+  trackingStatusCard: { gap: SP.sm, borderColor: BORDER_ACTIVE },
+  trackingStatusHint: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 20 },
+  trackingStatusOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs },
+  trackingStatusOption: { paddingHorizontal: SP.sm, paddingVertical: SP.xs, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: BORDER, backgroundColor: SURFACE },
+  trackingStatusOptionSelected: { borderColor: PURPLE, backgroundColor: PURPLE_DIM },
+  trackingStatusOptionText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
+  trackingStatusOptionTextSelected: { color: FG },
+  estimatedDeliveryLabel: { fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED, marginTop: SP.xs },
   groupHeader:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.sm },
   groupTitle:       { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   manufacturerCard: { gap: SP.sm },
