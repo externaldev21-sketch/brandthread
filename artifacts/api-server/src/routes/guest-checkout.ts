@@ -8,7 +8,7 @@ import crypto from "node:crypto";
 import {
   db, checkoutSessions, orders, productVariants, products, users, shippingRates,
 } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { computeApplicationFeeCents, mapStripeError, requireStripe } from "../lib/stripe";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 
@@ -83,7 +83,7 @@ router.post("/session", async (req, res) => {
         size: productVariants.size, color: productVariants.color, productName: products.name,
         images: products.images, sellerId: products.ownerId, status: products.status,
       }).from(productVariants).innerJoin(products, eq(products.id, productVariants.productId))
-        .where(and(eq(productVariants.id, item.variantId), eq(products.id, item.productId))).limit(1);
+        .where(and(eq(productVariants.id, item.variantId), eq(products.id, item.productId), isNull(products.deletedAt))).limit(1);
       if (!variant) return res.status(404).json({ error: `Variant ${item.variantId} not found` });
       if (variant.status !== "active" || variant.stock < quantity) return res.status(400).json({ error: `${variant.productName} is unavailable or out of stock` });
       if (sellerId && sellerId !== variant.sellerId) return res.status(400).json({ error: "All items must belong to the same seller" });

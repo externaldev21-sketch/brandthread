@@ -127,7 +127,8 @@ function mapApiProfile(profile: any, postsCount = 0, productsCount = 0): import(
     website: profile.website ?? undefined,
     avatarColor: '#8B5CF6',
     initials: brandName.slice(0, 2).toUpperCase(),
-    verified: Boolean(profile.verified),
+    // Only an explicit server boolean grants this public credential.
+    verified: profile.verified === true,
     isPublic: true,
     followers: Number(profile.followersCount ?? 0),
     following: Number(profile.followingCount ?? 0),
@@ -617,7 +618,7 @@ export default function SellerProfileScreen() {
           <View style={styles.brandNameRow}>
             <Text style={styles.brandName}>{profile.brandName}</Text>
             {profile.verified && (
-              <Feather name="check-circle" size={14} color={colors.primary} style={{ marginLeft: 6 }} />
+              <Feather name="check-circle" size={14} color={colors.primary} style={{ marginLeft: 6 }} accessibilityLabel="Verified seller" accessibilityRole="image" />
             )}
           </View>
 

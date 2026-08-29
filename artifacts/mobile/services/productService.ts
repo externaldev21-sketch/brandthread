@@ -15,6 +15,7 @@ import {
 } from '@/services/productTypes';
 import { calcTotalInventory } from '@/lib/productUtils';
 import { centsAtBasisPoints } from '@/lib/money';
+import { serviceRequest } from '@/lib/serviceConfig';
 
 // ─── Storage Keys ─────────────────────────────────────────────────────────────
 
@@ -227,12 +228,32 @@ export async function unarchiveProduct(id: string): Promise<Product | undefined>
   return updateProduct(id, { status: 'draft' });
 }
 
-export async function deleteProduct(id: string): Promise<boolean> {
+export interface DeletedProductRecovery {
+  recoverableUntil?: string;
+  [key: string]: unknown;
+}
+
+export async function deleteProduct(id: string): Promise<DeletedProductRecovery> {
   await ensureInitialized();
-  const len = _products.length;
+  // The server owns deletion and the recovery window. Do not delete the cache
+  // if it rejects the request: stale local data is safer than pretending a
+  // product disappeared when it did not.
+  const recovery = await serviceRequest<DeletedProductRecovery>(`/api/products/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
   _products = _products.filter(p => p.id !== id);
   await persist();
-  return _products.length < len;
+  return recovery ?? {};
+}
+
+export async function restoreProduct(id: string): Promise<void> {
+  await ensureInitialized();
+  await serviceRequest(`/api/products/${encodeURIComponent(id)}/restore`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+  // The server response is authoritative but may not return a complete product.
+  // Leave cache hydration to the next list read rather than manufacturing data.
 }
 
 export async function duplicateProduct(id: string): Promise<Product | undefined> {

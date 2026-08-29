@@ -4,12 +4,13 @@
  */
 import { Router } from "express";
 import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, boosts } from "@workspace/db";
-import { eq, and, asc, desc, ne, inArray, or, ilike, sql, count, gte } from "drizzle-orm";
+import { eq, and, asc, desc, ne, inArray, or, ilike, sql, count, gte, isNull } from "drizzle-orm";
 import { computeTrendingForToday, isCacheFresh } from "../jobs/computeTrending";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { requireAuth } from "../middlewares/requireAuth";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
+import { deriveSellerVerified } from "../lib/sellerEligibility";
 
 // ─── In-flight guard for synchronous cache-miss computation ──────────────────
 // Prevents concurrent requests from each triggering an independent full
@@ -73,8 +74,8 @@ router.get("/products", async (req, res) => {
 
     // Fetch active products, optionally scoped to a specific seller
     const whereClause = ownerId
-      ? and(eq(products.status, "active"), eq(products.ownerId, ownerId))
-      : eq(products.status, "active");
+      ? and(eq(products.status, "active"), isNull(products.deletedAt), eq(products.ownerId, ownerId))
+      : and(eq(products.status, "active"), isNull(products.deletedAt));
 
     const rows = await db
       .select()
@@ -142,15 +143,16 @@ router.get("/products", async (req, res) => {
     // Attach seller display name (best-effort; null if seller row not found)
     const ownerIds = [...new Set(filtered.map((p) => p.ownerId))];
     const sellerRows = ownerIds.length > 0
-      ? await db.select({ clerkId: users.clerkId, displayName: users.displayName })
+      ? await db.select({ clerkId: users.clerkId, displayName: users.displayName, verified: users.verified, verificationStatus: users.verificationStatus, activeStanding: users.activeStanding, policyRestricted: users.policyRestricted })
           .from(users)
           .where(inArray(users.clerkId, ownerIds))
       : [];
-    const sellerMap = Object.fromEntries(sellerRows.map((u) => [u.clerkId, u.displayName]));
+    const sellerMap = Object.fromEntries(sellerRows.map((u) => [u.clerkId, u]));
 
     const result = filtered.map((p) => ({
       ...p,
-      sellerDisplayName: sellerMap[p.ownerId] ?? null,
+      sellerDisplayName: sellerMap[p.ownerId]?.displayName ?? null,
+      sellerVerified: sellerMap[p.ownerId] ? deriveSellerVerified(sellerMap[p.ownerId]) : false,
       variants: variantsByProduct[p.id] ?? [],
     }));
 
@@ -173,13 +175,13 @@ router.get("/products/:id/related", async (req, res) => {
 
   try {
     const [current] = await db.select().from(products)
-      .where(and(eq(products.id, req.params.id), eq(products.status, "active"))).limit(1);
+      .where(and(eq(products.id, req.params.id), eq(products.status, "active"), isNull(products.deletedAt))).limit(1);
     if (!current) return res.status(404).json({ error: "Product not found" });
 
     // Fetch the candidate set in one query and batch its dependent records below.
     // Ranking is application-side because tags/styleTags are JSON arrays.
     const candidates = await db.select().from(products)
-      .where(and(eq(products.status, "active"), ne(products.id, current.id)));
+      .where(and(eq(products.status, "active"), isNull(products.deletedAt), ne(products.id, current.id)));
     const ranked = rankRelatedProducts(current, candidates).slice(0, lim);
     if (ranked.length === 0) return res.json([]);
 
@@ -211,7 +213,7 @@ router.get("/products/:id", async (req, res) => {
     const [product] = await db
       .select()
       .from(products)
-      .where(and(eq(products.id, req.params.id), eq(products.status, "active")))
+      .where(and(eq(products.id, req.params.id), eq(products.status, "active"), isNull(products.deletedAt)))
       .limit(1);
 
     if (!product) {
@@ -226,7 +228,7 @@ router.get("/products/:id", async (req, res) => {
 
     // Attach seller display name
     const [seller] = await db
-      .select({ displayName: users.displayName })
+      .select({ displayName: users.displayName, verified: users.verified, verificationStatus: users.verificationStatus, activeStanding: users.activeStanding, policyRestricted: users.policyRestricted })
       .from(users)
       .where(eq(users.clerkId, product.ownerId))
       .limit(1);
@@ -235,6 +237,7 @@ router.get("/products/:id", async (req, res) => {
     res.json({
       ...product,
       sellerDisplayName: seller?.displayName ?? null,
+      sellerVerified: seller ? deriveSellerVerified(seller) : false,
       sellerVacationMode: vacation.active,
       sellerVacationMessage: vacation.active ? vacation.message : null,
       sellerVacationUntil: vacation.until?.toISOString() ?? null,
@@ -301,7 +304,7 @@ router.get("/search", async (req, res): Promise<void> => {
         priceCents: productVariants.priceCents,
       }).from(products)
         .leftJoin(productVariants, eq(productVariants.productId, products.id))
-        .where(and(eq(products.status, "active"), ilike(products.name, pattern),
+        .where(and(eq(products.status, "active"), isNull(products.deletedAt), ilike(products.name, pattern),
           category ? eq(products.category, category) : undefined)),
     ]);
 
@@ -408,6 +411,9 @@ router.get("/sellers/:sellerId", async (req, res) => {
       profileImageUrl: users.profileImageUrl,
       avatarUrl:        users.avatarUrl,
       verified:        users.verified,
+      verificationStatus: users.verificationStatus,
+      activeStanding: users.activeStanding,
+      policyRestricted: users.policyRestricted,
       brandType:       users.brandType,
       accountType:     users.accountType,
       vacationMode:    users.vacationMode,
@@ -424,7 +430,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
     db
       .select()
       .from(products)
-      .where(and(eq(products.ownerId, sellerId), eq(products.status, "active")))
+      .where(and(eq(products.ownerId, sellerId), eq(products.status, "active"), isNull(products.deletedAt)))
       .orderBy(desc(products.createdAt))
       .limit(50),
     db
@@ -470,6 +476,7 @@ router.get("/sellers/:sellerId", async (req, res) => {
   return res.json({
     profile: {
       ...seller,
+      verified: deriveSellerVerified(seller),
       vacationMode: vacation.active,
       vacationMessage: vacation.active ? vacation.message : null,
       vacationUntil: vacation.until?.toISOString() ?? null,
@@ -526,7 +533,7 @@ router.get("/drops/:id", async (req, res) => {
 
   const [[seller], dropProducts] = await Promise.all([
     db
-      .select({ displayName: users.displayName, brandName: users.brandName, verified: users.verified })
+      .select({ displayName: users.displayName, brandName: users.brandName, verified: users.verified, verificationStatus: users.verificationStatus, activeStanding: users.activeStanding, policyRestricted: users.policyRestricted })
       .from(users)
       .where(eq(users.clerkId, drop.ownerId))
       .limit(1),
@@ -542,12 +549,12 @@ router.get("/drops/:id", async (req, res) => {
         createdAt:   products.createdAt,
       })
       .from(products)
-      .where(and(eq(products.dropId, req.params.id), eq(products.status, "active")))
+      .where(and(eq(products.dropId, req.params.id), eq(products.status, "active"), isNull(products.deletedAt)))
       .orderBy(products.createdAt)
       .limit(50),
   ]);
 
-  return res.json({ ...drop, seller: seller ?? null, products: dropProducts });
+  return res.json({ ...drop, seller: seller ? { ...seller, verified: deriveSellerVerified(seller) } : null, products: dropProducts });
 });
 
 router.get("/drops/:id/notify", requireAuth, async (req, res): Promise<void> => {
@@ -657,6 +664,9 @@ router.get("/posts", async (req, res) => {
         displayName: users.displayName,
         brandName:   users.brandName,
         verified:    users.verified,
+        verificationStatus: users.verificationStatus,
+        activeStanding: users.activeStanding,
+        policyRestricted: users.policyRestricted,
       })
       .from(posts)
       .leftJoin(users, eq(users.clerkId, posts.userId))
@@ -729,7 +739,7 @@ router.get("/posts", async (req, res) => {
       seller: {
         displayName: p.displayName,
         brandName:   p.brandName,
-        verified:    p.verified,
+        verified:    deriveSellerVerified(p),
       },
       taggedProducts: (tagsByPost[p.id] ?? []).map((t) => ({
         productId: t.productId,

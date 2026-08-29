@@ -154,4 +154,20 @@ describe("guest checkout", () => {
     expect(fakeStripe.creates[0].params.customer).toBeUndefined();
     expect(fakeStripe.creates[0].params.payment_intent_data.setup_future_usage).toBeUndefined();
   });
+
+  it("rejects a soft-deleted product before creating a Stripe session", async () => {
+    const createsBefore = fakeStripe.creates.length;
+    await db.update(products).set({ deletedAt: new Date(), removalKind: "seller_deleted" })
+      .where(eq(products.id, productId));
+    const result = await post("/api/guest/checkout/session", {
+      items: [{ productId, variantId, quantity: 1 }],
+      contactEmail: `deleted-${suffix}@test.local`,
+      shippingAddress: { name: "Guest Buyer", street: "123 Test Street", city: "Portland", state: "OR", zip: "97205", country: "US" },
+      successUrl: "https://brandthread.test/success",
+      cancelUrl: "https://brandthread.test/cancel",
+      clientIdempotencyKey: `guest-deleted-${suffix}`,
+    });
+    expect(result.status).toBe(404);
+    expect(fakeStripe.creates).toHaveLength(createsBefore);
+  });
 });

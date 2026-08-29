@@ -346,6 +346,20 @@ export async function removeCartItem(itemId: string): Promise<Cart> {
   return cart;
 }
 
+/** Restore a cart snapshot captured immediately before a reversible removal.
+ * The snapshot preserves line ordering and quantity (including a decrement to
+ * zero) instead of attempting to reconstruct an item from catalog data. */
+export async function restoreCartSnapshot(snapshot: Cart): Promise<Cart> {
+  const k = keys();
+  const restored: Cart = normalizeCart({
+    ...snapshot,
+    items: snapshot.items.map(item => ({ ...item })),
+    savedItems: snapshot.savedItems.map(item => ({ ...item })),
+  });
+  await saveCart(restored, k);
+  return restored;
+}
+
 export async function saveForLater(itemId: string): Promise<Cart> {
   const k = keys();
   const cart = await loadCart(k);

@@ -5,7 +5,7 @@
  * Do not create one-off buttons, cards or headers in individual screen files.
  */
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, createContext, useContext, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, TextInput, ScrollView,
   StyleSheet, ActivityIndicator, Animated, Platform,
@@ -29,6 +29,60 @@ import {
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { hapticLight, hapticMedium, hapticSelection } from '@/lib/haptics';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
+import { undoExpiresAt } from '@/lib/undoRecovery';
+
+// ─── Shared undo action/toast ─────────────────────────────────────────────────
+// Mutations remain responsible for their own server/local rollback. This provider
+// only owns the short-lived, accessible action affordance and its expiry.
+export interface UndoAction {
+  message: string;
+  undo: () => void | Promise<void>;
+  durationMs?: number;
+}
+type UndoToastContextValue = { showUndo: (action: UndoAction) => void; dismissUndo: () => void };
+const UndoToastContext = createContext<UndoToastContextValue | null>(null);
+
+export function UndoToastProvider({ children }: { children: React.ReactNode }) {
+  const [action, setAction] = useState<UndoAction | null>(null);
+  const [undoing, setUndoing] = useState(false);
+  useEffect(() => {
+    if (!action) return;
+    const expiresAt = undoExpiresAt(Date.now(), action.durationMs ?? 6000);
+    const timer = setTimeout(() => setAction(null), Math.max(0, expiresAt - Date.now()));
+    return () => clearTimeout(timer);
+  }, [action]);
+  const dismissUndo = useCallback(() => setAction(null), []);
+  const showUndo = useCallback((next: UndoAction) => { setUndoing(false); setAction(next); }, []);
+  const undo = useCallback(async () => {
+    if (!action || undoing) return;
+    setUndoing(true);
+    try { await action.undo(); setAction(null); } finally { setUndoing(false); }
+  }, [action, undoing]);
+  return (
+    <UndoToastContext.Provider value={{ showUndo, dismissUndo }}>
+      {children}
+      {action && (
+        <View accessibilityLiveRegion="polite" style={undoS.root}>
+          <Text style={undoS.message}>{action.message}</Text>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Undo: ${action.message}`} onPress={undo} disabled={undoing} style={undoS.button}>
+            <Text style={undoS.buttonText}>{undoing ? 'Restoring…' : 'Undo'}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </UndoToastContext.Provider>
+  );
+}
+const undoS = StyleSheet.create({
+  root: { position: 'absolute', left: SP.md, right: SP.md, bottom: SP.xl, minHeight: 52, borderRadius: RADIUS.md, backgroundColor: '#272738', borderWidth: 1, borderColor: BORDER_ACTIVE, paddingHorizontal: SP.md, flexDirection: 'row', alignItems: 'center', gap: SP.sm, zIndex: 1000, elevation: 1000 },
+  message: { flex: 1, color: FG, fontFamily: FONT.medium, fontSize: FS.sm },
+  button: { minHeight: 44, justifyContent: 'center', paddingHorizontal: SP.sm },
+  buttonText: { color: SUCCESS, fontFamily: FONT.bold, fontSize: FS.sm },
+});
+export function useUndoToast(): UndoToastContextValue {
+  const value = useContext(UndoToastContext);
+  if (!value) throw new Error('useUndoToast must be used inside UndoToastProvider');
+  return value;
+}
 
 // ─── Reusable Motion Primitives ───────────────────────────────────────────────
 

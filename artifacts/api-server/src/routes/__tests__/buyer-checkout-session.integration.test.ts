@@ -256,6 +256,14 @@ describe("POST /api/buyer/checkout/session", () => {
     ]);
   });
 
+  it("rejects a soft-deleted product before creating a Stripe session", async () => {
+    await db.update(products).set({ deletedAt: new Date(), removalKind: "seller_deleted" })
+      .where(eq(products.id, productId));
+    const result = await postCheckout(checkoutBody());
+    expect(result.status).toBe(404);
+    expect(fakeStripe.sessionCreates).toHaveLength(0);
+  });
+
   it("rejects duplicate variantIds with 400 before contacting Stripe", async () => {
     const result = await postCheckout(
       checkoutBody({

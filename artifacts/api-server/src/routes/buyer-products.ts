@@ -9,7 +9,7 @@
  */
 import { Router } from "express";
 import { db, productReserves, products, drops } from "@workspace/db";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router = Router();
@@ -24,7 +24,7 @@ router.post("/:productId/reserve", async (req, res) => {
   const [product] = await db
     .select({ id: products.id, demandCount: products.demandCount, dropId: products.dropId, isPreOrder: products.isPreOrder })
     .from(products)
-    .where(eq(products.id, productId))
+    .where(and(eq(products.id, productId), eq(products.status, "active"), isNull(products.deletedAt)))
     .limit(1);
   if (!product) { res.status(404).json({ error: "Product not found" }); return; }
 

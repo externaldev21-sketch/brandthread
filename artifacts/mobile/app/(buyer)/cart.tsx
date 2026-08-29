@@ -13,7 +13,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
-  getCart, updateCartItemQuantity, removeCartItem,
+  getCart, updateCartItemQuantity, removeCartItem, restoreCartSnapshot,
   saveForLater, moveToCart, removeSavedItem,
   groupCartBySeller, calculateCartSummary, createCheckoutSession, getCheckoutSession, validateCart,
 } from '@/services/cartService';
@@ -32,7 +32,7 @@ import {
 } from '@/lib/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  BrandthreadScreen, BrandthreadHeader, StatusBadge, EmptyState, BrandedLoader, PressableScale,
+  BrandthreadScreen, BrandthreadHeader, StatusBadge, EmptyState, BrandedLoader, PressableScale, useUndoToast,
 } from '@/components/BrandthreadUI';
 
 import { useAuth } from '@clerk/expo';
@@ -362,6 +362,7 @@ export default function CartScreen() {
   const router = useRouter();
   const api = useApi();
   const { isSignedIn } = useAuth();
+  const { showUndo } = useUndoToast();
 
   const [cart, setCart] = useState<Cart>({ id: '', items: [], savedItems: [], updatedAt: '' });
   const [loading, setLoading] = useState(true);
@@ -431,8 +432,15 @@ export default function CartScreen() {
     Haptics.selectionAsync();
     const item = cart.items.find(i => i.id === itemId);
     if (!item) return;
+    const snapshot = cart;
     const newCart = await updateCartItemQuantity(itemId, item.quantity - 1);
     setCart(newCart);
+    if (item.quantity === 1) {
+      showUndo({
+        message: `"${item.productName}" removed`,
+        undo: async () => setCart(await restoreCartSnapshot(snapshot)),
+      });
+    }
   }
 
   async function handleQtyInc(itemId: string) {
@@ -445,8 +453,16 @@ export default function CartScreen() {
 
   async function handleRemove(itemId: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const removed = cart.items.find(item => item.id === itemId);
+    const snapshot = cart;
     const newCart = await removeCartItem(itemId);
     setCart(newCart);
+    if (removed) {
+      showUndo({
+        message: `"${removed.productName}" removed`,
+        undo: async () => setCart(await restoreCartSnapshot(snapshot)),
+      });
+    }
   }
 
   async function handleSaveForLater(itemId: string) {

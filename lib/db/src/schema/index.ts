@@ -46,6 +46,10 @@ export const users = pgTable('users', {
   /** 'unverified' | 'pending' | 'verified' | 'failed' */
   verificationStatus:           text('verification_status').notNull().default('unverified'),
   stripeVerificationSessionId:  text('stripe_verification_session_id'),
+  // Platform-controlled seller eligibility. These must be evaluated together
+  // with a completed identity verification before exposing a verified badge.
+  activeStanding:               boolean('active_standing').notNull().default(true),
+  policyRestricted:             boolean('policy_restricted').notNull().default(false),
   returnPolicy:       text('return_policy'),
   cancellationPolicy: text('cancellation_policy'),
   // Public profile link (bio website)
@@ -95,6 +99,12 @@ export const products = pgTable('products', {
   description: text('description'),
   category: text('category').notNull().default('apparel'),
   status: text('status').notNull().default('draft'), // 'draft' | 'active' | 'archived'
+  // Deleted products are immediately invisible publicly. The original status is
+  // retained so a seller can restore it during the short recovery window.
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  recoverableUntil: timestamp('recoverable_until', { withTimezone: true }),
+  // `seller_deleted` can be restored briefly; `moderation_removed` is final.
+  removalKind: text('removal_kind'),
   images: json('images').$type<string[]>().notNull().default([]),
   tags: json('tags').$type<string[]>().notNull().default([]),
   styleTags:             json('style_tags').$type<string[]>().notNull().default([]),
@@ -111,6 +121,47 @@ export const products = pgTable('products', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   dropIdx: index('products_drop_id_idx').on(table.dropId),
+  deletedIdx: index('products_deleted_at_idx').on(table.deletedAt),
+}));
+
+// ─── Intellectual-property cases and immutable case history ───────────────────
+export const ipCases = pgTable('ip_cases', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  publicReference: text('public_reference').notNull().unique(),
+  // SHA-256 of the high-entropy status bearer token; the raw token is returned
+  // exactly once to the claimant and is never persisted.
+  statusTokenHash: text('status_token_hash').notNull(),
+  claimantName: text('claimant_name').notNull(),
+  claimantEmail: text('claimant_email').notNull(),
+  claimantContact: text('claimant_contact'),
+  listingProductId: uuid('listing_product_id').references(() => products.id, { onDelete: 'set null' }),
+  listingUrl: text('listing_url'),
+  rightsType: text('rights_type').notNull(),
+  description: text('description').notNull(),
+  evidenceReferences: json('evidence_references').$type<string[]>().notNull().default([]),
+  status: text('status').notNull().default('submitted'),
+  moderatorNotes: text('moderator_notes'),
+  assignedModeratorId: text('assigned_moderator_id'),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  statusLookupIdx: index('ip_cases_reference_token_idx').on(table.publicReference, table.statusTokenHash),
+  moderationIdx: index('ip_cases_moderation_idx').on(table.status, table.createdAt),
+  listingIdx: index('ip_cases_listing_idx').on(table.listingProductId),
+}));
+
+export const ipCaseAuditHistory = pgTable('ip_case_audit_history', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  caseId: uuid('case_id').notNull().references(() => ipCases.id, { onDelete: 'cascade' }),
+  action: text('action').notNull(),
+  previousStatus: text('previous_status'),
+  nextStatus: text('next_status'),
+  actorId: text('actor_id'),
+  details: json('details').$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  caseCreatedIdx: index('ip_case_audit_case_created_idx').on(table.caseId, table.createdAt),
 }));
 
 // ─── Product Variants (size / color / SKU combos) ─────────────────────────────

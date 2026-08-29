@@ -13,9 +13,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, COMP, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { AnimatedEntrance, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SearchBar, FilterChip, StatusBadge, EmptyState, SectionHeader, StatCard, GuidedTip, ProductGridSkeleton, PressableScale } from '@/components/BrandthreadUI';
+import { AnimatedEntrance, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SearchBar, FilterChip, StatusBadge, EmptyState, SectionHeader, StatCard, GuidedTip, ProductGridSkeleton, PressableScale, useUndoToast } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
-import { getProducts, getProductStats, archiveProduct, unarchiveProduct, deleteProduct, duplicateProduct, listDrafts, deleteDraft } from '@/services/productService';
+import { getProducts, getProductStats, archiveProduct, unarchiveProduct, deleteProduct, restoreProduct, duplicateProduct, listDrafts, deleteDraft } from '@/services/productService';
 import { Product, ProductDraft, ProductFilter, ProductCategory } from '@/services/productTypes';
 import { formatCents, integerPercent } from '@/lib/money';
 
@@ -167,9 +167,10 @@ interface ActionSheetProps {
   visible: boolean;
   onClose: () => void;
   onRefresh: () => void;
+  onDelete: (product: Product) => void;
 }
 
-function ActionSheet({ product, visible, onClose, onRefresh }: ActionSheetProps) {
+function ActionSheet({ product, visible, onClose, onRefresh, onDelete }: ActionSheetProps) {
   const router = useRouter();
   if (!product) return null;
 
@@ -194,21 +195,7 @@ function ActionSheet({ product, visible, onClose, onRefresh }: ActionSheetProps)
 
   async function handleDelete() {
     closeSheet();
-    Alert.alert(
-      'Delete product?',
-      'This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteProduct(p.id);
-            onRefresh();
-          },
-        },
-      ]
-    );
+    onDelete(p);
   }
 
   async function handleDuplicate() {
@@ -344,6 +331,7 @@ export default function ProductsScreen() {
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { showUndo } = useUndoToast();
 
   const [products, setProducts] = useState<Product[]>([]);
   const [inProgressDrafts, setInProgressDrafts] = useState<ProductDraft[]>([]);
@@ -424,18 +412,32 @@ export default function ProductsScreen() {
     refresh();
   }
 
-  async function handleDelete(id: string, name: string) {
+  async function handleDelete(product: Product) {
     Alert.alert(
       'Delete product?',
-      'This cannot be undone.',
+       'You can undo this for a short time.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            await deleteProduct(id);
-            refresh();
+            // Remove immediately; if the authoritative request fails, reload
+            // rather than retaining a client-side deletion.
+            setProducts(prev => prev.filter(p => p.id !== product.id));
+            try {
+              await deleteProduct(product.id);
+              showUndo({
+                message: `"${product.name}" deleted`,
+                undo: async () => {
+                  await restoreProduct(product.id);
+                  await loadProducts();
+                },
+              });
+            } catch {
+              await loadProducts();
+              Alert.alert('Could not delete product', 'Your product was not deleted. Please try again.');
+            }
           },
         },
       ]
@@ -648,6 +650,7 @@ export default function ProductsScreen() {
         visible={actionSheetVisible}
         onClose={() => setActionSheetVisible(false)}
         onRefresh={refresh}
+        onDelete={handleDelete}
       />
 
       {/* Filter modal */}

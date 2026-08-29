@@ -6,7 +6,7 @@ import { Router } from "express";
 import {
   db, checkoutSessions, orders, orderItems, productVariants, products, users, shippingRates, discountCodes, buyerAddresses,
 } from "@workspace/db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import {
   requireStripe,
@@ -221,7 +221,7 @@ router.post("/cart/validate", async (req, res) => {
       })
       .from(productVariants)
       .innerJoin(products, eq(productVariants.productId, products.id))
-      .where(and(eq(productVariants.id, item.variantId), eq(products.id, item.productId)))
+      .where(and(eq(productVariants.id, item.variantId), eq(products.id, item.productId), isNull(products.deletedAt)))
       .limit(1);
 
     const itemId = String(item.id ?? item.variantId);
@@ -386,6 +386,7 @@ router.post("/checkout/session", async (req, res) => {
           and(
             eq(productVariants.id, item.variantId),
             eq(products.id, item.productId),
+            isNull(products.deletedAt),
           ),
         )
         .limit(1);

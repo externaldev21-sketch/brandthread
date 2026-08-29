@@ -76,6 +76,7 @@ import vacationRouter  from "./vacation";
 import loyaltyRouter   from "./loyalty";
 import callRouter      from "./call";
 import featureFlagsRouter from "./feature-flags";
+import ipCasesRouter from "./ip-cases";
 
 const router = Router();
 
@@ -86,6 +87,7 @@ router.use("/guest/checkout",  guestCheckoutRouter);
 router.use("/webhooks",        webhooksRouter);
 router.use("/support",         supportRouter);
 router.use("/support-chat",    supportChatRouter);
+router.use("/ip-cases",        ipCasesRouter);
 // Specific seller sub-paths BEFORE the seller catch-all
 router.use("/seller/export",   sellerExportRouter);
 

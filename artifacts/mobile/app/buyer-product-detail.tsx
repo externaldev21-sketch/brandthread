@@ -750,6 +750,14 @@ export default function BuyerProductDetailScreen() {
             <Text style={s.sellerHandle}>{product.sellerHandle}</Text>
             <Feather name="chevron-right" size={14} color={MUTED} />
           </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => router.push(('/ip-report?listingId=' + encodeURIComponent(product.id)) as never)}
+            accessibilityRole="button"
+            accessibilityLabel="Report intellectual property infringement"
+            style={{ alignSelf: 'flex-start', marginBottom: SP.md }}
+          >
+            <Text style={{ color: MUTED, fontFamily: FONT.medium, fontSize: FS.xs, textDecorationLine: 'underline' }}>Report intellectual property infringement</Text>
+          </TouchableOpacity>
            {paymentUnavailable && (
              <View style={s.paymentWarningBanner} accessibilityRole="alert">
                <Feather name="alert-triangle" size={ICON.xs} color={ORANGE} />

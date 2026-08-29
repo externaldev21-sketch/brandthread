@@ -32,6 +32,8 @@ import { dismissNetworkNotice } from '@/lib/networkNotice';
 import { RevenueCatProvider } from '@/lib/revenueCat';
 import { registerGrantedPushToken } from '@/lib/contextualPushPermission';
 import { FeatureFlagProvider, FeatureFlagKey, useFeatureFlags } from '@/contexts/FeatureFlagContext';
+import { UndoToastProvider } from '@/components/BrandthreadUI';
+import { CookieConsentProvider } from '@/contexts/CookieConsentContext';
 
 // Push notifications are native-only. Importing the package is safe for the
 // web bundle, but registering a handler/listener there produces unsupported
@@ -519,6 +521,7 @@ function RootLayoutNav() {
         <Stack.Screen name="analytics-profit"      options={{ headerShown: false, animation: 'slide_from_right' }} />
         {/* Buyer commerce screens */}
         <Stack.Screen name="buyer-product-detail"  options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
+        <Stack.Screen name="ip-report"             options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-checkout"        options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-return-request"  options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-refund-request"  options={{ headerShown: false, animation: 'slide_from_right' }} />
@@ -665,17 +668,21 @@ export default function RootLayout() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView style={{ flex: 1 }}>
+            <CookieConsentProvider>
             <AppThemeProvider>
               <RoleProvider>
                 <RevenueCatProvider>
                   <FeatureFlagProvider>
-                    <KeyboardProvider>
-                      <RootLayoutNav />
-                    </KeyboardProvider>
+                    <UndoToastProvider>
+                      <KeyboardProvider>
+                        <RootLayoutNav />
+                      </KeyboardProvider>
+                    </UndoToastProvider>
                   </FeatureFlagProvider>
                 </RevenueCatProvider>
               </RoleProvider>
             </AppThemeProvider>
+            </CookieConsentProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>
       </ErrorBoundary>

@@ -13,6 +13,7 @@ import {
 } from "@workspace/db";
 import { eq, and, inArray, count, sql, desc, lt, gte } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { deriveSellerVerified } from "../lib/sellerEligibility";
 
 const router = Router();
 
@@ -54,6 +55,9 @@ router.get("/feed", requireAuth, async (req, res) => {
         displayName: users.displayName,
         brandName:   users.brandName,
         verified:    users.verified,
+        verificationStatus: users.verificationStatus,
+        activeStanding: users.activeStanding,
+        policyRestricted: users.policyRestricted,
         accountType: users.accountType,
       })
       .from(posts)
@@ -154,7 +158,7 @@ router.get("/feed", requireAuth, async (req, res) => {
       seller: {
         displayName: p.displayName,
         brandName:   p.brandName,
-        verified:    p.verified,
+        verified:    deriveSellerVerified(p),
       },
       taggedProducts: (tagsByPost[p.id] ?? []).map((t) => ({
         productId: t.productId,

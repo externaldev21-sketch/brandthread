@@ -412,11 +412,18 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       create:         (body: unknown)          => post('/api/products', body),
       update:         (id: string, body: unknown) => put(`/api/products/${id}`, body),
       archive:        (id: string)             => del(`/api/products/${id}`),
+      restore:        (id: string)             => post(`/api/products/${id}/restore`, {}),
       addVariant:     (id: string, body: unknown) => post(`/api/products/${id}/variants`, body),
       updateVariant:  (id: string, vId: string, body: unknown) => patch(`/api/products/${id}/variants/${vId}`, body),
       /** Bulk-import products from a rows array. Returns { successCount, failCount, errors }. */
       import: (rows: Array<{ name: string; description?: string; category?: string; price?: string }>) =>
         post<{ successCount: number; failCount: number; errors?: string[] }>('/api/products/import', { rows }),
+    },
+    ipCases: {
+      create: (body: { listingProductId: string; claimantName: string; claimantEmail: string; rightsType: string; description: string; evidenceReferences: string[] }) =>
+        post<{ caseReference: string; statusToken: string; status: string }>('/api/ip-cases', body),
+      status: (caseReference: string, token: string) =>
+        get<{ caseReference: string; status: string }>(`/api/ip-cases/${encodeURIComponent(caseReference)}/status?token=${encodeURIComponent(token)}`),
     },
     orders: {
       list:           ()                       => get('/api/orders'),

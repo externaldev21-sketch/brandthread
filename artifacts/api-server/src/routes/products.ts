@@ -1,12 +1,16 @@
 import { Router } from "express";
 import { db, products, productVariants } from "@workspace/db";
-import { eq, desc, sql, and } from "drizzle-orm";
+import { eq, desc, sql, and, isNull, gt } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext, requireRole } from "../middlewares/requireRole";
 import { logActivity, reqActor } from "../lib/activityLog";
 import crypto from "crypto";
+import { canRestoreProduct, PRODUCT_DELETE_RECOVERY_WINDOW_MS } from "../lib/productRecovery";
 
 const router = Router();
+/** Short server-side recovery interval; exported so integration tests need not
+ * depend on a magic number. */
+export { PRODUCT_DELETE_RECOVERY_WINDOW_MS } from "../lib/productRecovery";
 router.use(requireAuth);
 // Resolve team membership: managers act on the owner's store while the audit
 // log keeps track of who actually performed each action. Staff are read-only
@@ -32,7 +36,7 @@ router.get("/", async (req, res) => {
     })
     .from(products)
     .leftJoin(productVariants, eq(productVariants.productId, products.id))
-    .where(eq(products.ownerId, ownerId))
+    .where(and(eq(products.ownerId, ownerId), isNull(products.deletedAt)))
     .groupBy(products.id)
     .orderBy(desc(products.createdAt));
   res.json(rows);
@@ -170,25 +174,59 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
   res.json(updated);
 });
 
-// DELETE /api/products/:id — archive (manager+)
+// DELETE /api/products/:id — soft delete, immediately hidden from public views.
 router.delete("/:id", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
+  const now = new Date();
+  const recoverableUntil = new Date(now.getTime() + PRODUCT_DELETE_RECOVERY_WINDOW_MS);
   const [updated] = await db.update(products)
-    .set({ status: "archived", updatedAt: new Date() })
-    .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId)))
+    .set({ deletedAt: now, recoverableUntil, removalKind: "seller_deleted", updatedAt: now })
+    .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId), isNull(products.deletedAt)))
     .returning();
-  if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+  if (!updated) {
+    const [existing] = await db.select({
+      deletedAt: products.deletedAt, recoverableUntil: products.recoverableUntil, removalKind: products.removalKind,
+    }).from(products).where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId))).limit(1);
+    if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+    if (existing.removalKind === "seller_deleted") {
+      res.json({ success: true, recoverableUntil: existing.recoverableUntil }); return;
+    }
+    res.status(410).json({ error: "Product has been permanently removed", code: "PRODUCT_REMOVED" }); return;
+  }
 
   {
     const actor = reqActor(req);
     void logActivity(
       actor.ownerClerkId, actor.actorClerkId, actor.actorRole,
-      `Archived product "${updated.name}"`,
+      `Deleted product "${updated.name}"`,
       "product", updated.id,
     );
   }
 
-  res.json({ success: true });
+  res.json({ success: true, recoverableUntil: updated.recoverableUntil });
+});
+
+// POST /api/products/:id/restore — owner-only, idempotent within recovery window.
+router.post("/:id/restore", requireRole("manager"), async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  const now = new Date();
+  const [existing] = await db.select().from(products)
+    .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId))).limit(1);
+  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
+  if (!existing.deletedAt) { res.json({ success: true, restored: false, product: existing }); return; }
+  if (!canRestoreProduct(existing, now)) {
+    res.status(410).json({ error: "Product recovery window has expired", code: "PRODUCT_RECOVERY_EXPIRED" }); return;
+  }
+  const [product] = await db.update(products)
+    .set({ deletedAt: null, recoverableUntil: null, removalKind: null, updatedAt: now })
+    .where(and(eq(products.id, existing.id), eq(products.ownerId, ownerId), eq(products.removalKind, "seller_deleted"), gt(products.recoverableUntil, now)))
+    .returning();
+  // A concurrent successful restore is still an idempotent success.
+  if (!product) { res.json({ success: true, restored: false }); return; }
+  const actor = reqActor(req);
+  void logActivity(actor.ownerClerkId, actor.actorClerkId, actor.actorRole,
+    `Restored product "${product.name}"`, "product", product.id);
+  res.json({ success: true, restored: true, product });
 });
 
 // POST /api/products/:id/variants (manager+)
