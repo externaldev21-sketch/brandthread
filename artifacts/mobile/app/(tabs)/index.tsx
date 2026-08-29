@@ -7,7 +7,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { getSetupState, markSetupStarted, dismissWelcome, completionPercent, nextTask, nextBestAction, dismissTip, markFeatureOpened, type SetupState } from '@/lib/setupStore';
 import { deriveHubStats, deriveInventoryStats, deriveOrderStats } from '@/lib/sellerDashboardStats';
@@ -18,6 +18,7 @@ import { formatCents } from '@/lib/money';
 import { reportNetworkError } from '@/lib/networkNotice';
 import { useRevenueCat } from '@/lib/revenueCat';
 import { getBillingRecoveryTarget, isSubscriptionPaymentRecoveryRequired } from '@/lib/subscriptionRecovery';
+import { clearBadge, getBadgeCount, initFromStorage, subscribe } from '@/lib/orderBadgeStore';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -100,6 +101,7 @@ export default function SellerHomeScreen() {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { userId } = useAuth();
 
   const api = useApi();
   const { managementURL } = useRevenueCat();
@@ -129,6 +131,9 @@ export default function SellerHomeScreen() {
     toProcess: number;
     readyToShip: number;
   } | null>(null);
+  const [unseenOrderCount, setUnseenOrderCount] = useState(() =>
+    userId ? getBadgeCount(userId) : 0,
+  );
   const [invStats, setInvStats] = useState<{
     lowStockCount: number;
     outOfStockCount: number;
@@ -146,6 +151,30 @@ export default function SellerHomeScreen() {
   const [billingPortalLoading, setBillingPortalLoading] = useState(false);
   const progressAnim = useRef(new Animated.Value(0)).current;
   const dashboardScrollY = useRef(new Animated.Value(0)).current;
+
+  // Keep the home orders row in sync with the Orders tab's per-seller badge.
+  // Hydrating here also covers direct home-screen entry before the tab bar's
+  // first poll has completed.
+  useEffect(() => {
+    if (!userId) {
+      setUnseenOrderCount(0);
+      return;
+    }
+
+    let active = true;
+    const syncCount = () => {
+      if (active) setUnseenOrderCount(getBadgeCount(userId));
+    };
+
+    syncCount();
+    const unsubscribe = subscribe(syncCount);
+    initFromStorage(userId).then(syncCount);
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [userId]);
 
   // ── Load setup state ──────────────────────────────────────────────────────
   const loadSetup = useCallback(async () => {
@@ -291,6 +320,11 @@ export default function SellerHomeScreen() {
   function nav(route: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(route as never);
+  }
+
+  function handleOpenOrders() {
+    if (userId) clearBadge(userId);
+    nav('/(tabs)/orders');
   }
 
   async function handleOpenBillingPortal() {
@@ -849,18 +883,19 @@ export default function SellerHomeScreen() {
               );
             })}
 
-            {/* Order alerts — new orders take priority over ready-to-ship */}
-            {orderStats && orderStats.newOrders > 0 && (
+            {/* Unseen order alert — uses the same per-seller watermark as the
+                Orders tab badge, so both touch-points show the same count. */}
+            {unseenOrderCount > 0 && (
               <NavigationCard
-                label={`${orderStats.newOrders} new order${orderStats.newOrders > 1 ? 's' : ''} — action needed`}
+                label={`${unseenOrderCount} new order${unseenOrderCount > 1 ? 's' : ''} — action needed`}
                 icon="shopping-bag"
                 accent={BLUE}
                 description="Tap to review"
-                badge
-                onPress={() => nav('/(tabs)/orders')}
+                badge={unseenOrderCount}
+                onPress={handleOpenOrders}
               />
             )}
-            {orderStats && orderStats.newOrders === 0 && orderStats.readyToShip > 0 && (
+            {unseenOrderCount === 0 && orderStats && orderStats.newOrders === 0 && orderStats.readyToShip > 0 && (
               <NavigationCard
                 label={`${orderStats.readyToShip} order${orderStats.readyToShip > 1 ? 's' : ''} ready to ship`}
                 icon="truck"
