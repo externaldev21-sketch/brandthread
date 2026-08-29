@@ -39,6 +39,17 @@ function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function formatRelativeUpdate(timestamp: number): string {
+  const elapsedSeconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  if (elapsedSeconds < 5) return 'just now';
+  if (elapsedSeconds < 60) return `${elapsedSeconds}s ago`;
+  const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+  if (elapsedMinutes < 60) return `${elapsedMinutes}m ago`;
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+  if (elapsedHours < 24) return `${elapsedHours}h ago`;
+  return `${Math.floor(elapsedHours / 24)}d ago`;
+}
+
 function statusBadgeVariant(status: OrderStatus): 'info' | 'purple' | 'warning' | 'success' | 'neutral' | 'error' {
   switch (status) {
     case 'new':           return 'info';
@@ -215,6 +226,8 @@ export default function BuyerOrderDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [isFetching, setIsFetching] = useState(false);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null);
   const [reviewSubmitted, setReviewSubmitted] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
@@ -236,6 +249,8 @@ export default function BuyerOrderDetailScreen() {
     setReturnRequest(null);
     setFetchError(false);
     setRefreshing(false);
+    setIsFetching(false);
+    setLastUpdatedAt(null);
     setLoading(true);
     setShowReviewModal(false);
     setShowCancelModal(false);
@@ -250,6 +265,7 @@ export default function BuyerOrderDetailScreen() {
     let cancelled = false;
     const accountGeneration = accountGenerationRef.current;
     consecutiveFailuresRef.current = 0;
+    setIsFetching(true);
 
     function fetchOrder() {
       api.buyer.orders.get(id!).then(row => {
@@ -258,7 +274,8 @@ export default function BuyerOrderDetailScreen() {
           setOrderOwnerId(userId);
           setFetchError(false);
           setLoading(false);
-          setRefreshing(false);
+          setIsFetching(false);
+          setLastUpdatedAt(Date.now());
           consecutiveFailuresRef.current = 0;
         }
       }).catch(() => {
@@ -266,7 +283,7 @@ export default function BuyerOrderDetailScreen() {
           setOrder(null);
           setOrderOwnerId(userId);
           setLoading(false);
-          setRefreshing(false);
+          setIsFetching(false);
           setFetchError(true);
           consecutiveFailuresRef.current += 1;
           if (consecutiveFailuresRef.current >= 3 && timerRef.current !== null) {
@@ -288,6 +305,7 @@ export default function BuyerOrderDetailScreen() {
     timerRef.current = setInterval(fetchOrder, 15_000);
     return () => {
       cancelled = true;
+      setIsFetching(false);
       if (timerRef.current !== null) {
         clearInterval(timerRef.current);
         timerRef.current = null;
@@ -300,6 +318,7 @@ export default function BuyerOrderDetailScreen() {
     const accountGeneration = accountGenerationRef.current;
     setLoading(true);
     setFetchError(false);
+    setIsFetching(true);
     setOrder(null);
     consecutiveFailuresRef.current = 0;
     // Clear the stale polling interval so useFocusEffect re-runs cleanly
@@ -313,6 +332,8 @@ export default function BuyerOrderDetailScreen() {
       setOrderOwnerId(userId);
       setFetchError(false);
       setLoading(false);
+      setIsFetching(false);
+      setLastUpdatedAt(Date.now());
       timerRef.current = setInterval(() => {
         api.buyer.orders.get(id).then(r => {
           if (accountGenerationRef.current === accountGeneration) {
@@ -331,6 +352,7 @@ export default function BuyerOrderDetailScreen() {
       setOrder(null);
       setOrderOwnerId(userId);
       setLoading(false);
+      setIsFetching(false);
       setFetchError(true);
     });
   }
@@ -339,17 +361,21 @@ export default function BuyerOrderDetailScreen() {
     if (!id || refreshing) return;
     const accountGeneration = accountGenerationRef.current;
     setRefreshing(true);
+    setIsFetching(true);
     api.buyer.orders.get(id).then(row => {
       if (accountGenerationRef.current !== accountGeneration) return;
       setOrder(adaptOrderDetail(row));
       setOrderOwnerId(userId);
       setFetchError(false);
       setRefreshing(false);
+      setIsFetching(false);
+      setLastUpdatedAt(Date.now());
     }).catch(() => {
       if (accountGenerationRef.current !== accountGeneration) return;
       setOrder(null);
       setOrderOwnerId(userId);
       setRefreshing(false);
+       setIsFetching(false);
       setFetchError(true);
     });
     api.returns.listBuyer().then(rows => {
@@ -522,6 +548,20 @@ export default function BuyerOrderDetailScreen() {
         subtitle={order.sellerName}
         onBack={() => router.back()}
       />
+
+      <View style={styles.refreshStatus} accessibilityLiveRegion="polite">
+        {isFetching ? (
+          <>
+            <ActivityIndicator color={PURPLE} size="small" />
+            <Text style={styles.refreshStatusText}>Updating order status…</Text>
+          </>
+        ) : lastUpdatedAt !== null ? (
+          <>
+            <Feather name="check-circle" size={ICON.xs} color={SUBTLE} />
+            <Text style={styles.refreshStatusText}>Last updated {formatRelativeUpdate(lastUpdatedAt)}</Text>
+          </>
+        ) : null}
+      </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -919,6 +959,18 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontSize: FS.sm,
     fontFamily: FONT.medium,
     color: MUTED,
+  },
+  refreshStatus: {
+    minHeight: 28,
+    paddingHorizontal: SP.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
+  },
+  refreshStatusText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: SUBTLE,
   },
   preOrderInfoRow: {
     flexDirection: 'row',
