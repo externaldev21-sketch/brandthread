@@ -17,6 +17,7 @@ import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { LinearGradient } from 'expo-linear-gradient';
 import { formatCents } from '@/lib/money';
+import { getEntitlementRejection } from '@/lib/entitlementError';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -127,6 +128,20 @@ function productionStatusVariant(status: ProductionOrder['status']): 'success' |
     case 'cancelled': return 'error';
     default:          return 'neutral';
   }
+}
+
+function showManufacturerUpgrade(error: unknown, router: ReturnType<typeof useRouter>): boolean {
+  const rejection = getEntitlementRejection(error);
+  if (!rejection) return false;
+  Alert.alert(
+    `Upgrade to ${rejection.requiredPlan === 'growth' ? 'Growth' : 'Scale'}`,
+    rejection.message,
+    [
+      { text: 'Not now', style: 'cancel' },
+      { text: 'View plans', onPress: () => router.push('/subscription' as never) },
+    ],
+  );
+  return true;
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -333,7 +348,9 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
     } catch (e) {
       setManufacturers([]);
       setSavedIds(new Set());
-      setLoadError('Could not load manufacturers or favorites.');
+      if (!showManufacturerUpgrade(e, router)) {
+        setLoadError('Could not load manufacturers or favorites.');
+      }
       console.error(e);
     } finally {
       setLoading(false);
@@ -369,7 +386,9 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
         setSavedIds(prev => new Set(prev).add(mfg.id));
       }
     } catch (e) {
-      setMutationError('Could not update this favorite. Try again.');
+      if (!showManufacturerUpgrade(e, router)) {
+        setMutationError('Could not update this favorite. Try again.');
+      }
       console.error(e);
     } finally {
       setSavingIds(prev => { const s = new Set(prev); s.delete(mfg.id); return s; });
@@ -385,6 +404,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
       const conv = await getOrCreateConversation(mfg.id);
       router.push((`/manufacturer-messages?conversationId=${conv.id}`) as never);
     } catch (e) {
+      showManufacturerUpgrade(e, router);
       console.error(e);
     }
   };

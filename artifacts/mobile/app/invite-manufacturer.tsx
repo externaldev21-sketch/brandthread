@@ -27,6 +27,7 @@ import {
 
 import { createInvitation } from '@/services/manufacturerService';
 import { ManufacturerInvitation } from '@/services/manufacturerTypes';
+import { getEntitlementRejection } from '@/lib/entitlementError';
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -89,6 +90,18 @@ export default function InviteManufacturerScreen() {
       setSubmitted(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (e) {
+      const rejection = getEntitlementRejection(e);
+      if (rejection) {
+        Alert.alert(
+          `Upgrade to ${rejection.requiredPlan === 'growth' ? 'Growth' : 'Scale'}`,
+          rejection.message,
+          [
+            { text: 'Not now', style: 'cancel' },
+            { text: 'View plans', onPress: () => router.push('/subscription' as never) },
+          ],
+        );
+        return;
+      }
       Alert.alert('Error', 'Failed to create invitation. Please try again.');
     } finally {
       setSubmitting(false);

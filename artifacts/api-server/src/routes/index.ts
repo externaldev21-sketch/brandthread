@@ -115,7 +115,7 @@ router.use("/techpack",        tc, requirePlan("growth"), techpackRouter);
 router.use("/manufacturers/public",          manufacturerPublicRouter);
 router.use("/manufacturers/connect",         tc, manufacturerConnectRouter);
 // Growth-plan-gated Manufacturer Hub
-router.use("/manufacturers",   tc, requirePlan("growth"), manufacturersRouter);
+router.use("/manufacturers",   tc, manufacturersRouter);
 router.use("/inventory",       tc, inventoryRouter);
 router.use("/seller-hub",      tc, sellerHubRouter);
 router.use("/push",            pushRouter);
@@ -152,7 +152,7 @@ router.use("/drop-wallets",              tc, dropWalletRouter);
 router.use("/disputes",                  tc, disputesRouter);
 router.use("/finance",                   financeRouter); // router applies manager reads and owner mutations after team context
 router.use("/taxes",                     tc, taxesRouter);
-router.use("/team",                      tc, requirePlan("scale"), teamRouter);
+router.use("/team",                      tc, teamRouter);
 router.use("/store/ai",                  tc, storeAiRouter);
 router.use("/store",                     tc, storeRouter);
 

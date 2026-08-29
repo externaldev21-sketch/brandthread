@@ -1,11 +1,12 @@
 import { Router } from "express";
 import { db, products, productVariants } from "@workspace/db";
-import { eq, desc, sql, and, isNull, gt } from "drizzle-orm";
+import { eq, desc, sql, and, isNull, gt, ne } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext, requireRole } from "../middlewares/requireRole";
 import { logActivity, reqActor } from "../lib/activityLog";
 import crypto from "crypto";
 import { canRestoreProduct, PRODUCT_DELETE_RECOVERY_WINDOW_MS } from "../lib/productRecovery";
+import { getVerifiedPlanAccess, sendPlanLimitReached, sendPlanLookupUnavailable } from "../lib/planAccess";
 
 const router = Router();
 /** Short server-side recovery interval; exported so integration tests need not
@@ -16,6 +17,30 @@ router.use(requireAuth);
 // log keeps track of who actually performed each action. Staff are read-only
 // here — product mutations below require the manager role.
 router.use(teamContext());
+
+async function getProductAccess(req: any, res: any) {
+  const ownerId = req.clerkUserId as string;
+  try {
+    return await getVerifiedPlanAccess(ownerId);
+  } catch (error) {
+    sendPlanLookupUnavailable(req, res, error);
+    return null;
+  }
+}
+
+async function hasProductCapacity(tx: any, ownerId: string, limit: number | null, requested: number): Promise<boolean> {
+  if (limit === null) return true;
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"product-limit:" + ownerId}))`);
+  const [result] = await tx
+    .select({ count: sql<number>`count(*)::int` })
+    .from(products)
+    .where(and(
+      eq(products.ownerId, ownerId),
+      ne(products.status, "archived"),
+      isNull(products.deletedAt),
+    ));
+  return (result?.count ?? 0) + requested <= limit;
+}
 
 // GET /api/products — scoped to the authenticated user's brand
 router.get("/", async (req, res) => {
@@ -90,8 +115,13 @@ router.post("/", requireRole("manager"), async (req, res) => {
     });
   }
 
-  // Insert product + all variants atomically so a partial failure leaves no orphan records
+  const access = await getProductAccess(req, res);
+  if (!access) return;
+
+  // Serialize quota admission with insertion so concurrent requests cannot
+  // push Starter above its catalogue allowance.
   const product = await db.transaction(async (tx) => {
+    if (!await hasProductCapacity(tx, ownerId, access.limits.products, status === "archived" ? 0 : 1)) return null;
     const [prod] = await tx
       .insert(products)
       .values({ ownerId, name: name.trim(), description, category, status, images, tags, styleTags })
@@ -105,6 +135,15 @@ router.post("/", requireRole("manager"), async (req, res) => {
 
     return prod;
   });
+  if (!product) {
+    sendPlanLimitReached(res, {
+      resource: "products",
+      currentPlan: access.planId,
+      requiredPlan: "growth",
+      limit: access.limits.products!,
+    });
+    return;
+  }
 
   {
     const actor = reqActor(req);
@@ -140,8 +179,7 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
     sizeChart,
   } = req.body;
 
-  const [updated] = await db.update(products)
-    .set({
+  const updateValues = {
       ...(name         && { name }),
       ...(description  !== undefined && { description }),
       ...(category     && { category }),
@@ -157,9 +195,44 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
       // Size chart (pass null to clear)
       ...(sizeChart              !== undefined && { sizeChart: sizeChart ?? null }),
       updatedAt: new Date(),
-    })
-    .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId)))
-    .returning();
+  };
+
+  const access = status && status !== "archived" ? await getProductAccess(req, res) : null;
+  if (status && status !== "archived" && !access) return;
+  const result = await db.transaction(async (tx) => {
+    const [existing] = await tx
+      .select({ status: products.status, deletedAt: products.deletedAt })
+      .from(products)
+      .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId)))
+      .limit(1);
+    if (!existing) return { updated: null, limited: false };
+    if (
+      !existing.deletedAt
+      && existing.status === "archived"
+      && status !== undefined
+      && status !== "archived"
+      && access
+      && !await hasProductCapacity(tx, ownerId, access.limits.products, 1)
+    ) {
+      return { updated: null, limited: true };
+    }
+    const [updated] = await tx
+      .update(products)
+      .set(updateValues)
+      .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId)))
+      .returning();
+    return { updated, limited: false };
+  });
+  if (result.limited && access) {
+    sendPlanLimitReached(res, {
+      resource: "products",
+      currentPlan: access.planId,
+      requiredPlan: "growth",
+      limit: access.limits.products!,
+    });
+    return;
+  }
+  const updated = result.updated;
   if (!updated) { res.status(404).json({ error: "Not found" }); return; }
 
   {
@@ -210,19 +283,51 @@ router.delete("/:id", requireRole("manager"), async (req, res) => {
 router.post("/:id/restore", requireRole("manager"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const now = new Date();
-  const [existing] = await db.select().from(products)
-    .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId))).limit(1);
-  if (!existing) { res.status(404).json({ error: "Not found" }); return; }
-  if (!existing.deletedAt) { res.json({ success: true, restored: false, product: existing }); return; }
-  if (!canRestoreProduct(existing, now)) {
+  const access = await getProductAccess(req, res);
+  if (!access) return;
+  const result = await db.transaction(async (tx) => {
+    const [existing] = await tx.select().from(products)
+      .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId))).limit(1);
+    if (!existing) return { kind: "missing" as const };
+    if (!existing.deletedAt) return { kind: "unchanged" as const, product: existing };
+    if (!canRestoreProduct(existing, now)) return { kind: "expired" as const };
+    if (
+      existing.status !== "archived"
+      && !await hasProductCapacity(tx, ownerId, access.limits.products, 1)
+    ) {
+      return { kind: "limited" as const };
+    }
+    const [product] = await tx.update(products)
+      .set({ deletedAt: null, recoverableUntil: null, removalKind: null, updatedAt: now })
+      .where(and(
+        eq(products.id, existing.id),
+        eq(products.ownerId, ownerId),
+        eq(products.removalKind, "seller_deleted"),
+        gt(products.recoverableUntil, now),
+      ))
+      .returning();
+    return product
+      ? { kind: "restored" as const, product }
+      : { kind: "unchanged" as const };
+  });
+  if (result.kind === "missing") { res.status(404).json({ error: "Not found" }); return; }
+  if (result.kind === "unchanged") {
+    res.json({ success: true, restored: false, ...(result.product ? { product: result.product } : {}) });
+    return;
+  }
+  if (result.kind === "expired") {
     res.status(410).json({ error: "Product recovery window has expired", code: "PRODUCT_RECOVERY_EXPIRED" }); return;
   }
-  const [product] = await db.update(products)
-    .set({ deletedAt: null, recoverableUntil: null, removalKind: null, updatedAt: now })
-    .where(and(eq(products.id, existing.id), eq(products.ownerId, ownerId), eq(products.removalKind, "seller_deleted"), gt(products.recoverableUntil, now)))
-    .returning();
-  // A concurrent successful restore is still an idempotent success.
-  if (!product) { res.json({ success: true, restored: false }); return; }
+  if (result.kind === "limited") {
+    sendPlanLimitReached(res, {
+      resource: "products",
+      currentPlan: access.planId,
+      requiredPlan: "growth",
+      limit: access.limits.products!,
+    });
+    return;
+  }
+  const product = result.product;
   const actor = reqActor(req);
   void logActivity(actor.ownerClerkId, actor.actorClerkId, actor.actorRole,
     `Restored product "${product.name}"`, "product", product.id);
@@ -299,6 +404,10 @@ router.post("/import", requireRole("manager"), async (req, res) => {
   }
 
   const results: { success: boolean; name: string; productId?: string; error?: string }[] = [];
+  const validRows: Array<{
+    name: string; priceCents: number; category: string; description: string;
+    sku: string | null; images: string[]; tags: string[];
+  }> = [];
 
   for (const row of rows) {
     const name = String(row.name ?? '').trim();
@@ -313,35 +422,50 @@ router.post("/import", requireRole("manager"), async (req, res) => {
     const images = String(row.images ?? '').split('|').map((s: string) => s.trim()).filter(Boolean);
     const tags = String(row.tags ?? '').split(',').map((s: string) => s.trim()).filter(Boolean);
 
-    try {
-      const [product] = await db.insert(products).values({
+    validRows.push({ name, priceCents, category, description: description ?? '', sku, images, tags });
+  }
+
+  const access = await getProductAccess(req, res);
+  if (!access) return;
+  const inserted = await db.transaction(async (tx) => {
+    if (!await hasProductCapacity(tx, ownerId, access.limits.products, validRows.length)) return null;
+    const created: Array<{ name: string; productId: string }> = [];
+    for (const row of validRows) {
+      const [product] = await tx.insert(products).values({
         id: crypto.randomUUID(),
         ownerId,
-        name,
-        description: description ?? '',
-        category,
+        name: row.name,
+        description: row.description,
+        category: row.category,
         status: 'draft',
-        images,
-        tags,
+        images: row.images,
+        tags: row.tags,
       }).returning({ id: products.id });
 
-      // Insert a default variant if price > 0
-      if (priceCents > 0) {
-        await db.insert(productVariants).values({
+      if (row.priceCents > 0) {
+        await tx.insert(productVariants).values({
           id: crypto.randomUUID(),
           productId: product.id,
-          sku: sku ?? (name.replace(/\s+/g, '-').toUpperCase() + '-DEFAULT'),
-          priceCents,
+          sku: row.sku ?? (row.name.replace(/\s+/g, '-').toUpperCase() + '-DEFAULT'),
+          priceCents: row.priceCents,
           stock: 0,
           lowStockThreshold: 5,
         });
       }
-
-      results.push({ success: true, name, productId: product.id });
-    } catch (err: any) {
-      results.push({ success: false, name, error: err.message ?? 'Insert failed' });
+      created.push({ name: row.name, productId: product.id });
     }
+    return created;
+  });
+  if (!inserted) {
+    sendPlanLimitReached(res, {
+      resource: "products",
+      currentPlan: access.planId,
+      requiredPlan: "growth",
+      limit: access.limits.products!,
+    });
+    return;
   }
+  results.push(...inserted.map((row) => ({ success: true, ...row })));
 
   const successCount = results.filter(r => r.success).length;
 

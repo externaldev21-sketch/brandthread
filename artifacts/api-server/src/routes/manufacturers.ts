@@ -19,7 +19,8 @@ import {
   UpdateManufacturerOrderStatusBody,
   SetupManufacturerPaymentBody,
 } from "@workspace/api-zod";
-import { requireAuth } from "../middlewares/requireAuth";
+import { requireAuth, requirePlan } from "../middlewares/requireAuth";
+import { teamContext } from "../middlewares/requireRole";
 import { getWebOrigin } from "../lib/webOrigin";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { sendManufacturerSignupEmail } from "../lib/brandthreadEmail";
@@ -28,6 +29,7 @@ import { logger } from "../lib/logger";
 const router = Router();
 const objectStorage = new ObjectStorageService();
 const MAX_PROFILE_IMAGE_BYTES = 5 * 1024 * 1024;
+const requireGrowthSeller = [requireAuth, teamContext(), requirePlan("growth")] as const;
 
 function isSupportedImage(buffer: Buffer): boolean {
   return (
@@ -71,7 +73,7 @@ async function resolveManufacturerEmail(clerkId: string, suppliedEmail?: string 
 // FAVORITES — seller-scoped saved manufacturers, separate from relationships
 // ═══════════════════════════════════════════════════════════════════════════════
 
-router.get("/favorites", requireAuth, async (req, res) => {
+router.get("/favorites", ...requireGrowthSeller, async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   const rows = await db
     .select({
@@ -88,7 +90,7 @@ router.get("/favorites", requireAuth, async (req, res) => {
   })));
 });
 
-router.post("/favorites", requireAuth, async (req, res) => {
+router.post("/favorites", ...requireGrowthSeller, async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   const { manufacturerId } = req.body ?? {};
   if (!isUuid(manufacturerId)) {
@@ -135,7 +137,7 @@ router.post("/favorites", requireAuth, async (req, res) => {
   });
 });
 
-router.delete("/favorites/:manufacturerId", requireAuth, async (req, res) => {
+router.delete("/favorites/:manufacturerId", ...requireGrowthSeller, async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   const { manufacturerId } = req.params;
   if (!isUuid(manufacturerId)) {
@@ -156,7 +158,7 @@ router.delete("/favorites/:manufacturerId", requireAuth, async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // POST /api/manufacturers/invite-tokens — seller creates a private invite token
-router.post("/invite-tokens", requireAuth, async (req, res) => {
+router.post("/invite-tokens", ...requireGrowthSeller, async (req, res) => {
   const sellerId   = (req as any).clerkUserId as string;
   const { companyName, contactName, contactEmail, notes } = req.body;
 
@@ -173,7 +175,7 @@ router.post("/invite-tokens", requireAuth, async (req, res) => {
 });
 
 // GET /api/manufacturers/invite-tokens — seller lists their tokens
-router.get("/invite-tokens", requireAuth, async (req, res) => {
+router.get("/invite-tokens", ...requireGrowthSeller, async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   const rows = await db
     .select()
@@ -424,7 +426,7 @@ router.get("/me/dashboard", async (req, res) => {
 });
 
 // Seller-side: get or create a thread with a manufacturer
-router.post("/threads", requireAuth, async (req, res) => {
+router.post("/threads", ...requireGrowthSeller, async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   const { manufacturerId, subject = "General" } = req.body;
 
@@ -457,7 +459,7 @@ router.post("/threads", requireAuth, async (req, res) => {
 });
 
 // Seller-side: list threads I'm in
-router.get("/threads", requireAuth, async (req, res) => {
+router.get("/threads", ...requireGrowthSeller, async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
 
   const rows = await db
@@ -482,12 +484,24 @@ router.get("/threads", requireAuth, async (req, res) => {
   })));
 });
 
-// GET/POST messages for a thread
-router.get("/threads/:threadId/messages", async (req, res) => {
+// Seller-side GET/POST messages. Manufacturer accounts use the /me routes.
+router.get("/threads/:threadId/messages", ...requireGrowthSeller, async (req, res) => {
+  const sellerId = (req as any).clerkUserId as string;
+  const threadId = req.params.threadId as string;
+  const [thread] = await db
+    .select({ id: manufacturerThreads.id })
+    .from(manufacturerThreads)
+    .where(and(
+      eq(manufacturerThreads.id, threadId),
+      eq(manufacturerThreads.buyerClerkId, sellerId),
+    ))
+    .limit(1);
+  if (!thread) { res.status(404).json({ error: "Thread not found" }); return; }
+
   const messages = await db
     .select()
     .from(manufacturerMessages)
-    .where(eq(manufacturerMessages.threadId, req.params.threadId))
+    .where(eq(manufacturerMessages.threadId, threadId))
     .orderBy(manufacturerMessages.sentAt);
 
   res.json(messages.map(m => ({
@@ -496,36 +510,29 @@ router.get("/threads/:threadId/messages", async (req, res) => {
   })));
 });
 
-router.post("/threads/:threadId/messages", async (req, res) => {
-  const { userId } = getAuth(req);
-  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
-
+router.post("/threads/:threadId/messages", ...requireGrowthSeller, async (req, res) => {
   const parsed = SendThreadMessageBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
 
-  const { threadId } = req.params;
-  const { content, messageType = "text", mediaUrls, cardData, senderRole } = req.body;
+  const threadId = req.params.threadId as string;
+  const { content, messageType = "text", mediaUrls, cardData } = req.body;
+  const sellerId = (req as any).clerkUserId as string;
 
-  // Determine sender role: check if this user is the manufacturer for this thread
   const [thread] = await db
-    .select({ manufacturerId: manufacturerThreads.manufacturerId, buyerClerkId: manufacturerThreads.buyerClerkId })
+    .select({ id: manufacturerThreads.id })
     .from(manufacturerThreads)
-    .where(eq(manufacturerThreads.id, threadId))
+    .where(and(
+      eq(manufacturerThreads.id, threadId),
+      eq(manufacturerThreads.buyerClerkId, sellerId),
+    ))
     .limit(1);
-
-  let resolvedRole = senderRole ?? "seller";
-  if (thread) {
-    const mfr = await resolveManufacturer(userId);
-    if (mfr && mfr.id === thread.manufacturerId) {
-      resolvedRole = "manufacturer";
-    }
-  }
+  if (!thread) { res.status(404).json({ error: "Thread not found" }); return; }
 
   const [msg] = await db
     .insert(manufacturerMessages)
     .values({
       threadId,
-      senderRole:  resolvedRole,
+      senderRole:  "seller",
       content:     content ?? "",
       messageType: messageType ?? "text",
       mediaUrls:   Array.isArray(mediaUrls) ? mediaUrls : [],
@@ -566,6 +573,16 @@ router.get("/me/threads/:threadId/messages", async (req, res) => {
   const { userId } = getAuth(req);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
+  const mfr = await resolveManufacturer(userId);
+  if (!mfr) return res.status(404).json({ error: "Not registered" });
+  const [thread] = await db.select({ id: manufacturerThreads.id }).from(manufacturerThreads)
+    .where(and(
+      eq(manufacturerThreads.id, req.params.threadId),
+      eq(manufacturerThreads.manufacturerId, mfr.id),
+    ))
+    .limit(1);
+  if (!thread) return res.status(404).json({ error: "Thread not found" });
+
   const messages = await db
     .select()
     .from(manufacturerMessages)
@@ -587,6 +604,15 @@ router.post("/me/threads/:threadId/messages", async (req, res) => {
 
   const { threadId } = req.params;
   const { content, messageType, mediaUrls, cardData } = req.body;
+  const mfr = await resolveManufacturer(userId);
+  if (!mfr) return res.status(404).json({ error: "Not registered" });
+  const [thread] = await db.select({ id: manufacturerThreads.id }).from(manufacturerThreads)
+    .where(and(
+      eq(manufacturerThreads.id, threadId),
+      eq(manufacturerThreads.manufacturerId, mfr.id),
+    ))
+    .limit(1);
+  if (!thread) return res.status(404).json({ error: "Thread not found" });
 
   const [msg] = await db
     .insert(manufacturerMessages)

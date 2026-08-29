@@ -20,7 +20,7 @@
  */
 import { Router } from "express";
 import { db, teamMembers, teamActivityLogs, users } from "@workspace/db";
-import { eq, and, ne, or, desc } from "drizzle-orm";
+import { eq, and, ne, or, desc, gt, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext, requireRole } from "../middlewares/requireRole";
 import { logActivity, reqActor } from "../lib/activityLog";
@@ -30,6 +30,7 @@ import {
   sendTeamInviteEmail,
 } from "../lib/teamInvites";
 import crypto from "crypto";
+import { getVerifiedPlanAccess, sendPlanLimitReached, sendPlanLookupUnavailable } from "../lib/planAccess";
 
 const router = Router();
 
@@ -75,6 +76,22 @@ const isUuid = (s: string) =>
 function isExpired(m: typeof teamMembers.$inferSelect): boolean {
   if (!m.expiresAt) return true; // no expiry set → fail-closed
   return new Date(m.expiresAt) < new Date();
+}
+
+async function lockTeamSeats(tx: any, ownerId: string): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"team-seat-limit:" + ownerId}))`);
+}
+
+async function teamSeatCount(tx: any, ownerId: string): Promise<number> {
+  const rows = await tx
+    .select({ status: teamMembers.status, expiresAt: teamMembers.expiresAt })
+    .from(teamMembers)
+    .where(and(eq(teamMembers.ownerId, ownerId), ne(teamMembers.status, "removed")));
+  const now = Date.now();
+  return rows.filter((row: { status: string; expiresAt: Date | null }) =>
+    row.status === "active"
+    || (row.status === "pending" && !!row.expiresAt && row.expiresAt.valueOf() > now),
+  ).length;
 }
 
 /** Serialize a team_members row for the client. Invite link only for the owner. */
@@ -263,21 +280,68 @@ async function handleAccept(req: any, res: any) {
     return;
   }
 
-  // Atomic: only one caller can flip pending → active.
-  const [updated] = await db
-    .update(teamMembers)
-    .set({
-      memberClerkId: actorId,
-      status: "active",
-      acceptedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(and(eq(teamMembers.id, invite.id), eq(teamMembers.status, "pending")))
-    .returning();
-  if (!updated) {
+  let access;
+  try {
+    access = await getVerifiedPlanAccess(invite.ownerId);
+  } catch (error) {
+    sendPlanLookupUnavailable(req, res, error);
+    return;
+  }
+  const acceptance = await db.transaction(async (tx) => {
+    await lockTeamSeats(tx, invite.ownerId);
+    const [currentInvite] = await tx
+      .select()
+      .from(teamMembers)
+      .where(eq(teamMembers.id, invite.id))
+      .limit(1);
+    if (!currentInvite || currentInvite.status !== "pending") {
+      return { kind: "used" as const };
+    }
+    if (isExpired(currentInvite)) {
+      return { kind: "expired" as const };
+    }
+    const limit = access.limits.teamSeats;
+    if (limit !== null && await teamSeatCount(tx, invite.ownerId) > limit) {
+      return { kind: "limited" as const };
+    }
+    const [accepted] = await tx
+      .update(teamMembers)
+      .set({
+        memberClerkId: actorId,
+        status: "active",
+        acceptedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(and(
+        eq(teamMembers.id, invite.id),
+        eq(teamMembers.status, "pending"),
+        gt(teamMembers.expiresAt, new Date()),
+      ))
+      .returning();
+    if (accepted) return { kind: "accepted" as const, member: accepted };
+    const [latest] = await tx.select().from(teamMembers).where(eq(teamMembers.id, invite.id)).limit(1);
+    return latest?.status === "pending" && isExpired(latest)
+      ? { kind: "expired" as const }
+      : { kind: "used" as const };
+  });
+  if (acceptance.kind === "expired") {
+    res.status(410).json({ error: "This invite link has expired. Ask the store owner to send a new one.", expired: true });
+    return;
+  }
+  if (acceptance.kind === "used") {
     res.status(409).json({ error: "This invite has already been used" });
     return;
   }
+  if (acceptance.kind === "limited") {
+    sendPlanLimitReached(res, {
+      resource: "teamSeats",
+      currentPlan: access.planId,
+      requiredPlan: access.planId === "starter" ? "growth" : "scale",
+      limit: access.limits.teamSeats!,
+    });
+    return;
+  }
+  const updated = acceptance.member;
 
   await logActivity(
     invite.ownerId,
@@ -376,37 +440,59 @@ router.post("/invite", requireRole("owner"), async (req, res) => {
     return;
   }
 
-  const [existing] = await db
-    .select({ status: teamMembers.status })
-    .from(teamMembers)
-    .where(and(eq(teamMembers.ownerId, ownerId), eq(teamMembers.email, normEmail)))
-    .limit(1);
-  if (existing?.status === "active") {
-    res.status(409).json({ error: `${normEmail} is already on your team` });
+  let access;
+  try {
+    access = await getVerifiedPlanAccess(ownerId);
+  } catch (error) {
+    sendPlanLookupUnavailable(req, res, error);
     return;
   }
 
   const inviteToken = crypto.randomBytes(24).toString("hex");
   const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
-  const [member] = await db
-    .insert(teamMembers)
-    .values({ ownerId, email: normEmail, name: name ?? null, role, inviteToken, expiresAt, status: "pending" })
-    .onConflictDoUpdate({
-      target: [teamMembers.ownerId, teamMembers.email],
-      set: {
-        role,
-        inviteToken,
-        expiresAt,
-        status: "pending",
-        memberClerkId: null,
-        acceptedAt: null,
-        invitedAt: new Date(),
-        ...resetTeamInviteReminderTracking(),
-        ...(name ? { name } : {}),
-        updatedAt: new Date(),
-      },
-    })
-    .returning();
+  const admission = await db.transaction(async (tx) => {
+    await lockTeamSeats(tx, ownerId);
+    const [existing] = await tx
+      .select({ status: teamMembers.status, expiresAt: teamMembers.expiresAt })
+      .from(teamMembers)
+      .where(and(eq(teamMembers.ownerId, ownerId), eq(teamMembers.email, normEmail)))
+      .limit(1);
+    if (existing?.status === "active") return { kind: "active" as const };
+    const limit = access.limits.teamSeats;
+    const existingConsumesSeat = existing?.status === "pending"
+      && !!existing.expiresAt
+      && existing.expiresAt.valueOf() > Date.now();
+    if (limit !== null && !existingConsumesSeat && await teamSeatCount(tx, ownerId) >= limit) {
+      return { kind: "limited" as const };
+    }
+    const [member] = await tx
+      .insert(teamMembers)
+      .values({ ownerId, email: normEmail, name: name ?? null, role, inviteToken, expiresAt, status: "pending" })
+      .onConflictDoUpdate({
+        target: [teamMembers.ownerId, teamMembers.email],
+        set: {
+          role, inviteToken, expiresAt, status: "pending", memberClerkId: null,
+          acceptedAt: null, invitedAt: new Date(), ...resetTeamInviteReminderTracking(),
+          ...(name ? { name } : {}), updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return { kind: "created" as const, member };
+  });
+  if (admission.kind === "active") {
+    res.status(409).json({ error: `${normEmail} is already on your team` });
+    return;
+  }
+  if (admission.kind === "limited") {
+    sendPlanLimitReached(res, {
+      resource: "teamSeats",
+      currentPlan: access.planId,
+      requiredPlan: access.planId === "starter" ? "growth" : "scale",
+      limit: access.limits.teamSeats!,
+    });
+    return;
+  }
+  const member = admission.member;
 
   const { inviteUrl, deepLink } = inviteUrls(inviteToken);
   const actor = reqActor(req);
@@ -430,32 +516,51 @@ router.post("/invite/:id/regenerate", requireRole("owner"), async (req, res) => 
     res.status(404).json({ error: "Member not found" });
     return;
   }
-  const [m] = await db
-    .select()
-    .from(teamMembers)
-    .where(and(eq(teamMembers.id, id), eq(teamMembers.ownerId, ownerId), eq(teamMembers.status, "pending")))
-    .limit(1);
-  if (!m) {
-    res.status(404).json({ error: "Pending invite not found" });
+  let access;
+  try {
+    access = await getVerifiedPlanAccess(ownerId);
+  } catch (error) {
+    sendPlanLookupUnavailable(req, res, error);
     return;
   }
   const inviteToken = crypto.randomBytes(24).toString("hex");
   const expiresAt = new Date(Date.now() + INVITE_TTL_MS);
-  const [updated] = await db
-    .update(teamMembers)
-    .set({
-      inviteToken,
-      expiresAt,
-      invitedAt: new Date(),
-      ...resetTeamInviteReminderTracking(),
-      updatedAt: new Date(),
-    })
-    .where(eq(teamMembers.id, id))
-    .returning();
-  if (!updated) {
-    res.status(500).json({ error: "Failed to regenerate invite" });
+  const result = await db.transaction(async (tx) => {
+    await lockTeamSeats(tx, ownerId);
+    const [pending] = await tx
+      .select()
+      .from(teamMembers)
+      .where(and(eq(teamMembers.id, id), eq(teamMembers.ownerId, ownerId), eq(teamMembers.status, "pending")))
+      .limit(1);
+    if (!pending) return { kind: "missing" as const };
+    const currentlyConsumesSeat = !isExpired(pending);
+    const limit = access.limits.teamSeats;
+    const seatsAfterRegeneration = await teamSeatCount(tx, ownerId) + (currentlyConsumesSeat ? 0 : 1);
+    if (limit !== null && seatsAfterRegeneration > limit) return { kind: "limited" as const };
+    const [updated] = await tx
+      .update(teamMembers)
+      .set({
+        inviteToken, expiresAt, invitedAt: new Date(),
+        ...resetTeamInviteReminderTracking(), updatedAt: new Date(),
+      })
+      .where(eq(teamMembers.id, id))
+      .returning();
+    return { kind: "updated" as const, updated };
+  });
+  if (result.kind === "missing") {
+    res.status(404).json({ error: "Pending invite not found" });
     return;
   }
+  if (result.kind === "limited") {
+    sendPlanLimitReached(res, {
+      resource: "teamSeats",
+      currentPlan: access.planId,
+      requiredPlan: access.planId === "starter" ? "growth" : "scale",
+      limit: access.limits.teamSeats!,
+    });
+    return;
+  }
+  const updated = result.updated;
   const { inviteUrl, deepLink } = inviteUrls(inviteToken);
   const actor = reqActor(req);
   void logActivity(

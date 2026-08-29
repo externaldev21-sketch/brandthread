@@ -6,6 +6,10 @@ const routesSource = fs.readFileSync(
   path.resolve(__dirname, "..", "index.ts"),
   "utf8",
 );
+const manufacturersSource = fs.readFileSync(
+  path.resolve(__dirname, "..", "manufacturers.ts"),
+  "utf8",
+);
 
 describe("paid route mounts", () => {
   it("keeps every paid route behind an explicit minimum plan", () => {
@@ -28,16 +32,34 @@ describe("paid route mounts", () => {
       'router.use("/techpack",        tc, requirePlan("growth"), techpackRouter);',
     );
     expect(routesSource).toContain(
-      'router.use("/manufacturers",   tc, requirePlan("growth"), manufacturersRouter);',
+      'router.use("/manufacturers",   tc, manufacturersRouter);',
     );
     expect(routesSource).toContain(
-      'router.use("/team",                      tc, requirePlan("scale"), teamRouter);',
+      'router.use("/team",                      tc, teamRouter);',
     );
     expect(routesSource).toContain(
       'router.use("/live",                      tc, requirePlan("scale"), liveRouter);',
     );
     expect(routesSource).toContain(
       'router.use("/boosts",                    tc, requirePlan("scale"), boostsRouter);',
+    );
+  });
+
+  it("gates seller manufacturer actions without blocking manufacturer onboarding", () => {
+    expect(manufacturersSource).toContain(
+      'const requireGrowthSeller = [requireAuth, teamContext(), requirePlan("growth")] as const;',
+    );
+    expect(manufacturersSource).toContain(
+      'router.post("/invite-tokens", ...requireGrowthSeller',
+    );
+    expect(manufacturersSource).toContain(
+      'router.get("/threads/:threadId/messages", ...requireGrowthSeller',
+    );
+    expect(manufacturersSource).toContain(
+      'router.get("/invite-tokens/resolve/:token", async',
+    );
+    expect(manufacturersSource).toContain(
+      'router.post("/register-via-invite/:token", async',
     );
   });
 });

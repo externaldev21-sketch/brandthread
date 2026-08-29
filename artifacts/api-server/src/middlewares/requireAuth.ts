@@ -4,6 +4,7 @@ import { db } from "@workspace/db";
 import { users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { getEffectiveEntitlement } from "../lib/nativeEntitlements";
+import { PLAN_CATALOGUE, type SellerPlanId } from "../lib/planCatalogue";
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const { userId } = getAuth(req);
@@ -46,14 +47,6 @@ export async function requireModerator(req: Request, res: Response, next: NextFu
 
 // ─── Plan hierarchy ────────────────────────────────────────────────────────────
 
-const PLAN_ORDER: Record<string, number> = {
-  starter: 0,
-  growth: 1,
-  scale: 2,
-  // Compatibility for Stripe subscribers created under the prior name.
-  pro: 2,
-};
-
 /**
  * Development-only subscription override.
  *
@@ -72,10 +65,10 @@ const ALLOW_TEST_SUBSCRIPTION_BYPASS =
  * the authenticated seller's plan is below `minPlan`. If the server cannot
  * verify the plan, it returns 503 rather than granting paid access.
  */
-export function requirePlan(minPlan: "growth" | "scale" | "pro") {
+export function requirePlan(minPlan: SellerPlanId) {
   return async (req: Request, res: Response, next: NextFunction) => {
-    const { userId } = getAuth(req);
-    if (!userId) {
+    const { userId: actorUserId } = getAuth(req);
+    if (!actorUserId) {
       res.status(401).json({ error: "Unauthorized" });
       return;
     }
@@ -89,18 +82,20 @@ export function requirePlan(minPlan: "growth" | "scale" | "pro") {
       // This reads the server-verified native entitlement cache alongside the
       // existing Stripe fields. Access must remain denied if this verification
       // cannot complete.
-      const entitlement = await getEffectiveEntitlement(userId);
+      // teamContext rewrites clerkUserId to the authenticated store owner.
+      // Paid access belongs to that store, not to an individual team member.
+      const ownerId = ((req as any).clerkUserId as string | undefined) ?? actorUserId;
+      const entitlement = await getEffectiveEntitlement(ownerId);
       const plan = entitlement.planId;
-      const currentLevel = PLAN_ORDER[plan] ?? 0;
-      const normalizedRequiredPlan = minPlan === "pro" ? "scale" : minPlan;
-      const requiredLevel = PLAN_ORDER[normalizedRequiredPlan] ?? 1;
+      const currentLevel = PLAN_CATALOGUE[plan]?.rank ?? PLAN_CATALOGUE.starter.rank;
+      const requiredLevel = PLAN_CATALOGUE[minPlan].rank;
 
       if (currentLevel < requiredLevel) {
-        const planLabel = normalizedRequiredPlan.charAt(0).toUpperCase() + normalizedRequiredPlan.slice(1);
+        const planLabel = minPlan.charAt(0).toUpperCase() + minPlan.slice(1);
         res.status(403).json({
           error: "Plan required",
           code: "PLAN_REQUIRED",
-          requiredPlan: normalizedRequiredPlan,
+          requiredPlan: minPlan,
           currentPlan: plan,
           message: `This feature requires the ${planLabel} plan or higher. Upgrade to unlock it.`,
         });
@@ -114,7 +109,7 @@ export function requirePlan(minPlan: "growth" | "scale" | "pro") {
       res.status(503).json({
         error: "Unable to verify subscription plan",
         code: "PLAN_LOOKUP_UNAVAILABLE",
-        requiredPlan: minPlan === "pro" ? "scale" : minPlan,
+        requiredPlan: minPlan,
         message: "Subscription access could not be verified. Please try again.",
       });
     }

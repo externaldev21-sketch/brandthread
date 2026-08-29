@@ -33,6 +33,7 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
+import { getEntitlementRejection } from '@/lib/entitlementError';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -372,6 +373,20 @@ export default function ManufacturerMessagesScreen() {
 
   const mode = resolvedThreadId ? 'api' : 'demo';
 
+  const showUpgrade = useCallback((error: unknown): boolean => {
+    const rejection = getEntitlementRejection(error);
+    if (!rejection) return false;
+    Alert.alert(
+      `Upgrade to ${rejection.requiredPlan === 'growth' ? 'Growth' : 'Scale'}`,
+      rejection.message,
+      [
+        { text: 'Not now', style: 'cancel', onPress: () => router.back() },
+        { text: 'View plans', onPress: () => router.replace('/subscription' as never) },
+      ],
+    );
+    return true;
+  }, [router]);
+
   // ── Load ──────────────────────────────────────────────────────────────────────
 
   const loadApiMessages = useCallback(async (threadId: string) => {
@@ -379,9 +394,10 @@ export default function ManufacturerMessagesScreen() {
       const msgs = await api.manufacturers.threads.messages.list(threadId);
       setApiMessages(msgs.reverse()); // newest first for inverted list
     } catch (e) {
+      if (showUpgrade(e)) return;
       console.error('Failed to load messages:', e);
     }
-  }, [api]);
+  }, [api, showUpgrade]);
 
   const loadDemoConv = useCallback(async () => {
     const convs = await getConversations();
@@ -408,7 +424,11 @@ export default function ManufacturerMessagesScreen() {
           });
           setResolvedThreadId(thread.id);
           // Messages will load via the effect below
-        } catch { /* fall through to demo */ }
+        } catch (error) {
+          if (!showUpgrade(error)) {
+            Alert.alert('Error', 'Could not open this manufacturer conversation.');
+          }
+        }
       } else if (params.conversationId) {
         await loadDemoConv();
       }
@@ -440,8 +460,8 @@ export default function ManufacturerMessagesScreen() {
         });
         setApiMessages(prev => [{ ...msg }, ...prev]);
         setInputText('');
-      } catch {
-        Alert.alert('Error', 'Could not send message.');
+      } catch (error) {
+        if (!showUpgrade(error)) Alert.alert('Error', 'Could not send message.');
       }
     } else {
       // Demo path
@@ -504,7 +524,7 @@ export default function ManufacturerMessagesScreen() {
       });
       setApiMessages(prev => [{ ...msg }, ...prev]);
     } catch (e) {
-      Alert.alert('Error', 'Could not send photo.');
+      if (!showUpgrade(e)) Alert.alert('Error', 'Could not send photo.');
     }
     setSending(false);
   }
@@ -523,8 +543,8 @@ export default function ManufacturerMessagesScreen() {
         senderRole:  'seller',
       });
       setApiMessages(prev => [{ ...msg }, ...prev]);
-    } catch {
-      Alert.alert('Error', 'Could not send card.');
+    } catch (error) {
+      if (!showUpgrade(error)) Alert.alert('Error', 'Could not send card.');
     }
     setSending(false);
   }

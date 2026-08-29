@@ -14,11 +14,13 @@ import {
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
 import { useApi } from '@/hooks/useApi';
+import { getEntitlementRejection } from '@/lib/entitlementError';
 
 interface Photo {
   id: string;
@@ -42,6 +44,7 @@ const STEPS: Step[] = ['info', 'photos', 'sizing', 'details', 'result'];
 export default function TechPackGeneratorScreen() {
   const colors = useColors();
   const api = useApi();
+  const router = useRouter();
   const [step, setStep] = useState<Step>('info');
 
   // Step 1: product info
@@ -190,7 +193,20 @@ export default function TechPackGeneratorScreen() {
       } else {
         Alert.alert('Generation failed', 'Could not generate the tech pack. Please try again.');
       }
-    } catch {
+    } catch (error) {
+      const rejection = getEntitlementRejection(error);
+      if (rejection) {
+        Alert.alert(
+          `Upgrade to ${rejection.requiredPlan === 'growth' ? 'Growth' : 'Scale'}`,
+          rejection.message,
+          [
+            { text: 'Not now', style: 'cancel' },
+            { text: 'View plans', onPress: () => router.push('/subscription' as never) },
+          ],
+        );
+        setStep('details');
+        return;
+      }
       Alert.alert('Something went wrong', 'Could not generate the tech pack. Please try again.');
     } finally {
       setLoading(false);

@@ -9,6 +9,7 @@ import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
 import { useApi } from '@/lib/api';
 import { useTeamRole } from '@/hooks/useTeamRole';
+import { getEntitlementRejection } from '@/lib/entitlementError';
 
 function relTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -120,6 +121,19 @@ export default function TeamScreen() {
       setInviteResult({ inviteUrl: res.inviteUrl, emailSent: !!res.emailSent, email });
       await load();
     } catch (err: any) {
+      const rejection = getEntitlementRejection(err);
+      if (rejection) {
+        setInviteVisible(false);
+        Alert.alert(
+          `Upgrade to ${rejection.requiredPlan === 'growth' ? 'Growth' : 'Scale'}`,
+          rejection.message,
+          [
+            { text: 'Not now', style: 'cancel' },
+            { text: 'View plans', onPress: () => router.push('/subscription' as never) },
+          ],
+        );
+        return;
+      }
       Alert.alert('Error', err.message ?? 'Failed to create invite');
     } finally {
       setInviting(false);

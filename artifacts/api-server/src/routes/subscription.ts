@@ -25,20 +25,13 @@ import { requireStripe } from "../lib/stripe";
 import { logger } from "../lib/logger";
 import { getWebOrigin } from "../lib/webOrigin";
 import { getEffectiveEntitlement, reconcileRevenueCatEntitlement } from "../lib/nativeEntitlements";
+import { PLAN_CATALOGUE, isSellerPlanId, type SellerPlanId as PlanId } from "../lib/planCatalogue";
 
 const router = Router();
 router.use(requireAuth);
 router.use(teamContext());
 
 // ─── Plan catalogue (server-side source of truth) ─────────────────────────────
-
-const PLAN_CATALOGUE = {
-  starter: { amountCents: 2900,  name: "Brandthread Starter Plan", lookupKey: "brandthread_starter_monthly" },
-  growth:  { amountCents: 7900,  name: "Brandthread Growth Plan",  lookupKey: "brandthread_growth_monthly"  },
-  scale:   { amountCents: 19900, name: "Brandthread Scale Plan",   lookupKey: "brandthread_scale_monthly"   },
-} as const;
-
-type PlanId = keyof typeof PLAN_CATALOGUE;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -289,7 +282,7 @@ router.post("/checkout", requireRole("owner"), async (req, res) => {
     const clerkUserId = (req as any).clerkUserId as string;
     const { planId } = req.body;
 
-    if (!planId || !(planId in PLAN_CATALOGUE)) {
+    if (!isSellerPlanId(planId)) {
       res.status(400).json({ error: "planId must be 'starter', 'growth', or 'scale'" });
       return;
     }
@@ -306,7 +299,7 @@ router.post("/checkout", requireRole("owner"), async (req, res) => {
         const sub = await (stripe.subscriptions.retrieve as any)(user.subscriptionId);
         if (sub && ["active", "trialing"].includes(sub.status)) {
           // Update the existing subscription to the new plan — no new Checkout needed.
-          const priceId = await ensurePrice(stripe, planId as PlanId);
+          const priceId = await ensurePrice(stripe, planId);
           await (stripe.subscriptions.update as any)(user.subscriptionId, {
             items: [{ id: sub.items.data[0].id, price: priceId }],
             proration_behavior: "create_prorations",
@@ -328,7 +321,7 @@ router.post("/checkout", requireRole("owner"), async (req, res) => {
 
     // No active subscription — create a new Checkout session.
     const [priceId, customerId] = await Promise.all([
-      ensurePrice(stripe, planId as PlanId),
+      ensurePrice(stripe, planId),
       ensureCustomer(stripe, clerkUserId),
     ]);
 

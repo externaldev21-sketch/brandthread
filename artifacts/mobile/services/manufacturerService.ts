@@ -6,6 +6,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { serviceRequest } from '../lib/serviceConfig';
 import { centsAtPercent } from '../lib/money';
+import { getEntitlementRejection } from '../lib/entitlementError';
 import {
   Manufacturer, ManufacturerRelationship, ManufacturerInvitation,
   QuoteRequest, Quote, Counteroffer,
@@ -548,7 +549,11 @@ export async function createInvitation(data: Omit<ManufacturerInvitation, 'id' |
       inviteLink:  result.inviteUrl ?? `https://brandthread.app/manufacturer-onboard?token=${result.token}`,
       createdAt:   result.createdAt ?? now(),
     } as any;
-  } catch { /* fall through to demo */ }
+  } catch (error) {
+    // Authorization failures must never be replaced with a fake successful
+    // invitation. Let the screen present the real upgrade path.
+    if (getEntitlementRejection(error)) throw error;
+  }
 
   await ensureInitialized();
   const inv: ManufacturerInvitation = {

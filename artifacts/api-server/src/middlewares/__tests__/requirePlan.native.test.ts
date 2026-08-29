@@ -8,7 +8,7 @@ const state = vi.hoisted(() => {
   // middleware behavior under test must exercise the real plan lookup path.
   process.env.ENABLE_TEST_SUBSCRIPTION_BYPASS = "false";
   return {
-    planId: "growth" as "growth" | "scale",
+    planId: "starter" as "starter" | "growth" | "scale",
     lookupError: false,
   };
 });
@@ -57,6 +57,17 @@ describe("requirePlan native entitlements", () => {
   it("grants Growth endpoints from a server-verified native Growth entitlement", async () => {
     state.planId = "growth";
     expect((await fetch(`${base}/growth`)).status).toBe(200);
+  });
+
+  it("denies Starter access to Growth endpoints with a clear upgrade response", async () => {
+    state.planId = "starter";
+    const response = await fetch(`${base}/growth`);
+    await expect(response.json()).resolves.toMatchObject({
+      code: "PLAN_REQUIRED",
+      currentPlan: "starter",
+      requiredPlan: "growth",
+    });
+    expect(response.status).toBe(403);
   });
 
   it("grants Scale endpoints from a server-verified native Scale entitlement", async () => {

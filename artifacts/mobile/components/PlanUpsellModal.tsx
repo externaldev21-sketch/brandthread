@@ -27,9 +27,9 @@ interface Props {
   onClose: () => void;
   onUpgrade: () => void;
   featureName: string;
-  requiredPlan?: 'growth' | 'pro';
+  requiredPlan?: 'growth' | 'scale';
 }
-const PRO_FEATURES = [
+const SCALE_FEATURES = [
   'Everything in Growth',
   'Advanced analytics',
   'Priority support',
@@ -48,8 +48,8 @@ export default function PlanUpsellModal({
 }: Props) {
   const { theme } = useAppTheme();
   const growthStudioTools = React.useMemo(() => getGrowthStudioTools(theme), [theme]);
-  const planLabel = requiredPlan === 'pro' ? 'Pro' : 'Growth';
-  const planPrice = requiredPlan === 'pro' ? '$79' : '$29';
+  const planLabel = requiredPlan === 'scale' ? 'Scale' : 'Growth';
+  const planPrice = requiredPlan === 'scale' ? '$199' : '$79';
 
   function handleUpgrade() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -61,9 +61,9 @@ export default function PlanUpsellModal({
     onClose();
   }
 
-  // For Growth plan, show the rich tool list; for Pro, fall back to the
+  // For Growth plan, show the rich tool list; for Scale, fall back to the
   // original plain-text list.
-  const isGrowth = requiredPlan !== 'pro';
+  const isGrowth = requiredPlan !== 'scale';
 
   return (
     <Modal
@@ -159,7 +159,7 @@ export default function PlanUpsellModal({
             ) : (
               <>
                 <Text style={s.sectionLabel}>What you'll unlock</Text>
-                {PRO_FEATURES.map((f) => (
+                {SCALE_FEATURES.map((f) => (
                   <View key={f} style={s.perkRow}>
                     <View style={s.checkCircle}>
                       <Feather name="check" size={12} color={SUCCESS} />
