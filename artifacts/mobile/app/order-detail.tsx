@@ -20,7 +20,40 @@ import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, Ret
 // ─── API → Order adapter ──────────────────────────────────────────────────────
 
 function adaptApiOrder(raw: any): Order {
-  const customer = raw.customer ?? null;
+  const rawCustomer = raw.customer && typeof raw.customer === 'object' ? raw.customer : {};
+  let parsedShippingAddress: any = null;
+  if (raw.shippingAddress) {
+    try {
+      parsedShippingAddress = typeof raw.shippingAddress === 'string'
+        ? JSON.parse(raw.shippingAddress)
+        : raw.shippingAddress;
+    } catch {
+      // The address adapter below will keep its empty defaults.
+    }
+  }
+
+  // The detail API normally supplies `customer` for Stripe-originated orders
+  // by resolving buyerId through users. Keep the screen resilient to older
+  // responses (or a missing customer record) by using the other checkout
+  // identity fields before showing a generic label.
+  const customerName = [
+    rawCustomer.name,
+    raw.customerName,
+    raw.buyerName,
+    parsedShippingAddress?.name,
+  ].find((value): value is string => typeof value === 'string' && value.trim().length > 0)?.trim() ?? 'Customer';
+  const customerEmail = [
+    rawCustomer.email,
+    raw.customerEmail,
+    raw.buyerEmail,
+    raw.guestEmail,
+  ].find((value): value is string => typeof value === 'string' && value.trim().length > 0)?.trim() ?? '';
+  const customer = {
+    ...rawCustomer,
+    id: rawCustomer.id ?? raw.customerId ?? raw.buyerId ?? '',
+    name: customerName,
+    email: customerEmail,
+  };
   const items: any[] = Array.isArray(raw.items) ? raw.items : [];
 
   // DB status → UI order status
@@ -55,17 +88,15 @@ function adaptApiOrder(raw: any): Order {
 
   // Parse shipping address (stored as JSON in DB)
   const defaultAddr: OrderAddress = {
-    name: customer?.name ?? 'Customer',
+    name: customer.name,
     line1: '', city: '', state: '', zip: '', country: 'US',
   };
   let shippingAddr: OrderAddress = defaultAddr;
-  if (raw.shippingAddress) {
+  if (parsedShippingAddress) {
     try {
-      const sa = typeof raw.shippingAddress === 'string'
-        ? JSON.parse(raw.shippingAddress)
-        : raw.shippingAddress;
+      const sa = parsedShippingAddress;
       shippingAddr = {
-        name:    sa.name    ?? customer?.name ?? 'Customer',
+        name:    sa.name    ?? customer.name,
         line1:   sa.street  ?? sa.line1 ?? '',
         line2:   sa.line2,
         city:    sa.city    ?? '',
@@ -185,9 +216,7 @@ function adaptApiOrder(raw: any): Order {
     });
   }
 
-  const initials = customer?.name
-    ? customer.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
-    : 'C';
+  const initials = customer.name.split(/\s+/).map((n: string) => n[0] ?? '').join('').slice(0, 2).toUpperCase() || 'C';
 
   return {
     id:          raw.id,
@@ -204,14 +233,14 @@ function adaptApiOrder(raw: any): Order {
     riskLevel: 'low',
     riskFlags: [],
     customer: {
-      id:            customer?.id ?? '',
-      name:          customer?.name ?? 'Customer',
-      email:         customer?.email ?? '',
-      phone:         customer?.phone ?? undefined,
+      id:            customer.id,
+      name:          customer.name,
+      email:         customer.email,
+      phone:         customer.phone ?? undefined,
       initials,
-      totalOrders:   customer?.orderCount ?? 1,
-       lifetimeValueCents: customer?.totalSpentCents ?? 0,
-      tags:          customer?.tags ?? [],
+      totalOrders:   customer.orderCount ?? 1,
+       lifetimeValueCents: customer.totalSpentCents ?? 0,
+      tags:          customer.tags ?? [],
       shippingAddress: shippingAddr,
       billingAddress:  shippingAddr,
     },
