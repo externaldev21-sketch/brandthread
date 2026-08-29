@@ -956,6 +956,7 @@ router.get("/orders", async (req, res) => {
         estimatedDelivery:       orders.estimatedDelivery,
         shippingAddress:         orders.shippingAddress,
         stripePaymentIntentId:   orders.stripePaymentIntentId,
+        cancellationReason:      orders.cancellationReason,
         createdAt:               orders.createdAt,
       })
       .from(orders)

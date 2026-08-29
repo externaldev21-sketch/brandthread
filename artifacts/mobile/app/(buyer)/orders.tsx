@@ -8,7 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { BuyerOrderView, TrackingStatus, OrderStatus } from '@/services/orderTypes';
+import { BuyerOrderView, cancellationReasonLabel, TrackingStatus, OrderStatus } from '@/services/orderTypes';
 import { useApi } from '@/hooks/useApi';
 import { formatCents } from '@/lib/money';
 import {
@@ -61,6 +61,7 @@ function adaptOrder(row: any): BuyerOrderView {
     },
     trackingNumber:  row.trackingNumber ?? undefined,
     trackingCarrier: row.carrier ?? undefined,
+    cancellationReason: row.cancellationReason ?? null,
     isPreOrder:       false,
     hasReturnRequest: false,
     createdAt:        row.createdAt ?? new Date().toISOString(),
@@ -197,6 +198,11 @@ function BuyerOrderCard({ order, onPress }: { order: BuyerOrderView; onPress: ()
         )}
         <Text style={styles.totalText}>{formatCents(order.payment.totalCents)}</Text>
       </View>
+      {order.status === 'cancelled' && order.cancellationReason && (
+        <Text style={styles.cancellationReason} numberOfLines={1}>
+          {cancellationReasonLabel(order.cancellationReason)}
+        </Text>
+      )}
 
       {/* Tracking info */}
       {order.trackingStatus && (
@@ -424,6 +430,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: SP.sm,
     flexWrap: 'wrap',
+  },
+  cancellationReason: {
+    marginTop: SP.xs,
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: RED,
   },
   preOrderBadge: {
     backgroundColor: BLUE_DIM,

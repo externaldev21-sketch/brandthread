@@ -515,6 +515,15 @@ export const CANCELLATION_REASONS: { key: CancellationReason; label: string }[] 
   { key: 'other',               label: 'Other' },
 ];
 
+export function cancellationReasonLabel(reason: string | null | undefined): string {
+  if (!reason) return 'No reason provided';
+  // buyer_requested is the server's legacy value for a buyer-initiated
+  // cancellation; the shared list contains the seller-facing equivalent.
+  if (reason === 'buyer_requested') return 'You requested the cancellation';
+  return CANCELLATION_REASONS.find(item => item.key === reason)?.label
+    ?? reason.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 export const DISPUTE_TYPES: { key: DisputeType; label: string }[] = [
   { key: 'not_received',       label: 'Product not received' },
   { key: 'not_as_described',   label: 'Not as described' },

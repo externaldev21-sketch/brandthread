@@ -10,7 +10,7 @@ import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { Feather } from '@expo/vector-icons';
-import { BuyerOrderView, CANCELLATION_REASONS, OrderStatus, TrackingStatus } from '@/services/orderTypes';
+import { BuyerOrderView, cancellationReasonLabel, CANCELLATION_REASONS, OrderStatus, TrackingStatus } from '@/services/orderTypes';
 import { useApi } from '@/hooks/useApi';
 import {
   BG, CARD, CARD_ELEVATED, BORDER,
@@ -192,17 +192,6 @@ function adaptOrderDetail(row: any): BuyerOrderView {
     isCustomerVisible:   row.isCustomerVisible === true,
     createdAt:            row.createdAt ?? new Date().toISOString(),
   };
-}
-
-// ─── Cancellation reason → human-friendly label ───────────────────────────────
-
-function cancellationReasonLabel(reason: string | null | undefined): string {
-  if (!reason) return 'No reason provided';
-  // buyer_requested is the server's legacy value for a buyer-initiated
-  // cancellation; the shared list contains the seller-facing equivalent.
-  if (reason === 'buyer_requested') return 'You requested the cancellation';
-  return CANCELLATION_REASONS.find(item => item.key === reason)?.label
-    ?? reason.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
 export default function BuyerOrderDetailScreen() {
