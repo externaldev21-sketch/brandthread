@@ -361,15 +361,6 @@ export default function SignInScreen() {
             <Text style={s.secondaryBtnText}>Create an account</Text>
           </TouchableOpacity>
 
-          {/* ── Guest checkout / Browse ────────────────────────────────────────── */}
-          <TouchableOpacity
-            style={s.guestBtn}
-            onPress={() => { Haptics.selectionAsync(); router.replace('/(buyer)/discover' as never); }}
-            activeOpacity={0.85}
-          >
-            <Text style={s.guestBtnText}>Continue as guest</Text>
-          </TouchableOpacity>
-
           <View nativeID="clerk-captcha" />
         </ScrollView>
       </KeyboardAvoidingView>
@@ -475,11 +466,6 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: BORDER,
   },
   secondaryBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
-
-  guestBtn: {
-    marginTop: 16, paddingVertical: 12, alignItems: 'center',
-  },
-  guestBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: MUTED },
 
   // Active session screen
   sessionScroll: { justifyContent: 'flex-start' },

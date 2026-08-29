@@ -39,6 +39,10 @@ import {
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useRevenueCat } from '@/lib/revenueCat';
+import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
+import { useTeamRole } from '@/hooks/useTeamRole';
+import { recommendSellerPlan, SELLER_PLANS, type SellerPlanDefinition } from '@/lib/sellerPlans';
 
 // ─── Local palette constants ──────────────────────────────────────────────────
 // (plans.tsx predates the theme migration; keep these local so the screen is
@@ -48,86 +52,7 @@ const BORDER_ACTIVE = PURPLE;
 
 // ─── Plan catalogue ───────────────────────────────────────────────────────────
 
-interface PlanDef {
-  id:         'starter' | 'growth' | 'scale';
-  name:       string;
-  tagline:    string;
-  priceCents: number;
-  priceLabel: string;
-  highlight?: boolean;  // visually featured card
-  features:   string[];
-  notIncluded: string[];
-}
-
-const PLANS: PlanDef[] = [
-  {
-    id:          'starter',
-    name:        'Starter',
-    tagline:     'Launch your brand',
-    priceCents:  2900,
-    priceLabel:  '$29',
-    features: [
-      'Storefront + AI Store Builder',
-      'Up to 25 products',
-      'Standard checkout',
-      'Basic analytics',
-      'Community & freelancer marketplace',
-      'In-app AI chatbot support',
-    ],
-    notIncluded: [
-      'AI Design Studio',
-      'Manufacturer Hub & drops',
-      'Live shopping',
-      'Team seats',
-    ],
-  },
-  {
-    id:          'growth',
-    name:        'Growth',
-    tagline:     'Scale your catalog',
-    priceCents:  7900,
-    priceLabel:  '$79',
-    highlight:   true,
-    features: [
-      'Everything in Starter',
-      'Unlimited products',
-      'Full AI Design Studio (mockups, tech packs, photography)',
-      'Manufacturer Hub + drop escrow system',
-      'Live shopping',
-      'Up to 3 team seats',
-      'Boost & promotion credits',
-      'Priority order support',
-    ],
-    notIncluded: [
-      'Advanced analytics (top customers, conversions)',
-      'Priority manufacturer intros',
-      'White-glove support',
-    ],
-  },
-  {
-    id:          'scale',
-    name:        'Scale',
-    tagline:     'Enterprise-grade operations',
-    priceCents:  19900,
-    priceLabel:  '$199',
-    features: [
-      'Everything in Growth',
-      'Unlimited team seats',
-      'Advanced analytics (top customers, conversion breakdowns)',
-      'Priority manufacturer intros',
-      'White-glove support',
-      'Early access to new features',
-    ],
-    notIncluded: [],
-  },
-];
-
-// Map brand stage answers from onboarding to a recommended plan
-const STAGE_TO_PLAN: Record<string, PlanDef['id']> = {
-  'Just starting out':        'starter',
-  'Building my product line': 'growth',
-  'Scaling an existing brand':'scale',
-};
+const PLANS = SELLER_PLANS;
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
@@ -140,10 +65,12 @@ export default function PlansScreen() {
   const api       = useApi();
   const { fromOnboarding } = useLocalSearchParams<{ fromOnboarding?: string }>();
   const isOnboarding = fromOnboarding === 'true';
+  const { currentRole } = useTeamRole();
+  const { available: revenueCatAvailable, packages, purchase, restore } = useRevenueCat();
 
   const [loadingId,         setLoadingId]         = useState<string | null>(null);
   const [awaitingReturn,    setAwaitingReturn]    = useState(false);
-  const [recommendedId,     setRecommendedId]     = useState<PlanDef['id'] | null>(null);
+  const [recommendedId,     setRecommendedId]     = useState<SellerPlanDefinition['id'] | null>(null);
   const [currentPlanId,     setCurrentPlanId]     = useState<string | null>(null);
   /** 'none' means no paid subscription yet — Starter must remain selectable. */
   const [currentPlanStatus, setCurrentPlanStatus] = useState<string | null>(null);
@@ -154,10 +81,16 @@ export default function PlansScreen() {
   // ── On mount: load brand stage recommendation + current plan ──────────────
   useEffect(() => {
     (async () => {
-      const stage = await AsyncStorage.getItem('onboarding_brand_stage');
-      if (stage && STAGE_TO_PLAN[stage]) {
-        setRecommendedId(STAGE_TO_PLAN[stage]);
+      const [stage, goalsJson, selected] = await AsyncStorage.multiGet([
+        'onboarding_brand_stage', 'onboarding_goals', 'onboarding_selected_plan',
+      ]);
+      let goals: string[] = [];
+      try {
+        goals = goalsJson[1] ? JSON.parse(goalsJson[1]) : [];
+      } catch {
+        goals = [];
       }
+      setRecommendedId((selected[1] as SellerPlanDefinition['id'] | null) ?? recommendSellerPlan(stage[1] ?? '', goals).planId);
       // If not onboarding, load live plan so we can show CURRENT badge
       if (!isOnboarding) {
         try {
@@ -209,8 +142,12 @@ export default function PlansScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
 
-  async function handleSelect(plan: PlanDef) {
+  async function handleSelect(plan: SellerPlanDefinition) {
     haptic();
+    if (currentRole && currentRole !== 'owner') {
+      Alert.alert('Only the store owner can do this');
+      return;
+    }
 
     // "Skip" path — onboarding only, no Stripe, just go straight to dashboard
     if (plan.id === 'skip' as any) {
@@ -226,6 +163,24 @@ export default function PlansScreen() {
     setLoadingId(plan.id);
 
     try {
+      if (Platform.OS !== 'web') {
+        const packageToPurchase = packages.find((pkg) => pkg.identifier === SELLER_PACKAGE_IDS[plan.id]);
+        if (!revenueCatAvailable || !packageToPurchase) {
+          throw new Error('Subscriptions are temporarily unavailable. Please try again shortly.');
+        }
+        await purchase(packageToPurchase);
+        const status = await api.seller.subscription.status();
+        setCurrentPlanId(status.plan ?? plan.id);
+        setCurrentPlanStatus(status.status ?? 'active');
+        setLoadingId(null);
+        if (isOnboarding) {
+          await AsyncStorage.setItem(ONBOARDING_KEY, 'true');
+          router.replace('/(tabs)/' as never);
+        } else {
+          Alert.alert('Plan updated', `You're now on the ${capitalize(status.plan ?? plan.id)} plan.`);
+        }
+        return;
+      }
       const { url } = await api.seller.subscription.checkout(plan.id);
       checkoutOpenedRef.current = true;
       await Linking.openURL(url);
@@ -241,6 +196,25 @@ export default function PlansScreen() {
         e?.message ?? 'Please check your connection and try again.',
         [{ text: 'OK' }],
       );
+    }
+  }
+
+  async function handleRestore() {
+    if (currentRole && currentRole !== 'owner') {
+      Alert.alert('Only the store owner can do this');
+      return;
+    }
+    setLoadingId('restore');
+    try {
+      await restore();
+      const status = await api.seller.subscription.status();
+      setCurrentPlanId(status.plan ?? null);
+      setCurrentPlanStatus(status.status ?? null);
+      Alert.alert('Purchases restored', 'Your subscription status has been refreshed.');
+    } catch (e: any) {
+      Alert.alert('Could not restore purchases', e?.message ?? 'Please try again.');
+    } finally {
+      setLoadingId(null);
     }
   }
 
@@ -310,7 +284,7 @@ export default function PlansScreen() {
             <Text style={styles.recBannerText}>
               Based on your brand stage, we recommend{' '}
               <Text style={{ color: CYAN, fontFamily: FONT.semibold }}>
-                {PLANS.find(p => p.id === recommendedId)?.name}
+                 {PLANS.find(p => p.id === recommendedId)?.onboardingName}
               </Text>
             </Text>
           </View>
@@ -348,13 +322,18 @@ export default function PlansScreen() {
           const isRecommended = plan.id === recommendedId;
           const isCurrent     = !isOnboarding && plan.id === currentPlanId;
           const isLoading     = loadingId === plan.id;
+          const revenueCatPackage = packages.find((pkg) => pkg.identifier === SELLER_PACKAGE_IDS[plan.id]);
+          const priceLabel = Platform.OS === 'web'
+            ? plan.priceLabel
+            : revenueCatPackage?.product.priceString ?? '—';
+          const trial = revenueCatPackage?.product.introPrice;
 
           return (
             <View
               key={plan.id}
               style={[
                 styles.card,
-                plan.highlight && styles.cardHighlight,
+                 plan.id === 'growth' && styles.cardHighlight,
                 isCurrent      && styles.cardCurrent,
               ]}
             >
@@ -366,7 +345,7 @@ export default function PlansScreen() {
                     <Text style={styles.recBadgeText}>RECOMMENDED FOR YOU</Text>
                   </View>
                 )}
-                {plan.highlight && !isRecommended && (
+                {plan.id === 'growth' && !isRecommended && (
                   <View style={styles.popularBadge}>
                     <Text style={styles.popularBadgeText}>MOST POPULAR</Text>
                   </View>
@@ -381,24 +360,29 @@ export default function PlansScreen() {
               {/* Name + price */}
               <View style={styles.cardTopRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={[styles.planName, plan.highlight && { color: PURPLE }]}>
-                    {plan.name}
+                 <Text style={[styles.planName, plan.id === 'growth' && { color: PURPLE }]}>
+                    {plan.onboardingName}
                   </Text>
                   <Text style={styles.planTagline}>{plan.tagline}</Text>
                 </View>
                 <View style={styles.priceCol}>
-                  <Text style={[styles.priceLabel, plan.highlight && { color: PURPLE }]}>
-                    {plan.priceLabel}
+                 <Text style={[styles.priceLabel, plan.id === 'growth' && { color: PURPLE }]}>
+                     {priceLabel}
                   </Text>
-                  <Text style={styles.pricePeriod}>/mo</Text>
+                   <Text style={styles.pricePeriod}>{Platform.OS === 'web' ? '/mo' : 'per month'}</Text>
                 </View>
               </View>
+               {Platform.OS !== 'web' && trial && (
+                 <Text style={styles.nativeTrial}>
+                   Intro offer: {trial.priceString} for {trial.periodNumberOfUnits} {trial.periodUnit.toLowerCase()} {trial.periodNumberOfUnits === 1 ? '' : 's'}
+                 </Text>
+               )}
 
               {/* Included features */}
               <View style={styles.featureList}>
                 {plan.features.map((f) => (
                   <View key={f} style={styles.featureRow}>
-                    <Feather name="check" size={13} color={plan.highlight ? PURPLE : SUCCESS} style={{ marginTop: 2 }} />
+                    <Feather name="check" size={13} color={plan.id === 'growth' ? PURPLE : SUCCESS} style={{ marginTop: 2 }} />
                     <Text style={styles.featureText}>{f}</Text>
                   </View>
                 ))}
@@ -417,7 +401,7 @@ export default function PlansScreen() {
                 onPress={() => handleSelect(plan)}
                 style={[
                   styles.ctaBtn,
-                  plan.highlight    ? styles.ctaBtnHighlight : styles.ctaBtnDefault,
+                   plan.id === 'growth' ? styles.ctaBtnHighlight : styles.ctaBtnDefault,
                   isCurrent         && styles.ctaBtnCurrent,
                   (isCurrent || loadingId !== null) && { opacity: 0.5 },
                 ]}
@@ -448,6 +432,16 @@ export default function PlansScreen() {
           >
             <Text style={styles.skipText}>Skip for now — start with Starter</Text>
             <Feather name="arrow-right" size={14} color={MUTED} />
+          </TouchableOpacity>
+        )}
+        {Platform.OS !== 'web' && (
+          <TouchableOpacity
+            style={styles.restoreRow}
+            onPress={handleRestore}
+            disabled={loadingId !== null}
+            testID="seller-revenuecat-restore"
+          >
+            {loadingId === 'restore' ? <ActivityIndicator color={MUTED} size="small" /> : <Text style={styles.skipText}>Restore purchases</Text>}
           </TouchableOpacity>
         )}
 
@@ -558,6 +552,8 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
     gap: 6, paddingVertical: SP.lg, marginTop: 4,
   },
   skipText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
+   restoreRow: { alignItems: 'center', paddingVertical: SP.sm },
+   nativeTrial: { fontSize: FS.xs, fontFamily: FONT.regular, color: CYAN, marginTop: -SP.xs },
 
   // Awaiting Stripe overlay
   awaitRoot: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', gap: 20, padding: 40 },

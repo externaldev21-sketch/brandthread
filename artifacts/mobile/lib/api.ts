@@ -843,6 +843,17 @@ export function createApi(getToken: GetToken) {
          *  payment method, view invoices, or cancel. Returns { url }. */
         portal: () =>
           post<{ url: string }>('/api/seller/subscription/portal', {}),
+        /** Server verifies the current RevenueCat customer; no plan is client supplied. */
+        syncNative: () => post<{
+          plan: string;
+          status: string;
+          trialEnd: string | null;
+          renewsOn: string | null;
+          amountCents: number;
+          paymentMethodLabel: string | null;
+          managementURL?: string | null;
+          billingProvider?: 'stripe' | 'revenuecat';
+        }>('/api/seller/subscription/native/sync', {}),
       },
       // ─ Locations ──────────────────────────────────────────────────────────
       locations:            () => get<any>('/api/seller/locations'),

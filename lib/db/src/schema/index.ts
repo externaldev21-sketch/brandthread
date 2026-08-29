@@ -1,6 +1,7 @@
 import { pgTable, uuid, text, integer, timestamp, date, json, boolean, primaryKey, index, numeric, unique, uniqueIndex } from 'drizzle-orm/pg-core';
 export * from './manufacturers';
 export * from './freelancers';
+export * from './subscriptionEntitlements';
 import { manufacturers } from './manufacturers';
 import { relations } from 'drizzle-orm';
 

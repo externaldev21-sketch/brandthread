@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Linking, Share, ActivityIndicator, Alert } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Linking, Share, ActivityIndicator, Alert, Platform } from 'react-native';
 import { useColors } from '@/hooks/useColors';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import { isManagerRole, parseRoleError } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { formatCents } from '@/lib/money';
+import { useRevenueCat } from '@/lib/revenueCat';
 
 type BillFilter = 'all' | 'paid' | 'unpaid';
 
@@ -17,6 +18,7 @@ export default function BillingScreen() {
   const colors = useColors();
   const router = useRouter();
   const api = useApi();
+  const { managementURL, restore } = useRevenueCat();
   const [bannerVisible, setBannerVisible] = useState(true);
   const [filter, setFilter] = useState<BillFilter>('all');
   const { currentRole, isLoadingRole } = useTeamRole();
@@ -33,7 +35,10 @@ export default function BillingScreen() {
 
   useEffect(() => {
     let active = true;
-    Promise.all([api.seller.subscription.status(), api.seller.subscription.invoices()])
+    const billingRequest = Platform.OS === 'web'
+      ? Promise.all([api.seller.subscription.status(), api.seller.subscription.invoices()])
+      : api.seller.subscription.status().then((status) => [status, { invoices: [] }] as const);
+    billingRequest
       .then(([status, invoiceData]) => {
         if (!active) return;
         setBillingStatus({
@@ -66,6 +71,11 @@ export default function BillingScreen() {
   async function openBillingPortal() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
+      if (Platform.OS !== 'web') {
+        if (!managementURL) throw new Error('Subscription management is not available yet.');
+        await Linking.openURL(managementURL);
+        return;
+      }
       const { url } = await api.seller.subscription.portal();
       Linking.openURL(url);
     } catch (error) {
@@ -74,6 +84,22 @@ export default function BillingScreen() {
         return;
       }
       router.push('/plan-details' as never);
+    }
+  }
+
+  async function restorePurchases() {
+    try {
+      await restore();
+      const status = await api.seller.subscription.status();
+      setBillingStatus({
+        amountCents: status.amountCents,
+        renewsOn: status.renewsOn,
+        trialEnd: status.trialEnd,
+        paymentMethodLabel: status.paymentMethodLabel,
+      });
+      Alert.alert('Purchases restored', 'Your subscription has been refreshed.');
+    } catch (error: any) {
+      Alert.alert('Could not restore purchases', error?.message ?? 'Please try again.');
     }
   }
 
@@ -184,7 +210,7 @@ export default function BillingScreen() {
                 <Feather name="credit-card" size={18} color="#FFFFFF" />
               </View>
               <Text style={[styles.cardText, { color: colors.foreground }]}>{billingStatus.paymentMethodLabel ?? 'No payment method on file'}</Text>
-              <Feather name="edit-2" size={16} color={colors.mutedForeground} />
+               <Feather name={Platform.OS === 'web' ? 'edit-2' : 'external-link'} size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
           )}
         </View>
@@ -198,7 +224,16 @@ export default function BillingScreen() {
           </View>
         )}
 
-        <View style={styles.section}>
+        {!isReadOnly && Platform.OS !== 'web' && (
+          <View style={styles.section}>
+            <TouchableOpacity onPress={restorePurchases} activeOpacity={0.7} style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]} testID="seller-revenuecat-restore">
+              <Feather name="refresh-cw" size={18} color={colors.primary} />
+              <Text style={[styles.cardText, { color: colors.foreground }]}>Restore purchases</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {Platform.OS === 'web' && <View style={styles.section}>
           <View style={styles.rowBetween}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Past bills</Text>
             <TouchableOpacity onPress={() => exportBills()} activeOpacity={0.7}>
@@ -266,7 +301,7 @@ export default function BillingScreen() {
               <Feather name="chevron-right" size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
           </View>
-        </View>
+        </View>}
       </ScrollView>
     </View>
   );

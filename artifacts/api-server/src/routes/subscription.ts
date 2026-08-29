@@ -24,6 +24,7 @@ import { requireRole, teamContext } from "../middlewares/requireRole";
 import { requireStripe } from "../lib/stripe";
 import { logger } from "../lib/logger";
 import { getWebOrigin } from "../lib/webOrigin";
+import { getEffectiveEntitlement, reconcileRevenueCatEntitlement } from "../lib/nativeEntitlements";
 
 const router = Router();
 router.use(requireAuth);
@@ -118,7 +119,6 @@ async function ensureCustomer(stripe: any, clerkUserId: string): Promise<string>
  */
 router.get("/status", requireRole("owner"), async (req, res) => {
   try {
-    const stripe = requireStripe();
     const clerkUserId = (req as any).clerkUserId as string;
 
     const [user] = await db
@@ -138,11 +138,30 @@ router.get("/status", requireRole("owner"), async (req, res) => {
       return;
     }
 
-    if (!user.subscriptionId) {
-      res.json({ plan: "starter", status: "none", renewsOn: null, trialEnd: null, amountCents: 0, paymentMethodLabel: null });
+    const effective = await getEffectiveEntitlement(clerkUserId);
+    const nativeMetadata = effective.native ? {
+      status: effective.native.status,
+      productIdentifier: effective.native.productIdentifier,
+      expiresAt: effective.native.expiresAt,
+      trialEndsAt: effective.native.trialEndsAt,
+      isSandbox: effective.native.isSandbox,
+      lastSyncedAt: effective.native.lastSyncedAt,
+    } : null;
+
+    if (!user.subscriptionId || effective.provider === "revenuecat") {
+      const plan = effective.provider === "revenuecat" ? effective.planId : "starter";
+      res.json({
+        plan, status: effective.provider === "revenuecat" ? effective.status : "none",
+        renewsOn: null, trialEnd: null,
+        amountCents: effective.provider === "revenuecat" ? PLAN_CATALOGUE[plan].amountCents : 0,
+        paymentMethodLabel: null,
+        effectiveProvider: effective.provider,
+        native: nativeMetadata,
+      });
       return;
     }
 
+    const stripe = requireStripe();
     // Fetch live status directly from Stripe for accuracy.
     // Cast to `any` because the Stripe SDK's Response<Subscription> generic
     // doesn't expose current_period_end or expanded fields at the TS level.
@@ -177,12 +196,36 @@ router.get("/status", requireRole("owner"), async (req, res) => {
       trialEnd:           trialEndFmt,
       amountCents,
       paymentMethodLabel: pmLabel,
+      effectiveProvider: effective.provider,
+      native: nativeMetadata,
     });
   } catch (err: any) {
     const status = err.status ?? 500;
     if (status < 500) { res.status(status).json({ error: err.message }); return; }
     req.log.error({ err }, "Failed to fetch subscription status");
     res.status(500).json({ error: "Failed to fetch subscription status" });
+  }
+});
+
+/** Reconciles the authenticated owner's native-store entitlement from RevenueCat. */
+router.post("/native/sync", requireRole("owner"), async (req, res) => {
+  try {
+    const clerkUserId = (req as any).clerkUserId as string;
+    const entitlement = await reconcileRevenueCatEntitlement(clerkUserId);
+    const effective = await getEffectiveEntitlement(clerkUserId);
+    res.json({
+      plan: effective.planId,
+      status: effective.status,
+      effectiveProvider: effective.provider,
+      native: {
+        ...entitlement,
+        expiresAt: entitlement.expiresAt?.toISOString() ?? null,
+        trialEndsAt: entitlement.trialEndsAt?.toISOString() ?? null,
+      },
+    });
+  } catch (err: any) {
+    req.log.error({ err }, "Native subscription reconciliation failed");
+    res.status(503).json({ error: "Unable to reconcile native subscription" });
   }
 });
 

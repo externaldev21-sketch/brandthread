@@ -1,0 +1,51 @@
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import express from "express";
+import type { AddressInfo } from "node:net";
+import type { Server } from "node:http";
+
+const state = vi.hoisted(() => ({ planId: "growth" as "growth" | "scale" }));
+
+vi.mock("@clerk/express", () => ({
+  getAuth: () => ({ userId: "native-seller" }),
+}));
+vi.mock("@workspace/db", () => ({ db: {}, users: {} }));
+vi.mock("drizzle-orm", () => ({ eq: vi.fn() }));
+vi.mock("../../lib/nativeEntitlements", () => ({
+  getEffectiveEntitlement: async () => ({
+    planId: state.planId,
+    status: "active",
+    provider: "revenuecat",
+    native: null,
+  }),
+}));
+
+import { requirePlan } from "../requireAuth";
+
+let server: Server;
+let base = "";
+
+beforeAll(async () => {
+  const app = express();
+  app.get("/growth", requirePlan("growth"), (_req, res) => res.json({ ok: true }));
+  app.get("/scale", requirePlan("scale"), (_req, res) => res.json({ ok: true }));
+  await new Promise<void>((resolve) => {
+    server = app.listen(0, "127.0.0.1", () => resolve());
+  });
+  base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+});
+
+afterAll(async () => {
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+});
+
+describe("requirePlan native entitlements", () => {
+  it("grants Growth endpoints from a server-verified native Growth entitlement", async () => {
+    state.planId = "growth";
+    expect((await fetch(`${base}/growth`)).status).toBe(200);
+  });
+
+  it("grants Scale endpoints from a server-verified native Scale entitlement", async () => {
+    state.planId = "scale";
+    expect((await fetch(`${base}/scale`)).status).toBe(200);
+  });
+});

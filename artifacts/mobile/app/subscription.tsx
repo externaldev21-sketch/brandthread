@@ -12,7 +12,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  Alert, ActivityIndicator, Linking, AppState, AppStateStatus,
+  Alert, ActivityIndicator, Linking, AppState, AppStateStatus, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -32,6 +32,8 @@ import { formatCents } from '@/lib/money';
 import { pollSubscriptionStatus } from '@/lib/pollSubscriptionStatus';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { getGrowthStudioTools, GROWTH_EXTRAS } from '@/lib/growthTools';
+import { useRevenueCat } from '@/lib/revenueCat';
+import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
 
 // ─── Static plan catalogue ────────────────────────────────────────────────────
 
@@ -117,6 +119,7 @@ export default function SubscriptionScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api    = useApi();
+  const { available: revenueCatAvailable, packages: revenueCatPackages, purchase, restore, managementURL } = useRevenueCat();
   const growthStudioTools = React.useMemo(() => getGrowthStudioTools(theme), [theme]);
 
   const [activeTab,   setActiveTab]   = useState<'plan' | 'usage' | 'billing'>('plan');
@@ -234,6 +237,18 @@ export default function SubscriptionScreen() {
     }
 
     try {
+      if (Platform.OS !== 'web') {
+        const packageToPurchase = revenueCatPackages.find((pkg) =>
+          pkg.identifier === SELLER_PACKAGE_IDS[planId as keyof typeof SELLER_PACKAGE_IDS],
+        );
+        if (!revenueCatAvailable || !packageToPurchase) {
+          throw new Error('Subscriptions are temporarily unavailable. Please try again shortly.');
+        }
+        await purchase(packageToPurchase);
+        invalidatePlanCache();
+        await fetchStatus();
+        return;
+      }
       const { url } = await api.seller.subscription.checkout(planId as 'starter' | 'growth' | 'scale');
       externalSessionOpenedRef.current = { kind: 'checkout', expectedPlan: planId };
       await Linking.openURL(url);
@@ -250,6 +265,11 @@ export default function SubscriptionScreen() {
   async function handleOpenPortal() {
     haptic();
     try {
+      if (Platform.OS !== 'web') {
+        if (!managementURL) throw new Error('Subscription management is not available yet.');
+        await Linking.openURL(managementURL);
+        return;
+      }
       const { url } = await api.seller.subscription.portal();
       externalSessionOpenedRef.current = { kind: 'portal' };
       await Linking.openURL(url);
@@ -260,6 +280,18 @@ export default function SubscriptionScreen() {
         return;
       }
       Alert.alert('Portal error', e?.message ?? 'Could not open billing portal. Please try again.');
+    }
+  }
+
+  async function handleRestore() {
+    haptic();
+    try {
+      await restore();
+      invalidatePlanCache();
+      await fetchStatus();
+      Alert.alert('Purchases restored', 'Your RevenueCat subscription has been refreshed.');
+    } catch (e: any) {
+      Alert.alert('Restore error', e?.message ?? 'Could not restore purchases. Please try again.');
     }
   }
 
@@ -406,7 +438,11 @@ export default function SubscriptionScreen() {
                       <Text style={styles.planTagline}>{plan.tagline}</Text>
                     </View>
                     <View style={styles.planPriceCol}>
-                      <Text style={styles.planPrice}>{plan.price}</Text>
+                       <Text style={styles.planPrice}>
+                         {Platform.OS === 'web'
+                           ? plan.price
+                           : revenueCatPackages.find((pkg) => pkg.identifier === SELLER_PACKAGE_IDS[plan.id as keyof typeof SELLER_PACKAGE_IDS])?.product.priceString ?? '—'}
+                       </Text>
                       <Text style={styles.planPeriod}>{plan.period}</Text>
                     </View>
                   </View>
@@ -503,9 +539,14 @@ export default function SubscriptionScreen() {
 
              {!isReadOnly && (
                <TouchableOpacity style={styles.cancelBtn} onPress={handleOpenPortal}>
-                 <Text style={styles.cancelText}>Manage or cancel subscription</Text>
+                  <Text style={styles.cancelText}>{Platform.OS === 'web' ? 'Manage or cancel subscription' : 'Manage subscription'}</Text>
                </TouchableOpacity>
              )}
+              {!isReadOnly && Platform.OS !== 'web' && (
+                <TouchableOpacity style={styles.restoreBtn} onPress={handleRestore} testID="seller-revenuecat-restore">
+                  <Text style={styles.restoreText}>Restore purchases</Text>
+                </TouchableOpacity>
+              )}
           </>
         )}
 
@@ -578,7 +619,7 @@ export default function SubscriptionScreen() {
                  {!isReadOnly && (
                    <TouchableOpacity style={styles.manageBillingBtn} onPress={handleOpenPortal}>
                      <Feather name="external-link" size={16} color={PURPLE} />
-                     <Text style={styles.manageBillingText}>Manage billing &amp; invoices</Text>
+                      <Text style={styles.manageBillingText}>{Platform.OS === 'web' ? 'Manage billing & invoices' : 'Manage subscription'}</Text>
                      <Feather name="chevron-right" size={16} color={MUTED} />
                    </TouchableOpacity>
                  )}
@@ -652,6 +693,8 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
   changePlanBtnOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: BORDER },
   changePlanText:     { color: '#FFFFFF', fontSize: FS.sm, fontFamily: FONT.semibold },
   cancelBtn:          { alignItems: 'center', paddingVertical: SP.lg },
+  restoreBtn:         { alignItems: 'center', paddingVertical: SP.sm, marginBottom: SP.md },
+  restoreText:        { color: MUTED, fontSize: FS.sm, fontFamily: FONT.medium },
   cancelText:         { color: SUBTLE, fontSize: FS.sm, fontFamily: FONT.regular },
   usageCard:          { backgroundColor: CARD, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: BORDER, marginBottom: SP.sm },
   usageHeader:        { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SP.sm },

@@ -3,6 +3,7 @@ import type { Request, Response, NextFunction } from "express";
 import { db } from "@workspace/db";
 import { users } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { getEffectiveEntitlement } from "../lib/nativeEntitlements";
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
   const { userId } = getAuth(req);
@@ -48,6 +49,8 @@ export async function requireModerator(req: Request, res: Response, next: NextFu
 const PLAN_ORDER: Record<string, number> = {
   starter: 0,
   growth: 1,
+  scale: 2,
+  // Compatibility for Stripe subscribers created under the prior name.
   pro: 2,
 };
 
@@ -68,7 +71,7 @@ const ALLOW_TEST_SUBSCRIPTION_BYPASS =
  * Returns 403 with `{ error, code, requiredPlan, currentPlan, message }` when
  * the authenticated seller's plan is below `minPlan`.
  */
-export function requirePlan(minPlan: "growth" | "pro") {
+export function requirePlan(minPlan: "growth" | "scale" | "pro") {
   return async (req: Request, res: Response, next: NextFunction) => {
     const { userId } = getAuth(req);
     if (!userId) {
@@ -82,22 +85,21 @@ export function requirePlan(minPlan: "growth" | "pro") {
     }
 
     try {
-      const rows = await db
-        .select({ subscriptionPlanId: users.subscriptionPlanId })
-        .from(users)
-        .where(eq(users.clerkId, userId))
-        .limit(1);
-
-      const plan = rows[0]?.subscriptionPlanId ?? "starter";
+      // This reads the server-verified native entitlement cache alongside the
+      // existing Stripe fields. It deliberately retains the historical
+      // fail-open catch below; task #248 owns any broader policy change.
+      const entitlement = await getEffectiveEntitlement(userId);
+      const plan = entitlement.planId;
       const currentLevel = PLAN_ORDER[plan] ?? 0;
-      const requiredLevel = PLAN_ORDER[minPlan] ?? 1;
+      const normalizedRequiredPlan = minPlan === "pro" ? "scale" : minPlan;
+      const requiredLevel = PLAN_ORDER[normalizedRequiredPlan] ?? 1;
 
       if (currentLevel < requiredLevel) {
-        const planLabel = minPlan.charAt(0).toUpperCase() + minPlan.slice(1);
+        const planLabel = normalizedRequiredPlan.charAt(0).toUpperCase() + normalizedRequiredPlan.slice(1);
         res.status(403).json({
           error: "Plan required",
           code: "PLAN_REQUIRED",
-          requiredPlan: minPlan,
+          requiredPlan: normalizedRequiredPlan,
           currentPlan: plan,
           message: `This feature requires the ${planLabel} plan or higher. Upgrade to unlock it.`,
         });

@@ -7,11 +7,13 @@ import crypto from "crypto";
 import {
   db, checkoutSessions, orders, orderItems, productVariants, products, users, notificationsFeed, disputes,
   dropWallets, dropWalletTransactions, freelancers, freelancerJobs,
+  revenueCatWebhookEvents,
 } from "@workspace/db";
 import { eq, and, ne, sql } from "drizzle-orm";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe";
 import { refundJobPayment } from "../lib/freelancerEscrow";
 import { logger } from "../lib/logger";
+import { reconcileRevenueCatEntitlement } from "../lib/nativeEntitlements";
 import {
   awardLoyaltyPointsOnce,
   consumeLoyaltyRedemption,
@@ -23,6 +25,15 @@ import {
 } from "../lib/brandthreadEmail";
 
 const router = Router();
+
+function authorizationMatches(actual: string | undefined, expected: string): boolean {
+  const candidates = [expected, `Bearer ${expected}`];
+  return candidates.some((candidate) => {
+    const left = Buffer.from(actual ?? "");
+    const right = Buffer.from(candidate);
+    return left.length === right.length && crypto.timingSafeEqual(left, right);
+  });
+}
 
 async function sendOrderConfirmationForOrder(orderId: string): Promise<boolean> {
   const [order] = await db
@@ -168,6 +179,59 @@ router.post("/stripe", async (req: Request, res: Response) => {
   } catch (err) {
     req.log.error({ err, eventType: event.type, eventId: event.id }, "Stripe webhook handler failed");
     res.status(500).json({ error: "Webhook handler failed" });
+  }
+});
+
+// POST /api/webhooks/revenuecat — provider authorization plus a durable event ledger.
+router.post("/revenuecat", async (req: Request, res: Response): Promise<void> => {
+  const expectedAuthorization = process.env.REVENUECAT_WEBHOOK_AUTHORIZATION
+    ?? (process.env.SESSION_SECRET ? `Bearer ${process.env.SESSION_SECRET}` : undefined);
+  const authorization = req.header("authorization");
+  if (expectedAuthorization) {
+    if (!authorizationMatches(authorization, expectedAuthorization)) {
+      req.log.warn("RevenueCat webhook authorization failed");
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+  } else if (process.env.NODE_ENV === "production") {
+    req.log.error("RevenueCat webhook rejected: authorization secret is not configured");
+    res.status(503).json({ error: "RevenueCat webhook authorization is not configured" });
+    return;
+  } else {
+    req.log.warn("RevenueCat webhook accepted without authorization in development");
+  }
+
+  const event = req.body?.event ?? req.body;
+  const eventId = typeof event?.id === "string" ? event.id : null;
+  const appUserId = typeof event?.app_user_id === "string" ? event.app_user_id : null;
+  if (!eventId || !appUserId) {
+    res.status(400).json({ error: "RevenueCat event id and app_user_id are required" });
+    return;
+  }
+  const occurredAt = typeof event.event_timestamp_ms === "number"
+    ? new Date(event.event_timestamp_ms)
+    : typeof event.event_timestamp === "number" ? new Date(event.event_timestamp * 1000) : null;
+
+  try {
+    const [recorded] = await db.insert(revenueCatWebhookEvents).values({
+      eventId, appUserId, eventType: typeof event.type === "string" ? event.type : null, occurredAt,
+    }).onConflictDoNothing().returning({ id: revenueCatWebhookEvents.id });
+    if (!recorded) {
+      res.json({ received: true, duplicate: true });
+      return;
+    }
+    // Reconciliation reads the current provider state, so stale/out-of-order
+    // webhook payloads cannot overwrite a newer entitlement.
+    await reconcileRevenueCatEntitlement(appUserId);
+    res.json({ received: true });
+  } catch (err) {
+    // Do not permanently suppress a provider retry when the live lookup was
+    // unavailable. Successfully reconciled events remain in the ledger.
+    await db.delete(revenueCatWebhookEvents).where(eq(revenueCatWebhookEvents.eventId, eventId)).catch((deleteErr) => {
+      req.log.error({ err: deleteErr, eventId }, "Could not release failed RevenueCat webhook event");
+    });
+    req.log.error({ err, eventId, appUserId }, "RevenueCat webhook reconciliation failed");
+    res.status(500).json({ error: "RevenueCat webhook handler failed" });
   }
 });
 

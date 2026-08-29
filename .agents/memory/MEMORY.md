@@ -63,3 +63,4 @@
 - [API failure contract](api-failure-contract.md) — every API failure uses one request-correlated envelope; 5xx responses stay generic while diagnostics remain in structured logs.
 - [Stripe Connect payout truth](stripe-connect-payout-truth.md) — seller bank and verification UI must come from live Connect account state, never finance balances or cached labels.
 - [Expo web production boundary](expo-web-production-boundary.md) — browser hosting uses an Expo Router static export, same-origin Clerk/API routing, and explicit mobile-only fallbacks.
+- [Seller billing provider boundary](seller-billing-provider-boundary.md) — native seller plans use RevenueCat; web seller plans and all physical commerce remain Stripe; server computes access across both.

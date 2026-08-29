@@ -29,6 +29,7 @@ import { initBuyerProfile } from '@/lib/buyerProfile';
 import StoreContextBanner from '@/components/StoreContextBanner';
 import NetworkNoticeBanner from '@/components/NetworkNoticeBanner';
 import { dismissNetworkNotice } from '@/lib/networkNotice';
+import { RevenueCatProvider } from '@/lib/revenueCat';
 
 // Push notifications are native-only. Importing the package is safe for the
 // web bundle, but registering a handler/listener there produces unsupported
@@ -631,9 +632,11 @@ export default function RootLayout() {
           <GestureHandlerRootView style={{ flex: 1 }}>
             <AppThemeProvider>
               <RoleProvider>
-                <KeyboardProvider>
-                  <RootLayoutNav />
-                </KeyboardProvider>
+                <RevenueCatProvider>
+                  <KeyboardProvider>
+                    <RootLayoutNav />
+                  </KeyboardProvider>
+                </RevenueCatProvider>
               </RoleProvider>
             </AppThemeProvider>
           </GestureHandlerRootView>

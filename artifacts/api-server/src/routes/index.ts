@@ -148,7 +148,7 @@ router.use("/drop-wallets",              tc, dropWalletRouter);
 router.use("/disputes",                  tc, disputesRouter);
 router.use("/finance",                   financeRouter); // router applies manager reads and owner mutations after team context
 router.use("/taxes",                     tc, taxesRouter);
-router.use("/team",                      teamRouter);
+router.use("/team",                      tc, requirePlan("scale"), teamRouter);
 router.use("/store/ai",                  tc, storeAiRouter);
 router.use("/store",                     tc, storeRouter);
 
@@ -167,10 +167,10 @@ router.use("/buyer/payment-methods",     buyerPaymentsRouter);
 
 // ─── Live shopping ─────────────────────────────────────────────────────────────
 import liveRouter from "./live";
-router.use("/live",                      tc, liveRouter);
+router.use("/live",                      tc, requirePlan("scale"), liveRouter);
 
 // ─── Paid boosts, vacation mode, loyalty/rewards ──────────────────────────────
-router.use("/boosts",         tc, boostsRouter);
+router.use("/boosts",                    tc, requirePlan("scale"), boostsRouter);
 router.use("/seller/vacation",          tc, vacationRouter);
 router.use("/seller/notification-prefs", tc, notificationPrefsRouter);
 router.use("/loyalty",             loyaltyRouter); // buyer-scoped; no tc

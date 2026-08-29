@@ -2,7 +2,7 @@
  * Brandthread Onboarding — complete buyer + seller flows
  *
  * BUYER  steps: 0=Auth 1=AccountType 2=Name 3=Style 4=Loading 5=Notifications 6=Success
- * SELLER steps: 0=Auth 1=AccountType 2=Name 3=BrandName 4=Stage 5=Goals 6=Loading 7=Notifications 8=Success
+ * SELLER steps: 0=Auth 1=AccountType 2=Name 3=BrandName 4=Stage 5=Goals 6=Plan 7=Loading 8=Notifications 9=Success
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -42,6 +42,9 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { hydrateMyProfileFromAccount, socialKeysForUser } from '@/services/socialService';
 import { DEFAULT_BUYER_PROFILE, saveBuyerProfileForUser } from '@/lib/buyerProfile';
+import { SellerPlanRecommendationStep } from '@/components/onboarding/SellerPlanRecommendationStep';
+import { recommendSellerPlan } from '@/lib/sellerPlans';
+import type { SellerPlanId } from '@/lib/sellerBilling';
 
 // ─── Palette ────────────────────────────────────────────────────────────────
 const BG      = '#07070F';
@@ -82,7 +85,7 @@ const SELLER_LOADING_STEPS = ['Mapping your brand workspace', 'Preparing your pr
 
 const LEGACY_DRAFT_KEY = 'onboarding_draft';
 const DRAFT_KEY_PREFIX = 'onboarding_draft:';
-const DRAFT_VERSION = 4;
+const DRAFT_VERSION = 5;
 
 const BUYER_STEP_INDEX = {
   AUTH: 0,
@@ -101,9 +104,10 @@ const SELLER_STEP_INDEX = {
   BRAND_NAME: 3,
   BRAND_STAGE: 4,
   GOALS: 5,
-  LOADING: 6,
-  NOTIFICATIONS: 7,
-  SUCCESS: 8,
+  PLAN: 6,
+  LOADING: 7,
+  NOTIFICATIONS: 8,
+  SUCCESS: 9,
 } as const;
 
 function draftKeyForUser(userId?: string | null): string | null {
@@ -117,6 +121,13 @@ type Flow = 'buyer' | 'seller';
 // screen. Version 1 seller drafts also had a removed product-model step.
 function restoreDraftStep(flow: Flow, step: number, version?: number): number {
   if (version === DRAFT_VERSION) return step;
+
+  if (version === 4) {
+    const previousStep = flow === 'buyer'
+      ? [BUYER_STEP_INDEX.AUTH, BUYER_STEP_INDEX.ACCOUNT_TYPE, BUYER_STEP_INDEX.NAME, BUYER_STEP_INDEX.STYLE, BUYER_STEP_INDEX.LOADING, BUYER_STEP_INDEX.NOTIFICATIONS, BUYER_STEP_INDEX.SUCCESS]
+      : [SELLER_STEP_INDEX.AUTH, SELLER_STEP_INDEX.ACCOUNT_TYPE, SELLER_STEP_INDEX.NAME, SELLER_STEP_INDEX.BRAND_NAME, SELLER_STEP_INDEX.BRAND_STAGE, SELLER_STEP_INDEX.GOALS, SELLER_STEP_INDEX.LOADING, SELLER_STEP_INDEX.NOTIFICATIONS, SELLER_STEP_INDEX.SUCCESS];
+    return previousStep[step] ?? (flow === 'buyer' ? BUYER_STEP_INDEX.AUTH : SELLER_STEP_INDEX.AUTH);
+  }
 
   if (version === 3) {
     const previousStep = flow === 'buyer'
@@ -1077,6 +1088,7 @@ export default function OnboardingScreen() {
   const [brandName, setBrandName]         = useState('');
   const [brandStage, setBrandStage]       = useState('');
   const [goals, setGoals]                 = useState<string[]>([]);
+  const [selectedPlanId, setSelectedPlanId] = useState<SellerPlanId>('starter');
 
   // Shared post-questionnaire state
   const [notificationsGranted, setNotificationsGranted] = useState<boolean>(false);
@@ -1130,6 +1142,7 @@ export default function OnboardingScreen() {
               setBrandName(draft.brandName ?? '');
               setBrandStage(draft.brandStage ?? '');
               setGoals(draft.goals ?? []);
+              setSelectedPlanId(draft.selectedPlanId ?? recommendSellerPlan(draft.brandStage ?? '', draft.goals ?? []).planId);
             }
           } catch { /* bad json, ignore */ }
         }
@@ -1150,11 +1163,11 @@ export default function OnboardingScreen() {
     const data = {
       version: DRAFT_VERSION,
       ownerId: userId,
-      flow, step, firstName, username, styleInterests, brandName, brandStage, goals,
+      flow, step, firstName, username, styleInterests, brandName, brandStage, goals, selectedPlanId,
       ...overrides,
     };
     await AsyncStorage.setItem(draftKey, JSON.stringify(data));
-  }, [flow, step, firstName, username, styleInterests, brandName, brandStage, goals, user?.id]);
+  }, [flow, step, firstName, username, styleInterests, brandName, brandStage, goals, selectedPlanId, user?.id]);
 
   // Persist onboarding answers under the authenticated user's immutable ID.
   useEffect(() => {
@@ -1306,6 +1319,8 @@ export default function OnboardingScreen() {
         ['onboarding_first_name', firstName],
         ['onboarding_brand_name', brandName],
         ['onboarding_brand_stage', brandStage],   // read by plans.tsx for tier recommendation
+        ['onboarding_goals', JSON.stringify(goals)],
+        ['onboarding_selected_plan', selectedPlanId],
         ['notifications_granted', notificationsGranted ? 'true' : 'false'],
       ]);
       await AsyncStorage.multiRemove([draftKeyForUser(profile.clerkId)!, LEGACY_DRAFT_KEY]);
@@ -1350,6 +1365,7 @@ export default function OnboardingScreen() {
       if (step === SELLER_STEP_INDEX.BRAND_NAME) return brandName.trim().length >= 1;
       if (step === SELLER_STEP_INDEX.BRAND_STAGE) return !!brandStage;
       if (step === SELLER_STEP_INDEX.GOALS) return true;
+      if (step === SELLER_STEP_INDEX.PLAN) return true;
     }
     return true;
   }
@@ -1361,7 +1377,7 @@ export default function OnboardingScreen() {
 
   function progressFraction(): number {
     const progressFlow = flow ?? selectedFlow;
-    const total = progressFlow === 'buyer' ? 7 : 9;
+    const total = progressFlow === 'buyer' ? 7 : 10;
     return Math.min(1, (step + 1) / total);
   }
 
@@ -1370,7 +1386,7 @@ export default function OnboardingScreen() {
     if (!progressFlow) {
       return step === BUYER_STEP_INDEX.AUTH ? 'Step 1' : 'Step 2';
     }
-    const total = progressFlow === 'buyer' ? 7 : 9;
+    const total = progressFlow === 'buyer' ? 7 : 10;
     if (step >= total - 1) return 'Complete';
     if (step === total - 2) return 'Almost done';
     return `Step ${step + 1} of ${total}`;
@@ -1564,7 +1580,18 @@ export default function OnboardingScreen() {
         </ScrollView>
       );
 
-      // Step 6: Loading
+      // Step 6: Personalized plan recommendation
+      if (step === SELLER_STEP_INDEX.PLAN) return (
+        <SellerPlanRecommendationStep
+          brandStage={brandStage}
+          goals={goals}
+          selectedPlanId={selectedPlanId}
+          onSelect={setSelectedPlanId}
+          onContinue={() => goNext()}
+        />
+      );
+
+      // Step 7: Loading
       if (step === SELLER_STEP_INDEX.LOADING) return (
         <LoadingAnimation steps={SELLER_LOADING_STEPS} onDone={() => setStep(SELLER_STEP_INDEX.NOTIFICATIONS)} />
       );
@@ -1600,7 +1627,7 @@ export default function OnboardingScreen() {
   const showFooter = !isFullScreen
     && !isAuthStep
     && !isAccountTypeStep
-    && !(flow === 'seller' && step === SELLER_STEP_INDEX.GOALS);
+    && !(flow === 'seller' && (step === SELLER_STEP_INDEX.GOALS || step === SELLER_STEP_INDEX.PLAN));
 
   function footerButtonLabel(): string {
     if (flow === 'buyer' && step === BUYER_STEP_INDEX.STYLE) {
