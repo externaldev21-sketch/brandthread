@@ -10,7 +10,7 @@ import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUB
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState, StatCard, SearchBar, BrandedLoader } from '@/components/BrandthreadUI';
 import { filterOrders, sortOrders } from '@/services/orderService';
-import { Order, OrderFilterKey, OrderSortKey, OrderAddress, OrderCustomer, FulfillmentStatus, FulfillmentType, OrderStatus, PaymentStatus } from '@/services/orderTypes';
+import { Order, OrderFilterKey, OrderSortKey, OrderAddress, OrderCustomer, FulfillmentStatus, FulfillmentType, OrderStatus, PaymentStatus, CancellationReason, CANCELLATION_REASONS } from '@/services/orderTypes';
 import { useApi } from '@/hooks/useApi';
 import { useAuth } from '@clerk/expo';
 import { clearBadge } from '@/lib/orderBadgeStore';
@@ -82,6 +82,10 @@ function getFulfillmentLabel(status: string): string {
   }
 }
 
+function getCancellationReasonLabel(reason: string): string {
+  return CANCELLATION_REASONS.find(r => r.key === reason)?.label ?? reason.replace(/_/g, ' ');
+}
+
 function computeStats(orders: Order[]): OrderStats {
   return {
     newOrders: orders.filter(o => o.status === 'new').length,
@@ -130,6 +134,7 @@ function apiRowToOrder(row: any): Order {
     tags: [], shippingAddress: emptyAddr, billingAddress: emptyAddr,
   };
   const totalCents = row.totalCents ?? 0;
+  const cancellationReason = row.cancellationReason as string | null | undefined;
 
   return {
     id: row.id, orderNumber: row.orderNumber ?? '',
@@ -157,6 +162,14 @@ function apiRowToOrder(row: any): Order {
       trackingEvents: [], isDemo: false,
     }] : [],
     labels: [], returns: [], refunds: [], disputes: [], timeline: [], notes: [],
+    cancellation: ordStatus === 'cancelled' && cancellationReason ? {
+      id: `cancel_${row.id}`,
+      orderId: row.id,
+      reason: cancellationReason as CancellationReason,
+      refundAmountCents: totalCents,
+      notifyCustomer: true,
+      cancelledAt: typeof row.updatedAt === 'string' ? row.updatedAt : new Date(row.updatedAt).toISOString(),
+    } : undefined,
     hasUnreadMessage: false, isPreOrder: false, isManufacturerFulfilled: false,
     currency: 'USD', tags: [],
     createdAt: typeof row.createdAt === 'string' ? row.createdAt : new Date(row.createdAt).toISOString(),
@@ -280,6 +293,14 @@ function OrderCard({
       <Text style={s.itemSummary} numberOfLines={1}>
         {itemSummary}  ·  {order.lineItems.length} {order.lineItems.length === 1 ? 'item' : 'items'}
       </Text>
+      {order.status === 'cancelled' && order.cancellation?.reason && (
+        <View style={s.cancellationReasonRow}>
+          <Feather name="x-circle" size={12} color={RED} />
+          <Text style={s.cancellationReasonText} numberOfLines={1}>
+            Cancelled · {getCancellationReasonLabel(order.cancellation.reason)}
+          </Text>
+        </View>
+      )}
 
       {/* Divider */}
       <View style={s.divider} />
@@ -1203,6 +1224,18 @@ const s = StyleSheet.create({
     fontSize: FS.sm,
     fontFamily: FONT.regular,
     color: MUTED,
+  },
+  cancellationReasonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.xs,
+    marginTop: SP.xs,
+  },
+  cancellationReasonText: {
+    flex: 1,
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: RED,
   },
   divider: {
     height: 1,

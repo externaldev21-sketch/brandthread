@@ -66,6 +66,7 @@ router.get("/", async (req, res) => {
       totalCents: orders.totalCents,
       trackingNumber: orders.trackingNumber,
       carrier: orders.carrier,
+      cancellationReason: orders.cancellationReason,
       createdAt: orders.createdAt,
       updatedAt: orders.updatedAt,
       // Prefer the explicit customers record; fall back to the buyer's user row
