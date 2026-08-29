@@ -1,6 +1,6 @@
 /**
  * Brandthread Analytics — type system
- * All stable, no random values. Demo data seeded in analyticsService.ts.
+ * Values are supplied by authenticated analytics APIs; empty accounts remain zero/empty.
  */
 
 // ── Date / comparison ────────────────────────────────────────────────────────

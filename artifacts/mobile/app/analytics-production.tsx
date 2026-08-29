@@ -77,7 +77,7 @@ function ManufacturerCard({ mfr }: { mfr: ManufacturerAnalyticsRow }) {
       {mfr.delayRate > 10 && (
         <View style={s.mfrWarning}>
           <Feather name="alert-triangle" size={12} color={ORANGE} />
-          <Text style={s.mfrWarningText}>Demo data — not verified ratings</Text>
+          <Text style={s.mfrWarningText}>Higher-than-target delay rate</Text>
         </View>
       )}
       <View style={s.mfrFooter}>
@@ -179,7 +179,7 @@ export default function AnalyticsProductionScreen() {
 
       {/* Manufacturer performance */}
       <Text style={s.sectionTitle}>Manufacturer Performance</Text>
-      <Text style={s.disclaimer}>Performance data is for internal reference only. Ratings are based on demo data and are not verified.</Text>
+      <Text style={s.disclaimer}>Calculated only from your recorded production activity.</Text>
       {data?.manufacturers.length === 0 ? (
         <View style={s.emptyState}>
           <Feather name="tool" size={36} color={MUTED} />

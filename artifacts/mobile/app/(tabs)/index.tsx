@@ -10,9 +10,7 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApi } from '@/hooks/useApi';
 import { getSetupState, markSetupStarted, dismissWelcome, completionPercent, nextTask, nextBestAction, dismissTip, markFeatureOpened, type SetupState } from '@/lib/setupStore';
-import { getHubStats } from '@/services/manufacturerService';
-import { getOrderStats } from '@/services/orderService';
-import { getInventoryStats } from '@/services/inventoryService';
+import { deriveHubStats, deriveInventoryStats, deriveOrderStats } from '@/lib/sellerDashboardStats';
 import { BrandthreadScreen, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SearchBar, StatCard, QuickActionCard, SectionHeader, ProgressCard, NavigationCard, GuidedTip, NewFeatureBadge, LoadingSkeleton, EmptyState, StatusBadge } from '@/components/BrandthreadUI';
 import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, GREEN_BRIGHT, BLUE, ORANGE, RED, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
@@ -128,8 +126,6 @@ export default function SellerHomeScreen() {
     newOrders: number;
     toProcess: number;
     readyToShip: number;
-    returnRequests: number;
-    disputes: number;
   } | null>(null);
   const [invStats, setInvStats] = useState<{
     lowStockCount: number;
@@ -180,28 +176,26 @@ export default function SellerHomeScreen() {
       setStatsError(true);
       reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
-    // Load hub stats
-    getHubStats().then(stats => setHubStats({
-      activeQuotes: stats.activeQuotes,
-      samplesNeedingReview: stats.samplesNeedingReview,
-      activeProduction: stats.activeProduction,
-      unreadMessages: stats.unreadMessages,
-    })).catch((error) => { setStatsError(true); reportNetworkError(error, () => setRetryKey(key => key + 1)); });
-    // Load order stats
-    getOrderStats().then(s => setOrderStats({
-      newOrders: s.newOrders,
-      toProcess: s.toProcess,
-      readyToShip: s.readyToShip,
-      returnRequests: s.returnRequests,
-      disputes: s.disputes,
-    })).catch((error) => { setStatsError(true); reportNetworkError(error, () => setRetryKey(key => key + 1)); });
-    // Load inventory stats
-    getInventoryStats().then(s => setInvStats({
-      lowStockCount: s.lowStockCount,
-      outOfStockCount: s.outOfStockCount,
-      incomingCount: s.incomingCount,
-      delayedCount: s.delayedCount,
-    })).catch((error) => { setStatsError(true); reportNetworkError(error, () => setRetryKey(key => key + 1)); });
+    // Optional operational summaries use authenticated server data only.
+    // A plan-gated/unavailable hub stays hidden rather than falling back to demo records.
+    Promise.all([
+      api.sellerHub.quoteRequests.list(),
+      api.manufacturers.sampleOrders.list(),
+      api.manufacturers.threads.list(),
+    ]).then(([quotes, samples, threads]: any[]) => {
+      setHubStats(deriveHubStats(
+        Array.isArray(quotes) ? quotes : [],
+        Array.isArray(samples) ? samples : [],
+        Array.isArray(threads) ? threads : [],
+      ));
+    }).catch(() => setHubStats(null));
+    api.inventory.list().then((rows: any) => {
+      setInvStats(deriveInventoryStats(Array.isArray(rows) ? rows : []));
+    }).catch((error) => {
+      setInvStats(null);
+      setStatsError(true);
+      reportNetworkError(error, () => setRetryKey(key => key + 1));
+    });
     // ── Dashboard visual upgrade: hero card + trend chart + real orders ──
     api.finance.balance().then((data: any) => {
       setPayoutInfo(data && typeof data === 'object' ? data : null);
@@ -212,9 +206,11 @@ export default function SellerHomeScreen() {
     });
     api.orders.list().then((rows: any) => {
       const list = Array.isArray(rows) ? rows : [];
+      setOrderStats(deriveOrderStats(list));
       setRecentOrders(list.slice(0, 3));
       setSearchOrders(list);
     }).catch((error) => {
+      setOrderStats(null);
       setRecentOrders(null);
       setStatsError(true);
       reportNetworkError(error, () => setRetryKey(key => key + 1));

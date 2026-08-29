@@ -1,6 +1,7 @@
 /**
  * Brandthread Orders Service — demo layer with AsyncStorage persistence.
- * All writes persist across restarts. Demo data seeds on first load.
+ * All writes persist across restarts. Seller orders start empty; the separate
+ * buyer preview dataset remains available for buyer-facing demo flows.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -378,7 +379,7 @@ async function ensureInitialized() {
   _initialized = true;
   try {
     const [[, raw], [, rawBuyer]] = await AsyncStorage.multiGet([KEYS.orders, KEYS.buyer]);
-    _orders = raw ? JSON.parse(raw) : DEMO_ORDERS_DATA;
+    _orders = raw ? JSON.parse(raw) : [];
     _buyerOrders = rawBuyer ? JSON.parse(rawBuyer) : DEMO_BUYER_ORDERS;
     // Backfill sellerId/sellerHandle for records persisted before these fields were added
     _buyerOrders = _buyerOrders.map(o => ({
@@ -387,10 +388,10 @@ async function ensureInitialized() {
       sellerName:   o.sellerName   ?? 'Threadhaus',
       sellerHandle: o.sellerHandle ?? '@threadhaus',
     }));
-    if (!raw) await AsyncStorage.setItem(KEYS.orders, JSON.stringify(_orders));
+    if (!raw) await AsyncStorage.setItem(KEYS.orders, JSON.stringify([]));
     if (!rawBuyer) await AsyncStorage.setItem(KEYS.buyer, JSON.stringify(_buyerOrders));
   } catch {
-    _orders = DEMO_ORDERS_DATA;
+    _orders = [];
     _buyerOrders = DEMO_BUYER_ORDERS;
   }
 }
