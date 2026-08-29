@@ -13,4 +13,4 @@ Granular notification category switches control push delivery only. In-app notif
 
 **Why:** Disabling a disruptive device alert should not erase important order, payment, dispute, or message history inside the app.
 
-**How to apply:** Every new push-producing event must declare a logical event category and pass through the centralized preference-aware push helper. Do not send category pushes directly to stored device tokens.
+**How to apply:** Every new push-producing event must declare a logical event category and pass through the centralized preference-aware push helper. Feed labels such as `orders` are presentation categories, not push categories; pass the singular push category such as `order` explicitly. Do not send category pushes directly to stored device tokens.

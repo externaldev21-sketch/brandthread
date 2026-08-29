@@ -388,6 +388,7 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
     publishNotification({
       userId:     transitioned.buyerId,
       category:   "orders",
+      pushCategory: "order",
       type:       notif.type,
       title:      notif.title,
       body:       notif.body,
@@ -463,7 +464,9 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
 
   // Step 1: Atomically transition to shipped only when status isn't already shipped.
   // This prevents duplicate ship notifications on repeated tracking updates.
-  // A status/date-only update must not change the order's fulfillment status.
+  // A status/date-only update must not change the order's fulfillment status,
+  // except for in_transit: that status is itself the carrier's confirmation
+  // that the order has shipped.
   // Supplying a new tracking number retains the existing add-tracking behavior.
   let statusTransition: {
     id: string;
@@ -473,7 +476,7 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
     ownerId: string;
     subtotalCents: number;
   } | undefined;
-  if (trackingNumber !== undefined) {
+  if (trackingNumber !== undefined || trackingStatus === "in_transit") {
     [statusTransition] = await db.update(orders)
       .set({ status: "shipped", shippedAt: new Date(), updatedAt: new Date() })
       .where(and(
@@ -541,13 +544,14 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
 
   // Notify buyer only when status genuinely transitioned to shipped
   if (statusTransition?.buyerId) {
-    const carrierLabel = carrier ?? "carrier";
+    const carrierLabel = updated.carrier ?? carrier ?? "carrier";
     publishNotification({
       userId:     statusTransition.buyerId,
       category:   "orders",
+      pushCategory: "order",
       type:       "order_shipped",
       title:      "Your order has shipped! 🚚",
-      body:       `Order #${statusTransition.orderNumber} is on its way via ${carrierLabel} — tracking: ${trackingNumber}`,
+      body:       `Order #${statusTransition.orderNumber} is on its way via ${carrierLabel} — tracking: ${updated.trackingNumber ?? "not available yet"}`,
       targetId:   statusTransition.id,
       targetType: "order",
     }).catch(() => { /* non-critical */ });
