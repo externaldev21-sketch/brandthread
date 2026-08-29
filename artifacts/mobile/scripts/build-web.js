@@ -13,6 +13,16 @@ const path = require('path');
 const projectRoot = path.resolve(__dirname, '..');
 const outputDir = path.join(projectRoot, 'static-build');
 const CANONICAL_ORIGIN = 'https://brandthread.app';
+const ROUTE_METADATA = {
+  '/privacy': {
+    title: 'Privacy Policy | Brandthread',
+    description: 'How Brandthread collects, uses, shares, and protects information across its buyer, seller, social commerce, design, payment, and verification features.',
+  },
+  '/terms': {
+    title: 'Terms of Service | Brandthread',
+    description: 'Terms governing Brandthread accounts, social commerce, marketplace orders, seller subscriptions, content, AI tools, and platform conduct.',
+  },
+};
 
 function domainFromEnvironment() {
   const isPublishedBuild =
@@ -50,11 +60,19 @@ function addCanonicalMetadata() {
     const routePath = routePathForHtml(filePath);
     const canonicalUrl = `${CANONICAL_ORIGIN}${routePath}`;
     const html = fs.readFileSync(filePath, 'utf8');
+    const routeMetadata = ROUTE_METADATA[routePath];
     const metadata = [
       `<link rel="canonical" href="${canonicalUrl}" />`,
       `<meta property="og:url" content="${canonicalUrl}" />`,
+      routeMetadata ? `<title>${routeMetadata.title}</title>` : '',
+      routeMetadata ? `<meta name="description" content="${routeMetadata.description}" />` : '',
+      routeMetadata ? `<meta property="og:title" content="${routeMetadata.title}" />` : '',
+      routeMetadata ? `<meta property="og:description" content="${routeMetadata.description}" />` : '',
     ].join('');
-    const updated = html.replace('</head>', `${metadata}</head>`);
+    const withoutGenericTitle = routeMetadata
+      ? html.replace(/<title\b[^>]*>[\s\S]*?<\/title>/gi, '')
+      : html;
+    const updated = withoutGenericTitle.replace('</head>', `${metadata}</head>`);
     if (updated !== html) fs.writeFileSync(filePath, updated);
   }
 }

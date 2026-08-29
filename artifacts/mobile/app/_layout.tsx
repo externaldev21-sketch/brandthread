@@ -104,6 +104,7 @@ const DEV_FORCE_ONBOARDING_START = false;
 
 // Screens that don't require authentication
 const AUTH_SCREENS = ['sign-in', 'forgot-password', 'splash'];
+const PUBLIC_SCREENS = ['privacy', 'terms'];
 
 // ─── Auth gate ────────────────────────────────────────────────────────────────
 function AuthGate() {
@@ -192,6 +193,7 @@ function AuthGate() {
     const inAuthScreen    = AUTH_SCREENS.includes(segments[0] as string);
     const inOnboarding    = segments[0] === 'onboarding';
     const inPlans         = segments[0] === 'plans';
+    const inPublicScreen  = PUBLIC_SCREENS.includes(segments[0] as string);
     const inBuyerGroup    = segments[0] === '(buyer)';
     const inTabsGroup     = segments[0] === '(tabs)';
     // The index route ("/") has no segment — it only shows BootScreen and
@@ -199,7 +201,7 @@ function AuthGate() {
     const atRoot          = !segments[0] || (segments[0] as string) === 'index';
     // Team invite links must be viewable signed-out (deep-link entry point)
     const inInvite        = (segments[0] as string) === 'team-invite';
-    const inProtectedArea = !inAuthScreen && !inOnboarding && !inInvite;
+    const inProtectedArea = !inAuthScreen && !inOnboarding && !inInvite && !inPublicScreen;
 
     // Allow public access to specific buyer routes for guests
     const isGuestAllowedRoute =
@@ -217,6 +219,9 @@ function AuthGate() {
 
     if (!isLoaded) return;
     if (splashSeen === null) return; // still reading AsyncStorage
+    // Legal documents must remain reachable from App Store metadata, onboarding,
+    // and direct browser links regardless of authentication/onboarding state.
+    if (inPublicScreen) return;
 
     // Unauthenticated: show splash first time, then sign-in
     if (!isSignedIn && inProtectedArea && !isGuestAllowedRoute) {
@@ -496,6 +501,8 @@ function RootLayoutNav() {
         <Stack.Screen name="buyer-story-create"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
         <Stack.Screen name="buyer-notifications"     options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-privacy-settings"  options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="privacy"                 options={{ headerShown: false, animation: 'fade' }} />
+        <Stack.Screen name="terms"                   options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="buyer-saved"             options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-blocked"              options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-payment-methods"     options={{ headerShown: false, animation: 'slide_from_right' }} />

@@ -359,7 +359,7 @@ export default function SellerHomeScreen() {
             colors={theme.heroGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={s.heroCard}
+            style={[s.heroCard, { shadowColor: theme.shadowColor }]}
           >
             <View style={s.heroTop}>
               <View>
@@ -1130,7 +1130,6 @@ const s = StyleSheet.create({
     borderRadius: RADIUS.lg,
     padding: SP.lg,
     gap: 14,
-    shadowColor: theme.shadowColor,
     shadowOpacity: 0.45,
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 8 },
