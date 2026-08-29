@@ -116,10 +116,9 @@ router.post("/chat", requireAuth, async (req: Request, res: Response): Promise<v
 
   try {
     const completion = await openai.chat.completions.create({
-      model:       "gpt-4o-mini",
+      model:       "gpt-5.4-mini",
       messages:    [{ role: "system", content: systemPrompt }, ...safeMessages],
-      max_tokens:  Math.min(maxTokens ?? 700, 1500),
-      temperature: 0.7,
+      max_completion_tokens: Math.min(maxTokens ?? 700, 1500),
     });
 
     const raw = completion.choices[0]?.message?.content ?? "";
@@ -197,10 +196,9 @@ router.post("/brand-memory/rebuild", requireAuth, async (req: Request, res: Resp
 
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-5.4-mini",
       messages: [{ role: "user", content: prompt }],
-      max_tokens: 600,
-      temperature: 0.5,
+      max_completion_tokens: 600,
       response_format: { type: "json_object" },
     });
 

@@ -268,10 +268,9 @@ router.post("/message", async (req: Request, res: Response): Promise<void> => {
 
   try {
     const completion = await openai.chat.completions.create({
-      model:       "gpt-4o-mini",
+      model:       "gpt-5.4-mini",
       messages:    [{ role: "system", content: systemPrompt }, ...safeMessages],
-      max_tokens:  800,
-      temperature: 0.4, // lower = more factual for support use case
+      max_completion_tokens: 800,
     });
 
     const raw = completion.choices[0]?.message?.content ?? "";
