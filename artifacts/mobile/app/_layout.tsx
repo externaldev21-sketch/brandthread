@@ -393,6 +393,35 @@ function RootLayoutNav() {
   };
   const feature = gatedRoutes[route];
 
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+
+    const navigateFromNotification = (response: Notifications.NotificationResponse) => {
+      const data = response.notification.request.content.data as {
+        route?: unknown;
+      } | undefined;
+      if (data?.route === '/subscription') {
+        router.push('/subscription' as never);
+      }
+    };
+
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+      navigateFromNotification,
+    );
+    void Notifications.getLastNotificationResponseAsync()
+      .then((response) => {
+        if (!response) return;
+        navigateFromNotification(response);
+        void Notifications.clearLastNotificationResponseAsync().catch(() => {});
+      })
+      .catch(() => {
+        // Notification response handling is best-effort; normal app startup
+        // should never be blocked by an unavailable native notification API.
+      });
+
+    return () => subscription.remove();
+  }, [router]);
+
   if (feature && !isEnabled(feature)) {
     return (
       <View style={{ flex: 1, backgroundColor: '#07070F', alignItems: 'center', justifyContent: 'center', padding: 28, gap: 12 }}>

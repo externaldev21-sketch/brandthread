@@ -26,6 +26,7 @@ const REQUIRED_EVENTS = [
   "account.updated",
   "customer.subscription.created",
   "customer.subscription.updated",
+  "customer.subscription.trial_will_end",
   "customer.subscription.deleted",
   "identity.verification_session.verified",
   "identity.verification_session.requires_input",

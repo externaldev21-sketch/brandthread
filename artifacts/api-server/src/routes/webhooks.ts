@@ -24,6 +24,7 @@ import {
   sendOrderConfirmationEmail,
 } from "../lib/brandthreadEmail";
 import { publishNotification } from "./notifications-feed";
+import { sendPushToUser } from "../lib/push";
 
 const router = Router();
 
@@ -139,6 +140,10 @@ router.post("/stripe", async (req: Request, res: Response) => {
       case "customer.subscription.created":
       case "customer.subscription.updated":
         await handleSubscriptionUpdated(event.data.object);
+        break;
+
+      case "customer.subscription.trial_will_end":
+        await handleSubscriptionTrialWillEnd(event.data.object);
         break;
 
       case "customer.subscription.deleted":
@@ -775,6 +780,69 @@ async function handleSubscriptionUpdated(sub: any) {
   logger.info(
     { subscriptionId: sub.id, customerId, subscriptionStatus: sub.status, planId },
     "Subscription updated",
+  );
+}
+
+/**
+ * Warns a seller before Stripe converts their free trial into a paid
+ * subscription. Push delivery is optional: sendPushToUser silently returns
+ * when the seller has no registered device token.
+ */
+export async function handleSubscriptionTrialWillEnd(sub: any): Promise<void> {
+  const customerId: string =
+    typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
+  if (!customerId) {
+    logger.warn({ subscriptionId: sub.id }, "Trial-ending event missing customer ID");
+    return;
+  }
+
+  const [seller] = await db
+    .select({ clerkId: users.clerkId })
+    .from(users)
+    .where(eq(users.stripeCustomerId, customerId))
+    .limit(1);
+  if (!seller) {
+    logger.warn(
+      { subscriptionId: sub.id, customerId },
+      "Trial-ending event received for an unknown seller",
+    );
+    return;
+  }
+
+  const trialEndUnix = typeof sub.trial_end === "number" ? sub.trial_end : null;
+  if (!trialEndUnix) {
+    logger.warn(
+      { subscriptionId: sub.id, customerId },
+      "Trial-ending event missing trial end date",
+    );
+    return;
+  }
+
+  const amountCents = (sub.items?.data ?? []).reduce((total: number, item: any) => {
+    const unitAmount = item.price?.unit_amount;
+    if (typeof unitAmount !== "number") return total;
+    const quantity = typeof item.quantity === "number" ? item.quantity : 1;
+    return total + unitAmount * quantity;
+  }, 0);
+  const amount = `$${(amountCents / 100).toFixed(2).replace(/\.00$/, "")}`;
+  const trialEnd = new Date(trialEndUnix * 1000).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  await sendPushToUser(seller.clerkId, {
+    title: "Your free trial ends soon",
+    body: `Your 5-day trial ends in 3 days — you'll be charged ${amount} on ${trialEnd} unless you cancel.`,
+    data: {
+      type: "subscription_trial_will_end",
+      route: "/subscription",
+    },
+  });
+
+  logger.info(
+    { subscriptionId: sub.id, customerId, clerkId: seller.clerkId, trialEnd, amountCents },
+    "Seller trial-ending push notification sent",
   );
 }
 
