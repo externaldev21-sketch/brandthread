@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
   Dimensions, Animated, Alert, Share, TextInput, Modal, Image,
-  KeyboardAvoidingView, Platform, ScrollView,
+  KeyboardAvoidingView, Platform, ScrollView, RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -526,32 +526,43 @@ export default function FeedScreen() {
   const [hasUnread, setHasUnread] = useState(true);
   const [sellerFeedPosts, setSellerFeedPosts] = useState<SpotlightItem[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
+  const [feedRefreshing, setFeedRefreshing] = useState(false);
   const [feedError, setFeedError] = useState<string | null>(null);
   const [activeLiveStreams, setActiveLiveStreams] = useState<LiveStreamFeedItem[]>([]);
   const api = useApi();
 
   // Load published seller posts and subscribe to real-time changes
-  useEffect(() => {
-    async function loadFeed() {
-      setFeedLoading(true);
-      setFeedError(null);
-      try {
-        const rows = await getThreadPosts();
-        const mapped = (Array.isArray(rows) ? rows : [])
-          .map(mapSellerPost)
-          .filter((p): p is SpotlightItem => p !== null);
-        setSellerFeedPosts(mapped);
-      } catch {
-        setSellerFeedPosts([]);
-        setFeedError('We couldn’t load Thread. Check your connection and try again.');
-      } finally {
-        setFeedLoading(false);
-      }
+  const loadFeed = useCallback(async (initial = false) => {
+    if (initial) setFeedLoading(true);
+    else setFeedRefreshing(true);
+    setFeedError(null);
+    try {
+      const rows = await getThreadPosts();
+      const mapped = (Array.isArray(rows) ? rows : [])
+        .map(mapSellerPost)
+        .filter((p): p is SpotlightItem => p !== null);
+      setSellerFeedPosts(mapped);
+    } catch {
+      // Keep the current feed visible when a pull-to-refresh or social
+      // notification fails; only the first load needs an empty state.
+      if (initial) setSellerFeedPosts([]);
+      setFeedError('We couldn’t load Thread. Check your connection and try again.');
+    } finally {
+      if (initial) setFeedLoading(false);
+      else setFeedRefreshing(false);
     }
-    loadFeed();
-    const unsub = subscribeSocial(loadFeed);
-    return unsub;
   }, []);
+
+  useEffect(() => {
+    void loadFeed(true);
+    const unsub = subscribeSocial(() => { void loadFeed(); });
+    return unsub;
+  }, [loadFeed]);
+
+  const handleRefresh = useCallback(() => {
+    if (feedRefreshing) return;
+    void loadFeed();
+  }, [feedRefreshing, loadFeed]);
 
   // Poll active live streams every 30 seconds
   useEffect(() => {
@@ -716,6 +727,14 @@ export default function FeedScreen() {
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
         getItemLayout={(_, index) => ({ length: SCREEN_H, offset: SCREEN_H * index, index })}
+        refreshControl={
+          <RefreshControl
+            refreshing={feedRefreshing}
+            onRefresh={handleRefresh}
+            tintColor={PURPLE}
+            colors={[PURPLE]}
+          />
+        }
         ListEmptyComponent={
           searchQuery.trim() ? (
             <View style={{ width: SCREEN_W, height: SCREEN_H, alignItems: 'center', justifyContent: 'center', gap: 10 }}>
