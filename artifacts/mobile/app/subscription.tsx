@@ -327,7 +327,11 @@ export default function SubscriptionScreen() {
                   </View>
 
                   {/* Trial end or renewal line */}
-                  {currentPlan.trialEnd ? (
+                  {currentPlan.status === 'canceled' ? (
+                    <Text style={[styles.currentPlanRenews, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
+                      Access continues until {currentPlan.renewsOn}
+                    </Text>
+                  ) : currentPlan.trialEnd ? (
                     <Text style={[styles.currentPlanRenews, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
                       Free trial ends {currentPlan.trialEnd} · then {currentPlan.price}/mo
                     </Text>
@@ -516,12 +520,18 @@ export default function SubscriptionScreen() {
                   )}
                   <View style={styles.billingRow}>
                     <Text style={styles.billingLabel}>Next invoice</Text>
-                    <Text style={styles.billingValue}>{currentPlan.renewsOn}</Text>
+                    <Text style={styles.billingValue}>
+                      {currentPlan.status === 'canceled' ? '—' : currentPlan.renewsOn}
+                    </Text>
                   </View>
                   <View style={styles.billingRow}>
                     <Text style={styles.billingLabel}>Amount</Text>
                     <Text style={styles.billingValue}>
-                      {currentPlan.amountCents > 0 ? `${currentPlan.price}/mo` : '—'}
+                      {currentPlan.status === 'canceled'
+                        ? '$0'
+                        : currentPlan.amountCents > 0
+                          ? `${currentPlan.price}/mo`
+                          : '—'}
                     </Text>
                   </View>
                   <View style={styles.billingRow}>
