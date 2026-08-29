@@ -25,6 +25,7 @@ import {
   useSubscriptionPlan,
   type PlanId,
 } from "./useSubscriptionPlan";
+import { pollSubscriptionStatus } from "@/lib/pollSubscriptionStatus";
 
 type HookResult = ReturnType<typeof useSubscriptionPlan>;
 
@@ -139,5 +140,42 @@ describe("useSubscriptionPlan invalidation", () => {
     expect(second.plan).toBe("pro");
     expect(first.hasPlan("growth")).toBe(true);
     expect(second.hasPlan("pro")).toBe(true);
+  });
+
+  it("preserves Scale access after checkout polling observes delayed activation", async () => {
+    statusMock.mockResolvedValueOnce({ plan: "starter", status: "none" });
+    let latest!: HookResult;
+
+    renderers.push(
+      await renderConsumer((result) => {
+        latest = result;
+      }),
+    );
+    expect(latest.hasPlan("growth")).toBe(false);
+
+    statusMock
+      .mockResolvedValueOnce({ plan: "starter", status: "none" })
+      .mockResolvedValueOnce({ plan: "scale", status: "trialing" })
+      .mockResolvedValueOnce({ plan: "scale", status: "trialing" });
+
+    const refreshed = await pollSubscriptionStatus<{ plan: string; status: string }>({
+      loadStatus: statusMock,
+      shouldStop: (status) =>
+        status.plan === "scale"
+        && (status.status === "trialing" || status.status === "active"),
+      wait: async () => {},
+    });
+
+    expect(refreshed).toBe(true);
+
+    await act(async () => {
+      invalidatePlanCache();
+      await Promise.resolve();
+    });
+
+    expect(latest.plan).toBe("scale");
+    expect(latest.hasPlan("growth")).toBe(true);
+    expect(latest.hasPlan("scale")).toBe(true);
+    expect(statusMock).toHaveBeenCalledTimes(4);
   });
 });

@@ -29,6 +29,7 @@ import { invalidatePlanCache } from '@/hooks/useSubscriptionPlan';
 import { isManagerRole, parseRoleError } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import { formatCents } from '@/lib/money';
+import { pollSubscriptionStatus } from '@/lib/pollSubscriptionStatus';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { getGrowthStudioTools, GROWTH_EXTRAS } from '@/lib/growthTools';
 
@@ -137,34 +138,44 @@ export default function SubscriptionScreen() {
   const selectedPlan = currentPlan.name.toLowerCase();
   const hasGrowthAccess = selectedPlan === 'growth' || selectedPlan === 'scale';
 
-  const portalOpenedRef = useRef(false);
+  const externalSessionOpenedRef = useRef<
+    { kind: 'checkout'; expectedPlan: string } | { kind: 'portal' } | null
+  >(null);
 
-  const fetchStatus = useCallback(() => {
+  const applyStatus = useCallback((
+    data: Awaited<ReturnType<typeof api.seller.subscription.status>>,
+  ) => {
+    const planName =
+      data.plan === 'growth' ? 'Growth'
+      : data.plan === 'scale'  ? 'Scale'
+      : 'Starter';
+    const planPrice =
+      data.plan === 'growth' ? '$79'
+      : data.plan === 'scale'  ? '$199'
+      : '$29';
+    setCurrentPlan({
+      name:               planName,
+      price:              data.amountCents > 0 ? formatCents(data.amountCents) : planPrice,
+      period:             'month',
+      renewsOn:           data.renewsOn ?? '—',
+      trialEnd:           data.trialEnd ?? null,
+      status:             data.status,
+      amountCents:        data.amountCents,
+      paymentMethodLabel: data.paymentMethodLabel,
+    });
+  }, []);
+
+  const fetchStatus = useCallback(async () => {
     setStatusLoading(true);
-    api.seller.subscription.status()
-      .then(data => {
-        const planName =
-          data.plan === 'growth' ? 'Growth'
-          : data.plan === 'scale'  ? 'Scale'
-          : 'Starter';
-        const planPrice =
-          data.plan === 'growth' ? '$79'
-          : data.plan === 'scale'  ? '$199'
-          : '$29';
-        setCurrentPlan({
-          name:               planName,
-          price:              data.amountCents > 0 ? formatCents(data.amountCents) : planPrice,
-          period:             'month',
-          renewsOn:           data.renewsOn ?? '—',
-          trialEnd:           data.trialEnd ?? null,
-          status:             data.status,
-          amountCents:        data.amountCents,
-          paymentMethodLabel: data.paymentMethodLabel,
-        });
-      })
-      .catch(() => {})
-      .finally(() => setStatusLoading(false));
-  }, [api]);
+    try {
+      const data = await api.seller.subscription.status();
+      applyStatus(data);
+    } catch {
+      // Keep the last known subscription state on transient failures.
+    } finally {
+      setStatusLoading(false);
+    }
+  }, [api, applyStatus]);
 
   useFocusEffect(
     useCallback(() => {
@@ -174,15 +185,33 @@ export default function SubscriptionScreen() {
   );
 
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
-      if (nextState === 'active' && portalOpenedRef.current) {
-        portalOpenedRef.current = false;
+    const subscription = AppState.addEventListener('change', async (nextState: AppStateStatus) => {
+      const externalSession = externalSessionOpenedRef.current;
+      if (nextState !== 'active' || !externalSession) return;
+
+      externalSessionOpenedRef.current = null;
+      invalidatePlanCache();
+      setStatusLoading(true);
+
+      const refreshed = await pollSubscriptionStatus({
+        loadStatus: api.seller.subscription.status,
+        maxAttempts: externalSession.kind === 'checkout' ? 8 : 1,
+        shouldStop: (status) =>
+          externalSession.kind === 'portal'
+          || (
+            status.plan === externalSession.expectedPlan
+            && (status.status === 'trialing' || status.status === 'active')
+          ),
+        onStatus: applyStatus,
+      });
+
+      if (refreshed) {
         invalidatePlanCache();
-        fetchStatus();
       }
+      setStatusLoading(false);
     });
     return () => subscription.remove();
-  }, [fetchStatus]);
+  }, [api, applyStatus]);
 
   function haptic() { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }
 
@@ -206,9 +235,10 @@ export default function SubscriptionScreen() {
 
     try {
       const { url } = await api.seller.subscription.checkout(planId as 'starter' | 'growth' | 'scale');
-      portalOpenedRef.current = true;
-      Linking.openURL(url);
+      externalSessionOpenedRef.current = { kind: 'checkout', expectedPlan: planId };
+      await Linking.openURL(url);
     } catch (e: any) {
+      externalSessionOpenedRef.current = null;
       if (parseRoleError(e)) {
         Alert.alert('Only the store owner can do this');
         return;
@@ -221,9 +251,10 @@ export default function SubscriptionScreen() {
     haptic();
     try {
       const { url } = await api.seller.subscription.portal();
-      portalOpenedRef.current = true;
-      Linking.openURL(url);
+      externalSessionOpenedRef.current = { kind: 'portal' };
+      await Linking.openURL(url);
     } catch (e: any) {
+      externalSessionOpenedRef.current = null;
       if (parseRoleError(e)) {
         Alert.alert('Only the store owner can do this');
         return;
