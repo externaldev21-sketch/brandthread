@@ -1594,6 +1594,7 @@ export default function OnboardingScreen() {
 
   const isAuthStep = step === 0;
   const isAccountTypeStep = step === BUYER_STEP_INDEX.ACCOUNT_TYPE && !flow;
+  const hasOwnBackground = isFullScreen || isAccountTypeStep;
 
   // ── Show Continue button in footer (not auth, not goals, not full-screen) ───
   const showFooter = !isFullScreen
@@ -1611,6 +1612,8 @@ export default function OnboardingScreen() {
   if (!ready) {
     return (
       <View style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' }}>
+        <AnimatedGradientBackground />
+        <View pointerEvents="none" style={sm.backgroundDim} />
         <StatusBar barStyle="light-content" />
         <ActivityIndicator color={theme.accent} />
       </View>
@@ -1619,6 +1622,8 @@ export default function OnboardingScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: BG }}>
+      {!hasOwnBackground && <AnimatedGradientBackground />}
+      {!hasOwnBackground && <View pointerEvents="none" style={sm.backgroundDim} />}
       <StatusBar barStyle="light-content" />
 
       {/* Standard header for form/auth steps. */}
@@ -1699,6 +1704,10 @@ const sm = StyleSheet.create({
   stepWrap:  { flex: 1, paddingHorizontal: 24 },
   accountTypeStepWrap: { paddingHorizontal: 0 },
   footer:    { paddingHorizontal: 24, paddingTop: 12 },
+  backgroundDim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(7,7,15,0.34)',
+  },
 
   scroll:    { flexGrow: 1, paddingTop: 12, paddingBottom: 40 },
   stepHeadline: { fontSize: 32, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.8, lineHeight: 38, marginBottom: 8 },
