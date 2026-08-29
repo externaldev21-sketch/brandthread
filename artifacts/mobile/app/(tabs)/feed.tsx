@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
   Dimensions, Animated, Alert, Share, TextInput, Modal, Image,
-  KeyboardAvoidingView, Platform, ScrollView, RefreshControl,
+  KeyboardAvoidingView, Platform, ScrollView, RefreshControl, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -25,6 +25,7 @@ import { BrandedLoadingState } from '@/components/BrandthreadUI';
 import { formatCents } from '@/lib/money';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
+const THREAD_PAGE_SIZE = 30;
 
 // ─── Feed item display type ───────────────────────────────────────────────────
 
@@ -527,21 +528,32 @@ export default function FeedScreen() {
   const [sellerFeedPosts, setSellerFeedPosts] = useState<SpotlightItem[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
   const [feedRefreshing, setFeedRefreshing] = useState(false);
+  const [feedLoadingMore, setFeedLoadingMore] = useState(false);
+  const [feedHasMore, setFeedHasMore] = useState(true);
   const [feedError, setFeedError] = useState<string | null>(null);
   const [activeLiveStreams, setActiveLiveStreams] = useState<LiveStreamFeedItem[]>([]);
   const api = useApi();
+  const feedOffsetRef = useRef(0);
+  const feedLoadingMoreRef = useRef(false);
+  const feedHasMoreRef = useRef(true);
 
   // Load published seller posts and subscribe to real-time changes
   const loadFeed = useCallback(async (initial = false) => {
+    feedOffsetRef.current = 0;
+    feedHasMoreRef.current = true;
+    setFeedHasMore(true);
     if (initial) setFeedLoading(true);
     else setFeedRefreshing(true);
     setFeedError(null);
     try {
-      const rows = await getThreadPosts();
+      const rows = await getThreadPosts(0, THREAD_PAGE_SIZE);
       const mapped = (Array.isArray(rows) ? rows : [])
         .map(mapSellerPost)
         .filter((p): p is SpotlightItem => p !== null);
       setSellerFeedPosts(mapped);
+      feedOffsetRef.current = THREAD_PAGE_SIZE;
+      feedHasMoreRef.current = rows.length > 0;
+      setFeedHasMore(rows.length > 0);
     } catch {
       // Keep the current feed visible when a pull-to-refresh or social
       // notification fails; only the first load needs an empty state.
@@ -553,6 +565,37 @@ export default function FeedScreen() {
     }
   }, []);
 
+  const loadMoreFeed = useCallback(async () => {
+    if (feedLoadingMoreRef.current || !feedHasMoreRef.current || feedLoading || feedRefreshing) return;
+    feedLoadingMoreRef.current = true;
+    setFeedLoadingMore(true);
+    const offset = feedOffsetRef.current;
+    try {
+      const rows = await getThreadPosts(offset, THREAD_PAGE_SIZE);
+      const mapped = (Array.isArray(rows) ? rows : [])
+        .map(mapSellerPost)
+        .filter((p): p is SpotlightItem => p !== null);
+
+      setSellerFeedPosts(prev => {
+        const existingIds = new Set(prev.map(item => item.id));
+        const additions = mapped.filter(item => {
+          if (existingIds.has(item.id)) return false;
+          existingIds.add(item.id);
+          return true;
+        });
+        return [...prev, ...additions];
+      });
+      feedOffsetRef.current = offset + THREAD_PAGE_SIZE;
+      feedHasMoreRef.current = rows.length > 0;
+      setFeedHasMore(rows.length > 0);
+    } catch {
+      // Keep the current feed and cursor so a later scroll can retry the page.
+    } finally {
+      feedLoadingMoreRef.current = false;
+      setFeedLoadingMore(false);
+    }
+  }, [feedLoading, feedRefreshing]);
+
   useEffect(() => {
     void loadFeed(true);
     const unsub = subscribeSocial(() => { void loadFeed(); });
@@ -560,7 +603,7 @@ export default function FeedScreen() {
   }, [loadFeed]);
 
   const handleRefresh = useCallback(() => {
-    if (feedRefreshing) return;
+    if (feedRefreshing || feedLoadingMoreRef.current) return;
     void loadFeed();
   }, [feedRefreshing, loadFeed]);
 
@@ -726,6 +769,8 @@ export default function FeedScreen() {
         decelerationRate="fast"
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={viewabilityConfig}
+        onEndReached={loadMoreFeed}
+        onEndReachedThreshold={0.5}
         getItemLayout={(_, index) => ({ length: SCREEN_H, offset: SCREEN_H * index, index })}
         refreshControl={
           <RefreshControl
@@ -752,6 +797,17 @@ export default function FeedScreen() {
               <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20 }}>
                 Follow sellers to see their drops here
               </Text>
+            </View>
+          ) : null
+        }
+        ListFooterComponent={
+          feedLoadingMore ? (
+            <View style={styles.feedFooter}>
+              <ActivityIndicator size="small" color={MUTED} />
+            </View>
+          ) : !feedHasMore && sellerFeedPosts.length > 0 ? (
+            <View style={styles.feedFooter}>
+              <Text style={styles.feedFooterText}>You’re all caught up</Text>
             </View>
           ) : null
         }
@@ -965,4 +1021,9 @@ const styles = StyleSheet.create({
   commentSendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
 
   notifRow: { fontSize: 13.5, fontFamily: FONT.regular, color: FG, paddingBottom: 14 },
+  feedFooter: {
+    width: SCREEN_W, height: 72, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#000000',
+  },
+  feedFooterText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
 });

@@ -698,21 +698,31 @@ function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
  *  fails or returns nothing, the general feed alone is returned. Never falls
  *  back to demo data.
  */
-export async function getThreadPosts(): Promise<SellerThreadPost[]> {
+export async function getThreadPosts(offset = 0, limit = 30): Promise<SellerThreadPost[]> {
+  const pageOffset = Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0;
+  const pageLimit = Number.isFinite(limit) ? Math.min(50, Math.max(1, Math.floor(limit))) : 30;
+  const query = `?limit=${pageLimit}&offset=${pageOffset}`;
+
   const [followed, general] = await Promise.all([
-    serviceRequest('/api/posts/feed').then(
+    serviceRequest(`/api/posts/feed${query}`).then(
       (r) => (Array.isArray(r) ? (r as any[]) : []),
       () => [] as any[], // unauthenticated / API error → no personalised posts
     ),
-    serviceRequest('/api/public/posts').then(
+    serviceRequest(`/api/public/posts${query}`).then(
       (r) => (Array.isArray(r) ? (r as any[]) : []),
       () => [] as any[],
     ),
   ]);
 
-  // Followed sellers' posts first, then general posts not already included
-  const seen = new Set(followed.map((p) => p.id));
-  const merged = [...followed, ...general.filter((p) => !seen.has(p.id))];
+  // Followed sellers' posts first, then general posts not already included.
+  // Apply the set to the full merge so malformed/duplicated API rows cannot
+  // produce duplicate cards within a page.
+  const seen = new Set<string>();
+  const merged = [...followed, ...general].filter((p) => {
+    if (typeof p.id !== 'string' || seen.has(p.id)) return false;
+    seen.add(p.id);
+    return true;
+  });
   return merged.map((p, idx) => mapApiPostToSellerThreadPost(p, idx));
 }
 
