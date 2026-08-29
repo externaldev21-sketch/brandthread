@@ -198,10 +198,16 @@ function BuyerOrderCard({ order, onPress }: { order: BuyerOrderView; onPress: ()
         )}
         <Text style={styles.totalText}>{formatCents(order.payment.totalCents)}</Text>
       </View>
-      {order.status === 'cancelled' && order.cancellationReason && (
-        <Text style={styles.cancellationReason} numberOfLines={1}>
-          {cancellationReasonLabel(order.cancellationReason)}
-        </Text>
+      {order.status === 'cancelled' && (
+        <View style={styles.cancellationBanner}>
+          <Feather name="x-circle" size={ICON.sm} color={RED} />
+          <View style={styles.cancellationCopy}>
+            <Text style={styles.cancellationLabel}>Order cancelled</Text>
+            <Text style={styles.cancellationReason} numberOfLines={1}>
+              {cancellationReasonLabel(order.cancellationReason)}
+            </Text>
+          </View>
+        </View>
       )}
 
       {/* Tracking info */}
@@ -431,11 +437,32 @@ const styles = StyleSheet.create({
     gap: SP.sm,
     flexWrap: 'wrap',
   },
+  cancellationBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    marginTop: SP.sm,
+    paddingHorizontal: SP.sm,
+    paddingVertical: 7,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(248,113,113,0.28)',
+    backgroundColor: RED_DIM,
+  },
+  cancellationCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  cancellationLabel: {
+    fontSize: FS.xs,
+    fontFamily: FONT.bold,
+    color: RED,
+    letterSpacing: 0.2,
+  },
   cancellationReason: {
-    marginTop: SP.xs,
     fontSize: FS.xs,
     fontFamily: FONT.medium,
-    color: RED,
+    color: MUTED,
   },
   preOrderBadge: {
     backgroundColor: BLUE_DIM,
