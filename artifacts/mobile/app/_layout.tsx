@@ -399,9 +399,15 @@ function RootLayoutNav() {
     const navigateFromNotification = (response: Notifications.NotificationResponse) => {
       const data = response.notification.request.content.data as {
         route?: unknown;
+        targetId?: unknown;
+        targetType?: unknown;
       } | undefined;
       if (data?.route === '/subscription') {
         router.push('/subscription' as never);
+        return;
+      }
+      if (data?.targetType === 'order' && typeof data.targetId === 'string' && data.targetId) {
+        router.push(`/order-detail?id=${encodeURIComponent(data.targetId)}` as never);
       }
     };
 

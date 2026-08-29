@@ -16,7 +16,7 @@ describe("push notification delivery contract", () => {
 
   it("uses the bundled order sound and Android order channel for seller orders", () => {
     expect(buildExpoPushMessages([{ token: "ExponentPushToken[order]" }], {
-      title: "New order received",
+      title: "New order! 🛍️",
       body: "Order ready to review",
       sound: "order-received.wav",
       channelId: "orders",
