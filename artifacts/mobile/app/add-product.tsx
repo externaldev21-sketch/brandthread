@@ -1313,7 +1313,7 @@ export default function AddProductScreen() {
 
       {/* ── Header ── */}
       <View style={s.header}>
-        <TouchableOpacity onPress={handleExit} style={s.headerBack}>
+        <TouchableOpacity testID="add-product-exit" onPress={handleExit} style={s.headerBack}>
           <Feather name="x" size={ICON.md} color={FG} />
         </TouchableOpacity>
         <Text style={s.headerTitle}>{isEditMode ? 'Edit Product' : 'Add Product'}</Text>
