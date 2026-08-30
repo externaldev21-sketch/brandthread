@@ -31,6 +31,7 @@ import {
   uploadSampleImage,
   createSampleCheckoutSession, confirmSamplePayment,
 } from '@/services/manufacturerService';
+import { isStaleManufacturerWrite } from '@/services/manufacturerWriteRecovery';
 import { Sample, SampleReview, SampleStatus } from '@/services/manufacturerTypes';
 
 import {
@@ -305,16 +306,25 @@ export default function SampleDetailScreen() {
     }
     setReviewSubmitting(true);
     try {
-      await submitSampleReview(sample.id, {
+      const updated = await submitSampleReview(sample.id, sample.revision, {
         decision: reviewDecision,
         ...ratings,
         notes: reviewNotes,
         imageUris: [],
       });
+      if (updated) {
+        setSample(current => current && current.id === updated.id
+          ? { ...current, ...updated, imageUris: updated.imageUris.length ? updated.imageUris : current.imageUris }
+          : updated);
+      }
       setReviewMode(false);
-      await load();
-    } catch {
-      Alert.alert('Error', 'Failed to submit review.');
+    } catch (error) {
+      if (isStaleManufacturerWrite(error)) {
+        await load();
+        Alert.alert('Sample changed', 'This sample changed since it was loaded. The latest version was reloaded; review it and try again.');
+      } else {
+        Alert.alert('Could not submit review', error instanceof Error ? error.message : 'Please try again.');
+      }
     } finally {
       setReviewSubmitting(false);
     }
@@ -328,7 +338,7 @@ export default function SampleDetailScreen() {
     }
     setRevSubmitting(true);
     try {
-      await addSampleRevision(sample.id, {
+      const updated = await addSampleRevision(sample.id, sample.revision, {
         title: revTitle,
         notes: revNotes,
         priority: revPriority,
@@ -336,11 +346,20 @@ export default function SampleDetailScreen() {
         imageUris: [],
         fileIds: [],
       });
+      if (updated) {
+        setSample(current => current && current.id === updated.id
+          ? { ...current, ...updated, imageUris: updated.imageUris.length ? updated.imageUris : current.imageUris }
+          : updated);
+      }
       setRevisionMode(false);
       setRevTitle(''); setRevNotes(''); setRevDeadline('');
-      await load();
-    } catch {
-      Alert.alert('Error', 'Failed to submit revision request.');
+    } catch (error) {
+      if (isStaleManufacturerWrite(error)) {
+        await load();
+        Alert.alert('Sample changed', 'This sample changed since it was loaded. The latest version was reloaded; review it and try again.');
+      } else {
+        Alert.alert('Could not submit revision', error instanceof Error ? error.message : 'Please try again.');
+      }
     } finally {
       setRevSubmitting(false);
     }
@@ -384,8 +403,10 @@ export default function SampleDetailScreen() {
       const bytes = await file.bytes();
       // The authenticated API enforces the byte limit and validates image
       // signatures before it writes any object to private storage.
-      await uploadSampleImage(sample.id, contentType, bytes);
-      await load();
+      const updated = await uploadSampleImage(sample.id, contentType, bytes);
+      setSample(current => current && current.id === sample.id
+        ? { ...current, imageUris: updated.imageUrls, revision: updated.revision }
+        : current);
     } catch (err: any) {
       console.error('[SampleDetail] image upload error:', err);
       Alert.alert('Upload Failed', err?.message ?? 'Could not upload image. Please try again.');

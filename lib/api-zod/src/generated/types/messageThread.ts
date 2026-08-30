@@ -8,6 +8,8 @@
 
 export interface MessageThread {
   id: string;
+  manufacturerId: string;
+  sellerId: string;
   buyerName: string;
   /** @nullable */
   buyerAvatar?: string | null;
@@ -16,5 +18,5 @@ export interface MessageThread {
   lastMessageAt: string;
   unreadCount: number;
   /** @nullable */
-  orderStatus: string | null;
+  orderStatus?: string | null;
 }

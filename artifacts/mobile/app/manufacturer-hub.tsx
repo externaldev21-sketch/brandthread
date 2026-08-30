@@ -31,12 +31,11 @@ import {
 } from '@/components/BrandthreadUI';
 import {
   searchManufacturers, getRelationships, getRelationship,
-  saveManufacturer, unsaveManufacturer, updateRelationshipStatus,
-  getFavoriteManufacturerIds, favoriteManufacturer, unfavoriteManufacturer,
+  saveManufacturer, getManufacturer,
+  getFavoriteManufacturerIds, unfavoriteManufacturer,
   getQuoteRequests, getQuotes, acceptQuote, declineQuote,
   getSamples, getProductionOrders,
   getConversations, getOrCreateConversation,
-  DEMO_MANUFACTURERS,
 } from '@/services/manufacturerService';
 import {
   Manufacturer, ManufacturerRelationship, QuoteRequest, Quote, Sample,
@@ -382,7 +381,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
         await unfavoriteManufacturer(mfg.id);
         setSavedIds(prev => { const s = new Set(prev); s.delete(mfg.id); return s; });
       } else {
-        await favoriteManufacturer(mfg.id);
+        await saveManufacturer(mfg.id);
         setSavedIds(prev => new Set(prev).add(mfg.id));
       }
     } catch (e) {
@@ -534,8 +533,8 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
           <Text style={card.location}>{mfg.city}, {mfg.country}</Text>
           <View style={card.ratingRow}>
             <Feather name="star" size={12} color={GOLD} />
-            <Text style={card.ratingText}>{mfg.rating.toFixed(1)}</Text>
-            <Text style={card.reviewCount}>({mfg.reviewCount})</Text>
+            <Text style={card.ratingText}>{mfg.reviewCount > 0 ? mfg.rating.toFixed(1) : 'Not rated'}</Text>
+            {mfg.reviewCount > 0 && <Text style={card.reviewCount}>({mfg.reviewCount})</Text>}
           </View>
         </View>
       </View>
@@ -547,9 +546,10 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
         {(Array.isArray(mfg.specialties) ? mfg.specialties : []).slice(0, 3).join(' • ')}
       </Text>
       <Text style={card.stats}>
-        MOQ: {mfg.moq} · Lead: {mfg.leadTimeDays}d · {formatCents(mfg.unitPriceMinCents)}–{formatCents(mfg.unitPriceMaxCents)}/unit
+        MOQ: {mfg.moq || 'Contact'} · Lead: {mfg.leadTimeDays ? `${mfg.leadTimeDays}d` : 'Contact'}
+        {mfg.unitPriceMinCents > 0 ? ` · ${formatCents(mfg.unitPriceMinCents)}–${formatCents(mfg.unitPriceMaxCents)}/unit` : ''}
       </Text>
-      <Text style={card.response}>Response: ~{mfg.responseTimeHours}h</Text>
+      <Text style={card.response}>{mfg.responseTimeHours > 0 ? `Response: ~${mfg.responseTimeHours}h` : 'Response time not provided'}</Text>
 
       <View style={card.divider} />
 
@@ -740,21 +740,23 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
   const [mfgMap, setMfgMap] = useState<Record<string, Manufacturer>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     try {
+      setError('');
       const rels = await getRelationships();
       const safeRels = Array.isArray(rels) ? rels : [];
       setRelationships(safeRels);
       const map: Record<string, Manufacturer> = {};
       await Promise.all(safeRels.map(async rel => {
-        const { getManufacturer } = await import('@/services/manufacturerService');
         const mfg = await getManufacturer(rel.manufacturerId);
         if (mfg) map[mfg.id] = mfg;
       }));
       setMfgMap(map);
     } catch (e) {
       setRelationships([]);
+      setError('Could not load your saved manufacturers.');
       console.error(e);
     } finally {
       setLoading(false);
@@ -765,27 +767,32 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
   useFocusEffect(useCallback(() => { setLoading(true); load(); }, []));
 
   const showMore = (rel: ManufacturerRelationship, mfg: Manufacturer) => {
-    const options = ['Message', 'Request Quote', 'Assign Product', 'View History', 'Archive', 'Remove', 'Cancel'];
+    const options = ['Message', 'Request Quote', 'Cancel'];
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
-        { options, cancelButtonIndex: options.length - 1, destructiveButtonIndex: options.length - 2 },
+        { options, cancelButtonIndex: 2 },
         idx => {
-          if (idx === 0) getOrCreateConversation(mfg.id).then(conv => router.push((`/manufacturer-messages?threadId=${conv.id}`) as never));
+          if (idx === 0) getOrCreateConversation(mfg.id)
+            .then(conv => router.push((`/manufacturer-messages?threadId=${conv.id}`) as never))
+            .catch(() => setError('Could not open a conversation. Please try again.'));
           if (idx === 1) router.push((`/quote-request?manufacturerId=${mfg.id}`) as never);
-          if (idx === 3) updateRelationshipStatus(mfg.id, 'archived').then(load);
-          if (idx === 4) unsaveManufacturer(mfg.id).then(load);
         }
       );
     } else {
       Alert.alert(mfg.name, 'Choose action', [
-        { text: 'Message', onPress: () => getOrCreateConversation(mfg.id).then(conv => router.push((`/manufacturer-messages?threadId=${conv.id}`) as never)) },
+        { text: 'Message', onPress: () => getOrCreateConversation(mfg.id)
+          .then(conv => router.push((`/manufacturer-messages?threadId=${conv.id}`) as never))
+          .catch(() => setError('Could not open a conversation. Please try again.')) },
         { text: 'Request Quote', onPress: () => router.push((`/quote-request?manufacturerId=${mfg.id}`) as never) },
-        { text: 'Archive', onPress: () => updateRelationshipStatus(mfg.id, 'archived').then(load) },
-        { text: 'Remove', style: 'destructive', onPress: () => unsaveManufacturer(mfg.id).then(load) },
         { text: 'Cancel', style: 'cancel' },
       ]);
     }
   };
+
+  if (!loading && error) {
+    return <EmptyState icon="alert-circle" title="Could not load manufacturers" description={error}
+      action={{ label: 'Try again', onPress: load, icon: 'refresh-cw' }} style={s.emptyState} />;
+  }
 
   if (!loading && relationships.length === 0) {
     return (
@@ -883,15 +890,23 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [manufacturerNames, setManufacturerNames] = useState<Record<string, string>>({});
+  const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     try {
+      setError('');
       const [reqs, qs] = await Promise.all([getQuoteRequests(), getQuotes()]);
       setQuoteRequests((Array.isArray(reqs) ? reqs : []).filter(r => r.status !== 'accepted'));
       setQuotes(Array.isArray(qs) ? qs : []);
+      const ids = [...new Set([...reqs, ...qs].map(item => item.manufacturerId).filter(Boolean))];
+      const profiles = await Promise.all(ids.map(id => getManufacturer(id)));
+      setManufacturerNames(Object.fromEntries(profiles.filter(Boolean).map(profile => [profile!.id, profile!.name])));
     } catch (e) {
       setQuoteRequests([]);
       setQuotes([]);
+      setManufacturerNames({});
+      setError('Could not load quotes. Check your connection and try again.');
       console.error(e);
     } finally {
       setLoading(false);
@@ -904,19 +919,26 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const handleAccept = (quote: Quote) => {
     Alert.alert('Accept Quote', `Accept this quote for ${formatCents(quote.unitPriceCents)}/unit?`, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Accept', onPress: () => acceptQuote(quote.id).then(load) },
+      { text: 'Accept', onPress: () => acceptQuote(quote.id).then(load)
+        .catch(() => setError('Could not accept this quote. Refresh and try again.')) },
     ]);
   };
 
   const handleDecline = (quote: Quote) => {
     Alert.alert('Decline Quote', 'Are you sure you want to decline this quote?', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Decline', style: 'destructive', onPress: () => declineQuote(quote.id).then(load) },
+      { text: 'Decline', style: 'destructive', onPress: () => declineQuote(quote.id).then(load)
+        .catch(() => setError('Could not decline this quote. Refresh and try again.')) },
     ]);
   };
 
   // Group quotes by requestId for compare detection
   const quotesByRequest: Record<string, Quote[]> = {};
+  if (!loading && error) {
+    return <EmptyState icon="alert-circle" title="Could not load quotes" description={error}
+      action={{ label: 'Try again', onPress: load, icon: 'refresh-cw' }} style={s.emptyState} />;
+  }
+
   quotes.forEach(q => {
     if (!quotesByRequest[q.quoteRequestId]) quotesByRequest[q.quoteRequestId] = [];
     quotesByRequest[q.quoteRequestId].push(q);
@@ -951,8 +973,9 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
               <QuoteRequestCard
                 key={req.id}
                 req={req}
+                manufacturerName={manufacturerNames[req.manufacturerId]}
                 onView={() => router.push((`/quote-detail?quoteId=${req.id}`) as never)}
-                onWithdraw={() => load()}
+                onWithdraw={() => declineQuote(req.id).then(load).catch(() => setError('Could not withdraw this request. Refresh and try again.'))}
               />
             ))}
           </>
@@ -964,6 +987,7 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
               <QuoteReceivedCard
                 key={q.id}
                 quote={q}
+                manufacturerName={manufacturerNames[q.manufacturerId]}
                 canCompare={(quotesByRequest[q.quoteRequestId]?.length ?? 0) >= 2}
                 onAccept={() => handleAccept(q)}
                 onDecline={() => handleDecline(q)}
@@ -1002,15 +1026,14 @@ const fab = StyleSheet.create({
   label:{ fontSize: FS.sm, fontFamily: FONT.bold, color: ON_DARK },
 });
 
-function QuoteRequestCard({ req, onView, onWithdraw }: { req: QuoteRequest; onView: () => void; onWithdraw: () => void }) {
-  const mfg = DEMO_MANUFACTURERS.find(m => m.id === req.manufacturerId);
+function QuoteRequestCard({ req, manufacturerName, onView, onWithdraw }: { req: QuoteRequest; manufacturerName?: string; onView: () => void; onWithdraw: () => void }) {
   return (
     <View style={qc.root}>
       <View style={qc.topRow}>
         <Text style={qc.productName} numberOfLines={1}>{req.productName}</Text>
         <StatusBadge label={req.status.replace(/_/g, ' ')} variant={quoteRequestStatusVariant(req.status)} small />
       </View>
-      {mfg && <Text style={qc.mfgName}>{mfg.name}</Text>}
+      {!!manufacturerName && <Text style={qc.mfgName}>{manufacturerName}</Text>}
       <Text style={qc.details}>Qty: {req.quantity}{req.targetUnitPriceCents ? ` · Target: ${formatCents(req.targetUnitPriceCents)}/unit` : ''}</Text>
       {req.submittedAt && <Text style={qc.date}>Submitted: {fmtDate(req.submittedAt)}</Text>}
       <View style={qc.actionRow}>
@@ -1025,19 +1048,19 @@ function QuoteRequestCard({ req, onView, onWithdraw }: { req: QuoteRequest; onVi
   );
 }
 
-function QuoteReceivedCard({ quote, canCompare, onAccept, onDecline, onCounter, onCompare, onDetails }: {
+function QuoteReceivedCard({ quote, manufacturerName, canCompare, onAccept, onDecline, onCounter, onCompare, onDetails }: {
   quote: Quote; canCompare: boolean;
+  manufacturerName?: string;
   onAccept: () => void; onDecline: () => void;
   onCounter: () => void; onCompare: () => void; onDetails: () => void;
 }) {
-  const mfg = DEMO_MANUFACTURERS.find(m => m.id === quote.manufacturerId);
   return (
     <View style={qc.root}>
       <View style={qc.topRow}>
         <Text style={qc.productName} numberOfLines={1}>{quote.productName}</Text>
         <StatusBadge label="Quote received" variant="success" small />
       </View>
-      {mfg && <Text style={qc.mfgName}>{mfg.name}</Text>}
+      {!!manufacturerName && <Text style={qc.mfgName}>{manufacturerName}</Text>}
       <Text style={qc.details}>Unit: {formatCents(quote.unitPriceCents)} · Total: ~{formatCents(quote.totalEstimateCents)}</Text>
       {quote.validUntil && <Text style={qc.date}>Expires: {fmtDate(quote.validUntil)}</Text>}
       <View style={[qc.actionRow, { flexWrap: 'wrap' }]}>

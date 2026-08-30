@@ -3,7 +3,7 @@
 // Keep this file separate from UI — swap these functions with real API calls later.
 
 import type {
-  Product, Order, Manufacturer, ProductionJob, Sample, Quote,
+  Product, Order,
   InventoryItem, Customer, ContentPost, DesignProject, Payout,
   AnalyticsPoint, SubscriptionPlan,
 } from './types';
@@ -209,113 +209,6 @@ export const DEMO_ORDERS: Order[] = [
       { date: 'Jul 11, 2:00 PM',  event: 'Refund issued', type: 'info' },
     ],
     date: 'Jul 5, 2026', isPreOrder: false, isHighRisk: false,
-  },
-];
-
-// ─── Manufacturers ────────────────────────────────────────────────────────────
-
-export const DEMO_MANUFACTURERS: Manufacturer[] = [
-  {
-    id: 'm1', name: 'Ace Apparel Co.', country: 'Pakistan', city: 'Lahore', initials: 'ACE',
-    rating: 4.9, reviewCount: 142, verification: 'verified',
-    specialties: ['T-Shirts', 'Polos', 'Tank Tops', 'Activewear'],
-    moq: 100, priceRange: '$6.50–$14', leadTime: '18–22 days', responseTime: '< 2 hrs',
-    capabilities: ['Screen Print', 'Embroidery', 'DTG', 'Cut & Sew', 'Custom Labels'],
-    certifications: ['OEKO-TEX', 'GOTS', 'ISO 9001'],
-    description: 'Specialist in premium basics and activewear. Trusted by 200+ clothing brands globally.',
-    activeOrders: 12, completedOrders: 847, joined: '2023-06',
-  },
-  {
-    id: 'm2', name: 'Stitch Labs', country: 'Portugal', city: 'Porto', initials: 'SL',
-    rating: 4.8, reviewCount: 93, verification: 'verified',
-    specialties: ['Hoodies', 'Crewnecks', 'Sweatpants', 'Fleece'],
-    moq: 100, priceRange: '$18–$32', leadTime: '15–18 days', responseTime: '< 4 hrs',
-    capabilities: ['French Terry', 'Fleece', 'Embroidery', 'Garment Dye', 'Stone Wash'],
-    certifications: ['GOTS', 'Fair Wear'],
-    description: 'European-standard premium fleece production. Ethical and sustainable manufacturing.',
-    activeOrders: 7, completedOrders: 412, joined: '2024-01',
-  },
-  {
-    id: 'm3', name: 'Elite Garments', country: 'Turkey', city: 'Istanbul', initials: 'EG',
-    rating: 4.5, reviewCount: 67, verification: 'verified',
-    specialties: ['Outerwear', 'Denim', 'Workwear', 'Tailored'],
-    moq: 200, priceRange: '$22–$55', leadTime: '20–25 days', responseTime: '< 8 hrs',
-    capabilities: ['Denim Construction', 'Canvas Work', 'Woven Labels', 'Metal Hardware'],
-    certifications: ['OEKO-TEX', 'ISO 9001'],
-    description: 'Premium outerwear and structured garment specialist since 1987.',
-    activeOrders: 3, completedOrders: 289, joined: '2024-03',
-  },
-  {
-    id: 'm4', name: 'Apex Garment Co.', country: 'China', city: 'Guangzhou', initials: 'AG',
-    rating: 4.9, reviewCount: 218, verification: 'verified',
-    specialties: ['Jackets', 'Technical Wear', 'Accessories', 'Bags'],
-    moq: 50, priceRange: '$4–$18', leadTime: '14–18 days', responseTime: '< 1 hr',
-    capabilities: ['Technical Fabrication', 'YKK Zippers', 'Waterproof Coating', 'Screen Print', 'Embroidery'],
-    certifications: ['OEKO-TEX', 'ISO 9001', 'Bluesign'],
-    description: 'High-volume technical wear manufacturer with cutting-edge machinery.',
-    activeOrders: 22, completedOrders: 1342, joined: '2023-01',
-  },
-];
-
-// ─── Production jobs ──────────────────────────────────────────────────────────
-
-export const DEMO_PRODUCTION: ProductionJob[] = [
-  {
-    id: 'pr1', product: 'Oversized Hoodie — Midnight', manufacturer: 'Stitch Labs', manufacturerId: 'm2',
-    stage: 'production', quantity: 500, unitCost: 22.00, totalCost: 11000, deposit: 5500, remainingBalance: 5500,
-    startDate: 'Jul 1, 2026', estimatedCompletion: 'Jul 22, 2026', progress: 65,
-    photos: [], notes: 'Garment dye batch confirmed. Moving to cut stage.',
-  },
-  {
-    id: 'pr2', product: 'Canvas Cargo Jacket — Olive', manufacturer: 'Elite Garments', manufacturerId: 'm3',
-    stage: 'quality_check', quantity: 200, unitCost: 38.00, totalCost: 7600, deposit: 3800, remainingBalance: 3800,
-    startDate: 'Jun 20, 2026', estimatedCompletion: 'Jul 18, 2026', progress: 88,
-    photos: [], notes: 'QC photos requested.',
-  },
-  {
-    id: 'pr3', product: 'Archive Tee Vol.3 — White', manufacturer: 'Ace Apparel Co.', manufacturerId: 'm1',
-    stage: 'sample', quantity: 300, unitCost: 16.00, totalCost: 4800, deposit: 2400, remainingBalance: 2400,
-    startDate: 'Jul 10, 2026', estimatedCompletion: 'Aug 5, 2026', progress: 12,
-    photos: [], notes: 'Sample requested for print placement review.',
-  },
-];
-
-// ─── Samples ─────────────────────────────────────────────────────────────────
-
-export const DEMO_SAMPLES: Sample[] = [
-  {
-    id: 's1', product: 'Archive Tee Vol.3', manufacturer: 'Ace Apparel Co.', manufacturerId: 'm1',
-    stage: 'shipped', requestedDate: 'Jul 8, 2026', expectedDate: 'Jul 16, 2026', cost: 145,
-    notes: 'Please use plastisol ink on chest graphic.',
-  },
-  {
-    id: 's2', product: 'Cargo Sweatpants v2', manufacturer: 'Stitch Labs', manufacturerId: 'm2',
-    stage: 'in_development', requestedDate: 'Jul 5, 2026', expectedDate: 'Jul 20, 2026', cost: 220,
-    notes: 'Confirm pocket placement before sewing.',
-  },
-  {
-    id: 's3', product: 'Heavyweight Crewneck', manufacturer: 'Stitch Labs', manufacturerId: 'm2',
-    stage: 'review_needed', requestedDate: 'Jun 28, 2026', expectedDate: 'Jul 9, 2026',
-    receivedDate: 'Jul 10, 2026', cost: 195,
-  },
-];
-
-// ─── Quotes ──────────────────────────────────────────────────────────────────
-
-export const DEMO_QUOTES: Quote[] = [
-  {
-    id: 'q1', product: 'Vintage Washed Tee — Restock 500',
-    manufacturer: 'Ace Apparel Co.', manufacturerId: 'm1',
-    unitPrice: 14.50, sampleCost: 95, toolingCost: 0, shippingEstimate: 420,
-    moq: 100, productionTime: '18–22 days', paymentTerms: '50% deposit, 50% on delivery',
-    expiresAt: 'Jul 25, 2026', status: 'pending', requestedAt: 'Jul 10, 2026',
-  },
-  {
-    id: 'q2', product: 'Graphic Zip Hoodie — New Style',
-    manufacturer: 'Stitch Labs', manufacturerId: 'm2',
-    unitPrice: 28.00, sampleCost: 195, toolingCost: 320, shippingEstimate: 580,
-    moq: 150, productionTime: '22–26 days', paymentTerms: '40% deposit, 60% on delivery',
-    expiresAt: 'Jul 20, 2026', status: 'pending', requestedAt: 'Jul 8, 2026',
   },
 ];
 

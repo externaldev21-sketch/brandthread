@@ -5,11 +5,18 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { MessageCardData } from './messageCardData';
+import type { MessageMessageType } from './messageMessageType';
 
 export interface Message {
   id: string;
   threadId: string;
   senderRole: string;
+  senderId: string;
   content: string;
+  messageType: MessageMessageType;
+  mediaUrls: string[];
+  /** @nullable */
+  cardData?: MessageCardData;
   sentAt: string;
 }

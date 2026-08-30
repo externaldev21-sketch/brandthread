@@ -32,7 +32,9 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>;
 
 export default function Profile() {
-  const { data: profile, isLoading } = useGetMyManufacturerProfile();
+  const { data: profile, isLoading } = useGetMyManufacturerProfile({
+    query: { queryKey: getGetMyManufacturerProfileQueryKey(), refetchOnMount: "always", staleTime: 15_000 },
+  });
   const updateMutation = useUpdateMyManufacturerProfile();
   const queryClient = useQueryClient();
   const { getToken } = useAuth();
@@ -79,15 +81,21 @@ export default function Profile() {
   }, [profile, form]);
 
   const onSubmit = (data: FormValues) => {
+    if (!profile?.revision) {
+      toast.error("Refresh the profile before saving changes.");
+      return;
+    }
     updateMutation.mutate(
-      { data },
+      { data: { ...data, expectedRevision: profile.revision } },
       {
         onSuccess: (updatedProfile) => {
           toast.success("Profile updated successfully");
           queryClient.setQueryData(getGetMyManufacturerProfileQueryKey(), updatedProfile);
         },
-        onError: () => {
-          toast.error("Failed to update profile");
+        onError: async (error) => {
+          toast.error(error instanceof Error ? error.message : "Failed to update profile");
+          initialized.current = false;
+          await queryClient.invalidateQueries({ queryKey: getGetMyManufacturerProfileQueryKey() });
         }
       }
     );

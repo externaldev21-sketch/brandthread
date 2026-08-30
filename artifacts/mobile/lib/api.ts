@@ -517,7 +517,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         ),
         messages: {
           list: (threadId: string) => get<any[]>(`/api/manufacturers/threads/${encodeURIComponent(threadId)}/messages`),
-          send: (threadId: string, body: { content: string; messageType?: string; mediaUrls?: string[]; cardData?: any; senderRole?: string }) =>
+          send: (threadId: string, body: { clientRequestId: string; content?: string; messageType?: string; mediaUrls?: string[]; cardData?: any }) =>
             post<any>(`/api/manufacturers/threads/${encodeURIComponent(threadId)}/messages`, body),
         },
       },

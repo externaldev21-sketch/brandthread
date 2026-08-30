@@ -7,6 +7,8 @@
  */
 
 export interface ManufacturerUpdate {
+  /** @minimum 1 */
+  expectedRevision: number;
   businessName?: string;
   country?: string;
   city?: string;
@@ -17,7 +19,6 @@ export interface ManufacturerUpdate {
   priceRange?: string;
   bulkTurnaround?: string;
   sampleTurnaround?: string;
-  photos?: string[];
   website?: string;
   contactEmail?: string;
   contactPhone?: string;

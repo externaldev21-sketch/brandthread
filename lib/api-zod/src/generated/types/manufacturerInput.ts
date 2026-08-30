@@ -17,7 +17,6 @@ export interface ManufacturerInput {
   priceRange: string;
   bulkTurnaround: string;
   sampleTurnaround: string;
-  photos?: string[];
   website?: string;
   contactEmail?: string;
   contactPhone?: string;

@@ -13,7 +13,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { getQuotesForRequest, acceptQuote, getManufacturer } from '@/services/manufacturerService';
-import { DEMO_MANUFACTURERS } from '@/services/manufacturerService';
 import { Quote, Manufacturer } from '@/services/manufacturerTypes';
 import { BrandthreadHeader, BrandthreadCard, PrimaryButton, StatusBadge } from '@/components/BrandthreadUI';
 import {
@@ -103,19 +102,27 @@ export default function QuoteCompareScreen() {
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [manufacturers, setManufacturers] = useState<Map<string, Manufacturer>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     if (!requestId) { setLoading(false); return; }
-    const qs = await getQuotesForRequest(requestId);
-    setQuotes(qs);
-
-    const mfgMap = new Map<string, Manufacturer>();
-    for (const q of qs) {
-      const mfg = DEMO_MANUFACTURERS.find(m => m.id === q.manufacturerId);
-      if (mfg) mfgMap.set(q.manufacturerId, mfg);
+    setError('');
+    try {
+      const qs = await getQuotesForRequest(requestId);
+      setQuotes(qs);
+      const profiles = await Promise.all([...new Set(qs.map(q => q.manufacturerId))].map(id => getManufacturer(id)));
+      const mfgMap = new Map<string, Manufacturer>();
+      profiles.forEach(mfg => {
+        if (mfg) mfgMap.set(mfg.id, mfg);
+      });
+      setManufacturers(mfgMap);
+    } catch (loadError) {
+      setQuotes([]);
+      setManufacturers(new Map());
+      setError(loadError instanceof Error ? loadError.message : 'Could not load quotes.');
+    } finally {
+      setLoading(false);
     }
-    setManufacturers(mfgMap);
-    setLoading(false);
   }, [requestId]);
 
   useEffect(() => { load(); }, [load]);
@@ -145,7 +152,16 @@ export default function QuoteCompareScreen() {
     <View style={{ flex: 1, backgroundColor: BG, paddingTop: insets.top }}>
       <BrandthreadHeader title="Compare Quotes" onBack={() => router.back()} />
 
-      {quotes.length === 0 && (
+      {!!error && (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl }}>
+          <Feather name="alert-circle" size={48} color={ORANGE} style={{ marginBottom: SP.md }} />
+          <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, marginBottom: 8 }}>Could not load quotes</Text>
+          <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', marginBottom: SP.md }}>{error}</Text>
+          <PrimaryButton label="Try again" onPress={load} />
+        </View>
+      )}
+
+      {!error && quotes.length === 0 && (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl }}>
           <Feather name="inbox" size={48} color={SUBTLE} style={{ marginBottom: SP.md }} />
           <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, marginBottom: 8 }}>No Quotes Yet</Text>

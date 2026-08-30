@@ -3,7 +3,7 @@ import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowLeft, ArrowRight, Check, Factory, Image as ImageIcon, Upload } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Factory, Image as ImageIcon, ShieldCheck } from "lucide-react";
 
 import { useRegisterManufacturer } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -26,7 +26,6 @@ const formSchema = z.object({
   bulkTurnaround: z.string().min(2, "Bulk turnaround is required"),
   sampleTurnaround: z.string().min(2, "Sample turnaround is required"),
   description: z.string().min(10, "Description is required"),
-  photos: z.array(z.string()).min(1, "At least one photo is required"),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -47,7 +46,6 @@ export default function Onboarding() {
       bulkTurnaround: "30-45 days",
       sampleTurnaround: "10-14 days",
       description: "",
-      photos: [],
     },
     mode: "onChange"
   });
@@ -59,7 +57,7 @@ export default function Onboarding() {
     } else if (step === 2) {
       valid = await form.trigger(["moq", "priceRange", "bulkTurnaround", "sampleTurnaround", "description"]);
     } else if (step === 3) {
-      valid = await form.trigger(["photos"]);
+      valid = true;
     }
     
     if (valid) {
@@ -308,48 +306,14 @@ export default function Onboarding() {
                   <div className="space-y-6">
                     <div>
                       <h2 className="text-2xl font-bold tracking-tight">Facility Photos</h2>
-                      <p className="text-muted-foreground mt-1">Upload photos of your production floor and past work.</p>
+                      <p className="text-muted-foreground mt-1">Create your account first, then upload production photos through your protected profile.</p>
                     </div>
 
-                    <FormField
-                      control={form.control}
-                      name="photos"
-                      render={({ field }) => (
-                        <FormItem>
-                          <div className="border-2 border-dashed border-border rounded-lg p-12 text-center hover:bg-secondary/50 transition-colors cursor-pointer"
-                               onClick={() => {
-                                 // Mock file upload
-                                 const current = field.value || [];
-                                 field.onChange([...current, `https://api.dicebear.com/7.x/shapes/svg?seed=${Date.now()}`]);
-                               }}>
-                            <Upload className="w-10 h-10 mx-auto text-muted-foreground mb-4" />
-                            <h3 className="font-semibold mb-1">Click to upload photos</h3>
-                            <p className="text-sm text-muted-foreground">Supports JPG, PNG up to 10MB</p>
-                          </div>
-                          
-                          {field.value?.length > 0 && (
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-                              {field.value.map((url, i) => (
-                                <div key={i} className="aspect-square bg-secondary rounded border border-border overflow-hidden relative group">
-                                  <img src={url} alt={`Factory ${i}`} className="w-full h-full object-cover" />
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      field.onChange(field.value.filter((_, index) => index !== i));
-                                    }}
-                                    className="absolute top-2 right-2 bg-destructive text-destructive-foreground text-xs w-6 h-6 rounded flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                  >
-                                    &times;
-                                  </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    <div className="rounded-lg border border-border bg-secondary/30 p-10 text-center">
+                      <ShieldCheck className="mx-auto mb-4 h-10 w-10 text-primary" />
+                      <h3 className="font-semibold">Authenticated uploads only</h3>
+                      <p className="mt-2 text-sm text-muted-foreground">After registration, use Business Profile to upload verified JPEG, PNG, or WebP files. We never publish client-supplied image links.</p>
+                    </div>
                   </div>
                 )}
 

@@ -181,12 +181,14 @@ export default function QuoteDetailScreen() {
   const [counteroffers, setCounteroffers] = useState<Counteroffer[]>([]);
   const [manufacturerName, setManufacturerName] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [showCounterForm, setShowCounterForm] = useState(mode === 'counter');
 
   const load = useCallback(async () => {
     if (!quoteId) return;
     setLoading(true);
+    setLoadError('');
     try {
       const [q, cos] = await Promise.all([
         getQuote(quoteId),
@@ -197,7 +199,10 @@ export default function QuoteDetailScreen() {
         setCounteroffers(cos);
         const mfg = await getManufacturer(q.manufacturerId);
         setManufacturerName(mfg?.name ?? 'Manufacturer');
-      }
+      } else setLoadError('This quote is no longer available.');
+    } catch (error) {
+      setQuote(null);
+      setLoadError(error instanceof Error ? error.message : 'Could not load this quote.');
     } finally {
       setLoading(false);
     }
@@ -215,9 +220,14 @@ export default function QuoteDetailScreen() {
           text: 'Accept',
           onPress: async () => {
             setActionLoading(true);
-            await acceptQuote(quoteId!);
-            await load();
-            setActionLoading(false);
+            try {
+              await acceptQuote(quoteId!);
+              await load();
+            } catch (error) {
+              Alert.alert('Could not accept quote', error instanceof Error ? error.message : 'Refresh and try again.');
+            } finally {
+              setActionLoading(false);
+            }
           },
         },
       ]
@@ -235,9 +245,14 @@ export default function QuoteDetailScreen() {
           style: 'destructive',
           onPress: async () => {
             setActionLoading(true);
-            await declineQuote(quoteId!);
-            setActionLoading(false);
-            router.back();
+            try {
+              await declineQuote(quoteId!);
+              router.back();
+            } catch (error) {
+              Alert.alert('Could not decline quote', error instanceof Error ? error.message : 'Refresh and try again.');
+            } finally {
+              setActionLoading(false);
+            }
           },
         },
       ]
@@ -246,11 +261,15 @@ export default function QuoteDetailScreen() {
 
   const handleMessage = async () => {
     if (!quote) return;
-    const conv = await getOrCreateConversation(quote.manufacturerId, {
-      quoteId: quote.id,
-      contextLabel: `Quote: ${quote.productName}`,
-    });
-    router.push({ pathname: '/manufacturer-messages', params: { threadId: conv.id } } as any);
+    try {
+      const conv = await getOrCreateConversation(quote.manufacturerId, {
+        quoteId: quote.id,
+        contextLabel: `Quote: ${quote.productName}`,
+      });
+      router.push({ pathname: '/manufacturer-messages', params: { threadId: conv.id } } as any);
+    } catch (error) {
+      Alert.alert('Could not open conversation', error instanceof Error ? error.message : 'Please try again.');
+    }
   };
 
   const handleStartSample = async () => {
@@ -299,7 +318,10 @@ export default function QuoteDetailScreen() {
       <BrandthreadScreen>
         <BrandthreadHeader title="Quote Details" onBack={() => router.back()} />
         <View style={s.centered}>
-          <Text style={s.errorText}>Quote not found.</Text>
+          <Text style={s.errorText}>{loadError || 'Quote not found.'}</Text>
+          <TouchableOpacity style={s.retryButton} onPress={load}>
+            <Text style={s.retryButtonText}>Try again</Text>
+          </TouchableOpacity>
         </View>
       </BrandthreadScreen>
     );
@@ -333,7 +355,7 @@ export default function QuoteDetailScreen() {
               <StatusBadge label={statusLabel(quote.status)} variant={statusVariant(quote.status)} />
             </View>
             <Text style={s.productName}>{quote.productName}</Text>
-            <Text style={s.validUntil}>Valid until {formatDate(quote.validUntil)}</Text>
+            {!!quote.validUntil && <Text style={s.validUntil}>Valid until {formatDate(quote.validUntil)}</Text>}
             {isExpiringSoon && !isExpired && (
               <View style={s.warningBanner}>
                 <Feather name="alert-triangle" size={ICON.xs} color={ORANGE} />
@@ -529,6 +551,18 @@ const s = StyleSheet.create({
     fontSize: FS.base,
     fontFamily: FONT.medium,
     color: MUTED,
+  },
+  retryButton: {
+    marginTop: SP.md,
+    borderRadius: RADIUS.md,
+    backgroundColor: PURPLE,
+    paddingHorizontal: SP.md,
+    paddingVertical: SP.sm,
+  },
+  retryButtonText: {
+    color: ON_DARK,
+    fontFamily: FONT.semibold,
+    fontSize: FS.sm,
   },
 
   // Status card

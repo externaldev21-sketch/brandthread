@@ -79,7 +79,10 @@ router.post("/onboard", async (req, res) => {
     let stripeAccountId = mfr.stripeAccountId;
 
     if (!stripeAccountId) {
-      const account = await stripe.accounts.create({ type: "express" });
+      const account = await stripe.accounts.create(
+        { type: "express", metadata: { manufacturerId: mfr.id } },
+        { idempotencyKey: `manufacturer-connect-account/${mfr.id}` },
+      );
       stripeAccountId = account.id;
       await db
         .update(manufacturers)

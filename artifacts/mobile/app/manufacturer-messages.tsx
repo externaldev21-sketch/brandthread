@@ -29,6 +29,7 @@ import {
 } from '@/lib/theme';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { getEntitlementRejection } from '@/lib/entitlementError';
+import { PendingManufacturerOperations } from '@/services/manufacturerIdempotency';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -336,6 +337,7 @@ export default function ManufacturerMessagesScreen() {
 
   const inputRef = useRef<TextInput>(null);
   const listRef  = useRef<FlatList>(null);
+  const pendingOperations = useRef(new PendingManufacturerOperations());
 
   const showUpgrade = useCallback((error: unknown): boolean => {
     const rejection = getEntitlementRejection(error);
@@ -423,17 +425,20 @@ export default function ManufacturerMessagesScreen() {
     const text = inputText.trim();
     if (!text) return;
     setSending(true);
+    const signature = `${resolvedThreadId}:${text}`;
+    const operation = pendingOperations.current.get('text', signature);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     if (resolvedThreadId) {
       try {
         const msg = await api.manufacturers.threads.messages.send(resolvedThreadId, {
+          clientRequestId: operation.clientRequestId,
           content:     text,
           messageType: 'text',
-          senderRole:  'seller',
         });
         setApiMessages(prev => [{ ...msg }, ...prev]);
         setInputText('');
+        pendingOperations.current.complete('text', signature);
       } catch (error) {
         if (!showUpgrade(error)) Alert.alert('Error', 'Could not send message.');
       }
@@ -457,21 +462,27 @@ export default function ManufacturerMessagesScreen() {
     if (result.canceled) return;
 
     setSending(true);
+    const asset = result.assets[0];
+    const signature = `${resolvedThreadId}:${asset.uri}`;
+    const operation = pendingOperations.current.get('photo', signature);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
-      const asset = result.assets[0];
-      const upload = await api.manufacturers.threads.uploadAttachment(resolvedThreadId, {
-        uri: asset.uri,
-        mimeType: asset.mimeType,
-      });
+      if (!operation.metadata?.objectPath) {
+        const upload = await api.manufacturers.threads.uploadAttachment(resolvedThreadId, {
+          uri: asset.uri,
+          mimeType: asset.mimeType,
+        });
+        operation.metadata = { objectPath: upload.objectPath };
+      }
 
       const msg = await api.manufacturers.threads.messages.send(resolvedThreadId, {
+        clientRequestId: operation.clientRequestId,
         content:     '📷 Photo',
         messageType: 'image',
-        mediaUrls:   [upload.objectPath],
-        senderRole:  'seller',
+        mediaUrls:   [operation.metadata.objectPath],
       });
       setApiMessages(prev => [{ ...msg }, ...prev]);
+      pendingOperations.current.complete('photo', signature);
     } catch (e) {
       if (!showUpgrade(e)) Alert.alert('Error', 'Could not send photo.');
     }
@@ -483,8 +494,12 @@ export default function ManufacturerMessagesScreen() {
   async function handleSendCard(cardType: 'sample_card' | 'bulk_card', cardData: any) {
     if (!resolvedThreadId || !manufacturerId) return;
     setSending(true);
+    const signature = `${resolvedThreadId}:${manufacturerId}:${cardType}:${JSON.stringify(cardData)}`;
+    const orderOperation = pendingOperations.current.get('order-card', signature);
+    const messageOperation = pendingOperations.current.get('message-card', signature);
     try {
       const order = await api.manufacturers.sampleOrders.create({
+        clientRequestId: orderOperation.clientRequestId,
         manufacturerId,
         threadId: resolvedThreadId,
         orderType: cardType === 'sample_card' ? 'sample' : 'bulk',
@@ -495,12 +510,14 @@ export default function ManufacturerMessagesScreen() {
       });
       const label = cardType === 'sample_card' ? 'Sample Order Card' : 'Bulk Order Card';
       const msg = await api.manufacturers.threads.messages.send(resolvedThreadId, {
+        clientRequestId: messageOperation.clientRequestId,
         content:     label,
         messageType: cardType,
         cardData: { ...cardData, orderId: order.id },
-        senderRole:  'seller',
       });
       setApiMessages(prev => [{ ...msg }, ...prev]);
+      pendingOperations.current.complete('order-card', signature);
+      pendingOperations.current.complete('message-card', signature);
       router.push(
         `${cardType === 'bulk_card' ? '/production-detail' : '/sample-detail'}?id=${encodeURIComponent(order.id)}&paymentPrompt=1` as never,
       );

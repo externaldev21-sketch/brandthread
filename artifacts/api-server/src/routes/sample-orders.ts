@@ -18,7 +18,7 @@
 import express, { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
-import { sampleOrders, manufacturers, manufacturerThreads, manufacturerActivityEvents, dropWallets, dropWalletTransactions } from "@workspace/db";
+import { sampleOrders, manufacturers, manufacturerThreads, manufacturerActivityEvents, manufacturerRelationships, dropWallets, dropWalletTransactions } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireStripe, PLATFORM_COMMISSION_RATE, computeApplicationFeeCents } from "../lib/stripe";
@@ -26,6 +26,7 @@ import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 import { publishNotification } from "./notifications-feed";
 import { isAllowedBrandthreadCallbackUrl } from "../lib/brandthreadCallbackUrls";
+import { CreateProductionOrderBody } from "@workspace/api-zod";
 
 const router = Router();
 router.use(requireAuth);
@@ -142,11 +143,22 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
   try {
     const sellerId = (req as any).clerkUserId as string;
-    const { manufacturerId, threadId, orderType = "sample", title, description, quantity = 1, priceCents, notes } = req.body;
-
-    if (!manufacturerId || !title || !Number.isSafeInteger(priceCents) || priceCents <= 0
-      || !Number.isSafeInteger(quantity) || quantity <= 0) {
-      res.status(400).json({ error: "manufacturerId, title, and positive integer quantity and priceCents are required" }); return;
+    const parsed = CreateProductionOrderBody.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
+    const { clientRequestId, manufacturerId, threadId, orderType, title, description, quantity, priceCents, notes } = parsed.data;
+    const [duplicate] = await db.select().from(sampleOrders).where(and(
+      eq(sampleOrders.sellerId, sellerId),
+      eq(sampleOrders.clientRequestId, clientRequestId),
+    )).limit(1);
+    if (duplicate) {
+      if (duplicate.manufacturerId !== manufacturerId || duplicate.threadId !== (threadId ?? null)
+        || duplicate.orderType !== orderType || duplicate.title !== title
+        || duplicate.quantity !== quantity || duplicate.priceCents !== priceCents) {
+        res.status(409).json({ error: "clientRequestId was already used for a different order" });
+        return;
+      }
+      res.json({ ...duplicate, createdAt: duplicate.createdAt.toISOString(), updatedAt: duplicate.updatedAt.toISOString() });
+      return;
     }
 
     const [mfr] = await db
@@ -161,6 +173,8 @@ router.post("/", async (req, res) => {
       .limit(1);
 
     if (!mfr) { res.status(404).json({ error: "Manufacturer not found" }); return; }
+    await db.insert(manufacturerRelationships).values({ sellerId, manufacturerId })
+      .onConflictDoNothing();
     if (threadId != null) {
       const [thread] = await db.select({ id: manufacturerThreads.id }).from(manufacturerThreads)
         .where(and(
@@ -177,6 +191,7 @@ router.post("/", async (req, res) => {
       .values({
         manufacturerId,
         sellerId,
+        clientRequestId,
         threadId:  threadId ?? null,
         orderType,
         title,
@@ -187,8 +202,17 @@ router.post("/", async (req, res) => {
         stripePaymentIntentId: null,
         notes: notes ?? null,
         status: "pending_payment",
-      })
+      }).onConflictDoNothing()
       .returning();
+    if (!order) {
+      const [existing] = await db.select().from(sampleOrders).where(and(
+        eq(sampleOrders.sellerId, sellerId),
+        eq(sampleOrders.clientRequestId, clientRequestId),
+      )).limit(1);
+      if (!existing) { res.status(409).json({ error: "Order request conflicted; refresh and retry" }); return; }
+      res.json({ ...existing, createdAt: existing.createdAt.toISOString(), updatedAt: existing.updatedAt.toISOString() });
+      return;
+    }
 
     if (mfr.clerkId) {
       const notificationContext = orderNotificationContext(order);
@@ -461,9 +485,19 @@ router.patch("/:id/sample-detail", async (req, res) => {
       res.status(403).json({ error: "Only the seller can submit sample decisions." }); return;
     }
 
-    const { status, review, revision } = req.body as {
-      status?: string; review?: unknown; revision?: unknown;
+    const { status, review, revision, expectedRevision } = req.body as {
+      status?: string; review?: unknown; revision?: unknown; expectedRevision?: unknown;
     };
+    if (typeof expectedRevision !== "number" || !Number.isInteger(expectedRevision) || expectedRevision < 1) {
+      res.status(400).json({ error: "expectedRevision is required." }); return;
+    }
+    if (auth.order!.revision !== expectedRevision) {
+      res.status(409).json({
+        error: "Sample changed since it was loaded; refresh and review the latest values.",
+        code: "STALE_WRITE",
+      });
+      return;
+    }
     if (!review && !revision) {
       res.status(400).json({ error: "A review or revision request is required." }); return;
     }
@@ -486,9 +520,22 @@ router.patch("/:id/sample-detail", async (req, res) => {
         status: expectedStatus,
         notes: JSON.stringify(details),
         updatedAt: new Date(),
+        revision: sql`${sampleOrders.revision} + 1`,
       })
-      .where(eq(sampleOrders.id, req.params.id))
+      .where(and(
+        eq(sampleOrders.id, req.params.id),
+        eq(sampleOrders.sellerId, clerkUserId),
+        eq(sampleOrders.revision, expectedRevision),
+        eq(sampleOrders.status, auth.order!.status),
+      ))
       .returning();
+    if (!updated) {
+      res.status(409).json({
+        error: "Sample changed since it was loaded; refresh and review the latest values.",
+        code: "STALE_WRITE",
+      });
+      return;
+    }
     const [recipient] = await db.select({
       clerkId: manufacturers.clerkId,
     }).from(manufacturers)
@@ -887,16 +934,39 @@ router.post("/:id/images/upload", express.raw({ type: "image/*", limit: MAX_IMAG
 
     const objectPath = await objectStorage.createObjectEntityFromBuffer(bytes, contentType);
     try {
-      await objectStorage.trySetObjectEntityAclPolicy(objectPath, { owner: clerkUserId, visibility: "private" });
-      const currentUrls: string[] = Array.isArray(auth.order!.imageUrls) ? auth.order!.imageUrls as string[] : [];
-      const [updated] = await db.update(sampleOrders)
-        .set({ imageUrls: [...currentUrls, objectPath], updatedAt: new Date() })
-        .where(eq(sampleOrders.id, req.params.id))
-        .returning({ imageUrls: sampleOrders.imageUrls });
+      try {
+        await objectStorage.trySetObjectEntityAclPolicy(objectPath, { owner: clerkUserId, visibility: "private" });
+      } catch (error) {
+        await objectStorage.deleteObjectEntity(objectPath).catch(() => undefined);
+        throw error;
+      }
+      let updated: { imageUrls: unknown; revision: number } | undefined;
+      try {
+        [updated] = await db.update(sampleOrders)
+          .set({
+            // Append inside PostgreSQL rather than reading/replacing JSON in the
+            // request. Parallel uploads therefore preserve every object path.
+            imageUrls: sql`(COALESCE(${sampleOrders.imageUrls}::jsonb, '[]'::jsonb) || jsonb_build_array(${objectPath}::text))::json`,
+            updatedAt: new Date(),
+            revision: sql`${sampleOrders.revision} + 1`,
+          })
+          .where(eq(sampleOrders.id, req.params.id))
+          .returning({ imageUrls: sampleOrders.imageUrls, revision: sampleOrders.revision });
+      } catch (error) {
+        await objectStorage.deleteObjectEntity(objectPath).catch(() => undefined);
+        throw error;
+      }
+      if (!updated) {
+        await objectStorage.deleteObjectEntity(objectPath).catch(() => undefined);
+        res.status(409).json({
+          error: "Order changed while the image was uploading; refresh and retry.",
+          code: "STALE_WRITE",
+        });
+        return;
+      }
       const imageUrls = await Promise.all((updated.imageUrls as string[]).map(p => objectStorage.getObjectEntityDownloadURL(p)));
-      res.status(201).json({ imageUrls });
+      res.status(201).json({ imageUrls, revision: updated.revision });
     } catch (err) {
-      await objectStorage.deleteObjectEntity(objectPath).catch(() => undefined);
       throw err;
     }
   } catch (err) {

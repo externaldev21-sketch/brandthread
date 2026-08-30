@@ -284,6 +284,8 @@ export interface Sample {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  /** Server optimistic-concurrency revision for seller sample decisions/uploads. */
+  revision: number;
   threadId?: string;
   orderType?: 'sample' | 'bulk';
   manufacturerName?: string;
@@ -400,6 +402,8 @@ export interface ProductionOrder {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  /** Server optimistic-concurrency revision for order mutations. */
+  revision: number;
   threadId?: string;
   manufacturerName?: string;
   /** Server-confirmed Connect readiness; payment must not start unless true. */

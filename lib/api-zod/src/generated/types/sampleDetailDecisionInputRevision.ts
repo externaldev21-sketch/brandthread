@@ -6,8 +6,4 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface OrderStatusUpdate {
-  status: string;
-  trackingNumber?: string;
-  notes?: string;
-}
+export type SampleDetailDecisionInputRevision = { [key: string]: unknown };

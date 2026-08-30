@@ -6,6 +6,7 @@ export const manufacturers = pgTable('manufacturers', {
   id:                 uuid('id').primaryKey().defaultRandom(),
   // nullable: public applications don't have a Clerk account yet
   clerkId:            text('clerk_id').unique(),
+  applicationRequestId: text('application_request_id').unique(),
   businessName:       text('business_name').notNull(),
   country:            text('country').notNull(),
   city:               text('city'),
@@ -16,6 +17,8 @@ export const manufacturers = pgTable('manufacturers', {
   priceRange:         text('price_range').notNull().default(''),
   bulkTurnaround:     text('bulk_turnaround').notNull().default(''),
   sampleTurnaround:   text('sample_turnaround').notNull().default(''),
+  ratingBasisPoints:  integer('rating_basis_points').notNull().default(0),
+  responseTime:       text('response_time').notNull().default(''),
   photos:             json('photos').$type<string[]>().notNull().default([]),
   website:            text('website'),
   contactEmail:       text('contact_email'),
@@ -32,6 +35,9 @@ export const manufacturers = pgTable('manufacturers', {
   stripeAccountStatus: text('stripe_account_status'), // 'pending' | 'active' | 'restricted'
   createdAt:          timestamp('created_at').defaultNow().notNull(),
   updatedAt:          timestamp('updated_at').defaultNow().notNull(),
+  // Monotonic optimistic-concurrency token. Do not use timestamp equality:
+  // PostgreSQL preserves microseconds while JSON dates preserve milliseconds.
+  revision:           integer('revision').notNull().default(1),
 });
 
 // ─── Seller Favorite Manufacturers ───────────────────────────────────────────
@@ -46,6 +52,22 @@ export const savedManufacturers = pgTable('saved_manufacturers', {
     .on(table.sellerId, table.manufacturerId),
   sellerIdx: index('saved_manufacturers_seller_idx').on(table.sellerId),
   manufacturerIdx: index('saved_manufacturers_manufacturer_idx').on(table.manufacturerId),
+}));
+
+// A durable seller/manufacturer connection. Threads and orders reference the
+// same canonical manufacturer UUID and Clerk seller identity represented here.
+export const manufacturerRelationships = pgTable('manufacturer_relationships', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  sellerId: text('seller_id').notNull(),
+  manufacturerId: uuid('manufacturer_id').notNull().references(() => manufacturers.id, { onDelete: 'cascade' }),
+  status: text('status').notNull().default('active'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  sellerManufacturerUnique: uniqueIndex('manufacturer_relationships_seller_manufacturer_unique')
+    .on(table.sellerId, table.manufacturerId),
+  sellerIdx: index('manufacturer_relationships_seller_idx').on(table.sellerId),
+  manufacturerIdx: index('manufacturer_relationships_manufacturer_idx').on(table.manufacturerId),
 }));
 
 // ─── Manufacturer Payment Info (legacy bank/PayPal/Wise — kept for non-Stripe markets)
@@ -112,6 +134,10 @@ export const manufacturerMessages = pgTable('manufacturer_messages', {
   id:          uuid('id').primaryKey().defaultRandom(),
   threadId:    uuid('thread_id').notNull().references(() => manufacturerThreads.id, { onDelete: 'cascade' }),
   senderRole:  text('sender_role').notNull(),   // 'manufacturer' | 'seller'
+  // Always derived from the authenticated request. Nullable only for legacy
+  // rows written before participant identities were persisted.
+  senderClerkId: text('sender_clerk_id'),
+  clientRequestId: text('client_request_id'),
   content:     text('content').notNull(),
   // Extended for real messaging
   messageType: text('message_type').notNull().default('text'),
@@ -122,6 +148,8 @@ export const manufacturerMessages = pgTable('manufacturer_messages', {
   sentAt:      timestamp('sent_at').defaultNow().notNull(),
 }, (table) => ({
   threadIdx: index('manufacturer_messages_thread_id_idx').on(table.threadId),
+  requestUnique: uniqueIndex('manufacturer_messages_sender_request_unique')
+    .on(table.threadId, table.senderClerkId, table.clientRequestId),
 }));
 
 // An attachment is created by the authenticated upload endpoint before it can
@@ -190,6 +218,7 @@ export const sampleOrders = pgTable('sample_orders', {
   id:                      uuid('id').primaryKey().defaultRandom(),
   manufacturerId:          uuid('manufacturer_id').notNull().references(() => manufacturers.id, { onDelete: 'cascade' }),
   sellerId:                text('seller_id').notNull(),   // Clerk userId
+  clientRequestId:         text('client_request_id'),
   threadId:                uuid('thread_id').references(() => manufacturerThreads.id, { onDelete: 'set null' }),
   orderType:               text('order_type').notNull().default('sample'),  // 'sample' | 'bulk'
   title:                   text('title').notNull(),
@@ -221,11 +250,14 @@ export const sampleOrders = pgTable('sample_orders', {
   imageUrls:               json('image_urls').$type<string[]>().notNull().default([]),
   createdAt:               timestamp('created_at').defaultNow().notNull(),
   updatedAt:               timestamp('updated_at').defaultNow().notNull(),
+  revision:                integer('revision').notNull().default(1),
 }, (t) => ({
   sellerIdx: index('sample_orders_seller_idx').on(t.sellerId),
   mfgIdx:    index('sample_orders_mfg_idx').on(t.manufacturerId),
   threadIdx: index('sample_orders_thread_idx').on(t.threadId),
   walletIdx: index('sample_orders_wallet_id_idx').on(t.walletId),
+  sellerRequestUnique: uniqueIndex('sample_orders_seller_request_unique')
+    .on(t.sellerId, t.clientRequestId),
 }));
 
 // ─── Drop Wallets ─────────────────────────────────────────────────────────────

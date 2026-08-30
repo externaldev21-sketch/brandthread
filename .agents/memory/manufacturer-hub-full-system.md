@@ -19,6 +19,20 @@ A private object path is not authorization. Every thread upload must be bound se
 
 **How to apply:** Validate bytes, persist the upload binding, require an unconsumed binding from the current sender when creating a message, store only private paths, and return short-lived signed URLs.
 
+Manufacturer profile photos follow the same private-by-default storage rule. Public-directory eligibility is the authorization decision that permits an anonymous signed display URL; object ACLs never become public merely because a profile may later be published.
+
+**Why:** Pending or private manufacturers can upload the same assets as public profiles, so upload-time visibility cannot safely predict read authorization.
+
+**How to apply:** Persist private object paths, sign them for the authenticated owner, and sign them anonymously only after confirming the profile is active and public.
+
+## Shared-order concurrency rule
+
+Every mutable sample or bulk order operation uses an integer revision token and advances it atomically, including status decisions and media attachment.
+
+**Why:** Timestamp equality loses database precision, while read-modify-write arrays and JSON notes lose concurrent participant updates.
+
+**How to apply:** Require the last returned revision for conditional mutations, return a visible stale-write conflict, and use database-atomic append/update expressions for shared media.
+
 ## Production ownership rule
 
 Manufacturers advance production stages and add shipment tracking. Sellers can review samples and observe live status, but cannot advance production or trigger shipment-linked money movement.

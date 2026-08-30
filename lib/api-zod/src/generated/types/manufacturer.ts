@@ -33,4 +33,7 @@ export interface Manufacturer {
   verifiedAt?: string | null;
   paymentSetup?: boolean;
   createdAt: string;
+  updatedAt: string;
+  /** @minimum 1 */
+  revision: number;
 }

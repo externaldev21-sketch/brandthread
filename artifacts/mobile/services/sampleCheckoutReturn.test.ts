@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const source = fs.readFileSync(path.resolve(__dirname, 'sample-detail.tsx'), 'utf8');
+const source = fs.readFileSync(path.resolve(__dirname, '../app/sample-detail.tsx'), 'utf8');
 
 describe('sample hosted checkout return flow', () => {
   it('uses an auth session with the exact marked return URL', () => {

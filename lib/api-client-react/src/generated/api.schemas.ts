@@ -36,6 +36,9 @@ export interface Manufacturer {
   verifiedAt?: string | null;
   paymentSetup?: boolean;
   createdAt: string;
+  updatedAt: string;
+  /** @minimum 1 */
+  revision: number;
 }
 
 export interface ManufacturerInput {
@@ -49,13 +52,14 @@ export interface ManufacturerInput {
   priceRange: string;
   bulkTurnaround: string;
   sampleTurnaround: string;
-  photos?: string[];
   website?: string;
   contactEmail?: string;
   contactPhone?: string;
 }
 
 export interface ManufacturerUpdate {
+  /** @minimum 1 */
+  expectedRevision: number;
   businessName?: string;
   country?: string;
   city?: string;
@@ -66,10 +70,87 @@ export interface ManufacturerUpdate {
   priceRange?: string;
   bulkTurnaround?: string;
   sampleTurnaround?: string;
-  photos?: string[];
   website?: string;
   contactEmail?: string;
   contactPhone?: string;
+}
+
+export interface PublicManufacturer {
+  id: string;
+  businessName: string;
+  country: string;
+  /** @nullable */
+  city?: string | null;
+  specialty: string;
+  /** @nullable */
+  description?: string | null;
+  yearsInBusiness: number;
+  moq: number;
+  priceRange: string;
+  bulkTurnaround: string;
+  sampleTurnaround: string;
+  photos: string[];
+  /** @nullable */
+  website?: string | null;
+  isVerified: boolean;
+  /** @nullable */
+  rating?: number | null;
+  /** @nullable */
+  responseTime?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  /** @minimum 1 */
+  revision: number;
+}
+
+export type ManufacturerApplicationInput = ManufacturerInput & {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  clientRequestId: string;
+};
+
+export type ManufacturerApplicationReceiptStatus = typeof ManufacturerApplicationReceiptStatus[keyof typeof ManufacturerApplicationReceiptStatus];
+
+
+export const ManufacturerApplicationReceiptStatus = {
+  pending: 'pending',
+} as const;
+
+export interface ManufacturerApplicationReceipt {
+  id: string;
+  status: ManufacturerApplicationReceiptStatus;
+  published: false;
+}
+
+export interface ManufacturerRelationshipInput {
+  manufacturerId: string;
+}
+
+export type ManufacturerRelationshipStatus = typeof ManufacturerRelationshipStatus[keyof typeof ManufacturerRelationshipStatus];
+
+
+export const ManufacturerRelationshipStatus = {
+  active: 'active',
+  blocked: 'blocked',
+  ended: 'ended',
+} as const;
+
+export interface ManufacturerRelationship {
+  id: string;
+  sellerId: string;
+  manufacturerId: string;
+  status: ManufacturerRelationshipStatus;
+  manufacturer?: PublicManufacturer;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ManufacturerThreadInput {
+  manufacturerId: string;
+  /** @maxLength 200 */
+  subject?: string;
 }
 
 export type ManufacturerDashboardActiveSellersItem = { [key: string]: unknown };
@@ -97,11 +178,15 @@ export interface SampleOrder {
   imageUrls?: string[];
   createdAt: string;
   updatedAt: string;
+  /** @minimum 1 */
+  revision: number;
   [key: string]: unknown;
  }
 
 export interface MessageThread {
   id: string;
+  manufacturerId: string;
+  sellerId: string;
   buyerName: string;
   /** @nullable */
   buyerAvatar?: string | null;
@@ -110,7 +195,7 @@ export interface MessageThread {
   lastMessageAt: string;
   unreadCount: number;
   /** @nullable */
-  orderStatus: string | null;
+  orderStatus?: string | null;
 }
 
 export interface OrderBuckets {
@@ -131,11 +216,32 @@ export interface ManufacturerDashboard {
   orderHistory: SampleOrder[];
 }
 
+export type MessageMessageType = typeof MessageMessageType[keyof typeof MessageMessageType];
+
+
+export const MessageMessageType = {
+  text: 'text',
+  image: 'image',
+  sample_card: 'sample_card',
+  bulk_card: 'bulk_card',
+  system: 'system',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MessageCardData = { [key: string]: unknown } | null;
+
 export interface Message {
   id: string;
   threadId: string;
   senderRole: string;
+  senderId: string;
   content: string;
+  messageType: MessageMessageType;
+  mediaUrls: string[];
+  /** @nullable */
+  cardData?: MessageCardData;
   sentAt: string;
 }
 
@@ -156,6 +262,11 @@ export const MessageInputMessageType = {
 export type MessageInputCardData = { [key: string]: unknown } | null;
 
 export interface MessageInput {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  clientRequestId: string;
   content?: string;
   messageType?: MessageInputMessageType;
   mediaUrls?: string[];
@@ -163,24 +274,69 @@ export interface MessageInput {
   cardData?: MessageInputCardData;
 }
 
-export interface ManufacturerOrder {
-  id: string;
-  orderNumber: string;
-  buyerName: string;
-  productType: string;
+export interface AttachmentReceipt {
+  /** @pattern ^/objects/ */
+  objectPath: string;
+}
+
+export type ProductionOrderInputOrderType = typeof ProductionOrderInputOrderType[keyof typeof ProductionOrderInputOrderType];
+
+
+export const ProductionOrderInputOrderType = {
+  sample: 'sample',
+  bulk: 'bulk',
+} as const;
+
+export interface ProductionOrderInput {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  clientRequestId: string;
+  manufacturerId: string;
+  /** @nullable */
+  threadId?: string | null;
+  orderType: ProductionOrderInputOrderType;
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  title: string;
+  /** @nullable */
+  description?: string | null;
+  /** @minimum 1 */
   quantity: number;
-  /** @nullable */
-  colorway?: string | null;
-  /** @nullable */
-  size?: string | null;
-  status: string;
-  totalCents: number;
+  /** @minimum 1 */
+  priceCents: number;
   /** @nullable */
   notes?: string | null;
-  /** @nullable */
-  trackingNumber?: string | null;
-  createdAt: string;
-  updatedAt?: string;
+}
+
+export type SampleDetailDecisionInputStatus = typeof SampleDetailDecisionInputStatus[keyof typeof SampleDetailDecisionInputStatus];
+
+
+export const SampleDetailDecisionInputStatus = {
+  approved: 'approved',
+  rejected: 'rejected',
+  revision_requested: 'revision_requested',
+} as const;
+
+export type SampleDetailDecisionInputReview = { [key: string]: unknown };
+
+export type SampleDetailDecisionInputRevision = { [key: string]: unknown };
+
+export interface SampleDetailDecisionInput {
+  status: SampleDetailDecisionInputStatus;
+  /** @minimum 1 */
+  expectedRevision: number;
+  review?: SampleDetailDecisionInputReview;
+  revision?: SampleDetailDecisionInputRevision;
+}
+
+export interface SampleOrderImageUploadReceipt {
+  imageUrls: string[];
+  /** @minimum 1 */
+  revision: number;
 }
 
 export type ManufacturerSampleOrderStatusUpdateStatus = typeof ManufacturerSampleOrderStatusUpdateStatus[keyof typeof ManufacturerSampleOrderStatusUpdateStatus];
@@ -195,6 +351,8 @@ export const ManufacturerSampleOrderStatusUpdateStatus = {
 } as const;
 
 export interface ManufacturerSampleOrderStatusUpdate {
+  /** @minimum 1 */
+  expectedRevision: number;
   status: ManufacturerSampleOrderStatusUpdateStatus;
   trackingNumber?: string;
   carrier?: string;
@@ -228,12 +386,6 @@ export interface BulkPaymentOptions {
   wallets: BulkPaymentOptionsWalletsItem[];
 }
 
-export interface OrderStatusUpdate {
-  status: string;
-  trackingNumber?: string;
-  notes?: string;
-}
-
 export interface ManufacturerPayment {
   isSetup: boolean;
   /** @nullable */
@@ -257,6 +409,85 @@ export interface ManufacturerPaymentInput {
   paypalEmail?: string;
   wiseEmail?: string;
 }
+
+export type ManufacturerConnectStatusStatus = typeof ManufacturerConnectStatusStatus[keyof typeof ManufacturerConnectStatusStatus];
+
+
+export const ManufacturerConnectStatusStatus = {
+  not_started: 'not_started',
+  pending: 'pending',
+  restricted: 'restricted',
+  active: 'active',
+} as const;
+
+export interface ManufacturerConnectStatus {
+  connected: boolean;
+  ready: boolean;
+  status: ManufacturerConnectStatusStatus;
+  stripeAccountId?: string;
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  detailsSubmitted: boolean;
+  requirementsDue: string[];
+  /** @nullable */
+  disabledReason?: string | null;
+  /** @nullable */
+  recovery?: string | null;
+}
+
+export interface ManufacturerConnectOnboardingInput {
+  refreshUrl: string;
+  returnUrl: string;
+}
+
+export interface ManufacturerConnectOnboarding {
+  url: string;
+  stripeAccountId: string;
+}
+
+export type ManufacturerPaymentActivityCategory = typeof ManufacturerPaymentActivityCategory[keyof typeof ManufacturerPaymentActivityCategory];
+
+
+export const ManufacturerPaymentActivityCategory = {
+  payment: 'payment',
+  payout: 'payout',
+} as const;
+
+/**
+ * @nullable
+ */
+export type ManufacturerPaymentActivityOrderType = typeof ManufacturerPaymentActivityOrderType[keyof typeof ManufacturerPaymentActivityOrderType] | null;
+
+
+export const ManufacturerPaymentActivityOrderType = {
+  sample: 'sample',
+  bulk: 'bulk',
+} as const;
+
+export type ManufacturerPaymentActivityMetadata = { [key: string]: unknown };
+
+export interface ManufacturerPaymentActivity {
+  id: string;
+  manufacturerId: string;
+  /** @nullable */
+  sampleOrderId?: string | null;
+  category: ManufacturerPaymentActivityCategory;
+  type: string;
+  /** @nullable */
+  amountCents?: number | null;
+  /** @nullable */
+  orderTitle?: string | null;
+  /** @nullable */
+  orderType?: ManufacturerPaymentActivityOrderType;
+  metadata: ManufacturerPaymentActivityMetadata;
+  createdAt: string;
+}
+
+export type ListPublicManufacturersParams = {
+q?: string;
+country?: string;
+specialty?: string;
+};
 
 export type UploadManufacturerThreadAttachment201 = {
   objectPath: string;

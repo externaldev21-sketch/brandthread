@@ -6,11 +6,11 @@ import {
   manufacturerPayments,
   manufacturerThreads,
   manufacturerMessages,
-  manufacturerOrders,
   manufacturerInviteTokens,
   savedManufacturers,
   sampleOrders,
   manufacturerThreadAttachments,
+  manufacturerRelationships,
 } from "@workspace/db";
 import { eq, desc, and, sql, inArray, isNull } from "drizzle-orm";
 import crypto from "crypto";
@@ -18,7 +18,6 @@ import {
   RegisterManufacturerBody,
   UpdateMyManufacturerProfileBody,
   SendThreadMessageBody,
-  UpdateManufacturerOrderStatusBody,
   SetupManufacturerPaymentBody,
 } from "@workspace/api-zod";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
@@ -33,6 +32,13 @@ const router = Router();
 const objectStorage = new ObjectStorageService();
 const MAX_PROFILE_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_MESSAGE_ATTACHMENT_BYTES = 20 * 1024 * 1024;
+
+async function signedProfilePhotos(storedPhotos: unknown): Promise<string[]> {
+  if (!Array.isArray(storedPhotos)) return [];
+  return Promise.all(storedPhotos
+    .filter((path): path is string => typeof path === "string" && path.startsWith("/objects/"))
+    .map((path) => objectStorage.getObjectEntityDownloadURL(path)));
+}
 const requireGrowthSeller = [requireAuth, teamContext(), requirePlan("growth")] as const;
 
 function isSupportedImage(buffer: Buffer): boolean {
@@ -115,8 +121,30 @@ async function serializeMessage(message: typeof manufacturerMessages.$inferSelec
   }));
   return {
     ...message,
+    senderId: message.senderClerkId ?? await resolveLegacyMessageSender(message),
     mediaUrls: mediaUrls.filter((url): url is string => !!url),
     sentAt: message.sentAt.toISOString(),
+  };
+}
+
+async function resolveLegacyMessageSender(message: typeof manufacturerMessages.$inferSelect) {
+  const [participant] = await db.select({
+    sellerId: manufacturerThreads.buyerClerkId,
+    manufacturerClerkId: manufacturers.clerkId,
+  }).from(manufacturerThreads)
+    .leftJoin(manufacturers, eq(manufacturerThreads.manufacturerId, manufacturers.id))
+    .where(eq(manufacturerThreads.id, message.threadId))
+    .limit(1);
+  return message.senderRole === "manufacturer"
+    ? participant?.manufacturerClerkId ?? "legacy-manufacturer"
+    : participant?.sellerId ?? "legacy-seller";
+}
+
+function serializeRelationship(row: typeof manufacturerRelationships.$inferSelect) {
+  return {
+    ...row,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 
@@ -132,6 +160,41 @@ async function mediaAreBoundToSender(threadId: string, uploaderClerkId: string, 
       inArray(manufacturerThreadAttachments.objectPath, mediaUrls),
     ));
   return attachments.length === new Set(mediaUrls).size;
+}
+
+async function cardIsBoundToThread(
+  threadId: string,
+  manufacturerId: string,
+  sellerId: string,
+  messageType: string,
+  cardData: Record<string, unknown> | null | undefined,
+) {
+  if (messageType !== "sample_card" && messageType !== "bulk_card") return true;
+  const orderId = cardData?.orderId;
+  if (!isUuid(orderId)) return false;
+  const [order] = await db.select({ id: sampleOrders.id }).from(sampleOrders).where(and(
+    eq(sampleOrders.id, orderId),
+    eq(sampleOrders.threadId, threadId),
+    eq(sampleOrders.manufacturerId, manufacturerId),
+    eq(sampleOrders.sellerId, sellerId),
+    eq(sampleOrders.orderType, messageType === "bulk_card" ? "bulk" : "sample"),
+  )).limit(1);
+  return !!order;
+}
+
+function isSameMessageSubmission(
+  existing: typeof manufacturerMessages.$inferSelect,
+  input: {
+    content?: string;
+    messageType?: string;
+    mediaUrls?: string[];
+    cardData?: Record<string, unknown> | null;
+  },
+) {
+  return existing.content === (input.content ?? "")
+    && existing.messageType === (input.messageType ?? "text")
+    && JSON.stringify(existing.mediaUrls ?? []) === JSON.stringify(input.mediaUrls ?? [])
+    && JSON.stringify(existing.cardData ?? null) === JSON.stringify(input.cardData ?? null);
 }
 
 export function isSupportedAttachment(bytes: Buffer, contentType: string) {
@@ -237,6 +300,47 @@ router.delete("/favorites/:manufacturerId", ...requireGrowthSeller, async (req, 
   res.json({ ok: true });
 });
 
+router.get("/relationships", ...requireGrowthSeller, async (req, res) => {
+  const sellerId = (req as any).clerkUserId as string;
+  const rows = await db.select().from(manufacturerRelationships)
+    .where(eq(manufacturerRelationships.sellerId, sellerId))
+    .orderBy(desc(manufacturerRelationships.updatedAt));
+  res.json(rows.map(serializeRelationship));
+});
+
+router.post("/relationships", ...requireGrowthSeller, async (req, res) => {
+  const sellerId = (req as any).clerkUserId as string;
+  const manufacturerId = req.body?.manufacturerId;
+  if (!isUuid(manufacturerId)) {
+    res.status(400).json({ error: "A canonical manufacturer UUID is required" }); return;
+  }
+  const [manufacturer] = await db.select({ id: manufacturers.id }).from(manufacturers)
+    .where(and(eq(manufacturers.id, manufacturerId), eq(manufacturers.status, "active")))
+    .limit(1);
+  if (!manufacturer) { res.status(404).json({ error: "Manufacturer not found" }); return; }
+  const [created] = await db.insert(manufacturerRelationships)
+    .values({ sellerId, manufacturerId })
+    .onConflictDoNothing()
+    .returning();
+  const relationship = created ?? (await db.select().from(manufacturerRelationships).where(and(
+    eq(manufacturerRelationships.sellerId, sellerId),
+    eq(manufacturerRelationships.manufacturerId, manufacturerId),
+  )).limit(1))[0];
+  if (!relationship) { res.status(500).json({ error: "Unable to create relationship" }); return; }
+  res.status(created ? 201 : 200).json(serializeRelationship(relationship));
+});
+
+router.get("/me/relationships", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  const mfr = await resolveManufacturer(userId);
+  if (!mfr) return res.status(404).json({ error: "Not registered" });
+  const rows = await db.select().from(manufacturerRelationships)
+    .where(eq(manufacturerRelationships.manufacturerId, mfr.id))
+    .orderBy(desc(manufacturerRelationships.updatedAt));
+  return res.json(rows.map(serializeRelationship));
+});
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // INVITE TOKENS — seller creates private invite links for manufacturers
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -324,9 +428,10 @@ router.post("/register-via-invite/:token", async (req, res) => {
     .insert(manufacturers)
     .values({
       clerkId:           userId,
-       isPublicDirectory: true,
+      isPublicDirectory: true,
       status:            "active",
       ...parsed.data,
+      photos:            [],
     })
     .returning();
 
@@ -335,6 +440,9 @@ router.post("/register-via-invite/:token", async (req, res) => {
     .update(manufacturerInviteTokens)
     .set({ usedAt: new Date(), manufacturerId: mfr.id })
     .where(eq(manufacturerInviteTokens.id, inv.id));
+  await db.insert(manufacturerRelationships)
+    .values({ sellerId: inv.sellerId, manufacturerId: mfr.id })
+    .onConflictDoNothing();
 
   const signupEmail = await resolveManufacturerEmail(
     userId,
@@ -356,6 +464,7 @@ router.post("/register-via-invite/:token", async (req, res) => {
     invitedBySellerId: inv.sellerId,
     verifiedAt: null,
     createdAt:  mfr.createdAt.toISOString(),
+    updatedAt:  mfr.updatedAt.toISOString(),
   });
 });
 
@@ -372,8 +481,10 @@ router.get("/me", async (req, res) => {
 
   return res.json({
     ...mfr,
+    photos: await signedProfilePhotos(mfr.photos),
     verifiedAt: mfr.verifiedAt?.toISOString() ?? null,
     createdAt:  mfr.createdAt.toISOString(),
+    updatedAt:  mfr.updatedAt.toISOString(),
   });
 });
 
@@ -389,24 +500,45 @@ router.post(
       const clerkId = (req as any).clerkUserId as string;
       const mfr = await resolveManufacturer(clerkId);
       if (!mfr) return res.status(404).json({ error: "Manufacturer profile not found" });
+      if ((mfr.photos?.length ?? 0) >= 8) {
+        return res.status(409).json({ error: "A maximum of 8 factory photos is allowed" });
+      }
       if (!Buffer.isBuffer(req.body) || req.body.length === 0 || !isSupportedImage(req.body)) {
         return res.status(400).json({ error: "Upload a valid JPEG, PNG, or WebP image" });
       }
 
       const contentType = req.headers["content-type"]?.split(";")[0] ?? "application/octet-stream";
       const objectPath = await objectStorage.createObjectEntityFromBuffer(req.body, contentType);
-      await objectStorage.trySetObjectEntityAclPolicy(objectPath, {
-        owner: clerkId,
-        visibility: "public",
-      });
-      const photos = [...(mfr.photos ?? []), objectPath].slice(-8);
-      const [updated] = await db
-        .update(manufacturers)
-        .set({ photos, updatedAt: new Date() })
-        .where(eq(manufacturers.id, mfr.id))
-        .returning({ photos: manufacturers.photos });
-
-      return res.status(201).json({ photo: objectPath, photos: updated.photos });
+      let updated: { photos: unknown; revision: number } | undefined;
+      try {
+        await objectStorage.trySetObjectEntityAclPolicy(objectPath, {
+          owner: clerkId,
+          visibility: "private",
+        });
+        [updated] = await db
+          .update(manufacturers)
+          .set({
+            photos: sql`(COALESCE(${manufacturers.photos}::jsonb, '[]'::jsonb) || jsonb_build_array(${objectPath}::text))::json`,
+            updatedAt: new Date(),
+            revision: sql`${manufacturers.revision} + 1`,
+          })
+          .where(and(
+            eq(manufacturers.id, mfr.id),
+            sql`jsonb_array_length(COALESCE(${manufacturers.photos}::jsonb, '[]'::jsonb)) < 8`,
+          ))
+          .returning({ photos: manufacturers.photos, revision: manufacturers.revision });
+        if (!updated) {
+          await objectStorage.deleteObjectEntity(objectPath).catch(() => undefined);
+          return res.status(409).json({ error: "Profile changed or already has 8 factory photos; refresh and retry" });
+        }
+      } catch (error) {
+        await objectStorage.deleteObjectEntity(objectPath).catch(() => undefined);
+        throw error;
+      }
+      const displayPhotos = await signedProfilePhotos(updated.photos);
+      const photo = displayPhotos.at(-1);
+      if (!photo) throw new Error("Unable to sign attached profile photo");
+      return res.status(201).json({ photo, photos: displayPhotos, revision: updated.revision });
     } catch (error) {
       req.log.error({ err: error }, "Manufacturer photo upload failed");
       return res.status(500).json({ error: "Unable to upload factory image" });
@@ -424,16 +556,25 @@ router.patch("/me", async (req, res) => {
   const mfr = await resolveManufacturer(userId);
   if (!mfr) return res.status(404).json({ error: "Not registered" });
 
+  const { expectedRevision, ...changes } = parsed.data;
   const [updated] = await db
     .update(manufacturers)
-    .set({ ...parsed.data, updatedAt: new Date() })
-    .where(eq(manufacturers.id, mfr.id))
+    .set({ ...changes, updatedAt: new Date(), revision: sql`${manufacturers.revision} + 1` })
+    .where(and(eq(manufacturers.id, mfr.id), eq(manufacturers.revision, expectedRevision)))
     .returning();
+  if (!updated) {
+    return res.status(409).json({
+      error: "Profile changed since it was loaded; refresh and review the latest values",
+      code: "STALE_WRITE",
+    });
+  }
 
   return res.json({
     ...updated,
+    photos: await signedProfilePhotos(updated.photos),
     verifiedAt: updated.verifiedAt?.toISOString() ?? null,
     createdAt:  updated.createdAt.toISOString(),
+    updatedAt:  updated.updatedAt.toISOString(),
   });
 });
 
@@ -449,7 +590,7 @@ router.post("/register", async (req, res) => {
 
   const [mfr] = await db
     .insert(manufacturers)
-    .values({ clerkId: userId, isPublicDirectory: true, status: "active", ...parsed.data })
+    .values({ clerkId: userId, isPublicDirectory: true, status: "active", ...parsed.data, photos: [] })
     .returning();
 
   const signupEmail = await resolveManufacturerEmail(userId, parsed.data.contactEmail);
@@ -467,6 +608,7 @@ router.post("/register", async (req, res) => {
     ...mfr,
     verifiedAt: null,
     createdAt:  mfr.createdAt.toISOString(),
+    updatedAt:  mfr.updatedAt.toISOString(),
   });
 });
 
@@ -532,7 +674,13 @@ router.post("/threads", ...requireGrowthSeller, async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
   const { manufacturerId, subject = "General" } = req.body;
 
-  if (!manufacturerId) { res.status(400).json({ error: "manufacturerId required" }); return; }
+  if (!isUuid(manufacturerId)) { res.status(400).json({ error: "A canonical manufacturer UUID is required" }); return; }
+  const [manufacturer] = await db.select({ id: manufacturers.id }).from(manufacturers)
+    .where(and(eq(manufacturers.id, manufacturerId), eq(manufacturers.status, "active")))
+    .limit(1);
+  if (!manufacturer) { res.status(404).json({ error: "Manufacturer not found" }); return; }
+  await db.insert(manufacturerRelationships).values({ sellerId, manufacturerId })
+    .onConflictDoNothing();
 
   // Get seller name from auth
   const sellerName = (req as any).clerkUserName ?? "Seller";
@@ -548,7 +696,7 @@ router.post("/threads", ...requireGrowthSeller, async (req, res) => {
     .limit(1);
 
   if (existing) {
-    res.json({ ...existing, lastMessageAt: existing.lastMessageAt.toISOString(), createdAt: existing.createdAt.toISOString() });
+    res.json({ ...existing, sellerId, lastMessageAt: existing.lastMessageAt.toISOString(), createdAt: existing.createdAt.toISOString() });
     return;
   }
 
@@ -565,7 +713,7 @@ router.post("/threads", ...requireGrowthSeller, async (req, res) => {
   )).limit(1))[0];
   if (!thread) { res.status(500).json({ error: "Unable to create thread" }); return; }
 
-  res.status(201).json({ ...thread, lastMessageAt: thread.lastMessageAt.toISOString(), createdAt: thread.createdAt.toISOString() });
+  res.status(201).json({ ...thread, sellerId, lastMessageAt: thread.lastMessageAt.toISOString(), createdAt: thread.createdAt.toISOString() });
 });
 
 // Seller-side: list threads I'm in
@@ -586,6 +734,7 @@ router.get("/threads", ...requireGrowthSeller, async (req, res) => {
 
   res.json(rows.map(r => ({
     ...r.thread,
+    sellerId,
     manufacturerName:    r.mfrName,
     manufacturerCountry: r.mfrCountry,
     manufacturerPhoto:   r.mfrPhotos?.[0] ?? null,
@@ -626,7 +775,7 @@ router.post("/threads/:threadId/messages", ...requireGrowthSeller, async (req, r
   if (!parsed.success) { res.status(400).json({ error: parsed.error.flatten() }); return; }
 
   const threadId = req.params.threadId as string;
-  const { content, messageType = "text", mediaUrls, cardData } = req.body;
+  const { content, messageType = "text", mediaUrls, cardData, clientRequestId } = parsed.data;
   const sellerId = (req as any).clerkUserId as string;
 
   const [thread] = await db
@@ -638,7 +787,24 @@ router.post("/threads/:threadId/messages", ...requireGrowthSeller, async (req, r
     ))
     .limit(1);
   if (!thread) { res.status(404).json({ error: "Thread not found" }); return; }
+  const [duplicate] = await db.select().from(manufacturerMessages).where(and(
+    eq(manufacturerMessages.threadId, threadId),
+    eq(manufacturerMessages.senderClerkId, sellerId),
+    eq(manufacturerMessages.clientRequestId, clientRequestId),
+  )).limit(1);
+  if (duplicate) {
+    if (!isSameMessageSubmission(duplicate, parsed.data)) {
+      res.status(409).json({ error: "clientRequestId was already used for a different message" }); return;
+    }
+    res.json(await serializeMessage(duplicate)); return;
+  }
   const paths = Array.isArray(mediaUrls) ? mediaUrls : [];
+  if (!(content?.trim() || paths.length || messageType === "sample_card" || messageType === "bulk_card")) {
+    res.status(400).json({ error: "Message content, an attachment, or an order card is required" }); return;
+  }
+  if (!await cardIsBoundToThread(threadId, thread.manufacturerId, sellerId, messageType ?? "text", cardData)) {
+    res.status(400).json({ error: "Order cards must reference an order in this thread" }); return;
+  }
   if (!await mediaAreBoundToSender(threadId, sellerId, paths)) {
     res.status(400).json({ error: "Every attachment must be uploaded by you for this thread before sending" }); return;
   }
@@ -648,12 +814,23 @@ router.post("/threads/:threadId/messages", ...requireGrowthSeller, async (req, r
     .values({
       threadId,
       senderRole:  "seller",
+      senderClerkId: sellerId,
+      clientRequestId,
       content:     content ?? "",
       messageType: messageType ?? "text",
       mediaUrls:   paths,
       cardData:    cardData ?? null,
-    })
+    }).onConflictDoNothing()
     .returning();
+  if (!msg) {
+    const [existing] = await db.select().from(manufacturerMessages).where(and(
+      eq(manufacturerMessages.threadId, threadId),
+      eq(manufacturerMessages.senderClerkId, sellerId),
+      eq(manufacturerMessages.clientRequestId, clientRequestId),
+    )).limit(1);
+    if (!existing) { res.status(409).json({ error: "Message request conflicted; refresh and retry" }); return; }
+    res.json(await serializeMessage(existing)); return;
+  }
   if (paths.length) {
     await db.update(manufacturerThreadAttachments).set({ consumedAt: new Date() })
       .where(and(eq(manufacturerThreadAttachments.threadId, threadId),
@@ -702,6 +879,7 @@ router.get("/me/threads", async (req, res) => {
 
   return res.json(threads.map(t => ({
     ...t,
+    sellerId: t.buyerClerkId,
     lastMessageAt: t.lastMessageAt.toISOString(),
     createdAt:     t.createdAt.toISOString(),
     unreadCount: t.manufacturerUnreadCount,
@@ -742,12 +920,13 @@ router.post("/me/threads/:threadId/messages", async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
 
   const { threadId } = req.params;
-  const { content, messageType, mediaUrls, cardData } = req.body;
+  const { content, messageType, mediaUrls, cardData, clientRequestId } = parsed.data;
   const mfr = await resolveManufacturer(userId);
   if (!mfr) return res.status(404).json({ error: "Not registered" });
   const [thread] = await db.select({
     id: manufacturerThreads.id,
     buyerClerkId: manufacturerThreads.buyerClerkId,
+    manufacturerId: manufacturerThreads.manufacturerId,
   }).from(manufacturerThreads)
     .where(and(
       eq(manufacturerThreads.id, threadId),
@@ -755,7 +934,24 @@ router.post("/me/threads/:threadId/messages", async (req, res) => {
     ))
     .limit(1);
   if (!thread) return res.status(404).json({ error: "Thread not found" });
+  const [duplicate] = await db.select().from(manufacturerMessages).where(and(
+    eq(manufacturerMessages.threadId, threadId),
+    eq(manufacturerMessages.senderClerkId, userId),
+    eq(manufacturerMessages.clientRequestId, clientRequestId),
+  )).limit(1);
+  if (duplicate) {
+    if (!isSameMessageSubmission(duplicate, parsed.data)) {
+      return res.status(409).json({ error: "clientRequestId was already used for a different message" });
+    }
+    return res.json(await serializeMessage(duplicate));
+  }
   const paths = Array.isArray(mediaUrls) ? mediaUrls : [];
+  if (!(content?.trim() || paths.length || messageType === "sample_card" || messageType === "bulk_card")) {
+    return res.status(400).json({ error: "Message content, an attachment, or an order card is required" });
+  }
+  if (!await cardIsBoundToThread(threadId, thread.manufacturerId, thread.buyerClerkId, messageType ?? "text", cardData)) {
+    return res.status(400).json({ error: "Order cards must reference an order in this thread" });
+  }
   if (!await mediaAreBoundToSender(threadId, userId, paths)) {
     return res.status(400).json({ error: "Every attachment must be uploaded by you for this thread before sending" });
   }
@@ -765,12 +961,23 @@ router.post("/me/threads/:threadId/messages", async (req, res) => {
     .values({
       threadId,
       senderRole:  "manufacturer",
+      senderClerkId: userId,
+      clientRequestId,
       content:     content ?? "",
       messageType: messageType ?? "text",
       mediaUrls:   paths,
       cardData:    cardData ?? null,
-    })
+    }).onConflictDoNothing()
     .returning();
+  if (!msg) {
+    const [existing] = await db.select().from(manufacturerMessages).where(and(
+      eq(manufacturerMessages.threadId, threadId),
+      eq(manufacturerMessages.senderClerkId, userId),
+      eq(manufacturerMessages.clientRequestId, clientRequestId),
+    )).limit(1);
+    if (!existing) return res.status(409).json({ error: "Message request conflicted; refresh and retry" });
+    return res.json(await serializeMessage(existing));
+  }
   if (paths.length) {
     await db.update(manufacturerThreadAttachments).set({ consumedAt: new Date() })
       .where(and(eq(manufacturerThreadAttachments.threadId, threadId),
@@ -871,7 +1078,11 @@ router.patch("/me/sample-orders/:orderId/status", async (req, res) => {
   if (!mfr) return res.status(404).json({ error: "Not registered" });
   const stages = ["payment_received", "processing", "cut_and_sew", "packing", "shipped", "delivered"] as const;
   const status = req.body?.status;
+  const expectedRevision = req.body?.expectedRevision;
   if (!stages.includes(status)) return res.status(400).json({ error: "Invalid status" });
+  if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
+    return res.status(400).json({ error: "expectedRevision is required" });
+  }
   if (status === "shipped" && (
     typeof req.body?.trackingNumber !== "string" || !req.body.trackingNumber.trim()
     || typeof req.body?.carrier !== "string" || !req.body.carrier.trim()
@@ -893,13 +1104,14 @@ router.patch("/me/sample-orders/:orderId/status", async (req, res) => {
     carrier: status === "shipped" ? req.body.carrier.trim() : current.carrier,
     shippedAt: status === "shipped" ? now : current.shippedAt,
     deliveredAt: status === "delivered" ? now : current.deliveredAt,
-    updatedAt: now,
+    updatedAt: now, revision: sql`${sampleOrders.revision} + 1`,
   }).where(and(
     eq(sampleOrders.id, current.id),
     eq(sampleOrders.manufacturerId, mfr.id),
     eq(sampleOrders.status, current.status),
+    eq(sampleOrders.revision, expectedRevision),
   )).returning();
-  if (!updated) return res.status(409).json({ error: "Order status changed; refresh and retry" });
+  if (!updated) return res.status(409).json({ error: "Order changed; refresh and retry", code: "STALE_WRITE" });
   const notificationContext = sellerOrderNotificationContext(current);
   await notify(req, {
     userId: current.sellerId, category: "production", type: "manufacturer_order_status",
@@ -909,55 +1121,6 @@ router.patch("/me/sample-orders/:orderId/status", async (req, res) => {
     cta: notificationContext.cta,
   });
   return res.json(serializeSampleOrder(updated));
-});
-
-// Manufacturer orders
-router.get("/me/orders", async (req, res) => {
-  const { userId } = getAuth(req);
-  if (!userId) return res.status(401).json({ error: "Unauthorized" });
-
-  const mfr = await resolveManufacturer(userId);
-  if (!mfr) return res.status(404).json({ error: "Not registered" });
-
-  const orderList = await db
-    .select()
-    .from(manufacturerOrders)
-    .where(eq(manufacturerOrders.manufacturerId, mfr.id))
-    .orderBy(desc(manufacturerOrders.createdAt));
-
-  return res.json(orderList.map(o => ({
-    ...o,
-    createdAt: o.createdAt.toISOString(),
-    updatedAt: o.updatedAt.toISOString(),
-  })));
-});
-
-router.patch("/me/orders/:orderId/status", async (req, res) => {
-  const { userId } = getAuth(req);
-  if (!userId) return res.status(401).json({ error: "Unauthorized" });
-
-  const parsed = UpdateManufacturerOrderStatusBody.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
-
-  const mfr = await resolveManufacturer(userId);
-  if (!mfr) return res.status(404).json({ error: "Not registered" });
-  const [updated] = await db
-    .update(manufacturerOrders)
-    .set({
-      status:         parsed.data.status,
-      trackingNumber: parsed.data.trackingNumber ?? undefined,
-      notes:          parsed.data.notes ?? undefined,
-      updatedAt:      new Date(),
-    })
-    .where(and(
-      eq(manufacturerOrders.id, req.params.orderId),
-      eq(manufacturerOrders.manufacturerId, mfr.id),
-    ))
-    .returning();
-
-  if (!updated) return res.status(404).json({ error: "Order not found" });
-
-  return res.json({ ...updated, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() });
 });
 
 // Payment setup (legacy bank/PayPal/Wise)

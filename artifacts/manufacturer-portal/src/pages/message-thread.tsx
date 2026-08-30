@@ -22,6 +22,7 @@ export default function MessageThread({ threadId }: { threadId: string }) {
   const [draft, setDraft] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
+  const requestIdRef = useRef<string | null>(null);
 
   const thread = threads?.find(t => t.id === threadId);
 
@@ -33,6 +34,8 @@ export default function MessageThread({ threadId }: { threadId: string }) {
   }, [messages]);
 
   const handleSend = async () => {
+    const clientRequestId = requestIdRef.current ?? crypto.randomUUID();
+    requestIdRef.current = clientRequestId;
     if ((!draft.trim() && !attachment) || !threadId) return;
     let mediaUrls: string[] | undefined;
     const file = attachment;
@@ -47,17 +50,22 @@ export default function MessageThread({ threadId }: { threadId: string }) {
       }
     }
     sendMutation.mutate(
-      { threadId, data: { content: draft.trim() || undefined, messageType: mediaUrls ? (file?.type.startsWith("image/") ? "image" : "text") : "text", mediaUrls } },
+      { threadId, data: { clientRequestId, content: draft.trim() || undefined, messageType: mediaUrls ? (file?.type.startsWith("image/") ? "image" : "text") : "text", mediaUrls } },
       {
         onSuccess: (newMessage) => {
           setDraft("");
           setAttachment(null);
+          requestIdRef.current = null;
           // Optimistically update cache
           queryClient.setQueryData(getGetThreadMessagesQueryKey(threadId), (old: Message[] | undefined) => 
             old ? [...old, newMessage] : [newMessage]
           );
           void queryClient.invalidateQueries({ queryKey: getListManufacturerThreadsQueryKey() });
-        }
+        },
+        onError: () => {
+          void queryClient.invalidateQueries({ queryKey: getGetThreadMessagesQueryKey(threadId) });
+          void queryClient.invalidateQueries({ queryKey: getListManufacturerThreadsQueryKey() });
+        },
       }
     );
   };

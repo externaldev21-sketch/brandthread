@@ -19,6 +19,15 @@ const paymentCallMigration = fs.readFileSync(
   path.resolve(__dirname, "../../../../../lib/db/migrations/050_manufacturer_payment_call_events.sql"),
   "utf8",
 );
+const sharedContractMigration = fs.readFileSync(
+  path.resolve(__dirname, "../../../../../lib/db/migrations/052_manufacturer_shared_contracts.sql"),
+  "utf8",
+);
+const publicRoute = fs.readFileSync(path.resolve(__dirname, "..", "manufacturer-public.ts"), "utf8");
+const openApi = fs.readFileSync(
+  path.resolve(__dirname, "../../../../../lib/api-spec/openapi.yaml"),
+  "utf8",
+);
 const connectRoute = fs.readFileSync(path.resolve(__dirname, "..", "manufacturer-connect.ts"), "utf8");
 const webhookRoute = fs.readFileSync(path.resolve(__dirname, "..", "webhooks.ts"), "utf8");
 
@@ -31,9 +40,10 @@ describe("manufacturer two-sided authorization contract", () => {
   });
 
   it("scopes manufacturer order mutations to the authenticated manufacturer", () => {
-    expect(route).toContain("eq(manufacturerOrders.manufacturerId, mfr.id)");
     expect(route).toContain("eq(sampleOrders.manufacturerId, mfr.id)");
     expect(sampleRoute).toContain("if (!isManufacturer)");
+    expect(openApi).not.toContain("/manufacturers/me/orders:");
+    expect(route).not.toContain('router.get("/me/orders"');
   });
 
   it("uses an idempotent participant-state migration", () => {
@@ -50,10 +60,46 @@ describe("manufacturer two-sided authorization contract", () => {
   });
 
   it("guards shared order cards and concurrent production changes", () => {
-    expect(sampleRoute).toContain("Number.isSafeInteger(priceCents)");
-    expect(sampleRoute).toContain("Number.isSafeInteger(quantity)");
+    expect(sampleRoute).toContain("CreateProductionOrderBody.safeParse(req.body)");
     expect(sampleRoute).toContain('eq(manufacturerThreads.buyerClerkId, sellerId)');
     expect(sampleRoute).toContain("eq(sampleOrders.status, current)");
+  });
+
+  it("persists canonical relationships and idempotency identities", () => {
+    expect(sharedContractMigration).toContain("manufacturer_relationships");
+    expect(sharedContractMigration).toContain("manufacturer_messages_sender_request_unique");
+    expect(sharedContractMigration).toContain("sample_orders_seller_request_unique");
+    expect(route).toContain("manufacturerRelationships");
+    expect(route).toContain("senderClerkId: sellerId");
+    expect(route).toContain("senderClerkId: userId");
+    expect(sampleRoute).toContain("clientRequestId");
+    expect(connectRoute).toContain("manufacturer-connect-account/${mfr.id}");
+  });
+
+  it("keeps unauthenticated applications private and public DTOs contact-safe", () => {
+    expect(publicRoute).toContain('status:            "pending"');
+    expect(publicRoute).toContain("isPublicDirectory: false");
+    expect(publicRoute).not.toContain("contactEmail:    manufacturers.contactEmail");
+    expect(publicRoute).not.toContain("contactPhone:    manufacturers.contactPhone");
+    expect(openApi).toContain("ManufacturerApplicationReceipt");
+    expect(openApi).toContain("published: { type: boolean, const: false }");
+  });
+
+  it("requires optimistic concurrency tokens for profile and production changes", () => {
+    expect(openApi).toContain("required: [expectedRevision]");
+    expect(openApi).toContain("required: [status, expectedRevision]");
+    expect(route).toContain("eq(manufacturers.revision, expectedRevision)");
+    expect(route).toContain("eq(sampleOrders.revision, expectedRevision)");
+    expect(sharedContractMigration).toContain("revision INTEGER NOT NULL DEFAULT 1");
+    expect(route).toContain('code: "STALE_WRITE"');
+  });
+
+  it("binds shared order cards to the authenticated thread participants", () => {
+    expect(route).toContain("cardIsBoundToThread");
+    expect(route).toContain("eq(sampleOrders.threadId, threadId)");
+    expect(route).toContain("eq(sampleOrders.manufacturerId, manufacturerId)");
+    expect(route).toContain("eq(sampleOrders.sellerId, sellerId)");
+    expect(route).toContain("Order cards must reference an order in this thread");
   });
 
   it("validates actual attachment magic bytes", () => {

@@ -80,6 +80,172 @@ paths:
               schema:
                 $ref: "#/components/schemas/Manufacturer"
 
+  /manufacturers/public:
+    get:
+      operationId: listPublicManufacturers
+      tags: [manufacturers]
+      summary: List approved public manufacturer profiles
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: country, in: query, schema: { type: string } }
+        - { name: specialty, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Approved directory profiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PublicManufacturer" }
+
+  /manufacturers/public/{manufacturerId}:
+    get:
+      operationId: getPublicManufacturer
+      tags: [manufacturers]
+      parameters:
+        - { name: manufacturerId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Approved directory profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PublicManufacturer" }
+
+  /manufacturers/public/apply:
+    post:
+      operationId: applyAsManufacturer
+      tags: [manufacturers]
+      summary: Submit an unauthenticated application for review
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ManufacturerApplicationInput" }
+      responses:
+        "202":
+          description: Application accepted but not published
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ManufacturerApplicationReceipt" }
+
+  /manufacturers/relationships:
+    get:
+      operationId: listManufacturerRelationships
+      tags: [manufacturers]
+      summary: List relationships for the authenticated seller
+      responses:
+        "200":
+          description: Seller relationships
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ManufacturerRelationship" }
+    post:
+      operationId: createManufacturerRelationship
+      tags: [manufacturers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ManufacturerRelationshipInput" }
+      responses:
+        "201":
+          description: Existing or newly-created relationship
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ManufacturerRelationship" }
+
+  /manufacturers/me/relationships:
+    get:
+      operationId: listMyManufacturerRelationships
+      tags: [manufacturers]
+      summary: List relationships for the authenticated manufacturer
+      responses:
+        "200":
+          description: Manufacturer relationships
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ManufacturerRelationship" }
+
+  /manufacturers/threads:
+    get:
+      operationId: listSellerManufacturerThreads
+      tags: [manufacturers]
+      responses:
+        "200":
+          description: Authenticated seller threads
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MessageThread" }
+    post:
+      operationId: createManufacturerThread
+      tags: [manufacturers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ManufacturerThreadInput" }
+      responses:
+        "201":
+          description: Existing or newly-created canonical thread
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageThread" }
+
+  /manufacturers/threads/{threadId}/messages:
+    get:
+      operationId: getSellerManufacturerThreadMessages
+      tags: [manufacturers]
+      parameters:
+        - { name: threadId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Participant-authorized messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Message" }
+    post:
+      operationId: sendSellerManufacturerThreadMessage
+      tags: [manufacturers]
+      parameters:
+        - { name: threadId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MessageInput" }
+      responses:
+        "201":
+          description: Idempotently accepted message
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Message" }
+
+  /manufacturers/threads/{threadId}/attachments:
+    post:
+      operationId: uploadSellerManufacturerThreadAttachment
+      tags: [manufacturers]
+      parameters:
+        - { name: threadId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          image/*: { schema: { type: string, format: binary } }
+          application/pdf: { schema: { type: string, format: binary } }
+      responses:
+        "201":
+          description: Private participant-bound attachment
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AttachmentReceipt" }
+
   /manufacturers/me/dashboard:
     get:
       operationId: getManufacturerDashboard
@@ -180,46 +346,6 @@ paths:
 
   # ── Sample / Production Orders ────────────────────────────────────────────────
 
-  /manufacturers/me/orders:
-    get:
-      operationId: listManufacturerOrders
-      tags: [manufacturers]
-      summary: List all orders for this manufacturer
-      responses:
-        "200":
-          description: Orders
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ManufacturerOrder"
-
-  /manufacturers/me/orders/{orderId}/status:
-    patch:
-      operationId: updateManufacturerOrderStatus
-      tags: [manufacturers]
-      summary: Update order status (sampling / production / shipping / complete)
-      parameters:
-        - name: orderId
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/OrderStatusUpdate"
-      responses:
-        "200":
-          description: Updated order
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ManufacturerOrder"
-
   /manufacturers/me/sample-orders:
     get:
       operationId: listManufacturerSampleOrders
@@ -279,6 +405,81 @@ paths:
               schema: { $ref: "#/components/schemas/SampleOrder" }
         "409":
           description: Payment has not succeeded or no Stripe payment exists
+
+  /sample-orders:
+    get:
+      operationId: listSellerProductionOrders
+      tags: [manufacturers]
+      responses:
+        "200":
+          description: Seller-owned sample and bulk orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SampleOrder" }
+    post:
+      operationId: createProductionOrder
+      tags: [manufacturers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProductionOrderInput" }
+      responses:
+        "201":
+          description: Idempotently created sample or bulk order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SampleOrder" }
+
+  /sample-orders/{id}:
+    get:
+      operationId: getProductionOrder
+      tags: [manufacturers]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Participant-authorized order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SampleOrder" }
+
+  /sample-orders/{id}/sample-detail:
+    patch:
+      operationId: updateSampleOrderDetail
+      tags: [manufacturers]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SampleDetailDecisionInput" }
+      responses:
+        "200":
+          description: Seller decision applied to a delivered sample
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SampleOrder" }
+
+  /sample-orders/{id}/images/upload:
+    post:
+      operationId: uploadSampleOrderImage
+      tags: [manufacturers]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          image/*: { schema: { type: string, format: binary } }
+      responses:
+        "201":
+          description: Atomically attached private image
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SampleOrderImageUploadReceipt" }
 
   /sample-orders/{id}/checkout-session:
     post:
@@ -343,7 +544,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ManufacturerPayment"
-
     post:
       operationId: setupManufacturerPayment
       tags: [manufacturers]
@@ -362,6 +562,46 @@ paths:
               schema:
                 $ref: "#/components/schemas/ManufacturerPayment"
 
+  /manufacturers/connect/status:
+    get:
+      operationId: getManufacturerConnectStatus
+      tags: [manufacturers]
+      responses:
+        "200":
+          description: Stripe Connect readiness
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ManufacturerConnectStatus" }
+
+  /manufacturers/connect/onboard:
+    post:
+      operationId: createManufacturerConnectOnboarding
+      tags: [manufacturers]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ManufacturerConnectOnboardingInput" }
+      responses:
+        "200":
+          description: Stripe-hosted onboarding URL
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ManufacturerConnectOnboarding" }
+
+  /manufacturers/connect/payments:
+    get:
+      operationId: listManufacturerPaymentActivity
+      tags: [manufacturers]
+      responses:
+        "200":
+          description: Idempotently reconciled payment and payout activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ManufacturerPaymentActivity" }
+
 components:
   schemas:
     HealthStatus:
@@ -375,7 +615,7 @@ components:
 
     Manufacturer:
       type: object
-      required: [id, clerkId, businessName, country, specialty, moq, priceRange, bulkTurnaround, sampleTurnaround, status, createdAt]
+      required: [id, clerkId, businessName, country, specialty, moq, priceRange, bulkTurnaround, sampleTurnaround, status, createdAt, updatedAt, revision]
       properties:
         id:               { type: string }
         clerkId:          { type: string }
@@ -391,7 +631,7 @@ components:
         sampleTurnaround: { type: string }
         photos:
           type: array
-          items: { type: string }
+          items: { type: string, format: uri }
         website:          { type: ["string", "null"] }
         contactEmail:     { type: ["string", "null"] }
         contactPhone:     { type: ["string", "null"] }
@@ -399,6 +639,8 @@ components:
         verifiedAt:       { type: ["string", "null"] }
         paymentSetup:     { type: boolean }
         createdAt:        { type: string }
+        updatedAt:        { type: string }
+        revision:         { type: integer, minimum: 1 }
 
     ManufacturerInput:
       type: object
@@ -414,16 +656,15 @@ components:
         priceRange:       { type: string }
         bulkTurnaround:   { type: string }
         sampleTurnaround: { type: string }
-        photos:
-          type: array
-          items: { type: string }
         website:          { type: string }
         contactEmail:     { type: string }
         contactPhone:     { type: string }
 
     ManufacturerUpdate:
       type: object
+      required: [expectedRevision]
       properties:
+        expectedRevision: { type: integer, minimum: 1 }
         businessName:     { type: string }
         country:          { type: string }
         city:             { type: string }
@@ -434,12 +675,75 @@ components:
         priceRange:       { type: string }
         bulkTurnaround:   { type: string }
         sampleTurnaround: { type: string }
-        photos:
-          type: array
-          items: { type: string }
         website:          { type: string }
         contactEmail:     { type: string }
         contactPhone:     { type: string }
+
+    PublicManufacturer:
+      type: object
+      additionalProperties: false
+      required: [id, businessName, country, specialty, yearsInBusiness, moq, priceRange, bulkTurnaround, sampleTurnaround, photos, isVerified, createdAt, updatedAt, revision]
+      properties:
+        id: { type: string, format: uuid }
+        businessName: { type: string }
+        country: { type: string }
+        city: { type: ["string", "null"] }
+        specialty: { type: string }
+        description: { type: ["string", "null"] }
+        yearsInBusiness: { type: integer }
+        moq: { type: integer }
+        priceRange: { type: string }
+        bulkTurnaround: { type: string }
+        sampleTurnaround: { type: string }
+        photos: { type: array, items: { type: string, format: uri } }
+        website: { type: ["string", "null"] }
+        isVerified: { type: boolean }
+        rating: { type: ["number", "null"] }
+        responseTime: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        revision: { type: integer, minimum: 1 }
+
+    ManufacturerApplicationInput:
+      allOf:
+        - $ref: "#/components/schemas/ManufacturerInput"
+        - type: object
+          required: [clientRequestId]
+          properties:
+            clientRequestId: { type: string, minLength: 1, maxLength: 100 }
+
+    ManufacturerApplicationReceipt:
+      type: object
+      required: [id, status, published]
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [pending] }
+        published: { type: boolean, const: false }
+
+    ManufacturerRelationshipInput:
+      type: object
+      required: [manufacturerId]
+      properties:
+        manufacturerId: { type: string, format: uuid }
+
+    ManufacturerRelationship:
+      type: object
+      required: [id, sellerId, manufacturerId, status, createdAt, updatedAt]
+      properties:
+        id: { type: string, format: uuid }
+        sellerId: { type: string }
+        manufacturerId: { type: string, format: uuid }
+        status: { type: string, enum: [active, blocked, ended] }
+        manufacturer: { $ref: "#/components/schemas/PublicManufacturer" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ManufacturerThreadInput:
+      type: object
+      required: [manufacturerId]
+      properties:
+        manufacturerId: { type: string, format: uuid }
+        subject: { type: string, maxLength: 200 }
 
     ManufacturerDashboard:
       type: object
@@ -469,9 +773,11 @@ components:
 
     MessageThread:
       type: object
-      required: [id, buyerName, subject, lastMessage, lastMessageAt, unreadCount, orderStatus]
+      required: [id, manufacturerId, sellerId, buyerName, subject, lastMessage, lastMessageAt, unreadCount]
       properties:
         id:             { type: string }
+        manufacturerId: { type: string, format: uuid }
+        sellerId:       { type: string }
         buyerName:      { type: string }
         buyerAvatar:    { type: ["string", "null"] }
         subject:        { type: string }
@@ -482,17 +788,23 @@ components:
 
     Message:
       type: object
-      required: [id, threadId, senderRole, content, sentAt]
+      required: [id, threadId, senderRole, senderId, content, messageType, mediaUrls, sentAt]
       properties:
         id:          { type: string }
         threadId:    { type: string }
         senderRole:  { type: string }
+        senderId:    { type: string }
         content:     { type: string }
+        messageType: { type: string, enum: [text, image, sample_card, bulk_card, system] }
+        mediaUrls: { type: array, items: { type: string } }
+        cardData: { type: ["object", "null"], additionalProperties: true }
         sentAt:      { type: string }
 
     MessageInput:
       type: object
+      required: [clientRequestId]
       properties:
+        clientRequestId: { type: string, minLength: 1, maxLength: 100 }
         content: { type: string }
         messageType: { type: string, enum: [text, image, sample_card, bulk_card, system] }
         mediaUrls:
@@ -500,30 +812,18 @@ components:
           items: { type: string }
         cardData: { type: ["object", "null"], additionalProperties: true }
 
-    # ── Orders ────────────────────────────────────────────────────────────────────
-
-    ManufacturerOrder:
+    AttachmentReceipt:
       type: object
-      required: [id, orderNumber, buyerName, productType, quantity, status, totalCents, createdAt]
+      required: [objectPath]
       properties:
-        id:           { type: string }
-        orderNumber:  { type: string }
-        buyerName:    { type: string }
-        productType:  { type: string }
-        quantity:     { type: integer }
-        colorway:     { type: ["string", "null"] }
-        size:         { type: ["string", "null"] }
-        status:       { type: string }
-        totalCents:   { type: integer }
-        notes:        { type: ["string", "null"] }
-        trackingNumber: { type: ["string", "null"] }
-        createdAt:    { type: string }
-        updatedAt:    { type: string }
+        objectPath: { type: string, pattern: "^/objects/" }
+
+    # ── Orders ────────────────────────────────────────────────────────────────────
 
     SampleOrder:
       type: object
       additionalProperties: true
-      required: [id, manufacturerId, sellerId, orderType, title, quantity, priceCents, status, createdAt, updatedAt]
+      required: [id, manufacturerId, sellerId, orderType, title, quantity, priceCents, status, createdAt, updatedAt, revision]
       properties:
         id: { type: string }
         manufacturerId: { type: string }
@@ -540,6 +840,39 @@ components:
           items: { type: string, format: uri }
         createdAt: { type: string }
         updatedAt: { type: string }
+        revision: { type: integer, minimum: 1 }
+
+    ProductionOrderInput:
+      type: object
+      required: [clientRequestId, manufacturerId, orderType, title, quantity, priceCents]
+      properties:
+        clientRequestId: { type: string, minLength: 1, maxLength: 100 }
+        manufacturerId: { type: string, format: uuid }
+        threadId: { type: ["string", "null"], format: uuid }
+        orderType: { type: string, enum: [sample, bulk] }
+        title: { type: string, minLength: 1, maxLength: 200 }
+        description: { type: ["string", "null"] }
+        quantity: { type: integer, minimum: 1 }
+        priceCents: { type: integer, minimum: 1 }
+        notes: { type: ["string", "null"] }
+
+    SampleDetailDecisionInput:
+      type: object
+      required: [status, expectedRevision]
+      properties:
+        status: { type: string, enum: [approved, rejected, revision_requested] }
+        expectedRevision: { type: integer, minimum: 1 }
+        review: { type: object, additionalProperties: true }
+        revision: { type: object, additionalProperties: true }
+
+    SampleOrderImageUploadReceipt:
+      type: object
+      required: [imageUrls, revision]
+      properties:
+        imageUrls:
+          type: array
+          items: { type: string, format: uri }
+        revision: { type: integer, minimum: 1 }
 
     OrderBuckets:
       type: object
@@ -554,8 +887,9 @@ components:
 
     ManufacturerSampleOrderStatusUpdate:
       type: object
-      required: [status]
+      required: [status, expectedRevision]
       properties:
+        expectedRevision: { type: integer, minimum: 1 }
         status: { type: string, enum: [processing, cut_and_sew, packing, shipped, delivered] }
         trackingNumber: { type: string }
         carrier: { type: string }
@@ -595,14 +929,6 @@ components:
               availableCents: { type: integer }
               eligible: { type: boolean }
 
-    OrderStatusUpdate:
-      type: object
-      required: [status]
-      properties:
-        status:         { type: string }
-        trackingNumber: { type: string }
-        notes:          { type: string }
-
     # ── Payment ───────────────────────────────────────────────────────────────────
 
     ManufacturerPayment:
@@ -627,3 +953,47 @@ components:
         currency:      { type: string }
         paypalEmail:   { type: string }
         wiseEmail:     { type: string }
+
+    ManufacturerConnectStatus:
+      type: object
+      required: [connected, ready, status, chargesEnabled, payoutsEnabled, detailsSubmitted, requirementsDue]
+      properties:
+        connected: { type: boolean }
+        ready: { type: boolean }
+        status: { type: string, enum: [not_started, pending, restricted, active] }
+        stripeAccountId: { type: string }
+        chargesEnabled: { type: boolean }
+        payoutsEnabled: { type: boolean }
+        detailsSubmitted: { type: boolean }
+        requirementsDue: { type: array, items: { type: string } }
+        disabledReason: { type: ["string", "null"] }
+        recovery: { type: ["string", "null"] }
+
+    ManufacturerConnectOnboardingInput:
+      type: object
+      required: [refreshUrl, returnUrl]
+      properties:
+        refreshUrl: { type: string, format: uri }
+        returnUrl: { type: string, format: uri }
+
+    ManufacturerConnectOnboarding:
+      type: object
+      required: [url, stripeAccountId]
+      properties:
+        url: { type: string, format: uri }
+        stripeAccountId: { type: string }
+
+    ManufacturerPaymentActivity:
+      type: object
+      required: [id, manufacturerId, category, type, metadata, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        manufacturerId: { type: string, format: uuid }
+        sampleOrderId: { type: ["string", "null"], format: uuid }
+        category: { type: string, enum: [payment, payout] }
+        type: { type: string }
+        amountCents: { type: ["integer", "null"] }
+        orderTitle: { type: ["string", "null"] }
+        orderType: { type: ["string", "null"], enum: [sample, bulk, null] }
+        metadata: { type: object, additionalProperties: true }
+        createdAt: { type: string, format: date-time }

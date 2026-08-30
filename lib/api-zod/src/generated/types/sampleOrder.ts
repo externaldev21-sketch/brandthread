@@ -22,5 +22,7 @@ export interface SampleOrder {
   imageUrls?: string[];
   createdAt: string;
   updatedAt: string;
+  /** @minimum 1 */
+  revision: number;
   [key: string]: unknown;
  }

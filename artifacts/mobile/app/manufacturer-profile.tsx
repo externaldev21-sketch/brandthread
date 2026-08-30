@@ -28,7 +28,7 @@ import {
 } from '@/components/BrandthreadUI';
 
 import {
-  getManufacturer, getFavoriteManufacturerIds, favoriteManufacturer, unfavoriteManufacturer,
+  getManufacturer, getFavoriteManufacturerIds, saveManufacturer, unfavoriteManufacturer,
   getOrCreateConversation,
 } from '@/services/manufacturerService';
 
@@ -73,14 +73,6 @@ function SectionCard({ title, children }: { title: string; children: React.React
   );
 }
 
-// ─── Demo Reviews ─────────────────────────────────────────────────────────────
-
-const DEMO_REVIEWS = [
-  { id: 'r1', sellerName: 'Corridor Supply Co.', rating: 5, qualityRating: 5, comment: 'Heavyweight 420gsm fleece came out perfectly — seams are clean and the boxy fit is exactly what we spec\'d. Sampling took 12 days and revisions were handled fast. Solid partner for our drop schedule.', createdAt: '2024-11-15' },
-  { id: 'r2', sellerName: 'Dusk Division', rating: 4, qualityRating: 4, comment: 'Quality on the French-terry crewnecks was strong — consistent GSM across the run. Bulk shipment was 4 days late but they flagged it early and offered a discount on the next order. Would work with them again.', createdAt: '2024-10-08' },
-  { id: 'r3', sellerName: 'Raised By Wolves Studio', rating: 5, qualityRating: 5, comment: 'Best cut-and-sew factory we\'ve worked with for oversized silhouettes. Woven labels and inside-neck printing were executed exactly to our brand guide. Already into production round two.', createdAt: '2024-09-22' },
-];
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function ManufacturerProfileScreen() {
@@ -94,14 +86,19 @@ export default function ManufacturerProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (!id) return;
+    setLoadError('');
     Promise.all([getManufacturer(id), getFavoriteManufacturerIds()]).then(([mfg, favoriteIds]) => {
       setManufacturer(mfg ?? null);
       setSaved(favoriteIds.includes(id));
       setLoading(false);
-    }).catch(() => setLoading(false));
+    }).catch((error) => {
+      setLoadError(error instanceof Error ? error.message : 'This manufacturer profile could not be loaded.');
+      setLoading(false);
+    });
   }, [id]);
 
   async function handleSave() {
@@ -113,9 +110,11 @@ export default function ManufacturerProfileScreen() {
         await unfavoriteManufacturer(id);
         setSaved(false);
       } else {
-        await favoriteManufacturer(id);
+        await saveManufacturer(id);
         setSaved(true);
       }
+    } catch (error) {
+      Alert.alert('Could not update favorite', error instanceof Error ? error.message : 'Please try again.');
     } finally {
       setActionLoading(false);
     }
@@ -124,8 +123,12 @@ export default function ManufacturerProfileScreen() {
   async function handleMessage() {
     if (!id) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const conv = await getOrCreateConversation(id, { contextLabel: 'General' });
-    router.push(('/manufacturer-messages?threadId=' + conv.id) as never);
+    try {
+      const conv = await getOrCreateConversation(id, { contextLabel: 'General' });
+      router.push(('/manufacturer-messages?threadId=' + conv.id) as never);
+    } catch (error) {
+      Alert.alert('Could not open conversation', error instanceof Error ? error.message : 'Please try again.');
+    }
   }
 
   function handleQuote() {
@@ -146,7 +149,8 @@ export default function ManufacturerProfileScreen() {
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Feather name="arrow-left" size={ICON.md} color={FG} />
         </TouchableOpacity>
-        <EmptyState icon="alert-circle" title="Manufacturer not found" description="This manufacturer profile could not be loaded." />
+        <EmptyState icon="alert-circle" title="Manufacturer unavailable" description={loadError || 'This manufacturer profile could not be loaded.'}
+          action={{ label: 'Try again', onPress: () => router.replace(`/manufacturer-profile?id=${id}` as never), icon: 'refresh-cw' }} />
       </View>
     );
   }
@@ -199,7 +203,9 @@ export default function ManufacturerProfileScreen() {
           {/* Rating */}
           <View style={s.heroRatingRow}>
              <StarRating rating={m.rating} color={theme.onAccent} />
-             <Text style={[s.heroRatingText, getOnAccentTextStyle(theme)]}>{m.rating.toFixed(1)} ({m.reviewCount} reviews)</Text>
+             <Text style={[s.heroRatingText, getOnAccentTextStyle(theme)]}>
+               {m.reviewCount > 0 ? `${m.rating.toFixed(1)} (${m.reviewCount} reviews)` : 'No ratings yet'}
+             </Text>
           </View>
         </LinearGradient>
 

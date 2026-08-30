@@ -9,6 +9,11 @@ import type { MessageInputCardData } from './messageInputCardData';
 import type { MessageInputMessageType } from './messageInputMessageType';
 
 export interface MessageInput {
+  /**
+     * @minLength 1
+     * @maxLength 100
+     */
+  clientRequestId: string;
   content?: string;
   messageType?: MessageInputMessageType;
   mediaUrls?: string[];

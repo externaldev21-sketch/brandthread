@@ -36,9 +36,13 @@ export default function OrderTracker({ orderId }: { orderId: string }) {
     : [];
   const advance = () => {
     if (!next || (next === "shipped" && (!trackingNumber.trim() || !carrier.trim()))) return;
-    update.mutate({ orderId, data: { status: next as "processing" | "cut_and_sew" | "packing" | "shipped" | "delivered", trackingNumber: trackingNumber.trim() || undefined, carrier: carrier.trim() || undefined } }, {
+    update.mutate({ orderId, data: { status: next as "processing" | "cut_and_sew" | "packing" | "shipped" | "delivered", expectedRevision: order.revision, trackingNumber: trackingNumber.trim() || undefined, carrier: carrier.trim() || undefined } }, {
       onSuccess: () => {
         void queryClient.invalidateQueries({ queryKey: getGetManufacturerSampleOrderQueryKey(orderId) });
+        void queryClient.invalidateQueries({ queryKey: getListManufacturerSampleOrdersQueryKey() });
+      },
+      onError: () => {
+        void query.refetch();
         void queryClient.invalidateQueries({ queryKey: getListManufacturerSampleOrdersQueryKey() });
       },
     });
@@ -67,7 +71,7 @@ export default function OrderTracker({ orderId }: { orderId: string }) {
         ) : next && <div className="mt-6 border-t border-border pt-5">
           {next === "shipped" && <div className="mb-4 grid gap-3 sm:grid-cols-2"><Input value={carrier} onChange={(event) => setCarrier(event.target.value)} placeholder="Carrier (required)" data-testid="input-carrier" /><Input value={trackingNumber} onChange={(event) => setTrackingNumber(event.target.value)} placeholder="Tracking number (required)" data-testid="input-tracking-number" /></div>}
           <Button onClick={advance} disabled={update.isPending || (next === "shipped" && (!carrier.trim() || !trackingNumber.trim()))} data-testid="button-advance-order"><Truck className="mr-2 h-4 w-4" />{update.isPending ? "Updating..." : `Mark ${next.replaceAll("_", " ")}`}</Button>
-          {update.isError && <p className="mt-3 text-sm text-destructive">Unable to advance this order. Please try again.</p>}
+          {update.isError && <p className="mt-3 text-sm text-destructive">The update failed or the order changed elsewhere. Latest shared state has been reloaded; review it and try again.</p>}
         </div>}
       </section>
     </div>

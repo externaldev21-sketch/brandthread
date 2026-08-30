@@ -12,6 +12,9 @@ import {
   getProductionOrder,
   getSample,
   payBulkOrderFromWallet,
+  submitSampleReview,
+  addSampleRevision,
+  uploadSampleImage,
 } from './manufacturerService';
 
 describe('manufacturer order payment service contracts', () => {
@@ -20,7 +23,7 @@ describe('manufacturer order payment service contracts', () => {
   it('creates and confirms a hosted sample checkout session', async () => {
     serviceRequest
       .mockResolvedValueOnce({ sessionId: 'cs_1', url: 'https://checkout.stripe.test/cs_1', paymentStatus: 'unpaid' })
-      .mockResolvedValueOnce({ id: 'sample_1', status: 'payment_received', priceCents: 1200, createdAt: '2026-01-01', updatedAt: '2026-01-01' });
+      .mockResolvedValueOnce({ id: 'sample_1', status: 'payment_received', priceCents: 1200, revision: 2, createdAt: '2026-01-01', updatedAt: '2026-01-01' });
 
     await expect(createSampleCheckoutSession('sample_1', 'brandthread://sample-detail?id=sample_1'))
       .resolves.toMatchObject({ sessionId: 'cs_1' });
@@ -37,7 +40,7 @@ describe('manufacturer order payment service contracts', () => {
   it('loads eligible bulk wallets and pays only through the chosen wallet', async () => {
     serviceRequest
       .mockResolvedValueOnce({ orderId: 'bulk_1', requiredCents: 5000, wallets: [{ id: 'wallet_1', dropId: 'drop_1', availableCents: 6000, eligible: true }] })
-      .mockResolvedValueOnce({ id: 'bulk_1', orderType: 'bulk', status: 'payment_received', priceCents: 5000, quantity: 10, createdAt: '2026-01-01', updatedAt: '2026-01-01' });
+      .mockResolvedValueOnce({ id: 'bulk_1', orderType: 'bulk', status: 'payment_received', priceCents: 5000, quantity: 10, revision: 2, createdAt: '2026-01-01', updatedAt: '2026-01-01' });
     await expect(getBulkWalletOptions('bulk_1')).resolves.toMatchObject({ requiredCents: 5000 });
     await expect(payBulkOrderFromWallet('bulk_1', 'wallet_1')).resolves.toMatchObject({ id: 'bulk_1', status: 'active' });
     expect(serviceRequest).toHaveBeenNthCalledWith(1, '/api/sample-orders/bulk_1/payment-options');
@@ -49,6 +52,26 @@ describe('manufacturer order payment service contracts', () => {
     await expect(payBulkOrderFromWallet('bulk_1', 'wallet_1')).rejects.toThrow('Wallet funds unavailable');
   });
 
+  it('sends the persisted revision for seller decisions and returns upload revisions', async () => {
+    serviceRequest
+      .mockResolvedValueOnce({ id: 'sample_1', orderType: 'sample', status: 'approved', priceCents: 1200, revision: 4, createdAt: '2026-01-01', updatedAt: '2026-01-01' })
+      .mockResolvedValueOnce({ id: 'sample_1', orderType: 'sample', status: 'revision_requested', priceCents: 1200, revision: 5, createdAt: '2026-01-01', updatedAt: '2026-01-01' })
+      .mockResolvedValueOnce({ imageUrls: ['https://signed/image.jpg'], revision: 6 });
+
+    await submitSampleReview('sample_1', 3, {
+      decision: 'approved', overallRating: 5, qualityRating: 5, fitRating: 5, materialRating: 5,
+      colorRating: 5, printRating: 5, packagingRating: 5, notes: '', imageUris: [],
+    });
+    await addSampleRevision('sample_1', 4, { title: 'Sleeve', notes: '', priority: 'medium', imageUris: [], fileIds: [] });
+    await expect(uploadSampleImage('sample_1', 'image/jpeg', new Uint8Array([1]))).resolves
+      .toEqual({ imageUrls: ['https://signed/image.jpg'], revision: 6 });
+
+    expect(serviceRequest).toHaveBeenNthCalledWith(1, '/api/sample-orders/sample_1/sample-detail',
+      expect.objectContaining({ body: expect.stringContaining('"expectedRevision":3') }));
+    expect(serviceRequest).toHaveBeenNthCalledWith(2, '/api/sample-orders/sample_1/sample-detail',
+      expect.objectContaining({ body: expect.stringContaining('"expectedRevision":4') }));
+  });
+
   it('preserves manufacturer payout availability on seller order details', async () => {
     serviceRequest
       .mockResolvedValueOnce({
@@ -58,6 +81,7 @@ describe('manufacturer order payment service contracts', () => {
         manufacturerHasStripe: true,
         manufacturerPayoutReady: false,
         priceCents: 2500,
+        revision: 1,
         createdAt: '2026-01-01',
         updatedAt: '2026-01-01',
       })
@@ -70,6 +94,7 @@ describe('manufacturer order payment service contracts', () => {
         manufacturerPayoutReady: true,
         priceCents: 5000,
         quantity: 10,
+        revision: 1,
         createdAt: '2026-01-01',
         updatedAt: '2026-01-01',
       });

@@ -8,6 +8,8 @@
 import type { ManufacturerSampleOrderStatusUpdateStatus } from './manufacturerSampleOrderStatusUpdateStatus';
 
 export interface ManufacturerSampleOrderStatusUpdate {
+  /** @minimum 1 */
+  expectedRevision: number;
   status: ManufacturerSampleOrderStatusUpdateStatus;
   trackingNumber?: string;
   carrier?: string;

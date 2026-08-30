@@ -227,42 +227,6 @@ const DEMO_ORDERS_DATA: Order[] = [
     } as Order;
   })(),
 
-  // 4. Pre-order
-  (() => {
-    const id = 'ord_004'; const num = '#1035'; const totalCents = 32000;
-    const items: OrderLineItem[] = [
-      { id: 'li_004a', productId: 'p6', productName: 'Limited Drop Hoodie', variant: 'Forest Green / L', sku: 'LTD-GRN-L', quantity: 2, unitPriceCents: 16000, discountAmountCents: 0, taxAmountCents: 0, totalCents: 32000, fulfillmentSource: 'manufacturer', isPreOrder: true, productionStatus: 'In production' },
-    ];
-    return {
-      id, orderNumber: num, source: 'Thread', salesChannel: 'Brandthread',
-      status: 'processing' as OrderStatus, paymentStatus: 'paid' as PaymentStatus,
-      fulfillmentStatus: 'manufacturer_pending' as FulfillmentStatus, fulfillmentType: 'manufacturer' as FulfillmentType,
-      riskLevel: 'low' as const, riskFlags: [],
-      customer: makeCustomer('cust_004', 'Morgan Davis', 'morgan.davis@brandthread-mail.com', 1, 32000),
-      lineItems: items,
-      fulfillment: makeFulfillment(id, items.map(i => i.id), 'manufacturer', 'manufacturer_pending'),
-      payment: makePayment(totalCents), heldFunds: makeHeld(id, totalCents, ['payment_confirmed', 'manufacturer_deposit', 'production_started']),
-      shipments: [], labels: [], returns: [], refunds: [], disputes: [],
-      preOrder: {
-        manufacturerId: 'mfg_001', manufacturerName: 'Apex Apparel Co.',
-        fundingGoalCents: 500000, unitsOrdered: 2,
-        estimatedProductionDate: daysFromNow(14),
-        estimatedShipDate: daysFromNow(30),
-        productionStatus: 'started',
-        customerNotified: true, delayNoticeCount: 0,
-      },
-      timeline: makeTimeline([
-        { type: 'order_created', message: `Pre-order ${num} placed`, customerVisible: true },
-        { type: 'payment_confirmed', message: 'Pre-order payment confirmed', customerVisible: true },
-        { type: 'manufacturer_assigned', message: 'Assigned to Apex Apparel Co.' },
-        { type: 'production_update', message: 'Production started at Apex Apparel Co.' },
-      ]),
-      notes: [], hasUnreadMessage: false, isPreOrder: true, isManufacturerFulfilled: true,
-      sellerId: 'u_threadhaus', sellerName: 'Threadhaus', sellerHandle: '@threadhaus',
-      currency: 'USD', tags: ['pre-order'], createdAt: daysAgo(7), updatedAt: now(),
-    } as Order;
-  })(),
-
   // 5. Return requested
   (() => {
     const id = 'ord_005'; const num = '#1030'; const totalCents = 11200;

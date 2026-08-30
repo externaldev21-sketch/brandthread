@@ -123,6 +123,7 @@ export default function QuoteRequestScreen() {
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
   const [manufacturer, setManufacturer] = useState<Manufacturer | null>(null);
+  const [manufacturerError, setManufacturerError] = useState('');
   const draftId = useRef<string>('qr_' + uid());
 
   // Step 1
@@ -158,7 +159,13 @@ export default function QuoteRequestScreen() {
   // Load manufacturer
   useEffect(() => {
     if (manufacturerId) {
-      getManufacturer(manufacturerId).then(m => setManufacturer(m ?? null));
+      setManufacturerError('');
+      getManufacturer(manufacturerId).then(m => {
+        setManufacturer(m ?? null);
+        if (!m) setManufacturerError('This manufacturer is no longer available.');
+      }).catch((error) => setManufacturerError(error instanceof Error ? error.message : 'Could not load manufacturer.'));
+    } else {
+      setManufacturerError('Choose a manufacturer from the live directory before requesting a quote.');
     }
   }, [manufacturerId]);
 
@@ -194,8 +201,8 @@ export default function QuoteRequestScreen() {
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      if (!manufacturerId && !requestId) return;
-      const mfgId = manufacturerId ?? 'mfg_unknown';
+      if (!manufacturerId) return;
+      const mfgId = manufacturerId;
       const name = productName.trim() || 'Untitled Product';
       saveQuoteRequestDraft({
         id: draftId.current,
@@ -219,7 +226,9 @@ export default function QuoteRequestScreen() {
         hasLabels,
         customPackaging,
         currentStep: step,
-      }).then(qr => { draftId.current = qr.id; });
+      }).then(qr => { draftId.current = qr.id; }).catch((error) => {
+        setManufacturerError(error instanceof Error ? error.message : 'Draft could not be saved.');
+      });
     }, 2000);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
   }, [
@@ -286,8 +295,11 @@ export default function QuoteRequestScreen() {
     }
     setSubmitting(true);
     try {
+      if (!manufacturerId || !manufacturer) {
+        throw new Error(manufacturerError || 'Choose a manufacturer from the live directory before submitting.');
+      }
       // Ensure draft exists first
-      const mfgId = manufacturerId ?? 'mfg_unknown';
+      const mfgId = manufacturerId;
       const qr = await saveQuoteRequestDraft({
         id: draftId.current,
         manufacturerId: mfgId,
@@ -310,7 +322,7 @@ export default function QuoteRequestScreen() {
         [{ text: 'OK', onPress: () => router.back() }]
       );
     } catch (e) {
-      Alert.alert('Error', 'Failed to submit quote request. Please try again.');
+      Alert.alert('Could not submit quote', e instanceof Error ? e.message : 'Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -322,6 +334,11 @@ export default function QuoteRequestScreen() {
     return (
       <View style={sc.stepContent}>
         <Text style={sc.stepHeadline}>Which product is this quote for?</Text>
+        {!!manufacturerError && (
+          <BrandthreadCard style={sc.warningCard}>
+            <Text style={sc.warningItem}>{manufacturerError}</Text>
+          </BrandthreadCard>
+        )}
 
         {/* Manufacturer info */}
         {manufacturer && (
