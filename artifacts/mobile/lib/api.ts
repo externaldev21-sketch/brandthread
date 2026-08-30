@@ -506,6 +506,15 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         list:   () => get<any[]>('/api/manufacturers/threads'),
         create: (body: { manufacturerId: string; subject?: string }) =>
           post<any>('/api/manufacturers/threads', body),
+        uploadAttachment: (
+          threadId: string,
+          image: { uri: string; mimeType?: string | null },
+        ) => uploadImage<{ objectPath: string }>(
+          `/api/manufacturers/threads/${encodeURIComponent(threadId)}/attachments`,
+          image,
+          getToken,
+          getCacheScope,
+        ),
         messages: {
           list: (threadId: string) => get<any[]>(`/api/manufacturers/threads/${encodeURIComponent(threadId)}/messages`),
           send: (threadId: string, body: { content: string; messageType?: string; mediaUrls?: string[]; cardData?: any; senderRole?: string }) =>
@@ -521,6 +530,16 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         list:       () => get<any[]>('/api/sample-orders'),
         create:     (body: any) => post<any>('/api/sample-orders', body),
         get:        (id: string) => get<any>(`/api/sample-orders/${encodeURIComponent(id)}`),
+        createCheckoutSession: (id: string, returnUrl: string) =>
+          post<{ sessionId: string; url: string | null; paymentStatus: string }>(
+            `/api/sample-orders/${encodeURIComponent(id)}/checkout-session`, { returnUrl },
+          ),
+        confirmPayment: (id: string) =>
+          post<any>(`/api/sample-orders/${encodeURIComponent(id)}/pay`, {}),
+        paymentOptions: (id: string) =>
+          get<{ orderId: string; requiredCents: number; wallets: Array<{ id: string; dropId: string; availableCents: number; eligible: boolean }> }>(
+            `/api/sample-orders/${encodeURIComponent(id)}/payment-options`,
+          ),
         advance:    (id: string) => patch<any>(`/api/sample-orders/${encodeURIComponent(id)}/advance`, {}),
         addTracking: (id: string, body: { trackingNumber: string; carrier?: string }) =>
           patch<any>(`/api/sample-orders/${encodeURIComponent(id)}/tracking`, body),

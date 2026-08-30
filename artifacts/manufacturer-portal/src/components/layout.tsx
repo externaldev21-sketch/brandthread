@@ -1,13 +1,13 @@
 import React from "react";
 import { Link, useLocation } from "wouter";
-import { 
+import {
   LayoutDashboard, 
   Package, 
   MessageSquare, 
-  Wallet, 
+  History,
+  Store,
   Settings,
   Factory,
-  LogOut
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGetMyManufacturerProfile } from "@workspace/api-client-react";
@@ -19,9 +19,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/orders", label: "Orders", icon: Package },
-    { href: "/messages", label: "Messages", icon: MessageSquare },
-    { href: "/payment", label: "Payment", icon: Wallet },
+    { href: "/messages", label: "Inbox", icon: MessageSquare },
+    { href: "/sellers", label: "Sellers", icon: Store },
+    { href: "/orders", label: "Active Orders", icon: Package, exact: true },
+    { href: "/orders/history", label: "Completed", icon: History },
     { href: "/profile", label: "Profile", icon: Settings },
   ];
 
@@ -41,9 +42,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <h3 className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground mb-3">Menu</h3>
             <nav className="space-y-1">
               {navItems.map((item) => {
-                const isActive = location.startsWith(item.href);
+                const isActive = item.exact ? location === item.href : location.startsWith(item.href);
                 return (
-                  <Link key={item.href} href={item.href} className={cn(
+                  <Link key={item.href} href={item.href} data-testid={`link-nav-${item.label.toLowerCase().replace(" ", "-")}`} className={cn(
                     "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
                     isActive 
                       ? "bg-primary/10 text-primary" 
@@ -99,6 +100,22 @@ export function Layout({ children }: { children: React.ReactNode }) {
             {children}
           </div>
         </div>
+        <nav className="grid grid-cols-5 border-t border-border bg-card md:hidden">
+          {navItems.slice(0, 5).map((item) => {
+            const isActive = item.exact ? location === item.href : location.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn("flex flex-col items-center gap-1 px-1 py-2 text-[10px]", isActive ? "text-primary" : "text-muted-foreground")}
+                data-testid={`link-mobile-${item.label.toLowerCase().replace(" ", "-")}`}
+              >
+                <item.icon className="h-4 w-4" />
+                <span className="max-w-full truncate">{item.label.replace(" Orders", "")}</span>
+              </Link>
+            );
+          })}
+        </nav>
       </main>
     </div>
   );

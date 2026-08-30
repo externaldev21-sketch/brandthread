@@ -2,7 +2,6 @@
  * Manufacturer Messages Screen
  * Params:
  *   threadId      — real DB thread UUID (takes priority)
- *   conversationId — legacy demo AsyncStorage ID (fallback)
  *   mfrName       — manufacturer display name (pre-fill header)
  *   mfrId         — manufacturer UUID (for creating threads)
  */
@@ -13,17 +12,13 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet,
   KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Image,
-  ScrollView,
+  ScrollView, RefreshControl,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import {
-  getConversations, sendMessage as demoSendMessage, markConversationRead,
-} from '@/services/manufacturerService';
-import { ManufacturerConversation, ManufacturerMessage } from '@/services/manufacturerTypes';
 import { BrandthreadHeader, StatusBadge } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 import {
@@ -58,7 +53,7 @@ function fmtCents(c: number) { return formatCents(c); }
 
 // ─── Message Bubble ───────────────────────────────────────────────────────────
 
-function ApiMessageBubble({ msg }: { msg: ApiMessage }) {
+function ApiMessageBubble({ msg, onOpenOrder }: { msg: ApiMessage; onOpenOrder: (id: string, type: string) => void }) {
   const isSeller = msg.senderRole === 'seller';
   const isSystem = msg.senderRole === 'system' || msg.messageType === 'system';
 
@@ -94,7 +89,7 @@ function ApiMessageBubble({ msg }: { msg: ApiMessage }) {
     const label = msg.messageType === 'sample_card' ? 'Sample Order' : 'Bulk Order';
     return (
       <View style={[bubS.row, isSeller ? bubS.rowRight : bubS.rowLeft]}>
-        <View style={bubS.cardMsg}>
+        <TouchableOpacity style={bubS.cardMsg} onPress={() => card?.orderId && onOpenOrder(card.orderId, card.orderType)}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <Text style={{ fontSize: 20 }}>{icon}</Text>
             <Text style={bubS.cardLabel}>{label}</Text>
@@ -124,7 +119,7 @@ function ApiMessageBubble({ msg }: { msg: ApiMessage }) {
             <Text style={[bubS.cardDesc]}>{card.description}</Text>
           )}
           <Text style={bubS.timestamp}>{fmtTime(msg.sentAt)}</Text>
-        </View>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -138,32 +133,6 @@ function ApiMessageBubble({ msg }: { msg: ApiMessage }) {
         </View>
         <Text style={[bubS.timestamp, isSeller ? { textAlign: 'right' } : {}]}>
           {fmtTime(msg.sentAt)}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-// Legacy demo bubble (for AsyncStorage path)
-function DemoBubble({ msg }: { msg: ManufacturerMessage }) {
-  const isSeller = msg.senderType === 'seller';
-  const isSystem = msg.senderType === 'system';
-  if (isSystem) {
-    return (
-      <View style={bubS.systemWrap}>
-        <Text style={bubS.systemText}>{msg.text}</Text>
-        <Text style={bubS.timestamp}>{fmtTime(msg.createdAt)}</Text>
-      </View>
-    );
-  }
-  return (
-    <View style={[bubS.row, isSeller ? bubS.rowRight : bubS.rowLeft]}>
-      <View style={{ maxWidth: '78%' }}>
-        <View style={[bubS.bubble, isSeller ? bubS.sellerBubble : bubS.mfgBubble]}>
-          <Text style={[bubS.msgText, isSeller && { color: '#fff' }]}>{msg.text}</Text>
-        </View>
-        <Text style={[bubS.timestamp, isSeller ? { textAlign: 'right' } : {}]}>
-          {fmtTime(msg.createdAt)}
         </Text>
       </View>
     </View>
@@ -344,7 +313,6 @@ export default function ManufacturerMessagesScreen() {
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const { theme } = useAppTheme();
   const params = useLocalSearchParams<{
-    conversationId?: string;
     threadId?: string;
     mfrName?: string;
     mfrId?: string;
@@ -353,25 +321,21 @@ export default function ManufacturerMessagesScreen() {
   const insets  = useSafeAreaInsets();
   const api     = useApi();
 
-  // Which mode: 'api' if we have a threadId or can create one; 'demo' otherwise
   const [resolvedThreadId, setResolvedThreadId] = useState<string | null>(params.threadId ?? null);
   const [mfrDisplayName, setMfrDisplayName] = useState(params.mfrName ?? 'Manufacturer');
+  const [manufacturerId, setManufacturerId] = useState(params.mfrId ?? '');
 
   // API mode state
   const [apiMessages,    setApiMessages]    = useState<ApiMessage[]>([]);
-  // Demo mode state
-  const [demoConversation, setDemoConv] = useState<ManufacturerConversation | null>(null);
-  const [demoMessages,     setDemoMsgs] = useState<ManufacturerMessage[]>([]);
-
   const [inputText,  setInputText]  = useState('');
   const [sending,    setSending]    = useState(false);
   const [loading,    setLoading]    = useState(true);
+  const [loadError,  setLoadError]  = useState('');
+  const [refreshing, setRefreshing] = useState(false);
   const [cardDialog, setCardDialog] = useState<'sample_card' | 'bulk_card' | null>(null);
 
   const inputRef = useRef<TextInput>(null);
   const listRef  = useRef<FlatList>(null);
-
-  const mode = resolvedThreadId ? 'api' : 'demo';
 
   const showUpgrade = useCallback((error: unknown): boolean => {
     const rejection = getEntitlementRejection(error);
@@ -391,31 +355,34 @@ export default function ManufacturerMessagesScreen() {
 
   const loadApiMessages = useCallback(async (threadId: string) => {
     try {
+      setLoadError('');
       const msgs = await api.manufacturers.threads.messages.list(threadId);
       setApiMessages(msgs.reverse()); // newest first for inverted list
     } catch (e) {
       if (showUpgrade(e)) return;
+      setLoadError('Could not load messages.');
       console.error('Failed to load messages:', e);
+    } finally {
+      setRefreshing(false);
     }
   }, [api, showUpgrade]);
-
-  const loadDemoConv = useCallback(async () => {
-    const convs = await getConversations();
-    const conv  = convs.find(c => c.id === params.conversationId);
-    if (conv) {
-      setDemoConv(conv);
-      setMfrDisplayName(conv.manufacturerName);
-      setDemoMsgs([...conv.messages].reverse());
-      await markConversationRead(params.conversationId!);
-    }
-  }, [params.conversationId]);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
       if (resolvedThreadId) {
+        try {
+          const threads = await api.manufacturers.threads.list();
+          const thread = threads.find((item: any) => item.id === resolvedThreadId);
+          if (thread) {
+            setMfrDisplayName(thread.manufacturerName);
+            setManufacturerId(thread.manufacturerId);
+          }
+        } catch (error) {
+          if (!showUpgrade(error)) Alert.alert('Error', 'Could not load this conversation.');
+        }
         await loadApiMessages(resolvedThreadId);
-      } else if (params.mfrId && !params.conversationId) {
+      } else if (params.mfrId) {
         // Create or get thread for this manufacturer
         try {
           const thread = await api.manufacturers.threads.create({
@@ -429,8 +396,10 @@ export default function ManufacturerMessagesScreen() {
             Alert.alert('Error', 'Could not open this manufacturer conversation.');
           }
         }
-      } else if (params.conversationId) {
-        await loadDemoConv();
+      } else {
+        Alert.alert('Conversation unavailable', 'A valid manufacturer thread is required.', [
+          { text: 'Back', onPress: () => router.back() },
+        ]);
       }
       setLoading(false);
     })();
@@ -442,6 +411,11 @@ export default function ManufacturerMessagesScreen() {
       loadApiMessages(resolvedThreadId).catch(() => {});
     }
   }, [resolvedThreadId, loadApiMessages]);
+  useEffect(() => {
+    if (!resolvedThreadId) return;
+    const timer = setInterval(() => loadApiMessages(resolvedThreadId), 5_000);
+    return () => clearInterval(timer);
+  }, [resolvedThreadId, loadApiMessages]);
 
   // ── Send text ─────────────────────────────────────────────────────────────────
 
@@ -451,7 +425,7 @@ export default function ManufacturerMessagesScreen() {
     setSending(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
-    if (mode === 'api' && resolvedThreadId) {
+    if (resolvedThreadId) {
       try {
         const msg = await api.manufacturers.threads.messages.send(resolvedThreadId, {
           content:     text,
@@ -463,18 +437,6 @@ export default function ManufacturerMessagesScreen() {
       } catch (error) {
         if (!showUpgrade(error)) Alert.alert('Error', 'Could not send message.');
       }
-    } else {
-      // Demo path
-      try {
-        const msg = await demoSendMessage(params.conversationId!, {
-          text,
-          isInternalNote: false,
-        });
-        setDemoMsgs(prev => [msg, ...prev]);
-        setInputText('');
-      } catch {
-        Alert.alert('Error', 'Could not send message.');
-      }
     }
     setSending(false);
   }
@@ -482,9 +444,7 @@ export default function ManufacturerMessagesScreen() {
   // ── Send photo ────────────────────────────────────────────────────────────────
 
   async function handlePhotoSend() {
-    if (mode !== 'api' || !resolvedThreadId) {
-      Alert.alert('Photo sharing', 'Photo sharing requires a real manufacturer connection.'); return;
-    }
+    if (!resolvedThreadId) return;
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
       Alert.alert('Permission needed', 'Allow photo access to share images.'); return;
@@ -499,27 +459,16 @@ export default function ManufacturerMessagesScreen() {
     setSending(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     try {
-      const uri = result.assets[0].uri;
-      // Upload image via object storage
-      const formData = new FormData();
-      const filename = uri.split('/').pop() ?? 'image.jpg';
-      formData.append('file', { uri, name: filename, type: 'image/jpeg' } as any);
-
-      const uploadRes = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL ?? ''}/api-server/api/upload`, {
-        method: 'POST',
-        body:   formData,
+      const asset = result.assets[0];
+      const upload = await api.manufacturers.threads.uploadAttachment(resolvedThreadId, {
+        uri: asset.uri,
+        mimeType: asset.mimeType,
       });
-
-      let imageUrl = uri; // fallback to local URI
-      if (uploadRes.ok) {
-        const uploadData = await uploadRes.json();
-        imageUrl = uploadData.url ?? uri;
-      }
 
       const msg = await api.manufacturers.threads.messages.send(resolvedThreadId, {
         content:     '📷 Photo',
         messageType: 'image',
-        mediaUrls:   [imageUrl],
+        mediaUrls:   [upload.objectPath],
         senderRole:  'seller',
       });
       setApiMessages(prev => [{ ...msg }, ...prev]);
@@ -532,17 +481,29 @@ export default function ManufacturerMessagesScreen() {
   // ── Send card ─────────────────────────────────────────────────────────────────
 
   async function handleSendCard(cardType: 'sample_card' | 'bulk_card', cardData: any) {
-    if (mode !== 'api' || !resolvedThreadId) return;
+    if (!resolvedThreadId || !manufacturerId) return;
     setSending(true);
     try {
+      const order = await api.manufacturers.sampleOrders.create({
+        manufacturerId,
+        threadId: resolvedThreadId,
+        orderType: cardType === 'sample_card' ? 'sample' : 'bulk',
+        title: cardData.title,
+        description: cardData.description,
+        quantity: cardData.quantity,
+        priceCents: cardData.priceCents,
+      });
       const label = cardType === 'sample_card' ? 'Sample Order Card' : 'Bulk Order Card';
       const msg = await api.manufacturers.threads.messages.send(resolvedThreadId, {
         content:     label,
         messageType: cardType,
-        cardData,
+        cardData: { ...cardData, orderId: order.id },
         senderRole:  'seller',
       });
       setApiMessages(prev => [{ ...msg }, ...prev]);
+      router.push(
+        `${cardType === 'bulk_card' ? '/production-detail' : '/sample-detail'}?id=${encodeURIComponent(order.id)}&paymentPrompt=1` as never,
+      );
     } catch (error) {
       if (!showUpgrade(error)) Alert.alert('Error', 'Could not send card.');
     }
@@ -555,10 +516,8 @@ export default function ManufacturerMessagesScreen() {
     const actions: any[] = [
       { text: '🖼️  Send Photo',       onPress: handlePhotoSend },
     ];
-    if (mode === 'api') {
-      actions.push({ text: '🧵 Send Sample Order Card', onPress: () => setCardDialog('sample_card') });
-      actions.push({ text: '📦 Send Bulk Order Card',   onPress: () => setCardDialog('bulk_card')   });
-    }
+    actions.push({ text: '🧵 Send Sample Order Card', onPress: () => setCardDialog('sample_card') });
+    actions.push({ text: '📦 Send Bulk Order Card',   onPress: () => setCardDialog('bulk_card')   });
     actions.push({
       text: '📹 Start Video Call',
       onPress: () => Alert.alert('Video Calling', 'Video and voice calling requires the EAS native build. Ask your account manager to enable it for your workspace.'),
@@ -577,8 +536,6 @@ export default function ManufacturerMessagesScreen() {
       </View>
     );
   }
-
-  const isEmpty = mode === 'api' ? apiMessages.length === 0 : demoMessages.length === 0;
 
   return (
     <KeyboardAvoidingView
@@ -599,7 +556,7 @@ export default function ManufacturerMessagesScreen() {
       <View style={{ paddingTop: insets.top, backgroundColor: BG, borderBottomWidth: 1, borderBottomColor: BORDER }}>
         <BrandthreadHeader
           title={mfrDisplayName}
-          subtitle={mode === 'api' ? 'Connected' : 'Offline'}
+          subtitle="Connected"
           onBack={() => router.back()}
           rightElement={
             <TouchableOpacity
@@ -613,15 +570,28 @@ export default function ManufacturerMessagesScreen() {
       </View>
 
       {/* Messages */}
-      {mode === 'api' ? (
-        <FlatList
+      {loadError && apiMessages.length === 0 ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.lg }}>
+          <Text style={{ color: MUTED, fontFamily: FONT.medium, marginBottom: SP.md }}>{loadError}</Text>
+          <TouchableOpacity style={dlgS.sendBtn} onPress={() => resolvedThreadId && loadApiMessages(resolvedThreadId)}>
+            <Text style={dlgS.sendBtnText}>Try again</Text>
+          </TouchableOpacity>
+        </View>
+      ) : <FlatList
           ref={listRef}
           data={apiMessages}
           keyExtractor={m => m.id}
           inverted
-          renderItem={({ item }) => <ApiMessageBubble msg={item} />}
+          renderItem={({ item }) => <ApiMessageBubble msg={item} onOpenOrder={(orderId, orderType) =>
+            router.push(`${orderType === 'bulk' ? '/production-detail' : '/sample-detail'}?id=${orderId}&paymentPrompt=1` as never)
+          } />}
           contentContainerStyle={{ paddingVertical: SP.md }}
           showsVerticalScrollIndicator={false}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => {
+            if (!resolvedThreadId) return;
+            setRefreshing(true);
+            loadApiMessages(resolvedThreadId);
+          }} tintColor={PURPLE} />}
           ListEmptyComponent={
             <View style={{ alignItems: 'center', marginTop: 40 }}>
               <Text style={{ color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.sm }}>
@@ -629,25 +599,7 @@ export default function ManufacturerMessagesScreen() {
               </Text>
             </View>
           }
-        />
-      ) : (
-        <FlatList
-          ref={listRef}
-          data={demoMessages}
-          keyExtractor={m => m.id}
-          inverted
-          renderItem={({ item }) => <DemoBubble msg={item} />}
-          contentContainerStyle={{ paddingVertical: SP.md }}
-          showsVerticalScrollIndicator={false}
-          ListEmptyComponent={
-            <View style={{ alignItems: 'center', marginTop: 40 }}>
-              <Text style={{ color: SUBTLE, fontFamily: FONT.regular, fontSize: FS.sm }}>
-                No messages yet.
-              </Text>
-            </View>
-          }
-        />
-      )}
+        />}
 
       {/* Input Bar */}
       <View style={[s.inputArea, { paddingBottom: Math.max(insets.bottom, SP.md) }]}>

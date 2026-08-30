@@ -1,21 +1,25 @@
 import { useState, useRef, useEffect } from "react";
-import { useGetThreadMessages, useListManufacturerThreads, useSendThreadMessage, getGetThreadMessagesQueryKey } from "@workspace/api-client-react";
+import { useGetThreadMessages, useListManufacturerThreads, useSendThreadMessage, useUploadManufacturerThreadAttachment, getGetThreadMessagesQueryKey, getListManufacturerThreadsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { ArrowLeft, Send, Package } from "lucide-react";
+import { ArrowLeft, Send, Package, MessageSquare, Paperclip, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Message } from "@workspace/api-client-react";
+import { EmptyState, QueryError } from "@/components/query-state";
 
 export default function MessageThread({ threadId }: { threadId: string }) {
-  const { data: messages, isLoading: messagesLoading } = useGetThreadMessages(threadId, { query: { enabled: !!threadId, queryKey: getGetThreadMessagesQueryKey(threadId) } });
-  const { data: threads } = useListManufacturerThreads();
+  const messagesQuery = useGetThreadMessages(threadId, { query: { enabled: !!threadId, queryKey: getGetThreadMessagesQueryKey(threadId), refetchInterval: 10_000 } });
+  const threadsQuery = useListManufacturerThreads({ query: { queryKey: getListManufacturerThreadsQueryKey(), refetchInterval: 10_000 } });
+  const { data: messages, isLoading: messagesLoading } = messagesQuery;
+  const { data: threads } = threadsQuery;
   const sendMutation = useSendThreadMessage();
+  const uploadMutation = useUploadManufacturerThreadAttachment();
   const queryClient = useQueryClient();
   
   const [draft, setDraft] = useState("");
+  const [attachment, setAttachment] = useState<File | null>(null);
   const endOfMessagesRef = useRef<HTMLDivElement>(null);
 
   const thread = threads?.find(t => t.id === threadId);
@@ -27,24 +31,37 @@ export default function MessageThread({ threadId }: { threadId: string }) {
     }
   }, [messages]);
 
-  const handleSend = () => {
-    if (!draft.trim() || !threadId) return;
-
+  const handleSend = async () => {
+    if ((!draft.trim() && !attachment) || !threadId) return;
+    let mediaUrls: string[] | undefined;
+    const file = attachment;
+    if (file) {
+      try {
+        // Pass the selected File itself so the generated client receives its
+        // original bytes and exact MIME type (image/jpeg, image/png, or application/pdf).
+        const uploaded = await uploadMutation.mutateAsync({ threadId, data: file });
+        mediaUrls = [uploaded.objectPath];
+      } catch {
+        return;
+      }
+    }
     sendMutation.mutate(
-      { threadId, data: { content: draft } },
+      { threadId, data: { content: draft.trim() || undefined, messageType: mediaUrls ? (file?.type.startsWith("image/") ? "image" : "text") : "text", mediaUrls } },
       {
         onSuccess: (newMessage) => {
           setDraft("");
+          setAttachment(null);
           // Optimistically update cache
           queryClient.setQueryData(getGetThreadMessagesQueryKey(threadId), (old: Message[] | undefined) => 
             old ? [...old, newMessage] : [newMessage]
           );
+          void queryClient.invalidateQueries({ queryKey: getListManufacturerThreadsQueryKey() });
         }
       }
     );
   };
 
-  if (messagesLoading || !thread) {
+  if (messagesLoading || threadsQuery.isLoading) {
     return (
       <div className="h-full flex flex-col border border-border bg-card rounded-lg animate-pulse">
         <div className="h-16 border-b border-border bg-secondary/20"></div>
@@ -54,6 +71,23 @@ export default function MessageThread({ threadId }: { threadId: string }) {
         </div>
       </div>
     );
+  }
+
+  if (messagesQuery.isError || threadsQuery.isError) {
+    return (
+      <QueryError
+        title="Unable to load conversation"
+        description="The latest messages could not be retrieved."
+        onRetry={() => {
+          void messagesQuery.refetch();
+          void threadsQuery.refetch();
+        }}
+      />
+    );
+  }
+
+  if (!thread) {
+    return <EmptyState icon={MessageSquare} title="Conversation not found" description="It may have been removed or you may no longer have access." />;
   }
 
   return (
@@ -87,8 +121,14 @@ export default function MessageThread({ threadId }: { threadId: string }) {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+        {messages?.length === 0 && (
+          <div className="py-16 text-center text-sm text-muted-foreground" data-testid="status-empty-thread">
+            No messages yet. Send the first reply below.
+          </div>
+        )}
         {messages?.map((msg, i) => {
           const isMe = msg.senderRole === "manufacturer";
+          const richMessage = msg as typeof msg & { messageType?: string; mediaUrls?: string[]; cardData?: Record<string, unknown> | null };
           const showTime = i === 0 || new Date(msg.sentAt).getTime() - new Date(messages[i-1].sentAt).getTime() > 1000 * 60 * 30; // 30 mins
           
           return (
@@ -105,6 +145,14 @@ export default function MessageThread({ threadId }: { threadId: string }) {
                   : "bg-secondary border border-border text-foreground self-start"
               )}>
                 <p className="whitespace-pre-wrap">{msg.content}</p>
+                {richMessage.mediaUrls?.map((url) => url.match(/\.(pdf)(\?|$)/i) ? (
+                  <a key={url} href={url} target="_blank" rel="noreferrer" className="mt-3 flex items-center gap-2 underline"><FileText className="h-4 w-4" />Open PDF attachment</a>
+                ) : <a key={url} href={url} target="_blank" rel="noreferrer"><img src={url} alt="Message attachment" className="mt-3 max-h-64 rounded object-cover" /></a>)}
+                {(richMessage.messageType === "sample_card" || richMessage.messageType === "bulk_card") && richMessage.cardData && typeof richMessage.cardData.orderId === "string" && (
+                  <Link href={`/orders/${richMessage.cardData.orderId}`} className="mt-3 block rounded border border-current/30 p-3 font-medium underline" data-testid={`link-message-order-${msg.id}`}>
+                    Open {richMessage.messageType === "bulk_card" ? "bulk" : "sample"} order tracker
+                  </Link>
+                )}
               </div>
               <span className={cn(
                 "text-[10px] text-muted-foreground mt-1 px-1",
@@ -132,15 +180,28 @@ export default function MessageThread({ threadId }: { threadId: string }) {
             }}
             placeholder="Type your reply... (Press Enter to send)" 
             className="min-h-[60px] max-h-[150px] bg-secondary/30 resize-none border-border"
+            data-testid="input-message-draft"
           />
+          <label className="flex cursor-pointer items-center justify-center rounded border border-border px-3 hover:bg-secondary" data-testid="button-attach-message">
+            <Paperclip className="h-4 w-4" />
+            <input type="file" accept="image/*,.pdf,application/pdf" className="sr-only" onChange={(event) => setAttachment(event.target.files?.[0] ?? null)} />
+          </label>
           <Button 
             onClick={handleSend}
-            disabled={!draft.trim() || sendMutation.isPending}
+            disabled={(!draft.trim() && !attachment) || sendMutation.isPending || uploadMutation.isPending}
             className="h-auto px-6"
+            data-testid="button-send-message"
           >
             <Send className="w-4 h-4" />
           </Button>
         </div>
+        {attachment && <p className="mt-2 text-xs text-muted-foreground" data-testid="text-attachment-name">Attached: {attachment.name}</p>}
+        {uploadMutation.isError && <p className="mt-2 text-sm text-destructive" role="alert">Attachment upload failed. Please try again.</p>}
+        {sendMutation.isError && (
+          <p className="mt-2 text-sm text-destructive" role="alert" data-testid="status-send-error">
+            Message not sent. Check your connection and try again.
+          </p>
+        )}
       </div>
     </div>
   );

@@ -5,13 +5,20 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { ManufacturerOrder } from './manufacturerOrder';
+import type { ManufacturerDashboardActiveSellersItem } from './manufacturerDashboardActiveSellersItem';
+import type { MessageThread } from './messageThread';
+import type { OrderBuckets } from './orderBuckets';
+import type { SampleOrder } from './sampleOrder';
 
 export interface ManufacturerDashboard {
   activeOrders: number;
   pendingMessages: number;
   completedOrders: number;
   totalRevenueCents: number;
-  pendingPayoutCents: number;
-  recentOrders?: ManufacturerOrder[];
+  recentOrders: SampleOrder[];
+  activeSellers: ManufacturerDashboardActiveSellersItem[];
+  messages: MessageThread[];
+  sampleOrders: OrderBuckets;
+  bulkOrders: OrderBuckets;
+  orderHistory: SampleOrder[];
 }

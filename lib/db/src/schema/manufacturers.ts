@@ -94,7 +94,11 @@ export const manufacturerThreads = pgTable('manufacturer_threads', {
   buyerAvatar:    text('buyer_avatar'),
   subject:        text('subject').notNull(),
   orderStatus:    text('order_status'),
+  // Kept for backwards compatibility; new clients use the participant-specific
+  // counters below.
   unreadCount:    integer('unread_count').notNull().default(0),
+  sellerUnreadCount: integer('seller_unread_count').notNull().default(0),
+  manufacturerUnreadCount: integer('manufacturer_unread_count').notNull().default(0),
   lastMessage:    text('last_message').notNull().default(''),
   lastMessageAt:  timestamp('last_message_at').defaultNow().notNull(),
   createdAt:      timestamp('created_at').defaultNow().notNull(),
@@ -118,6 +122,21 @@ export const manufacturerMessages = pgTable('manufacturer_messages', {
   sentAt:      timestamp('sent_at').defaultNow().notNull(),
 }, (table) => ({
   threadIdx: index('manufacturer_messages_thread_id_idx').on(table.threadId),
+}));
+
+// An attachment is created by the authenticated upload endpoint before it can
+// be referenced by a message. This prevents clients from attaching another
+// thread's private object path by guessing it.
+export const manufacturerThreadAttachments = pgTable('manufacturer_thread_attachments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  threadId: uuid('thread_id').notNull().references(() => manufacturerThreads.id, { onDelete: 'cascade' }),
+  uploaderClerkId: text('uploader_clerk_id').notNull(),
+  objectPath: text('object_path').notNull().unique(),
+  consumedAt: timestamp('consumed_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  threadUploaderIdx: index('manufacturer_thread_attachments_thread_uploader_idx')
+    .on(table.threadId, table.uploaderClerkId, table.consumedAt),
 }));
 
 // ─── Manufacturer Orders ──────────────────────────────────────────────────────
@@ -158,6 +177,8 @@ export const sampleOrders = pgTable('sample_orders', {
   // Stage: payment_received → processing → cut_and_sew → packing → shipped → delivered
   status:                  text('status').notNull().default('payment_received'),
   stripePaymentIntentId:   text('stripe_payment_intent_id'),
+  stripeCheckoutSessionId: text('stripe_checkout_session_id'),
+  checkoutSessionVersion: integer('checkout_session_version').notNull().default(0),
   platformFeeCents:        integer('platform_fee_cents').notNull().default(0),
   payoutReleased:          boolean('payout_released').notNull().default(false),
   stripeTransferId:        text('stripe_transfer_id'),
@@ -166,6 +187,9 @@ export const sampleOrders = pgTable('sample_orders', {
   shippedAt:               timestamp('shipped_at'),
   deliveredAt:             timestamp('delivered_at'),
   walletId:                uuid('wallet_id'),   // FK enforced in migration
+  // Wallet payment claim state protects external transfer retries.
+  walletPaymentState:      text('wallet_payment_state').notNull().default('pending'),
+  walletPaymentAttemptKey: text('wallet_payment_attempt_key'),
   notes:                   text('notes'),
   // Sample progress images — array of object storage paths (e.g. /objects/uploads/<uuid>)
   imageUrls:               json('image_urls').$type<string[]>().notNull().default([]),

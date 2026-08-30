@@ -337,6 +337,20 @@ export async function customFetch<T = unknown>(
 
   const headers = mergeHeaders(isRequest(input) ? input.headers : undefined, headersInit);
 
+  // OpenAPI represents the raw attachment request as a Blob and Orval emits the
+  // wildcard media type from the operation. Browsers do not replace an explicit
+  // wildcard header, so use the concrete File/Blob type at request time.
+  if (
+    typeof Blob !== "undefined" &&
+    init.body instanceof Blob &&
+    headers.get("content-type")?.endsWith("/*")
+  ) {
+    if (!init.body.type) {
+      throw new TypeError("customFetch: uploaded Blob must declare a concrete media type.");
+    }
+    headers.set("content-type", init.body.type);
+  }
+
   if (
     typeof init.body === "string" &&
     !headers.has("content-type") &&

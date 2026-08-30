@@ -12,7 +12,7 @@ export type QuoteRequestStatus =
   | 'counteroffer_sent' | 'accepted' | 'declined' | 'expired' | 'cancelled';
 
 export type SampleStatus =
-  | 'requested' | 'awaiting_payment' | 'paid' | 'in_development'
+  | 'requested' | 'pending_payment' | 'awaiting_payment' | 'paid' | 'in_development'
   | 'revision_requested' | 'shipped' | 'delivered' | 'review_needed'
   | 'approved' | 'rejected' | 'cancelled';
 
@@ -284,6 +284,24 @@ export interface Sample {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  threadId?: string;
+  orderType?: 'sample' | 'bulk';
+  manufacturerName?: string;
+  manufacturerCountry?: string;
+  quantity?: number;
+}
+
+export interface ManufacturerThread {
+  id: string;
+  manufacturerId: string;
+  manufacturerName: string;
+  manufacturerCountry?: string | null;
+  manufacturerPhoto?: string | null;
+  subject: string;
+  lastMessage?: string | null;
+  lastMessageAt: string;
+  unreadCount: number;
+  createdAt: string;
 }
 
 // ─── Production ───────────────────────────────────────────────────────────────
@@ -379,6 +397,9 @@ export interface ProductionOrder {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  threadId?: string;
+  manufacturerName?: string;
+  walletPaymentState?: 'pending' | 'processing' | 'paid' | 'failed' | null;
 }
 
 // ─── Messaging ────────────────────────────────────────────────────────────────

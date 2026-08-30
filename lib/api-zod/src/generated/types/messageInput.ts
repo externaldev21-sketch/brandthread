@@ -5,7 +5,13 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { MessageInputCardData } from './messageInputCardData';
+import type { MessageInputMessageType } from './messageInputMessageType';
 
 export interface MessageInput {
-  content: string;
+  content?: string;
+  messageType?: MessageInputMessageType;
+  mediaUrls?: string[];
+  /** @nullable */
+  cardData?: MessageInputCardData;
 }

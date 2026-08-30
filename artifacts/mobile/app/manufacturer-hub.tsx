@@ -7,7 +7,7 @@ import { useColors } from '@/hooks/useColors';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Modal, Switch, RefreshControl, ActionSheetIOS, Platform,
+  StyleSheet, Alert, Modal, Switch, RefreshControl, ActionSheetIOS, Platform, ActivityIndicator,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -34,7 +34,7 @@ import {
   saveManufacturer, unsaveManufacturer, updateRelationshipStatus,
   getFavoriteManufacturerIds, favoriteManufacturer, unfavoriteManufacturer,
   getQuoteRequests, getQuotes, acceptQuote, declineQuote,
-  getSamples, getProductionOrders, advanceProductionStage,
+  getSamples, getProductionOrders,
   getConversations, getOrCreateConversation,
   DEMO_MANUFACTURERS,
 } from '@/services/manufacturerService';
@@ -402,7 +402,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const onMessage = async (mfg: Manufacturer) => {
     try {
       const conv = await getOrCreateConversation(mfg.id);
-      router.push((`/manufacturer-messages?conversationId=${conv.id}`) as never);
+      router.push((`/manufacturer-messages?threadId=${conv.id}`) as never);
     } catch (e) {
       showManufacturerUpgrade(e, router);
       console.error(e);
@@ -770,7 +770,7 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
       ActionSheetIOS.showActionSheetWithOptions(
         { options, cancelButtonIndex: options.length - 1, destructiveButtonIndex: options.length - 2 },
         idx => {
-          if (idx === 0) getOrCreateConversation(mfg.id).then(conv => router.push((`/manufacturer-messages?conversationId=${conv.id}`) as never));
+          if (idx === 0) getOrCreateConversation(mfg.id).then(conv => router.push((`/manufacturer-messages?threadId=${conv.id}`) as never));
           if (idx === 1) router.push((`/quote-request?manufacturerId=${mfg.id}`) as never);
           if (idx === 3) updateRelationshipStatus(mfg.id, 'archived').then(load);
           if (idx === 4) unsaveManufacturer(mfg.id).then(load);
@@ -778,7 +778,7 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
       );
     } else {
       Alert.alert(mfg.name, 'Choose action', [
-        { text: 'Message', onPress: () => getOrCreateConversation(mfg.id).then(conv => router.push((`/manufacturer-messages?conversationId=${conv.id}`) as never)) },
+        { text: 'Message', onPress: () => getOrCreateConversation(mfg.id).then(conv => router.push((`/manufacturer-messages?threadId=${conv.id}`) as never)) },
         { text: 'Request Quote', onPress: () => router.push((`/quote-request?manufacturerId=${mfg.id}`) as never) },
         { text: 'Archive', onPress: () => updateRelationshipStatus(mfg.id, 'archived').then(load) },
         { text: 'Remove', style: 'destructive', onPress: () => unsaveManufacturer(mfg.id).then(load) },
@@ -830,7 +830,7 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
             </View>
             <View style={relCard.divider} />
             <View style={relCard.actionRow}>
-              <TouchableOpacity style={relCard.btn} onPress={() => getOrCreateConversation(mfg.id).then(conv => router.push((`/manufacturer-messages?conversationId=${conv.id}`) as never))}>
+              <TouchableOpacity style={relCard.btn} onPress={() => getOrCreateConversation(mfg.id).then(conv => router.push((`/manufacturer-messages?threadId=${conv.id}`) as never))}>
                 <Feather name="message-circle" size={ICON.sm} color={CYAN} />
                 <Text style={[relCard.btnText, { color: CYAN }]}>Message</Text>
               </TouchableOpacity>
@@ -1085,12 +1085,15 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const [samples, setSamples] = useState<Sample[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     try {
+      setError('');
       const s = await getSamples();
-      setSamples(s);
+      setSamples(s.filter(order => order.orderType !== 'bulk'));
     } catch (e) {
+      setError('Could not load sample orders.');
       console.error(e);
     } finally {
       setLoading(false);
@@ -1099,8 +1102,17 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   }, []);
 
   useFocusEffect(useCallback(() => { setLoading(true); load(); }, []));
+  useEffect(() => {
+    const timer = setInterval(load, 15_000);
+    return () => clearInterval(timer);
+  }, [load]);
 
-  if (!loading && samples.length === 0) {
+  if (loading) return <View style={s.centered}><ActivityIndicator color={PURPLE} /></View>;
+  if (error) {
+    return <EmptyState icon="alert-circle" title="Could not load samples" description={error}
+      action={{ label: 'Try again', onPress: load, icon: 'refresh-cw' }} style={s.emptyState} />;
+  }
+  if (samples.length === 0) {
     return (
       <EmptyState
         icon="package"
@@ -1117,7 +1129,6 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
       data={samples}
       keyExtractor={item => item.id}
       renderItem={({ item }) => {
-        const mfg = DEMO_MANUFACTURERS.find(m => m.id === item.manufacturerId);
         const canReview = item.status === 'review_needed' || item.status === 'delivered';
         return (
           <View style={smpCard.root}>
@@ -1125,7 +1136,7 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
               <Text style={smpCard.productName} numberOfLines={1}>{item.productName}</Text>
               <StatusBadge label={item.status.replace(/_/g, ' ')} variant={sampleStatusVariant(item.status)} small />
             </View>
-            {mfg && <Text style={smpCard.mfgName}>{mfg.name}</Text>}
+            {!!item.manufacturerName && <Text style={smpCard.mfgName}>{item.manufacturerName}</Text>}
             {item.estimatedCompletionDate && (
               <Text style={smpCard.date}>Est: {fmtDate(item.estimatedCompletionDate)}</Text>
             )}
@@ -1177,12 +1188,15 @@ function ProductionTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const [productionOrders, setProductionOrders] = useState<ProductionOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     try {
+      setError('');
       const orders = await getProductionOrders();
       setProductionOrders(orders);
     } catch (e) {
+      setError('Could not load production orders.');
       console.error(e);
     } finally {
       setLoading(false);
@@ -1191,18 +1205,17 @@ function ProductionTab({ router }: { router: ReturnType<typeof useRouter> }) {
   }, []);
 
   useFocusEffect(useCallback(() => { setLoading(true); load(); }, []));
+  useEffect(() => {
+    const timer = setInterval(load, 15_000);
+    return () => clearInterval(timer);
+  }, [load]);
 
-  const handleAdvance = async (orderId: string) => {
-    try {
-      await advanceProductionStage(orderId);
-      await load();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  if (!loading && productionOrders.length === 0) {
+  if (loading) return <View style={s.centered}><ActivityIndicator color={PURPLE} /></View>;
+  if (error) {
+    return <EmptyState icon="alert-circle" title="Could not load production" description={error}
+      action={{ label: 'Try again', onPress: load, icon: 'refresh-cw' }} style={s.emptyState} />;
+  }
+  if (productionOrders.length === 0) {
     return (
       <EmptyState
         icon="layers"
@@ -1219,7 +1232,6 @@ function ProductionTab({ router }: { router: ReturnType<typeof useRouter> }) {
       data={productionOrders}
       keyExtractor={item => item.id}
       renderItem={({ item: order }) => {
-        const mfg = DEMO_MANUFACTURERS.find(m => m.id === order.manufacturerId);
         const stageKeys = PRODUCTION_STAGES.map(s => s.key);
         const currentIdx = stageKeys.indexOf(order.currentStage);
         const progressPct = Math.round((currentIdx / (PRODUCTION_STAGES.length - 1)) * 100);
@@ -1230,7 +1242,7 @@ function ProductionTab({ router }: { router: ReturnType<typeof useRouter> }) {
             <View style={prodCard.topRow}>
               <View style={prodCard.nameCol}>
                 <Text style={prodCard.productName} numberOfLines={1}>{order.productName}</Text>
-                <Text style={prodCard.mfgLine}>{mfg?.name ?? order.manufacturerId} · {order.quantity} units</Text>
+                <Text style={prodCard.mfgLine}>{order.manufacturerName ?? 'Manufacturer'} · {order.quantity} units</Text>
               </View>
               <StatusBadge label={order.status} variant={productionStatusVariant(order.status)} small />
             </View>
@@ -1254,14 +1266,9 @@ function ProductionTab({ router }: { router: ReturnType<typeof useRouter> }) {
               <TouchableOpacity style={prodCard.btn} onPress={() => router.push((`/production-detail?id=${order.id}`) as never)}>
                 <Text style={prodCard.btnText}>Details</Text>
               </TouchableOpacity>
-              {mfg && (
-                <TouchableOpacity style={prodCard.btn} onPress={() => getOrCreateConversation(mfg.id).then(conv => router.push((`/manufacturer-messages?conversationId=${conv.id}`) as never))}>
+              {!!order.threadId && (
+                <TouchableOpacity style={prodCard.btn} onPress={() => router.push((`/manufacturer-messages?threadId=${order.threadId}`) as never)}>
                   <Text style={prodCard.btnText}>Message</Text>
-                </TouchableOpacity>
-              )}
-              {order.status === 'active' && currentIdx < PRODUCTION_STAGES.length - 1 && (
-                <TouchableOpacity style={[prodCard.btn, prodCard.advanceBtn]} onPress={() => handleAdvance(order.id)}>
-                  <Text style={[prodCard.btnText, { color: PURPLE_LIGHT }]}>Advance stage (demo)</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -1300,12 +1307,15 @@ function MessagesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   const [conversations, setConversations] = useState<ManufacturerConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     try {
+      setError('');
       const convs = await getConversations();
       setConversations(convs);
     } catch (e) {
+      setError('Could not load manufacturer messages.');
       console.error(e);
     } finally {
       setLoading(false);
@@ -1314,8 +1324,17 @@ function MessagesTab({ router }: { router: ReturnType<typeof useRouter> }) {
   }, []);
 
   useFocusEffect(useCallback(() => { setLoading(true); load(); }, []));
+  useEffect(() => {
+    const timer = setInterval(load, 10_000);
+    return () => clearInterval(timer);
+  }, [load]);
 
-  if (!loading && conversations.length === 0) {
+  if (loading) return <View style={s.centered}><ActivityIndicator color={PURPLE} /></View>;
+  if (error) {
+    return <EmptyState icon="alert-circle" title="Could not load messages" description={error}
+      action={{ label: 'Try again', onPress: load, icon: 'refresh-cw' }} style={s.emptyState} />;
+  }
+  if (conversations.length === 0) {
     return (
       <EmptyState
         icon="message-circle"
@@ -1334,7 +1353,7 @@ function MessagesTab({ router }: { router: ReturnType<typeof useRouter> }) {
         <TouchableOpacity
           style={msgCard.root}
           activeOpacity={0.8}
-          onPress={() => router.push((`/manufacturer-messages?conversationId=${conv.id}`) as never)}
+          onPress={() => router.push((`/manufacturer-messages?threadId=${conv.id}`) as never)}
         >
           <View style={msgCard.avatar}>
             <Text style={msgCard.avatarText}>{conv.manufacturerName.charAt(0)}</Text>
@@ -1384,6 +1403,7 @@ const msgCard = StyleSheet.create({
 const s = StyleSheet.create({
   root:         { flex: 1, backgroundColor: BG },
   flex:         { flex: 1 },
+  centered:     { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm, minHeight: COMP.headerH },
   headerTitle:  { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, letterSpacing: -0.3 },
   headerActions:{ flexDirection: 'row', gap: SP.sm },

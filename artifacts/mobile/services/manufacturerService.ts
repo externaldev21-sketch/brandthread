@@ -14,6 +14,7 @@ import {
   ProductionOrder, ProductionStage, ProductionUpdate, QualityControlCheck,
   ProductionIssue, ManufacturerPaymentRecord,
   ManufacturerConversation, ManufacturerMessage,
+  ManufacturerThread,
   ManufacturerFile, ManufacturerPriceCard,
   PRODUCTION_STAGES, QC_CATEGORIES,
   ProductionStageKey,
@@ -827,6 +828,11 @@ function mapSampleOrder(row: any, imageUris: string[] = []): Sample {
     notes:          row.notes ?? undefined,
     createdAt:      row.createdAt ?? now(),
     updatedAt:      row.updatedAt ?? now(),
+    threadId:       row.threadId ?? undefined,
+    orderType:      row.orderType ?? 'sample',
+    manufacturerName: row.manufacturerName ?? undefined,
+    manufacturerCountry: row.manufacturerCountry ?? undefined,
+    quantity:       Number(row.quantity ?? 1),
   } as Sample;
 }
 
@@ -850,6 +856,44 @@ export async function createSample(data: {
     }),
   });
   return mapSampleOrder(row);
+}
+
+export interface SampleCheckoutSession {
+  sessionId: string;
+  url: string | null;
+  paymentStatus: string;
+}
+export interface BulkWalletOption {
+  id: string;
+  dropId: string;
+  availableCents: number;
+  eligible: boolean;
+}
+
+export async function createSampleCheckoutSession(sampleOrderId: string, returnUrl: string): Promise<SampleCheckoutSession> {
+  return serviceRequest<SampleCheckoutSession>(`/api/sample-orders/${encodeURIComponent(sampleOrderId)}/checkout-session`, {
+    method: 'POST', body: JSON.stringify({ returnUrl }),
+  });
+}
+
+export async function confirmSamplePayment(sampleOrderId: string): Promise<Sample> {
+  const row = await serviceRequest<any>(`/api/sample-orders/${encodeURIComponent(sampleOrderId)}/pay`, {
+    method: 'POST', body: JSON.stringify({}),
+  });
+  return mapSampleOrder(row);
+}
+
+export async function getBulkWalletOptions(orderId: string): Promise<{ requiredCents: number; wallets: BulkWalletOption[] }> {
+  return serviceRequest<{ orderId: string; requiredCents: number; wallets: BulkWalletOption[] }>(
+    `/api/sample-orders/${encodeURIComponent(orderId)}/payment-options`,
+  );
+}
+
+export async function payBulkOrderFromWallet(orderId: string, walletId: string): Promise<ProductionOrder> {
+  const row = await serviceRequest<any>(`/api/sample-orders/${encodeURIComponent(orderId)}/pay-from-wallet`, {
+    method: 'POST', body: JSON.stringify({ walletId }),
+  });
+  return mapBulkOrder(row);
 }
 
 export async function updateSampleStatus(id: string, status: Sample['status']): Promise<Sample | undefined> {
@@ -879,13 +923,41 @@ export async function addSampleRevision(sampleId: string, rev: Omit<SampleRevisi
 // ─── Production Orders ────────────────────────────────────────────────────────
 
 export async function getProductionOrders(): Promise<ProductionOrder[]> {
-  await ensureInitialized();
-  return [..._productionOrders];
+  const rows = await serviceRequest<any[]>('/api/sample-orders');
+  if (!Array.isArray(rows)) throw new Error('Production orders response was invalid.');
+  return rows.filter(row => row.orderType === 'bulk').map(mapBulkOrder);
 }
 
 export async function getProductionOrder(id: string): Promise<ProductionOrder | undefined> {
-  await ensureInitialized();
-  return _productionOrders.find(p => p.id === id);
+  const row = await serviceRequest<any>(`/api/sample-orders/${encodeURIComponent(id)}`);
+  if (!row?.id || row.orderType !== 'bulk') return undefined;
+  return mapBulkOrder(row);
+}
+
+function mapBulkOrder(row: any): ProductionOrder {
+  const stageMap: Record<string, ProductionStageKey> = {
+    pending_payment: 'deposit_pending', payment_received: 'deposit_paid',
+    processing: 'materials_sourcing', cut_and_sew: 'sewing', packing: 'packaging',
+    shipped: 'shipped', delivered: 'delivered',
+  };
+  const currentStage = stageMap[row.status] ?? 'quote_accepted';
+  const currentIndex = PRODUCTION_STAGES.findIndex(stage => stage.key === currentStage);
+  return {
+    id: row.id, sellerId: row.sellerId, manufacturerId: row.manufacturerId,
+    quoteId: '', productName: row.title ?? '', status: row.status === 'delivered' ? 'completed' : row.status === 'pending_payment' ? 'pending' : 'active',
+    quantity: Number(row.quantity ?? 1), variants: {},
+    totalCostCents: Number(row.priceCents ?? 0), depositAmountCents: row.status === 'pending_payment' ? 0 : Number(row.priceCents ?? 0),
+    remainingBalanceCents: row.status === 'pending_payment' ? Number(row.priceCents ?? 0) : 0,
+    currentStage,
+    stages: PRODUCTION_STAGES.map((stage, index) => ({ ...stage, completedAt: index < currentIndex ? row.updatedAt : undefined })),
+    updates: [], qcChecklist: [], issues: [], payments: [], fileIds: [],
+    trackingNumber: row.trackingNumber ?? undefined, trackingCarrier: row.carrier ?? undefined,
+    deliveredDate: row.deliveredAt ?? undefined, notes: row.description ?? row.notes ?? undefined,
+    createdAt: row.createdAt, updatedAt: row.updatedAt,
+    estimatedCompletionDate: undefined,
+    threadId: row.threadId, manufacturerName: row.manufacturerName,
+    walletPaymentState: row.walletPaymentState ?? null,
+  } as ProductionOrder;
 }
 
 export async function createProductionOrder(data: {
@@ -1058,39 +1130,31 @@ export async function confirmDelivery(orderId: string): Promise<void> {
 // ─── Messaging ────────────────────────────────────────────────────────────────
 
 export async function getConversations(): Promise<ManufacturerConversation[]> {
-  await ensureInitialized();
-  return [..._conversations].sort((a, b) =>
-    (b.lastMessageAt ?? '').localeCompare(a.lastMessageAt ?? '')
-  );
+  const rows = await serviceRequest<ManufacturerThread[]>('/api/manufacturers/threads');
+  return rows.map(row => ({
+    id: row.id, sellerId: '', manufacturerId: row.manufacturerId,
+    manufacturerName: row.manufacturerName, contextLabel: row.subject,
+    lastMessage: row.lastMessage ?? undefined, lastMessageAt: row.lastMessageAt,
+    unreadCount: row.unreadCount, messages: [], createdAt: row.createdAt,
+    updatedAt: row.lastMessageAt,
+  }));
 }
 
 export async function getOrCreateConversation(manufacturerId: string, opts?: {
   productId?: string; quoteId?: string; sampleId?: string; productionId?: string; contextLabel?: string;
 }): Promise<ManufacturerConversation> {
-  await ensureInitialized();
-  const mfg = _manufacturers.find(m => m.id === manufacturerId);
-  let conv = _conversations.find(c => c.manufacturerId === manufacturerId &&
-    c.quoteId === opts?.quoteId && c.productionId === opts?.productionId);
-  if (!conv) {
-    conv = {
-      id: 'conv_' + uid(),
-      sellerId: 'seller_001',
-      manufacturerId,
-      manufacturerName: mfg?.name ?? 'Manufacturer',
-      productId: opts?.productId,
-      quoteId: opts?.quoteId,
-      sampleId: opts?.sampleId,
-      productionId: opts?.productionId,
-      contextLabel: opts?.contextLabel ?? 'General',
-      unreadCount: 0,
-      messages: [],
-      createdAt: now(),
-      updatedAt: now(),
-    };
-    _conversations.push(conv);
-    await persistAll();
-  }
-  return conv;
+  const row = await serviceRequest<any>('/api/manufacturers/threads', {
+    method: 'POST',
+    body: JSON.stringify({ manufacturerId, subject: opts?.contextLabel ?? 'General' }),
+  });
+  return {
+    id: row.id, sellerId: row.buyerClerkId ?? '', manufacturerId,
+    manufacturerName: row.manufacturerName ?? 'Manufacturer',
+    contextLabel: row.subject ?? opts?.contextLabel ?? 'General',
+    unreadCount: row.sellerUnreadCount ?? 0, messages: [],
+    lastMessage: row.lastMessage, lastMessageAt: row.lastMessageAt,
+    createdAt: row.createdAt, updatedAt: row.lastMessageAt,
+  };
 }
 
 export async function sendMessage(conversationId: string, data: {

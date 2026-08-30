@@ -155,6 +155,29 @@ paths:
               schema:
                 $ref: "#/components/schemas/Message"
 
+  /manufacturers/me/threads/{threadId}/attachments:
+    post:
+      operationId: uploadManufacturerThreadAttachment
+      tags: [manufacturers]
+      summary: Upload an image or PDF for an authorized manufacturer thread
+      parameters:
+        - { name: threadId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          image/*: { schema: { type: string, format: binary } }
+          application/pdf: { schema: { type: string, format: binary } }
+      responses:
+        "201":
+          description: Private attachment stored
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [objectPath]
+                properties:
+                  objectPath: { type: string }
+
   # ── Sample / Production Orders ────────────────────────────────────────────────
 
   /manufacturers/me/orders:
@@ -196,6 +219,115 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ManufacturerOrder"
+
+  /manufacturers/me/sample-orders:
+    get:
+      operationId: listManufacturerSampleOrders
+      tags: [manufacturers]
+      responses:
+        "200":
+          description: Shared sample and bulk orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/SampleOrder" }
+
+  /manufacturers/me/sample-orders/{orderId}:
+    get:
+      operationId: getManufacturerSampleOrder
+      tags: [manufacturers]
+      parameters:
+        - { name: orderId, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Shared order detail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SampleOrder" }
+
+  /manufacturers/me/sample-orders/{orderId}/status:
+    patch:
+      operationId: advanceManufacturerSampleOrder
+      tags: [manufacturers]
+      parameters:
+        - { name: orderId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ManufacturerSampleOrderStatusUpdate" }
+      responses:
+        "200":
+          description: Updated shared order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SampleOrder" }
+
+  /sample-orders/{id}/pay:
+    post:
+      operationId: confirmSampleOrderPayment
+      tags: [manufacturers]
+      summary: Confirm a seller-owned sample order's succeeded Stripe payment
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Confirmed payment and activated order
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SampleOrder" }
+        "409":
+          description: Payment has not succeeded or no Stripe payment exists
+
+  /sample-orders/{id}/checkout-session:
+    post:
+      operationId: createSampleOrderCheckoutSession
+      tags: [manufacturers]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SampleCheckoutSessionInput" }
+      responses:
+        "201":
+          description: Reusable hosted Checkout session
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SampleCheckoutSession" }
+
+  /sample-orders/{id}/payment-options:
+    get:
+      operationId: getBulkOrderPaymentOptions
+      tags: [manufacturers]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Eligible seller drop wallets for pending bulk payment
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkPaymentOptions" }
+
+  /sample-orders/{id}/pay-from-wallet:
+    post:
+      operationId: payBulkOrderFromWallet
+      tags: [manufacturers]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BulkWalletPaymentInput" }
+      responses:
+        "200":
+          description: Wallet payment reconciled
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SampleOrder" }
 
   # ── Payment setup ─────────────────────────────────────────────────────────────
 
@@ -311,17 +443,27 @@ components:
 
     ManufacturerDashboard:
       type: object
-      required: [activeOrders, pendingMessages, completedOrders, totalRevenueCents, pendingPayoutCents]
+      required: [activeOrders, pendingMessages, completedOrders, totalRevenueCents, recentOrders, activeSellers, messages, sampleOrders, bulkOrders, orderHistory]
       properties:
         activeOrders:        { type: integer }
         pendingMessages:     { type: integer }
         completedOrders:     { type: integer }
         totalRevenueCents:   { type: integer }
-        pendingPayoutCents:  { type: integer }
         recentOrders:
           type: array
           items:
-            $ref: "#/components/schemas/ManufacturerOrder"
+            $ref: "#/components/schemas/SampleOrder"
+        activeSellers:
+          type: array
+          items: { type: object, additionalProperties: true }
+        messages:
+          type: array
+          items: { $ref: "#/components/schemas/MessageThread" }
+        sampleOrders: { $ref: "#/components/schemas/OrderBuckets" }
+        bulkOrders: { $ref: "#/components/schemas/OrderBuckets" }
+        orderHistory:
+          type: array
+          items: { $ref: "#/components/schemas/SampleOrder" }
 
     # ── Messages ──────────────────────────────────────────────────────────────────
 
@@ -350,9 +492,13 @@ components:
 
     MessageInput:
       type: object
-      required: [content]
       properties:
         content: { type: string }
+        messageType: { type: string, enum: [text, image, sample_card, bulk_card, system] }
+        mediaUrls:
+          type: array
+          items: { type: string }
+        cardData: { type: ["object", "null"], additionalProperties: true }
 
     # ── Orders ────────────────────────────────────────────────────────────────────
 
@@ -373,6 +519,81 @@ components:
         trackingNumber: { type: ["string", "null"] }
         createdAt:    { type: string }
         updatedAt:    { type: string }
+
+    SampleOrder:
+      type: object
+      additionalProperties: true
+      required: [id, manufacturerId, sellerId, orderType, title, quantity, priceCents, status, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        manufacturerId: { type: string }
+        sellerId: { type: string }
+        threadId: { type: ["string", "null"] }
+        orderType: { type: string, enum: [sample, bulk] }
+        title: { type: string }
+        quantity: { type: integer }
+        priceCents: { type: integer }
+        status: { type: string }
+        imageUrls:
+          type: array
+          description: Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.
+          items: { type: string, format: uri }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+
+    OrderBuckets:
+      type: object
+      required: [active, completed]
+      properties:
+        active:
+          type: array
+          items: { $ref: "#/components/schemas/SampleOrder" }
+        completed:
+          type: array
+          items: { $ref: "#/components/schemas/SampleOrder" }
+
+    ManufacturerSampleOrderStatusUpdate:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [processing, cut_and_sew, packing, shipped, delivered] }
+        trackingNumber: { type: string }
+        carrier: { type: string }
+
+    SampleCheckoutSession:
+      type: object
+      required: [sessionId, paymentStatus]
+      properties:
+        sessionId: { type: string }
+        url: { type: ["string", "null"] }
+        paymentStatus: { type: string }
+
+    SampleCheckoutSessionInput:
+      type: object
+      required: [returnUrl]
+      properties: { returnUrl: { type: string } }
+
+    BulkWalletPaymentInput:
+      type: object
+      required: [walletId]
+      properties: { walletId: { type: string } }
+
+    BulkPaymentOptions:
+      type: object
+      required: [orderId, requiredCents, wallets]
+      properties:
+        orderId: { type: string }
+        requiredCents: { type: integer }
+        wallets:
+          type: array
+          items:
+            type: object
+            required: [id, dropId, availableCents, eligible]
+            properties:
+              id: { type: string }
+              dropId: { type: string }
+              availableCents: { type: integer }
+              eligible: { type: boolean }
 
     OrderStatusUpdate:
       type: object

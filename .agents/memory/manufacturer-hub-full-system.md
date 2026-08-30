@@ -1,59 +1,44 @@
 ---
 name: Manufacturer Hub Full System
-description: Complete real-backend implementation of the manufacturer hub — public directory, invite tokens, Stripe Connect payouts, sample/bulk 6-stage orders, drop wallet, and real-time messaging.
+description: Durable safety and ownership rules for shared manufacturer conversations, orders, private media, notifications, and wallet-backed payments.
 ---
 
-## What was built (migration 017)
+## Shared-record rule
 
-### DB changes
-- `manufacturers.clerk_id` made nullable (public applications have no Clerk account)
-- New columns on `manufacturers`: `years_in_business`, `is_public_directory`, `contact_email`, `city`, `stripe_account_id`, `stripe_account_status`
-- New table `manufacturer_invite_tokens`: seller creates private onboarding links
-- New table `sample_orders`: 6-stage tracker (`payment_received → processing → cut_and_sew → packing → shipped → delivered`), Stripe PaymentIntent, payout tracking
-- New table `drop_wallets`: per-drop, per-seller held funds ledger
-- New table `drop_wallet_transactions`: immutable ledger for deposits/releases/payments
-- `manufacturer_messages` extended: `message_type`, `media_urls`, `card_data` columns
+A seller/manufacturer pair has one canonical thread, and both participants read and write the same thread, messages, order cards, sample orders, and bulk orders. Participant unread state is independent.
 
-### API routes
-- `GET|POST /api/manufacturers/public` — public directory (no auth required)
-- `POST /api/manufacturers/public/apply` — public application (clerkId nullable)
-- `GET /api/manufacturers/public/:id` — single public profile
-- `POST /api/manufacturers/connect/onboard` — Stripe Connect Express for manufacturer payouts
-- `GET  /api/manufacturers/connect/status` — Connect account status
-- `POST /api/manufacturers/invite-tokens` — seller creates private invite
-- `GET  /api/manufacturers/invite-tokens` — seller lists their tokens
-- `GET  /api/manufacturers/invite-tokens/resolve/:token` — no auth, for onboard form
-- `POST /api/manufacturers/register-via-invite/:token` — register through private invite (requires Clerk auth)
-- `GET|POST /api/manufacturers/threads` — list / create threads (seller-side)
-- `GET|POST /api/manufacturers/threads/:threadId/messages` — real DB messaging
-- `GET|POST /api/sample-orders` — create/list 6-stage orders
-- `GET /api/sample-orders/:id` — order detail with stage index
-- `PATCH /api/sample-orders/:id/advance` — advance production stage
-- `PATCH /api/sample-orders/:id/tracking` — add tracking + trigger payout to manufacturer
-- `POST /api/sample-orders/:id/pay-from-wallet` — pay bulk order from drop wallet
-- `GET|POST /api/drop-wallets/:dropId` — create/get wallet
-- `POST /api/drop-wallets/:dropId/deposit` — record buyer order payment
-- `POST /api/drop-wallets/:dropId/release-order/:orderId` — per-order payout (Stripe payout to seller bank)
-- `POST /api/drop-wallets/:dropId/pay-shipping/:orderId` — deduct label cost from wallet
+**Why:** Duplicated or role-specific records drift, split history, and let one participant's read action clear the other participant's badge.
 
-### Mobile changes
-- `lib/api.ts`: added `manufacturers` group with all sub-groups (public, inviteTokens, registerViaInvite, threads, connect, sampleOrders, dropWallets); fixed pre-existing duplicate `products`/`buyer` keys
-- `manufacturerService.ts`: `searchManufacturers` now calls `/api/manufacturers/public`; `createInvitation` now calls `POST /api/manufacturers/invite-tokens`; both fall back to demo on error
-- `manufacturer-onboard.tsx`: submit calls real API (`public/apply` or `register-via-invite/:token` if `?token=` param present)
-- `manufacturer-messages.tsx`: full rewrite — real API (threadId param), demo fallback (conversationId param), photo sharing, sample_card/bulk_card message dialogs, calling button (graceful Alert for EAS requirement)
+**How to apply:** Enforce pair uniqueness in the database, authorize every operation against either participant, and place the read boundary before fetching so later sends cannot be erased.
 
-## Architecture rules
-- Public apply → `is_public_directory = true`, `clerk_id = NULL`, `status = 'active'` immediately live
-- Private invite → `is_public_directory = false`, requires Clerk auth; marks invite token as `used_at`
-- Sample order payments: Stripe PaymentIntent with `application_fee_amount` + `transfer_data.destination` (manufacturer Connect account)
-- Payout release: triggered when tracking number added → `stripe.transfers.create` → seller's `stripe_account_id`
-- Drop wallet: DB ledger tracks balance; `drop_wallet_transactions` is immutable; `balance - released - reserved = available`
-- Pre-order drops with wallets: seller Connect account set to manual payouts so Stripe holds funds
-- Video/voice calling: implemented as graceful UI (button in header + attach menu), requires EAS native build with `react-native-agora`
+## Private attachment rule
 
-## Key gotchas
-- `clerk_id` is now nullable — queries filtering by `clerkId` must handle NULL (use `eq(manufacturers.clerkId, userId)` which already handles this correctly in Postgres)
-- The `drop-wallet.ts` route uses `orders.dropId`, `orders.ownerId`, `orders.subtotalCents`, `orders.trackingNumber` — all exist in schema/index.ts
-- `requireAuth` sets `(req as any).clerkUserId` — all routes that need seller ID use this
-- Messages screen accepts either `threadId` (real API) or `conversationId` (demo AsyncStorage) — auto-resolves, falls back gracefully
-- `api.ts` `preorder` key was renamed from the duplicate `buyer` block to avoid TS duplicate property error
+A private object path is not authorization. Every thread upload must be bound server-side to its thread and uploader before it can be referenced, and signed display URLs are issued only after thread authorization.
+
+**Why:** Signing arbitrary client-supplied object paths would let a participant expose any private object path they learn.
+
+**How to apply:** Validate bytes, persist the upload binding, require an unconsumed binding from the current sender when creating a message, store only private paths, and return short-lived signed URLs.
+
+## Production ownership rule
+
+Manufacturers advance production stages and add shipment tracking. Sellers can review samples and observe live status, but cannot advance production or trigger shipment-linked money movement.
+
+**Why:** Shared visibility must not imply shared authority over manufacturing state or payouts.
+
+**How to apply:** Make status transitions conditional on the exact current stage and authenticated manufacturer; make seller decisions separate explicit transitions.
+
+## Payment recovery rule
+
+Any wallet-backed external transfer must be claimed and reserved transactionally before calling Stripe, use a persisted deterministic idempotency key, and support reconciliation from an in-progress state.
+
+**Why:** A failure after Stripe succeeds can otherwise duplicate a transfer on retry or strand reserved funds forever.
+
+**How to apply:** Persist attempt identity before the external call, classify ambiguous failures as reconcilable, compensate only definitive rejection, and atomically finalize the order and immutable ledger.
+
+## Notification context rule
+
+Manufacturer-thread, sample-order, and bulk-order notifications retain distinct target types and participant-specific destinations.
+
+**Why:** A generic order target can open the wrong tracker even when the notification recipient is correct.
+
+**How to apply:** Samples deep-link to sample review/tracking, bulk orders to production tracking, and thread messages to the canonical shared conversation.

@@ -408,6 +408,18 @@ function RootLayoutNav() {
       }
       if (data?.targetType === 'order' && typeof data.targetId === 'string' && data.targetId) {
         router.push(`/order-detail?id=${encodeURIComponent(data.targetId)}` as never);
+        return;
+      }
+      if (data?.targetType === 'manufacturer_thread' && typeof data.targetId === 'string' && data.targetId) {
+        router.push(`/manufacturer-messages?threadId=${encodeURIComponent(data.targetId)}` as never);
+        return;
+      }
+      if (data?.targetType === 'sample_order' && typeof data.targetId === 'string' && data.targetId) {
+        router.push(`/sample-detail?id=${encodeURIComponent(data.targetId)}` as never);
+        return;
+      }
+      if (data?.targetType === 'bulk_order' && typeof data.targetId === 'string' && data.targetId) {
+        router.push(`/production-detail?id=${encodeURIComponent(data.targetId)}` as never);
       }
     };
 

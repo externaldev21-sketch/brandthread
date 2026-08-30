@@ -125,7 +125,7 @@ export default function ManufacturerProfileScreen() {
     if (!id) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const conv = await getOrCreateConversation(id, { contextLabel: 'General' });
-    router.push(('/manufacturer-messages?conversationId=' + conv.id) as never);
+    router.push(('/manufacturer-messages?threadId=' + conv.id) as never);
   }
 
   function handleQuote() {

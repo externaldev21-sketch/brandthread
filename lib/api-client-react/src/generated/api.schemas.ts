@@ -72,6 +72,97 @@ export interface ManufacturerUpdate {
   contactPhone?: string;
 }
 
+export type ManufacturerDashboardActiveSellersItem = { [key: string]: unknown };
+
+export type SampleOrderOrderType = typeof SampleOrderOrderType[keyof typeof SampleOrderOrderType];
+
+
+export const SampleOrderOrderType = {
+  sample: 'sample',
+  bulk: 'bulk',
+} as const;
+
+export interface SampleOrder {
+  id: string;
+  manufacturerId: string;
+  sellerId: string;
+  /** @nullable */
+  threadId?: string | null;
+  orderType: SampleOrderOrderType;
+  title: string;
+  quantity: number;
+  priceCents: number;
+  status: string;
+  /** Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints. */
+  imageUrls?: string[];
+  createdAt: string;
+  updatedAt: string;
+  [key: string]: unknown;
+ }
+
+export interface MessageThread {
+  id: string;
+  buyerName: string;
+  /** @nullable */
+  buyerAvatar?: string | null;
+  subject: string;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount: number;
+  /** @nullable */
+  orderStatus: string | null;
+}
+
+export interface OrderBuckets {
+  active: SampleOrder[];
+  completed: SampleOrder[];
+}
+
+export interface ManufacturerDashboard {
+  activeOrders: number;
+  pendingMessages: number;
+  completedOrders: number;
+  totalRevenueCents: number;
+  recentOrders: SampleOrder[];
+  activeSellers: ManufacturerDashboardActiveSellersItem[];
+  messages: MessageThread[];
+  sampleOrders: OrderBuckets;
+  bulkOrders: OrderBuckets;
+  orderHistory: SampleOrder[];
+}
+
+export interface Message {
+  id: string;
+  threadId: string;
+  senderRole: string;
+  content: string;
+  sentAt: string;
+}
+
+export type MessageInputMessageType = typeof MessageInputMessageType[keyof typeof MessageInputMessageType];
+
+
+export const MessageInputMessageType = {
+  text: 'text',
+  image: 'image',
+  sample_card: 'sample_card',
+  bulk_card: 'bulk_card',
+  system: 'system',
+} as const;
+
+/**
+ * @nullable
+ */
+export type MessageInputCardData = { [key: string]: unknown } | null;
+
+export interface MessageInput {
+  content?: string;
+  messageType?: MessageInputMessageType;
+  mediaUrls?: string[];
+  /** @nullable */
+  cardData?: MessageInputCardData;
+}
+
 export interface ManufacturerOrder {
   id: string;
   orderNumber: string;
@@ -92,38 +183,49 @@ export interface ManufacturerOrder {
   updatedAt?: string;
 }
 
-export interface ManufacturerDashboard {
-  activeOrders: number;
-  pendingMessages: number;
-  completedOrders: number;
-  totalRevenueCents: number;
-  pendingPayoutCents: number;
-  recentOrders?: ManufacturerOrder[];
+export type ManufacturerSampleOrderStatusUpdateStatus = typeof ManufacturerSampleOrderStatusUpdateStatus[keyof typeof ManufacturerSampleOrderStatusUpdateStatus];
+
+
+export const ManufacturerSampleOrderStatusUpdateStatus = {
+  processing: 'processing',
+  cut_and_sew: 'cut_and_sew',
+  packing: 'packing',
+  shipped: 'shipped',
+  delivered: 'delivered',
+} as const;
+
+export interface ManufacturerSampleOrderStatusUpdate {
+  status: ManufacturerSampleOrderStatusUpdateStatus;
+  trackingNumber?: string;
+  carrier?: string;
 }
 
-export interface MessageThread {
-  id: string;
-  buyerName: string;
+export interface SampleCheckoutSession {
+  sessionId: string;
   /** @nullable */
-  buyerAvatar?: string | null;
-  subject: string;
-  lastMessage: string;
-  lastMessageAt: string;
-  unreadCount: number;
-  /** @nullable */
-  orderStatus: string | null;
+  url?: string | null;
+  paymentStatus: string;
 }
 
-export interface Message {
+export interface SampleCheckoutSessionInput {
+  returnUrl: string;
+}
+
+export interface BulkWalletPaymentInput {
+  walletId: string;
+}
+
+export type BulkPaymentOptionsWalletsItem = {
   id: string;
-  threadId: string;
-  senderRole: string;
-  content: string;
-  sentAt: string;
-}
+  dropId: string;
+  availableCents: number;
+  eligible: boolean;
+};
 
-export interface MessageInput {
-  content: string;
+export interface BulkPaymentOptions {
+  orderId: string;
+  requiredCents: number;
+  wallets: BulkPaymentOptionsWalletsItem[];
 }
 
 export interface OrderStatusUpdate {
@@ -155,4 +257,8 @@ export interface ManufacturerPaymentInput {
   paypalEmail?: string;
   wiseEmail?: string;
 }
+
+export type UploadManufacturerThreadAttachment201 = {
+  objectPath: string;
+};
 

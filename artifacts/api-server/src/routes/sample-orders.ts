@@ -24,6 +24,8 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { requireStripe, PLATFORM_COMMISSION_RATE, computeApplicationFeeCents } from "../lib/stripe";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
+import { publishNotification } from "./notifications-feed";
+import { getWebOrigin } from "../lib/webOrigin";
 
 const router = Router();
 router.use(requireAuth);
@@ -84,6 +86,34 @@ const ORDER_STAGES = [
   "delivered",
 ] as const;
 
+function orderNotificationContext(order: Pick<typeof sampleOrders.$inferSelect, "id" | "orderType">) {
+  const isBulk = order.orderType === "bulk";
+  return {
+    targetType: isBulk ? "bulk_order" : "sample_order",
+    sellerCta: isBulk ? `/bulk-orders/${order.id}` : `/sample-orders/${order.id}`,
+    manufacturerCta: `/manufacturers/orders/${order.id}`,
+  };
+}
+
+export function isDefinitiveTransferRejection(error: unknown) {
+  const statusCode = (error as { statusCode?: number } | null)?.statusCode;
+  return statusCode != null && statusCode >= 400 && statusCode < 500
+    && statusCode !== 409 && statusCode !== 429;
+}
+
+function isAllowedCheckoutReturnUrl(value: unknown): value is string {
+  if (typeof value !== "string" || !value) return false;
+  if (value.startsWith("brandthread://")) return true;
+  try {
+    const url = new URL(value);
+    const webOrigin = new URL(getWebOrigin()).origin;
+    return url.origin === webOrigin
+      || (process.env.NODE_ENV !== "production" && url.hostname === "localhost");
+  } catch {
+    return false;
+  }
+}
+
 // ── GET /api/sample-orders ────────────────────────────────────────────────────
 
 router.get("/", async (req, res) => {
@@ -120,44 +150,36 @@ router.get("/", async (req, res) => {
 
 router.post("/", async (req, res) => {
   try {
-    const stripe = requireStripe();
     const sellerId = (req as any).clerkUserId as string;
     const { manufacturerId, threadId, orderType = "sample", title, description, quantity = 1, priceCents, notes } = req.body;
 
-    if (!manufacturerId || !title || typeof priceCents !== "number" || priceCents <= 0) {
-      res.status(400).json({ error: "manufacturerId, title, priceCents required" }); return;
+    if (!manufacturerId || !title || !Number.isSafeInteger(priceCents) || priceCents <= 0
+      || !Number.isSafeInteger(quantity) || quantity <= 0) {
+      res.status(400).json({ error: "manufacturerId, title, and positive integer quantity and priceCents are required" }); return;
     }
 
     const [mfr] = await db
-      .select({ stripeAccountId: manufacturers.stripeAccountId })
+      .select({
+        stripeAccountId: manufacturers.stripeAccountId,
+        clerkId: manufacturers.clerkId,
+        businessName: manufacturers.businessName,
+      })
       .from(manufacturers)
       .where(eq(manufacturers.id, manufacturerId))
       .limit(1);
 
     if (!mfr) { res.status(404).json({ error: "Manufacturer not found" }); return; }
-
-    const platformFeeCents = computeApplicationFeeCents(priceCents);
-    let stripePaymentIntentId: string | null = null;
-    let clientSecret: string | null = null;
-
-    if (mfr.stripeAccountId) {
-      // Create payment intent with manufacturer as destination
-      const intent = await stripe.paymentIntents.create({
-        amount:                priceCents,
-        currency:              "usd",
-        application_fee_amount: platformFeeCents,
-        transfer_data:         { destination: mfr.stripeAccountId },
-        metadata: {
-          orderType,
-          sellerId,
-          manufacturerId,
-          title,
-        },
-      });
-      stripePaymentIntentId = intent.id;
-      clientSecret          = intent.client_secret;
+    if (threadId != null) {
+      const [thread] = await db.select({ id: manufacturerThreads.id }).from(manufacturerThreads)
+        .where(and(
+          eq(manufacturerThreads.id, threadId),
+          eq(manufacturerThreads.manufacturerId, manufacturerId),
+          eq(manufacturerThreads.buyerClerkId, sellerId),
+        )).limit(1);
+      if (!thread) { res.status(403).json({ error: "threadId is not an authorized thread for this manufacturer" }); return; }
     }
 
+    const platformFeeCents = computeApplicationFeeCents(priceCents);
     const [order] = await db
       .insert(sampleOrders)
       .values({
@@ -170,15 +192,29 @@ router.post("/", async (req, res) => {
         quantity,
         priceCents,
         platformFeeCents,
-        stripePaymentIntentId,
+        stripePaymentIntentId: null,
         notes: notes ?? null,
-        status: stripePaymentIntentId ? "payment_received" : "payment_received",
+        status: "pending_payment",
       })
       .returning();
 
+    if (mfr.clerkId) {
+      const notificationContext = orderNotificationContext(order);
+      await publishNotification({
+        userId: mfr.clerkId,
+        category: "production",
+        type: "manufacturer_sample_request",
+        title: `New ${orderType} request`,
+        body: title,
+        actorName: (req as any).clerkUserName ?? "Seller",
+        targetId: order.id,
+        targetType: notificationContext.targetType,
+        cta: notificationContext.manufacturerCta,
+      }).catch((error) => req.log.error({ err: error, orderId: order.id }, "Sample request notification failed"));
+    }
+
     res.status(201).json({
       ...order,
-      clientSecret,
       hasConnect:  !!mfr.stripeAccountId,
       createdAt:   order.createdAt.toISOString(),
       updatedAt:   order.updatedAt.toISOString(),
@@ -186,6 +222,159 @@ router.post("/", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to create sample order");
     res.status(500).json({ error: "Failed to create order" });
+  }
+});
+
+// Creates the single card-charge path for samples. The Checkout Session is
+// deterministic per order so retries/concurrent presses reuse Stripe's session.
+router.post("/:id/checkout-session", async (req, res) => {
+  try {
+    const sellerId = (req as any).clerkUserId as string;
+    const { returnUrl } = req.body ?? {};
+    if (!isAllowedCheckoutReturnUrl(returnUrl)) {
+      res.status(400).json({ error: "returnUrl must be an allowed Brandthread app or web URL" }); return;
+    }
+    const [row] = await db.select({ order: sampleOrders, stripeAccountId: manufacturers.stripeAccountId })
+      .from(sampleOrders).leftJoin(manufacturers, eq(sampleOrders.manufacturerId, manufacturers.id))
+      .where(and(eq(sampleOrders.id, req.params.id), eq(sampleOrders.sellerId, sellerId))).limit(1);
+    if (!row) { res.status(404).json({ error: "Order not found" }); return; }
+    if (row.order.orderType !== "sample" || row.order.status !== "pending_payment") {
+      res.status(409).json({ error: "Order is not awaiting sample payment" }); return;
+    }
+    if (!row.stripeAccountId) { res.status(409).json({ error: "Manufacturer cannot receive card payment" }); return; }
+    const stripe = requireStripe();
+    let checkoutSessionVersion = row.order.checkoutSessionVersion;
+    if (row.order.stripeCheckoutSessionId) {
+      const session = await stripe.checkout.sessions.retrieve(row.order.stripeCheckoutSessionId);
+      // A paid/complete session must never be replaced; confirmation owns the
+      // order transition. An open session is safely reusable.
+      if (session.payment_status === "paid" || session.status === "complete" || session.status === "open") {
+        res.json({ sessionId: session.id, url: session.url, paymentStatus: session.payment_status }); return;
+      }
+      // Expired/unpaid sessions are atomically detached. The incremented
+      // version makes replacement idempotency distinct from the expired call.
+      const [rotated] = await db.update(sampleOrders).set({
+        stripeCheckoutSessionId: null,
+        checkoutSessionVersion: sql`${sampleOrders.checkoutSessionVersion} + 1`,
+        updatedAt: new Date(),
+      }).where(and(
+        eq(sampleOrders.id, row.order.id),
+        eq(sampleOrders.status, "pending_payment"),
+        eq(sampleOrders.stripeCheckoutSessionId, row.order.stripeCheckoutSessionId),
+      )).returning({ checkoutSessionVersion: sampleOrders.checkoutSessionVersion });
+      if (rotated) {
+        checkoutSessionVersion = rotated.checkoutSessionVersion;
+      } else {
+        // Another request rotated/persisted a replacement. Re-read it rather
+        // than returning the old expired session.
+        const [current] = await db.select({
+          stripeCheckoutSessionId: sampleOrders.stripeCheckoutSessionId,
+          checkoutSessionVersion: sampleOrders.checkoutSessionVersion,
+        }).from(sampleOrders).where(eq(sampleOrders.id, row.order.id)).limit(1);
+        if (current?.stripeCheckoutSessionId) {
+          const replacement = await stripe.checkout.sessions.retrieve(current.stripeCheckoutSessionId);
+          res.json({ sessionId: replacement.id, url: replacement.url, paymentStatus: replacement.payment_status }); return;
+        }
+        checkoutSessionVersion = current?.checkoutSessionVersion ?? checkoutSessionVersion;
+      }
+    }
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      payment_method_types: ["card"],
+      line_items: [{
+        quantity: 1,
+        price_data: {
+          currency: "usd", unit_amount: row.order.priceCents,
+          product_data: { name: row.order.title, description: row.order.description ?? undefined },
+        },
+      }],
+      success_url: returnUrl.includes("?") ? `${returnUrl}&checkout_session_id={CHECKOUT_SESSION_ID}` : `${returnUrl}?checkout_session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: returnUrl,
+      payment_intent_data: {
+        application_fee_amount: row.order.platformFeeCents,
+        transfer_data: { destination: row.stripeAccountId },
+        metadata: { sampleOrderId: row.order.id, sellerId, manufacturerId: row.order.manufacturerId },
+      },
+      metadata: { sampleOrderId: row.order.id, sellerId },
+    }, { idempotencyKey: `sample-order-checkout/${row.order.id}/v${checkoutSessionVersion}` });
+    const [persisted] = await db.update(sampleOrders).set({
+      stripeCheckoutSessionId: session.id, updatedAt: new Date(),
+    }).where(and(
+      eq(sampleOrders.id, row.order.id),
+      eq(sampleOrders.status, "pending_payment"),
+      sql`${sampleOrders.stripeCheckoutSessionId} IS NULL`,
+      eq(sampleOrders.checkoutSessionVersion, checkoutSessionVersion),
+    ))
+      .returning({ stripeCheckoutSessionId: sampleOrders.stripeCheckoutSessionId });
+    if (persisted) {
+      res.status(201).json({ sessionId: persisted.stripeCheckoutSessionId, url: session.url, paymentStatus: session.payment_status }); return;
+    }
+    const [current] = await db.select({ stripeCheckoutSessionId: sampleOrders.stripeCheckoutSessionId })
+      .from(sampleOrders).where(eq(sampleOrders.id, row.order.id)).limit(1);
+    if (current?.stripeCheckoutSessionId) {
+      const replacement = await stripe.checkout.sessions.retrieve(current.stripeCheckoutSessionId);
+      res.json({ sessionId: replacement.id, url: replacement.url, paymentStatus: replacement.payment_status }); return;
+    }
+    res.status(409).json({ error: "Checkout session changed; retry" });
+  } catch (err) {
+    req.log.error({ err, orderId: req.params.id }, "Failed to create sample Checkout Session");
+    res.status(500).json({ error: "Failed to create checkout session" });
+  }
+});
+
+// Confirms that Stripe actually collected the seller payment. This endpoint is
+// idempotent: a notification is emitted only when transitioning into paid state.
+router.post("/:id/pay", async (req, res) => {
+  try {
+    const stripe = requireStripe();
+    const sellerId = (req as any).clerkUserId as string;
+    const [row] = await db.select({
+      order: sampleOrders,
+      mfrClerkId: manufacturers.clerkId,
+      mfrName: manufacturers.businessName,
+    }).from(sampleOrders)
+      .leftJoin(manufacturers, eq(sampleOrders.manufacturerId, manufacturers.id))
+      .where(and(eq(sampleOrders.id, req.params.id), eq(sampleOrders.sellerId, sellerId)))
+      .limit(1);
+    if (!row) { res.status(404).json({ error: "Order not found" }); return; }
+    let paymentStatus: string;
+    if (row.order.stripeCheckoutSessionId) {
+      const session = await stripe.checkout.sessions.retrieve(row.order.stripeCheckoutSessionId);
+      paymentStatus = session.payment_status;
+      if (paymentStatus !== "paid") {
+        res.status(409).json({ error: "Payment has not succeeded", paymentStatus }); return;
+      }
+    } else if (row.order.stripePaymentIntentId) {
+      const intent = await stripe.paymentIntents.retrieve(row.order.stripePaymentIntentId);
+      paymentStatus = intent.status;
+      if (paymentStatus !== "succeeded") {
+        res.status(409).json({ error: "Payment has not succeeded", paymentStatus }); return;
+      }
+    } else {
+      res.status(409).json({ error: "Order has no payment session to confirm" }); return;
+    }
+    const [updated] = await db.update(sampleOrders)
+      .set({ status: "payment_received", updatedAt: new Date() })
+      .where(and(
+        eq(sampleOrders.id, row.order.id),
+        eq(sampleOrders.status, "pending_payment"),
+      )).returning();
+    if (!updated) {
+      res.status(409).json({ error: "Order is no longer awaiting payment" }); return;
+    }
+    if (row.mfrClerkId) {
+      const notificationContext = orderNotificationContext(row.order);
+      await publishNotification({
+        userId: row.mfrClerkId, category: "production", type: "manufacturer_payment_received",
+        title: "Payment received", body: `${row.order.title} is ready for production.`,
+        targetId: row.order.id, targetType: notificationContext.targetType,
+        cta: notificationContext.manufacturerCta,
+      }).catch((error) => req.log.error({ err: error, orderId: row.order.id }, "Payment notification failed"));
+    }
+    res.json({ ...updated, paymentStatus, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() });
+  } catch (err) {
+    req.log.error({ err, orderId: req.params.id }, "Failed to confirm sample order payment");
+    res.status(500).json({ error: "Failed to confirm payment" });
   }
 });
 
@@ -274,6 +463,24 @@ router.patch("/:id/sample-detail", async (req, res) => {
       })
       .where(eq(sampleOrders.id, req.params.id))
       .returning();
+    const [recipient] = await db.select({
+      clerkId: manufacturers.clerkId,
+    }).from(manufacturers)
+      .where(eq(manufacturers.id, auth.order!.manufacturerId))
+      .limit(1);
+    if (recipient?.clerkId) {
+      const notificationContext = orderNotificationContext(auth.order!);
+      await publishNotification({
+        userId: recipient.clerkId,
+        category: "production",
+        type: "manufacturer_order_status",
+        title: `${auth.order!.title}: ${expectedStatus.replaceAll("_", " ")}`,
+        body: "The seller submitted a sample decision.",
+        targetId: auth.order!.id,
+        targetType: notificationContext.targetType,
+        cta: notificationContext.manufacturerCta,
+      }).catch((error) => req.log.error({ err: error, orderId: auth.order!.id }, "Sample decision notification failed"));
+    }
     res.json({ ...updated, createdAt: updated.createdAt.toISOString(), updatedAt: updated.updatedAt.toISOString() });
   } catch (err) {
     req.log.error({ err, orderId: req.params.id }, "Failed to update sample order detail");
@@ -297,10 +504,8 @@ router.patch("/:id/advance", async (req, res) => {
 
     if (!row) { res.status(404).json({ error: "Not found" }); return; }
 
-    // Allow seller (for demo) or the manufacturer themselves
-    const isSeller        = row.order.sellerId === clerkUserId;
     const isManufacturer  = row.mfrClerkId === clerkUserId;
-    if (!isSeller && !isManufacturer) {
+    if (!isManufacturer) {
       res.status(403).json({ error: "Forbidden" }); return;
     }
 
@@ -311,16 +516,37 @@ router.patch("/:id/advance", async (req, res) => {
     }
 
     const nextStage = ORDER_STAGES[idx + 1];
+    if (nextStage === "shipped" && (
+      typeof req.body?.trackingNumber !== "string" || !req.body.trackingNumber.trim()
+      || typeof req.body?.carrier !== "string" || !req.body.carrier.trim()
+    )) {
+      res.status(400).json({ error: "carrier and trackingNumber are required when shipping an order" }); return;
+    }
     const now       = new Date();
     const extra: Partial<typeof sampleOrders.$inferInsert> = {};
-    if (nextStage === "shipped") extra.shippedAt = now;
+    if (nextStage === "shipped") {
+      extra.shippedAt = now;
+      extra.trackingNumber = req.body.trackingNumber.trim();
+      extra.carrier = req.body.carrier.trim();
+    }
     if (nextStage === "delivered") extra.deliveredAt = now;
 
     const [updated] = await db
       .update(sampleOrders)
       .set({ status: nextStage, ...extra, updatedAt: now })
-      .where(eq(sampleOrders.id, req.params.id))
+      .where(and(eq(sampleOrders.id, req.params.id), eq(sampleOrders.status, current)))
       .returning();
+    if (!updated) { res.status(409).json({ error: "Order status changed; refresh and retry" }); return; }
+
+    const notificationContext = orderNotificationContext(row.order);
+    await publishNotification({
+      userId: row.order.sellerId, category: "production", type: "manufacturer_order_status",
+      title: `${row.order.title} is now ${nextStage.replaceAll("_", " ")}`,
+      body: "Your manufacturer updated the order status.",
+      targetId: row.order.id,
+      targetType: notificationContext.targetType,
+      cta: notificationContext.sellerCta,
+    }).catch((error) => req.log.error({ err: error, orderId: row.order.id }, "Order status notification failed"));
 
     res.json({
       ...updated,
@@ -336,12 +562,13 @@ router.patch("/:id/advance", async (req, res) => {
 });
 
 // ── PATCH /api/sample-orders/:id/tracking ─────────────────────────────────────
-// Adds tracking number and marks shipped. Also triggers payout to manufacturer.
+// Manufacturer records tracking only once production has reached packing. Stripe
+// destination charges already route payment to Connect; creating a Transfer here
+// would duplicate the settlement and is intentionally not performed.
 
 router.patch("/:id/tracking", async (req, res) => {
   try {
-    const stripe      = requireStripe();
-    const sellerId    = (req as any).clerkUserId as string;
+    const clerkUserId = (req as any).clerkUserId as string;
     const { trackingNumber, carrier } = req.body;
 
     if (!trackingNumber) {
@@ -350,36 +577,22 @@ router.patch("/:id/tracking", async (req, res) => {
 
     const [row] = await db
       .select({
-        order:           sampleOrders,
-        mfrStripeId:     manufacturers.stripeAccountId,
+        order: sampleOrders,
+        mfrClerkId: manufacturers.clerkId,
       })
       .from(sampleOrders)
       .leftJoin(manufacturers, eq(sampleOrders.manufacturerId, manufacturers.id))
-      .where(and(eq(sampleOrders.id, req.params.id), eq(sampleOrders.sellerId, sellerId)))
+      .where(eq(sampleOrders.id, req.params.id))
       .limit(1);
 
     if (!row) { res.status(404).json({ error: "Not found" }); return; }
+    if (row.mfrClerkId !== clerkUserId) { res.status(403).json({ error: "Forbidden" }); return; }
 
     const order = row.order;
-    const now   = new Date();
-
-    // Attempt Stripe payout to manufacturer Connect account if not already released
-    let stripeTransferId: string | null = order.stripeTransferId;
-    if (!order.payoutReleased && row.mfrStripeId && order.stripePaymentIntentId) {
-      try {
-        const netCents = order.priceCents - order.platformFeeCents;
-        const transfer = await stripe.transfers.create({
-          amount:      netCents,
-          currency:    "usd",
-          destination: row.mfrStripeId,
-          transfer_group: `sample_${order.id}`,
-          metadata: { sampleOrderId: order.id, sellerId },
-        });
-        stripeTransferId = transfer.id;
-      } catch (e) {
-        req.log.error({ err: e, orderId: order.id }, "Stripe transfer failed for sample order");
-      }
+    if (order.status !== "packing") {
+      res.status(409).json({ error: "Tracking can only be added when the order is packing" }); return;
     }
+    const now   = new Date();
 
     const [updated] = await db
       .update(sampleOrders)
@@ -388,12 +601,11 @@ router.patch("/:id/tracking", async (req, res) => {
         carrier:         carrier ?? null,
         status:          "shipped",
         shippedAt:       now,
-        payoutReleased:  !!stripeTransferId,
-        stripeTransferId: stripeTransferId ?? order.stripeTransferId,
         updatedAt:       now,
       })
-      .where(eq(sampleOrders.id, req.params.id))
+      .where(and(eq(sampleOrders.id, req.params.id), eq(sampleOrders.status, "packing")))
       .returning();
+    if (!updated) { res.status(409).json({ error: "Order status changed; refresh and retry" }); return; }
 
     res.json({
       ...updated,
@@ -405,6 +617,35 @@ router.patch("/:id/tracking", async (req, res) => {
   } catch (err) {
     req.log.error({ err, orderId: req.params.id }, "Failed to add sample order tracking");
     res.status(500).json({ error: "Failed to add tracking" });
+  }
+});
+
+// ── GET /api/sample-orders/:id/payment-options ────────────────────────────────
+router.get("/:id/payment-options", async (req, res) => {
+  try {
+    const sellerId = (req as any).clerkUserId as string;
+    const [order] = await db.select().from(sampleOrders).where(and(
+      eq(sampleOrders.id, req.params.id), eq(sampleOrders.sellerId, sellerId),
+    )).limit(1);
+    if (!order) { res.status(404).json({ error: "Order not found" }); return; }
+    if (order.orderType !== "bulk" || order.status !== "pending_payment" || order.walletPaymentState !== "pending") {
+      res.status(409).json({ error: "Order is not eligible for wallet payment" }); return;
+    }
+    const wallets = await db.select().from(dropWallets).where(eq(dropWallets.sellerId, sellerId));
+    res.json({
+      orderId: order.id,
+      requiredCents: order.priceCents,
+      wallets: wallets.map((wallet) => {
+        const availableCents = wallet.balanceCents - wallet.releasedCents - wallet.reservedCents;
+        return {
+          id: wallet.id, dropId: wallet.dropId, availableCents,
+          eligible: availableCents >= order.priceCents,
+        };
+      }),
+    });
+  } catch (err) {
+    req.log.error({ err, orderId: req.params.id }, "Failed to list wallet payment options");
+    res.status(500).json({ error: "Failed to list payment options" });
   }
 });
 
@@ -423,6 +664,7 @@ router.post("/:id/pay-from-wallet", async (req, res) => {
       .select({
         order:       sampleOrders,
         mfrStripeId: manufacturers.stripeAccountId,
+        mfrClerkId: manufacturers.clerkId,
         wallet:      dropWallets,
       })
       .from(sampleOrders)
@@ -436,62 +678,98 @@ router.post("/:id/pay-from-wallet", async (req, res) => {
 
     const order  = row.order;
     const wallet = row.wallet;
-
-    if (wallet.sellerId !== sellerId) {
-      res.status(403).json({ error: "Wallet does not belong to you" }); return;
+    if (order.orderType !== "bulk" || order.status !== "pending_payment" || order.stripeTransferId
+      || !["pending", "processing"].includes(order.walletPaymentState)) {
+      res.status(409).json({ error: "This bulk order is not eligible for wallet payment" }); return;
+    }
+    if (wallet.sellerId !== sellerId) { res.status(403).json({ error: "Wallet does not belong to you" }); return; }
+    if (!row.mfrStripeId) { res.status(409).json({ error: "Manufacturer cannot receive wallet payment" }); return; }
+    const attemptKey = order.walletPaymentAttemptKey ?? `sample-order-wallet/${order.id}`;
+    if (order.walletPaymentState === "processing" && order.walletId !== walletId) {
+      res.status(409).json({ error: "Payment is already processing from a different wallet" }); return;
     }
 
-    const availableCents = wallet.balanceCents - wallet.releasedCents - wallet.reservedCents;
-    if (availableCents < order.priceCents) {
-      res.status(400).json({
-        error: `Insufficient wallet balance. Available: $${(availableCents / 100).toFixed(2)}, required: $${(order.priceCents / 100).toFixed(2)}`,
-      }); return;
-    }
+    // Claim the order and reserve funds together before calling Stripe. Both
+    // predicates are conditional, so replayed/concurrent requests cannot pay it.
+    const claimed = order.walletPaymentState === "processing" ? true : await db.transaction(async (tx) => {
+      const [claim] = await tx.update(sampleOrders).set({
+        walletPaymentState: "processing", walletPaymentAttemptKey: attemptKey,
+        walletId, updatedAt: new Date(),
+      }).where(and(
+        eq(sampleOrders.id, order.id), eq(sampleOrders.sellerId, sellerId),
+        eq(sampleOrders.orderType, "bulk"), eq(sampleOrders.status, "pending_payment"),
+        eq(sampleOrders.walletPaymentState, "pending"),
+        sql`${sampleOrders.walletId} IS NULL`, sql`${sampleOrders.stripeTransferId} IS NULL`,
+      )).returning({ id: sampleOrders.id });
+      if (!claim) return false;
+      const [reserved] = await tx.update(dropWallets).set({
+        reservedCents: sql`${dropWallets.reservedCents} + ${order.priceCents}`,
+        updatedAt: new Date(),
+      }).where(and(eq(dropWallets.id, walletId), eq(dropWallets.sellerId, sellerId),
+        sql`${dropWallets.balanceCents} - ${dropWallets.releasedCents} - ${dropWallets.reservedCents} >= ${order.priceCents}`,
+      )).returning({ id: dropWallets.id });
+      if (!reserved) throw new Error("INSUFFICIENT_WALLET");
+      return true;
+    }).catch((error) => {
+      if ((error as Error).message === "INSUFFICIENT_WALLET") return false;
+      throw error;
+    });
+    if (!claimed) { res.status(409).json({ error: "Wallet funds unavailable or payment already in progress" }); return; }
 
-    // Transfer from platform to manufacturer's Connect account
-    let stripeTransferId: string | null = null;
-    if (row.mfrStripeId) {
+    let stripeTransferId: string;
+    try {
       const transfer = await stripe.transfers.create({
-        amount:      order.priceCents,
-        currency:    "usd",
-        destination: row.mfrStripeId,
+        amount: order.priceCents, currency: "usd", destination: row.mfrStripeId,
         transfer_group: wallet.stripeTransferGroup ?? `drop_${wallet.dropId}`,
         metadata: { sampleOrderId: order.id, sellerId, paymentSource: "drop_wallet" },
-      });
+      }, { idempotencyKey: attemptKey });
       stripeTransferId = transfer.id;
+    } catch (error) {
+      // A 4xx request error (other than conflict/rate limiting) is definitive:
+      // Stripe rejected the transfer before creation. Network/5xx/ambiguous
+      // errors retain processing+reservation so retry reconciles via the same key.
+      const definitivelyRejected = isDefinitiveTransferRejection(error);
+      if (definitivelyRejected) {
+        await db.transaction(async (tx) => {
+          const [released] = await tx.update(sampleOrders).set({
+            walletPaymentState: "pending", walletId: null, updatedAt: new Date(),
+          }).where(and(
+            eq(sampleOrders.id, order.id), eq(sampleOrders.walletPaymentState, "processing"),
+            eq(sampleOrders.walletPaymentAttemptKey, attemptKey),
+          )).returning({ id: sampleOrders.id });
+          if (released) {
+            await tx.update(dropWallets).set({
+              reservedCents: sql`GREATEST(${dropWallets.reservedCents} - ${order.priceCents}, 0)`,
+              updatedAt: new Date(),
+            }).where(and(eq(dropWallets.id, walletId), eq(dropWallets.sellerId, sellerId)));
+          }
+        });
+      }
+      throw error;
     }
 
-    // Debit wallet
-    await db.transaction(async (tx) => {
-      await tx
-        .update(dropWallets)
-        .set({
-          reservedCents: wallet.reservedCents + order.priceCents,
-          updatedAt:     new Date(),
-        })
-        .where(eq(dropWallets.id, walletId));
-
-      await tx
-        .insert(dropWalletTransactions)
-        .values({
-          walletId,
-          type:             "bulk_payment",
-          amountCents:      order.priceCents,
-          sampleOrderId:    order.id,
-          description:      `Bulk order payment: ${order.title}`,
-          stripeTransferId: stripeTransferId ?? undefined,
-        });
+    const [updated] = await db.transaction(async (tx) => {
+      const finalized = await tx.update(sampleOrders).set({
+        walletId, stripeTransferId, walletPaymentState: "paid", status: "payment_received", updatedAt: new Date(),
+      }).where(and(eq(sampleOrders.id, order.id), eq(sampleOrders.walletPaymentState, "processing")))
+        .returning();
+      if (!finalized[0]) throw new Error("WALLET_FINALIZE_CONFLICT");
+      await tx.insert(dropWalletTransactions).values({
+        walletId, type: "bulk_payment", amountCents: order.priceCents,
+        sampleOrderId: order.id, description: `Bulk order payment: ${order.title}`, stripeTransferId,
+      }).onConflictDoNothing();
+      return finalized;
     });
-
-    const [updated] = await db
-      .update(sampleOrders)
-      .set({
-        walletId,
-        stripeTransferId: stripeTransferId ?? undefined,
-        updatedAt:        new Date(),
-      })
-      .where(eq(sampleOrders.id, req.params.id))
-      .returning();
+    if (!updated) { res.status(409).json({ error: "Payment reconciliation required; retry safely" }); return; }
+    if (row.mfrClerkId) {
+      const notificationContext = orderNotificationContext(order);
+      await publishNotification({
+        userId: row.mfrClerkId, category: "production", type: "manufacturer_payment_received",
+        title: "Payment received", body: `${order.title} is ready for production.`,
+        targetId: order.id, targetType: notificationContext.targetType,
+        cta: notificationContext.manufacturerCta,
+      }).catch((error) => req.log.error({ err: error, orderId: order.id }, "Wallet payment notification failed"));
+    }
 
     res.json({
       ...updated,

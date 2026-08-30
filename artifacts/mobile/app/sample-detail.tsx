@@ -14,6 +14,8 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
 import { formatCents } from '@/lib/money';
 import { File as FSFile } from 'expo-file-system';
 
@@ -25,8 +27,9 @@ import {
 
 import {
   getSample, submitSampleReview, addSampleRevision,
-  getOrCreateConversation, getManufacturer,
+  getOrCreateConversation,
   uploadSampleImage,
+  createSampleCheckoutSession, confirmSamplePayment,
 } from '@/services/manufacturerService';
 import { Sample, SampleReview, SampleStatus } from '@/services/manufacturerTypes';
 
@@ -154,10 +157,12 @@ interface RatingState {
 
 export default function SampleDetailScreen() {
   const colors = useColors();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, paymentPrompt, paymentReturn } = useLocalSearchParams<{ id: string; paymentPrompt?: string; paymentReturn?: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const reviewSectionRef = useRef<ScrollView>(null);
+  const paymentPromptConsumed = useRef(false);
+  const paymentReturnConsumed = useRef(false);
 
   const [sample, setSample] = useState<Sample | null>(null);
   const [manufacturerName, setManufacturerName] = useState('');
@@ -185,6 +190,8 @@ export default function SampleDetailScreen() {
 
   // Image upload state
   const [imageUploading, setImageUploading] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -194,8 +201,7 @@ export default function SampleDetailScreen() {
       const s = await getSample(id);
       if (s) {
         setSample(s);
-        const mfg = await getManufacturer(s.manufacturerId);
-        setManufacturerName(mfg?.name ?? 'Manufacturer');
+        setManufacturerName(s.manufacturerName ?? 'Manufacturer');
       } else {
         setSample(null);
       }
@@ -208,6 +214,80 @@ export default function SampleDetailScreen() {
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const timer = setInterval(load, 15_000);
+    return () => clearInterval(timer);
+  }, [load]);
+
+  const confirmHostedPayment = useCallback(async () => {
+    if (!sample || paying) return false;
+    setPaying(true);
+    setPaymentError('');
+    try {
+      await confirmSamplePayment(sample.id);
+      await load();
+      return true;
+    } catch (error: any) {
+      setPaymentError(error?.message?.includes('not succeeded')
+        ? 'Payment is still being confirmed. Refresh in a moment and try again.'
+        : error?.message ?? 'Could not confirm payment. Please try again.');
+      return false;
+    } finally {
+      setPaying(false);
+    }
+  }, [sample, paying, load]);
+
+  const handlePaySecurely = useCallback(async () => {
+    if (!sample || sample.status !== 'pending_payment' || paying) return;
+    setPaying(true);
+    setPaymentError('');
+    try {
+      const returnUrl = Linking.createURL('sample-detail', {
+        queryParams: { id: sample.id, paymentReturn: '1' },
+      });
+      const session = await createSampleCheckoutSession(sample.id, returnUrl);
+      if (!session.url) {
+        // The idempotent backend can return no URL for a session that Stripe
+        // already settled. Confirm before treating it as unavailable.
+        setPaying(false);
+        const confirmed = await confirmHostedPayment();
+        if (!confirmed) setPaymentError('Secure checkout is unavailable and payment is not yet confirmed. Please try again.');
+        return;
+      }
+      const result = await WebBrowser.openAuthSessionAsync(session.url, returnUrl);
+      if (result.type === 'success') {
+        setPaying(false);
+        await confirmHostedPayment();
+        return;
+      }
+      if (result.type === 'cancel' || result.type === 'dismiss') {
+        setPaymentError('Checkout was cancelled. Your order is still awaiting payment.');
+        return;
+      }
+      setPaymentError('Secure checkout did not return a payment confirmation. Please try again.');
+    } catch (error: any) {
+      setPaymentError(error?.message ?? 'Could not open secure checkout. Please try again.');
+    } finally {
+      setPaying(false);
+    }
+  }, [sample, paying, confirmHostedPayment]);
+
+  useEffect(() => {
+    if (paymentPrompt === '1' && !paymentPromptConsumed.current && sample?.status === 'pending_payment' && !paying) {
+      paymentPromptConsumed.current = true;
+      void handlePaySecurely();
+    }
+  }, [paymentPrompt, sample?.id, sample?.status, paying, handlePaySecurely]);
+
+  // A Checkout redirect can recreate the app (cold return) or update route
+  // params in place (warm return). Confirmation is idempotent server-side;
+  // consume this marker locally and remove it from the route to avoid loops.
+  useEffect(() => {
+    if (paymentReturn !== '1' || paymentReturnConsumed.current || !sample || paying) return;
+    paymentReturnConsumed.current = true;
+    router.setParams({ paymentReturn: undefined, paymentPrompt: undefined } as never);
+    void confirmHostedPayment();
+  }, [paymentReturn, sample?.id, paying, confirmHostedPayment, router]);
 
   const setRating = (dim: keyof RatingState) => (val: number) =>
     setRatings(prev => ({ ...prev, [dim]: val }));
@@ -311,11 +391,11 @@ export default function SampleDetailScreen() {
 
   const handleMessage = async () => {
     if (!sample) return;
-    const conv = await getOrCreateConversation(sample.manufacturerId, {
+    const threadId = sample.threadId ?? (await getOrCreateConversation(sample.manufacturerId, {
       sampleId: sample.id,
       contextLabel: `Sample: ${sample.productName}`,
-    });
-    router.push({ pathname: '/manufacturer-messages', params: { conversationId: conv.id } } as any);
+    })).id;
+    router.push({ pathname: '/manufacturer-messages', params: { threadId } } as any);
   };
 
   if (loading) {
@@ -369,6 +449,14 @@ export default function SampleDetailScreen() {
             <StatusBadge label={STATUS_LABELS[sample.status] ?? sample.status} variant={statusVariant(sample.status)} />
             <StatusBadge label={TYPE_LABELS[sample.type] ?? sample.type} variant="neutral" />
           </View>
+          {sample.status === 'pending_payment' && (
+            <BrandthreadCard style={s.section} elevated>
+              <Text style={s.paymentTitle}>Payment required</Text>
+              <Text style={s.paymentText}>Pay securely to send this sample into production.</Text>
+              {!!paymentError && <Text style={s.paymentError}>{paymentError}</Text>}
+              <PrimaryButton label="Pay securely" onPress={handlePaySecurely} loading={paying} icon="lock" />
+            </BrandthreadCard>
+          )}
 
           {/* ── STATUS TIMELINE ──────────────────────────────────── */}
           <SectionHeader title="Progress" style={s.sectionHeader} />
@@ -703,6 +791,9 @@ const s = StyleSheet.create({
   sectionHeader: {
     marginTop: SP.sm,
   },
+  paymentTitle: { fontSize: FS.base, fontFamily: FONT.bold, color: FG, marginBottom: SP.xs },
+  paymentText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginBottom: SP.md },
+  paymentError: { fontSize: FS.sm, fontFamily: FONT.medium, color: ORANGE, marginBottom: SP.sm },
   loadingContainer: {
     padding: SP.md,
     gap: SP.md,

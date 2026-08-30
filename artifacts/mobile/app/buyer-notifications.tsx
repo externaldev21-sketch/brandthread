@@ -105,6 +105,20 @@ function notifIconColor(cat: NotificationCategory, accent: string, accentLight: 
 }
 
 function notifNavigation(notif: Notification, router: ReturnType<typeof useRouter>): void {
+  // Server notifications can target shared manufacturer orders. Resolve these
+  // first so list taps agree with native push/deep-link routing.
+  if (notif.targetId && notif.targetType === 'sample_order') {
+    router.push(('/sample-detail?id=' + encodeURIComponent(notif.targetId)) as any);
+    return;
+  }
+  if (notif.targetId && notif.targetType === 'bulk_order') {
+    router.push(('/production-detail?id=' + encodeURIComponent(notif.targetId)) as any);
+    return;
+  }
+  if (notif.targetId && notif.targetType === 'manufacturer_thread') {
+    router.push(('/manufacturer-messages?threadId=' + encodeURIComponent(notif.targetId)) as any);
+    return;
+  }
   switch (notif.type) {
     case 'friend_request':
       router.push('/buyer-friend-requests' as any);

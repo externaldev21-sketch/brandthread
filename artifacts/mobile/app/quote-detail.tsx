@@ -250,7 +250,7 @@ export default function QuoteDetailScreen() {
       quoteId: quote.id,
       contextLabel: `Quote: ${quote.productName}`,
     });
-    router.push({ pathname: '/manufacturer-messages', params: { conversationId: conv.id } } as any);
+    router.push({ pathname: '/manufacturer-messages', params: { threadId: conv.id } } as any);
   };
 
   const handleStartSample = async () => {
@@ -273,7 +273,7 @@ export default function QuoteDetailScreen() {
         type: 'proto',
         costCents: quote.sampleCostCents,
       });
-      router.push({ pathname: '/sample-detail', params: { id: sample.id } } as any);
+      router.push({ pathname: '/sample-detail', params: { id: sample.id, paymentPrompt: '1' } } as any);
     } catch (err: any) {
       Alert.alert('Could not start sample', err?.message ?? 'Please try again after refreshing the quote.');
     } finally {

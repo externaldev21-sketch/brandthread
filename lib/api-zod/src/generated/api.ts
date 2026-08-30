@@ -139,22 +139,105 @@ export const GetManufacturerDashboardResponse = zod.object({
   "pendingMessages": zod.number(),
   "completedOrders": zod.number(),
   "totalRevenueCents": zod.number(),
-  "pendingPayoutCents": zod.number(),
   "recentOrders": zod.array(zod.object({
   "id": zod.string(),
-  "orderNumber": zod.string(),
-  "buyerName": zod.string(),
-  "productType": zod.string(),
+  "manufacturerId": zod.string(),
+  "sellerId": zod.string(),
+  "threadId": zod.string().nullish(),
+  "orderType": zod.enum(['sample', 'bulk']),
+  "title": zod.string(),
   "quantity": zod.number(),
-  "colorway": zod.string().nullish(),
-  "size": zod.string().nullish(),
+  "priceCents": zod.number(),
   "status": zod.string(),
-  "totalCents": zod.number(),
-  "notes": zod.string().nullish(),
-  "trackingNumber": zod.string().nullish(),
+  "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
   "createdAt": zod.string(),
-  "updatedAt": zod.string().optional()
-})).optional()
+  "updatedAt": zod.string()
+})),
+  "activeSellers": zod.array(zod.record(zod.string(), zod.unknown())),
+  "messages": zod.array(zod.object({
+  "id": zod.string(),
+  "buyerName": zod.string(),
+  "buyerAvatar": zod.string().nullish(),
+  "subject": zod.string(),
+  "lastMessage": zod.string(),
+  "lastMessageAt": zod.string(),
+  "unreadCount": zod.number(),
+  "orderStatus": zod.string().nullable()
+})),
+  "sampleOrders": zod.object({
+  "active": zod.array(zod.object({
+  "id": zod.string(),
+  "manufacturerId": zod.string(),
+  "sellerId": zod.string(),
+  "threadId": zod.string().nullish(),
+  "orderType": zod.enum(['sample', 'bulk']),
+  "title": zod.string(),
+  "quantity": zod.number(),
+  "priceCents": zod.number(),
+  "status": zod.string(),
+  "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})),
+  "completed": zod.array(zod.object({
+  "id": zod.string(),
+  "manufacturerId": zod.string(),
+  "sellerId": zod.string(),
+  "threadId": zod.string().nullish(),
+  "orderType": zod.enum(['sample', 'bulk']),
+  "title": zod.string(),
+  "quantity": zod.number(),
+  "priceCents": zod.number(),
+  "status": zod.string(),
+  "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}))
+}),
+  "bulkOrders": zod.object({
+  "active": zod.array(zod.object({
+  "id": zod.string(),
+  "manufacturerId": zod.string(),
+  "sellerId": zod.string(),
+  "threadId": zod.string().nullish(),
+  "orderType": zod.enum(['sample', 'bulk']),
+  "title": zod.string(),
+  "quantity": zod.number(),
+  "priceCents": zod.number(),
+  "status": zod.string(),
+  "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})),
+  "completed": zod.array(zod.object({
+  "id": zod.string(),
+  "manufacturerId": zod.string(),
+  "sellerId": zod.string(),
+  "threadId": zod.string().nullish(),
+  "orderType": zod.enum(['sample', 'bulk']),
+  "title": zod.string(),
+  "quantity": zod.number(),
+  "priceCents": zod.number(),
+  "status": zod.string(),
+  "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}))
+}),
+  "orderHistory": zod.array(zod.object({
+  "id": zod.string(),
+  "manufacturerId": zod.string(),
+  "sellerId": zod.string(),
+  "threadId": zod.string().nullish(),
+  "orderType": zod.enum(['sample', 'bulk']),
+  "title": zod.string(),
+  "quantity": zod.number(),
+  "priceCents": zod.number(),
+  "status": zod.string(),
+  "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+}))
 })
 
 
@@ -199,7 +282,10 @@ export const SendThreadMessageParams = zod.object({
 })
 
 export const SendThreadMessageBody = zod.object({
-  "content": zod.string()
+  "content": zod.string().optional(),
+  "messageType": zod.enum(['text', 'image', 'sample_card', 'bulk_card', 'system']).optional(),
+  "mediaUrls": zod.array(zod.string()).optional(),
+  "cardData": zod.record(zod.string(), zod.unknown()).nullish()
 })
 
 export const SendThreadMessageResponse = zod.object({
@@ -208,6 +294,18 @@ export const SendThreadMessageResponse = zod.object({
   "senderRole": zod.string(),
   "content": zod.string(),
   "sentAt": zod.string()
+})
+
+
+/**
+ * @summary Upload an image or PDF for an authorized manufacturer thread
+ */
+export const UploadManufacturerThreadAttachmentParams = zod.object({
+  "threadId": zod.coerce.string()
+})
+
+export const UploadManufacturerThreadAttachmentResponse = zod.object({
+  "objectPath": zod.string()
 })
 
 
@@ -259,6 +357,147 @@ export const UpdateManufacturerOrderStatusResponse = zod.object({
   "trackingNumber": zod.string().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
+})
+
+
+export const ListManufacturerSampleOrdersResponseItem = zod.object({
+  "id": zod.string(),
+  "manufacturerId": zod.string(),
+  "sellerId": zod.string(),
+  "threadId": zod.string().nullish(),
+  "orderType": zod.enum(['sample', 'bulk']),
+  "title": zod.string(),
+  "quantity": zod.number(),
+  "priceCents": zod.number(),
+  "status": zod.string(),
+  "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+export const ListManufacturerSampleOrdersResponse = zod.array(ListManufacturerSampleOrdersResponseItem)
+
+
+export const GetManufacturerSampleOrderParams = zod.object({
+  "orderId": zod.coerce.string()
+})
+
+export const GetManufacturerSampleOrderResponse = zod.object({
+  "id": zod.string(),
+  "manufacturerId": zod.string(),
+  "sellerId": zod.string(),
+  "threadId": zod.string().nullish(),
+  "orderType": zod.enum(['sample', 'bulk']),
+  "title": zod.string(),
+  "quantity": zod.number(),
+  "priceCents": zod.number(),
+  "status": zod.string(),
+  "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+export const AdvanceManufacturerSampleOrderParams = zod.object({
+  "orderId": zod.coerce.string()
+})
+
+export const AdvanceManufacturerSampleOrderBody = zod.object({
+  "status": zod.enum(['processing', 'cut_and_sew', 'packing', 'shipped', 'delivered']),
+  "trackingNumber": zod.string().optional(),
+  "carrier": zod.string().optional()
+})
+
+export const AdvanceManufacturerSampleOrderResponse = zod.object({
+  "id": zod.string(),
+  "manufacturerId": zod.string(),
+  "sellerId": zod.string(),
+  "threadId": zod.string().nullish(),
+  "orderType": zod.enum(['sample', 'bulk']),
+  "title": zod.string(),
+  "quantity": zod.number(),
+  "priceCents": zod.number(),
+  "status": zod.string(),
+  "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+/**
+ * @summary Confirm a seller-owned sample order's succeeded Stripe payment
+ */
+export const ConfirmSampleOrderPaymentParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const ConfirmSampleOrderPaymentResponse = zod.object({
+  "id": zod.string(),
+  "manufacturerId": zod.string(),
+  "sellerId": zod.string(),
+  "threadId": zod.string().nullish(),
+  "orderType": zod.enum(['sample', 'bulk']),
+  "title": zod.string(),
+  "quantity": zod.number(),
+  "priceCents": zod.number(),
+  "status": zod.string(),
+  "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
+})
+
+
+export const CreateSampleOrderCheckoutSessionParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const CreateSampleOrderCheckoutSessionBody = zod.object({
+  "returnUrl": zod.string()
+})
+
+export const CreateSampleOrderCheckoutSessionResponse = zod.object({
+  "sessionId": zod.string(),
+  "url": zod.string().nullish(),
+  "paymentStatus": zod.string()
+})
+
+
+export const GetBulkOrderPaymentOptionsParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const GetBulkOrderPaymentOptionsResponse = zod.object({
+  "orderId": zod.string(),
+  "requiredCents": zod.number(),
+  "wallets": zod.array(zod.object({
+  "id": zod.string(),
+  "dropId": zod.string(),
+  "availableCents": zod.number(),
+  "eligible": zod.boolean()
+}))
+})
+
+
+export const PayBulkOrderFromWalletParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const PayBulkOrderFromWalletBody = zod.object({
+  "walletId": zod.string()
+})
+
+export const PayBulkOrderFromWalletResponse = zod.object({
+  "id": zod.string(),
+  "manufacturerId": zod.string(),
+  "sellerId": zod.string(),
+  "threadId": zod.string().nullish(),
+  "orderType": zod.enum(['sample', 'bulk']),
+  "title": zod.string(),
+  "quantity": zod.number(),
+  "priceCents": zod.number(),
+  "status": zod.string(),
+  "imageUrls": zod.array(zod.string().url()).optional().describe('Short-lived display URLs returned only to an authorized order participant; private object paths are never returned by detail endpoints.'),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string()
 })
 
 

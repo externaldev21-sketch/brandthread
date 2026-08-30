@@ -15,6 +15,8 @@ import MessageThread from '@/pages/message-thread';
 import Payment from '@/pages/payment';
 import Profile from '@/pages/profile';
 import Reports from '@/pages/reports';
+import Sellers from '@/pages/sellers';
+import OrderTracker from '@/pages/order-tracker';
 import NotFound from '@/pages/not-found';
 import { Layout } from '@/components/layout';
 
@@ -215,7 +217,16 @@ function AppRouter() {
               <Protected><Layout><Dashboard /></Layout></Protected>
             </Route>
             <Route path="/orders">
-              <Protected><Layout><Orders /></Layout></Protected>
+              <Protected><Layout><Orders view="active" /></Layout></Protected>
+            </Route>
+            <Route path="/orders/history">
+              <Protected><Layout><Orders view="history" /></Layout></Protected>
+            </Route>
+            <Route path="/orders/:orderId">
+              {(params) => <Protected><Layout><OrderTracker orderId={params.orderId!} /></Layout></Protected>}
+            </Route>
+            <Route path="/sellers">
+              <Protected><Layout><Sellers /></Layout></Protected>
             </Route>
             <Route path="/messages">
               <Protected><Layout><Messages /></Layout></Protected>
