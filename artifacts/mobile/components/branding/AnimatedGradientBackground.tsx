@@ -117,29 +117,33 @@ function FloatingParticle({
   const { x, y, size, duration, drift, opacity, phase, fadeIn, fadeOut } = particle;
   const progress = useRef(new Animated.Value(phase)).current;
   const animation = useRef<Animated.CompositeAnimation | null>(null);
+  const active = useRef(false);
 
   useEffect(() => {
-    let mounted = true;
+    active.current = true;
     const spawnNext = (from: number, cycleDuration: number) => {
+      if (!active.current) return;
       progress.setValue(from);
-      animation.current = Animated.timing(progress, {
+      const nextAnimation = Animated.timing(progress, {
         toValue: 1,
         duration: cycleDuration,
         easing: Easing.linear,
         useNativeDriver: true,
       });
-      animation.current.start(({ finished }) => {
-        if (!mounted || !finished) return;
+      animation.current = nextAnimation;
+      nextAnimation.start(({ finished }) => {
+        if (!active.current || !finished || animation.current !== nextAnimation) return;
         spawnNext(0, duration * (0.84 + Math.random() * 0.32));
       });
     };
 
     spawnNext(phase, Math.max(3500, duration * (1 - phase)));
     return () => {
-      mounted = false;
+      active.current = false;
       animation.current?.stop();
+      animation.current = null;
     };
-  }, [duration, phase, progress]);
+  }, [duration, phase]);
 
   return (
     <Animated.View
@@ -190,11 +194,14 @@ function ParticleField({
   width: number;
   height: number;
 }) {
-  const [particles] = useState(createParticleConfigs);
+  const particles = useRef<ParticleConfig[] | null>(null);
+  if (!particles.current) {
+    particles.current = createParticleConfigs();
+  }
 
   return (
     <View pointerEvents="none" style={styles.particleField}>
-      {particles.map((particle, index) => (
+      {particles.current.map((particle, index) => (
         <FloatingParticle
           key={`particle-${index}`}
           particle={particle}
@@ -339,14 +346,29 @@ function SilkRibbon({
   height: number;
 }) {
   const [elapsed, setElapsed] = useState(0);
+  const frame = useRef<number | null>(null);
+  const mounted = useRef(false);
 
   useEffect(() => {
+    mounted.current = true;
     const startTime = Date.now();
-    const timer = setInterval(() => {
-      setElapsed(Date.now() - startTime);
-    }, 48);
+    let lastPaint = startTime;
+    const tick = () => {
+      if (!mounted.current) return;
+      const now = Date.now();
+      if (now - lastPaint >= 48) {
+        lastPaint = now;
+        setElapsed(now - startTime);
+      }
+      frame.current = requestAnimationFrame(tick);
+    };
 
-    return () => clearInterval(timer);
+    frame.current = requestAnimationFrame(tick);
+    return () => {
+      mounted.current = false;
+      if (frame.current !== null) cancelAnimationFrame(frame.current);
+      frame.current = null;
+    };
   }, []);
 
   const { body, sheen } = ribbonGeometry(width, height, ribbon, elapsed);

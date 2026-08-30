@@ -46,16 +46,18 @@ export default function SplashScreen() {
     <View style={styles.root}>
       <AnimatedGradientBackground />
 
-      {/* Logo mark */}
-      <Animated.View style={[styles.logoWrap, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
-        <BrandthreadLogo size={110} />
-      </Animated.View>
+      <View pointerEvents="none" style={styles.brandBlock}>
+        {/* Logo mark */}
+        <Animated.View style={[styles.logoWrap, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
+          <BrandthreadLogo size={136} />
+        </Animated.View>
 
-      {/* Wordmark + tagline */}
-      <Animated.View style={[styles.textWrap, { opacity: textOpacity }]}>
-        <Text style={styles.wordmark}>BRANDTHREAD</Text>
-        <Text style={styles.tagline}>Build it. Wear it. Scale it.</Text>
-      </Animated.View>
+        {/* Wordmark + tagline */}
+        <Animated.View style={[styles.textWrap, { opacity: textOpacity }]}>
+          <Text style={styles.wordmark}>BRANDTHREAD</Text>
+          <Text style={styles.tagline}>Build it. Wear it. Scale it.</Text>
+        </Animated.View>
+      </View>
 
       {/* The only way forward is an explicit tap. */}
       <Animated.View style={[styles.ctaWrap, { bottom: insets.bottom + 28, opacity: ctaOpacity }]}>
@@ -78,16 +80,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  logoWrap: { alignItems: 'center', marginBottom: 36 },
-  textWrap: { alignItems: 'center', gap: 8 },
+  brandBlock: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoWrap: { alignItems: 'center', marginBottom: 40 },
+  textWrap: { alignItems: 'center', gap: 10 },
   wordmark: {
-    fontSize: 15,
+    fontSize: 19,
     fontFamily: 'Inter_700Bold',
     color: '#FFFFFF',
-    letterSpacing: 4,
+    letterSpacing: 5,
   },
   tagline: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Inter_400Regular',
     color: '#FFFFFF55',
     letterSpacing: 0.3,
