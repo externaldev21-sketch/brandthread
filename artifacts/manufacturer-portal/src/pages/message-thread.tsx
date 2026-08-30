@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { Message } from "@workspace/api-client-react";
 import { EmptyState, QueryError } from "@/components/query-state";
+import { ThreadCall } from "@/components/thread-call";
 
 export default function MessageThread({ threadId }: { threadId: string }) {
   const messagesQuery = useGetThreadMessages(threadId, { query: { enabled: !!threadId, queryKey: getGetThreadMessagesQueryKey(threadId), refetchInterval: 10_000 } });
@@ -117,6 +118,7 @@ export default function MessageThread({ threadId }: { threadId: string }) {
             {thread.orderStatus.replace('_', ' ')}
           </div>
         )}
+        <ThreadCall threadId={threadId} />
       </div>
 
       {/* Messages */}

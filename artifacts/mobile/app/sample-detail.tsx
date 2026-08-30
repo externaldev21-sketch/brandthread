@@ -238,7 +238,7 @@ export default function SampleDetailScreen() {
   }, [sample, paying, load]);
 
   const handlePaySecurely = useCallback(async () => {
-    if (!sample || sample.status !== 'pending_payment' || paying) return;
+    if (!sample || sample.status !== 'pending_payment' || paying || sample.manufacturerPayoutReady !== true) return;
     setPaying(true);
     setPaymentError('');
     try {
@@ -266,14 +266,19 @@ export default function SampleDetailScreen() {
       }
       setPaymentError('Secure checkout did not return a payment confirmation. Please try again.');
     } catch (error: any) {
-      setPaymentError(error?.message ?? 'Could not open secure checkout. Please try again.');
+      const message = String(error?.message ?? '');
+      setPaymentError(
+        message.includes('Manufacturer cannot receive') || message.includes('payouts are not ready')
+          ? 'The manufacturer must finish Stripe payout setup before you can pay. Message them to complete verification, then refresh this order.'
+          : message || 'Could not open secure checkout. Please try again.',
+      );
     } finally {
       setPaying(false);
     }
   }, [sample, paying, confirmHostedPayment]);
 
   useEffect(() => {
-    if (paymentPrompt === '1' && !paymentPromptConsumed.current && sample?.status === 'pending_payment' && !paying) {
+    if (paymentPrompt === '1' && !paymentPromptConsumed.current && sample?.status === 'pending_payment' && sample.manufacturerPayoutReady === true && !paying) {
       paymentPromptConsumed.current = true;
       void handlePaySecurely();
     }
@@ -452,9 +457,26 @@ export default function SampleDetailScreen() {
           {sample.status === 'pending_payment' && (
             <BrandthreadCard style={s.section} elevated>
               <Text style={s.paymentTitle}>Payment required</Text>
-              <Text style={s.paymentText}>Pay securely to send this sample into production.</Text>
+              <Text style={s.paymentText}>
+                {sample.manufacturerPayoutReady !== true
+                  ? 'Payment is unavailable until the manufacturer connects and verifies their Stripe payout account. Message them, then refresh this order.'
+                  : 'Pay securely to send this sample into production. Funds are routed to the manufacturer through Stripe.'}
+              </Text>
               {!!paymentError && <Text style={s.paymentError}>{paymentError}</Text>}
-              <PrimaryButton label="Pay securely" onPress={handlePaySecurely} loading={paying} icon="lock" />
+              <PrimaryButton
+                label={sample.manufacturerPayoutReady !== true ? 'Manufacturer payout setup required' : 'Pay securely'}
+                onPress={handlePaySecurely}
+                loading={paying}
+                disabled={sample.manufacturerPayoutReady !== true}
+                icon={sample.manufacturerPayoutReady !== true ? 'alert-circle' : 'lock'}
+              />
+              {sample.manufacturerPayoutReady !== true && (
+                <TouchableOpacity onPress={handleMessage} style={{ marginTop: SP.sm }}>
+                  <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.semibold, textAlign: 'center' }}>
+                    Message manufacturer
+                  </Text>
+                </TouchableOpacity>
+              )}
             </BrandthreadCard>
           )}
 

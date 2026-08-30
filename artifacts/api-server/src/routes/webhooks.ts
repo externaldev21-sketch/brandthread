@@ -7,7 +7,7 @@ import crypto from "crypto";
 import {
   db, checkoutSessions, orders, orderItems, productVariants, products, users, notificationsFeed, disputes,
   dropWallets, dropWalletTransactions, freelancers, freelancerJobs,
-  revenueCatWebhookEvents,
+  revenueCatWebhookEvents, manufacturers, sampleOrders, manufacturerActivityEvents,
 } from "@workspace/db";
 import { eq, and, ne, sql } from "drizzle-orm";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe";
@@ -25,6 +25,7 @@ import {
 } from "../lib/brandthreadEmail";
 import { publishNotification } from "./notifications-feed";
 import { sendPushToUser } from "../lib/push";
+import { connectReadiness } from "./manufacturer-connect";
 
 const router = Router();
 
@@ -115,14 +116,14 @@ router.post("/stripe", async (req: Request, res: Response) => {
       // Synchronous payment (cards, wallets) — already captured at session completion
       case "checkout.session.completed":
         if (event.data.object.payment_status === "paid") {
-          await handleCheckoutPaid(event.data.object);
+          await handleCheckoutPaid(event.data.object, event.id);
         }
         // payment_status === 'unpaid' means async method chosen → wait for below
         break;
 
       // Delayed payment method (ACH bank debit, etc.) captured successfully
       case "checkout.session.async_payment_succeeded":
-        await handleCheckoutPaid(event.data.object);
+        await handleCheckoutPaid(event.data.object, event.id);
         break;
 
       // Delayed payment failed — release any unused rewards reservation.
@@ -132,7 +133,23 @@ router.post("/stripe", async (req: Request, res: Response) => {
         break;
 
       case "account.updated":
-        await handleAccountUpdated(event.data.object);
+        await handleAccountUpdated(event.data.object, event.id);
+        break;
+      case "transfer.created":
+      case "transfer.updated":
+        await handleManufacturerTransfer(event.data.object, event.id);
+        break;
+      case "transfer.reversed":
+        await handleManufacturerTransferReversed(event.data.object, event.id);
+        break;
+      case "charge.refunded":
+        await handleManufacturerCardReversal({
+          paymentIntentId: event.data.object.payment_intent ?? null,
+          chargeId: event.data.object.id ?? null,
+          cumulativeReversedCents: event.data.object.amount_refunded,
+          providerEventId: event.id,
+          source: "refund",
+        });
         break;
 
       // ── Seller platform subscription (billed to seller's own payment method) ──
@@ -170,15 +187,25 @@ router.post("/stripe", async (req: Request, res: Response) => {
 
       // ── Stripe Disputes / Chargebacks ─────────────────────────────────────
       case "charge.dispute.created":
-        await handleDisputeCreated(event.data.object);
+        if (!await handleManufacturerCardReversal({
+          paymentIntentId: event.data.object.payment_intent ?? null,
+          chargeId: event.data.object.charge ?? null,
+          cumulativeReversedCents: event.data.object.amount,
+          providerEventId: event.id,
+          source: "dispute",
+        })) await handleDisputeCreated(event.data.object);
         break;
 
       case "charge.dispute.updated":
-        await handleDisputeUpdated(event.data.object);
+        if (!await isManufacturerCardPayment(event.data.object.payment_intent ?? null, event.data.object.charge ?? null)) {
+          await handleDisputeUpdated(event.data.object);
+        }
         break;
 
       case "charge.dispute.closed":
-        await handleDisputeClosed(event.data.object);
+        if (!await isManufacturerCardPayment(event.data.object.payment_intent ?? null, event.data.object.charge ?? null)) {
+          await handleDisputeClosed(event.data.object);
+        }
         break;
 
       default:
@@ -292,11 +319,13 @@ async function releaseCheckoutLoyaltyRedemption(session: any) {
  * The unique index on stripe_checkout_session_id plus the early-exit guard
  * ensure at-most-once order creation even on webhook retries.
  */
-export async function handleCheckoutPaid(session: any) {
+export async function handleCheckoutPaid(session: any, providerEventId?: string) {
   const sessionId: string   = session.id;
   const piId:      string | null = session.payment_intent ?? null;
   const metadata:  Record<string, string> = session.metadata ?? {};
   const csRef:     string | undefined = metadata["csRef"];
+
+  if (await handleManufacturerCheckoutPaid(session, providerEventId)) return;
 
   // Freelancer job escrow payments are a separate flow from cart orders.
   // Fast path: session metadata (set at session creation). Fallback: match by
@@ -1205,11 +1234,12 @@ async function handleFreelancerJobPaid(session: any, jobIdOverride?: string) {
   logger.info({ jobId, stripeSessionId: session.id }, "Freelancer job already paid or not found; skipping");
 }
 
-async function handleAccountUpdated(account: any) {
+async function handleAccountUpdated(account: any, providerEventId?: string) {
   const stripeAccountId: string  = account.id;
   const chargesEnabled:  boolean = account.charges_enabled ?? false;
   const payoutsEnabled:  boolean = account.payouts_enabled ?? false;
   const detailsSubmitted: boolean = account.details_submitted ?? false;
+  const manufacturerReadiness = connectReadiness(account);
 
   const status =
     chargesEnabled && payoutsEnabled
@@ -1230,7 +1260,337 @@ async function handleAccountUpdated(account: any) {
     .set({ stripeAccountStatus: status, updatedAt: new Date() })
     .where(eq(freelancers.stripeAccountId, stripeAccountId));
 
+  const [manufacturer] = await db.update(manufacturers)
+    .set({
+      stripeAccountStatus: manufacturerReadiness.status,
+      paymentSetup: manufacturerReadiness.ready,
+      updatedAt: new Date(),
+    })
+    .where(eq(manufacturers.stripeAccountId, stripeAccountId))
+    .returning({ id: manufacturers.id, clerkId: manufacturers.clerkId });
+  if (manufacturer) {
+    const [activity] = await db.insert(manufacturerActivityEvents).values({
+      manufacturerId: manufacturer.id,
+      category: "payout",
+      type: manufacturerReadiness.ready ? "payouts_ready" : "payouts_restricted",
+      providerEventId,
+      metadata: manufacturerReadiness,
+    }).onConflictDoNothing({ target: manufacturerActivityEvents.providerEventId })
+      .returning({ id: manufacturerActivityEvents.id });
+    if (activity && manufacturer.clerkId) {
+      await publishNotification({
+        userId: manufacturer.clerkId,
+        category: "production",
+        type: manufacturerReadiness.ready ? "manufacturer_payouts_ready" : "manufacturer_payouts_restricted",
+        title: manufacturerReadiness.ready ? "Payouts are ready" : "Payout setup needs attention",
+        body: manufacturerReadiness.ready
+          ? "You can now receive seller payments."
+          : "Return to payout settings to complete Stripe requirements.",
+        targetId: manufacturer.id,
+        targetType: "manufacturer_payout",
+        cta: "/manufacturers/payment",
+      });
+    }
+  }
+
   logger.info({ stripeAccountId, accountStatus: status }, "Connect account updated");
+}
+
+async function handleManufacturerCheckoutPaid(session: any, providerEventId?: string): Promise<boolean> {
+  const orderId = session.metadata?.sampleOrderId;
+  const [row] = await db.select({
+    order: sampleOrders,
+    mfrClerkId: manufacturers.clerkId,
+  }).from(sampleOrders)
+    .leftJoin(manufacturers, eq(sampleOrders.manufacturerId, manufacturers.id))
+    .where(orderId
+      ? eq(sampleOrders.id, orderId)
+      : eq(sampleOrders.stripeCheckoutSessionId, session.id))
+    .limit(1);
+  if (!row) return false;
+  const paymentIntentId = typeof session.payment_intent === "string"
+    ? session.payment_intent
+    : session.payment_intent?.id ?? null;
+  const [updated] = await db.update(sampleOrders).set({
+    status: "payment_received",
+    stripePaymentIntentId: paymentIntentId,
+    updatedAt: new Date(),
+  }).where(and(eq(sampleOrders.id, row.order.id), eq(sampleOrders.status, "pending_payment")))
+    .returning({ id: sampleOrders.id });
+  if (updated) {
+    await db.insert(manufacturerActivityEvents).values({
+      manufacturerId: row.order.manufacturerId,
+      sampleOrderId: row.order.id,
+      actorClerkId: row.order.sellerId,
+      category: "payment",
+      type: "payment_received",
+      amountCents: row.order.priceCents,
+      providerEventId: providerEventId ?? `checkout:${session.id}`,
+      metadata: { source: "stripe_checkout", sessionId: session.id, orderType: row.order.orderType },
+    }).onConflictDoNothing({ target: manufacturerActivityEvents.providerEventId });
+  }
+  if (updated && row.mfrClerkId) {
+    await publishNotification({
+      userId: row.mfrClerkId,
+      category: "production",
+      type: "manufacturer_payment_received",
+      title: "Payment received",
+      body: `${row.order.title} is ready for production.`,
+      targetId: row.order.id,
+      targetType: row.order.orderType === "bulk" ? "bulk_order" : "sample_order",
+      cta: `/manufacturers/orders/${row.order.id}`,
+    });
+  }
+  return true;
+}
+
+async function handleManufacturerTransfer(transfer: any, providerEventId: string): Promise<void> {
+  const orderId = transfer.metadata?.sampleOrderId;
+  if (!orderId) return;
+  const [order] = await db.select().from(sampleOrders).where(eq(sampleOrders.id, orderId)).limit(1);
+  if (!order || !order.walletId) return;
+  const walletId = order.walletId;
+  const ownsNotification = await db.transaction(async (tx) => {
+    const [updated] = await tx.update(sampleOrders).set({
+      stripeTransferId: transfer.id,
+      walletPaymentState: "paid",
+      status: "payment_received",
+      updatedAt: new Date(),
+    }).where(and(eq(sampleOrders.id, order.id), eq(sampleOrders.walletPaymentState, "processing")))
+      .returning({ id: sampleOrders.id });
+    if (updated) {
+      await tx.update(dropWallets).set({
+        releasedCents: sql`${dropWallets.releasedCents} + ${order.priceCents}`,
+        reservedCents: sql`GREATEST(${dropWallets.reservedCents} - ${order.priceCents}, 0)`,
+        updatedAt: new Date(),
+      }).where(eq(dropWallets.id, walletId));
+      await tx.insert(dropWalletTransactions).values({
+        walletId,
+        type: "bulk_payment",
+        amountCents: order.priceCents,
+        sampleOrderId: order.id,
+        description: `Bulk order payment: ${order.title}`,
+        stripeTransferId: transfer.id,
+      });
+    }
+    if (updated) {
+      const [claimed] = await tx.insert(manufacturerActivityEvents).values({
+        manufacturerId: order.manufacturerId,
+        sampleOrderId: order.id,
+        actorClerkId: order.sellerId,
+        category: "payment",
+        type: "payment_received",
+        amountCents: order.priceCents,
+        providerEventId: `transfer:${transfer.id}`,
+        metadata: { source: "drop_wallet", transferId: transfer.id, stripeEventId: providerEventId, notificationOwner: "webhook" },
+      }).onConflictDoNothing({ target: manufacturerActivityEvents.providerEventId })
+        .returning({ id: manufacturerActivityEvents.id });
+      return !!claimed;
+    }
+    return false;
+  });
+  if (ownsNotification) {
+    const [manufacturer] = await db.select({ clerkId: manufacturers.clerkId })
+      .from(manufacturers).where(eq(manufacturers.id, order.manufacturerId)).limit(1);
+    if (manufacturer?.clerkId) {
+      await publishNotification({
+        userId: manufacturer.clerkId,
+        category: "production",
+        type: "manufacturer_payment_received",
+        title: "Payment received",
+        body: `${order.title} is ready for production.`,
+        targetId: order.id,
+        targetType: order.orderType === "bulk" ? "bulk_order" : "sample_order",
+        cta: `/manufacturers/orders/${order.id}`,
+      });
+    }
+  }
+}
+
+export function reversalDeltaCents(
+  cumulativeReversedCents: unknown,
+  alreadyReversedCents: number,
+  originalAmountCents: number,
+): number {
+  const cumulative = typeof cumulativeReversedCents === "number" ? cumulativeReversedCents : originalAmountCents;
+  return Math.max(0, Math.min(cumulative - alreadyReversedCents, originalAmountCents - alreadyReversedCents));
+}
+
+async function findManufacturerCardOrder(
+  paymentIntentId: string | null,
+  chargeId: string | null,
+) {
+  let resolvedPaymentIntentId = paymentIntentId;
+  // Refund/dispute payloads normally contain payment_intent. Resolve a charge
+  // defensively for older/provider-variant payloads, then persist the linkage.
+  if (!resolvedPaymentIntentId && chargeId && stripe) {
+    const charge = await stripe.charges.retrieve(chargeId);
+    resolvedPaymentIntentId = typeof charge.payment_intent === "string"
+      ? charge.payment_intent
+      : charge.payment_intent?.id ?? null;
+  }
+  const conditions = resolvedPaymentIntentId
+    ? eq(sampleOrders.stripePaymentIntentId, resolvedPaymentIntentId)
+    : chargeId ? eq(sampleOrders.stripeChargeId, chargeId) : undefined;
+  if (!conditions) return null;
+  const [order] = await db.select({
+    order: sampleOrders,
+    clerkId: manufacturers.clerkId,
+  }).from(sampleOrders)
+    .leftJoin(manufacturers, eq(sampleOrders.manufacturerId, manufacturers.id))
+    .where(conditions)
+    .limit(1);
+  return order ? { ...order, paymentIntentId: resolvedPaymentIntentId } : null;
+}
+
+async function isManufacturerCardPayment(paymentIntentId: string | null, chargeId: string | null): Promise<boolean> {
+  return !!await findManufacturerCardOrder(paymentIntentId, chargeId);
+}
+
+async function handleManufacturerCardReversal(input: {
+  paymentIntentId: string | null;
+  chargeId: string | null;
+  cumulativeReversedCents: unknown;
+  providerEventId: string;
+  source: "refund" | "dispute";
+}): Promise<boolean> {
+  const found = await findManufacturerCardOrder(input.paymentIntentId, input.chargeId);
+  if (!found) return false;
+  const notification = await db.transaction(async (tx): Promise<{
+    clerkId: string; title: string; orderType: string; reviewState: string;
+  } | null> => {
+    await tx.execute(sql`SELECT id FROM sample_orders WHERE id = ${found.order.id}::uuid FOR UPDATE`);
+    const [order] = await tx.select().from(sampleOrders).where(eq(sampleOrders.id, found.order.id)).limit(1);
+    if (!order) return null;
+    const priorEvents = await tx.select({ amountCents: manufacturerActivityEvents.amountCents })
+      .from(manufacturerActivityEvents)
+      .where(and(
+        eq(manufacturerActivityEvents.sampleOrderId, order.id),
+        eq(manufacturerActivityEvents.type, "payment_reversed"),
+      ));
+    const alreadyReversedCents = priorEvents.reduce((sum, event) => sum + (event.amountCents ?? 0), 0);
+    const reversedCents = reversalDeltaCents(input.cumulativeReversedCents, alreadyReversedCents, order.priceCents);
+    if (!reversedCents) return null;
+    const [recorded] = await tx.insert(manufacturerActivityEvents).values({
+      manufacturerId: order.manufacturerId,
+      sampleOrderId: order.id,
+      category: "payment",
+      type: "payment_reversed",
+      amountCents: reversedCents,
+      providerEventId: input.providerEventId,
+      metadata: { source: input.source, chargeId: input.chargeId, paymentIntentId: found.paymentIntentId },
+    }).onConflictDoNothing({ target: manufacturerActivityEvents.providerEventId })
+      .returning({ id: manufacturerActivityEvents.id });
+    if (!recorded) return null;
+    const totalReversedCents = alreadyReversedCents + reversedCents;
+    const reviewState = totalReversedCents >= order.priceCents ? "reversed" : "partial_reversal";
+    await tx.update(sampleOrders).set({
+      status: "payment_review",
+      paymentReviewState: reviewState,
+      stripeChargeId: input.chargeId ?? order.stripeChargeId,
+      updatedAt: new Date(),
+    }).where(eq(sampleOrders.id, order.id));
+    if (found.clerkId) {
+      return { clerkId: found.clerkId, title: order.title, orderType: order.orderType, reviewState };
+    }
+    return null;
+  });
+  if (notification) {
+    await publishNotification({
+      userId: notification.clerkId,
+      category: "production",
+      type: "manufacturer_payment_reversed",
+      title: notification.reviewState === "reversed" ? "Payment reversed" : "Payment partially reversed",
+      body: `${notification.title} requires payment review.`,
+      targetId: found.order.id,
+      targetType: notification.orderType === "bulk" ? "bulk_order" : "sample_order",
+      cta: `/manufacturers/orders/${found.order.id}`,
+    });
+  }
+  return true;
+}
+
+async function handleManufacturerTransferReversed(transfer: any, providerEventId: string): Promise<void> {
+  const orderId = transfer.metadata?.sampleOrderId;
+  if (!orderId) return;
+  const notification = await db.transaction(async (tx): Promise<{
+    clerkId: string; title: string; orderType: string; reviewState: string;
+  } | null> => {
+    // Serialize distinct partial-reversal events for one order before deriving
+    // the delta from Stripe's cumulative amount_reversed.
+    const locked = await tx.execute(
+      sql`SELECT id FROM sample_orders WHERE id = ${orderId}::uuid FOR UPDATE`,
+    );
+    if (!((locked as any).rows?.length)) return null;
+    const [order] = await tx.select().from(sampleOrders).where(eq(sampleOrders.id, orderId)).limit(1);
+    if (!order?.walletId || order.stripeTransferId !== transfer.id) return null;
+    const priorEvents = await tx.select({ amountCents: manufacturerActivityEvents.amountCents })
+      .from(manufacturerActivityEvents)
+      .where(and(
+        eq(manufacturerActivityEvents.sampleOrderId, order.id),
+        eq(manufacturerActivityEvents.type, "payment_reversed"),
+      ));
+    const alreadyReversedCents = priorEvents.reduce((sum, event) => sum + (event.amountCents ?? 0), 0);
+    const reversedCents = reversalDeltaCents(transfer.amount_reversed, alreadyReversedCents, order.priceCents);
+    if (reversedCents === 0) return null;
+    // Claim provider delivery first. A Stripe retry must not adjust the wallet
+    // twice, even after a process crash between event receipt and notification.
+    const [recorded] = await tx.insert(manufacturerActivityEvents).values({
+      manufacturerId: order.manufacturerId,
+      sampleOrderId: order.id,
+      category: "payment",
+      type: "payment_reversed",
+      amountCents: reversedCents,
+      providerEventId,
+      metadata: {
+        transferId: transfer.id,
+        cumulativeReversedCents: transfer.amount_reversed ?? order.priceCents,
+      },
+    }).onConflictDoNothing({ target: manufacturerActivityEvents.providerEventId })
+      .returning({ id: manufacturerActivityEvents.id });
+    if (!recorded) return null;
+    const totalReversedCents = alreadyReversedCents + reversedCents;
+    const reviewState = totalReversedCents >= order.priceCents ? "reversed" : "partial_reversal";
+    await tx.update(sampleOrders).set({
+      status: "payment_review",
+      walletPaymentState: "reversed",
+      paymentReviewState: reviewState,
+      updatedAt: new Date(),
+    }).where(eq(sampleOrders.id, order.id));
+    // A reversal returns funds from the manufacturer's transfer to the
+    // seller's wallet. releasedCents is reduced so availableCents becomes
+    // truthful immediately; the immutable negative ledger line records it.
+    await tx.update(dropWallets).set({
+      releasedCents: sql`GREATEST(${dropWallets.releasedCents} - ${reversedCents}, 0)`,
+      updatedAt: new Date(),
+    }).where(eq(dropWallets.id, order.walletId));
+    await tx.insert(dropWalletTransactions).values({
+      walletId: order.walletId,
+      type: "bulk_payment_reversal",
+      amountCents: -reversedCents,
+      sampleOrderId: order.id,
+      description: `${reviewState === "reversed" ? "Full" : "Partial"} bulk payment reversal: ${order.title}`,
+      stripeTransferId: transfer.id,
+    });
+    const [manufacturer] = await tx.select({ clerkId: manufacturers.clerkId })
+      .from(manufacturers).where(eq(manufacturers.id, order.manufacturerId)).limit(1);
+    if (manufacturer?.clerkId) {
+      return { clerkId: manufacturer.clerkId, title: order.title, orderType: order.orderType, reviewState };
+    }
+    return null;
+  });
+  if (notification) {
+    await publishNotification({
+      userId: notification.clerkId,
+      category: "production",
+      type: "manufacturer_payment_reversed",
+      title: notification.reviewState === "reversed" ? "Payment reversed" : "Payment partially reversed",
+      body: `${notification.title} requires payment review.`,
+      targetId: orderId,
+      targetType: notification.orderType === "bulk" ? "bulk_order" : "sample_order",
+      cta: `/manufacturers/orders/${orderId}`,
+    });
+  }
 }
 
 export default router;

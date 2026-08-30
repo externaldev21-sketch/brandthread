@@ -6,10 +6,11 @@
 import { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
-import { manufacturers } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { manufacturerActivityEvents, manufacturers, sampleOrders } from "@workspace/db";
+import { desc, eq } from "drizzle-orm";
 import { requireStripe } from "../lib/stripe";
 import { getWebOrigin } from "../lib/webOrigin";
+import { isAllowedBrandthreadCallbackUrl } from "../lib/brandthreadCallbackUrls";
 
 const router = Router();
 
@@ -22,6 +23,35 @@ async function resolveManufacturer(clerkId: string) {
   return mfr ?? null;
 }
 
+export function isAllowedOnboardingUrl(value: unknown): value is string {
+  return isAllowedBrandthreadCallbackUrl(value, "manufacturer_onboarding");
+}
+
+export function connectReadiness(account: {
+  charges_enabled?: boolean;
+  payouts_enabled?: boolean;
+  details_submitted?: boolean;
+  requirements?: { currently_due?: string[] | null; past_due?: string[] | null; disabled_reason?: string | null };
+}) {
+  const chargesEnabled = account.charges_enabled === true;
+  const payoutsEnabled = account.payouts_enabled === true;
+  const detailsSubmitted = account.details_submitted === true;
+  const ready = chargesEnabled && payoutsEnabled && detailsSubmitted;
+  const requirementsDue = Array.from(new Set([
+    ...(account.requirements?.currently_due ?? []),
+    ...(account.requirements?.past_due ?? []),
+  ]));
+  return {
+    ready,
+    chargesEnabled,
+    payoutsEnabled,
+    detailsSubmitted,
+    status: ready ? "active" : detailsSubmitted ? "restricted" : "pending",
+    requirementsDue,
+    disabledReason: account.requirements?.disabled_reason ?? null,
+  };
+}
+
 // ── POST /api/manufacturers/connect/onboard ────────────────────────────────────
 
 router.post("/onboard", async (req, res) => {
@@ -30,11 +60,15 @@ router.post("/onboard", async (req, res) => {
     const { userId } = getAuth(req);
     if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
-    const baseUrl = `${getWebOrigin("https://localhost:3000")}/api-server`;
+    const baseUrl = getWebOrigin("https://localhost:3000");
     const {
-      refreshUrl = `${baseUrl}/manufacturers/connect/onboard/refresh`,
-      returnUrl  = `${baseUrl}/manufacturers/connect/onboard/return`,
+      refreshUrl = `${baseUrl}/manufacturers/payment`,
+      returnUrl  = `${baseUrl}/manufacturers/payment`,
     } = req.body;
+    if (!isAllowedOnboardingUrl(refreshUrl) || !isAllowedOnboardingUrl(returnUrl)) {
+      res.status(400).json({ error: "refreshUrl and returnUrl must be allowed Brandthread app or web URLs" });
+      return;
+    }
 
     const mfr = await resolveManufacturer(userId);
     if (!mfr) {
@@ -91,27 +125,33 @@ router.get("/status", async (req, res) => {
         chargesEnabled:   false,
         payoutsEnabled:   false,
         detailsSubmitted: false,
+        ready:            false,
         status:           "not_started",
+        requirementsDue:  [],
+        disabledReason:   null,
+        recovery:         "Start Stripe onboarding and add an eligible bank account before accepting payments.",
       });
       return;
     }
 
     const account = await stripe.accounts.retrieve(mfr.stripeAccountId);
-    // Sync DB status
-    if (account.charges_enabled && mfr.stripeAccountStatus !== "active") {
+    if (account.deleted) {
+      res.status(409).json({ error: "Connected payout account was deleted", connected: false, ready: false });
+      return;
+    }
+    const readiness = connectReadiness(account);
+    if (mfr.stripeAccountStatus !== readiness.status || mfr.paymentSetup !== readiness.ready) {
       await db
         .update(manufacturers)
-        .set({ stripeAccountStatus: "active", updatedAt: new Date() })
+        .set({ stripeAccountStatus: readiness.status, paymentSetup: readiness.ready, updatedAt: new Date() })
         .where(eq(manufacturers.id, mfr.id));
     }
 
     res.json({
       connected:        true,
       stripeAccountId:  mfr.stripeAccountId,
-      chargesEnabled:   account.charges_enabled,
-      payoutsEnabled:   account.payouts_enabled,
-      detailsSubmitted: account.details_submitted,
-      status:           account.charges_enabled ? "active" : (mfr.stripeAccountStatus ?? "pending"),
+      ...readiness,
+      recovery: readiness.ready ? null : "Complete Stripe verification and add an eligible bank account before accepting payments.",
     });
   } catch (err: any) {
     const status = err.status ?? 500;
@@ -120,6 +160,29 @@ router.get("/status", async (req, res) => {
       req.log.error({ err, status }, "Failed to retrieve manufacturer Connect status");
       res.status(500).json({ error: "Failed to retrieve Connect status" });
     }
+  }
+});
+
+router.get("/payments", async (req, res) => {
+  try {
+    const { userId } = getAuth(req);
+    if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+    const mfr = await resolveManufacturer(userId);
+    if (!mfr) { res.status(404).json({ error: "Manufacturer profile not found" }); return; }
+    const rows = await db.select({
+      event: manufacturerActivityEvents,
+      orderTitle: sampleOrders.title,
+      orderType: sampleOrders.orderType,
+    }).from(manufacturerActivityEvents)
+      .leftJoin(sampleOrders, eq(manufacturerActivityEvents.sampleOrderId, sampleOrders.id))
+      .where(eq(manufacturerActivityEvents.manufacturerId, mfr.id))
+      .orderBy(desc(manufacturerActivityEvents.createdAt));
+    res.json(rows.filter(({ event }) => event.category === "payment" || event.category === "payout").map(({ event, ...rest }) => ({
+      ...event, ...rest, createdAt: event.createdAt.toISOString(),
+    })));
+  } catch (err) {
+    req.log.error({ err }, "Failed to list manufacturer payments");
+    res.status(500).json({ error: "Failed to list payment history" });
   }
 });
 

@@ -512,6 +512,28 @@ export default function ManufacturerMessagesScreen() {
 
   // ── Attach menu ───────────────────────────────────────────────────────────────
 
+  function handleStartCall(mode: 'voice' | 'video') {
+    if (!resolvedThreadId) {
+      Alert.alert('Call unavailable', 'This conversation is not ready for calls.');
+      return;
+    }
+    const initials = mfrDisplayName
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map(part => part[0]?.toUpperCase())
+      .join('') || '?';
+    const query = new URLSearchParams({
+      conversationId: resolvedThreadId,
+      participantName: mfrDisplayName,
+      participantInitials: initials,
+      participantColor: PURPLE,
+      mode,
+      manufacturerCall: '1',
+    });
+    router.push(`/call-screen?${query.toString()}` as never);
+  }
+
   function handleAttachPress() {
     const actions: any[] = [
       { text: '🖼️  Send Photo',       onPress: handlePhotoSend },
@@ -519,8 +541,12 @@ export default function ManufacturerMessagesScreen() {
     actions.push({ text: '🧵 Send Sample Order Card', onPress: () => setCardDialog('sample_card') });
     actions.push({ text: '📦 Send Bulk Order Card',   onPress: () => setCardDialog('bulk_card')   });
     actions.push({
+      text: '📞 Start Voice Call',
+      onPress: () => handleStartCall('voice'),
+    });
+    actions.push({
       text: '📹 Start Video Call',
-      onPress: () => Alert.alert('Video Calling', 'Video and voice calling requires the EAS native build. Ask your account manager to enable it for your workspace.'),
+      onPress: () => handleStartCall('video'),
     });
     actions.push({ text: 'Cancel', style: 'cancel' });
 
@@ -556,15 +582,29 @@ export default function ManufacturerMessagesScreen() {
       <View style={{ paddingTop: insets.top, backgroundColor: BG, borderBottomWidth: 1, borderBottomColor: BORDER }}>
         <BrandthreadHeader
           title={mfrDisplayName}
-          subtitle="Connected"
+          subtitle="Manufacturer conversation"
           onBack={() => router.back()}
           rightElement={
-            <TouchableOpacity
-              onPress={() => Alert.alert('Video Calling', 'Video and voice calling requires the EAS native build.')}
-              style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' }}
-            >
-              <Feather name="video" size={16} color={PURPLE_LIGHT} />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: SP.xs }}>
+              <TouchableOpacity
+                onPress={() => handleStartCall('voice')}
+                accessibilityRole="button"
+                accessibilityLabel="Start voice call"
+                testID="manufacturer-voice-call"
+                style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Feather name="phone" size={16} color={PURPLE_LIGHT} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handleStartCall('video')}
+                accessibilityRole="button"
+                accessibilityLabel="Start video call"
+                testID="manufacturer-video-call"
+                style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Feather name="video" size={16} color={PURPLE_LIGHT} />
+              </TouchableOpacity>
+            </View>
           }
         />
       </View>

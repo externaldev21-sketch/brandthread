@@ -1,315 +1,191 @@
-import { useState } from "react";
-import { useGetManufacturerPayment, useSetupManufacturerPayment, getGetManufacturerPaymentQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { ShieldCheck, Building, Wallet, CheckCircle2, Lock } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { useAuth } from "@clerk/react";
+import { ArrowDownLeft, CheckCircle2, Clock3, ExternalLink, RefreshCw, ShieldAlert, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { toast } from "sonner";
-import { ManufacturerPayment } from "@workspace/api-client-react";
 
-const formSchema = z.object({
-  method: z.enum(["bank_transfer", "paypal", "wise"]),
-  accountNumber: z.string().optional(),
-  routingNumber: z.string().optional(),
-  bankName: z.string().optional(),
-  currency: z.string().min(3, "Currency code required (e.g. USD)"),
-  paypalEmail: z.string().email().optional().or(z.literal('')),
-  wiseEmail: z.string().email().optional().or(z.literal('')),
-}).refine(data => {
-  if (data.method === 'bank_transfer') {
-    return !!data.accountNumber && !!data.routingNumber && !!data.bankName;
-  }
-  if (data.method === 'paypal') return !!data.paypalEmail;
-  if (data.method === 'wise') return !!data.wiseEmail;
-  return true;
-}, {
-  message: "Required fields missing for selected payment method",
-  path: ["method"]
-});
+type ConnectStatus = {
+  connected: boolean;
+  ready: boolean;
+  status: "not_started" | "pending" | "restricted" | "active";
+  chargesEnabled: boolean;
+  payoutsEnabled: boolean;
+  detailsSubmitted: boolean;
+  requirementsDue: string[];
+  disabledReason: string | null;
+  recovery: string | null;
+};
 
-type FormValues = z.infer<typeof formSchema>;
+type PaymentActivity = {
+  id: string;
+  type: string;
+  amountCents: number | null;
+  orderTitle: string | null;
+  orderType: string | null;
+  createdAt: string;
+  metadata: Record<string, unknown>;
+};
+
+const money = (cents: number) =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
 
 export default function Payment() {
-  const { data: payment, isLoading } = useGetManufacturerPayment();
-  const setupMutation = useSetupManufacturerPayment();
-  const queryClient = useQueryClient();
-  const [isEditing, setIsEditing] = useState(false);
+  const { getToken } = useAuth();
+  const [status, setStatus] = useState<ConnectStatus | null>(null);
+  const [activity, setActivity] = useState<PaymentActivity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState("");
 
-  const form = useForm<FormValues>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      method: "bank_transfer",
-      currency: "USD",
-      accountNumber: "",
-      routingNumber: "",
-      bankName: "",
-      paypalEmail: "",
-      wiseEmail: ""
+  const request = useCallback(async <T,>(path: string, init?: RequestInit): Promise<T> => {
+    const token = await getToken();
+    const response = await fetch(path, {
+      ...init,
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...init?.headers },
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || "Request failed");
+    return body as T;
+  }, [getToken]);
+
+  const load = useCallback(async () => {
+    setError("");
+    try {
+      const [nextStatus, nextActivity] = await Promise.all([
+        request<ConnectStatus>("/api/manufacturers/connect/status"),
+        request<PaymentActivity[]>("/api/manufacturers/connect/payments"),
+      ]);
+      setStatus(nextStatus);
+      setActivity(nextActivity);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Payout information could not be loaded.");
+    } finally {
+      setLoading(false);
     }
-  });
+  }, [request]);
 
-  const selectedMethod = form.watch("method");
+  useEffect(() => { void load(); }, [load]);
 
-  const onSubmit = (data: FormValues) => {
-    setupMutation.mutate(
-      { data: { ...data, accountNumber: data.accountNumber ?? '', routingNumber: data.routingNumber ?? '', bankName: data.bankName ?? '' } },
-      {
-        onSuccess: (updatedPayment) => {
-          toast.success("Payment details saved securely");
-          queryClient.setQueryData(getGetManufacturerPaymentQueryKey(), updatedPayment);
-          setIsEditing(false);
-        },
-        onError: () => {
-          toast.error("Failed to save payment details");
-        }
-      }
-    );
+  const startOnboarding = async () => {
+    setStarting(true);
+    setError("");
+    try {
+      const returnUrl = `${window.location.origin}${import.meta.env.BASE_URL}payment`;
+      const result = await request<{ url: string }>("/api/manufacturers/connect/onboard", {
+        method: "POST",
+        body: JSON.stringify({ returnUrl, refreshUrl: returnUrl }),
+      });
+      window.location.assign(result.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Stripe onboarding could not be opened.");
+      setStarting(false);
+    }
   };
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="h-10 w-48 bg-secondary rounded animate-pulse"></div>
-        <div className="h-64 bg-card rounded border border-border animate-pulse"></div>
-      </div>
-    );
+  if (loading) {
+    return <div className="space-y-6"><div className="h-10 w-48 animate-pulse rounded bg-secondary" /><div className="h-64 animate-pulse rounded border border-border bg-card" /></div>;
   }
 
-  const showForm = !payment?.isSetup || isEditing;
+  const totalReceived = activity.reduce((sum, item) => {
+    if (item.type === "payment_received" || item.type === "transfer_paid") {
+      return sum + (item.amountCents ?? 0);
+    }
+    if (item.type === "payment_reversed") {
+      return sum - (item.amountCents ?? 0);
+    }
+    return sum;
+  }, 0);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 max-w-4xl mx-auto pb-12">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Payout Settings</h1>
-        <p className="text-muted-foreground mt-1">Manage how you receive funds from completed orders.</p>
+    <div className="mx-auto max-w-5xl space-y-8 pb-12 animate-in fade-in duration-500">
+      <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Payouts</h1>
+          <p className="mt-1 text-muted-foreground">Connect a verified bank account and review payment activity.</p>
+        </div>
+        <Button variant="outline" onClick={() => void load()} className="gap-2">
+          <RefreshCw className="h-4 w-4" /> Refresh status
+        </Button>
       </div>
 
-      {/* Escrow Explainer */}
-      <div className="bg-primary/5 border border-primary/20 rounded-lg p-6 flex flex-col md:flex-row gap-6 items-start">
-        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-          <ShieldCheck className="w-6 h-6 text-primary" />
+      {error && <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">{error}</div>}
+
+      <section className={`rounded-lg border p-6 ${status?.ready ? "border-primary/30 bg-primary/5" : "border-amber-500/30 bg-amber-500/5"}`}>
+        <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+          <div className="flex gap-4">
+            <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${status?.ready ? "bg-primary/15 text-primary" : "bg-amber-500/15 text-amber-400"}`}>
+              {status?.ready ? <CheckCircle2 className="h-6 w-6" /> : <ShieldAlert className="h-6 w-6" />}
+            </div>
+            <div>
+              <h2 className="text-xl font-bold">{status?.ready ? "Ready to receive payments" : status?.connected ? "Finish payout setup" : "Connect your payout account"}</h2>
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                {status?.ready
+                  ? "Stripe has verified your account. Seller payments can be routed to your connected bank account."
+                  : status?.recovery ?? "Complete secure Stripe onboarding before accepting paid orders."}
+              </p>
+              {status?.requirementsDue?.length ? (
+                <p className="mt-3 text-xs text-amber-300">Stripe still requires: {status.requirementsDue.map((item) => item.replaceAll("_", " ")).join(", ")}</p>
+              ) : null}
+            </div>
+          </div>
+          {!status?.ready && (
+            <Button onClick={() => void startOnboarding()} disabled={starting} className="shrink-0 gap-2">
+              <ExternalLink className="h-4 w-4" /> {starting ? "Opening Stripe…" : status?.connected ? "Continue setup" : "Connect with Stripe"}
+            </Button>
+          )}
         </div>
-        <div className="space-y-2">
-          <h3 className="font-semibold text-lg text-primary">Secure Escrow Model</h3>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Brandthread holds buyer funds securely in escrow the moment an order is approved. 
-            Once you mark the production as <strong>Complete</strong> and provide shipping details, 
-            funds are automatically released to your configured payout method. Zero invoice chasing.
-          </p>
+        <div className="mt-6 grid grid-cols-1 gap-3 border-t border-border/60 pt-5 sm:grid-cols-3">
+          {[
+            ["Identity details", status?.detailsSubmitted],
+            ["Payments enabled", status?.chargesEnabled],
+            ["Bank payouts enabled", status?.payoutsEnabled],
+          ].map(([label, complete]) => (
+            <div key={String(label)} className="flex items-center gap-2 text-sm">
+              {complete ? <CheckCircle2 className="h-4 w-4 text-primary" /> : <Clock3 className="h-4 w-4 text-muted-foreground" />}
+              <span className={complete ? "text-foreground" : "text-muted-foreground"}>{String(label)}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-lg border border-border bg-card p-5">
+          <p className="text-sm text-muted-foreground">Recorded payments</p>
+          <p className="mt-2 text-3xl font-bold">{money(totalReceived)}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-5">
+          <p className="text-sm text-muted-foreground">Payout account</p>
+          <p className="mt-2 text-lg font-semibold capitalize">{status?.status.replaceAll("_", " ") ?? "Not started"}</p>
         </div>
       </div>
 
-      {!showForm ? (
-        <div className="bg-card border border-border rounded-lg overflow-hidden">
-          <div className="p-6 border-b border-border flex justify-between items-center bg-secondary/30">
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="w-5 h-5 text-primary" />
-              <h2 className="font-semibold text-lg">Active Payout Method</h2>
-            </div>
-            <Button variant="outline" onClick={() => setIsEditing(true)}>Update Details</Button>
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1 font-mono uppercase tracking-wider">Method</p>
-                <div className="flex items-center gap-2 font-medium text-lg capitalize">
-                  {payment.method === 'bank_transfer' ? <Building className="w-5 h-5 text-muted-foreground" /> : <Wallet className="w-5 h-5 text-muted-foreground" />}
-                  {payment.method?.replace('_', ' ')}
-                </div>
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground mb-1 font-mono uppercase tracking-wider">Currency</p>
-                <p className="font-medium text-lg">{payment.currency}</p>
-              </div>
-              
-              {payment.method === 'bank_transfer' ? (
-                <>
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1 font-mono uppercase tracking-wider">Bank Name</p>
-                    <p className="font-medium text-lg">{payment.bankName}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1 font-mono uppercase tracking-wider">Account Last 4</p>
-                    <div className="flex items-center gap-2 font-mono text-lg">
-                      •••• {payment.bankLast4}
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="col-span-2">
-                  <p className="text-sm text-muted-foreground mb-1 font-mono uppercase tracking-wider">Account Email</p>
-                  <p className="font-medium text-lg flex items-center gap-2">
-                    <Lock className="w-4 h-4 text-muted-foreground" />
-                    [Protected Email Address]
-                  </p>
-                </div>
-              )}
-            </div>
-            <div className="mt-8 pt-4 border-t border-border/50 text-xs text-muted-foreground">
-              Last updated: {payment.setupAt ? new Date(payment.setupAt).toLocaleDateString() : 'Unknown'}
-            </div>
-          </div>
+      <section className="space-y-4">
+        <div>
+          <h2 className="text-xl font-bold">Payment activity</h2>
+          <p className="text-sm text-muted-foreground">Order payments and payout changes are recorded here.</p>
         </div>
-      ) : (
-        <div className="bg-card border border-border rounded-lg p-6 md:p-8">
-          <div className="mb-8">
-            <h2 className="text-xl font-bold">Configure Payouts</h2>
-            <p className="text-sm text-muted-foreground mt-1">These details are encrypted and stored securely.</p>
+        {activity.length === 0 ? (
+          <div className="flex flex-col items-center rounded-lg border border-dashed border-border bg-card/40 px-6 py-12 text-center">
+            <Wallet className="mb-3 h-8 w-8 text-muted-foreground" />
+            <p className="font-medium">No payment activity yet</p>
+            <p className="mt-1 text-sm text-muted-foreground">Paid sample and bulk orders will appear here.</p>
           </div>
-
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="method"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Payout Method</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger className="h-12">
-                            <SelectValue placeholder="Select method" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="bank_transfer">Wire / Bank Transfer</SelectItem>
-                          <SelectItem value="paypal">PayPal</SelectItem>
-                          <SelectItem value="wise">Wise (TransferWise)</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="currency"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Settlement Currency</FormLabel>
-                      <FormControl>
-                        <Input {...field} className="h-12 uppercase font-mono" placeholder="USD, EUR, GBP..." />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {selectedMethod === 'bank_transfer' && (
-                <div className="space-y-6 animate-in slide-in-from-top-2">
-                  <div className="h-px bg-border w-full"></div>
-                  <h3 className="font-semibold">Bank Details</h3>
-                  
-                  <FormField
-                    control={form.control}
-                    name="bankName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Bank Name</FormLabel>
-                        <FormControl>
-                          <Input {...field} className="h-12" placeholder="e.g. JPMorgan Chase" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <FormField
-                      control={form.control}
-                      name="routingNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Routing Number / SWIFT / BIC</FormLabel>
-                          <FormControl>
-                            <Input {...field} className="h-12 font-mono" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="accountNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Account Number / IBAN</FormLabel>
-                          <FormControl>
-                            <Input {...field} type="password" placeholder="••••••••••••" className="h-12 font-mono tracking-widest" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-border bg-card">
+            {activity.map((item) => (
+              <div key={item.id} className="flex items-center justify-between gap-4 border-b border-border p-4 last:border-0">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="rounded-full bg-primary/10 p-2 text-primary"><ArrowDownLeft className="h-4 w-4" /></div>
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{item.orderTitle ?? item.type.replaceAll("_", " ")}</p>
+                    <p className="text-xs capitalize text-muted-foreground">{item.orderType ?? "Payout"} · {new Date(item.createdAt).toLocaleString()}</p>
                   </div>
                 </div>
-              )}
-
-              {selectedMethod === 'paypal' && (
-                <div className="space-y-6 animate-in slide-in-from-top-2">
-                  <div className="h-px bg-border w-full"></div>
-                  <h3 className="font-semibold">PayPal Details</h3>
-                  <FormField
-                    control={form.control}
-                    name="paypalEmail"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>PayPal Email Address</FormLabel>
-                        <FormControl>
-                          <Input {...field} type="email" className="h-12" placeholder="payments@yourcompany.com" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              )}
-
-              {selectedMethod === 'wise' && (
-                <div className="space-y-6 animate-in slide-in-from-top-2">
-                  <div className="h-px bg-border w-full"></div>
-                  <h3 className="font-semibold">Wise Details</h3>
-                  <FormField
-                    control={form.control}
-                    name="wiseEmail"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Wise Account Email</FormLabel>
-                        <FormControl>
-                          <Input {...field} type="email" className="h-12" placeholder="payments@yourcompany.com" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              )}
-
-              <div className="flex gap-4 pt-4">
-                {isEditing && (
-                  <Button type="button" variant="outline" onClick={() => setIsEditing(false)} className="h-12 px-6">
-                    Cancel
-                  </Button>
-                )}
-                <Button type="submit" className="h-12 px-8 flex-1 md:flex-none font-semibold gap-2" disabled={setupMutation.isPending}>
-                  <Lock className="w-4 h-4" />
-                  {setupMutation.isPending ? "Encrypting & Saving..." : "Save Securely"}
-                </Button>
+                <span className="shrink-0 font-mono font-semibold">{item.amountCents == null ? "—" : money(item.amountCents)}</span>
               </div>
-            </form>
-          </Form>
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

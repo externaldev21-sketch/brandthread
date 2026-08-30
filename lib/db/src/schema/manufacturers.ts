@@ -139,6 +139,28 @@ export const manufacturerThreadAttachments = pgTable('manufacturer_thread_attach
     .on(table.threadId, table.uploaderClerkId, table.consumedAt),
 }));
 
+// Immutable manufacturer payment/call lifecycle ledger. providerEventId makes
+// Stripe webhook reconciliation idempotent while actorClerkId records who
+// requested participant-scoped call credentials.
+export const manufacturerActivityEvents = pgTable('manufacturer_activity_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  manufacturerId: uuid('manufacturer_id').notNull().references(() => manufacturers.id, { onDelete: 'cascade' }),
+  sampleOrderId: uuid('sample_order_id'),
+  threadId: uuid('thread_id').references(() => manufacturerThreads.id, { onDelete: 'set null' }),
+  actorClerkId: text('actor_clerk_id'),
+  category: text('category').notNull(), // 'payment' | 'call' | 'payout'
+  type: text('type').notNull(),
+  amountCents: integer('amount_cents'),
+  providerEventId: text('provider_event_id').unique(),
+  metadata: json('metadata').$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  manufacturerCreatedIdx: index('manufacturer_activity_manufacturer_created_idx')
+    .on(table.manufacturerId, table.createdAt),
+  orderIdx: index('manufacturer_activity_sample_order_idx').on(table.sampleOrderId),
+  threadIdx: index('manufacturer_activity_thread_idx').on(table.threadId),
+}));
+
 // ─── Manufacturer Orders ──────────────────────────────────────────────────────
 
 export const manufacturerOrders = pgTable('manufacturer_orders', {
@@ -177,6 +199,7 @@ export const sampleOrders = pgTable('sample_orders', {
   // Stage: payment_received → processing → cut_and_sew → packing → shipped → delivered
   status:                  text('status').notNull().default('payment_received'),
   stripePaymentIntentId:   text('stripe_payment_intent_id'),
+  stripeChargeId:          text('stripe_charge_id'),
   stripeCheckoutSessionId: text('stripe_checkout_session_id'),
   checkoutSessionVersion: integer('checkout_session_version').notNull().default(0),
   platformFeeCents:        integer('platform_fee_cents').notNull().default(0),
@@ -190,6 +213,9 @@ export const sampleOrders = pgTable('sample_orders', {
   // Wallet payment claim state protects external transfer retries.
   walletPaymentState:      text('wallet_payment_state').notNull().default('pending'),
   walletPaymentAttemptKey: text('wallet_payment_attempt_key'),
+  // 'none' | 'partial_reversal' | 'reversed'; a reversal requires review and
+  // must never appear as a successfully settled payment.
+  paymentReviewState:      text('payment_review_state').notNull().default('none'),
   notes:                   text('notes'),
   // Sample progress images — array of object storage paths (e.g. /objects/uploads/<uuid>)
   imageUrls:               json('image_urls').$type<string[]>().notNull().default([]),

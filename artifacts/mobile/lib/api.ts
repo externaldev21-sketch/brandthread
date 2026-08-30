@@ -523,8 +523,29 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       },
       connect: {
         onboard: (body?: { refreshUrl?: string; returnUrl?: string }) =>
-          post<any>('/api/manufacturers/connect/onboard', body ?? {}),
-        status: () => get<any>('/api/manufacturers/connect/status'),
+          post<{ url: string; stripeAccountId: string }>('/api/manufacturers/connect/onboard', body ?? {}),
+        status: () => get<{
+          connected: boolean;
+          stripeAccountId?: string;
+          chargesEnabled: boolean;
+          payoutsEnabled: boolean;
+          detailsSubmitted: boolean;
+          ready?: boolean;
+          requirementsDue?: string[];
+          disabledReason?: string | null;
+          recovery?: string | null;
+          status: 'not_started' | 'pending' | 'active' | string;
+        }>('/api/manufacturers/connect/status'),
+        payments: () => get<Array<{
+          id: string;
+          category: 'payment' | 'payout';
+          type: string;
+          sampleOrderId?: string | null;
+          orderTitle?: string | null;
+          orderType?: 'sample' | 'bulk' | null;
+          metadata?: Record<string, unknown> | null;
+          createdAt: string;
+        }>>('/api/manufacturers/connect/payments'),
       },
       sampleOrders: {
         list:       () => get<any[]>('/api/sample-orders'),
@@ -803,9 +824,17 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     /** 1:1 voice / video call tokens (Agora RTC). */
     call: {
       token: (body: { conversationId: string; mode: 'voice' | 'video' }) =>
-        post<{ appId: string; token: string; channelName: string; uid: number; mode: string }>(
+        post<{ appId: string; token: string; channelName: string; uid: number; mode: string; expiresAt?: string }>(
           '/api/call/token', body
         ),
+      event: (body: {
+        threadId: string;
+        type: 'started' | 'ended' | 'declined' | 'failed';
+        mode: 'voice' | 'video';
+        /** Stable UUID used by the server to make lifecycle retries idempotent. */
+        clientEventId: string;
+      }) =>
+        post<{ recorded: true }>('/api/call/events', body),
     },
     /** Unauthenticated public endpoints — no Authorization header needed. */
     publicProducts: {

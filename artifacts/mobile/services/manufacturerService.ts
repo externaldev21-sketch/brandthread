@@ -832,6 +832,8 @@ function mapSampleOrder(row: any, imageUris: string[] = []): Sample {
     orderType:      row.orderType ?? 'sample',
     manufacturerName: row.manufacturerName ?? undefined,
     manufacturerCountry: row.manufacturerCountry ?? undefined,
+    manufacturerPayoutReady: row.manufacturerPayoutReady === true,
+    manufacturerHasStripe: row.manufacturerHasStripe === true,
     quantity:       Number(row.quantity ?? 1),
   } as Sample;
 }
@@ -956,6 +958,8 @@ function mapBulkOrder(row: any): ProductionOrder {
     createdAt: row.createdAt, updatedAt: row.updatedAt,
     estimatedCompletionDate: undefined,
     threadId: row.threadId, manufacturerName: row.manufacturerName,
+    manufacturerPayoutReady: row.manufacturerPayoutReady === true,
+    manufacturerHasStripe: row.manufacturerHasStripe === true,
     walletPaymentState: row.walletPaymentState ?? null,
   } as ProductionOrder;
 }

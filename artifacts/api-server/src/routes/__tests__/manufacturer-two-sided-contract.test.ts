@@ -3,6 +3,11 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { isSupportedAttachment } from "../manufacturers";
 import { isDefinitiveTransferRejection } from "../sample-orders";
+import { connectReadiness, isAllowedOnboardingUrl } from "../manufacturer-connect";
+import { isAllowedCheckoutReturnUrl } from "../sample-orders";
+import { getWebOrigin } from "../../lib/webOrigin";
+import { CALL_TOKEN_TTL_SECONDS, isAuthorizedManufacturerThreadParticipant, isValidCallClientEventId } from "../call";
+import { reversalDeltaCents } from "../webhooks";
 
 const route = fs.readFileSync(path.resolve(__dirname, "..", "manufacturers.ts"), "utf8");
 const sampleRoute = fs.readFileSync(path.resolve(__dirname, "..", "sample-orders.ts"), "utf8");
@@ -10,6 +15,12 @@ const migration = fs.readFileSync(
   path.resolve(__dirname, "../../../../../lib/db/migrations/046_manufacturer_thread_participant_unread.sql"),
   "utf8",
 );
+const paymentCallMigration = fs.readFileSync(
+  path.resolve(__dirname, "../../../../../lib/db/migrations/050_manufacturer_payment_call_events.sql"),
+  "utf8",
+);
+const connectRoute = fs.readFileSync(path.resolve(__dirname, "..", "manufacturer-connect.ts"), "utf8");
+const webhookRoute = fs.readFileSync(path.resolve(__dirname, "..", "webhooks.ts"), "utf8");
 
 describe("manufacturer two-sided authorization contract", () => {
   it("maintains and clears participant-specific unread counters", () => {
@@ -83,5 +94,116 @@ describe("manufacturer two-sided authorization contract", () => {
     expect(sampleRoute).toContain('checkoutSessionVersion: sql');
     expect(sampleRoute).toContain('sample-order-checkout/${row.order.id}/v${checkoutSessionVersion}');
     expect(sampleRoute).toContain('session.payment_status === "paid" || session.status === "complete"');
+  });
+
+  it("does not report incomplete manufacturer payout accounts as ready", () => {
+    expect(connectReadiness({
+      charges_enabled: true,
+      payouts_enabled: false,
+      details_submitted: true,
+      requirements: { currently_due: ["external_account"] },
+    })).toMatchObject({
+      ready: false,
+      status: "restricted",
+      requirementsDue: ["external_account"],
+    });
+    expect(connectReadiness({
+      charges_enabled: true,
+      payouts_enabled: true,
+      details_submitted: true,
+    }).ready).toBe(true);
+  });
+
+  it("rejects unauthorized manufacturer call participants and keeps credentials short-lived", () => {
+    const thread = { buyerClerkId: "seller_1", manufacturerClerkId: "manufacturer_1" };
+    expect(isAuthorizedManufacturerThreadParticipant("seller_1", thread)).toBe(true);
+    expect(isAuthorizedManufacturerThreadParticipant("manufacturer_1", thread)).toBe(true);
+    expect(isAuthorizedManufacturerThreadParticipant("intruder", thread)).toBe(false);
+    expect(isAuthorizedManufacturerThreadParticipant("intruder", null)).toBe(false);
+    expect(CALL_TOKEN_TTL_SECONDS).toBeLessThanOrEqual(15 * 60);
+  });
+
+  it("uses the same full Stripe readiness truth in account webhooks", () => {
+    expect(webhookRoute).toContain("connectReadiness(account)");
+    expect(webhookRoute).toContain("paymentSetup: manufacturerReadiness.ready");
+    expect(route).not.toContain(".set({ paymentSetup: true");
+  });
+
+  it("only accepts first-party Connect onboarding return and refresh URLs", () => {
+    expect(isAllowedOnboardingUrl("brandthread://payouts/complete")).toBe(true);
+    expect(isAllowedOnboardingUrl("brandthread://payouts/refresh")).toBe(true);
+    expect(isAllowedOnboardingUrl("brandthread://attacker.example/complete")).toBe(false);
+    expect(isAllowedOnboardingUrl("brandthread://payouts/complete/extra")).toBe(false);
+    expect(isAllowedOnboardingUrl("brandthread://user@payouts/complete")).toBe(false);
+    expect(isAllowedOnboardingUrl("https://evil.example/redirect")).toBe(false);
+    expect(isAllowedOnboardingUrl("javascript:alert(1)")).toBe(false);
+    expect(isAllowedOnboardingUrl(`${new URL(getWebOrigin()).origin}/arbitrary`)).toBe(false);
+    expect(connectRoute).toContain("isAllowedOnboardingUrl(refreshUrl)");
+    expect(connectRoute).toContain("isAllowedOnboardingUrl(returnUrl)");
+  });
+
+  it("only accepts the canonical sample-checkout callback and required query", () => {
+    const id = "11111111-1111-4111-8111-111111111111";
+    expect(isAllowedCheckoutReturnUrl(`brandthread://sample-detail?id=${id}&paymentReturn=1`)).toBe(true);
+    expect(isAllowedCheckoutReturnUrl(`brandthread://attacker/sample-detail?id=${id}&paymentReturn=1`)).toBe(false);
+    expect(isAllowedCheckoutReturnUrl(`brandthread://sample-detail?id=${id}&paymentReturn=1&next=https://evil.example`)).toBe(false);
+    expect(isAllowedCheckoutReturnUrl(`brandthread://sample-detail?id=not-an-order&paymentReturn=1`)).toBe(false);
+    expect(isAllowedCheckoutReturnUrl(`brandthread://sample-detail?id=${id}&id=22222222-2222-4222-8222-222222222222&paymentReturn=1`)).toBe(false);
+    expect(isAllowedCheckoutReturnUrl(`brandthread://sample-detail?id=${id}&paymentReturn=1&paymentReturn=0`)).toBe(false);
+    const origin = new URL(getWebOrigin()).origin;
+    expect(isAllowedCheckoutReturnUrl(`${origin}/sample-detail?id=${id}&id=22222222-2222-4222-8222-222222222222&paymentReturn=1`)).toBe(false);
+  });
+
+  it("reconciles partial transfer reversals exactly once into review state", () => {
+    expect(reversalDeltaCents(300, 100, 1_000)).toBe(200);
+    expect(reversalDeltaCents(1_200, 300, 1_000)).toBe(700);
+    expect(reversalDeltaCents(300, 300, 1_000)).toBe(0);
+    expect(webhookRoute).toContain("FOR UPDATE");
+    expect(webhookRoute).toContain('paymentReviewState: reviewState');
+    expect(webhookRoute).toContain('walletPaymentState: "reversed"');
+    expect(paymentCallMigration).toContain("payment_review_state");
+  });
+
+  it("reconciles partial, full, and replayed destination-charge reversals without wallet mutation", () => {
+    expect(reversalDeltaCents(250, 0, 1_000)).toBe(250);
+    expect(reversalDeltaCents(1_000, 250, 1_000)).toBe(750);
+    expect(reversalDeltaCents(1_000, 1_000, 1_000)).toBe(0);
+    expect(webhookRoute).toContain('case "charge.refunded"');
+    expect(webhookRoute).toContain('source: "dispute"');
+    expect(webhookRoute).toContain("handleManufacturerCardReversal");
+    expect(webhookRoute).toContain("stripeChargeId: input.chargeId");
+    expect(webhookRoute).toContain("onConflictDoNothing({ target: manufacturerActivityEvents.providerEventId })");
+  });
+
+  it("requires a stable client event id and safely identifies call-event replays", () => {
+    expect(isValidCallClientEventId("call_evt_123")).toBe(true);
+    expect(isValidCallClientEventId("short")).toBe(false);
+    expect(isValidCallClientEventId("bad event id")).toBe(false);
+    const callRoute = fs.readFileSync(path.resolve(__dirname, "..", "call.ts"), "utf8");
+    expect(callRoute).toContain("clientEventId");
+    expect(callRoute).toContain("providerEventId = `call:${threadId}:${callerId}:${clientEventId}`");
+    expect(callRoute).toContain("duplicate: true");
+    expect(callRoute).toContain("if (!recorded)");
+  });
+
+  it("keeps ordinary buyer and seller conversation calls backward compatible", () => {
+    const callRoute = fs.readFileSync(path.resolve(__dirname, "..", "call.ts"), "utf8");
+    const mobileCall = fs.readFileSync(path.resolve(__dirname, "../../../../mobile/app/call-screen.tsx"), "utf8");
+    expect(callRoute).toContain("conversationParticipants");
+    expect(callRoute).toContain('channelPrefix = "call"');
+    expect(callRoute).toContain("`call_${threadId}`");
+    expect(callRoute).toContain("if (thread)");
+    expect(mobileCall).toContain("params.manufacturerCall === '1'");
+  });
+
+  it("accepts webhook-before-response wallet reconciliation with one notification owner", () => {
+    expect(sampleRoute).toContain('eq(sampleOrders.status, "payment_received")');
+    expect(sampleRoute).toContain('eq(sampleOrders.walletPaymentState, "paid")');
+    expect(sampleRoute).toContain("eq(sampleOrders.stripeTransferId, stripeTransferId)");
+    expect(sampleRoute).toContain("ownsNotification: !!notificationOwner");
+    expect(sampleRoute).toContain("reconciliation.ownsNotification");
+    expect(webhookRoute).toContain('providerEventId: `transfer:${transfer.id}`');
+    expect(webhookRoute).toContain("notificationOwner: \"webhook\"");
+    expect(webhookRoute).toContain("if (ownsNotification)");
   });
 });

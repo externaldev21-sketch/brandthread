@@ -288,6 +288,9 @@ export interface Sample {
   orderType?: 'sample' | 'bulk';
   manufacturerName?: string;
   manufacturerCountry?: string;
+  /** Server-confirmed Connect readiness; payment must not start unless true. */
+  manufacturerPayoutReady?: boolean;
+  manufacturerHasStripe?: boolean;
   quantity?: number;
 }
 
@@ -399,6 +402,9 @@ export interface ProductionOrder {
   updatedAt: string;
   threadId?: string;
   manufacturerName?: string;
+  /** Server-confirmed Connect readiness; payment must not start unless true. */
+  manufacturerPayoutReady?: boolean;
+  manufacturerHasStripe?: boolean;
   walletPaymentState?: 'pending' | 'processing' | 'paid' | 'failed' | null;
 }
 

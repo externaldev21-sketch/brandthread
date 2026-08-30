@@ -9,6 +9,8 @@ import {
   confirmSamplePayment,
   createSampleCheckoutSession,
   getBulkWalletOptions,
+  getProductionOrder,
+  getSample,
   payBulkOrderFromWallet,
 } from './manufacturerService';
 
@@ -45,5 +47,34 @@ describe('manufacturer order payment service contracts', () => {
   it('keeps insufficient-wallet errors available for retry UI', async () => {
     serviceRequest.mockRejectedValueOnce(new Error('Wallet funds unavailable'));
     await expect(payBulkOrderFromWallet('bulk_1', 'wallet_1')).rejects.toThrow('Wallet funds unavailable');
+  });
+
+  it('preserves manufacturer payout availability on seller order details', async () => {
+    serviceRequest
+      .mockResolvedValueOnce({
+        id: 'sample_1',
+        orderType: 'sample',
+        status: 'pending_payment',
+        manufacturerHasStripe: true,
+        manufacturerPayoutReady: false,
+        priceCents: 2500,
+        createdAt: '2026-01-01',
+        updatedAt: '2026-01-01',
+      })
+      .mockResolvedValueOnce({ imageUrls: [] })
+      .mockResolvedValueOnce({
+        id: 'bulk_1',
+        orderType: 'bulk',
+        status: 'pending_payment',
+        manufacturerHasStripe: true,
+        manufacturerPayoutReady: true,
+        priceCents: 5000,
+        quantity: 10,
+        createdAt: '2026-01-01',
+        updatedAt: '2026-01-01',
+      });
+
+    await expect(getSample('sample_1')).resolves.toMatchObject({ manufacturerPayoutReady: false });
+    await expect(getProductionOrder('bulk_1')).resolves.toMatchObject({ manufacturerPayoutReady: true });
   });
 });

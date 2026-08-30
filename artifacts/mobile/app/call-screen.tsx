@@ -11,12 +11,13 @@
  */
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, Alert,
+  View, Text, TouchableOpacity, StyleSheet,
   Dimensions, ActivityIndicator, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
+import { randomUUID } from 'expo-crypto';
 import { useApi } from '@/lib/api';
 import {
   BG, PURPLE, PURPLE_DIM, BORDER,
@@ -93,6 +94,7 @@ function NativeCallScreen() {
     myInitials?: string;
     myColor?: string;
     mode?: string;
+    manufacturerCall?: string;
   }>();
 
   const mode             = (params.mode ?? 'voice') as 'voice' | 'video';
@@ -102,48 +104,96 @@ function NativeCallScreen() {
   const myInit           = params.myInitials ?? 'Me';
 
   // Call state
-  const [status, setStatus]           = useState<'connecting' | 'ringing' | 'connected' | 'ended'>('connecting');
+  const [status, setStatus]           = useState<'connecting' | 'ringing' | 'connected' | 'ended' | 'unavailable'>('connecting');
+  const [unavailableReason, setUnavailableReason] = useState('');
   const [muted, setMuted]             = useState(false);
   const [cameraOff, setCameraOff]     = useState(false);
   const [remoteUid, setRemoteUid]     = useState<number | null>(null);
+  const [channelName, setChannelName] = useState('');
   const [duration, setDuration]       = useState(0);
   const [screenSharing, setScreenSharing] = useState(false);
 
   const engineRef  = useRef<any>(null);
   const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+  const callStartedRef = useRef(false);
+  const credentialsIssuedRef = useRef(false);
+  const remoteJoinedRef = useRef(false);
+  const terminalEventRef = useRef<'ended' | 'failed' | 'declined' | null>(null);
+  // Keep one UUID per lifecycle type. If an SDK callback repeats or an API
+  // request is retried, the server receives the same idempotency key.
+  const eventIdsRef = useRef<Partial<Record<'started' | 'ended' | 'failed' | 'declined', string>>>({});
+
+  function clientEventIdFor(type: 'started' | 'ended' | 'failed' | 'declined') {
+    const existing = eventIdsRef.current[type];
+    if (existing) return existing;
+    const clientEventId = randomUUID();
+    eventIdsRef.current[type] = clientEventId;
+    return clientEventId;
+  }
+
+  /**
+   * A terminal lifecycle event is recorded at most once per screen instance.
+   * The server independently authorizes the manufacturer thread, so a failed
+   * best-effort audit request must never change call UI or retry indefinitely.
+   */
+  function emitTerminalEvent(type: 'ended' | 'failed' | 'declined') {
+    if (params.manufacturerCall !== '1' || !params.conversationId || terminalEventRef.current) return;
+    terminalEventRef.current = type;
+    void api.call.event({
+      threadId: params.conversationId,
+      type,
+      mode,
+      clientEventId: clientEventIdFor(type),
+    }).catch(() => {});
+  }
 
   // ── Fetch token + init Agora ─────────────────────────────────────────────────
 
   const initCall = useCallback(async () => {
     if (!params.conversationId) {
-      Alert.alert('Error', 'No conversation found for this call.');
-      router.back();
+      setUnavailableReason('No authorized conversation was provided for this call.');
+      setStatus('unavailable');
+      return;
+    }
+
+    if (!AgoraModule) {
+      setUnavailableReason('Calling is not supported in Expo Go or this device build. Use a native Brandthread build, or continue by message.');
+      setStatus('unavailable');
+      emitTerminalEvent('failed');
       return;
     }
 
     let tokenData: { appId: string; token: string; channelName: string; uid: number } | null = null;
     try {
-      tokenData = await (api as any).call.token({
+      tokenData = await api.call.token({
         conversationId: params.conversationId,
         mode,
-      }) as any;
+      });
     } catch (err: any) {
       const msg = String(err?.message ?? '');
       if (msg.includes('503') || msg.includes('not configured')) {
-        // Agora not configured in this environment — show placeholder UI
-        setStatus('connected');
+        setUnavailableReason('Calling is not configured for this workspace. Continue the conversation by message.');
+        setStatus('unavailable');
         return;
       }
-      Alert.alert('Call failed', 'Could not start the call. Please try again.');
-      router.back();
+      if (msg.includes('403') || msg.includes('participant')) {
+        setUnavailableReason('Only participants in this conversation can join its calls.');
+      } else {
+        setUnavailableReason('The call could not be started. Check your connection and try again.');
+      }
+      setStatus('unavailable');
+      emitTerminalEvent('failed');
       return;
     }
 
-    if (!tokenData?.appId || !AgoraModule) {
-      // Web / Expo Go / no appId — show degraded UI
-      setStatus('connected');
+    if (!tokenData?.appId || !tokenData.channelName) {
+      setUnavailableReason('Calling is not configured for this workspace. Continue the conversation by message.');
+      setStatus('unavailable');
+      emitTerminalEvent('failed');
       return;
     }
+    setChannelName(tokenData.channelName);
+    credentialsIssuedRef.current = true;
 
     const { createAgoraRtcEngine, ChannelProfileType, ClientRoleType } = AgoraModule;
 
@@ -162,9 +212,19 @@ function NativeCallScreen() {
       engine.registerEventHandler({
         onJoinChannelSuccess: () => {
           setStatus('ringing');
+          callStartedRef.current = true;
+          if (params.manufacturerCall === '1') {
+            void api.call.event({
+              threadId: params.conversationId,
+              type: 'started',
+              mode,
+              clientEventId: clientEventIdFor('started'),
+            }).catch(() => {});
+          }
         },
         onUserJoined: (connection: any, uid: number) => {
           setRemoteUid(uid);
+          remoteJoinedRef.current = true;
           setStatus('connected');
           timerRef.current = setInterval(() => setDuration(d => d + 1), 1000);
         },
@@ -172,10 +232,15 @@ function NativeCallScreen() {
           setRemoteUid(null);
           clearInterval(timerRef.current!);
           setStatus('ended');
+          emitTerminalEvent('ended');
           setTimeout(() => router.back(), 1500);
         },
         onError: (err: any) => {
           console.warn('[Agora call error]', err);
+          clearInterval(timerRef.current!);
+          setUnavailableReason('The call ended because of a device or connection error. Continue the conversation by message.');
+          setStatus('unavailable');
+          emitTerminalEvent('failed');
         },
       });
 
@@ -190,14 +255,19 @@ function NativeCallScreen() {
       setStatus('ringing');
     } catch (e) {
       console.warn('[Agora init]', e);
-      setStatus('connected');
+      setUnavailableReason('Calling is not supported by this device or app build. Continue the conversation by message.');
+      setStatus('unavailable');
+      emitTerminalEvent('failed');
     }
-  }, [params.conversationId, mode]);
+  }, [api, mode, params.conversationId]);
 
   useEffect(() => {
     initCall();
     return () => {
       clearInterval(timerRef.current!);
+      if (callStartedRef.current || credentialsIssuedRef.current) {
+        emitTerminalEvent(remoteJoinedRef.current ? 'ended' : 'declined');
+      }
       try {
         engineRef.current?.leaveChannel();
         engineRef.current?.release();
@@ -238,6 +308,7 @@ function NativeCallScreen() {
 
   function handleHangUp() {
     clearInterval(timerRef.current!);
+    emitTerminalEvent(remoteJoinedRef.current ? 'ended' : 'declined');
     try {
       engineRef.current?.leaveChannel();
       engineRef.current?.release();
@@ -255,6 +326,7 @@ function NativeCallScreen() {
     status === 'connecting' ? 'Connecting…' :
     status === 'ringing'    ? 'Calling…' :
     status === 'connected'  ? (duration > 0 ? formatDuration(duration) : 'Connected') :
+    status === 'unavailable' ? 'Unavailable' :
                               'Call ended';
 
   return (
@@ -278,6 +350,20 @@ function NativeCallScreen() {
 
       {/* ── Video area ─────────────────────────────────────────────────────── */}
       <View style={s.videoArea}>
+        {status === 'unavailable' ? (
+          <View style={s.unavailable}>
+            <View style={s.unavailableIcon}>
+              <Feather name="phone-off" size={30} color={MUTE_RED} />
+            </View>
+            <Text style={s.unavailableTitle}>Call unavailable</Text>
+            <Text style={s.unavailableText}>{unavailableReason}</Text>
+            <TouchableOpacity style={s.messageButton} onPress={() => router.back()}>
+              <Feather name="message-circle" size={17} color="#fff" />
+              <Text style={s.messageButtonText}>Return to messages</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
 
         {/* Remote video / avatar */}
         {mode === 'video' && isConnected && remoteUid != null && RtcView && !cameraOff ? (
@@ -285,7 +371,7 @@ function NativeCallScreen() {
             <RtcView
               uid={remoteUid}
               style={{ flex: 1 }}
-              channelId={`call_${params.conversationId}`}
+              channelId={channelName}
             />
           </View>
         ) : (
@@ -332,7 +418,7 @@ function NativeCallScreen() {
             <RtcView
               uid={0}
               style={{ flex: 1, borderRadius: RADIUS.md }}
-              channelId={`call_${params.conversationId}`}
+              channelId={channelName}
               setupMode={1} // VideoViewSetupMode.VideoViewSetupAdd
             />
           </View>
@@ -344,10 +430,12 @@ function NativeCallScreen() {
             </View>
           </View>
         )}
+          </>
+        )}
       </View>
 
       {/* ── Controls ───────────────────────────────────────────────────────── */}
-      <View style={s.controls}>
+      {status !== 'unavailable' && <View style={s.controls}>
         {/* Mute */}
         <TouchableOpacity
           style={[s.ctrlBtn, muted && s.ctrlBtnActive]}
@@ -405,7 +493,7 @@ function NativeCallScreen() {
             </Text>
           </TouchableOpacity>
         )}
-      </View>
+      </View>}
     </View>
   );
 }
@@ -464,6 +552,50 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     gap: SP.xl,
     alignItems: 'center',
+  },
+  unavailable: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SP.xl,
+  },
+  unavailableIcon: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,59,48,0.14)',
+    marginBottom: SP.md,
+  },
+  unavailableTitle: {
+    color: FG,
+    fontFamily: FONT.bold,
+    fontSize: FS.xl,
+    marginBottom: SP.sm,
+  },
+  unavailableText: {
+    color: MUTED,
+    fontFamily: FONT.regular,
+    fontSize: FS.base,
+    lineHeight: 22,
+    textAlign: 'center',
+    maxWidth: 360,
+  },
+  messageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.sm,
+    backgroundColor: PURPLE,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SP.lg,
+    paddingVertical: SP.md,
+    marginTop: SP.xl,
+  },
+  messageButtonText: {
+    color: '#fff',
+    fontFamily: FONT.semibold,
+    fontSize: FS.sm,
   },
   callingText: {
     fontSize: FS.xl,

@@ -68,18 +68,23 @@ export default function ProductionDetailScreen() {
     return () => clearInterval(timer);
   }, [load]);
   useEffect(() => {
-    if (order?.status === 'pending') void loadWallets();
-  }, [order?.status, loadWallets]);
+    if (order?.status === 'pending' && order.manufacturerPayoutReady === true) void loadWallets();
+  }, [order?.status, order?.manufacturerPayoutReady, loadWallets]);
 
   const payFromWallet = async () => {
-    if (!id || !selectedWalletId || paying) return;
+    if (!id || !selectedWalletId || paying || order?.manufacturerPayoutReady !== true) return;
     setPaying(true);
     setPaymentError('');
     try {
       await payBulkOrderFromWallet(id, selectedWalletId);
       await load(true);
     } catch (err: any) {
-      setPaymentError(err?.message ?? 'Wallet payment could not be completed. Please retry.');
+      const message = String(err?.message ?? '');
+      setPaymentError(
+        message.includes('payouts are not ready')
+          ? 'The manufacturer must finish Stripe verification before this wallet payment can be released. Message them, then retry.'
+          : message || 'Wallet payment could not be completed. Please retry.',
+      );
     } finally {
       setPaying(false);
     }
@@ -138,7 +143,11 @@ export default function ProductionDetailScreen() {
         {order.status === 'pending' && (
           <BrandthreadCard>
             <Text style={styles.heading}>Pay from a drop wallet</Text>
-            <Text style={styles.walletHelp}>This bulk order requires {formatCents(requiredCents || order.totalCostCents)}. Wallet payments may take a moment to reconcile.</Text>
+            <Text style={styles.walletHelp}>
+              {order.manufacturerPayoutReady !== true
+                ? 'Payment is unavailable until the manufacturer connects and verifies their Stripe payout account. Message them, then refresh this order.'
+                : `This bulk order requires ${formatCents(requiredCents || order.totalCostCents)}. Wallet payments may take a moment to reconcile.`}
+            </Text>
             {order.walletPaymentState === 'processing' ? (
               <Text style={styles.processing}>Payment is processing. This tracker will refresh automatically.</Text>
             ) : wallets.length === 0 ? (
@@ -154,8 +163,13 @@ export default function ProductionDetailScreen() {
             )}
             {!!paymentError && wallets.length > 0 && <Text style={styles.walletError}>{paymentError}</Text>}
             <SecondaryButton label={paying ? 'Processing payment…' : 'Pay from selected wallet'} icon="lock" onPress={payFromWallet}
-              disabled={!selectedWalletId || paying || order.walletPaymentState === 'processing'} />
-            {(!!paymentError || wallets.length === 0) && <TouchableOpacity onPress={loadWallets}><Text style={styles.retryLink}>Retry wallet options</Text></TouchableOpacity>}
+              disabled={!selectedWalletId || paying || order.walletPaymentState === 'processing' || order.manufacturerPayoutReady !== true} />
+            {(!!paymentError || wallets.length === 0) && order.manufacturerPayoutReady === true && <TouchableOpacity onPress={loadWallets}><Text style={styles.retryLink}>Retry wallet options</Text></TouchableOpacity>}
+            {order.manufacturerPayoutReady !== true && (
+              <TouchableOpacity onPress={openThread}>
+                <Text style={styles.retryLink}>Message manufacturer about payout setup</Text>
+              </TouchableOpacity>
+            )}
           </BrandthreadCard>
         )}
 

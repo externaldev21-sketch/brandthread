@@ -18,14 +18,14 @@
 import express, { Router } from "express";
 import { getAuth } from "@clerk/express";
 import { db } from "@workspace/db";
-import { sampleOrders, manufacturers, manufacturerThreads, dropWallets, dropWalletTransactions } from "@workspace/db";
+import { sampleOrders, manufacturers, manufacturerThreads, manufacturerActivityEvents, dropWallets, dropWalletTransactions } from "@workspace/db";
 import { eq, and, desc, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireStripe, PLATFORM_COMMISSION_RATE, computeApplicationFeeCents } from "../lib/stripe";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
 import { publishNotification } from "./notifications-feed";
-import { getWebOrigin } from "../lib/webOrigin";
+import { isAllowedBrandthreadCallbackUrl } from "../lib/brandthreadCallbackUrls";
 
 const router = Router();
 router.use(requireAuth);
@@ -101,17 +101,8 @@ export function isDefinitiveTransferRejection(error: unknown) {
     && statusCode !== 409 && statusCode !== 429;
 }
 
-function isAllowedCheckoutReturnUrl(value: unknown): value is string {
-  if (typeof value !== "string" || !value) return false;
-  if (value.startsWith("brandthread://")) return true;
-  try {
-    const url = new URL(value);
-    const webOrigin = new URL(getWebOrigin()).origin;
-    return url.origin === webOrigin
-      || (process.env.NODE_ENV !== "production" && url.hostname === "localhost");
-  } catch {
-    return false;
-  }
+export function isAllowedCheckoutReturnUrl(value: unknown): value is string {
+  return isAllowedBrandthreadCallbackUrl(value, "sample_checkout");
 }
 
 // ── GET /api/sample-orders ────────────────────────────────────────────────────
@@ -161,6 +152,7 @@ router.post("/", async (req, res) => {
     const [mfr] = await db
       .select({
         stripeAccountId: manufacturers.stripeAccountId,
+        paymentSetup: manufacturers.paymentSetup,
         clerkId: manufacturers.clerkId,
         businessName: manufacturers.businessName,
       })
@@ -216,6 +208,7 @@ router.post("/", async (req, res) => {
     res.status(201).json({
       ...order,
       hasConnect:  !!mfr.stripeAccountId,
+      manufacturerPayoutReady: mfr.paymentSetup,
       createdAt:   order.createdAt.toISOString(),
       updatedAt:   order.updatedAt.toISOString(),
     });
@@ -243,6 +236,16 @@ router.post("/:id/checkout-session", async (req, res) => {
     }
     if (!row.stripeAccountId) { res.status(409).json({ error: "Manufacturer cannot receive card payment" }); return; }
     const stripe = requireStripe();
+    const connectedAccount = await stripe.accounts.retrieve(row.stripeAccountId);
+    if (connectedAccount.deleted || !connectedAccount.charges_enabled
+      || !connectedAccount.payouts_enabled || !connectedAccount.details_submitted) {
+      res.status(409).json({
+        error: "Manufacturer payouts are not ready",
+        code: "MANUFACTURER_PAYOUTS_INCOMPLETE",
+        recovery: "Ask the manufacturer to complete Stripe verification and add an eligible bank account.",
+      });
+      return;
+    }
     let checkoutSessionVersion = row.order.checkoutSessionVersion;
     if (row.order.stripeCheckoutSessionId) {
       const session = await stripe.checkout.sessions.retrieve(row.order.stripeCheckoutSessionId);
@@ -360,8 +363,29 @@ router.post("/:id/pay", async (req, res) => {
         eq(sampleOrders.status, "pending_payment"),
       )).returning();
     if (!updated) {
+      const [reconciled] = await db.select().from(sampleOrders)
+        .where(eq(sampleOrders.id, row.order.id)).limit(1);
+      if (reconciled?.status === "payment_received") {
+        res.json({
+          ...reconciled,
+          paymentStatus,
+          createdAt: reconciled.createdAt.toISOString(),
+          updatedAt: reconciled.updatedAt.toISOString(),
+        });
+        return;
+      }
       res.status(409).json({ error: "Order is no longer awaiting payment" }); return;
     }
+    await db.insert(manufacturerActivityEvents).values({
+      manufacturerId: row.order.manufacturerId,
+      sampleOrderId: row.order.id,
+      actorClerkId: sellerId,
+      category: "payment",
+      type: "payment_received",
+      amountCents: row.order.priceCents,
+      providerEventId: `checkout:${row.order.stripeCheckoutSessionId ?? row.order.stripePaymentIntentId}`,
+      metadata: { source: "seller_confirmation", orderType: row.order.orderType },
+    }).onConflictDoNothing({ target: manufacturerActivityEvents.providerEventId });
     if (row.mfrClerkId) {
       const notificationContext = orderNotificationContext(row.order);
       await publishNotification({
@@ -393,6 +417,7 @@ router.get("/:id", async (req, res) => {
         mfrName:    manufacturers.businessName,
         mfrCountry: manufacturers.country,
         mfrStripe:  manufacturers.stripeAccountId,
+        mfrPaymentReady: manufacturers.paymentSetup,
       })
       .from(sampleOrders)
       .leftJoin(manufacturers, eq(sampleOrders.manufacturerId, manufacturers.id))
@@ -408,6 +433,7 @@ router.get("/:id", async (req, res) => {
       manufacturerName:     row.mfrName,
       manufacturerCountry:  row.mfrCountry,
       manufacturerHasStripe: !!row.mfrStripe,
+      manufacturerPayoutReady: row.mfrPaymentReady,
       stageIndex,
       stages: ORDER_STAGES,
       createdAt:  row.order.createdAt.toISOString(),
@@ -684,6 +710,16 @@ router.post("/:id/pay-from-wallet", async (req, res) => {
     }
     if (wallet.sellerId !== sellerId) { res.status(403).json({ error: "Wallet does not belong to you" }); return; }
     if (!row.mfrStripeId) { res.status(409).json({ error: "Manufacturer cannot receive wallet payment" }); return; }
+    const connectedAccount = await stripe.accounts.retrieve(row.mfrStripeId);
+    if (connectedAccount.deleted || !connectedAccount.charges_enabled
+      || !connectedAccount.payouts_enabled || !connectedAccount.details_submitted) {
+      res.status(409).json({
+        error: "Manufacturer payouts are not ready",
+        code: "MANUFACTURER_PAYOUTS_INCOMPLETE",
+        recovery: "Ask the manufacturer to complete Stripe verification and add an eligible bank account.",
+      });
+      return;
+    }
     const attemptKey = order.walletPaymentAttemptKey ?? `sample-order-wallet/${order.id}`;
     if (order.walletPaymentState === "processing" && order.walletId !== walletId) {
       res.status(409).json({ error: "Payment is already processing from a different wallet" }); return;
@@ -748,20 +784,50 @@ router.post("/:id/pay-from-wallet", async (req, res) => {
       throw error;
     }
 
-    const [updated] = await db.transaction(async (tx) => {
+    const reconciliation = await db.transaction(async (tx) => {
       const finalized = await tx.update(sampleOrders).set({
         walletId, stripeTransferId, walletPaymentState: "paid", status: "payment_received", updatedAt: new Date(),
       }).where(and(eq(sampleOrders.id, order.id), eq(sampleOrders.walletPaymentState, "processing")))
         .returning();
-      if (!finalized[0]) throw new Error("WALLET_FINALIZE_CONFLICT");
-      await tx.insert(dropWalletTransactions).values({
-        walletId, type: "bulk_payment", amountCents: order.priceCents,
-        sampleOrderId: order.id, description: `Bulk order payment: ${order.title}`, stripeTransferId,
-      }).onConflictDoNothing();
-      return finalized;
+      let reconciled = finalized[0];
+      if (reconciled) {
+        await tx.update(dropWallets).set({
+          releasedCents: sql`${dropWallets.releasedCents} + ${order.priceCents}`,
+          reservedCents: sql`GREATEST(${dropWallets.reservedCents} - ${order.priceCents}, 0)`,
+          updatedAt: new Date(),
+        }).where(and(eq(dropWallets.id, walletId), eq(dropWallets.sellerId, sellerId)));
+        await tx.insert(dropWalletTransactions).values({
+          walletId, type: "bulk_payment", amountCents: order.priceCents,
+          sampleOrderId: order.id, description: `Bulk order payment: ${order.title}`, stripeTransferId,
+        }).onConflictDoNothing();
+      } else {
+        [reconciled] = await tx.select().from(sampleOrders).where(and(
+          eq(sampleOrders.id, order.id),
+          eq(sampleOrders.status, "payment_received"),
+          eq(sampleOrders.walletPaymentState, "paid"),
+          eq(sampleOrders.stripeTransferId, stripeTransferId),
+        )).limit(1);
+        if (!reconciled) throw new Error("WALLET_FINALIZE_CONFLICT");
+      }
+      const existingPayment = await tx.select({ id: manufacturerActivityEvents.id })
+        .from(manufacturerActivityEvents).where(and(
+          eq(manufacturerActivityEvents.sampleOrderId, order.id),
+          eq(manufacturerActivityEvents.type, "payment_received"),
+        )).limit(1);
+      const [notificationOwner] = existingPayment.length ? [] : await tx.insert(manufacturerActivityEvents).values({
+        manufacturerId: order.manufacturerId,
+        sampleOrderId: order.id,
+        actorClerkId: sellerId,
+        category: "payment",
+        type: "payment_received",
+        amountCents: order.priceCents,
+        providerEventId: `transfer:${stripeTransferId}`,
+        metadata: { source: "drop_wallet", orderType: order.orderType, notificationOwner: "request" },
+      }).onConflictDoNothing({ target: manufacturerActivityEvents.providerEventId })
+        .returning({ id: manufacturerActivityEvents.id });
+      return { order: reconciled, ownsNotification: !!notificationOwner };
     });
-    if (!updated) { res.status(409).json({ error: "Payment reconciliation required; retry safely" }); return; }
-    if (row.mfrClerkId) {
+    if (row.mfrClerkId && reconciliation.ownsNotification) {
       const notificationContext = orderNotificationContext(order);
       await publishNotification({
         userId: row.mfrClerkId, category: "production", type: "manufacturer_payment_received",
@@ -772,10 +838,10 @@ router.post("/:id/pay-from-wallet", async (req, res) => {
     }
 
     res.json({
-      ...updated,
+      ...reconciliation.order,
       paidFromWallet: true,
-      createdAt: updated.createdAt.toISOString(),
-      updatedAt: updated.updatedAt.toISOString(),
+      createdAt: reconciliation.order.createdAt.toISOString(),
+      updatedAt: reconciliation.order.updatedAt.toISOString(),
     });
   } catch (err) {
     req.log.error({ err, orderId: req.params.id }, "Failed to pay sample order from wallet");

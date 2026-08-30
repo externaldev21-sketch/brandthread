@@ -1017,11 +1017,6 @@ router.post("/me/payment", async (req, res) => {
     })
     .returning();
 
-  await db
-    .update(manufacturers)
-    .set({ paymentSetup: true, updatedAt: new Date() })
-    .where(eq(manufacturers.id, mfr.id));
-
   return res.json({
     isSetup:   true,
     method:    payment.method,
