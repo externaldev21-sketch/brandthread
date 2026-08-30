@@ -125,6 +125,19 @@ export default function SellerInboxScreen() {
     return c.participants.find((p) => p.userId !== myId) ?? c.participants[0] ?? null;
   }
 
+  function openConversation(conversationId: string) {
+    // Keep the inbox truthful while the conversation screen completes its
+    // server-side mark-as-read request and avoid an inflated header total.
+    setConvs((current) =>
+      current.map((conversation) =>
+        conversation.id === conversationId
+          ? { ...conversation, unreadCount: 0 }
+          : conversation,
+      ),
+    );
+    router.push(('/seller-conversation?id=' + encodeURIComponent(conversationId)) as never);
+  }
+
   function renderItem({ item }: ListRenderItemInfo<ConvView>) {
     const other = otherParticipant(item);
     if (!other) return null;
@@ -133,7 +146,7 @@ export default function SellerInboxScreen() {
       <TouchableOpacity
         style={s.row}
         activeOpacity={0.7}
-        onPress={() => router.push(('/seller-conversation?id=' + encodeURIComponent(item.id)) as never)}
+        onPress={() => openConversation(item.id)}
       >
         <View style={[s.avatar, { backgroundColor: other.color || PURPLE }]}>
           <Text style={s.avatarInitials}>{other.initials || (other.name?.[0] ?? '?').toUpperCase()}</Text>

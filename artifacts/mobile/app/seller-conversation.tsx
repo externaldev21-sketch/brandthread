@@ -163,7 +163,6 @@ export default function SellerConversationScreen() {
       ]);
       if (generationRef.current !== generation) return;
       setConv(c as ConvView);
-      api.conversations.markRead(id).catch(() => {});
     } catch (e) {
       console.error('Failed to load conversation', e);
     } finally {
@@ -174,6 +173,12 @@ export default function SellerConversationScreen() {
   useFocusEffect(useCallback(() => {
     const generation = ++generationRef.current;
     consecutiveFailuresRef.current = 0;
+    // Mark the thread as read as soon as it opens. This is intentionally
+    // independent of loading the conversation/messages so a slow or failed
+    // read request cannot leave the seller's inbox badge stale.
+    if (id) {
+      api.conversations.markRead(id).catch(() => {});
+    }
     loadAll(generation);
     pollRef.current = setInterval(() => loadMessages(generation), 15_000);
     return () => {
@@ -182,7 +187,7 @@ export default function SellerConversationScreen() {
         pollRef.current = null;
       }
     };
-  }, [loadAll, loadMessages]));
+  }, [api, id, loadAll, loadMessages]));
 
   useEffect(() => {
     if (messages.length > 0) {
