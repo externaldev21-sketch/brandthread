@@ -28,6 +28,7 @@
 - [Expo web boot & root route](expo-web-boot.md) — boot never blank; AuthGate must handle bare "/"; ?bt_preview=buyer|seller (dev+web) bypasses auth for captures/canvas frames; static screenshots catch FOIT.
 - [Expo dependency repair](expo-dependency-repair.md) — never interrupt pnpm’s forced mobile relink; run long repairs in background and restart Metro only after package links return.
 - [Expo root navigation readiness](expo-root-navigation-readiness.md) — defer preview redirects until Expo Router registers the root Stack or web preview crashes before first paint.
+- [Expo native prebuild guards](expo-native-prebuild-guards.md) — package lifecycle scripts do not intercept direct `expo prebuild`; invariant checks belong in Expo config plugins.
 - [Push notifications & service config](push-notifications-service-config.md) — expo-notifications wired in _layout.tsx; configureServices(getToken) + PushRegistrar components; expo-camera must be ~17.0.10 for Expo 54.
 - [DB package project references](db-project-references.md) — lib/db uses composite:true + emitDeclarationOnly; must run tsc --build in lib/db before api-server TypeScript checks will see new exports.
 - [Analytics service API wiring](analytics-api-wiring.md) — getOverview/getSalesAnalytics/getProductAnalytics try real API first, fall back to demo; dashboard=monthly totals, revenue=daily chart, products=top by revenue.

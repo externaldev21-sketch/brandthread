@@ -163,6 +163,7 @@
       "output": "static"
     },
     "plugins": [
+      "./plugins/with-verify-app-identity",
       "expo-router",
       "expo-font",
       "expo-web-browser",

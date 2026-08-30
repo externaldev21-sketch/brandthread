@@ -6,9 +6,13 @@
   "scripts": {
     "dev": "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY=$CLERK_PUBLISHABLE_KEY EXPO_PUBLIC_API_BASE_URL=https://$REPLIT_DEV_DOMAIN EXPO_PACKAGER_PROXY_URL=https://$REPLIT_EXPO_DEV_DOMAIN EXPO_PUBLIC_DOMAIN=$REPLIT_DEV_DOMAIN EXPO_PUBLIC_REPL_ID=$REPL_ID REACT_NATIVE_PACKAGER_HOSTNAME=$REPLIT_DEV_DOMAIN pnpm exec expo start --tunnel --port $PORT",
     "build": "node scripts/build-web.js",
+    "prebuild": "pnpm run verify:app-identity",
+    "eas-build-pre-install": "pnpm run verify:app-identity",
+    "native:prebuild": "node scripts/native-prebuild.js",
     "serve": "node server/serve.js",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "verify:app-identity": "node scripts/verify-app-identity.js",
     "verify:privacy-manifest": "node scripts/verify-ios-privacy-manifest.js",
     "verify:privacy-manifest:config": "node scripts/verify-ios-privacy-manifest.js --config-only"
   },
