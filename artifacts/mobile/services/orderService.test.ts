@@ -63,3 +63,34 @@ describe('buyer order cache account boundary', () => {
     expect(buyerBResult.error).toBeInstanceOf(Error);
   });
 });
+
+describe('buyer order cancellation context', () => {
+  beforeEach(() => {
+    storage.clear();
+    serviceRequest.mockReset();
+  });
+
+  it('preserves cancellationReason from the buyer orders API response', async () => {
+    serviceRequest.mockResolvedValueOnce([{
+      id: 'cancelled-order',
+      orderNumber: 'BT-CANCELLED',
+      ownerId: 'seller-a',
+      sellerDisplayName: 'Seller A',
+      status: 'cancelled',
+      totalCents: 2400,
+      subtotalCents: 2000,
+      shippingCents: 400,
+      stripePaymentIntentId: 'pi_cancelled',
+      cancellationReason: 'buyer_requested',
+      createdAt: '2026-08-30T12:00:00.000Z',
+    }]);
+
+    const result = await getBuyerOrdersWithStatus('buyer-a');
+
+    expect(result.orders).toHaveLength(1);
+    expect(result.orders[0]).toMatchObject({
+      status: 'cancelled',
+      cancellationReason: 'buyer_requested',
+    });
+  });
+});

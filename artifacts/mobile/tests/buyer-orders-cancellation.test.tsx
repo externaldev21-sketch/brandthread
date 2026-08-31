@@ -241,4 +241,26 @@ describe('buyer order cancellation banner', () => {
       node => (node.type as unknown) === 'Text' && textContent(node.props.children) === 'Order cancelled',
     )).toHaveLength(1);
   });
+
+  it('renders the friendly shared label for buyer_requested', async () => {
+    getBuyerOrdersWithStatusMock.mockResolvedValue({
+      orders: [{
+        ...baseOrder,
+        cancellationReason: 'buyer_requested',
+      }],
+      error: null,
+    });
+
+    renderer = await renderScreen();
+
+    const cancellationReasons = renderer.root.findAll(
+      node => (node.type as unknown) === 'Text'
+        && textContent(node.props.children).includes('You requested the cancellation'),
+    );
+    expect(cancellationReasons).toHaveLength(1);
+    expect(renderer.root.findAll(
+      node => (node.type as unknown) === 'Text'
+        && textContent(node.props.children).includes('buyer_requested'),
+    )).toHaveLength(0);
+  });
 });
