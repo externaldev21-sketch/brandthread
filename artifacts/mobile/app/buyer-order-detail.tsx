@@ -207,6 +207,41 @@ function adaptOrderDetail(row: any): BuyerOrderView {
   };
 }
 
+export function BuyerCancellationDetailsCard({
+  order,
+}: {
+  order: Pick<
+    BuyerOrderView,
+    'status' | 'isCustomerVisible' | 'cancellationReason' | 'cancellationNotes'
+  >;
+}) {
+  if (order.status !== 'cancelled' || !order.isCustomerVisible || !order.cancellationReason) {
+    return null;
+  }
+
+  return (
+    <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
+      <GradientCard
+        colors={['rgba(239,68,68,0.14)', 'rgba(239,68,68,0.05)']}
+        style={{ borderColor: 'rgba(239,68,68,0.35)' }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs }}>
+          <Feather name="x-circle" size={ICON.sm} color={RED} />
+          <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: RED }}>Order Cancelled</Text>
+        </View>
+        <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginBottom: 2 }}>
+          {cancellationReasonLabel(order.cancellationReason)}
+        </Text>
+        {!!order.cancellationNotes && (
+          <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: SP.xs, lineHeight: 18 }}>
+            {order.cancellationNotes}
+          </Text>
+        )}
+      </GradientCard>
+    </View>
+  );
+}
+
 export default function BuyerOrderDetailScreen() {
   const colors = useColors();
   const { theme } = useAppTheme();
@@ -645,27 +680,7 @@ export default function BuyerOrderDetailScreen() {
         )}
 
         {/* ── Cancellation Reason ───────────────────────────────────────────── */}
-        {order.status === 'cancelled' && order.isCustomerVisible && order.cancellationReason && (
-          <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
-            <GradientCard
-              colors={['rgba(239,68,68,0.14)', 'rgba(239,68,68,0.05)']}
-              style={{ borderColor: 'rgba(239,68,68,0.35)' }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs }}>
-                <Feather name="x-circle" size={ICON.sm} color={RED} />
-                <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color: RED }}>Order Cancelled</Text>
-              </View>
-              <Text style={{ fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginBottom: 2 }}>
-                {cancellationReasonLabel(order.cancellationReason)}
-              </Text>
-              {!!order.cancellationNotes && (
-                <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: SP.xs, lineHeight: 18 }}>
-                  {order.cancellationNotes}
-                </Text>
-              )}
-            </GradientCard>
-          </View>
-        )}
+        <BuyerCancellationDetailsCard order={order} />
 
         {/* ── Products ─────────────────────────────────────────────────────── */}
         <SectionCard title={`Items (${order.lineItems.length})`}>

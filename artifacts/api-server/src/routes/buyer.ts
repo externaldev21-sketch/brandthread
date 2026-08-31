@@ -1009,12 +1009,16 @@ router.get("/orders/:id", async (req, res) => {
       .from(orderItems)
       .where(eq(orderItems.orderId, row.id));
 
-    // Cancellation reasons are customer-visible when present. Seller
-    // cancellations currently always notify the buyer, while buyer-initiated
-    // cancellations store their own reason for the same order-history view.
+    // Cancellation details are customer-visible only when the order is
+    // cancelled and has a reason. Keep the notes behind the same boundary so
+    // a private/internal note cannot be returned on its own.
+    const isCustomerVisible =
+      row.status === "cancelled" && Boolean(row.cancellationReason);
     res.json({
       ...row,
-      isCustomerVisible: Boolean(row.cancellationReason),
+      cancellationReason: isCustomerVisible ? row.cancellationReason : null,
+      cancellationNotes: isCustomerVisible ? row.cancellationNotes : null,
+      isCustomerVisible,
       items,
     });
   } catch (err) {
