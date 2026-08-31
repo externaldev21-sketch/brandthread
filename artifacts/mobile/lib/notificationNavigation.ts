@@ -41,6 +41,10 @@ export function createNotificationResponseHandler(
       router.push(`/order-detail?id=${encodeURIComponent(data.targetId)}`);
       return;
     }
+    if (data?.targetType === 'buyer_order' && typeof data.targetId === 'string' && data.targetId) {
+      router.push(`/buyer-order-detail?id=${encodeURIComponent(data.targetId)}`);
+      return;
+    }
     if (data?.targetType === 'manufacturer_thread' && typeof data.targetId === 'string' && data.targetId) {
       router.push(`/manufacturer-messages?threadId=${encodeURIComponent(data.targetId)}`);
       return;

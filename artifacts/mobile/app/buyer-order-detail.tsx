@@ -240,6 +240,45 @@ export function BuyerCancellationDetailsCard({
   );
 }
 
+export function BuyerTrackingAlertCard({
+  trackingStatus,
+}: {
+  trackingStatus?: TrackingStatus;
+}) {
+  const isOutForDelivery = trackingStatus === 'out_for_delivery';
+  const isDeliveryProblem = trackingStatus === 'exception' || trackingStatus === 'returned_to_sender';
+  if (!isOutForDelivery && !isDeliveryProblem) return null;
+
+  const title = isOutForDelivery
+    ? 'Arriving today'
+    : trackingStatus === 'returned_to_sender'
+      ? 'Package returning to sender'
+      : 'Delivery problem';
+  const message = isOutForDelivery
+    ? 'Your package is out for delivery. Keep an eye out for it today.'
+    : trackingStatus === 'returned_to_sender'
+      ? 'The carrier is returning this package to the sender. Contact the seller for help.'
+      : 'The carrier reported a problem with this delivery. Check the tracking details or contact the seller.';
+  const color = isOutForDelivery ? ORANGE : RED;
+  const background = isOutForDelivery ? ORANGE_DIM : RED_DIM;
+
+  return (
+    <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
+      <GradientCard
+        colors={[`${color}24`, `${background}88`]}
+        style={{ borderColor: `${color}66` }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.xs }}>
+          <Feather name={isOutForDelivery ? 'truck' : 'alert-triangle'} size={ICON.sm} color={color} />
+          <Text style={{ fontSize: FS.sm, fontFamily: FONT.bold, color }}>{title}</Text>
+        </View>
+        <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: FG, lineHeight: 20 }}>
+          {message}
+        </Text>
+      </GradientCard>
+    </View>
+  );
+}
 export default function BuyerOrderDetailScreen() {
   const colors = useColors();
   const { theme } = useAppTheme();
@@ -679,6 +718,9 @@ export default function BuyerOrderDetailScreen() {
 
         {/* ── Cancellation Reason ───────────────────────────────────────────── */}
         <BuyerCancellationDetailsCard order={order} />
+
+        {/* ── Delivery Alert ───────────────────────────────────────────────── */}
+        <BuyerTrackingAlertCard trackingStatus={order.trackingStatus} />
 
         {/* ── Products ─────────────────────────────────────────────────────── */}
         <SectionCard title={`Items (${order.lineItems.length})`}>

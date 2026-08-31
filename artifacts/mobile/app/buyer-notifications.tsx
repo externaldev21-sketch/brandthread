@@ -81,6 +81,9 @@ function notifIcon(type: Notification['type']): string {
     case 'order_delivered': return 'package';
     case 'order_cancelled': return 'x-circle';
     case 'order_delay': return 'alert-triangle';
+    case 'order_out_for_delivery': return 'truck';
+    case 'order_exception': return 'alert-triangle';
+    case 'order_returned_to_sender': return 'corner-up-left';
     case 'drop_live': return 'zap';
     case 'product_restocked': return 'refresh-cw';
     case 'price_drop': return 'trending-down';
@@ -122,6 +125,10 @@ function notifNavigation(notif: Notification, router: ReturnType<typeof useRoute
     router.push(('/manufacturer-messages?threadId=' + encodeURIComponent(notif.targetId)) as any);
     return;
   }
+  if (notif.targetId && notif.targetType === 'buyer_order') {
+    router.push(('/buyer-order-detail?id=' + encodeURIComponent(notif.targetId)) as any);
+    return;
+  }
   switch (notif.type) {
     case 'friend_request':
       router.push('/buyer-friend-requests' as any);
@@ -133,6 +140,9 @@ function notifNavigation(notif: Notification, router: ReturnType<typeof useRoute
     case 'order_delivered':
     case 'order_cancelled':
     case 'order_delay':
+    case 'order_out_for_delivery':
+    case 'order_exception':
+    case 'order_returned_to_sender':
     case 'return_update':
     case 'refund_update':
     case 'dispute_update':

@@ -282,6 +282,7 @@ export type NotificationType =
   | 'repost' | 'mention' | 'story_reaction' | 'story_reply' | 'new_follower'
   | 'order_confirmed' | 'order_processing' | 'order_production'
   | 'order_shipped' | 'order_delivered' | 'order_cancelled' | 'order_delay'
+  | 'order_out_for_delivery' | 'order_exception' | 'order_returned_to_sender'
   | 'return_update' | 'refund_update' | 'dispute_update'
   | 'product_restocked' | 'drop_live' | 'preorder_closing'
   | 'price_drop' | 'saved_product_update'

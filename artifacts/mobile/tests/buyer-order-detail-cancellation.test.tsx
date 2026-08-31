@@ -116,7 +116,7 @@ vi.mock('@/lib/theme', () => ({
   ICON: { xs: 12, sm: 16, md: 20, lg: 24, xxl: 40 },
 }));
 
-import { BuyerCancellationDetailsCard } from '@/app/buyer-order-detail';
+import { BuyerCancellationDetailsCard, BuyerTrackingAlertCard } from '@/app/buyer-order-detail';
 
 function textContent(value: unknown): string {
   if (typeof value === 'string' || typeof value === 'number') return String(value);
@@ -182,5 +182,29 @@ describe('buyer order cancellation details', () => {
       expect(textContent(cards[0])).toContain(reasonLabel);
       expect(textContent(cards[0])).toContain(order.cancellationNotes);
     }
+  });
+});
+
+describe('buyer order tracking alerts', () => {
+  it.each([
+    ['out_for_delivery', 'Arriving today'],
+    ['exception', 'Delivery problem'],
+    ['returned_to_sender', 'Package returning to sender'],
+  ] as const)('shows the %s alert', (trackingStatus, expectedTitle) => {
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(<BuyerTrackingAlertCard trackingStatus={trackingStatus} />);
+    });
+
+    expect(textContent(renderer.toJSON())).toContain(expectedTitle);
+  });
+
+  it('stays hidden for routine tracking updates', () => {
+    let renderer!: ReactTestRenderer;
+    act(() => {
+      renderer = create(<BuyerTrackingAlertCard trackingStatus="in_transit" />);
+    });
+
+    expect(renderer.toJSON()).toBeNull();
   });
 });

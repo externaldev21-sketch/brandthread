@@ -465,6 +465,23 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
     res.status(400).json({ error: "trackingNumber, carrier, trackingStatus, or estimatedDelivery required" }); return;
   }
 
+  // Claim a genuinely new carrier status before applying the other tracking
+  // fields. The IS DISTINCT FROM predicate is re-evaluated while PostgreSQL
+  // holds the row lock, so concurrent retries can only claim one transition.
+  // Keeping this separate also lets us distinguish a status transition from a
+  // carrier/date-only edit when deciding whether to alert the buyer.
+  let trackingStatusTransition: typeof orders.$inferSelect | undefined;
+  if (trackingStatus !== undefined) {
+    [trackingStatusTransition] = await db.update(orders)
+      .set({ trackingStatus, updatedAt: new Date() })
+      .where(and(
+        eq(orders.id, req.params.id),
+        eq(orders.ownerId, ownerId),
+        sql`${orders.trackingStatus} IS DISTINCT FROM ${trackingStatus}`,
+      ))
+      .returning();
+  }
+
   // Step 1: Atomically transition to shipped only when status isn't already shipped.
   // This prevents duplicate ship notifications on repeated tracking updates.
   // A status/date-only update must not change the order's fulfillment status,
@@ -497,9 +514,9 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
   const carrierChanged = carrier === undefined
     ? sql`FALSE`
     : sql`${orders.carrier} IS DISTINCT FROM ${carrier}`;
-  const trackingStatusChanged = trackingStatus === undefined
-    ? sql`FALSE`
-    : sql`${orders.trackingStatus} IS DISTINCT FROM ${trackingStatus}`;
+  // trackingStatus was claimed above so that status-only retries are
+  // idempotent and can be distinguished from carrier/date edits.
+  const trackingStatusChanged = sql`FALSE`;
   const estimatedDeliveryChanged = estimatedDelivery === undefined
     ? sql`FALSE`
     : sql`${orders.estimatedDelivery} IS DISTINCT FROM ${estimatedDelivery}`;
@@ -507,7 +524,6 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
   const updatePayload: Record<string, unknown> = { updatedAt: new Date() };
   if (trackingNumber !== undefined) updatePayload.trackingNumber = trackingNumber;
   if (carrier !== undefined) updatePayload.carrier = carrier;
-  if (trackingStatus !== undefined) updatePayload.trackingStatus = trackingStatus;
   if (estimatedDelivery !== undefined) updatePayload.estimatedDelivery = estimatedDelivery;
 
   // Step 2: Update only when tracking values materially change. PostgreSQL
@@ -558,6 +574,41 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
       body:       `Order #${statusTransition.orderNumber} is on its way via ${carrierLabel} — tracking: ${updated.trackingNumber ?? "not available yet"}`,
       targetId:   statusTransition.id,
       targetType: "order",
+    }).catch(() => { /* non-critical */ });
+  }
+  const trackingAlertMap: Partial<Record<typeof TRACKING_STATUSES[number], {
+    type: string;
+    title: string;
+    body: string;
+  }>> = {
+    out_for_delivery: {
+      type: "order_out_for_delivery",
+      title: "Your package is arriving today 🚚",
+      body: `Order #${updated.orderNumber} is out for delivery today.`,
+    },
+    exception: {
+      type: "order_exception",
+      title: "Delivery problem with your order",
+      body: `Order #${updated.orderNumber} has a delivery exception. Check the tracking details or contact the seller.`,
+    },
+    returned_to_sender: {
+      type: "order_returned_to_sender",
+      title: "Your package is being returned",
+      body: `Order #${updated.orderNumber} is being returned to the sender. Contact the seller for help.`,
+    },
+  };
+  const trackingAlert = trackingStatusTransition
+    && trackingAlertMap[trackingStatusTransition.trackingStatus as typeof TRACKING_STATUSES[number]];
+  if (trackingAlert && updated.buyerId) {
+    publishNotification({
+      userId:     updated.buyerId,
+      category:   "orders",
+      pushCategory: "order",
+      type:        trackingAlert.type,
+      title:      trackingAlert.title,
+      body:       trackingAlert.body,
+      targetId:   updated.id,
+      targetType: "buyer_order",
     }).catch(() => { /* non-critical */ });
   }
   if (statusTransition) {
