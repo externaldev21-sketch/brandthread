@@ -11,6 +11,7 @@ import Onboarding from '@/pages/onboarding';
 import Dashboard from '@/pages/dashboard';
 import Orders from '@/pages/orders';
 import Messages from '@/pages/messages';
+import IpCases from '@/pages/moderation/ip-cases';
 import MessageThread from '@/pages/message-thread';
 import Payment from '@/pages/payment';
 import Profile from '@/pages/profile';
@@ -19,6 +20,7 @@ import Sellers from '@/pages/sellers';
 import OrderTracker from '@/pages/order-tracker';
 import NotFound from '@/pages/not-found';
 import { Layout } from '@/components/layout';
+import { useIsModerator } from '@/hooks/use-ip-cases';
 
 // ── Clerk setup ────────────────────────────────────────────────────────────────
 
@@ -131,6 +133,16 @@ function Protected({ children }: { children: React.ReactNode }) {
       <Show when="signed-out"><Redirect to="/sign-in" /></Show>
     </>
   );
+}
+
+function ModeratorProtected({ children }: { children: React.ReactNode }) {
+  const { data: isModerator, isLoading } = useIsModerator();
+
+  if (isLoading) {
+    return <div className="min-h-screen bg-background" data-testid="status-moderator-check" />;
+  }
+
+  return isModerator ? children : <Redirect to="/dashboard" />;
 }
 
 // ── Home redirect ─────────────────────────────────────────────────────────────
@@ -246,6 +258,9 @@ function AppRouter() {
             </Route>
             <Route path="/reports">
               <Protected><Layout><Reports /></Layout></Protected>
+            </Route>
+            <Route path="/moderation/ip-cases">
+              <Protected><ModeratorProtected><Layout><IpCases /></Layout></ModeratorProtected></Protected>
             </Route>
 
             <Route component={NotFound} />

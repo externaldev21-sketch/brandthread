@@ -201,11 +201,19 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
   if (status && status !== "archived" && !access) return;
   const result = await db.transaction(async (tx) => {
     const [existing] = await tx
-      .select({ status: products.status, deletedAt: products.deletedAt })
+      .select({ status: products.status, deletedAt: products.deletedAt, removalKind: products.removalKind })
       .from(products)
       .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId)))
-      .limit(1);
-    if (!existing) return { updated: null, limited: false };
+      .limit(1)
+      .for("update");
+    if (!existing) return { updated: null, limited: false, moderationLocked: false };
+    if (
+      existing.removalKind?.startsWith("moderation_")
+      && status !== undefined
+      && status !== "archived"
+    ) {
+      return { updated: null, limited: false, moderationLocked: true };
+    }
     if (
       !existing.deletedAt
       && existing.status === "archived"
@@ -214,15 +222,22 @@ router.put("/:id", requireRole("manager"), async (req, res) => {
       && access
       && !await hasProductCapacity(tx, ownerId, access.limits.products, 1)
     ) {
-      return { updated: null, limited: true };
+      return { updated: null, limited: true, moderationLocked: false };
     }
     const [updated] = await tx
       .update(products)
       .set(updateValues)
       .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId)))
       .returning();
-    return { updated, limited: false };
+    return { updated, limited: false, moderationLocked: false };
   });
+  if (result.moderationLocked) {
+    res.status(409).json({
+      error: "This listing is locked by a platform moderation action",
+      code: "PRODUCT_MODERATION_LOCKED",
+    });
+    return;
+  }
   if (result.limited && access) {
     sendPlanLimitReached(res, {
       resource: "products",
@@ -254,7 +269,12 @@ router.delete("/:id", requireRole("manager"), async (req, res) => {
   const recoverableUntil = new Date(now.getTime() + PRODUCT_DELETE_RECOVERY_WINDOW_MS);
   const [updated] = await db.update(products)
     .set({ deletedAt: now, recoverableUntil, removalKind: "seller_deleted", updatedAt: now })
-    .where(and(eq(products.id, req.params.id), eq(products.ownerId, ownerId), isNull(products.deletedAt)))
+    .where(and(
+      eq(products.id, req.params.id),
+      eq(products.ownerId, ownerId),
+      isNull(products.deletedAt),
+      isNull(products.removalKind),
+    ))
     .returning();
   if (!updated) {
     const [existing] = await db.select({

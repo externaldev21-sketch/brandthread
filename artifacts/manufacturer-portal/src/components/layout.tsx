@@ -8,14 +8,17 @@ import {
   Store,
   Settings,
   Factory,
+  ShieldAlert,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGetMyManufacturerProfile } from "@workspace/api-client-react";
+import { useIsModerator } from "@/hooks/use-ip-cases";
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   
   const { data: profile } = useGetMyManufacturerProfile();
+  const { data: isModerator } = useIsModerator();
 
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -25,6 +28,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { href: "/orders/history", label: "Completed", icon: History },
     { href: "/profile", label: "Profile", icon: Settings },
   ];
+
+  if (isModerator) {
+    navItems.push({ href: "/moderation/ip-cases", label: "Safety Queue", icon: ShieldAlert });
+  }
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden text-foreground selection:bg-primary selection:text-primary-foreground">

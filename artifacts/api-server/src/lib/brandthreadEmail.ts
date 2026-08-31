@@ -379,4 +379,27 @@ export async function sendManufacturerSignupEmail(options: {
   });
 }
 
+export async function sendIpCaseInformationRequestEmail(options: {
+  to: string;
+  caseReference: string;
+  requestedInformation: string;
+  idempotencyKey: string;
+}): Promise<boolean> {
+  const html = renderBrandthreadEmail({
+    preheader: `More information is needed for case ${options.caseReference}.`,
+    eyebrow: "Rights-holder case",
+    title: "More information is needed",
+    subtitle: `Brandthread is reviewing case ${options.caseReference}.`,
+    bodyHtml: `<p>Our safety team needs the following information to continue its review:</p>
+      <p style="padding:14px 16px;background:#f5f5f5;border-left:3px solid #111111;">${escapeHtml(options.requestedInformation)}</p>
+      <p style="margin-bottom:0;color:#666666;">Reply to the original case correspondence with the requested material. Keep your case reference in the subject line.</p>`,
+  });
+  return sendBrandthreadEmail({
+    to: options.to,
+    subject: `Information requested for Brandthread case ${options.caseReference}`,
+    html,
+    idempotencyKey: options.idempotencyKey,
+  });
+}
+
 export { escapeHtml, formatCents, formatDate };
