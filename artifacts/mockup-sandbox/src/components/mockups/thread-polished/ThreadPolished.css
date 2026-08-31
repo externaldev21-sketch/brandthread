@@ -1,0 +1,44 @@
+.thread-polished {
+  --ink: #f5f0e8;
+  --muted: #9b968f;
+  --line: #2b2928;
+  --panel: #171616;
+  --canvas: #0d0d0d;
+  --lime: #c8f169;
+  min-height: 100%;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+.thread-polished * { box-sizing: border-box; }
+.thread-scroll { scrollbar-width: none; }
+.thread-scroll::-webkit-scrollbar { display: none; }
+.thread-polished button { font: inherit; }
+.thread-card {
+  background: linear-gradient(145deg, #1a1918 0%, #131313 100%);
+  border: 1px solid var(--line);
+}
+.thread-media {
+  background:
+    radial-gradient(circle at 77% 28%, rgba(212,244,130,.36), transparent 23%),
+    radial-gradient(circle at 25% 82%, rgba(216,106,67,.75), transparent 30%),
+    linear-gradient(132deg, #27342c 0%, #8d503b 45%, #e4b076 100%);
+}
+.thread-media.two {
+  background:
+    radial-gradient(circle at 22% 25%, rgba(224,242,181,.3), transparent 20%),
+    linear-gradient(145deg, #263332, #789b8a 46%, #d7c09a);
+}
+.thread-grain:after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .08;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.7'/%3E%3C/svg%3E");
+}
+.thread-pill { transition: transform .18s ease, background-color .18s ease; }
+.thread-pill:active { transform: scale(.96); }
+.thread-fade { animation: thread-rise .5s ease both; }
+@keyframes thread-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
