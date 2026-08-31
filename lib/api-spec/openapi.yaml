@@ -26,6 +26,26 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 
+  /drops/{id}/broadcast-preview:
+    get:
+      operationId: getDropBroadcastPreview
+      tags: [drops]
+      summary: Preview the audience for a drop notification
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Number of unique recipients who would receive the notification
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DropBroadcastPreview"
+        "404":
+          description: Drop not found
+
   # ── Manufacturer registration & profile ───────────────────────────────────────
 
   /manufacturers/me:
@@ -610,6 +630,12 @@ components:
         status:
           type: string
       required: [status]
+
+    DropBroadcastPreview:
+      type: object
+      required: [followers]
+      properties:
+        followers: { type: integer, minimum: 0 }
 
     # ── Manufacturer ─────────────────────────────────────────────────────────────
 

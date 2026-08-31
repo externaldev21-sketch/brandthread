@@ -23,6 +23,7 @@ import type {
   AttachmentReceipt,
   BulkPaymentOptions,
   BulkWalletPaymentInput,
+  DropBroadcastPreview,
   HealthStatus,
   ListPublicManufacturersParams,
   Manufacturer,
@@ -146,6 +147,83 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getHealthCheckQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetDropBroadcastPreviewUrl = (id: string,) => {
+
+
+
+
+  return `/api/drops/${id}/broadcast-preview`
+}
+
+/**
+ * @summary Preview the audience for a drop notification
+ */
+export const getDropBroadcastPreview = async (id: string, options?: RequestInit): Promise<DropBroadcastPreview> => {
+
+  return customFetch<DropBroadcastPreview>(getGetDropBroadcastPreviewUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDropBroadcastPreviewQueryKey = (id: string,) => {
+    return [
+    `/api/drops/${id}/broadcast-preview`
+    ] as const;
+    }
+
+
+export const getGetDropBroadcastPreviewQueryOptions = <TData = Awaited<ReturnType<typeof getDropBroadcastPreview>>, TError = ErrorType<void>>(id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDropBroadcastPreview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDropBroadcastPreviewQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDropBroadcastPreview>>> = ({ signal }) => getDropBroadcastPreview(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDropBroadcastPreview>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDropBroadcastPreviewQueryResult = NonNullable<Awaited<ReturnType<typeof getDropBroadcastPreview>>>
+export type GetDropBroadcastPreviewQueryError = ErrorType<void>
+
+
+/**
+ * @summary Preview the audience for a drop notification
+ */
+
+export function useGetDropBroadcastPreview<TData = Awaited<ReturnType<typeof getDropBroadcastPreview>>, TError = ErrorType<void>>(
+ id: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDropBroadcastPreview>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDropBroadcastPreviewQueryOptions(id,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

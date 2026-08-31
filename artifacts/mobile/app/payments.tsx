@@ -107,6 +107,9 @@ const statusConfig: Record<DropStatus, { variant: 'success' | 'warning' | 'info'
 // ─── Drop Card ────────────────────────────────────────────────────────────────
 
 type BroadcastState = 'idle' | 'loading' | 'sent' | 'already_sent';
+interface BroadcastPreview {
+  followers: number;
+}
 
 interface DropCardProps {
   drop: Drop;
@@ -114,10 +117,11 @@ interface DropCardProps {
   isDark: boolean;
   isLast: boolean;
   broadcastState: BroadcastState;
+  broadcastPreview?: BroadcastPreview;
   onBroadcast: () => void;
 }
 
-function DropCard({ drop, colors, isDark, isLast, broadcastState, onBroadcast }: DropCardProps) {
+function DropCard({ drop, colors, isDark, isLast, broadcastState, broadcastPreview, onBroadcast }: DropCardProps) {
   const primary = colors.primary;
   const isPreOrder = drop.type === 'pre-order';
   const s = statusConfig[drop.status];
@@ -213,35 +217,54 @@ function DropCard({ drop, colors, isDark, isLast, broadcastState, onBroadcast }:
       {/* Notify Followers broadcast button — only for active (live) drops */}
       {drop.status === 'processing' && (
         <View style={[styles.broadcastWrap, { borderTopColor: colors.border }]}>
-          <TouchableOpacity
-            style={[
-              styles.broadcastBtn,
-              broadcastState === 'sent' || broadcastState === 'already_sent'
-                ? { backgroundColor: 'rgba(16,185,129,0.12)', borderColor: 'rgba(16,185,129,0.30)' }
-                : { backgroundColor: colors.accent, borderColor: colors.primary },
-              broadcastState === 'loading' && { opacity: 0.6 },
-            ]}
-            activeOpacity={broadcastState === 'idle' ? 0.75 : 1}
-            disabled={broadcastState !== 'idle'}
-            onPress={onBroadcast}
-          >
-            {broadcastState === 'loading' ? (
-              <ActivityIndicator size="small" color={primary} />
-            ) : broadcastState === 'sent' || broadcastState === 'already_sent' ? (
-              <Feather name="check-circle" size={14} color={colors.success} />
-            ) : (
-              <Feather name="bell" size={14} color={primary} />
-            )}
-            <Text style={[
-              styles.broadcastBtnText,
-              { color: broadcastState === 'sent' || broadcastState === 'already_sent' ? colors.success : primary },
-            ]}>
-              {broadcastState === 'sent' ? 'Followers notified' :
-               broadcastState === 'already_sent' ? 'Already notified' :
-               broadcastState === 'loading' ? 'Sending…' :
-               'Notify Followers'}
-            </Text>
-          </TouchableOpacity>
+          {broadcastPreview?.followers === 0 && broadcastState === 'idle' ? (
+            <View style={styles.zeroAudience}>
+              <Feather name="users" size={14} color={colors.mutedForeground} />
+              <Text style={[styles.zeroAudienceText, { color: colors.mutedForeground }]}>
+                0 followers — grow your audience first
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.broadcastRow}>
+              {broadcastPreview && (
+                <View style={[styles.followerPill, { backgroundColor: colors.accent, borderColor: colors.border }]}>
+                  <Feather name="users" size={12} color={primary} />
+                  <Text style={[styles.followerPillText, { color: colors.foreground }]}>
+                    {broadcastPreview.followers} follower{broadcastPreview.followers === 1 ? '' : 's'}
+                  </Text>
+                </View>
+              )}
+              <TouchableOpacity
+                style={[
+                  styles.broadcastBtn,
+                  broadcastState === 'sent' || broadcastState === 'already_sent'
+                    ? { backgroundColor: 'rgba(16,185,129,0.12)', borderColor: 'rgba(16,185,129,0.30)' }
+                    : { backgroundColor: colors.accent, borderColor: colors.primary },
+                  broadcastState === 'loading' && { opacity: 0.6 },
+                ]}
+                activeOpacity={broadcastState === 'idle' ? 0.75 : 1}
+                disabled={broadcastState !== 'idle'}
+                onPress={onBroadcast}
+              >
+                {broadcastState === 'loading' ? (
+                  <ActivityIndicator size="small" color={primary} />
+                ) : broadcastState === 'sent' || broadcastState === 'already_sent' ? (
+                  <Feather name="check-circle" size={14} color={colors.success} />
+                ) : (
+                  <Feather name="bell" size={14} color={primary} />
+                )}
+                <Text style={[
+                  styles.broadcastBtnText,
+                  { color: broadcastState === 'sent' || broadcastState === 'already_sent' ? colors.success : primary },
+                ]}>
+                  {broadcastState === 'sent' ? 'Followers notified' :
+                   broadcastState === 'already_sent' ? 'Already notified' :
+                   broadcastState === 'loading' ? 'Sending…' :
+                   'Notify Followers'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       )}
     </View>
@@ -309,6 +332,8 @@ export default function PaymentsScreen() {
 
   // Broadcast state per drop id
   const [broadcastStates, setBroadcastStates] = useState<Record<string, BroadcastState>>({});
+  // Audience preview per active drop. Missing entries are still loading.
+  const [broadcastPreviews, setBroadcastPreviews] = useState<Record<string, BroadcastPreview | undefined>>({});
   // Toast
   const [toast, setToast]       = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -344,11 +369,14 @@ export default function PaymentsScreen() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setBroadcastPreviews({});
     try {
       // Load drops from the drops API and map to our Drop shape
       const raw = (await api.drops.list()) as any[];
+      const usingDemoFallback = raw.length === 0;
+      let mapped: Drop[] = DROPS_FALLBACK;
       if (raw.length > 0) {
-        const mapped: Drop[] = raw.map((d: any) => ({
+        mapped = raw.map((d: any) => ({
           id:             d.id,
           name:           d.name ?? d.title ?? 'Drop',
           type:           d.releaseAt ? 'pre-order' : 'pre-made',
@@ -361,9 +389,20 @@ export default function PaymentsScreen() {
         }));
         setDrops(mapped);
       }
+      const activeDrops = mapped.filter((drop) => drop.status === 'processing');
+      const previewEntries = await Promise.all(activeDrops.map(async (drop) => {
+        try {
+          return [drop.id, await api.drops.broadcastPreview(drop.id)] as const;
+        } catch {
+          // Demo fallback IDs do not exist on the server. A real preview
+          // failure must not be mistaken for an empty audience.
+          return [drop.id, usingDemoFallback ? { followers: 0 } : undefined] as const;
+        }
+      }));
+      setBroadcastPreviews(Object.fromEntries(previewEntries));
     } catch { /* stay with fallback mock data */ }
     setLoading(false);
-  }, []);
+  }, [api]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
@@ -506,6 +545,7 @@ export default function PaymentsScreen() {
             key={d.id} drop={d} colors={colors} isDark={isDark}
             isLast={i === preOrderDrops.length - 1}
             broadcastState={broadcastStates[d.id] ?? 'idle'}
+            broadcastPreview={broadcastPreviews[d.id]}
             onBroadcast={() => handleBroadcast(d.id, d.name)}
           />
         ))}
@@ -527,6 +567,7 @@ export default function PaymentsScreen() {
             key={d.id} drop={d} colors={colors} isDark={isDark}
             isLast={i === preMadeDrops.length - 1}
             broadcastState={broadcastStates[d.id] ?? 'idle'}
+            broadcastPreview={broadcastPreviews[d.id]}
             onBroadcast={() => handleBroadcast(d.id, d.name)}
           />
         ))}
@@ -621,8 +662,13 @@ const styles = StyleSheet.create({
 
   // Broadcast button
   broadcastWrap: { marginTop: 14, paddingTop: 14, borderTopWidth: 1 },
+  broadcastRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  followerPill: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, borderWidth: 1, paddingHorizontal: 9, paddingVertical: 8 },
+  followerPillText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  zeroAudience: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 9 },
+  zeroAudienceText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
   broadcastBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 7, borderRadius: 10, borderWidth: 1,
     paddingVertical: 10, paddingHorizontal: 14,
   },

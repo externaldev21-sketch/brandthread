@@ -7,6 +7,16 @@ import { sendPushToUser } from "../lib/push";
 const router = Router();
 router.use(requireAuth);
 
+async function getBroadcastAudience(sellerId: string, dropId: string): Promise<string[]> {
+  const [followerRows, alertRows] = await Promise.all([
+    db.select({ userId: follows.followerId }).from(follows).where(eq(follows.followingId, sellerId)),
+    db.select({ userId: dropAlertSubscriptions.userId }).from(dropAlertSubscriptions)
+      .where(eq(dropAlertSubscriptions.dropId, dropId)),
+  ]);
+
+  return [...new Set([...followerRows, ...alertRows].map((row) => row.userId))];
+}
+
 // GET /api/drops
 router.get("/", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
@@ -87,6 +97,26 @@ router.patch("/:id", async (req, res) => {
   res.json(updated);
 });
 
+// ─── GET /api/drops/:id/broadcast-preview ────────────────────────────────────
+// Return the exact number of unique recipients for the drop broadcast without
+// sending anything. The audience matches the POST broadcast route.
+router.get("/:id/broadcast-preview", async (req, res): Promise<void> => {
+  const sellerId = (req as any).clerkUserId as string;
+
+  const [drop] = await db
+    .select({ id: drops.id })
+    .from(drops)
+    .where(and(eq(drops.id, req.params.id), eq(drops.ownerId, sellerId)))
+    .limit(1);
+  if (!drop) {
+    res.status(404).json({ error: "Drop not found" });
+    return;
+  }
+
+  const audience = await getBroadcastAudience(sellerId, drop.id);
+  res.json({ followers: audience.length });
+});
+
 // ─── POST /api/drops/:id/broadcast ───────────────────────────────────────────
 // Send a push notification to all followers announcing a live/active drop.
 // Idempotent: each drop can only be broadcast once (unique drop_id constraint).
@@ -117,12 +147,7 @@ router.post("/:id/broadcast", async (req, res) => {
   }
 
   // Notify both followers and buyers who explicitly requested this drop alert.
-  const [followerRows, alertRows] = await Promise.all([
-    db.select({ userId: follows.followerId }).from(follows).where(eq(follows.followingId, sellerId)),
-    db.select({ userId: dropAlertSubscriptions.userId }).from(dropAlertSubscriptions)
-      .where(eq(dropAlertSubscriptions.dropId, drop.id)),
-  ]);
-  const followerIds = [...new Set([...followerRows, ...alertRows].map((row) => row.userId))];
+  const followerIds = await getBroadcastAudience(sellerId, drop.id);
 
   if (followerIds.length === 0) {
     return res.json({ ok: true, sent: 0, errors: 0, followers: 0, message: "No followers to notify yet." });

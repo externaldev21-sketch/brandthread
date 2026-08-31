@@ -9,6 +9,11 @@ export interface HealthStatus {
   status: string;
 }
 
+export interface DropBroadcastPreview {
+  /** @minimum 0 */
+  followers: number;
+}
+
 export interface Manufacturer {
   id: string;
   clerkId: string;

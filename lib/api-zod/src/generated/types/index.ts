@@ -10,6 +10,7 @@ export * from './attachmentReceipt';
 export * from './bulkPaymentOptions';
 export * from './bulkPaymentOptionsWalletsItem';
 export * from './bulkWalletPaymentInput';
+export * from './dropBroadcastPreview';
 export * from './healthStatus';
 export * from './listPublicManufacturersParams';
 export * from './manufacturer';

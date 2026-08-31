@@ -452,6 +452,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       get:     (id: string)             => get(`/api/drops/${id}`),
       create:  (body: unknown)          => post('/api/drops', body),
       update:  (id: string, body: unknown) => patch(`/api/drops/${id}`, body),
+      /** Return the number of unique recipients who would receive a drop broadcast. */
+      broadcastPreview: (dropId: string) =>
+        get<{ followers: number }>(`/api/drops/${encodeURIComponent(dropId)}/broadcast-preview`),
       /** Send a push broadcast to followers when a drop goes live. */
       broadcast: (dropId: string) =>
         post<{ ok: boolean; sent: number; errors: number; followers: number }>(

@@ -17,6 +17,22 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary Preview the audience for a drop notification
+ */
+export const GetDropBroadcastPreviewParams = zod.object({
+  "id": zod.coerce.string().uuid()
+})
+
+export const getDropBroadcastPreviewResponseFollowersMin = 0;
+
+
+
+export const GetDropBroadcastPreviewResponse = zod.object({
+  "followers": zod.number().min(getDropBroadcastPreviewResponseFollowersMin)
+})
+
+
+/**
  * @summary Get current manufacturer's profile
  */
 
