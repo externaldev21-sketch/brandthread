@@ -3,8 +3,8 @@ import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
-import { db, interactions, posts, users } from "@workspace/db";
-import { inArray } from "drizzle-orm";
+import { db, interactions, orders, posts, users } from "@workspace/db";
+import { eq, inArray } from "drizzle-orm";
 
 const suffix = crypto.randomBytes(6).toString("hex");
 const sellerA = `seller-profile-a-${suffix}`;
@@ -15,15 +15,47 @@ const authState = vi.hoisted(() => ({
   clerkUserId: "",
 }));
 
+const storageState = vi.hoisted(() => ({
+  objectPath: "/objects/uploads/avatar-normalized",
+  signedUrlPrefix: "https://storage.test",
+  created: [] as Array<{ bytes: Buffer; contentType: string }>,
+  acl: [] as Array<{ path: string; owner: string; visibility: string }>,
+}));
+
 vi.mock("../../middlewares/requireAuth", () => ({
-  requireAuth: (req: any, _res: unknown, next: () => void) => {
+  requireAuth: (req: any, res: any, next: () => void) => {
+    if (!authState.clerkUserId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
     req.clerkUserId = authState.clerkUserId;
     next();
   },
 }));
 
+vi.mock("../../lib/objectStorage", () => ({
+  ObjectStorageService: class {
+    async createObjectEntityFromBuffer(bytes: Buffer, contentType: string) {
+      storageState.created.push({ bytes, contentType });
+      return storageState.objectPath;
+    }
+    async trySetObjectEntityAclPolicy(
+      path: string,
+      policy: { owner: string; visibility: string },
+    ) {
+      storageState.acl.push({ path, owner: policy.owner, visibility: policy.visibility });
+      return path;
+    }
+    async getObjectEntityDownloadURL(path: string) {
+      return `${storageState.signedUrlPrefix}${path}`;
+    }
+    async deleteObjectEntity() {}
+  },
+}));
+
 let server: Server;
 let base = "";
+const orderIds: string[] = [];
 
 beforeAll(async () => {
   await db.insert(users).values([
@@ -34,6 +66,8 @@ beforeAll(async () => {
       displayName: "Seller A",
       role: "seller",
       accountType: "seller",
+      storefrontVisitCount: 4,
+      avatarUrl: "https://images.clerk.test/seller-a.jpg",
     },
     {
       clerkId: sellerB,
@@ -52,6 +86,46 @@ beforeAll(async () => {
       accountType: "seller",
     },
   ]);
+
+  const metricOrders = await db.insert(orders).values([
+    {
+      ownerId: sellerA,
+      buyerId: "buyer-paid",
+      orderNumber: `${suffix}-paid`,
+      status: "fulfilled",
+      totalCents: 12_345,
+      subtotalCents: 12_345,
+      stripeCheckoutSessionId: `${suffix}-paid-session`,
+    },
+    {
+      ownerId: sellerA,
+      buyerId: "buyer-cancelled",
+      orderNumber: `${suffix}-cancelled`,
+      status: "cancelled",
+      totalCents: 2_000,
+      subtotalCents: 2_000,
+      stripeCheckoutSessionId: `${suffix}-cancelled-session`,
+    },
+    {
+      ownerId: sellerA,
+      buyerId: "buyer-refund-pending",
+      orderNumber: `${suffix}-refund-pending`,
+      status: "refund_pending",
+      totalCents: 3_000,
+      subtotalCents: 3_000,
+      stripeCheckoutSessionId: `${suffix}-refund-pending-session`,
+    },
+    {
+      ownerId: sellerA,
+      buyerId: "buyer-refunded",
+      orderNumber: `${suffix}-refunded`,
+      status: "refunded",
+      totalCents: 4_000,
+      subtotalCents: 4_000,
+      stripeCheckoutSessionId: `${suffix}-refunded-session`,
+    },
+  ]).returning({ id: orders.id });
+  orderIds.push(...metricOrders.map((order) => order.id));
 
   const [sellerAPost, sellerASecondPost, sellerBPost] = await db
     .insert(posts)
@@ -83,6 +157,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await db.delete(orders).where(inArray(orders.id, orderIds));
   await db.delete(interactions).where(inArray(interactions.postId, postIds));
   await db.delete(posts).where(inArray(posts.id, postIds));
   await db.delete(users).where(
@@ -95,7 +170,17 @@ async function getProfile() {
   const response = await fetch(`${base}/api/seller/profile`);
   return {
     status: response.status,
-    body: await response.json() as { totalLikes: number },
+    body: await response.json() as {
+      totalLikes: number;
+      profileImageUrl: string | null;
+      avatarUrl: string | null;
+      metrics: {
+        revenueCents: number;
+        visitors: number;
+        orders: number;
+        conversionRate: number;
+      };
+    },
   };
 }
 
@@ -116,5 +201,96 @@ describe("seller profile likes metric", () => {
 
     expect(result.status).toBe(200);
     expect(result.body.totalLikes).toBe(0);
+  });
+});
+
+describe("seller profile identity and performance regressions", () => {
+  it("rejects an avatar upload when there is no authenticated seller", async () => {
+    authState.clerkUserId = "";
+    const response = await fetch(`${base}/api/seller/profile/avatar/upload`, {
+      method: "POST",
+      headers: { "content-type": "image/png" },
+      body: Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    });
+
+    expect(response.status).toBe(401);
+    expect(storageState.created).toHaveLength(0);
+  });
+
+  it("rejects an image whose bytes do not match the declared avatar type", async () => {
+    authState.clerkUserId = sellerA;
+    const response = await fetch(`${base}/api/seller/profile/avatar/upload`, {
+      method: "POST",
+      headers: { "content-type": "image/png" },
+      body: Buffer.from("not a png"),
+    });
+
+    expect(response.status).toBe(400);
+    expect(storageState.created).toHaveLength(0);
+  });
+
+  it("persists only the normalized private object path after a valid upload", async () => {
+    authState.clerkUserId = sellerA;
+    storageState.created = [];
+    storageState.acl = [];
+    storageState.objectPath = "/objects/uploads/avatar-normalized";
+    const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0]);
+
+    const response = await fetch(`${base}/api/seller/profile/avatar/upload`, {
+      method: "POST",
+      headers: { "content-type": "image/png" },
+      body: png,
+    });
+    const body = await response.json() as { profileImageUrl: string };
+    const [saved] = await db
+      .select({ profileImageUrl: users.profileImageUrl })
+      .from(users)
+      .where(eq(users.clerkId, sellerA));
+
+    expect(response.status).toBe(201);
+    expect(body.profileImageUrl).toBe("https://storage.test/objects/uploads/avatar-normalized");
+    expect(saved.profileImageUrl).toBe("/objects/uploads/avatar-normalized");
+    expect(storageState.created).toEqual([{ bytes: png, contentType: "image/png" }]);
+    expect(storageState.acl).toEqual([{
+      path: "/objects/uploads/avatar-normalized",
+      owner: sellerA,
+      visibility: "private",
+    }]);
+  });
+
+  it("prefers the custom avatar, then Clerk's avatar, and leaves the UI to show initials otherwise", async () => {
+    authState.clerkUserId = sellerA;
+
+    await db.update(users)
+      .set({ profileImageUrl: "/objects/uploads/custom-avatar", avatarUrl: "https://images.clerk.test/fallback.jpg" })
+      .where(eq(users.clerkId, sellerA));
+    const custom = await getProfile();
+    expect(custom.body.profileImageUrl).toBe("https://storage.test/objects/uploads/custom-avatar");
+
+    await db.update(users)
+      .set({ profileImageUrl: null })
+      .where(eq(users.clerkId, sellerA));
+    const clerk = await getProfile();
+    expect(clerk.body.profileImageUrl).toBe("https://images.clerk.test/fallback.jpg");
+
+    await db.update(users)
+      .set({ avatarUrl: null })
+      .where(eq(users.clerkId, sellerA));
+    const initials = await getProfile();
+    expect(initials.body.profileImageUrl).toBeNull();
+    expect(initials.body.avatarUrl).toBeNull();
+  });
+
+  it("counts only paid checkout orders that are not cancelled or refunded", async () => {
+    authState.clerkUserId = sellerA;
+    const result = await getProfile();
+
+    expect(result.status).toBe(200);
+    expect(result.body.metrics).toEqual({
+      revenueCents: 12_345,
+      visitors: 4,
+      orders: 1,
+      conversionRate: 25,
+    });
   });
 });

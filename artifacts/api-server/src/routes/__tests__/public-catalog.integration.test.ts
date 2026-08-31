@@ -1,18 +1,31 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
-import { db, products, productVariants, users } from "@workspace/db";
-import { inArray } from "drizzle-orm";
+import { db, products, productVariants, storefrontVisits, users } from "@workspace/db";
+import { eq, inArray } from "drizzle-orm";
 
 const suffix = crypto.randomBytes(6).toString("hex");
 const sellerA = `catalog-seller-a-${suffix}`;
 const sellerB = `catalog-seller-b-${suffix}`;
+const visitor = `catalog-visitor-${suffix}`;
 const productIds: string[] = [];
 let currentProductId = "";
 let server: Server;
 let base = "";
+const authState = vi.hoisted(() => ({ clerkUserId: "" }));
+
+vi.mock("../../middlewares/requireAuth", () => ({
+  requireAuth: (req: any, res: any, next: () => void) => {
+    if (!authState.clerkUserId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+    req.clerkUserId = authState.clerkUserId;
+    next();
+  },
+}));
 
 async function addProduct(ownerId: string, name: string, category: string, priceCents: number) {
   const [product] = await db.insert(products).values({
@@ -51,6 +64,14 @@ beforeAll(async () => {
       role: "seller",
       accountType: "seller",
     },
+    {
+      clerkId: visitor,
+      email: `${visitor}@test.local`,
+      name: "Catalog Visitor",
+      displayName: "Catalog Visitor",
+      role: "buyer",
+      accountType: "buyer",
+    },
   ]);
   const current = await addProduct(sellerA, "Catalog Jacket", "apparel", 2_500);
   currentProductId = current.id;
@@ -68,8 +89,11 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  await db.delete(storefrontVisits).where(
+    eq(storefrontVisits.sellerId, sellerA),
+  );
   await db.delete(products).where(inArray(products.id, productIds));
-  await db.delete(users).where(inArray(users.clerkId, [sellerA, sellerB]));
+  await db.delete(users).where(inArray(users.clerkId, [sellerA, sellerB, visitor]));
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
@@ -105,5 +129,44 @@ describe("public catalog search and related products", () => {
       `${base}/api/public/search?q=Catalog&minPriceCents=3000&maxPriceCents=1000`,
     );
     expect(response.status).toBe(400);
+  });
+
+  it("counts one signed-in viewer once per seller per UTC day", async () => {
+    authState.clerkUserId = visitor;
+    const first = await fetch(`${base}/api/public/sellers/${sellerA}/visit`, { method: "POST" });
+    const second = await fetch(`${base}/api/public/sellers/${sellerA}/visit`, { method: "POST" });
+
+    expect(first.status).toBe(204);
+    expect(second.status).toBe(204);
+
+    const [seller] = await db
+      .select({ storefrontVisitCount: users.storefrontVisitCount })
+      .from(users)
+      .where(eq(users.clerkId, sellerA));
+    const visits = await db
+      .select({ id: storefrontVisits.id })
+      .from(storefrontVisits)
+      .where(eq(storefrontVisits.sellerId, sellerA));
+
+    expect(seller.storefrontVisitCount).toBe(1);
+    expect(visits).toHaveLength(1);
+  });
+
+  it("does not record a seller visiting their own storefront", async () => {
+    authState.clerkUserId = sellerA;
+    const response = await fetch(`${base}/api/public/sellers/${sellerA}/visit`, { method: "POST" });
+
+    expect(response.status).toBe(204);
+    const [seller] = await db
+      .select({ storefrontVisitCount: users.storefrontVisitCount })
+      .from(users)
+      .where(eq(users.clerkId, sellerA));
+    const visits = await db
+      .select({ id: storefrontVisits.id })
+      .from(storefrontVisits)
+      .where(eq(storefrontVisits.sellerId, sellerA));
+
+    expect(seller.storefrontVisitCount).toBe(1);
+    expect(visits).toHaveLength(1);
   });
 });
