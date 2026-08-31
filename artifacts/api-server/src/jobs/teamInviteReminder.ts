@@ -140,7 +140,15 @@ export async function runTeamInviteReminder(): Promise<void> {
     }
 
     if (reminded > 0) {
-      logger.info({ job: "teamInviteReminder", reminded }, "Invite reminders sent");
+      logger.info(
+        { job: "teamInviteReminder", reminded, candidates: candidates.length },
+        "Invite reminders sent",
+      );
+    } else {
+      logger.info(
+        { job: "teamInviteReminder", candidates: candidates.length },
+        "No invite reminders due",
+      );
     }
   } catch (err) {
     logger.error({ err, job: "teamInviteReminder" }, "Invite reminder job failed");

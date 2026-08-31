@@ -16,6 +16,8 @@ const state = vi.hoisted(() => ({
   sendResults: [] as boolean[],
   sendOptions: [] as Array<{ reminder?: boolean; idempotencyKey?: string }>,
   persistSuccess: true,
+  noCandidates: false,
+  infoMessages: [] as Array<{ fields: Record<string, unknown>; message: string }>,
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -45,7 +47,8 @@ vi.mock("@workspace/db", () => {
       select: () => ({
         from: () => ({
           leftJoin: () => ({
-            where: async () => (state.reminderSentAt ? [] : [state.candidate]),
+            where: async () =>
+              state.noCandidates || state.reminderSentAt ? [] : [state.candidate],
           }),
         }),
       }),
@@ -82,6 +85,16 @@ vi.mock("@workspace/db", () => {
   };
 });
 
+vi.mock("../../lib/logger", () => ({
+  logger: {
+    info: (fields: Record<string, unknown>, message: string) => {
+      state.infoMessages.push({ fields, message });
+    },
+    warn: () => {},
+    error: () => {},
+  },
+}));
+
 vi.mock("../../lib/teamInvites", () => ({
   inviteUrls: (token: string) => ({ inviteUrl: `https://example.com/?token=${token}` }),
   sendTeamInviteEmail: async (
@@ -107,6 +120,8 @@ beforeEach(() => {
   state.sendResults = [];
   state.sendOptions = [];
   state.persistSuccess = true;
+  state.noCandidates = false;
+  state.infoMessages = [];
   state.candidate.expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 });
 
@@ -153,5 +168,16 @@ describe("team invite reminder job", () => {
       },
     ]);
     expect(state.reminderSentAt).toBeInstanceOf(Date);
+  });
+
+  it("logs a clear no-work result when no invites are due", async () => {
+    state.noCandidates = true;
+
+    await runTeamInviteReminder();
+
+    expect(state.infoMessages).toContainEqual({
+      fields: { job: "teamInviteReminder", candidates: 0 },
+      message: "No invite reminders due",
+    });
   });
 });
