@@ -10,7 +10,7 @@ import { openai } from "@workspace/integrations-openai-ai-server";
 import { requireAuth } from "../middlewares/requireAuth";
 import { clerkClient } from "@clerk/express";
 import { db, products, productVariants, orders, posts, storefronts } from "@workspace/db";
-import { eq, lt, lte, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, asc, inArray, sql } from "drizzle-orm";
 
 const router = Router();
 
@@ -261,7 +261,11 @@ router.get("/suggestions", requireAuth, async (req: Request, res: Response): Pro
     const unfulfilledOrders = await db
       .select({ id: orders.id, status: orders.status, createdAt: orders.createdAt })
       .from(orders)
-      .where(and(eq(orders.ownerId, ownerId), eq(orders.status, "paid")))
+      .where(and(
+        eq(orders.ownerId, ownerId),
+        inArray(orders.status, ["pending", "processing"]),
+      ))
+      .orderBy(asc(orders.createdAt))
       .limit(10);
 
     if (unfulfilledOrders.length > 0) {
