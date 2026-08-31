@@ -9,6 +9,7 @@ import {
   Settings,
   Factory,
   ShieldAlert,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useGetMyManufacturerProfile } from "@workspace/api-client-react";
@@ -23,6 +24,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const navItems = [
     { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/messages", label: "Inbox", icon: MessageSquare },
+    { href: "/quote-requests", label: "Quote Requests", icon: FileText },
     { href: "/sellers", label: "Sellers", icon: Store },
     { href: "/orders", label: "Active Orders", icon: Package, exact: true },
     { href: "/orders/history", label: "Completed", icon: History },

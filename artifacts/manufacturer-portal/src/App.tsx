@@ -18,6 +18,7 @@ import Profile from '@/pages/profile';
 import Reports from '@/pages/reports';
 import Sellers from '@/pages/sellers';
 import OrderTracker from '@/pages/order-tracker';
+import QuoteRequests from '@/pages/quote-requests';
 import NotFound from '@/pages/not-found';
 import { Layout } from '@/components/layout';
 import { useIsModerator } from '@/hooks/use-ip-cases';
@@ -249,6 +250,9 @@ function AppRouter() {
                   <Layout><MessageThread threadId={params.threadId!} /></Layout>
                 </Protected>
               )}
+            </Route>
+            <Route path="/quote-requests">
+              <Protected><Layout><QuoteRequests /></Layout></Protected>
             </Route>
             <Route path="/payment">
               <Protected><Layout><Payment /></Layout></Protected>
