@@ -44,14 +44,30 @@ router.post("/:dropId", async (req, res) => {
       return;
     }
 
-    const [wallet] = await db
+    const [createdWallet] = await db
       .insert(dropWallets)
       .values({
         dropId:             drop.id,
         sellerId,
         stripeTransferGroup: `drop_${drop.id}`,
       })
+      .onConflictDoNothing({ target: dropWallets.dropId })
       .returning();
+    if (!createdWallet) {
+      const [wallet] = await db.select().from(dropWallets)
+        .where(eq(dropWallets.dropId, drop.id))
+        .limit(1);
+      if (!wallet) {
+        res.status(409).json({ error: "Wallet creation conflicted; retry" }); return;
+      }
+      res.json({
+        ...wallet,
+        createdAt: wallet.createdAt.toISOString(),
+        updatedAt: wallet.updatedAt.toISOString(),
+      });
+      return;
+    }
+    const wallet = createdWallet;
 
     // For pre-order drops: set seller's Stripe Connect account to manual payouts
     // so funds stay in balance until we explicitly release them.
@@ -125,10 +141,20 @@ router.post("/:dropId/deposit", async (req, res) => {
     const sellerId = (req as any).clerkUserId as string;
     const { orderId, amountCents, stripeTransferId } = req.body;
 
-    if (!orderId || typeof amountCents !== "number") {
-      res.status(400).json({ error: "orderId and amountCents required" }); return;
+    if (!orderId || !Number.isInteger(amountCents) || amountCents <= 0) {
+      res.status(400).json({ error: "orderId and a positive whole-number amountCents are required" }); return;
     }
 
+    const [order] = await db.select({ id: orders.id }).from(orders).where(and(
+      eq(orders.id, orderId),
+      eq(orders.dropId, req.params.dropId as any),
+      eq(orders.ownerId, sellerId),
+    )).limit(1);
+    if (!order) {
+      res.status(404).json({ error: "Order not found for this drop" }); return;
+    }
+
+    let duplicate = false;
     await db.transaction(async (tx) => {
       // Lock wallet row — prevents concurrent deposits from double-crediting
       const lockResult = await tx.execute(
@@ -136,6 +162,18 @@ router.post("/:dropId/deposit", async (req, res) => {
       );
       const walletRow = (lockResult as any).rows?.[0];
       if (!walletRow) { throw Object.assign(new Error("Wallet not found"), { status: 404 }); }
+
+      const existing = await tx.execute(
+        sql`SELECT id FROM drop_wallet_transactions
+            WHERE wallet_id = ${walletRow.id}::uuid
+              AND order_id = ${orderId}::uuid
+              AND type = 'deposit'
+            LIMIT 1`,
+      );
+      if ((existing as any).rows?.length > 0) {
+        duplicate = true;
+        return;
+      }
 
       // Atomic balance increment (no read-modify-write race)
       await tx.execute(
@@ -152,7 +190,7 @@ router.post("/:dropId/deposit", async (req, res) => {
       });
     });
 
-    res.json({ deposited: true, amountCents });
+    res.json({ deposited: true, amountCents, duplicate });
   } catch (err: any) {
     if (err.status && err.status < 500) { res.status(err.status).json({ error: err.message }); return; }
     req.log.error({ err }, "Failed to deposit into wallet");
@@ -243,6 +281,8 @@ router.post("/:dropId/release-order/:orderId", async (req, res) => {
           destination:    user.stripeAccountId!,
           transfer_group: w.stripe_transfer_group ?? `drop_${req.params.dropId}`,
           metadata:       { dropId: req.params.dropId, orderId: req.params.orderId, sellerId },
+        }, {
+          idempotencyKey: `drop-wallet-release/${w.id}/${req.params.orderId}`,
         });
         stripeTransferId = transfer.id;
       }
@@ -289,33 +329,55 @@ router.post("/:dropId/pay-shipping/:orderId", async (req, res) => {
     const sellerId   = (req as any).clerkUserId as string;
     const { labelCents, carrier, trackingNumber, description } = req.body;
 
-    if (typeof labelCents !== "number" || labelCents <= 0) {
+    if (!Number.isInteger(labelCents) || labelCents <= 0) {
       res.status(400).json({ error: "labelCents required" }); return;
     }
 
-    const [wallet] = await db
-      .select()
-      .from(dropWallets)
-      .where(and(eq(dropWallets.dropId, req.params.dropId), eq(dropWallets.sellerId, sellerId)))
-      .limit(1);
-    if (!wallet) { res.status(404).json({ error: "Wallet not found" }); return; }
+    const [order] = await db.select({ id: orders.id }).from(orders).where(and(
+      eq(orders.id, req.params.orderId),
+      eq(orders.dropId, req.params.dropId as any),
+      eq(orders.ownerId, sellerId),
+    )).limit(1);
+    if (!order) { res.status(404).json({ error: "Order not found for this drop" }); return; }
 
-    const available = wallet.balanceCents - wallet.releasedCents - wallet.reservedCents;
-    if (available < labelCents) {
-      res.status(400).json({ error: `Insufficient wallet balance. Available: $${(available / 100).toFixed(2)}` }); return;
-    }
-
+    let duplicate = false;
     await db.transaction(async (tx) => {
-      await tx
-        .update(dropWallets)
-        .set({
-          reservedCents: wallet.reservedCents + labelCents,
-          updatedAt:     new Date(),
-        })
-        .where(eq(dropWallets.id, wallet.id));
+      const lockResult = await tx.execute(
+        sql`SELECT id, balance_cents, released_cents, reserved_cents
+            FROM drop_wallets
+            WHERE drop_id = ${req.params.dropId}::uuid AND seller_id = ${sellerId}
+            FOR UPDATE LIMIT 1`,
+      );
+      const wallet = (lockResult as any).rows?.[0];
+      if (!wallet) { throw Object.assign(new Error("Wallet not found"), { status: 404 }); }
+
+      const existing = await tx.execute(
+        sql`SELECT id FROM drop_wallet_transactions
+            WHERE wallet_id = ${wallet.id}::uuid
+              AND order_id = ${req.params.orderId}::uuid
+              AND type = 'shipping_payment'
+            LIMIT 1`,
+      );
+      if ((existing as any).rows?.length > 0) {
+        duplicate = true;
+        return;
+      }
+
+      const available = wallet.balance_cents - wallet.released_cents - wallet.reserved_cents;
+      if (available < labelCents) {
+        throw Object.assign(new Error(
+          `Insufficient wallet balance. Available: $${(available / 100).toFixed(2)}`,
+        ), { status: 400 });
+      }
+
+      await tx.execute(
+        sql`UPDATE drop_wallets
+            SET reserved_cents = reserved_cents + ${labelCents}, updated_at = NOW()
+            WHERE id = ${wallet.id}::uuid`,
+      );
 
       await tx.insert(dropWalletTransactions).values({
-        walletId:    wallet.id,
+        walletId:    wallet.id as string,
         type:        "shipping_payment",
         amountCents: labelCents,
         orderId:     req.params.orderId ?? null,
@@ -324,7 +386,7 @@ router.post("/:dropId/pay-shipping/:orderId", async (req, res) => {
     });
 
     // Optionally update order tracking
-    if (trackingNumber || carrier) {
+    if (!duplicate && (trackingNumber || carrier)) {
       await db
         .update(orders)
         .set({
@@ -337,8 +399,11 @@ router.post("/:dropId/pay-shipping/:orderId", async (req, res) => {
         .where(and(eq(orders.id, req.params.orderId), eq(orders.ownerId, sellerId)));
     }
 
-    res.json({ paid: true, labelCents, deductedFromWallet: true });
-  } catch (err) {
+    res.json({ paid: true, labelCents, deductedFromWallet: true, duplicate });
+  } catch (err: any) {
+    if (err.status && err.status < 500) {
+      res.status(err.status).json({ error: err.message }); return;
+    }
     req.log.error({ err }, "Failed to pay shipping from wallet");
     res.status(500).json({ error: "Failed to pay shipping from wallet" });
   }

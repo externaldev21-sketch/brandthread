@@ -10,7 +10,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { disputes, orders } from "@workspace/db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { stripe, requireStripe } from "../lib/stripe";
 
@@ -203,8 +203,15 @@ router.post("/:id/evidence", async (req, res) => {
         status:         stripeStatus === row.status ? "evidence_submitted" : stripeStatus,
         updatedAt:      new Date(),
       })
-      .where(eq(disputes.id, row.id))
+      .where(and(
+        eq(disputes.id, row.id),
+        sql`${disputes.status} NOT IN ('won', 'lost', 'closed')`,
+      ))
       .returning();
+    if (!updated) {
+      res.status(409).json({ error: "Dispute changed while evidence was being submitted" });
+      return;
+    }
 
     res.json({ success: true, dispute: rowToDispute(updated), evidenceItem });
   } catch (err) {
@@ -243,8 +250,15 @@ router.post("/:id/submit", async (req, res) => {
     const [dbRow] = await db
       .update(disputes)
       .set({ status: mapStripeStatus(updated.status), updatedAt: new Date() })
-      .where(eq(disputes.id, row.id))
+      .where(and(
+        eq(disputes.id, row.id),
+        sql`${disputes.status} NOT IN ('won', 'lost', 'closed')`,
+      ))
       .returning();
+    if (!dbRow) {
+      res.status(409).json({ error: "Dispute changed while it was being submitted" });
+      return;
+    }
 
     res.json({ success: true, dispute: rowToDispute(dbRow) });
   } catch (err: any) {
@@ -271,8 +285,15 @@ router.post("/:id/accept", async (req, res) => {
     const [updated] = await db
       .update(disputes)
       .set({ status: "closed", updatedAt: new Date() })
-      .where(eq(disputes.id, row.id))
+      .where(and(
+        eq(disputes.id, row.id),
+        sql`${disputes.status} NOT IN ('won', 'lost')`,
+      ))
       .returning();
+    if (!updated) {
+      res.status(409).json({ error: "Finalised disputes cannot be accepted" });
+      return;
+    }
 
     res.json({ accepted: true, dispute: rowToDispute(updated) });
   } catch (err) {
