@@ -84,3 +84,4 @@
 - [Payment API security boundaries](payment-api-security-boundaries.md) — entitlement failures deny access; distributed limits fail closed; Stripe dispatch uses retryable, heartbeat-fenced event claims.
 - [Thread pagination boundary](thread-feed-pagination.md) — independently paginated followed/public sources need separate raw cursors, cross-source seen IDs, and refresh generations.
 - [Tax reporting boundaries](tax-reporting-boundaries.md) — annual gross uses successful-payment UTC year; preserve Stripe tax, gross, and final destination without inferring compliance.
+- [Notification response deduplication](notification-response-deduplication.md) — warm listeners and cold-start recovery can surface the same Expo response; dedupe navigation by request identifier.

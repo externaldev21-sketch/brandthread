@@ -34,6 +34,7 @@ import { registerGrantedPushToken } from '@/lib/contextualPushPermission';
 import { FeatureFlagProvider, FeatureFlagKey, useFeatureFlags } from '@/contexts/FeatureFlagContext';
 import { UndoToastProvider } from '@/components/BrandthreadUI';
 import { CookieConsentProvider } from '@/contexts/CookieConsentContext';
+import { createNotificationResponseHandler } from '@/lib/notificationNavigation';
 
 // Push notifications are native-only. Importing the package is safe for the
 // web bundle, but registering a handler/listener there produces unsupported
@@ -385,6 +386,7 @@ function RootLayoutNav() {
   const segments = useSegments();
   const router = useRouter();
   const { isEnabled } = useFeatureFlags();
+  const handledNotificationIdsRef = useRef(new Set<string>());
   const route = segments[segments.length - 1] ?? '';
   const gatedRoutes: Partial<Record<string, FeatureFlagKey>> = {
     'design-ai-photoshoot': 'aiPhotoShoot',
@@ -396,32 +398,10 @@ function RootLayoutNav() {
   useEffect(() => {
     if (Platform.OS === 'web') return;
 
-    const navigateFromNotification = (response: Notifications.NotificationResponse) => {
-      const data = response.notification.request.content.data as {
-        route?: unknown;
-        targetId?: unknown;
-        targetType?: unknown;
-      } | undefined;
-      if (data?.route === '/subscription') {
-        router.push('/subscription' as never);
-        return;
-      }
-      if (data?.targetType === 'order' && typeof data.targetId === 'string' && data.targetId) {
-        router.push(`/order-detail?id=${encodeURIComponent(data.targetId)}` as never);
-        return;
-      }
-      if (data?.targetType === 'manufacturer_thread' && typeof data.targetId === 'string' && data.targetId) {
-        router.push(`/manufacturer-messages?threadId=${encodeURIComponent(data.targetId)}` as never);
-        return;
-      }
-      if (data?.targetType === 'sample_order' && typeof data.targetId === 'string' && data.targetId) {
-        router.push(`/sample-detail?id=${encodeURIComponent(data.targetId)}` as never);
-        return;
-      }
-      if (data?.targetType === 'bulk_order' && typeof data.targetId === 'string' && data.targetId) {
-        router.push(`/production-detail?id=${encodeURIComponent(data.targetId)}` as never);
-      }
-    };
+    const navigateFromNotification = createNotificationResponseHandler(
+      { push: (href) => router.push(href as never) },
+      handledNotificationIdsRef.current,
+    );
 
     const subscription = Notifications.addNotificationResponseReceivedListener(
       navigateFromNotification,
