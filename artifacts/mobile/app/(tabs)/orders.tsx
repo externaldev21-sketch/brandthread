@@ -83,7 +83,7 @@ function getFulfillmentLabel(status: string): string {
   }
 }
 
-function getCancellationReasonLabel(reason: string): string {
+export function getCancellationReasonLabel(reason: string): string {
   return CANCELLATION_REASONS.find(r => r.key === reason)?.label ?? reason.replace(/_/g, ' ');
 }
 
@@ -122,7 +122,7 @@ const FULFILLMENT_MAP: Partial<Record<OrderStatus, FulfillmentStatus>> = {
   disputed:      'unfulfilled',
 };
 
-function apiRowToOrder(row: any): Order {
+export function apiRowToOrder(row: any): Order {
   const ordStatus: OrderStatus = DB_STATUS_MAP[row.status as string] ?? 'new';
   const fStatus: FulfillmentStatus = FULFILLMENT_MAP[ordStatus] ?? 'unfulfilled';
   const initials = ((row.customerName as string | undefined) ?? 'C')
@@ -219,7 +219,7 @@ interface OrderCardProps {
   onShip: () => void;
 }
 
-function OrderCard({
+export function OrderCard({
   order, selected, selectionMode, onPress, onLongPress,
   onMarkProcessing, onMarkReady, onShip,
 }: OrderCardProps) {
