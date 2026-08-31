@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { dbMock, fetchMock, table } = vi.hoisted(() => {
+const { dbMock, sendPushToUser, table } = vi.hoisted(() => {
   const table = () => new Proxy({}, {
     get: (_target, property) => `column.${String(property)}`,
   });
@@ -11,7 +11,7 @@ const { dbMock, fetchMock, table } = vi.hoisted(() => {
       insert: vi.fn(),
       delete: vi.fn(),
     },
-    fetchMock: vi.fn(),
+    sendPushToUser: vi.fn(async () => undefined),
     table,
   };
 });
@@ -35,6 +35,7 @@ vi.mock("@workspace/db", () => ({
   sampleOrders: table(),
   manufacturerActivityEvents: table(),
   pushTokens: table(),
+  notificationDeliveries: table(),
   stripeTrialWarningEvents: table(),
 }));
 
@@ -62,6 +63,10 @@ vi.mock("../lib/logger", () => ({
   },
 }));
 vi.mock("../lib/nativeEntitlements", () => ({ reconcileRevenueCatEntitlement: vi.fn() }));
+vi.mock("../lib/push", () => ({
+  sendPushToUser,
+  stableNotificationId: (...parts: string[]) => `stable:${parts.join(":")}`,
+}));
 vi.mock("./loyalty", () => ({
   awardLoyaltyPointsOnce: vi.fn(),
   consumeLoyaltyRedemption: vi.fn(),
@@ -101,6 +106,16 @@ function queueSelect<T>(rows: T) {
   dbMock.select.mockImplementationOnce(() => queryReturning(rows));
 }
 
+function mutationReturning<T>(rows: T) {
+  const query = {
+    values: vi.fn(() => query),
+    onConflictDoNothing: vi.fn(() => query),
+    onConflictDoUpdate: vi.fn(() => query),
+    returning: vi.fn(() => Promise.resolve(rows)),
+    where: vi.fn(() => Promise.resolve()),
+  };
+  return query;
+}
 const trialEnd = Math.floor(new Date("2026-09-14T12:00:00.000Z").getTime() / 1000);
 
 describe("customer.subscription.trial_will_end webhook", () => {
@@ -119,14 +134,14 @@ describe("customer.subscription.trial_will_end webhook", () => {
       };
       return query;
     });
-    fetchMock.mockReset();
-    fetchMock.mockResolvedValue({ ok: true });
-    vi.stubGlobal("fetch", fetchMock);
+    dbMock.delete.mockReset();
+    dbMock.delete.mockImplementation(() => mutationReturning(undefined));
+    sendPushToUser.mockReset();
+    sendPushToUser.mockResolvedValue(undefined);
   });
 
   it("sends the exact charge, trial date, and Subscription route to a seller device", async () => {
     queueSelect([{ clerkId: "clerk_seller_123" }]);
-    queueSelect([{ token: "ExponentPushToken[trial-warning]" }]);
 
     await handleSubscriptionTrialWillEnd({
       id: "sub_trial_123",
@@ -140,27 +155,19 @@ describe("customer.subscription.trial_will_end webhook", () => {
       },
     }, "evt_trial_will_end_123");
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [, request] = fetchMock.mock.calls[0] as [
-      string,
-      { body: string },
-    ];
-    expect(JSON.parse(request.body)).toEqual([{
-      to: "ExponentPushToken[trial-warning]",
+    expect(sendPushToUser).toHaveBeenCalledWith("clerk_seller_123", {
       title: "Your free trial ends soon",
       body: "Your 5-day trial ends in 3 days — you'll be charged $29.99 on Sep 14, 2026 unless you cancel.",
       data: {
+        notificationId: "stable:subscription-trial-ending:sub_trial_123:clerk_seller_123",
         type: "subscription_trial_will_end",
         route: "/subscription",
       },
-      sound: "default",
-    }]);
+    });
   });
 
-  it("succeeds without trying Expo when the seller has no registered token", async () => {
+  it("succeeds when the push service has no deliverable device token", async () => {
     queueSelect([{ clerkId: "clerk_seller_123" }]);
-    queueSelect([]);
-    fetchMock.mockRejectedValue(new Error("Expo should not be called"));
 
     await expect(handleSubscriptionTrialWillEnd({
       id: "sub_trial_no_token",
@@ -169,6 +176,6 @@ describe("customer.subscription.trial_will_end webhook", () => {
       items: { data: [{ price: { unit_amount: 2999 } }] },
     }, "evt_trial_will_end_no_token")).resolves.toBeUndefined();
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sendPushToUser).toHaveBeenCalledTimes(1);
   });
 });

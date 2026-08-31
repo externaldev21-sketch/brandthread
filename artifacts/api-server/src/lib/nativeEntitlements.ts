@@ -157,6 +157,69 @@ export type EffectiveEntitlement = {
   native: typeof sellerSubscriptionEntitlements.$inferSelect | null;
 };
 
+type LegacySubscription = {
+  planId: string | null;
+  status: string | null;
+} | null | undefined;
+
+type NativeSubscription = typeof sellerSubscriptionEntitlements.$inferSelect | null | undefined;
+
+function sellerPlanId(value: unknown): SellerPlanId | null {
+  if (value === "starter" || value === "growth" || value === "scale") return value;
+  return null;
+}
+
+/**
+ * Resolve access from the two seller subscription providers.
+ *
+ * This is intentionally independent of the database query so provider
+ * disagreement remains easy to exercise in tests. Only recognized plans and
+ * currently valid provider states can grant access; an unrecognized record is
+ * treated as unavailable rather than being allowed to fall through as a
+ * paid plan.
+ */
+export function resolveEffectiveEntitlement(
+  legacy: LegacySubscription,
+  native: NativeSubscription,
+  now = new Date(),
+): EffectiveEntitlement {
+  const nativePlan = sellerPlanId(native?.planId);
+  const nativeStatus = typeof native?.status === "string" ? native.status.toLowerCase() : "";
+  const nativeActive = !!native
+    && !!nativePlan
+    && ["active", "trial", "grace"].includes(nativeStatus)
+    && !!native.expiresAt
+    && native.expiresAt.valueOf() > now.valueOf();
+
+  const legacyPlan = legacy?.planId === "pro" ? "scale" : sellerPlanId(legacy?.planId);
+  const legacyStatus = typeof legacy?.status === "string" ? legacy.status.toLowerCase() : "";
+  const stripeActive = !!legacyPlan && ["active", "trialing", "past_due"].includes(legacyStatus);
+
+  if (
+    nativeActive
+    && nativePlan
+    && (!stripeActive || PLAN_RANK[nativePlan] >= PLAN_RANK[legacyPlan!])
+  ) {
+    return {
+      planId: nativePlan,
+      status: native?.status ?? "none",
+      provider: "revenuecat",
+      native: native ?? null,
+    };
+  }
+
+  if (stripeActive && legacyPlan) {
+    return {
+      planId: legacyPlan,
+      status: legacy?.status ?? "none",
+      provider: "stripe",
+      native: native ?? null,
+    };
+  }
+
+  return { planId: "starter", status: "none", provider: "none", native: native ?? null };
+}
+
 /** Shared effective access calculation. Stripe data remains untouched for all legacy web subscribers. */
 export async function getEffectiveEntitlement(clerkUserId: string): Promise<EffectiveEntitlement> {
   const [[legacy], [native]] = await Promise.all([
@@ -166,18 +229,5 @@ export async function getEffectiveEntitlement(clerkUserId: string): Promise<Effe
       .where(and(eq(sellerSubscriptionEntitlements.clerkUserId, clerkUserId), eq(sellerSubscriptionEntitlements.provider, "revenuecat")))
       .orderBy(desc(sellerSubscriptionEntitlements.lastSyncedAt)).limit(1),
   ]);
-  const nativeActive = native
-    && ["active", "trial", "grace"].includes(native.status)
-    && !!native.expiresAt
-    && native.expiresAt.valueOf() > Date.now();
-  const stripeActive = legacy && ["active", "trialing", "past_due"].includes(legacy.status ?? "");
-  const legacyEffectivePlan = legacy?.planId === "pro" ? "scale" : legacy?.planId;
-  if (nativeActive && (!stripeActive || PLAN_RANK[native.planId as SellerPlanId] >= PLAN_RANK[(legacyEffectivePlan as SellerPlanId) ?? "starter"])) {
-    return { planId: native.planId as SellerPlanId, status: native.status, provider: "revenuecat", native };
-  }
-  if (stripeActive) {
-    const legacyPlan = legacy.planId === "pro" ? "scale" : legacy.planId;
-    return { planId: (legacyPlan as SellerPlanId) ?? "starter", status: legacy.status ?? "none", provider: "stripe", native: native ?? null };
-  }
-  return { planId: "starter", status: "none", provider: "none", native: native ?? null };
+  return resolveEffectiveEntitlement(legacy, native);
 }

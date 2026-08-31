@@ -11,6 +11,8 @@ const state = vi.hoisted(() => {
   process.env.ENABLE_TEST_SUBSCRIPTION_BYPASS = "true";
   return {
     planId: "starter" as string,
+    provider: "none" as "stripe" | "revenuecat" | "none",
+    status: "none",
     lookupError: false,
     authUserId: "native-seller" as string | null,
     downstreamCalls: 0,
@@ -27,8 +29,8 @@ vi.mock("../../lib/nativeEntitlements", () => ({
     if (state.lookupError) throw new Error("database unavailable");
     return {
       planId: state.planId,
-      status: "active",
-      provider: "revenuecat",
+      status: state.status,
+      provider: state.provider,
       native: null,
     };
   },
@@ -60,11 +62,16 @@ describe("requirePlan native entitlements", () => {
   beforeEach(() => {
     state.lookupError = false;
     state.authUserId = "native-seller";
+    state.planId = "starter";
+    state.provider = "none";
+    state.status = "none";
     state.downstreamCalls = 0;
   });
 
   it("grants Growth endpoints from a server-verified native Growth entitlement", async () => {
     state.planId = "growth";
+    state.provider = "revenuecat";
+    state.status = "active";
     expect((await fetch(`${base}/growth`)).status).toBe(200);
   });
 
@@ -97,6 +104,25 @@ describe("requirePlan native entitlements", () => {
 
   it("grants Scale endpoints from a server-verified native Scale entitlement", async () => {
     state.planId = "scale";
+    state.provider = "revenuecat";
+    state.status = "active";
+    expect((await fetch(`${base}/scale`)).status).toBe(200);
+  });
+
+  it("uses the resolved Stripe Growth entitlement when native access is expired", async () => {
+    state.planId = "growth";
+    state.provider = "stripe";
+    state.status = "active";
+
+    expect((await fetch(`${base}/growth`)).status).toBe(200);
+    expect((await fetch(`${base}/scale`)).status).toBe(403);
+  });
+
+  it("uses the resolved native Scale entitlement when legacy Stripe is canceled", async () => {
+    state.planId = "scale";
+    state.provider = "revenuecat";
+    state.status = "active";
+
     expect((await fetch(`${base}/scale`)).status).toBe(200);
   });
 

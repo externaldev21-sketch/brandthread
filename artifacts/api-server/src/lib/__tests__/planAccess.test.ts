@@ -2,13 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   planId: "starter" as "starter" | "growth" | "scale",
+  provider: "stripe" as "stripe" | "revenuecat" | "none",
   unavailable: false,
 }));
 
 vi.mock("../nativeEntitlements", () => ({
   getEffectiveEntitlement: async () => {
     if (state.unavailable) throw new Error("unavailable");
-    return { planId: state.planId, status: "active", provider: "stripe", native: null };
+    return { planId: state.planId, status: "active", provider: state.provider, native: null };
   },
 }));
 
@@ -17,6 +18,7 @@ import { getVerifiedPlanAccess, sendPlanLimitReached } from "../planAccess";
 describe("plan access catalogue", () => {
   beforeEach(() => {
     state.planId = "starter";
+    state.provider = "stripe";
     state.unavailable = false;
   });
 
@@ -32,6 +34,15 @@ describe("plan access catalogue", () => {
     await expect(getVerifiedPlanAccess("owner")).resolves.toEqual({
       planId: "growth",
       limits: { products: null, teamSeats: 3 },
+    });
+  });
+
+  it("uses a resolved native Scale entitlement for the highest tier limits", async () => {
+    state.planId = "scale";
+    state.provider = "revenuecat";
+    await expect(getVerifiedPlanAccess("owner")).resolves.toEqual({
+      planId: "scale",
+      limits: { products: null, teamSeats: null },
     });
   });
 
