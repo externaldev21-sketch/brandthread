@@ -13,7 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useApi } from '@/lib/api';
+import { PostAnalyticsResponse, useApi } from '@/lib/api';
 import { useColors } from '@/hooks/useColors';
 
 // ─── Design Tokens ─────────────────────────────────────────────────────────────
@@ -140,7 +140,7 @@ export default function PostAnalyticsScreen() {
 
   const api = useApi();
   const postId = typeof params.id === 'string' ? params.id : '';
-  const [post, setPost] = useState<any | null>(null);
+  const [analytics, setAnalytics] = useState<PostAnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(Boolean(postId));
   const [loadError, setLoadError] = useState<string | null>(
     postId ? null : 'Choose a post from your content library first.',
@@ -151,10 +151,10 @@ export default function PostAnalyticsScreen() {
     setLoading(true);
     setLoadError(null);
     try {
-      setPost(await api.posts.get(postId));
+      setAnalytics(await api.posts.analytics(postId));
     } catch {
-      setPost(null);
-      setLoadError('We couldn’t load this post. It may have been removed, or your connection may be offline.');
+      setAnalytics(null);
+      setLoadError('We couldn’t load verified analytics for this post. Make sure it belongs to your store, then try again.');
     } finally {
       setLoading(false);
     }
@@ -180,7 +180,7 @@ export default function PostAnalyticsScreen() {
     );
   }
 
-  if (!post || loadError) {
+  if (!analytics || loadError) {
     return (
       <View style={styles.notFound}>
         <Feather name="alert-circle" size={30} color={ERR} />
@@ -192,11 +192,9 @@ export default function PostAnalyticsScreen() {
     );
   }
 
-  const analytics: any = null;
+  const { post, metrics } = analytics;
   const gradColors = postTypeGradient(post.mediaType ?? 'image', colors.primary);
 
-  // The live post API currently reports only durable like and repost counts.
-  // Keep this screen honest rather than deriving views, revenue, or retention.
   return (
     <View style={styles.root}>
       <View style={[styles.header, { paddingTop: insets.top }]}>
@@ -225,18 +223,50 @@ export default function PostAnalyticsScreen() {
         </View>
 
         <View style={styles.heroGrid}>
-          <HeroCard icon="heart" iconColor={colors.primary} label="Likes" value={formatNumber(Number(post.likeCount ?? post.likesCount ?? 0))} />
-          <HeroCard icon="repeat" iconColor={ORANGE} label="Reposts" value={formatNumber(Number(post.repostCount ?? post.repostsCount ?? 0))} />
+          <HeroCard icon="eye" iconColor={GREEN} label="Views" value={metrics.views.tracked ? formatNumber(metrics.views.count ?? 0) : 'Not tracked'} />
+          <HeroCard icon="heart" iconColor={colors.primary} label="Likes" value={formatNumber(metrics.likes)} />
+          <HeroCard icon="bookmark" iconColor={BLUE} label="Saves" value={formatNumber(metrics.saves.count)} />
+          <HeroCard icon="repeat" iconColor={ORANGE} label="Reposts" value={formatNumber(metrics.reposts)} />
         </View>
 
         <SectionTitle title="Performance data" />
         <View style={styles.card}>
-          <Feather name="bar-chart-2" size={26} color={colors.primary} />
-          <Text style={styles.unavailableTitle}>More post analytics are coming soon</Text>
-          <Text style={styles.unavailableText}>
-            Views, saves, product clicks, conversions, and audience insights are not available from the live API yet. We only show verified counts above.
-          </Text>
+          <AnalyticsRow
+            label="Product clicks"
+            value={formatNumber(metrics.productClicks.count)}
+            detail={`${formatNumber(metrics.productClicks.uniqueClickers)} unique shoppers`}
+          />
+          <AnalyticsRow
+            label="Conversions"
+            value={formatNumber(metrics.conversions.orders)}
+            detail={metrics.conversions.rate == null
+              ? 'Rate unavailable until a product click is recorded'
+              : `${(metrics.conversions.rate * 100).toFixed(1)}% of product clicks`}
+          />
+          <AnalyticsRow
+            label="Attributed revenue"
+            value={formatRevenue(metrics.conversions.revenueCents / 100)}
+            detail="From non-cancelled attributed orders"
+          />
+          <AnalyticsRow
+            label="Average watch time"
+            value={metrics.retention.tracked
+              ? `${(metrics.retention.averageWatchTimeSeconds ?? 0).toFixed(1)}s`
+              : 'Not tracked'}
+            detail={metrics.retention.tracked
+              ? `${formatNumber(metrics.retention.sampleCount)} watch samples`
+              : 'Shown after valid watch-time events are recorded'}
+          />
         </View>
+
+        {(!metrics.views.tracked || !metrics.retention.tracked) && (
+          <View style={styles.availabilityNote}>
+            <Feather name="info" size={18} color={colors.primary} />
+            <Text style={styles.unavailableText}>
+              Unavailable metrics are labeled “Not tracked.” Brandthread never estimates post performance from demo data.
+            </Text>
+          </View>
+        )}
 
         <View style={styles.quickActionsRow}>
           <TouchableOpacity
@@ -448,6 +478,18 @@ function HeroCard({ icon, iconColor, label, value }: HeroCardProps) {
       <Feather name={icon} size={16} color={iconColor} />
       <Text style={styles.heroValue}>{value}</Text>
       <Text style={styles.heroLabel}>{label}</Text>
+    </View>
+  );
+}
+
+function AnalyticsRow({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return (
+    <View style={styles.analyticsRow}>
+      <View style={styles.analyticsRowCopy}>
+        <Text style={styles.analyticsLabel}>{label}</Text>
+        <Text style={styles.analyticsDetail}>{detail}</Text>
+      </View>
+      <Text style={styles.analyticsValue}>{value}</Text>
     </View>
   );
 }
@@ -680,6 +722,44 @@ const styles = StyleSheet.create({
     color: MUTED,
     fontSize: 13,
     lineHeight: 19,
+  },
+  availabilityNote: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: CARD,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 14,
+    padding: 14,
+    gap: 10,
+    marginTop: 12,
+  },
+  analyticsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+    paddingVertical: 4,
+  },
+  analyticsRowCopy: {
+    flex: 1,
+    gap: 3,
+  },
+  analyticsLabel: {
+    color: FG,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  analyticsDetail: {
+    color: MUTED,
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  analyticsValue: {
+    color: FG,
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'right',
   },
 
   // ── Engagement Bars ──

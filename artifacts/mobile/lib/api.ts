@@ -348,6 +348,44 @@ export interface LocalUserProfile {
   brandName: string | null;
 }
 
+export interface PostAnalyticsResponse {
+  post: {
+    id: string;
+    mediaType: string;
+    mediaUrl: string;
+    caption: string | null;
+    createdAt: string;
+  };
+  metrics: {
+    likes: number;
+    reposts: number;
+    views: {
+      tracked: boolean;
+      count: number | null;
+      uniqueViewers: number | null;
+    };
+    saves: {
+      tracked: true;
+      count: number;
+    };
+    productClicks: {
+      tracked: true;
+      count: number;
+      uniqueClickers: number;
+    };
+    conversions: {
+      tracked: true;
+      orders: number;
+      revenueCents: number;
+      rate: number | null;
+    };
+    retention: {
+      tracked: boolean;
+      sampleCount: number;
+      averageWatchTimeSeconds: number | null;
+    };
+  };
+}
 export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () => 'anonymous') {
   const get     = <T>(path: string) => request<T>(path, { method: 'GET' }, getToken, false, getCacheScope);
   const getText  = (path: string)   => request<string>(path, { method: 'GET' }, getToken, true, getCacheScope);
@@ -1106,7 +1144,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       publicList: (ownerId?: string) =>
         get<any[]>(`/api/public/posts${ownerId ? `?ownerId=${encodeURIComponent(ownerId)}` : ''}`),
       get: (id: string) => get<any>(`/api/posts/${encodeURIComponent(id)}`),
-      interact: (id: string, body: { type: 'like' | 'repost' | 'watch_time' | 'shop_click'; value?: string }) =>
+      /** Owner-only verified performance. Untracked metrics return tracked=false and null values. */
+      analytics: (id: string) =>
+        get<PostAnalyticsResponse>(`/api/posts/${encodeURIComponent(id)}/analytics`),
+      interact: (id: string, body: { type: 'like' | 'repost' | 'view' | 'watch_time' | 'shop_click'; value?: string }) =>
         post<{ action: string; count?: number }>(`/api/posts/${encodeURIComponent(id)}/interact`, body),
     },
     /** Content reporting (buyers and sellers can submit reports) */

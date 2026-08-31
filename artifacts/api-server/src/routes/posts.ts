@@ -5,11 +5,13 @@
  * GET  /api/public/posts        — paginated public feed of all published posts (no auth)
  * POST /api/posts              — create post + tag products (requireAuth)
  * GET  /api/posts/:id          — get single post + tags + counts (public)
- * POST /api/posts/:id/interact — toggle like / repost; record watch_time (requireAuth)
+ * GET  /api/posts/:id/analytics — owner-only verified performance (requireAuth)
+ * POST /api/posts/:id/interact — toggle like / repost; record analytics events (requireAuth)
  */
 import { Router } from "express";
 import {
   db, posts, postTaggedProducts, products, users, interactions, follows, boosts,
+  savedItems, orders,
 } from "@workspace/db";
 import { eq, and, inArray, count, sql, desc, lt, gte } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -245,6 +247,140 @@ router.post("/", requireAuth, async (req, res) => {
   return res.status(201).json({ ...post, taggedProducts });
 });
 
+// ─── GET /api/posts/:id/analytics ────────────────────────────────────────────
+// Owner-only, server-verified post performance.
+//
+// Metric availability:
+// - likes/reposts: always returned from durable interaction rows.
+// - views: returned only after explicit `view` events have been recorded.
+// - saves: current live saves from saved_items (`item_type = post`).
+// - product clicks: explicit `shop_click` events.
+// - conversions: non-cancelled orders whose source_post_id matches this post.
+// - retention: average watch time only when valid `watch_time` samples exist.
+//
+// We intentionally do not derive views from feed delivery, infer completion
+// rate without media duration, or fabricate unavailable values.
+router.get("/:id/analytics", requireAuth, async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  const { id } = req.params;
+  if (typeof id !== "string" || !UUID_RE.test(id)) {
+    return res.status(404).json({ error: "Post analytics not found" });
+  }
+
+  const [post] = await db
+    .select({
+      id: posts.id,
+      mediaType: posts.mediaType,
+      mediaUrl: posts.mediaUrl,
+      caption: posts.caption,
+      createdAt: posts.createdAt,
+    })
+    .from(posts)
+    .where(and(eq(posts.id, id), eq(posts.userId, ownerId)))
+    .limit(1);
+
+  // Deliberately return the same response for a missing post and another
+  // seller's post so this endpoint never reveals ownership information.
+  if (!post) {
+    return res.status(404).json({ error: "Post analytics not found" });
+  }
+
+  try {
+    const [interactionRows, saveRows, conversionRows, watchRows] = await Promise.all([
+      db
+        .select({
+          type: interactions.type,
+          count: sql<number>`count(*)::int`,
+          uniqueUsers: sql<number>`count(distinct ${interactions.userId})::int`,
+        })
+        .from(interactions)
+        .where(and(
+          eq(interactions.postId, id),
+          inArray(interactions.type, ["like", "repost", "view", "shop_click"]),
+        ))
+        .groupBy(interactions.type),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(savedItems)
+        .where(and(eq(savedItems.itemType, "post"), eq(savedItems.targetId, id))),
+      db
+        .select({
+          count: sql<number>`count(*)::int`,
+          revenueCents: sql<number>`coalesce(sum(${orders.totalCents}), 0)::int`,
+        })
+        .from(orders)
+        .where(and(
+          eq(orders.ownerId, ownerId),
+          eq(orders.sourcePostId, id),
+          sql`${orders.status} != 'cancelled'`,
+        )),
+      db
+        .select({ value: interactions.value })
+        .from(interactions)
+        .where(and(eq(interactions.postId, id), eq(interactions.type, "watch_time"))),
+    ]);
+
+    const interactionsByType = new Map(
+      interactionRows.map((row) => [
+        row.type,
+        { count: Number(row.count), uniqueUsers: Number(row.uniqueUsers) },
+      ]),
+    );
+    const views = interactionsByType.get("view");
+    const productClicks = interactionsByType.get("shop_click");
+    const validWatchSeconds = watchRows
+      .map((row) => Number(row.value))
+      .filter((value) => Number.isFinite(value) && value >= 0);
+    const conversionCount = Number(conversionRows[0]?.count ?? 0);
+    const productClickCount = productClicks?.count ?? 0;
+
+    return res.json({
+      post: {
+        ...post,
+        createdAt: post.createdAt.toISOString(),
+      },
+      metrics: {
+        likes: interactionsByType.get("like")?.count ?? 0,
+        reposts: interactionsByType.get("repost")?.count ?? 0,
+        views: views
+          ? { tracked: true, count: views.count, uniqueViewers: views.uniqueUsers }
+          : { tracked: false, count: null, uniqueViewers: null },
+        saves: {
+          tracked: true,
+          count: Number(saveRows[0]?.count ?? 0),
+        },
+        productClicks: {
+          tracked: true,
+          count: productClickCount,
+          uniqueClickers: productClicks?.uniqueUsers ?? 0,
+        },
+        conversions: {
+          tracked: true,
+          orders: conversionCount,
+          revenueCents: Number(conversionRows[0]?.revenueCents ?? 0),
+          rate: productClickCount > 0 ? conversionCount / productClickCount : null,
+        },
+        retention: validWatchSeconds.length > 0
+          ? {
+              tracked: true,
+              sampleCount: validWatchSeconds.length,
+              averageWatchTimeSeconds:
+                validWatchSeconds.reduce((sum, seconds) => sum + seconds, 0) /
+                validWatchSeconds.length,
+            }
+          : {
+              tracked: false,
+              sampleCount: 0,
+              averageWatchTimeSeconds: null,
+            },
+      },
+    });
+  } catch (err) {
+    req.log.error({ err, ownerId, postId: id }, "Failed to load post analytics");
+    return res.status(500).json({ error: "Failed to load post analytics" });
+  }
+});
+
 // ─── GET /api/posts/:id ──────────────────────────────────────────────────────
 router.get("/:id", async (req, res) => {
   const { id } = req.params;
@@ -288,15 +424,17 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
     return res.status(404).json({ error: "Post not found" });
   }
   const { type, value } = req.body as {
-    type: "like" | "repost" | "watch_time";
+    type: "like" | "repost" | "view" | "watch_time" | "shop_click";
     value?: string;
   };
 
-  if (!["like", "repost", "watch_time"].includes(type)) {
-    return res.status(400).json({ error: "type must be like, repost, or watch_time" });
+  if (!["like", "repost", "view", "watch_time", "shop_click"].includes(type)) {
+    return res.status(400).json({
+      error: "type must be like, repost, view, watch_time, or shop_click",
+    });
   }
 
-  if (type === "watch_time") {
+  if (type === "view" || type === "watch_time" || type === "shop_click") {
     await db.insert(interactions).values({ userId: clerkId, postId: id, type, value: value ?? null });
     return res.json({ action: "recorded" });
   }
