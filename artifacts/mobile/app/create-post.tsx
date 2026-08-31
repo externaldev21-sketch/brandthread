@@ -504,6 +504,7 @@ export default function CreatePostScreen() {
         trimEnd,
       });
       setComposedVideo(result);
+      setVideoClips(uploaded.map(({ objectPath: _objectPath, ...clip }) => clip));
       setScrubTime(0);
       setPreviewSeekTime(0);
       setProcessingPhase('ready');

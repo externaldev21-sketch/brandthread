@@ -3,6 +3,7 @@ import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
+import { Readable } from "node:stream";
 import { db, posts, users } from "@workspace/db";
 import { eq, inArray } from "drizzle-orm";
 
@@ -42,6 +43,8 @@ vi.mock("../../lib/objectStorage", () => ({
       return {
         getMetadata: async () => [{ size: String(object.bytes.length), contentType: object.contentType }],
         download: async () => [object.bytes],
+        createReadStream: ({ start = 0, end = object.bytes.length - 1 } = {}) =>
+          Readable.from(object.bytes.subarray(start, end + 1)),
         __path: path,
       };
     }
@@ -187,6 +190,7 @@ describe("seller post management", () => {
     expect(composed.status).toBe(200);
     expect(composed.body.mediaPath).toMatch(/^\/objects\/uploads\//);
     expect(composed.body.thumbnailPath).toMatch(/^\/objects\/uploads\//);
+    expect(videoStorage.objects.has(upload.objectPath)).toBe(false);
 
     const published = await request("/api/posts", {
       method: "POST",
@@ -211,7 +215,53 @@ describe("seller post management", () => {
     expect(publicPost.status).toBe(200);
     expect(publicPost.body.mediaUrls).toEqual([published.body.mediaUrl]);
     expect(publicPost.body.mediaUrls.join(" ")).not.toContain("signed-preview.test");
+    const mediaResponse = await fetch(published.body.mediaUrl, {
+      headers: { Range: "bytes=0-4" },
+    });
+    expect(mediaResponse.status).toBe(206);
+    expect(mediaResponse.headers.get("accept-ranges")).toBe("bytes");
+    expect(mediaResponse.headers.get("content-range")).toContain("bytes 0-4/");
+    expect((await mediaResponse.arrayBuffer()).byteLength).toBe(5);
     await db.delete(posts).where(eq(posts.id, published.body.id));
+  });
+
+  it("rejects unsupported owned objects before video processing", async () => {
+    authState.clerkUserId = sellerA;
+    const imagePath = `/objects/uploads/not-video-${suffix}.jpg`;
+    videoStorage.objects.set(imagePath, {
+      bytes: Buffer.from([0xff, 0xd8, 0xff, 0xdb]),
+      contentType: "image/jpeg",
+      owner: sellerA,
+      visibility: "private",
+    });
+
+    const response = await request("/api/posts/compose-video", {
+      method: "POST",
+      body: JSON.stringify({
+        clips: [{ objectPath: imagePath, speed: 1, filter: "none" }],
+        trimStart: 0,
+        trimEnd: 1,
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain("supported video");
+    expect(videoStorage.objects.has(imagePath)).toBe(true);
+  });
+
+  it("rejects traversal-shaped clip paths without touching storage", async () => {
+    authState.clerkUserId = sellerA;
+    const response = await request("/api/posts/compose-video", {
+      method: "POST",
+      body: JSON.stringify({
+        clips: [{ objectPath: "/objects/uploads/../other-seller/video.mp4" }],
+        trimStart: 0,
+        trimEnd: 1,
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toBe("Invalid clip settings");
   });
 
   it("stores lifecycle state and keeps non-published posts private", async () => {

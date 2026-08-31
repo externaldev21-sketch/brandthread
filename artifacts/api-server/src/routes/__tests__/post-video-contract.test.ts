@@ -29,4 +29,13 @@ describe("post video publication contract", () => {
     expect(postsRoute).toContain("composedMediaUrl(req, mediaPath)");
     expect(postsRoute).toContain("composedMediaUrl(req, thumbnailPath)");
   });
+
+  it("revalidates stored clips and cleans source objects after composition", () => {
+    expect(videoRoute).toContain("isSupportedVideo(contentType, bytes)");
+    expect(videoRoute).toContain("MAX_TOTAL_DURATION_SECONDS = 600");
+    expect(videoRoute).toContain("storage.deleteObjectEntity(path)");
+    expect(videoRoute).toContain("OBJECT_PATH_RE");
+    expect(videoRoute).toContain('req.get("range")');
+    expect(videoRoute).toContain("file.createReadStream({ start, end })");
+  });
 });

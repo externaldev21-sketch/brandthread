@@ -26,6 +26,7 @@ vi.mock("../../middlewares/requireAuth", () => ({
 
 vi.mock("drizzle-orm", () => ({
   and: (...conditions: unknown[]) => conditions,
+  asc: (value: unknown) => value,
   desc: (value: unknown) => value,
   eq: (...values: unknown[]) => values,
 }));

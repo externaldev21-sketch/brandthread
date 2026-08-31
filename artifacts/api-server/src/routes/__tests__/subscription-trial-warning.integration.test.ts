@@ -5,7 +5,10 @@ import { eq } from "drizzle-orm";
 
 const sendPushToUser = vi.hoisted(() => vi.fn(async () => undefined));
 
-vi.mock("../../lib/push", () => ({ sendPushToUser }));
+vi.mock("../../lib/push", () => ({
+  sendPushToUser,
+  stableNotificationId: (...parts: string[]) => parts.join(":"),
+}));
 
 const { handleSubscriptionTrialWillEnd } = await import("../webhooks");
 

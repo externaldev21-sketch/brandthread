@@ -139,6 +139,9 @@ beforeAll(async () => {
 
   await db.insert(interactions).values([
     { userId: "buyer-1", postId: sellerAPost.id, type: "like" },
+    // One buyer can like multiple posts; totalLikes counts engagement rows,
+    // not unique people.
+    { userId: "buyer-1", postId: sellerASecondPost.id, type: "like" },
     { userId: "buyer-2", postId: sellerASecondPost.id, type: "like" },
     { userId: "buyer-3", postId: sellerAPost.id, type: "comment", value: "Nice look!" },
     { userId: "buyer-4", postId: sellerBPost.id, type: "like" },
@@ -195,7 +198,7 @@ describe("seller profile likes metric", () => {
     const result = await getProfile();
 
     expect(result.status).toBe(200);
-    expect(result.body.totalLikes).toBe(2);
+    expect(result.body.totalLikes).toBe(3);
   });
 
   it("returns zero when the authenticated seller has no likes", async () => {
@@ -245,7 +248,7 @@ describe("seller profile likes metric", () => {
     authState.clerkUserId = sellerA;
     const result = await getProfile();
     expect(result.status).toBe(200);
-    expect(result.body.totalLikes).toBe(4);
+    expect(result.body.totalLikes).toBe(5);
   });
 });
 
