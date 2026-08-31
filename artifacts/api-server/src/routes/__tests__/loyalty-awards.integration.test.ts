@@ -9,6 +9,7 @@ import {
   awardLoyaltyPointsOnce,
   bindLoyaltyRedemptionToCheckout,
   consumeLoyaltyRedemption,
+  redeemLoyaltyPoints,
   reserveLoyaltyRedemption,
   reversePurchasePointsOnce,
 } from "../loyalty";
@@ -109,6 +110,46 @@ describe("loyalty purchase awards", () => {
 });
 
 describe("loyalty checkout redemptions", () => {
+  it("serializes concurrent redemptions so deductions cannot exceed the balance", async () => {
+    const buyerId = `loyalty-test-${crypto.randomUUID()}`;
+    testBuyerIds.push(buyerId);
+
+    await db.insert(loyaltyPoints).values({
+      buyerId,
+      points: 150,
+      source: "bonus",
+      referenceId: crypto.randomUUID(),
+      note: "Test redemption balance",
+    });
+
+    const attempts = await Promise.allSettled([
+      redeemLoyaltyPoints(buyerId, 100),
+      redeemLoyaltyPoints(buyerId, 100),
+    ]);
+    const successful = attempts.filter(
+      (attempt): attempt is PromiseFulfilledResult<Awaited<ReturnType<typeof redeemLoyaltyPoints>>> =>
+        attempt.status === "fulfilled",
+    );
+    const rejected = attempts.filter((attempt) => attempt.status === "rejected");
+
+    expect(successful).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect(successful[0]?.value).toMatchObject({
+      pointsUsed: 100,
+      discountCents: 100,
+    });
+    expect(successful[0]?.value.token).toMatch(/^LOYAL-/);
+    expect(rejected[0]).toMatchObject({
+      reason: { code: "INSUFFICIENT_POINTS" },
+    });
+
+    const [balance] = await db
+      .select({ total: sql<number>`COALESCE(SUM(${loyaltyPoints.points}), 0)` })
+      .from(loyaltyPoints)
+      .where(eq(loyaltyPoints.buyerId, buyerId));
+    expect(Number(balance?.total ?? 0)).toBe(50);
+  });
+
   it("reserves one token for checkout and marks it used only after the order succeeds", async () => {
     const buyerId = `loyalty-test-${crypto.randomUUID()}`;
     const token = `LOYAL-TEST-${crypto.randomUUID().toUpperCase()}`;

@@ -13,6 +13,7 @@
  *  • Minimum redemption: 100 pts ($1.00)
  */
 import { Router } from "express";
+import { randomUUID } from "node:crypto";
 import { db, loyaltyPoints } from "@workspace/db";
 import { eq, sql, desc, and, inArray, isNull } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -377,6 +378,49 @@ router.post("/earn", async (req, res) => {
 // ─── POST /api/loyalty/redeem ─────────────────────────────────────────────────
 // Buyer redeems points for a discount at checkout.
 // Returns { discountCents, token } — mobile passes token to checkout.
+export async function redeemLoyaltyPoints(
+  buyerId: string,
+  points: number,
+): Promise<{ token: string; discountCents: number; pointsUsed: number }> {
+  if (!Number.isInteger(points) || points < 100) {
+    throw new LoyaltyRedemptionError("Minimum redemption is 100 points");
+  }
+
+  const discountCents = points;  // 100 pts = $1.00 = 100 cents
+  return db.transaction(async (tx) => {
+    // Keep the balance read and deduction in the same buyer-scoped critical
+    // section. Without this lock, two requests can both spend the same points.
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${`loyalty-balance:${buyerId}`}))`,
+    );
+    const [balanceRow] = await tx
+      .select({ total: sql<number>`COALESCE(SUM(${loyaltyPoints.points}), 0)` })
+      .from(loyaltyPoints)
+      .where(eq(loyaltyPoints.buyerId, buyerId));
+    const balance = Number(balanceRow?.total ?? 0);
+    if (points > balance) {
+      throw new LoyaltyRedemptionError(
+        `Insufficient points. You have ${balance} pts.`,
+        400,
+        "INSUFFICIENT_POINTS",
+      );
+    }
+
+    // Generate the token after acquiring the lock so concurrent requests
+    // cannot produce the same token before entering their transactions.
+    const token = `LOYAL-${buyerId.slice(-6).toUpperCase()}-${randomUUID().toUpperCase()}`;
+    await tx.insert(loyaltyPoints).values({
+      buyerId,
+      points:      -points,
+      source:      "redemption",
+      referenceId: token,
+      note:        `Redeemed ${points} pts for $${(discountCents / 100).toFixed(2)} off`,
+    });
+
+    return { token, pointsUsed: points, discountCents };
+  });
+}
+
 router.post("/redeem", async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   const { points: rawPoints } = req.body as { points?: number };
@@ -386,34 +430,13 @@ router.post("/redeem", async (req, res) => {
     return res.status(400).json({ error: "Minimum redemption is 100 points" });
   }
 
-  const discountCents = points;  // 100 pts = $1.00 = 100 cents
-  const token = `LOYAL-${clerkId.slice(-6).toUpperCase()}-${Date.now().toString(36).toUpperCase()}`;
   try {
-    await db.transaction(async (tx) => {
-      // Serializing on buyer ID prevents concurrent requests from observing the
-      // same balance and creating more token value than the buyer owns.
-      await tx.execute(
-        sql`SELECT pg_advisory_xact_lock(hashtext(${`loyalty-balance:${clerkId}`}))`,
-      );
-      const [balanceRow] = await tx
-        .select({ total: sql<number>`COALESCE(SUM(${loyaltyPoints.points}), 0)` })
-        .from(loyaltyPoints)
-        .where(eq(loyaltyPoints.buyerId, clerkId));
-      const balance = Number(balanceRow?.total ?? 0);
-      if (points > balance) {
-        throw new LoyaltyRedemptionError(
-          `Insufficient points. You have ${balance} pts.`,
-          400,
-          "INSUFFICIENT_POINTS",
-        );
-      }
-      await tx.insert(loyaltyPoints).values({
-        buyerId:     clerkId,
-        points:      -points,
-        source:      "redemption",
-        referenceId: token,
-        note:        `Redeemed ${points} pts for $${(discountCents / 100).toFixed(2)} off`,
-      });
+    const redemption = await redeemLoyaltyPoints(clerkId, points);
+    return res.json({
+      ok:           true,
+      pointsUsed:   redemption.pointsUsed,
+      discountCents: redemption.discountCents,
+      token:        redemption.token, // client passes this to checkout
     });
   } catch (error) {
     if (error instanceof LoyaltyRedemptionError) {
@@ -421,13 +444,6 @@ router.post("/redeem", async (req, res) => {
     }
     throw error;
   }
-
-  return res.json({
-    ok:           true,
-    pointsUsed:   points,
-    discountCents,
-    token,        // client passes this to /api/buyer/checkout to apply the discount
-  });
 });
 
 export default router;
