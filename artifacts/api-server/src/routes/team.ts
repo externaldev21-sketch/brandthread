@@ -20,9 +20,14 @@
  */
 import { Router } from "express";
 import { db, teamMembers, teamActivityLogs, users } from "@workspace/db";
-import { eq, and, ne, or, asc, desc, gt, sql } from "drizzle-orm";
+import { eq, and, ne, or, asc, desc, gt, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { teamContext, requireRole } from "../middlewares/requireRole";
+import {
+  teamContext,
+  requireRole,
+  InvalidStoreContextError,
+  resolveTeamContext,
+} from "../middlewares/requireRole";
 import { logActivity, reqActor } from "../lib/activityLog";
 import { teamMembershipOrderBy } from "../lib/teamMembership";
 import {
@@ -67,6 +72,50 @@ const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 const isUuid = (s: string) =>
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+
+async function activeMembershipsFor(userId: string) {
+  const memberships = await db
+    .select({
+      id: teamMembers.id,
+      ownerId: teamMembers.ownerId,
+      role: teamMembers.role,
+      acceptedAt: teamMembers.acceptedAt,
+    })
+    .from(teamMembers)
+    .where(and(eq(teamMembers.memberClerkId, userId), eq(teamMembers.status, "active")))
+    .orderBy(...teamMembershipOrderBy());
+
+  const ownerIds = [...new Set(
+    memberships
+      .map((membership) => membership.ownerId)
+      .filter((ownerId) => ownerId !== userId),
+  )];
+  const owners = ownerIds.length === 0
+    ? []
+    : await db
+      .select({
+        clerkId: users.clerkId,
+        name: users.name,
+        displayName: users.displayName,
+        brandName: users.brandName,
+      })
+      .from(users)
+      .where(inArray(users.clerkId, ownerIds));
+  const ownerById = new Map(owners.map((owner) => [owner.clerkId, owner]));
+
+  return memberships
+    .filter((membership) => membership.ownerId !== userId)
+    .map((membership) => {
+      const owner = ownerById.get(membership.ownerId);
+      return {
+        id: membership.id,
+        ownerId: membership.ownerId,
+        role: membership.role,
+        acceptedAt: membership.acceptedAt,
+        ownerName: owner?.brandName ?? owner?.displayName ?? owner?.name ?? "Another store",
+      };
+    });
+}
 
 /**
  * Returns true when an invite token is expired.
@@ -195,51 +244,83 @@ router.get("/invite/accept/:token", async (req, res) => {
 // ─── Authenticated routes ─────────────────────────────────────────────────────
 router.use(requireAuth);
 
-// GET /api/team/my-membership — the caller's active membership in another store.
+// GET /api/team/my-memberships — all active memberships in other stores.
 // Must be placed BEFORE teamContext() so it always reads the real caller's id.
-// Returns null when the user is not a member of any other store.
+router.get("/my-memberships", async (req, res) => {
+  const userId = (req as any).clerkUserId as string | undefined;
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+
+  try {
+    res.json({ memberships: await activeMembershipsFor(userId) });
+  } catch (err) {
+    req.log.error({ err, userId }, "Team memberships lookup failed");
+    res.status(503).json({
+      error: "Unable to load store memberships",
+      code: "STORE_MEMBERSHIPS_UNAVAILABLE",
+    });
+  }
+});
+
+// GET /api/team/my-membership — legacy single-membership response. Keep this
+// while clients migrate to the explicit multi-store switcher.
 router.get("/my-membership", async (req, res) => {
   const userId = (req as any).clerkUserId as string | undefined;
   if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
 
   try {
-    const [membership] = await db
-      .select({
-        id: teamMembers.id,
-        ownerId: teamMembers.ownerId,
-        role: teamMembers.role,
-        status: teamMembers.status,
-        acceptedAt: teamMembers.acceptedAt,
-      })
-      .from(teamMembers)
-      .where(and(eq(teamMembers.memberClerkId, userId), eq(teamMembers.status, "active")))
-      .orderBy(...teamMembershipOrderBy())
-      .limit(1);
-
-    if (!membership || membership.ownerId === userId) {
+    const [membership] = await activeMembershipsFor(userId);
+    if (!membership) {
       res.json({ membership: null });
       return;
     }
 
-    // Fetch the store owner's display info.
-    const [owner] = await db
-      .select({ name: users.name, displayName: users.displayName, brandName: users.brandName })
-      .from(users)
-      .where(eq(users.clerkId, membership.ownerId))
-      .limit(1);
-
-    res.json({
-      membership: {
-        id: membership.id,
-        ownerId: membership.ownerId,
-        role: membership.role,
-        acceptedAt: membership.acceptedAt,
-        ownerName: owner?.brandName ?? owner?.displayName ?? owner?.name ?? "Another store",
-      },
-    });
+    res.json({ membership });
   } catch (err) {
     req.log.error({ err, userId }, "Team membership lookup failed");
     res.json({ membership: null });
+  }
+});
+
+// POST /api/team/context — validate an explicit store selection. The selection
+// is request-scoped; clients should send the returned membership id in
+// X-Store-Context on subsequent requests.
+router.post("/context", async (req, res) => {
+  const selection =
+    typeof req.body?.storeContext === "string"
+      ? req.body.storeContext
+      : typeof req.body?.membershipId === "string"
+        ? req.body.membershipId
+        : null;
+  if (!selection || (selection !== "own" && selection !== "joined" && !isUuid(selection))) {
+    res.status(400).json({
+      error: "Choose your own store or an active store membership.",
+      code: "INVALID_STORE_CONTEXT",
+    });
+    return;
+  }
+
+  req.headers["x-store-context"] = selection;
+  try {
+    const context = await resolveTeamContext(req);
+    res.json({
+      storeContext: selection,
+      storeOwnerId: context?.storeOwnerId ?? null,
+      teamMembershipId: context?.teamMembershipId ?? null,
+      role: context?.actorRole ?? "owner",
+    });
+  } catch (err) {
+    if (err instanceof InvalidStoreContextError) {
+      res.status(403).json({
+        error: err.message,
+        code: "STORE_CONTEXT_NOT_ALLOWED",
+      });
+      return;
+    }
+    req.log.error({ err }, "Store context selection failed");
+    res.status(503).json({
+      error: "Unable to verify the selected store",
+      code: "STORE_CONTEXT_UNAVAILABLE",
+    });
   }
 });
 
@@ -247,7 +328,12 @@ router.use(teamContext());
 
 /** GET /api/team/context — resolved role for the active store context. */
 router.get("/context", (req, res) => {
-  res.json({ role: (req as any).actorRole ?? "owner" });
+  const context = (req as any).teamContext;
+  res.json({
+    role: context?.actorRole ?? "owner",
+    storeOwnerId: context?.storeOwnerId ?? (req as any).clerkUserId ?? null,
+    teamMembershipId: context?.teamMembershipId ?? null,
+  });
 });
 
 // POST /api/team/invite/accept/:token — link the signed-in caller to the invite

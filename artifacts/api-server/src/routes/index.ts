@@ -157,7 +157,9 @@ router.use("/drop-wallets",              tc, dropWalletRouter);
 router.use("/disputes",                  tc, disputesRouter);
 router.use("/finance",                   financeRouter); // router applies manager reads and owner mutations after team context
 router.use("/taxes",                     tc, taxesRouter);
-router.use("/team",                      tc, teamRouter);
+// teamRouter owns its middleware ordering so membership discovery sees the
+// actual caller before any store-context rewrite.
+router.use("/team",                      teamRouter);
 router.use("/store/ai",                  tc, storeAiRouter);
 router.use("/store",                     tc, storeRouter);
 router.use("/shopify-imports",           tc, shopifyImportRouter);

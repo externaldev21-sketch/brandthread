@@ -16,7 +16,7 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUser, useAuth } from '@clerk/expo';
 import { getSetupState, completionPercent, SetupState } from '@/lib/setupStore';
-import { useApi, setStoreContext, getStoreContext, type StoreContext } from '@/lib/api';
+import { useApi } from '@/lib/api';
 import { BG, SURFACE, CARD, BORDER, FG, MUTED, SUBTLE, SUCCESS, BLUE, ORANGE, RED, GOLD, FONT, FS, SP, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, SecondaryButton, NavigationCard, StatusBadge } from '@/components/BrandthreadUI';
@@ -121,14 +121,6 @@ export default function MoreScreen() {
   );
   const [unreadMessages, setUnreadMessages] = useState(0);
 
-  // Store context switcher state
-  const [teamMembership, setTeamMembership] = useState<{
-    id: string; ownerId: string; role: string; ownerName: string;
-  } | null>(null);
-  const [activeContext, setActiveContext] = useState<StoreContext>('joined');
-
-  const STORE_CTX_KEY = '@brandthread/store_context';
-
   useEffect(() => {
     getSetupState().then(setSetupState);
   }, []);
@@ -150,29 +142,7 @@ export default function MoreScreen() {
       }
     }
 
-    async function fetchMembership() {
-      try {
-        const { membership } = await api.team.myMembership();
-        if (cancelled) return;
-        setTeamMembership(membership ?? null);
-        if (membership) {
-          // Context is already hydrated by ServiceConfigurer at boot;
-          // just sync the visual state to what the module-level var says.
-          const current = getStoreContext();
-          const ctx: StoreContext = current === 'own' ? 'own' : 'joined';
-          setActiveContext(ctx);
-        } else {
-          // No membership — always own store, no rewrite.
-          setActiveContext('joined');
-          setStoreContext(null);
-        }
-      } catch {
-        // silently ignore — switcher won't show if offline
-      }
-    }
-
     fetchUnread();
-    fetchMembership();
     return () => { cancelled = true; };
   }, [api]));
 
@@ -184,21 +154,6 @@ export default function MoreScreen() {
   const avatarLetter = (user?.firstName?.[0] ?? 'S').toUpperCase();
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
-
-  const handleStoreSwitch = async (ctx: StoreContext) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setActiveContext(ctx);
-    setStoreContext(ctx);
-    await AsyncStorage.setItem(STORE_CTX_KEY, ctx);
-    // Brief confirmation
-    Alert.alert(
-      ctx === 'own' ? 'Switched to your store' : `Switched to ${teamMembership?.ownerName ?? 'joined store'}`,
-      ctx === 'own'
-        ? 'You are now managing your own store.'
-        : `You are now managing ${teamMembership?.ownerName ?? 'the joined store'} as ${teamMembership?.role ?? 'member'}.`,
-      [{ text: 'OK' }],
-    );
-  };
 
   const handleSignOut = async () => {
     try {
@@ -257,69 +212,6 @@ export default function MoreScreen() {
             style={styles.editProfileBtn}
           />
         </GradientCard>
-
-        {/* STORE CONTEXT SWITCHER — only shown when user is a team member */}
-        {!!teamMembership && (
-          <BrandthreadCard style={styles.switcherCard}>
-            <Text style={styles.switcherTitle}>ACTIVE STORE</Text>
-            <View style={styles.switcherRow}>
-              {/* Own store option */}
-              <TouchableOpacity
-                style={[
-                  styles.switcherOption,
-                  activeContext === 'own' && styles.switcherOptionActive,
-                ]}
-                onPress={() => activeContext !== 'own' && handleStoreSwitch('own')}
-                activeOpacity={0.75}
-              >
-                <Feather
-                  name="home"
-                  size={13}
-                  color={activeContext === 'own' ? PURPLE_LIGHT : MUTED}
-                />
-                <Text
-                  style={[
-                    styles.switcherLabel,
-                    activeContext === 'own' && styles.switcherLabelActive,
-                  ]}
-                  numberOfLines={1}
-                >
-                  My Store
-                </Text>
-              </TouchableOpacity>
-
-              {/* Joined store option */}
-              <TouchableOpacity
-                style={[
-                  styles.switcherOption,
-                  activeContext === 'joined' && styles.switcherOptionActive,
-                ]}
-                onPress={() => activeContext !== 'joined' && handleStoreSwitch('joined')}
-                activeOpacity={0.75}
-              >
-                <Feather
-                  name="users"
-                  size={13}
-                  color={activeContext === 'joined' ? PURPLE_LIGHT : MUTED}
-                />
-                <Text
-                  style={[
-                    styles.switcherLabel,
-                    activeContext === 'joined' && styles.switcherLabelActive,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {teamMembership.ownerName}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.switcherHint}>
-              {activeContext === 'own'
-                ? 'You are managing your own store'
-                : `You are managing ${teamMembership.ownerName} as ${teamMembership.role}`}
-            </Text>
-          </BrandthreadCard>
-        )}
 
         {/* STORE SETUP PROGRESS */}
         <BrandthreadCard style={styles.setupCard}>

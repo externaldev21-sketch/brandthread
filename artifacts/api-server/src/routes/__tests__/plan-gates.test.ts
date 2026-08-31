@@ -35,7 +35,7 @@ describe("paid route mounts", () => {
       'router.use("/manufacturers",   tc, manufacturersRouter);',
     );
     expect(routesSource).toContain(
-      'router.use("/team",                      tc, teamRouter);',
+      'router.use("/team",                      teamRouter);',
     );
     expect(routesSource).toContain(
       'router.use("/live",                      tc, requirePlan("scale"), liveRouter);',

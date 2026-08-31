@@ -40,7 +40,20 @@ export interface TeamContext {
   teamMembershipId: string | null;
 }
 
-async function resolveTeamContext(req: Request): Promise<TeamContext | null> {
+export class InvalidStoreContextError extends Error {
+  constructor(message = "The selected store is not available to this account.") {
+    super(message);
+    this.name = "InvalidStoreContextError";
+  }
+}
+
+function headerValue(req: Request, name: string): string | null {
+  const value = (req.headers as Record<string, string | string[] | undefined>)[name];
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+export async function resolveTeamContext(req: Request): Promise<TeamContext | null> {
   const existing = (req as any).teamContext as TeamContext | undefined;
   if (existing) return existing;
 
@@ -54,38 +67,65 @@ async function resolveTeamContext(req: Request): Promise<TeamContext | null> {
     teamMembershipId: null,
   };
 
-  // If the client explicitly requests their own store context, skip team rewrite.
-  const storeContextHeader = (req.headers as Record<string, string | string[] | undefined>)["x-store-context"];
-  const wantsOwnStore =
-    storeContextHeader === "own" ||
-    (Array.isArray(storeContextHeader) && storeContextHeader[0] === "own");
+  // `own` is the user's store. A membership UUID explicitly selects one of
+  // their joined stores. `joined` and an absent header preserve the legacy
+  // newest-membership behavior for older clients.
+  const storeContextHeader = headerValue(req, "x-store-context");
+  const wantsOwnStore = storeContextHeader === "own";
+  const selectedMembershipId =
+    storeContextHeader && storeContextHeader !== "own" && storeContextHeader !== "joined"
+      ? storeContextHeader
+      : null;
 
-  if (!wantsOwnStore) {
-    try {
-      const [membership] = await db
-        .select({
-          id: teamMembers.id,
-          ownerId: teamMembers.ownerId,
-          role: teamMembers.role,
-        })
-        .from(teamMembers)
-        .where(and(eq(teamMembers.memberClerkId, userId), eq(teamMembers.status, "active")))
-        .orderBy(...teamMembershipOrderBy())
-        .limit(1);
+  if (wantsOwnStore) {
+    (req as any).teamContext = ctx;
+    (req as any).actorClerkId = ctx.actorClerkId;
+    (req as any).actorRole = ctx.actorRole;
+    (req as any).clerkUserId = ctx.storeOwnerId;
+    return ctx;
+  }
 
-      if (membership && membership.ownerId !== userId) {
-        ctx.actorRole = (membership.role as TeamRole) ?? "staff";
-        ctx.storeOwnerId = membership.ownerId;
-        ctx.teamMembershipId = membership.id;
-        // Touch lastActiveAt (fire & forget) — drives online/offline status.
-        db.update(teamMembers)
-          .set({ lastActiveAt: new Date() })
-          .where(eq(teamMembers.id, membership.id))
-          .then(() => {}, () => {});
-      }
-    } catch (err) {
-      req.log.error({ err, actorClerkId: userId }, "Team membership lookup failed");
-      // Fail open as owner-of-self — never lock a seller out of their own store.
+  try {
+    const [membership] = await db
+      .select({
+        id: teamMembers.id,
+        ownerId: teamMembers.ownerId,
+        role: teamMembers.role,
+      })
+      .from(teamMembers)
+      .where(
+        selectedMembershipId
+          ? and(
+              eq(teamMembers.id, selectedMembershipId),
+              eq(teamMembers.memberClerkId, userId),
+              eq(teamMembers.status, "active"),
+            )
+          : and(eq(teamMembers.memberClerkId, userId), eq(teamMembers.status, "active")),
+      )
+      .orderBy(...teamMembershipOrderBy())
+      .limit(1);
+
+    if (selectedMembershipId && (!membership || membership.ownerId === userId)) {
+      throw new InvalidStoreContextError();
+    }
+
+    if (membership && membership.ownerId !== userId) {
+      ctx.actorRole = (membership.role as TeamRole) ?? "staff";
+      ctx.storeOwnerId = membership.ownerId;
+      ctx.teamMembershipId = membership.id;
+      // Touch lastActiveAt (fire & forget) — drives online/offline status.
+      db.update(teamMembers)
+        .set({ lastActiveAt: new Date() })
+        .where(eq(teamMembers.id, membership.id))
+        .then(() => {}, () => {});
+    }
+  } catch (err) {
+    if (err instanceof InvalidStoreContextError) throw err;
+    req.log.error({ err, actorClerkId: userId }, "Team membership lookup failed");
+    // An explicit selection must never fall back to a different store. For
+    // legacy/default resolution, preserve the existing owner-of-self fallback.
+    if (selectedMembershipId) {
+      throw new InvalidStoreContextError("Unable to verify the selected store. Please try again.");
     }
   }
 
@@ -101,8 +141,19 @@ async function resolveTeamContext(req: Request): Promise<TeamContext | null> {
  * Typed as RequestHandler<any,…> so adding it to a route doesn't clobber the
  * route's own path-literal param inference. */
 export function teamContext(): RequestHandler<any, any, any, any> {
-  return async (req, _res, next) => {
-    await resolveTeamContext(req as Request);
+  return async (req, res, next) => {
+    try {
+      await resolveTeamContext(req as Request);
+    } catch (err) {
+      if (err instanceof InvalidStoreContextError) {
+        res.status(403).json({
+          error: err.message,
+          code: "STORE_CONTEXT_NOT_ALLOWED",
+        });
+        return;
+      }
+      throw err;
+    }
     next();
   };
 }
@@ -120,7 +171,19 @@ export function requireRole(minRole: TeamRole): RequestHandler<any, any, any, an
       return;
     }
 
-    const ctx = await resolveTeamContext(req as Request);
+    let ctx: TeamContext | null;
+    try {
+      ctx = await resolveTeamContext(req as Request);
+    } catch (err) {
+      if (err instanceof InvalidStoreContextError) {
+        res.status(403).json({
+          error: err.message,
+          code: "STORE_CONTEXT_NOT_ALLOWED",
+        });
+        return;
+      }
+      throw err;
+    }
     const role = ctx?.actorRole ?? "owner";
 
     if (TEAM_OWNER_BYPASS && role === "owner") {

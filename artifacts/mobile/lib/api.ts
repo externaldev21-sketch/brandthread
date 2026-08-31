@@ -161,14 +161,22 @@ async function getCachedSellerPaymentStatus(
 }
 
 // ─── Store context switcher ───────────────────────────────────────────────────
-// When a team member wants to act on their own store instead of the joined store,
-// the client sends X-Store-Context: own. The backend teamContext() middleware
-// skips the clerkUserId rewrite, so all queries run against the user's own data.
-// 'joined' (or null) restores the default behaviour (backend decides based on
-// active team membership).
-export type StoreContext = 'own' | 'joined';
+// The client sends X-Store-Context: own for the user's store or the selected
+// team_members.id for a joined store. 'joined' (or null) preserves the legacy
+// newest-membership behavior for older sessions.
+export type StoreContext = 'own' | 'joined' | (string & {});
 let _storeContext: StoreContext | null = null;
 const _storeContextListeners = new Set<(ctx: StoreContext | null) => void>();
+
+export function storeContextStorageKey(userId: string): string {
+  return `@brandthread/store_context:${userId}`;
+}
+
+export function storeContextHeaders(): Record<string, string> {
+  return _storeContext && _storeContext !== 'joined'
+    ? { 'X-Store-Context': _storeContext }
+    : {};
+}
 
 /** Set the active store context. Call this from the switcher UI and persist
  *  the value to AsyncStorage for the next app launch. */
@@ -205,7 +213,7 @@ async function request<T = any>(
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(_storeContext === 'own' ? { 'X-Store-Context': 'own' } : {}),
+    ...storeContextHeaders(),
     // Normalize any HeadersInit shape (Headers instance, string[][], or plain object).
     ...(options.headers
       ? options.headers instanceof Headers
@@ -269,7 +277,7 @@ async function uploadImage<T = any>(
       headers: {
         "Content-Type": contentType,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(_storeContext === "own" ? { "X-Store-Context": "own" } : {}),
+        ...storeContextHeaders(),
       },
       body: imageBlob,
     });
@@ -306,7 +314,7 @@ async function uploadVideo<T = any>(
       headers: {
         "Content-Type": contentType,
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(_storeContext === "own" ? { "X-Store-Context": "own" } : {}),
+        ...storeContextHeaders(),
       },
       body: videoBlob,
     });
@@ -1485,15 +1493,32 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       roleMembers: (role: string) => get<any[]>(`/api/team/roles/${encodeURIComponent(role)}/members`),
       /** Resolves the caller's permission tier for the active store context. */
       context: () => get<{ role: 'owner' | 'manager' | 'staff' }>('/api/team/context'),
-      /** Returns the caller's active membership in another seller's store (null if none).
-       *  Used by the store switcher: if non-null the user can toggle between their own
-       *  store and the store they joined. */
+      /** Returns all of the caller's active memberships in other seller stores. */
+      myMemberships: () =>
+        get<{
+          memberships: Array<{
+            id: string;
+            ownerId: string;
+            role: 'owner' | 'manager' | 'staff' | string;
+            acceptedAt: string | null;
+            ownerName: string;
+          }>;
+        }>('/api/team/my-memberships'),
+      /** Validate a store selection before applying it to subsequent requests. */
+      selectContext: (storeContext: StoreContext) =>
+        post<{
+          storeContext: StoreContext;
+          storeOwnerId: string | null;
+          teamMembershipId: string | null;
+          role: 'owner' | 'manager' | 'staff';
+        }>('/api/team/context', { storeContext }),
+      /** Legacy single-membership response retained for older screens. */
       myMembership: () =>
         get<{
           membership: {
             id: string;
             ownerId: string;
-            role: string;
+            role: 'owner' | 'manager' | 'staff' | string;
             acceptedAt: string | null;
             ownerName: string;
           } | null;

@@ -22,7 +22,13 @@ import { AppThemeProvider } from '@/contexts/AppThemeContext';
 import BootScreen from '@/components/BootScreen';
 import * as Notifications from 'expo-notifications';
 import { configureServices } from '@/lib/serviceConfig';
-import { clearApiCache, configureApi, setStoreContext, useApi } from '@/lib/api';
+import {
+  clearApiCache,
+  configureApi,
+  setStoreContext,
+  storeContextStorageKey,
+  useApi,
+} from '@/lib/api';
 import { clearSocialCache, hydrateMyProfileFromAccount, initSocialService, socialKeysForUser } from '@/services/socialService';
 import { clearCartCache, initCartService } from '@/services/cartService';
 import { initBuyerProfile } from '@/lib/buyerProfile';
@@ -325,8 +331,6 @@ function AuthGate() {
 }
 
 // ─── Wire background services + module-level API singleton to Clerk token ─────
-const STORE_CTX_KEY = '@brandthread/store_context';
-
 function ServiceConfigurer() {
   const { getToken, isSignedIn, isLoaded } = useAuth();
   const { user } = useUser();
@@ -394,16 +398,17 @@ function ServiceConfigurer() {
 
     if (isSignedIn) {
       // Restore the context that was active in the last session.
-      AsyncStorage.getItem(STORE_CTX_KEY).then((saved) => {
-        setStoreContext(saved === 'own' ? 'own' : null);
+      const userId = user?.id;
+      if (!userId) return;
+      AsyncStorage.getItem(storeContextStorageKey(userId)).then((saved) => {
+        setStoreContext(saved || null);
       }).catch(() => {});
     } else if (prev === true) {
       // Just signed out — clear context so the next user starts fresh.
       setStoreContext(null);
-      AsyncStorage.removeItem(STORE_CTX_KEY).catch(() => {});
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSignedIn, isLoaded]);
+  }, [isSignedIn, isLoaded, user?.id]);
 
   return null;
 }
