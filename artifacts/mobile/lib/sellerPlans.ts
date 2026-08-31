@@ -5,19 +5,18 @@ export type SellerBrandStage = 'idea' | 'build' | 'selling' | 'scale';
 export interface SellerPlanDefinition {
   id: SellerPlanId;
   name: string;
-  onboardingName: string;
   tagline: string;
   priceCents: number;
   priceLabel: string;
   features: string[];
   notIncluded: string[];
+  highlight?: boolean;
 }
 
 export const SELLER_PLANS: SellerPlanDefinition[] = [
   {
     id: 'starter',
     name: 'Starter',
-    onboardingName: 'Starter',
     tagline: 'Launch and run your storefront',
     priceCents: 2900,
     priceLabel: '$29',
@@ -32,10 +31,10 @@ export const SELLER_PLANS: SellerPlanDefinition[] = [
   {
     id: 'growth',
     name: 'Growth',
-    onboardingName: 'Growth',
     tagline: 'Create products and source production',
     priceCents: 7900,
     priceLabel: '$79',
+    highlight: true,
     features: [
       'Everything in Starter',
       'AI logos, mockups, product photography, and lifestyle imagery',
@@ -47,7 +46,6 @@ export const SELLER_PLANS: SellerPlanDefinition[] = [
   {
     id: 'scale',
     name: 'Scale',
-    onboardingName: 'Pro',
     tagline: 'Operate and promote a growing brand',
     priceCents: 19900,
     priceLabel: '$199',
@@ -61,6 +59,18 @@ export const SELLER_PLANS: SellerPlanDefinition[] = [
     notIncluded: [],
   },
 ];
+
+/**
+ * Resolve a plan returned by billing services to the public catalogue.
+ *
+ * Stripe webhooks already translate the retired `pro` lookup key to Growth,
+ * but keeping this boundary tolerant protects older mobile/API responses
+ * without putting the legacy label back on an upgrade surface.
+ */
+export function getSellerPlan(planId: string | null | undefined): SellerPlanDefinition | undefined {
+  const normalizedId = planId === 'pro' ? 'growth' : planId;
+  return SELLER_PLANS.find((plan) => plan.id === normalizedId);
+}
 
 const GOAL_WEIGHTS: Record<string, number> = {
   'Create designs': 1,
@@ -110,6 +120,6 @@ export function recommendSellerPlan(stage: string, goals: string[]): SellerPlanR
   return {
     planId,
     score,
-    reason: `Because you’re ${stagePhrase}${goalPhrase}, ${plan.onboardingName} is the best fit for what you need right now.`,
+    reason: `Because you’re ${stagePhrase}${goalPhrase}, ${plan.name} is the best fit for what you need right now.`,
   };
 }

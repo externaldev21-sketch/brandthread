@@ -34,78 +34,12 @@ import { useTeamRole } from '@/hooks/useTeamRole';
 import { getGrowthStudioTools, GROWTH_EXTRAS } from '@/lib/growthTools';
 import { useRevenueCat } from '@/lib/revenueCat';
 import { SELLER_PACKAGE_IDS } from '@/lib/sellerBilling';
+import { getSellerPlan, SELLER_PLANS } from '@/lib/sellerPlans';
 import {
   getBillingRecoveryTarget,
   isSubscriptionPaymentRecoveryRequired,
   type SubscriptionBillingProvider,
 } from '@/lib/subscriptionRecovery';
-
-// ─── Static plan catalogue ────────────────────────────────────────────────────
-
-interface PlanFeature { text: string; included: boolean }
-interface Plan {
-  id:       string;
-  name:     string;
-  tagline:  string;
-  price:    string;
-  period:   string;
-  highlight?: boolean;
-  features: PlanFeature[];
-}
-
-const PLANS: Plan[] = [
-  {
-    id:      'starter',
-    name:    'Starter',
-    tagline: 'Launch your brand',
-    price:   '$29',
-    period:  '/mo',
-    features: [
-      { text: 'Storefront + AI Store Builder', included: true },
-      { text: 'Up to 25 products',             included: true },
-      { text: 'Standard checkout',             included: true },
-      { text: 'Basic analytics',               included: true },
-      { text: 'Community & freelancer marketplace', included: true },
-      { text: 'AI Design Studio',              included: false },
-      { text: 'Manufacturer Hub',              included: false },
-      { text: 'Live shopping',                 included: false },
-    ],
-  },
-  {
-    id:      'growth',
-    name:    'Growth',
-    tagline: 'Scale your catalog',
-    price:   '$79',
-    period:  '/mo',
-    highlight: true,
-    features: [
-      { text: 'Everything in Starter',         included: true },
-      { text: 'Unlimited products',            included: true },
-      { text: 'AI Design Studio (full)',       included: true },
-      { text: 'Manufacturer Hub + drops',      included: true },
-      { text: 'Live shopping',                 included: true },
-      { text: 'Up to 3 team seats',            included: true },
-      { text: 'Boost & promotion credits',     included: true },
-      { text: 'Advanced analytics',            included: false },
-      { text: 'Unlimited team seats',          included: false },
-    ],
-  },
-  {
-    id:      'scale',
-    name:    'Scale',
-    tagline: 'Enterprise-grade operations',
-    price:   '$199',
-    period:  '/mo',
-    features: [
-      { text: 'Everything in Growth',          included: true },
-      { text: 'Unlimited team seats',          included: true },
-      { text: 'Advanced analytics',            included: true },
-      { text: 'Priority manufacturer intros',  included: true },
-      { text: 'White-glove support',           included: true },
-      { text: 'Early access to new features',  included: true },
-    ],
-  },
-];
 
 interface UsageStat { label: string; used: number; limit: number | null; unit?: string }
 const USAGE: UsageStat[] = [
@@ -154,17 +88,10 @@ export default function SubscriptionScreen() {
   const applyStatus = useCallback((
     data: Awaited<ReturnType<typeof api.seller.subscription.status>>,
   ) => {
-    const planName =
-      data.plan === 'growth' ? 'Growth'
-      : data.plan === 'scale'  ? 'Scale'
-      : 'Starter';
-    const planPrice =
-      data.plan === 'growth' ? '$79'
-      : data.plan === 'scale'  ? '$199'
-      : '$29';
+    const plan = getSellerPlan(data.plan) ?? SELLER_PLANS[0];
     setCurrentPlan({
-      name:               planName,
-      price:              data.amountCents > 0 ? formatCents(data.amountCents) : planPrice,
+      name:               plan.name,
+      price:              data.amountCents > 0 ? formatCents(data.amountCents) : plan.priceLabel,
       period:             'month',
       renewsOn:           data.renewsOn ?? '—',
       trialEnd:           data.trialEnd ?? null,
@@ -429,7 +356,7 @@ export default function SubscriptionScreen() {
 
             {/* Plan options */}
             <Text style={styles.sectionTitle}>All plans</Text>
-            {PLANS.map((plan) => {
+             {SELLER_PLANS.map((plan) => {
               const isCurrent = plan.id === selectedPlan;
               return (
                 <View key={plan.id} style={[styles.planCard, isCurrent && styles.planCardHighlight, plan.highlight && !isCurrent && styles.planCardFeatured]}>
@@ -449,19 +376,25 @@ export default function SubscriptionScreen() {
                       <Text style={styles.planTagline}>{plan.tagline}</Text>
                     </View>
                     <View style={styles.planPriceCol}>
-                       <Text style={styles.planPrice}>
+                        <Text style={styles.planPrice}>
                          {Platform.OS === 'web'
-                           ? plan.price
+                            ? plan.priceLabel
                            : revenueCatPackages.find((pkg) => pkg.identifier === SELLER_PACKAGE_IDS[plan.id as keyof typeof SELLER_PACKAGE_IDS])?.product.priceString ?? '—'}
                        </Text>
-                      <Text style={styles.planPeriod}>{plan.period}</Text>
+                       <Text style={styles.planPeriod}>/mo</Text>
                     </View>
                   </View>
                   <View style={styles.featureList}>
-                    {plan.features.map((f) => (
-                      <View key={f.text} style={styles.featureRow}>
-                        <Feather name={f.included ? 'check' : 'x'} size={14} color={f.included ? SUCCESS : SUBTLE} />
-                        <Text style={[styles.featureText, !f.included && styles.featureTextDim]}>{f.text}</Text>
+                     {plan.features.map((feature) => (
+                       <View key={feature} style={styles.featureRow}>
+                         <Feather name="check" size={14} color={SUCCESS} />
+                         <Text style={styles.featureText}>{feature}</Text>
+                       </View>
+                     ))}
+                     {plan.notIncluded.map((feature) => (
+                       <View key={feature} style={styles.featureRow}>
+                         <Feather name="x" size={14} color={SUBTLE} />
+                         <Text style={[styles.featureText, styles.featureTextDim]}>{feature}</Text>
                       </View>
                     ))}
                   </View>

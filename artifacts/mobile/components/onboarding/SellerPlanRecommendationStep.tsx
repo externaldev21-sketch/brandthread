@@ -26,7 +26,7 @@ export function SellerPlanRecommendationStep({
   return (
     <ScrollView contentContainerStyle={styles.root} showsVerticalScrollIndicator={false}>
       <Text style={[styles.eyebrow, { color: theme.secondary }]}>YOUR PERSONALIZED PLAN</Text>
-      <Text style={styles.title}>We recommend {SELLER_PLANS.find((plan) => plan.id === recommendation.planId)?.onboardingName}</Text>
+      <Text style={styles.title}>We recommend {SELLER_PLANS.find((plan) => plan.id === recommendation.planId)?.name}</Text>
       <Text style={styles.reason}>{recommendation.reason}</Text>
       <Text style={styles.guidance}>This is guidance, not a gate. Pick any plan, and change it before subscribing.</Text>
 
@@ -56,8 +56,7 @@ export function SellerPlanRecommendationStep({
                 )}
                 {selected && <Feather name="check-circle" size={18} color={theme.accentLight} />}
               </View>
-              <Text style={styles.planName}>{plan.onboardingName}</Text>
-              {plan.onboardingName !== plan.name && <Text style={styles.internalName}>Scale plan</Text>}
+              <Text style={styles.planName}>{plan.name}</Text>
               <Text style={styles.tagline}>{plan.tagline}</Text>
               <Text style={[styles.price, selected && { color: theme.accentLight }]}>{price}<Text style={styles.period}>/mo</Text></Text>
               <View style={styles.features}>
@@ -75,14 +74,13 @@ export function SellerPlanRecommendationStep({
 
       <TouchableOpacity onPress={onContinue} activeOpacity={0.86} style={[styles.continue, { backgroundColor: theme.accent }]}>
         <Text style={[styles.continueText, { color: theme.onAccent }]}>
-          Continue with {SELLER_PLANS.find((plan) => plan.id === selectedPlanId)?.onboardingName}
+          Continue with {SELLER_PLANS.find((plan) => plan.id === selectedPlanId)?.name}
         </Text>
       </TouchableOpacity>
       <Text style={styles.chargeNote}>No charge is made on this step.</Text>
     </ScrollView>
   );
 }
-
 const styles = StyleSheet.create({
   root: { flexGrow: 1, paddingTop: 10, paddingBottom: 40 },
   eyebrow: { fontSize: 11, fontFamily: 'Inter_700Bold', letterSpacing: 1.2, marginBottom: 8 },
@@ -95,7 +93,6 @@ const styles = StyleSheet.create({
   badge: { flexDirection: 'row', gap: 5, alignItems: 'center', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4 },
   badgeText: { fontSize: 9, fontFamily: 'Inter_700Bold', letterSpacing: 0.5 },
   planName: { color: '#FFF', fontSize: 24, fontFamily: 'Inter_700Bold', marginTop: 10 },
-  internalName: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontFamily: 'Inter_500Medium', marginTop: -1 },
   tagline: { color: 'rgba(255,255,255,0.5)', fontSize: 12, lineHeight: 17, fontFamily: 'Inter_400Regular', marginTop: 3 },
   price: { color: '#FFF', fontSize: 30, fontFamily: 'Inter_700Bold', marginTop: 14 },
   period: { color: 'rgba(255,255,255,0.42)', fontSize: 12, fontFamily: 'Inter_400Regular' },

@@ -52,8 +52,6 @@ const BORDER_ACTIVE = PURPLE;
 
 // ─── Plan catalogue ───────────────────────────────────────────────────────────
 
-const PLANS = SELLER_PLANS;
-
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function PlansScreen() {
@@ -284,7 +282,7 @@ export default function PlansScreen() {
             <Text style={styles.recBannerText}>
               Based on your brand stage, we recommend{' '}
               <Text style={{ color: CYAN, fontFamily: FONT.semibold }}>
-                 {PLANS.find(p => p.id === recommendedId)?.onboardingName}
+                 {SELLER_PLANS.find(p => p.id === recommendedId)?.name}
               </Text>
             </Text>
           </View>
@@ -318,7 +316,7 @@ export default function PlansScreen() {
         </View>
 
         {/* Plan cards */}
-        {PLANS.map((plan) => {
+        {SELLER_PLANS.map((plan) => {
           const isRecommended = plan.id === recommendedId;
           const isCurrent     = !isOnboarding && plan.id === currentPlanId;
           const isLoading     = loadingId === plan.id;
@@ -361,7 +359,7 @@ export default function PlansScreen() {
               <View style={styles.cardTopRow}>
                 <View style={{ flex: 1 }}>
                  <Text style={[styles.planName, plan.id === 'growth' && { color: PURPLE }]}>
-                    {plan.onboardingName}
+                    {plan.name}
                   </Text>
                   <Text style={styles.planTagline}>{plan.tagline}</Text>
                 </View>

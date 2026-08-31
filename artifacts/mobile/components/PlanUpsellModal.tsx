@@ -21,6 +21,7 @@ import * as Haptics from 'expo-haptics';
 import { CARD, BORDER, FG, MUTED, SUBTLE, SUCCESS, FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { GROWTH_EXTRAS, GROWTH_STUDIO_TOOLS, getGrowthStudioTools } from '@/lib/growthTools';
+import { getSellerPlan } from '@/lib/sellerPlans';
 
 interface Props {
   visible: boolean;
@@ -48,8 +49,9 @@ export default function PlanUpsellModal({
 }: Props) {
   const { theme } = useAppTheme();
   const growthStudioTools = React.useMemo(() => getGrowthStudioTools(theme), [theme]);
-  const planLabel = requiredPlan === 'scale' ? 'Scale' : 'Growth';
-  const planPrice = requiredPlan === 'scale' ? '$199' : '$79';
+  const plan = getSellerPlan(requiredPlan)!;
+  const planLabel = plan.name;
+  const planPrice = plan.priceLabel;
 
   function handleUpgrade() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -320,7 +322,7 @@ const s = StyleSheet.create({
     marginVertical: SP.md,
   },
 
-  // ── Perk rows (extras + Pro) ──
+  // ── Perk rows ──
   perkRow: {
     flexDirection: 'row',
     alignItems: 'center',

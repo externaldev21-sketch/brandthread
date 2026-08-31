@@ -5,7 +5,7 @@
 import type {
   Product, Order,
   InventoryItem, Customer, ContentPost, DesignProject, Payout,
-  AnalyticsPoint, SubscriptionPlan,
+  AnalyticsPoint,
 } from './types';
 
 // ─── Products ────────────────────────────────────────────────────────────────
@@ -271,53 +271,6 @@ export const DEMO_ANALYTICS: AnalyticsPoint[] = [
   { date: 'Jul 5',  revenue: 8200,  orders: 89,  visitors: 6200,  conversion: 1.44 },
   { date: 'Jul 12', revenue: 11400, orders: 124, visitors: 8100,  conversion: 1.53 },
 ];
-
-// ─── Subscription plans ───────────────────────────────────────────────────────
-
-export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
-  {
-    id: 'starter', name: 'Starter', price: 29, interval: 'month', highlight: false,
-    features: [
-      { name: 'Up to 20 products',          included: true },
-      { name: 'Orders & fulfilment',         included: true },
-      { name: 'Basic analytics',             included: true },
-      { name: 'Manufacturer directory',      included: true },
-      { name: 'AI Design Studio',            included: false },
-      { name: 'Store builder',               included: false },
-      { name: 'Content creation',            included: false },
-      { name: 'Team members',                included: false, limit: '1 user' },
-    ],
-  },
-  {
-    id: 'pro', name: 'Pro', price: 79, interval: 'month', badge: 'Most Popular', highlight: true,
-    features: [
-      { name: 'Unlimited products',          included: true },
-      { name: 'Orders & fulfilment',         included: true },
-      { name: 'Advanced analytics',          included: true },
-      { name: 'Manufacturer directory',      included: true },
-      { name: 'AI Design Studio',            included: true },
-      { name: 'Store builder',               included: true },
-      { name: 'Content creation',            included: true },
-      { name: 'Team members',                included: true, limit: '5 users' },
-    ],
-  },
-  {
-    id: 'scale', name: 'Scale', price: 199, interval: 'month', badge: 'Best Value', highlight: false,
-    features: [
-      { name: 'Unlimited products',          included: true },
-      { name: 'Priority order processing',   included: true },
-      { name: 'Full analytics suite',        included: true },
-      { name: 'Dedicated manufacturer mgr',  included: true },
-      { name: 'AI Design Studio',            included: true },
-      { name: 'Custom store builder',        included: true },
-      { name: 'Multi-channel content',       included: true },
-      { name: 'Team members',                included: true, limit: 'Unlimited' },
-    ],
-  },
-];
-
-// ─── Setup checklist ──────────────────────────────────────────────────────────
-
 export interface SetupTask {
   id:       string;
   label:    string;

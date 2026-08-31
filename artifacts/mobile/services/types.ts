@@ -474,20 +474,3 @@ export interface SellerPost {
   scheduledAt?:    string;
   publishedAt?:    string;
 }
-
-// ─── Subscription plans ───────────────────────────────────────────────────────
-export interface PlanFeature {
-  name:      string;
-  included:  boolean;
-  limit?:    string;
-}
-
-export interface SubscriptionPlan {
-  id:       string;
-  name:     string;
-  price:    number;
-  interval: 'month' | 'year';
-  badge?:   string;
-  features: PlanFeature[];
-  highlight: boolean;
-}
