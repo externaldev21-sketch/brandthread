@@ -4,9 +4,11 @@ import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 
 const state = vi.hoisted(() => {
-  // The Replit development workflow enables this convenience override. The
-  // middleware behavior under test must exercise the real plan lookup path.
-  process.env.ENABLE_TEST_SUBSCRIPTION_BYPASS = "false";
+  // A bypass must only be honored by an explicitly development-mode server.
+  // Keep the flag enabled here so this suite proves test/release-like modes
+  // still exercise the real entitlement lookup path.
+  process.env.NODE_ENV = "test";
+  process.env.ENABLE_TEST_SUBSCRIPTION_BYPASS = "true";
   return {
     planId: "starter" as "starter" | "growth" | "scale",
     lookupError: false,

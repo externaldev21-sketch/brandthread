@@ -54,7 +54,7 @@ export async function requireModerator(req: Request, res: Response, next: NextFu
  * a server environment variable so client code can never unlock paid endpoints.
  */
 const ALLOW_TEST_SUBSCRIPTION_BYPASS =
-  process.env.NODE_ENV !== "production" &&
+  process.env.NODE_ENV === "development" &&
   process.env.ENABLE_TEST_SUBSCRIPTION_BYPASS === "true";
 
 /**
