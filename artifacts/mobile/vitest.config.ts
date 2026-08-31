@@ -6,6 +6,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      "@/lib/revenueCat": new URL("./lib/revenueCat.web.tsx", import.meta.url).pathname,
       "@": new URL(".", import.meta.url).pathname,
     },
   },

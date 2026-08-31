@@ -76,3 +76,4 @@
 - [Trust and recovery boundaries](trust-recovery-boundaries.md) — product deletion has a five-minute server recovery window; IP status uses hashed capabilities; verified status is always derived.
 - [Expo platform modules in Vitest](expo-platform-modules-vitest.md) — Vitest does not resolve suffix-only Expo modules; renderer-tested imports need a neutral fallback.
 - [Expo React types under pnpm](expo-react-types-pnpm.md) — keep an exact React type path in mobile tsconfig so dependency declarations do not resolve React as untyped JavaScript.
+- [Expo Router test placement](expo-router-test-placement.md) — never add Vitest files under the mobile app route tree; Metro imports them as routes and can break web boot.
