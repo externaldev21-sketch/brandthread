@@ -7,12 +7,13 @@
  * GET  /:id           get a single public manufacturer profile
  */
 import { Router } from "express";
-import { db } from "@workspace/db";
-import { manufacturers } from "@workspace/db";
-import { eq, and, ilike, sql, or } from "drizzle-orm";
+import { getAuth } from "@clerk/express";
+import { db, manufacturers, manufacturerReviews, sampleOrders, users } from "@workspace/db";
+import { eq, and, ilike, sql, or, inArray, desc } from "drizzle-orm";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { ApplyAsManufacturerBody } from "@workspace/api-zod";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { requireAuth } from "../middlewares/requireAuth";
 
 const router = Router();
 const objectStorage = new ObjectStorageService();
@@ -41,7 +42,70 @@ const publicManufacturerFields = {
   isPublicDirectory: manufacturers.isPublicDirectory,
 };
 
-async function serializePublicManufacturer(mfr: typeof publicManufacturerFields extends infer _T ? any : never) {
+type ReviewSummary = { rating: number | null; reviewCount: number };
+
+async function getReviewSummaries(manufacturerIds: string[]): Promise<Map<string, ReviewSummary>> {
+  if (manufacturerIds.length === 0) return new Map();
+  const rows = await db.select({
+    manufacturerId: manufacturerReviews.manufacturerId,
+    reviewCount: sql<number>`count(*)::integer`,
+    rating: sql<number>`round(avg(${manufacturerReviews.rating})::numeric, 2)::float`,
+  }).from(manufacturerReviews)
+    .where(inArray(manufacturerReviews.manufacturerId, manufacturerIds))
+    .groupBy(manufacturerReviews.manufacturerId);
+  return new Map(rows.map((row) => [row.manufacturerId, {
+    rating: Number(row.rating),
+    reviewCount: Number(row.reviewCount),
+  }]));
+}
+
+function serializeManufacturerReview(row: {
+  id: string;
+  sellerId: string;
+  sellerName: string | null;
+  rating: number;
+  qualityRating: number;
+  communicationRating: number;
+  deliveryRating: number;
+  comment: string;
+  createdAt: Date;
+}) {
+  return {
+    id: row.id,
+    sellerId: row.sellerId,
+    sellerName: row.sellerName?.trim() || "Verified seller",
+    rating: row.rating,
+    qualityRating: row.qualityRating,
+    communicationRating: row.communicationRating,
+    deliveryRating: row.deliveryRating,
+    comment: row.comment,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+async function listManufacturerReviews(manufacturerId: string) {
+  const rows = await db.select({
+    id: manufacturerReviews.id,
+    sellerId: manufacturerReviews.sellerId,
+    sellerName: users.displayName,
+    rating: manufacturerReviews.rating,
+    qualityRating: manufacturerReviews.qualityRating,
+    communicationRating: manufacturerReviews.communicationRating,
+    deliveryRating: manufacturerReviews.deliveryRating,
+    comment: manufacturerReviews.comment,
+    createdAt: manufacturerReviews.createdAt,
+  }).from(manufacturerReviews)
+    .leftJoin(users, eq(users.clerkId, manufacturerReviews.sellerId))
+    .where(eq(manufacturerReviews.manufacturerId, manufacturerId))
+    .orderBy(desc(manufacturerReviews.createdAt));
+  return rows.map(serializeManufacturerReview);
+}
+
+async function serializePublicManufacturer(
+  mfr: typeof publicManufacturerFields extends infer _T ? any : never,
+  summary?: ReviewSummary,
+  reviews?: Awaited<ReturnType<typeof listManufacturerReviews>>,
+) {
   if (mfr.status !== "active" || mfr.isPublicDirectory !== true) return null;
   const { status: _status, isPublicDirectory: _isPublicDirectory, photos: storedPhotos, ...publicFields } = mfr;
   const photos = await Promise.all((storedPhotos ?? [])
@@ -51,7 +115,9 @@ async function serializePublicManufacturer(mfr: typeof publicManufacturerFields 
     ...publicFields,
     photos,
     isVerified: !!mfr.verifiedAt,
-    rating: mfr.ratingBasisPoints > 0 ? mfr.ratingBasisPoints / 100 : null,
+    rating: summary?.rating ?? null,
+    reviewCount: summary?.reviewCount ?? 0,
+    reviews: reviews ?? [],
     responseTime: mfr.responseTime || null,
     ratingBasisPoints: undefined,
     verifiedAt: mfr.verifiedAt?.toISOString() ?? null,
@@ -100,11 +166,98 @@ router.get("/", async (req, res) => {
       .where(and(...conditions))
       .orderBy(sql`${manufacturers.verifiedAt} DESC NULLS LAST, ${manufacturers.createdAt} DESC`);
 
-    const serialized = await Promise.all(rows.map(serializePublicManufacturer));
+    const summaries = await getReviewSummaries(rows.map((row) => row.id));
+    const serialized = await Promise.all(rows.map((row) =>
+      serializePublicManufacturer(row, summaries.get(row.id))));
     res.json(serialized.filter((row) => row !== null));
   } catch (err) {
     req.log.error({ err }, "Failed to fetch public manufacturers");
     res.status(500).json({ error: "Failed to fetch manufacturers" });
+  }
+});
+
+// ── GET/POST /api/manufacturers/public/:id/reviews ───────────────────────────
+
+router.get("/:id/reviews", async (req, res) => {
+  const manufacturerId = String(req.params.id);
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(manufacturerId)) {
+    res.status(400).json({ error: "A canonical manufacturer UUID is required" }); return;
+  }
+  const [manufacturer] = await db.select({ id: manufacturers.id }).from(manufacturers).where(and(
+    eq(manufacturers.id, manufacturerId),
+    eq(manufacturers.status, "active"),
+    eq(manufacturers.isPublicDirectory, true),
+  )).limit(1);
+  if (!manufacturer) { res.status(404).json({ error: "Not found" }); return; }
+  res.json(await listManufacturerReviews(manufacturer.id));
+});
+
+router.post("/:id/reviews", requireAuth, async (req, res) => {
+  const manufacturerId = String(req.params.id);
+  const { userId } = getAuth(req);
+  if (!userId) { res.status(401).json({ error: "Unauthorized" }); return; }
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(manufacturerId)) {
+    res.status(400).json({ error: "A canonical manufacturer UUID is required" }); return;
+  }
+  const { sampleOrderId, rating, qualityRating, communicationRating, deliveryRating, comment = "" } = req.body ?? {};
+  const ratings = [rating, qualityRating, communicationRating, deliveryRating];
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sampleOrderId ?? "")
+    || ratings.some((value) => !Number.isInteger(value) || value < 1 || value > 5)) {
+    res.status(400).json({ error: "sampleOrderId and integer ratings from 1 to 5 are required" }); return;
+  }
+  if (typeof comment !== "string" || comment.trim().length > 2000) {
+    res.status(400).json({ error: "Comment must be 2,000 characters or fewer" }); return;
+  }
+
+  const [eligibleOrder] = await db.select({ id: sampleOrders.id }).from(sampleOrders).where(and(
+    eq(sampleOrders.id, sampleOrderId),
+    eq(sampleOrders.sellerId, userId),
+    eq(sampleOrders.manufacturerId, manufacturerId),
+    inArray(sampleOrders.orderType, ["sample", "bulk"]),
+    inArray(sampleOrders.status, ["delivered", "review_needed", "approved", "rejected", "revision_requested", "completed"]),
+  )).limit(1);
+  if (!eligibleOrder) {
+    res.status(403).json({ error: "A completed manufacturer order or delivered sample is required" }); return;
+  }
+
+  const [duplicate] = await db.select({ id: manufacturerReviews.id }).from(manufacturerReviews)
+    .where(eq(manufacturerReviews.sampleOrderId, eligibleOrder.id)).limit(1);
+  if (duplicate) { res.status(409).json({ error: "This order has already been reviewed" }); return; }
+
+  try {
+    const created = await db.transaction(async (tx) => {
+      const [review] = await tx.insert(manufacturerReviews).values({
+        sellerId: userId,
+        manufacturerId,
+        sampleOrderId: eligibleOrder.id,
+        rating,
+        qualityRating,
+        communicationRating,
+        deliveryRating,
+        comment: comment.trim(),
+      }).returning();
+      await tx.update(manufacturers).set({
+        ratingBasisPoints: sql`COALESCE((
+          SELECT ROUND(AVG(rating) * 100)::integer
+          FROM manufacturer_reviews
+          WHERE manufacturer_id = ${manufacturerId}
+        ), 0)`,
+        updatedAt: new Date(),
+      }).where(eq(manufacturers.id, manufacturerId));
+      return review;
+    });
+    const [seller] = await db.select({ displayName: users.displayName }).from(users)
+      .where(eq(users.clerkId, userId)).limit(1);
+    res.status(201).json(serializeManufacturerReview({
+      ...created,
+      sellerName: seller?.displayName ?? null,
+    }));
+  } catch (error: any) {
+    if (error?.code === "23505") {
+      res.status(409).json({ error: "This order has already been reviewed" }); return;
+    }
+    req.log.error({ err: error, manufacturerId, sampleOrderId }, "Failed to create manufacturer review");
+    res.status(500).json({ error: "Failed to create review" });
   }
 });
 
@@ -194,7 +347,11 @@ router.get("/:id", async (req, res) => {
       res.status(404).json({ error: "Not found" }); return;
     }
 
-    const serialized = await serializePublicManufacturer(mfr);
+    const [summaries, reviews] = await Promise.all([
+      getReviewSummaries([mfr.id]),
+      listManufacturerReviews(mfr.id),
+    ]);
+    const serialized = await serializePublicManufacturer(mfr, summaries.get(mfr.id), reviews);
     if (!serialized) {
       res.status(404).json({ error: "Not found" }); return;
     }

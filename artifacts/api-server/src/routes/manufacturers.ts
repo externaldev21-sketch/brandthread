@@ -11,6 +11,7 @@ import {
   sampleOrders,
   manufacturerThreadAttachments,
   manufacturerRelationships,
+  sellerQuoteRequests,
 } from "@workspace/db";
 import { eq, desc, and, sql, inArray, isNull } from "drizzle-orm";
 import crypto from "crypto";
@@ -52,6 +53,26 @@ function isSupportedImage(buffer: Buffer): boolean {
 function isUuid(value: unknown): value is string {
   return typeof value === "string"
     && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+const MANUFACTURER_QUOTE_TRANSITIONS: Record<string, ReadonlySet<string>> = {
+  submitted: new Set(["viewed", "questions_asked", "quoted", "declined"]),
+  viewed: new Set(["questions_asked", "quoted", "declined"]),
+  questions_asked: new Set(["quoted", "declined"]),
+  counteroffer_sent: new Set(["quoted", "declined"]),
+};
+
+export function canManufacturerTransitionQuote(from: string, to: string): boolean {
+  return MANUFACTURER_QUOTE_TRANSITIONS[from]?.has(to) === true;
+}
+
+function serializeQuoteRequest(row: typeof sellerQuoteRequests.$inferSelect) {
+  return {
+    ...row,
+    quoteValidUntil: row.quoteValidUntil?.toISOString() ?? null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
 }
 
 // ── Helper ─────────────────────────────────────────────────────────────────────
@@ -339,6 +360,74 @@ router.get("/me/relationships", async (req, res) => {
     .where(eq(manufacturerRelationships.manufacturerId, mfr.id))
     .orderBy(desc(manufacturerRelationships.updatedAt));
   return res.json(rows.map(serializeRelationship));
+});
+
+// Manufacturer-scoped quote inbox and responses. These endpoints operate on
+// the same seller_quote_requests rows read by the seller mobile Hub.
+router.get("/me/quote-requests", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  const mfr = await resolveManufacturer(userId);
+  if (!mfr) return res.status(404).json({ error: "Not registered" });
+  const rows = await db.select().from(sellerQuoteRequests)
+    .where(eq(sellerQuoteRequests.manufacturerId, mfr.id))
+    .orderBy(desc(sellerQuoteRequests.createdAt));
+  return res.json(rows.map(serializeQuoteRequest));
+});
+
+router.patch("/me/quote-requests/:id", async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  const mfr = await resolveManufacturer(userId);
+  if (!mfr) return res.status(404).json({ error: "Not registered" });
+  const [existing] = await db.select().from(sellerQuoteRequests).where(and(
+    eq(sellerQuoteRequests.id, req.params.id),
+    eq(sellerQuoteRequests.manufacturerId, mfr.id),
+  )).limit(1);
+  if (!existing) return res.status(404).json({ error: "Quote request not found" });
+
+  const { status, quotedPriceCents, quotedTurnaround, validUntil, notes, counterofferStatus } = req.body as {
+    status?: string;
+    quotedPriceCents?: number;
+    quotedTurnaround?: string;
+    validUntil?: string;
+    notes?: string;
+    counterofferStatus?: "accepted" | "declined";
+  };
+  if (!status || !canManufacturerTransitionQuote(existing.status, status)) {
+    return res.status(409).json({ error: `Cannot move quote request from ${existing.status} to ${status ?? "an unspecified status"}` });
+  }
+  if (status === "quoted" && (!Number.isInteger(quotedPriceCents) || (quotedPriceCents ?? 0) < 1)) {
+    return res.status(400).json({ error: "quotedPriceCents must be a positive integer" });
+  }
+  const quoteValidUntil = validUntil ? new Date(validUntil) : null;
+  if (validUntil && Number.isNaN(quoteValidUntil?.getTime())) {
+    return res.status(400).json({ error: "validUntil must be a valid date" });
+  }
+  if (quoteValidUntil && quoteValidUntil.getTime() <= Date.now()) {
+    return res.status(400).json({ error: "validUntil must be in the future" });
+  }
+  if (counterofferStatus && existing.status !== "counteroffer_sent") {
+    return res.status(409).json({ error: "There is no pending counteroffer to resolve" });
+  }
+
+  const [updated] = await db.update(sellerQuoteRequests).set({
+    status,
+    quotedPriceCents: status === "quoted" ? quotedPriceCents : existing.quotedPriceCents,
+    quotedTurnaround: status === "quoted" ? quotedTurnaround?.trim() || null : existing.quotedTurnaround,
+    quoteValidUntil: status === "quoted" ? quoteValidUntil : existing.quoteValidUntil,
+    notes: notes?.trim() || existing.notes,
+    counteroffer: counterofferStatus && existing.counteroffer
+      ? { ...existing.counteroffer, status: counterofferStatus }
+      : existing.counteroffer,
+    updatedAt: new Date(),
+  }).where(and(
+    eq(sellerQuoteRequests.id, existing.id),
+    eq(sellerQuoteRequests.manufacturerId, mfr.id),
+    eq(sellerQuoteRequests.status, existing.status),
+  )).returning();
+  if (!updated) return res.status(409).json({ error: "Quote request changed; refresh and try again" });
+  return res.json(serializeQuoteRequest(updated));
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

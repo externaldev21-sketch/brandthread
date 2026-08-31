@@ -54,7 +54,8 @@ describe('manufacturer order payment service contracts', () => {
 
   it('sends the persisted revision for seller decisions and returns upload revisions', async () => {
     serviceRequest
-      .mockResolvedValueOnce({ id: 'sample_1', orderType: 'sample', status: 'approved', priceCents: 1200, revision: 4, createdAt: '2026-01-01', updatedAt: '2026-01-01' })
+      .mockResolvedValueOnce({ id: 'sample_1', manufacturerId: 'b7d2c2d0-a3ae-4d65-90e4-d777f1f1bca1', orderType: 'sample', status: 'approved', priceCents: 1200, revision: 4, createdAt: '2026-01-01', updatedAt: '2026-01-01' })
+      .mockResolvedValueOnce({ id: 'review_1', rating: 5 })
       .mockResolvedValueOnce({ id: 'sample_1', orderType: 'sample', status: 'revision_requested', priceCents: 1200, revision: 5, createdAt: '2026-01-01', updatedAt: '2026-01-01' })
       .mockResolvedValueOnce({ imageUrls: ['https://signed/image.jpg'], revision: 6 });
 
@@ -68,7 +69,9 @@ describe('manufacturer order payment service contracts', () => {
 
     expect(serviceRequest).toHaveBeenNthCalledWith(1, '/api/sample-orders/sample_1/sample-detail',
       expect.objectContaining({ body: expect.stringContaining('"expectedRevision":3') }));
-    expect(serviceRequest).toHaveBeenNthCalledWith(2, '/api/sample-orders/sample_1/sample-detail',
+    expect(serviceRequest).toHaveBeenNthCalledWith(2, '/api/manufacturers/public/b7d2c2d0-a3ae-4d65-90e4-d777f1f1bca1/reviews',
+      expect.objectContaining({ body: expect.stringContaining('"sampleOrderId":"sample_1"') }));
+    expect(serviceRequest).toHaveBeenNthCalledWith(3, '/api/sample-orders/sample_1/sample-detail',
       expect.objectContaining({ body: expect.stringContaining('"expectedRevision":4') }));
   });
 

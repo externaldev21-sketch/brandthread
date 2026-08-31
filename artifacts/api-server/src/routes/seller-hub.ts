@@ -4,11 +4,33 @@
  */
 import { Router } from "express";
 import { db, manufacturers, sellerQuoteRequests } from "@workspace/db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 
 const router = Router();
 router.use(requireAuth);
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SELLER_QUOTE_TRANSITIONS: Record<string, ReadonlySet<string>> = {
+  submitted: new Set(["cancelled"]),
+  viewed: new Set(["cancelled"]),
+  questions_asked: new Set(["cancelled"]),
+  quoted: new Set(["accepted", "declined", "counteroffer_sent", "cancelled"]),
+  counteroffer_sent: new Set(["cancelled"]),
+};
+
+export function canSellerTransitionQuote(from: string, to: string): boolean {
+  return SELLER_QUOTE_TRANSITIONS[from]?.has(to) === true;
+}
+
+function serializeQuoteRequest(row: typeof sellerQuoteRequests.$inferSelect) {
+  return {
+    ...row,
+    quoteValidUntil: row.quoteValidUntil?.toISOString() ?? null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
 
 // ─── Manufacturer Discovery ────────────────────────────────────────────────────
 
@@ -45,10 +67,10 @@ router.get("/quote-requests", async (req, res) => {
   const rows = await db
     .select()
     .from(sellerQuoteRequests)
-    .where(eq(sellerQuoteRequests.sellerId, sellerId));
+    .where(eq(sellerQuoteRequests.sellerId, sellerId))
+    .orderBy(desc(sellerQuoteRequests.createdAt));
 
-  // Most recent first
-  res.json(rows.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()));
+  res.json(rows.map(serializeQuoteRequest));
 });
 
 // POST /api/seller-hub/quote-requests
@@ -73,8 +95,14 @@ router.post("/quote-requests", async (req, res) => {
     details?: string;
   };
 
-  if (!manufacturerId || !productName) {
-    return res.status(400).json({ error: "manufacturerId and productName are required" });
+  if (!UUID_RE.test(manufacturerId ?? "") || typeof productName !== "string" || !productName.trim()) {
+    return res.status(400).json({ error: "A canonical manufacturerId and productName are required" });
+  }
+  if (!["quote", "sample"].includes(type)) {
+    return res.status(400).json({ error: "type must be quote or sample" });
+  }
+  if (quantity !== undefined && (!Number.isInteger(quantity) || quantity < 1)) {
+    return res.status(400).json({ error: "quantity must be a positive integer" });
   }
 
   // Verify manufacturer is active
@@ -93,8 +121,8 @@ router.post("/quote-requests", async (req, res) => {
       sellerId,
       manufacturerId,
       type,
-      productName,
-      productType,
+      productName: productName.trim(),
+      productType: productType.trim() || "apparel",
       quantity,
       colorways,
       details,
@@ -102,7 +130,7 @@ router.post("/quote-requests", async (req, res) => {
     })
     .returning();
 
-  return res.status(201).json(row);
+  return res.status(201).json(serializeQuoteRequest(row));
 });
 
 // GET /api/seller-hub/quote-requests/:id
@@ -119,14 +147,24 @@ router.get("/quote-requests/:id", async (req, res) => {
     );
 
   if (!row) return res.status(404).json({ error: "Not found" });
-  return res.json(row);
+  return res.json(serializeQuoteRequest(row));
 });
 
 // PATCH /api/seller-hub/quote-requests/:id
-// Seller can: accept a quote ('accepted'), cancel ('cancelled'), or add notes.
+// Seller can withdraw an open request, or accept/decline/counter a persisted
+// manufacturer quote. Status transitions are conditional to prevent races.
 router.patch("/quote-requests/:id", async (req, res) => {
   const sellerId = (req as any).clerkUserId as string;
-  const { status, notes } = req.body as { status?: string; notes?: string };
+  const { status, counteroffer } = req.body as {
+    status?: string;
+    counteroffer?: {
+      desiredUnitPriceCents?: number;
+      desiredMoq?: number;
+      desiredProductionDays?: number;
+      desiredPaymentTerms?: string;
+      notes?: string;
+    };
+  };
 
   const [existing] = await db
     .select()
@@ -140,19 +178,41 @@ router.patch("/quote-requests/:id", async (req, res) => {
 
   if (!existing) return res.status(404).json({ error: "Not found" });
 
-  const updates: Partial<typeof sellerQuoteRequests.$inferInsert> & { updatedAt?: Date } = {
+  if (!status || !canSellerTransitionQuote(existing.status, status)) {
+    return res.status(409).json({ error: `Cannot move quote request from ${existing.status} to ${status ?? "an unspecified status"}` });
+  }
+
+  const updates: Partial<typeof sellerQuoteRequests.$inferInsert> = {
+    status,
     updatedAt: new Date(),
   };
-  if (status) updates.status = status;
-  if (notes !== undefined) updates.notes = notes;
+  if (status === "counteroffer_sent") {
+    if (!counteroffer || !Object.values(counteroffer).some((value) => value !== undefined && value !== "")) {
+      return res.status(400).json({ error: "Counteroffer terms are required" });
+    }
+    if (counteroffer.desiredUnitPriceCents !== undefined
+      && (!Number.isInteger(counteroffer.desiredUnitPriceCents) || counteroffer.desiredUnitPriceCents < 1)) {
+      return res.status(400).json({ error: "desiredUnitPriceCents must be a positive integer" });
+    }
+    updates.counteroffer = {
+      ...counteroffer,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+    };
+  }
 
   const [updated] = await db
     .update(sellerQuoteRequests)
     .set(updates)
-    .where(eq(sellerQuoteRequests.id, req.params.id))
+    .where(and(
+      eq(sellerQuoteRequests.id, req.params.id),
+      eq(sellerQuoteRequests.sellerId, sellerId),
+      eq(sellerQuoteRequests.status, existing.status),
+    ))
     .returning();
 
-  return res.json(updated);
+  if (!updated) return res.status(409).json({ error: "Quote request changed; refresh and try again" });
+  return res.json(serializeQuoteRequest(updated));
 });
 
 export default router;

@@ -33,7 +33,7 @@ import {
   searchManufacturers, getRelationships, getRelationship,
   saveManufacturer, getManufacturer,
   getFavoriteManufacturerIds, unfavoriteManufacturer,
-  getQuoteRequests, getQuotes, acceptQuote, declineQuote,
+  getQuoteRequests, getQuotes, acceptQuote, declineQuote, withdrawQuoteRequest,
   getSamples, getProductionOrders,
   getConversations, getOrCreateConversation,
 } from '@/services/manufacturerService';
@@ -975,7 +975,7 @@ function QuotesTab({ router }: { router: ReturnType<typeof useRouter> }) {
                 req={req}
                 manufacturerName={manufacturerNames[req.manufacturerId]}
                 onView={() => router.push((`/quote-detail?quoteId=${req.id}`) as never)}
-                onWithdraw={() => declineQuote(req.id).then(load).catch(() => setError('Could not withdraw this request. Refresh and try again.'))}
+                onWithdraw={() => withdrawQuoteRequest(req.id).then(load).catch(() => setError('Could not withdraw this request. Refresh and try again.'))}
               />
             ))}
           </>

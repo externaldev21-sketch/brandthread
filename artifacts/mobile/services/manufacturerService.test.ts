@@ -16,10 +16,24 @@ describe('mapPublicManufacturer', () => {
       photos: [],
       isVerified: true,
       rating: 4.7,
+      reviewCount: 3,
+      reviews: [{
+        id: 'review-1',
+        sellerId: 'seller-1',
+        sellerName: 'Studio One',
+        rating: 5,
+        qualityRating: 5,
+        communicationRating: 4,
+        deliveryRating: 5,
+        comment: 'Accurate sample.',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      }],
       responseTime: '6 hours',
       createdAt: '2025-01-01T00:00:00.000Z',
     });
     expect(manufacturer.rating).toBe(4.7);
     expect(manufacturer.responseTimeHours).toBe(6);
+    expect(manufacturer.reviewCount).toBe(3);
+    expect(manufacturer.reviews).toHaveLength(1);
   });
 });

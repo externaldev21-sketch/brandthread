@@ -9,6 +9,7 @@ import { serviceRequest } from '../lib/serviceConfig';
 import {
   Counteroffer,
   Manufacturer,
+  ManufacturerReview,
   ManufacturerConversation,
   ManufacturerInvitation,
   ManufacturerRelationship,
@@ -118,7 +119,7 @@ function apiRowToQuote(row: any): Quote | null {
     leadTimeDays: parseDays(row.quotedTurnaround),
     productionDays: parseDays(row.quotedTurnaround),
     paymentTerms: row.notes ?? 'Not provided',
-    validUntil: row.validUntil ?? '',
+    validUntil: row.quoteValidUntil ?? '',
     status: row.status === 'quoted' ? 'quote_received' : row.status,
     lineItems: [],
     notes: row.notes ?? undefined,
@@ -321,28 +322,59 @@ export async function declineQuote(quoteId: string): Promise<void> {
   });
 }
 
+export async function withdrawQuoteRequest(quoteId: string): Promise<void> {
+  await serviceRequest(`/api/seller-hub/quote-requests/${encodeURIComponent(quoteId)}`, {
+    method: 'PATCH', body: JSON.stringify({ status: 'cancelled' }),
+  });
+}
+
 export async function submitCounteroffer(
   quoteId: string,
   data: Omit<Counteroffer, 'id' | 'quoteId' | 'sellerId' | 'status' | 'createdAt'>,
 ): Promise<Counteroffer> {
   const row = await serviceRequest<any>(`/api/seller-hub/quote-requests/${encodeURIComponent(quoteId)}`, {
     method: 'PATCH',
-    body: JSON.stringify({ status: 'counteroffer_sent', notes: JSON.stringify({ kind: 'counteroffer', ...data }) }),
+    body: JSON.stringify({ status: 'counteroffer_sent', counteroffer: data }),
   });
   return { id: row.id, quoteId, sellerId: row.sellerId ?? '', status: 'pending', ...data, createdAt: row.updatedAt ?? now() };
 }
 
 export async function getCounteroffersForQuote(quoteId: string): Promise<Counteroffer[]> {
   const row = await serviceRequest<any>(`/api/seller-hub/quote-requests/${encodeURIComponent(quoteId)}`);
-  if (row.status !== 'counteroffer_sent') return [];
-  try {
-    const parsed = JSON.parse(row.notes ?? '{}');
-    if (parsed.kind !== 'counteroffer') return [];
-    const { kind: _kind, ...data } = parsed;
-    return [{ id: row.id, quoteId, sellerId: row.sellerId ?? '', status: 'pending', ...data, createdAt: row.updatedAt ?? row.createdAt }];
-  } catch {
-    return [];
-  }
+  if (!row.counteroffer) return [];
+  return [{
+    id: row.id,
+    quoteId,
+    sellerId: row.sellerId ?? '',
+    status: row.counteroffer.status ?? 'pending',
+    desiredUnitPriceCents: row.counteroffer.desiredUnitPriceCents,
+    desiredMoq: row.counteroffer.desiredMoq,
+    desiredProductionDays: row.counteroffer.desiredProductionDays,
+    desiredPaymentTerms: row.counteroffer.desiredPaymentTerms,
+    notes: row.counteroffer.notes,
+    createdAt: row.counteroffer.createdAt ?? row.updatedAt ?? row.createdAt,
+  }];
+}
+
+export async function getManufacturerReviews(manufacturerId: string): Promise<ManufacturerReview[]> {
+  assertCanonicalManufacturerId(manufacturerId);
+  const rows = await serviceRequest<ManufacturerReview[]>(
+    `/api/manufacturers/public/${encodeURIComponent(manufacturerId)}/reviews`,
+  );
+  if (!Array.isArray(rows)) throw new Error('Manufacturer reviews returned an invalid response.');
+  return rows;
+}
+
+export async function submitManufacturerReview(
+  manufacturerId: string,
+  sampleOrderId: string,
+  review: Omit<ManufacturerReview, 'id' | 'sellerId' | 'sellerName' | 'createdAt'>,
+): Promise<ManufacturerReview> {
+  assertCanonicalManufacturerId(manufacturerId);
+  return serviceRequest<ManufacturerReview>(
+    `/api/manufacturers/public/${encodeURIComponent(manufacturerId)}/reviews`,
+    { method: 'POST', body: JSON.stringify({ sampleOrderId, ...review }) },
+  );
 }
 
 export async function uploadSampleImage(sampleOrderId: string, contentType: string, bytes: Uint8Array): Promise<{ imageUrls: string[]; revision: number }> {
@@ -442,6 +474,13 @@ export async function submitSampleReview(
   const status = review.decision === 'approved' ? 'approved' : review.decision === 'rejected' ? 'rejected' : 'revision_requested';
   const row = await serviceRequest<any>(`/api/sample-orders/${encodeURIComponent(sampleId)}/sample-detail`, {
     method: 'PATCH', body: JSON.stringify({ status, expectedRevision, review }),
+  });
+  await submitManufacturerReview(row.manufacturerId, sampleId, {
+    rating: review.overallRating,
+    qualityRating: review.qualityRating || review.overallRating,
+    communicationRating: review.fitRating || review.overallRating,
+    deliveryRating: review.packagingRating || review.overallRating,
+    comment: review.notes,
   });
   return mapSampleOrder(row);
 }

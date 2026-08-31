@@ -98,6 +98,7 @@ export interface Manufacturer {
   responseTimeHours: number;
   rating: number;
   reviewCount: number;
+  reviews: ManufacturerReview[];
   isVerified: boolean;
   shippingRegions: string[];
   website?: string;

@@ -631,7 +631,16 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           manufacturerId: string; type?: string; productName: string;
           productType?: string; quantity?: number; colorways?: string; details?: string;
         }) => post<any>('/api/seller-hub/quote-requests', body),
-        update: (id: string, body: { status?: string; notes?: string }) =>
+        update: (id: string, body: {
+          status?: string;
+          counteroffer?: {
+            desiredUnitPriceCents?: number;
+            desiredMoq?: number;
+            desiredProductionDays?: number;
+            desiredPaymentTerms?: string;
+            notes?: string;
+          };
+        }) =>
           patch<any>(`/api/seller-hub/quote-requests/${id}`, body),
       },
     },

@@ -429,11 +429,22 @@ export const sellerQuoteRequests = pgTable('seller_quote_requests', {
   status:           text('status').notNull().default('submitted'),
   quotedPriceCents: integer('quoted_price_cents'),
   quotedTurnaround: text('quoted_turnaround'),
+  quoteValidUntil:  timestamp('quote_valid_until'),
+  counteroffer:     json('counteroffer').$type<{
+    desiredUnitPriceCents?: number;
+    desiredMoq?: number;
+    desiredProductionDays?: number;
+    desiredPaymentTerms?: string;
+    notes?: string;
+    status: 'pending' | 'accepted' | 'declined';
+    createdAt: string;
+  }>(),
   notes:            text('notes'),
   createdAt:        timestamp('created_at').defaultNow().notNull(),
   updatedAt:        timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({
   manufacturerIdx: index('seller_quote_requests_mfr_idx').on(table.manufacturerId),
+  sellerIdx: index('seller_quote_requests_seller_idx').on(table.sellerId),
 }));
 
 // ─── Relations ────────────────────────────────────────────────────────────────

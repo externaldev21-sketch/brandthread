@@ -10,6 +10,7 @@
 - [Manufacturer Hub Architecture](manufacturer-hub-architecture.md) — 9 screens, types+service files, route list, no-local-const rule, null-safety-in-handlers rule, demo behavior.
 - [Manufacturer Hub Full System](manufacturer-hub-full-system.md) — migration 017, public directory, invite tokens, Stripe Connect for mfg payouts, 6-stage sample/bulk orders, drop wallet ledger, real messaging.
 - [Manufacturer payout and call integrity](manufacturer-payout-call-integrity.md) — payout truth, reversal accounting, exact callbacks, and participant-scoped call events must stay idempotent across provider races.
+- [Manufacturer quote and review integrity](manufacturer-quote-review-integrity.md) — quotes use role-specific locked transitions; reviews require a completed shared order and aggregate from immutable review rows.
 - [Manufacturer favorites boundary](manufacturer-favorites-boundary.md) — seller favorites are server-authoritative and separate from My Manufacturers relationship/workflow records.
 - [Orders System Architecture](orders-system-architecture.md) — orderTypes.ts + orderService.ts; 7 new screens; routes in _layout.tsx; AsyncStorage v1 keys; demo data seeds 6 orders.
 - [Inventory System Architecture](inventory-system-architecture.md) — inventoryTypes.ts + inventoryService.ts; 7 screens (hub + 6 detail); AsyncStorage inv:*:v1 keys; demo seeds 6 items + 2 locations.

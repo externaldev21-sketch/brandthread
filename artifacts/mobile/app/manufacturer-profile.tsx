@@ -372,7 +372,23 @@ export default function ManufacturerProfileScreen() {
 
           {/* ── Reviews ── */}
           <SectionCard title="Reviews">
-            <EmptyState icon="star" title="No reviews yet" description="Ratings will appear here after completed orders are reviewed." />
+            {m.reviews.length === 0 ? (
+              <EmptyState icon="star" title="No reviews yet" description="Ratings will appear here after completed orders are reviewed." />
+            ) : m.reviews.map((review) => (
+              <View key={review.id} style={s.reviewCard}>
+                <View style={s.reviewHeader}>
+                  <View style={{ gap: SP.xs }}>
+                    <Text style={s.reviewerName}>{review.sellerName}</Text>
+                    <StarRating rating={review.rating} />
+                  </View>
+                  <Text style={s.reviewDate}>{new Date(review.createdAt).toLocaleDateString()}</Text>
+                </View>
+                {!!review.comment && <Text style={s.reviewComment}>{review.comment}</Text>}
+                <Text style={s.reviewBreakdown}>
+                  Quality {review.qualityRating}/5 · Communication {review.communicationRating}/5 · Delivery {review.deliveryRating}/5
+                </Text>
+              </View>
+            ))}
           </SectionCard>
 
           {/* ── Shipping ── */}
@@ -598,6 +614,9 @@ const s = StyleSheet.create({
   },
   reviewComment: {
     fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 18,
+  },
+  reviewBreakdown: {
+    fontSize: FS.xs, fontFamily: FONT.medium, color: SUBTLE, lineHeight: 17,
   },
   contactRow: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,

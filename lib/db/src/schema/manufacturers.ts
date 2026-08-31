@@ -70,6 +70,27 @@ export const manufacturerRelationships = pgTable('manufacturer_relationships', {
   manufacturerIdx: index('manufacturer_relationships_manufacturer_idx').on(table.manufacturerId),
 }));
 
+// Seller reviews are tied to a completed shared sample/bulk order. A seller may
+// review each completed order once; directory aggregates are derived from these
+// rows rather than entered on manufacturer profiles.
+export const manufacturerReviews = pgTable('manufacturer_reviews', {
+  id:                  uuid('id').primaryKey().defaultRandom(),
+  sellerId:            text('seller_id').notNull(),
+  manufacturerId:      uuid('manufacturer_id').notNull().references(() => manufacturers.id, { onDelete: 'cascade' }),
+  sampleOrderId:        uuid('sample_order_id').notNull(),
+  rating:               integer('rating').notNull(),
+  qualityRating:        integer('quality_rating').notNull(),
+  communicationRating: integer('communication_rating').notNull(),
+  deliveryRating:       integer('delivery_rating').notNull(),
+  comment:              text('comment').notNull().default(''),
+  createdAt:            timestamp('created_at').defaultNow().notNull(),
+  updatedAt:            timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orderUnique: uniqueIndex('manufacturer_reviews_order_unique').on(table.sampleOrderId),
+  manufacturerIdx: index('manufacturer_reviews_manufacturer_idx').on(table.manufacturerId),
+  sellerIdx: index('manufacturer_reviews_seller_idx').on(table.sellerId),
+}));
+
 // ─── Manufacturer Payment Info (legacy bank/PayPal/Wise — kept for non-Stripe markets)
 
 export const manufacturerPayments = pgTable('manufacturer_payments', {

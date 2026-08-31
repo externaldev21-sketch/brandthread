@@ -1,164 +1,171 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity,
-  ScrollView, StyleSheet, Platform, Alert,
+  ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text,
+  TextInput, TouchableOpacity, View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
+import {
+  getManufacturer, saveQuoteRequestDraft, submitQuoteRequest,
+} from '@/services/manufacturerService';
+import type { Manufacturer } from '@/services/manufacturerTypes';
 
-const BG    = '#07070F';
-const CARD  = '#12121F';
-const BORD  = 'rgba(255,255,255,0.07)';
-const FG    = '#F4F4FF';
+const BG = '#07070F';
+const CARD = '#12121F';
+const BORDER = 'rgba(255,255,255,0.07)';
+const FG = '#F4F4FF';
 const MUTED = 'rgba(244,244,255,0.50)';
-
 const PRODUCT_TYPES = ['T-Shirt', 'Hoodie', 'Sweatpants', 'Shorts', 'Jacket', 'Hat', 'Custom'];
-const QUANTITIES    = ['1 sample', '2–3 samples', '5 samples', '10 samples'];
+const QUANTITIES = [1, 3, 5, 10];
 
 export default function RequestSampleScreen() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const params = useLocalSearchParams<{ name?: string }>();
-  const mfrName = params.name ?? 'Manufacturer';
-
+  const { manufacturerId } = useLocalSearchParams<{ manufacturerId?: string }>();
+  const [manufacturer, setManufacturer] = useState<Manufacturer | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [productType, setProductType] = useState('T-Shirt');
-  const [qty,          setQty]         = useState('1 sample');
-  const [colorway,     setColorway]    = useState('');
-  const [size,         setSize]        = useState('M');
-  const [notes,        setNotes]       = useState('');
-  const [contact,      setContact]     = useState('');
-  const [sending,      setSending]     = useState(false);
+  const [quantity, setQuantity] = useState(1);
+  const [colorway, setColorway] = useState('');
+  const [size, setSize] = useState('M');
+  const [notes, setNotes] = useState('');
+  const [contact, setContact] = useState('');
+  const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    if (!manufacturerId) {
+      setLoadError('Choose a manufacturer from the Manufacturer Hub before requesting a sample.');
+      setLoading(false);
+      return;
+    }
+    getManufacturer(manufacturerId)
+      .then((value) => {
+        if (!active) return;
+        setManufacturer(value ?? null);
+        if (!value) setLoadError('This manufacturer is unavailable.');
+      })
+      .catch((error) => active && setLoadError(
+        error instanceof Error ? error.message : 'Could not load this manufacturer.',
+      ))
+      .finally(() => active && setLoading(false));
+    return () => { active = false; };
+  }, [manufacturerId]);
 
   async function submit() {
-    if (!contact.trim()) { Alert.alert('Missing info', 'Please enter your email or WhatsApp number.'); return; }
+    if (!manufacturerId || !manufacturer) return;
+    if (!contact.trim()) {
+      Alert.alert('Missing info', 'Enter your email or WhatsApp number.');
+      return;
+    }
     setSending(true);
-    await new Promise((r) => setTimeout(r, 1400));
-    setSending(false);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert(
-      '✅ Sample Request Sent',
-      `Your request has been sent to ${mfrName}. They will contact you at ${contact.trim()} within 48 hours to confirm details and shipping.`,
-      [{ text: 'Done', onPress: () => router.back() }],
+    try {
+      const draft = await saveQuoteRequestDraft({
+        manufacturerId,
+        productName: `${productType} sample`,
+        productionType: productType,
+        quantity,
+        sampleRequired: true,
+        colorways: colorway.trim() ? [colorway.trim()] : [],
+        sizes: size.trim() ? [size.trim()] : [],
+        notes: [notes.trim(), `Reply contact: ${contact.trim()}`].filter(Boolean).join('\n'),
+        currentStep: 5,
+      });
+      await submitQuoteRequest(draft.id);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert(
+        'Sample request sent',
+        `Your request is now visible to ${manufacturer.name}.`,
+        [{ text: 'Done', onPress: () => router.back() }],
+      );
+    } catch (error) {
+      Alert.alert('Could not send request', error instanceof Error ? error.message : 'Try again.');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  if (loading) {
+    return <View style={styles.center}><ActivityIndicator color={colors.primary} /></View>;
+  }
+
+  if (loadError || !manufacturer) {
+    return (
+      <View style={[styles.center, { paddingHorizontal: 28 }]}>
+        <Feather name="alert-circle" size={28} color={MUTED} />
+        <Text style={styles.errorText}>{loadError}</Text>
+        <TouchableOpacity style={[styles.button, { backgroundColor: colors.primary }]} onPress={() => router.replace('/manufacturer-hub' as never)}>
+          <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Open Manufacturer Hub</Text>
+        </TouchableOpacity>
+      </View>
     );
   }
 
   return (
-    <View style={[s.root, { paddingTop: Platform.OS === 'web' ? 20 : insets.top }]}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Feather name="arrow-left" size={22} color={FG} />
-        </TouchableOpacity>
+    <View style={[styles.root, { paddingTop: Platform.OS === 'web' ? 20 : insets.top }]}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}><Feather name="arrow-left" size={22} color={FG} /></TouchableOpacity>
         <View>
-          <Text style={s.headerTitle}>Request Sample</Text>
-          <Text style={s.headerSub}>{mfrName}</Text>
+          <Text style={styles.headerTitle}>Request Sample</Text>
+          <Text style={styles.headerSub}>{manufacturer.name}</Text>
         </View>
         <View style={{ width: 22 }} />
       </View>
-
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120, gap: 20 }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        {/* Product type */}
-        <View style={s.fieldGroup}>
-          <Text style={s.fieldLabel}>Product Type</Text>
-          <View style={s.chipRow}>
-            {PRODUCT_TYPES.map((t) => (
-              <TouchableOpacity
-                key={t} style={[s.chip, productType === t && [s.chipActive, { backgroundColor: colors.accent, borderColor: colors.primary }]]}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setProductType(t); }}
-                activeOpacity={0.75}
-              >
-                <Text style={[s.chipText, productType === t && [s.chipTextActive, { color: colors.primary }]]}>{t}</Text>
-              </TouchableOpacity>
-            ))}
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <Field label="Product type">
+          <View style={styles.chips}>
+            {PRODUCT_TYPES.map((item) => <Chip key={item} label={item} active={item === productType} onPress={() => setProductType(item)} color={colors.primary} />)}
           </View>
-        </View>
-
-        {/* Qty */}
-        <View style={s.fieldGroup}>
-          <Text style={s.fieldLabel}>Sample Quantity</Text>
-          <View style={s.chipRow}>
-            {QUANTITIES.map((q) => (
-              <TouchableOpacity
-                key={q} style={[s.chip, qty === q && [s.chipActive, { backgroundColor: colors.accent, borderColor: colors.primary }]]}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setQty(q); }}
-                activeOpacity={0.75}
-              >
-                <Text style={[s.chipText, qty === q && [s.chipTextActive, { color: colors.primary }]]}>{q}</Text>
-              </TouchableOpacity>
-            ))}
+        </Field>
+        <Field label="Quantity">
+          <View style={styles.chips}>
+            {QUANTITIES.map((item) => <Chip key={item} label={`${item}`} active={item === quantity} onPress={() => setQuantity(item)} color={colors.primary} />)}
           </View>
-        </View>
-
-        {/* Colorway */}
-        <View style={s.fieldGroup}>
-          <Text style={s.fieldLabel}>Colorway</Text>
-          <TextInput style={s.input} value={colorway} onChangeText={setColorway} placeholder="e.g. Black, Vintage White, Olive" placeholderTextColor={MUTED} />
-        </View>
-
-        {/* Size */}
-        <View style={s.fieldGroup}>
-          <Text style={s.fieldLabel}>Sample Size</Text>
-          <TextInput style={s.input} value={size} onChangeText={setSize} placeholder="e.g. M, L, or unisex" placeholderTextColor={MUTED} />
-        </View>
-
-        {/* Notes */}
-        <View style={s.fieldGroup}>
-          <Text style={s.fieldLabel}>Specification Notes</Text>
-          <TextInput
-            style={[s.input, { height: 100, textAlignVertical: 'top' }]}
-            value={notes} onChangeText={setNotes} multiline
-            placeholder="Fabric weight, fit notes, print placement, references…"
-            placeholderTextColor={MUTED}
-          />
-        </View>
-
-        {/* Contact */}
-        <View style={s.fieldGroup}>
-          <Text style={s.fieldLabel}>Your Email or WhatsApp</Text>
-          <TextInput style={s.input} value={contact} onChangeText={setContact} placeholder="you@email.com or +1 555…" placeholderTextColor={MUTED} keyboardType="email-address" autoCapitalize="none" />
-          <Text style={s.fieldHint}>The manufacturer will contact you directly to confirm specs and arrange shipping.</Text>
-        </View>
-
-        {/* Escrow note */}
-        <View style={[s.escrowNote, { backgroundColor: colors.accent, borderColor: colors.primary + '33' }]}>
-          <Feather name="shield" size={15} color={colors.primary} />
-          <Text style={s.escrowText}>
-            <Text style={{ color: colors.primary, fontFamily: 'Inter_600SemiBold' }}>Payment protection: </Text>
-            Sample costs are charged only after the manufacturer confirms your request and provides a quote.
-          </Text>
-        </View>
+        </Field>
+        <Field label="Colorway"><TextInput value={colorway} onChangeText={setColorway} placeholder="e.g. Washed black" placeholderTextColor={MUTED} style={styles.input} /></Field>
+        <Field label="Size"><TextInput value={size} onChangeText={setSize} placeholderTextColor={MUTED} style={styles.input} /></Field>
+        <Field label="Reply contact"><TextInput value={contact} onChangeText={setContact} placeholder="Email or WhatsApp" placeholderTextColor={MUTED} style={styles.input} autoCapitalize="none" /></Field>
+        <Field label="Notes"><TextInput value={notes} onChangeText={setNotes} placeholder="Materials, construction, or deadlines" placeholderTextColor={MUTED} style={[styles.input, styles.notes]} multiline /></Field>
       </ScrollView>
-
-      <View style={[s.bottom, { paddingBottom: insets.bottom + 12 }]}>
-        <TouchableOpacity style={[s.submitBtn, { backgroundColor: colors.primary }, sending && { opacity: 0.7 }]} onPress={submit} activeOpacity={0.85} disabled={sending}>
-          <Feather name={sending ? 'loader' : 'send'} size={16} color={colors.primaryForeground} />
-          <Text style={[s.submitBtnText, { color: colors.primaryForeground }]}>{sending ? 'Sending…' : 'Send Sample Request'}</Text>
+      <View style={[styles.bottom, { paddingBottom: insets.bottom + 12 }]}>
+        <TouchableOpacity style={[styles.button, { backgroundColor: colors.primary }, sending && { opacity: 0.65 }]} onPress={submit} disabled={sending}>
+          {sending && <ActivityIndicator size="small" color={colors.primaryForeground} />}
+          <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{sending ? 'Sending…' : 'Send Sample Request'}</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-const s = StyleSheet.create({
-  root:     { flex: 1, backgroundColor: BG },
-  header:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORD },
-  headerTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG, textAlign: 'center' },
-  headerSub:   { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center' },
-  fieldGroup: { gap: 8 },
-  fieldLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, textTransform: 'uppercase', letterSpacing: 0.5 },
-  fieldHint:  { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 16 },
-  chipRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip:       { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: CARD, borderWidth: 1, borderColor: BORD },
-  chipActive: {},
-  chipText:   { fontSize: 13, fontFamily: 'Inter_500Medium', color: MUTED },
-  chipTextActive: {},
-  input:      { backgroundColor: CARD, borderWidth: 1, borderColor: BORD, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, fontFamily: 'Inter_400Regular', color: FG },
-  escrowNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 12, borderWidth: 1, padding: 14 },
-  escrowText: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, flex: 1, lineHeight: 18 },
-  bottom:     { paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: BORD, backgroundColor: BG },
-  submitBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 16, paddingVertical: 16 },
-  submitBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold' },
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <View style={styles.field}><Text style={styles.label}>{label}</Text>{children}</View>;
+}
+
+function Chip({ label, active, onPress, color }: { label: string; active: boolean; onPress: () => void; color: string }) {
+  return <TouchableOpacity style={[styles.chip, active && { borderColor: color, backgroundColor: `${color}22` }]} onPress={onPress}><Text style={[styles.chipText, active && { color }]}>{label}</Text></TouchableOpacity>;
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: BG },
+  center: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', gap: 14 },
+  errorText: { color: MUTED, textAlign: 'center', lineHeight: 20 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
+  headerTitle: { color: FG, fontSize: 16, fontFamily: 'Inter_700Bold', textAlign: 'center' },
+  headerSub: { color: MUTED, fontSize: 12, fontFamily: 'Inter_400Regular', textAlign: 'center' },
+  content: { padding: 16, paddingBottom: 120, gap: 20 },
+  field: { gap: 8 },
+  label: { color: MUTED, fontSize: 12, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.5 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { backgroundColor: CARD, borderColor: BORDER, borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 },
+  chipText: { color: MUTED, fontSize: 13, fontFamily: 'Inter_500Medium' },
+  input: { backgroundColor: CARD, borderColor: BORDER, borderWidth: 1, borderRadius: 12, color: FG, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  notes: { minHeight: 100, textAlignVertical: 'top' },
+  bottom: { paddingHorizontal: 16, paddingTop: 12, backgroundColor: BG, borderTopWidth: 1, borderTopColor: BORDER },
+  button: { minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, paddingHorizontal: 20 },
+  buttonText: { fontSize: 15, fontFamily: 'Inter_700Bold' },
 });
