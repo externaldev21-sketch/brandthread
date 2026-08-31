@@ -8,14 +8,15 @@ type AlertButton = {
   onPress?: () => void | Promise<void>;
 };
 
-const { alertMock, useUserMock, routerBackMock } = vi.hoisted(() => ({
+const { alertMock, useUserMock, routerBackMock, routerPushMock } = vi.hoisted(() => ({
   alertMock: vi.fn(),
   useUserMock: vi.fn(),
   routerBackMock: vi.fn(),
+  routerPushMock: vi.fn(),
 }));
 
 vi.mock('react-native', () => {
-  const React = require('react') as typeof import('react');
+  const React = require('react');
   const nativeComponent = (name: string) => {
     function MockNativeComponent(props: Record<string, unknown>) {
       return React.createElement(name, props, props.children as React.ReactNode);
@@ -39,7 +40,7 @@ vi.mock('react-native', () => {
 });
 
 vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: routerBackMock }),
+  useRouter: () => ({ back: routerBackMock, push: routerPushMock }),
 }));
 
 vi.mock('@clerk/expo', () => ({
@@ -71,6 +72,14 @@ vi.mock('@/hooks/useColors', () => ({
   }),
 }));
 
+vi.mock('@/components/KeyboardAwareScrollViewCompat', () => {
+  const React = require('react');
+  return {
+    KeyboardAwareScrollViewCompat: (props: Record<string, unknown>) =>
+      React.createElement('KeyboardAwareScrollViewCompat', props, props.children as React.ReactNode),
+  };
+});
+
 import LoginMethods from '@/app/login-methods';
 
 type ExternalAccount = {
@@ -86,6 +95,7 @@ type TestUser = {
   primaryEmailAddress: { emailAddress: string } | null;
   twoFactorEnabled: boolean;
   reload: ReturnType<typeof vi.fn>;
+  updatePassword: ReturnType<typeof vi.fn>;
   createExternalAccount: ReturnType<typeof vi.fn>;
 };
 
@@ -97,7 +107,11 @@ function makeExternalAccount(provider: Provider): ExternalAccount {
     id: `${provider}-account`,
     provider,
     emailAddress: `${provider}@example.com`,
-    destroy: vi.fn(),
+    destroy: vi.fn(() => {
+      currentUser.externalAccounts = currentUser.externalAccounts.filter(
+        (account) => account.id !== `${provider}-account`,
+      );
+    }),
   };
 }
 
@@ -108,8 +122,10 @@ function makeUser(accounts: ExternalAccount[] = []): TestUser {
     primaryEmailAddress: null,
     twoFactorEnabled: false,
     reload: vi.fn(async () => {
-      currentUser.externalAccounts = [];
       rerenderUser?.();
+    }),
+    updatePassword: vi.fn(async () => {
+      currentUser.passwordEnabled = true;
     }),
     createExternalAccount: vi.fn(),
   };
@@ -152,6 +168,7 @@ describe('LoginMethods linked-account removal', () => {
     alertMock.mockReset();
     useUserMock.mockReset();
     routerBackMock.mockReset();
+    routerPushMock.mockReset();
     rerenderUser = undefined;
     currentUser = makeUser();
     useUserMock.mockImplementation(() => {
@@ -237,5 +254,50 @@ describe('LoginMethods linked-account removal', () => {
     );
     expect(rendererForTest.root.findByProps({ testID: 'remove-apple-login-method' })).toBeTruthy();
     expect(rendererForTest.root.findAllByProps({ testID: 'connect-apple-login-method' })).toHaveLength(0);
+  });
+
+  it('lets buyers add a password, refreshes Clerk state, and keeps the social account removable', async () => {
+    const account = makeExternalAccount('google');
+    currentUser = makeUser([account]);
+    rendererForTest = await renderScreen();
+
+    await act(async () => {
+      rendererForTest.root.findByProps({ testID: 'setup-password-login-method' }).props.onPress();
+    });
+
+    await act(async () => {
+      rendererForTest.root.findByProps({ testID: 'new-password-input' }).props.onChangeText('correct horse');
+      rendererForTest.root.findByProps({ testID: 'confirm-password-input' }).props.onChangeText('correct horse');
+    });
+    await act(async () => {
+      await rendererForTest.root.findByProps({ testID: 'save-password-button' }).props.onPress();
+    });
+
+    expect(currentUser.updatePassword).toHaveBeenCalledWith({ newPassword: 'correct horse' });
+    expect(currentUser.reload).toHaveBeenCalledOnce();
+    expect(rendererForTest.root.findByProps({ testID: 'remove-google-login-method' })).toBeTruthy();
+    expect(rendererForTest.root.findAllByProps({ testID: 'setup-password-login-method' })).toHaveLength(0);
+  });
+
+  it('keeps password setup errors visible and does not refresh or change the account', async () => {
+    const account = makeExternalAccount('apple');
+    currentUser = makeUser([account]);
+    currentUser.updatePassword.mockRejectedValueOnce(new Error('Password was rejected by Clerk.'));
+    rendererForTest = await renderScreen();
+
+    await act(async () => {
+      rendererForTest.root.findByProps({ testID: 'setup-password-login-method' }).props.onPress();
+      rendererForTest.root.findByProps({ testID: 'new-password-input' }).props.onChangeText('correct horse');
+      rendererForTest.root.findByProps({ testID: 'confirm-password-input' }).props.onChangeText('correct horse');
+    });
+    await act(async () => {
+      await rendererForTest.root.findByProps({ testID: 'save-password-button' }).props.onPress();
+    });
+
+    expect(currentUser.updatePassword).toHaveBeenCalledOnce();
+    expect(currentUser.reload).not.toHaveBeenCalled();
+    expect(rendererForTest.root.findByProps({ testID: 'setup-password-login-method' })).toBeTruthy();
+    expect(rendererForTest.root.findByProps({ testID: 'password-setup-error' }).props.children)
+      .toBe('Password was rejected by Clerk.');
   });
 });

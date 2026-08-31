@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '@clerk/expo';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
+import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import {
   BG, CARD, BORDER, FG, MUTED, SUBTLE,
   FONT, FS, SP, RADIUS, SUCCESS, SUCCESS_DIM, CARD_ELEVATED, RED, RED_DIM,
@@ -41,6 +42,12 @@ export default function LoginMethods() {
   const [verifying, setVerifying] = useState(false);
   const [linkingProvider, setLinkingProvider] = useState<string | null>(null);
   const [removingProvider, setRemovingProvider] = useState<OAuthProvider | null>(null);
+  const [passwordSetupOpen, setPasswordSetupOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordSetupError, setPasswordSetupError] = useState('');
+  const [passwordSetupSaving, setPasswordSetupSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const externalAccounts = user?.externalAccounts ?? [];
   const hasGoogle  = externalAccounts.some(a => a.provider === 'google');
@@ -86,6 +93,52 @@ export default function LoginMethods() {
       connected: hasApple,
     },
   ];
+
+  function openPasswordSetup() {
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordSetupError('');
+    setShowPassword(false);
+    setPasswordSetupOpen(true);
+  }
+
+  function closePasswordSetup() {
+    if (passwordSetupSaving) return;
+    setPasswordSetupOpen(false);
+    setPasswordSetupError('');
+  }
+
+  async function savePassword() {
+    if (!user || passwordSetupSaving) return;
+
+    if (newPassword.length < 8) {
+      setPasswordSetupError('Use at least 8 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordSetupError('Passwords do not match.');
+      return;
+    }
+
+    setPasswordSetupSaving(true);
+    setPasswordSetupError('');
+    try {
+      await user.updatePassword({ newPassword });
+      // Clerk updates passwordEnabled asynchronously. Reload before closing so
+      // the removal guard can never run against stale account state.
+      await user.reload();
+      setPasswordSetupOpen(false);
+      setNewPassword('');
+      setConfirmPassword('');
+      Alert.alert('Password added', 'You can now remove a connected account while keeping your password as a sign-in method.');
+    } catch (e: any) {
+      setPasswordSetupError(
+        e?.errors?.[0]?.message ?? e?.message ?? 'Could not add your password. Please try again.',
+      );
+    } finally {
+      setPasswordSetupSaving(false);
+    }
+  }
 
   // ── OAuth linking ────────────────────────────────────────────────────────────
   async function linkOAuth(strategy: 'oauth_google' | 'oauth_apple', provider: string) {
@@ -255,7 +308,8 @@ export default function LoginMethods() {
               const isLinking = linkingProvider === method.label;
               const externalAccount = method.id === 'google' ? googleAccount : appleAccount;
               const isRemoving = removingProvider === method.id;
-              const tappable = isOAuth && !method.connected;
+              const isPassword = method.id === 'password';
+              const tappable = (isOAuth || isPassword) && !method.connected;
 
               const rowContent = (
                 <View style={s.row}>
@@ -291,12 +345,16 @@ export default function LoginMethods() {
                         </TouchableOpacity>
                       )}
                     </View>
-                  ) : isOAuth ? (
+                  ) : isOAuth || isPassword ? (
                     isLinking ? (
                       <ActivityIndicator size="small" color={colors.primary} />
                     ) : (
-                      <View style={[s.enableBtn, { backgroundColor: colors.accent, borderColor: colors.primary }]}>
-                        <Text style={[s.enableBtnText, { color: colors.primary }]}>Connect</Text>
+                      <View
+                        style={[s.enableBtn, { backgroundColor: colors.accent, borderColor: colors.primary }]}
+                      >
+                        <Text style={[s.enableBtnText, { color: colors.primary }]}>
+                          {isPassword ? 'Set up' : 'Connect'}
+                        </Text>
                       </View>
                     )
                   ) : (
@@ -310,10 +368,16 @@ export default function LoginMethods() {
                   {idx > 0 && <View style={s.divider} />}
                   {tappable ? (
                     <TouchableOpacity
-                      testID={tappable ? `connect-${method.id}-login-method` : undefined}
+                      testID={isPassword ? 'setup-password-login-method' : `connect-${method.id}-login-method`}
                       activeOpacity={0.7}
-                      disabled={!!linkingProvider || !!removingProvider}
-                      onPress={() => linkOAuth(strategy as 'oauth_google' | 'oauth_apple', method.label)}
+                      disabled={!!linkingProvider || !!removingProvider || passwordSetupSaving}
+                      onPress={() => {
+                        if (isPassword) {
+                          openPasswordSetup();
+                        } else {
+                          linkOAuth(strategy as 'oauth_google' | 'oauth_apple', method.label);
+                        }
+                      }}
                     >
                       {rowContent}
                     </TouchableOpacity>
@@ -369,6 +433,112 @@ export default function LoginMethods() {
           </View>
         </ScrollView>
       )}
+
+      {/* Password setup sheet */}
+      <Modal
+        visible={passwordSetupOpen}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={closePasswordSetup}
+      >
+        <View style={s.modal}>
+          <View style={s.modalHeader}>
+            <Text style={s.modalTitle}>Add a password</Text>
+            <TouchableOpacity
+              onPress={closePasswordSetup}
+              style={s.modalClose}
+              disabled={passwordSetupSaving}
+              testID="close-password-setup"
+            >
+              <Feather name="x" size={20} color={FG} />
+            </TouchableOpacity>
+          </View>
+
+          <KeyboardAwareScrollViewCompat
+            contentContainerStyle={s.passwordSetupBody}
+            bottomOffset={80}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <Text style={s.passwordSetupIntro}>
+              Create a password so you can keep signing in if you disconnect your social account.
+            </Text>
+
+            <Text style={s.passwordSetupLabel}>New password</Text>
+            <View style={s.passwordInputRow}>
+              <TextInput
+                testID="new-password-input"
+                style={s.passwordInput}
+                value={newPassword}
+                onChangeText={(value) => {
+                  setNewPassword(value);
+                  setPasswordSetupError('');
+                }}
+                placeholder="Minimum 8 characters"
+                placeholderTextColor={SUBTLE}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="new-password"
+              />
+              <TouchableOpacity
+                onPress={() => setShowPassword((visible) => !visible)}
+                style={s.passwordVisibilityButton}
+                testID="toggle-password-visibility"
+              >
+                <Feather name={showPassword ? 'eye-off' : 'eye'} size={18} color={MUTED} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={s.passwordSetupLabel}>Confirm password</Text>
+            <TextInput
+              testID="confirm-password-input"
+              style={s.passwordInputStandalone}
+              value={confirmPassword}
+              onChangeText={(value) => {
+                setConfirmPassword(value);
+                setPasswordSetupError('');
+              }}
+              placeholder="Enter it again"
+              placeholderTextColor={SUBTLE}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoComplete="new-password"
+              onSubmitEditing={savePassword}
+              returnKeyType="done"
+            />
+
+            {passwordSetupError ? (
+              <View style={s.passwordErrorBox}>
+                <Feather name="alert-circle" size={14} color={RED} />
+                <Text testID="password-setup-error" style={s.passwordErrorText}>
+                  {passwordSetupError}
+                </Text>
+              </View>
+            ) : null}
+
+            <TouchableOpacity
+              testID="save-password-button"
+              style={[
+                s.verifyBtn,
+                { backgroundColor: colors.primary, opacity: passwordSetupSaving ? 0.6 : 1 },
+              ]}
+              onPress={savePassword}
+              disabled={passwordSetupSaving}
+              activeOpacity={0.85}
+            >
+              {passwordSetupSaving ? (
+                <ActivityIndicator color={colors.primaryForeground} />
+              ) : (
+                <Text style={[s.verifyBtnText, { color: colors.primaryForeground }]}>
+                  Add password
+                </Text>
+              )}
+            </TouchableOpacity>
+          </KeyboardAwareScrollViewCompat>
+        </View>
+      </Modal>
 
       {/* TOTP setup modal */}
       <Modal visible={!!totpModal} animationType="slide" presentationStyle="pageSheet">
@@ -578,4 +748,40 @@ const s = StyleSheet.create({
     paddingVertical: 16, alignItems: 'center',
   },
   verifyBtnText: { fontSize: FS.base, fontFamily: FONT.semibold },
+
+  passwordSetupBody: { paddingHorizontal: SP.md, paddingTop: SP.lg, paddingBottom: 40 },
+  passwordSetupIntro: {
+    fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED,
+    lineHeight: 21, marginBottom: SP.lg,
+  },
+  passwordSetupLabel: {
+    fontSize: FS.xs, fontFamily: FONT.semibold, color: MUTED,
+    marginBottom: 6, marginTop: SP.sm,
+  },
+  passwordInputRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: CARD, borderRadius: RADIUS.sm,
+    borderWidth: 1, borderColor: BORDER,
+  },
+  passwordInput: {
+    flex: 1, paddingHorizontal: SP.md, paddingVertical: 14,
+    fontSize: FS.sm, fontFamily: FONT.regular, color: FG,
+  },
+  passwordInputStandalone: {
+    backgroundColor: CARD, borderRadius: RADIUS.sm,
+    borderWidth: 1, borderColor: BORDER,
+    paddingHorizontal: SP.md, paddingVertical: 14,
+    fontSize: FS.sm, fontFamily: FONT.regular, color: FG,
+  },
+  passwordVisibilityButton: { paddingHorizontal: SP.md, paddingVertical: 12 },
+  passwordErrorBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: RED_DIM, borderRadius: RADIUS.sm,
+    borderWidth: 1, borderColor: 'rgba(248,113,113,0.3)',
+    paddingHorizontal: SP.sm, paddingVertical: 10, marginTop: SP.md,
+  },
+  passwordErrorText: {
+    flex: 1, fontSize: FS.xs, fontFamily: FONT.regular,
+    color: RED, lineHeight: 18,
+  },
 });
