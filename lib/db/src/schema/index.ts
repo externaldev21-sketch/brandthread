@@ -712,8 +712,27 @@ export const notificationsFeed = pgTable('notifications_feed', {
     .where(sql`${table.type} = 'new_order_received' AND ${table.targetId} IS NOT NULL`),
 }));
 
-// ─── Reviews (buyer → seller/product rating after delivered order) ──────────────
-
+export const notificationDeliveries = pgTable('notification_deliveries', {
+  id:                 uuid('id').primaryKey().defaultRandom(),
+  notificationId:     text('notification_id').notNull(),
+  userId:             text('user_id').notNull(),
+  ownerId:            text('owner_id').notNull(),
+  pushToken:          text('push_token').notNull(),
+  status:             text('status').notNull().default('queued'), // queued | sent | provider_error
+  providerMessageId:  text('provider_message_id'),
+  providerStatus:     text('provider_status'),
+  providerError:      text('provider_error'),
+  queuedAt:           timestamp('queued_at').defaultNow().notNull(),
+  sentAt:             timestamp('sent_at'),
+  providerResultAt:   timestamp('provider_result_at'),
+  createdAt:          timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  notificationTokenUnique: uniqueIndex('notification_deliveries_notification_token_idx')
+    .on(table.notificationId, table.pushToken),
+  userIdx: index('notification_deliveries_user_idx').on(table.userId),
+  ownerIdx: index('notification_deliveries_owner_idx').on(table.ownerId),
+  notificationIdx: index('notification_deliveries_notification_idx').on(table.notificationId),
+}));
 export const reviews = pgTable('reviews', {
   id:        uuid('id').primaryKey().defaultRandom(),
   buyerId:   text('buyer_id').notNull(),
@@ -1161,6 +1180,22 @@ export const shopifyImportProductMappings = pgTable('shopify_import_product_mapp
   sourceProductUnique: uniqueIndex('shopify_import_source_product_unique')
     .on(table.ownerId, table.sourceUrl, table.sourceProductId),
   jobIdx: index('shopify_import_product_mappings_job_idx').on(table.importJobId),
+}));
+
+export const notificationEvents = pgTable('notification_events', {
+  id:             uuid('id').primaryKey().defaultRandom(),
+  notificationId: text('notification_id').notNull(),
+  userId:         text('user_id').notNull(),
+  ownerId:        text('owner_id').notNull(),
+  deliveryId:     uuid('delivery_id').references(() => notificationDeliveries.id, { onDelete: 'set null' }),
+  eventType:      text('event_type').notNull(), // receipt | open | tap
+  eventKey:       text('event_key').notNull().unique(),
+  occurredAt:     timestamp('occurred_at').defaultNow().notNull(),
+  createdAt:      timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  userIdx: index('notification_events_user_idx').on(table.userId),
+  ownerIdx: index('notification_events_owner_idx').on(table.ownerId),
+  notificationIdx: index('notification_events_notification_idx').on(table.notificationId),
 }));
 
 export const shippingLabels = pgTable('shipping_labels', {

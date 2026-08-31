@@ -706,6 +706,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           getToken,
         ),
     },
+    notifications: {
+      trackEvent: (body: {
+        notificationId: string;
+        eventType: 'receipt' | 'open' | 'tap';
+        occurredAt?: string;
+      }) => post<{ ok: boolean; recorded: boolean }>('/api/notifications/events', body),
+    },
     notificationPrefs: {
       get: () =>
         get<{

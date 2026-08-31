@@ -86,3 +86,4 @@
 - [Thread pagination boundary](thread-feed-pagination.md) — independently paginated followed/public sources need separate raw cursors, cross-source seen IDs, and refresh generations.
 - [Tax reporting boundaries](tax-reporting-boundaries.md) — annual gross uses successful-payment UTC year; preserve Stripe tax, gross, and final destination without inferring compliance.
 - [Notification response deduplication](notification-response-deduplication.md) — warm listeners and cold-start recovery can surface the same Expo response; dedupe navigation by request identifier.
+- [Notification measurement integrity](notification-measurement-integrity.md) — Expo tickets are provider results, not receipts; client events need stable IDs and an account-scoped durable outbox.

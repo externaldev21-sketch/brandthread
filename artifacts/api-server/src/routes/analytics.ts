@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { db, orders, customers, productVariants, drops, products, orderItems, users } from "@workspace/db";
+import { db, orders, customers, productVariants, drops, products, orderItems, users, notificationDeliveries, notificationEvents } from "@workspace/db";
 import { sql, gte, and, eq } from "drizzle-orm";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { buildCustomerAnalyticsResponse } from "./analyticsCustomers";
@@ -225,6 +225,49 @@ router.get("/post-clicks", async (req, res) => {
   } catch (err) {
     req.log.error({ err }, "Failed to load post click analytics");
     res.status(500).json({ error: 'Failed to load post click analytics' });
+  }
+});
+
+// GET /api/analytics/notifications
+// Delivery and engagement totals are scoped to the active seller/store owner.
+// No notification titles, bodies, tokens, or recipient identities leave this
+// endpoint; it is an aggregate-only reporting surface.
+router.get("/notifications", async (req, res) => {
+  const ownerId = (req as any).clerkUserId as string;
+  try {
+    const [deliveryRows, eventRows] = await Promise.all([
+      db.select({
+        queued: sql<number>`count(*) FILTER (WHERE ${notificationDeliveries.status} = 'queued')::int`,
+        sent: sql<number>`count(*) FILTER (WHERE ${notificationDeliveries.status} = 'sent')::int`,
+        providerResults: sql<number>`count(*) FILTER (WHERE ${notificationDeliveries.providerResultAt} IS NOT NULL)::int`,
+        providerErrors: sql<number>`count(*) FILTER (WHERE ${notificationDeliveries.status} = 'provider_error')::int`,
+      }).from(notificationDeliveries).where(eq(notificationDeliveries.ownerId, ownerId)),
+      db.select({
+        eventType: notificationEvents.eventType,
+        count: sql<number>`count(*)::int`,
+      }).from(notificationEvents)
+        .where(eq(notificationEvents.ownerId, ownerId))
+        .groupBy(notificationEvents.eventType),
+    ]);
+    const eventCounts = Object.fromEntries(eventRows.map((row) => [row.eventType, row.count]));
+    const delivery = deliveryRows[0] ?? { queued: 0, sent: 0, providerResults: 0, providerErrors: 0 };
+    return res.json({
+      queued: delivery.queued,
+      sent: delivery.sent,
+      providerResults: delivery.providerResults,
+      providerErrors: delivery.providerErrors,
+      open: eventCounts.open ?? 0,
+      tap: eventCounts.tap ?? 0,
+      receipt: eventCounts.receipt ?? 0,
+      events: {
+        receipt: eventCounts.receipt ?? 0,
+        open: eventCounts.open ?? 0,
+        tap: eventCounts.tap ?? 0,
+      },
+    });
+  } catch (err) {
+    req.log.error({ err }, "Failed to load notification analytics");
+    return res.status(500).json({ error: "Failed to load notification analytics" });
   }
 });
 

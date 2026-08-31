@@ -13,7 +13,13 @@ const path = require('path');
 const projectRoot = path.resolve(__dirname, '..');
 const outputDir = path.join(projectRoot, 'static-build');
 const CANONICAL_ORIGIN = 'https://brandthread.app';
+const OG_IMAGE_URL = `${CANONICAL_ORIGIN}/brandthread-logo.png`;
+const DEFAULT_METADATA = {
+  title: 'Brandthread | Discover what’s next',
+  description: 'Brandthread connects independent brands, buyers, and makers through social discovery, storefronts, and tools to build what’s next.',
+};
 const ROUTE_METADATA = {
+  '/': DEFAULT_METADATA,
   '/privacy': {
     title: 'Privacy Policy | Brandthread',
     description: 'How Brandthread collects, uses, shares, and protects information across its buyer, seller, social commerce, design, payment, and verification features.',
@@ -23,6 +29,7 @@ const ROUTE_METADATA = {
     description: 'Terms governing Brandthread accounts, social commerce, marketplace orders, seller subscriptions, content, AI tools, and platform conduct.',
   },
 };
+const PUBLIC_ROUTES = ['/', '/privacy', '/terms'];
 
 function domainFromEnvironment() {
   const isPublishedBuild =
@@ -55,26 +62,124 @@ function routePathForHtml(filePath) {
   return `/${relativePath.replace(/\.html$/, '')}`;
 }
 
+function normalizeRoutePath(routePath) {
+  if (routePath === '/') return routePath;
+  return routePath.replace(/\/+$/, '');
+}
+
+function structuredDataForRoute(routePath) {
+  if (routePath === '/') {
+    return [
+      {
+        '@context': 'https://schema.org',
+        '@type': 'Organization',
+        name: 'Brandthread',
+        url: CANONICAL_ORIGIN,
+        logo: OG_IMAGE_URL,
+        description: DEFAULT_METADATA.description,
+      },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'WebSite',
+        name: 'Brandthread',
+        url: CANONICAL_ORIGIN,
+        description: DEFAULT_METADATA.description,
+      },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'WebApplication',
+        name: 'Brandthread',
+        url: CANONICAL_ORIGIN,
+        applicationCategory: 'SocialNetworkingApplication',
+        operatingSystem: 'Web, iOS, Android',
+        description: DEFAULT_METADATA.description,
+      },
+    ];
+  }
+  const routeMetadata = ROUTE_METADATA[routePath];
+  if (!routeMetadata) return [];
+  return [{
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: routeMetadata.title,
+    description: routeMetadata.description,
+    url: `${CANONICAL_ORIGIN}${routePath}`,
+    isPartOf: { '@type': 'WebSite', name: 'Brandthread', url: CANONICAL_ORIGIN },
+  }];
+}
+
 function addCanonicalMetadata() {
   for (const filePath of htmlFilesIn(outputDir)) {
-    const routePath = routePathForHtml(filePath);
+    const routePath = normalizeRoutePath(routePathForHtml(filePath));
     const canonicalUrl = `${CANONICAL_ORIGIN}${routePath}`;
     const html = fs.readFileSync(filePath, 'utf8');
-    const routeMetadata = ROUTE_METADATA[routePath];
-    const metadata = [
+    const routeMetadata = ROUTE_METADATA[routePath] || DEFAULT_METADATA;
+    const isPublic = PUBLIC_ROUTES.includes(routePath);
+    const structuredData = structuredDataForRoute(routePath);
+    const publicMetadata = [
       `<link rel="canonical" href="${canonicalUrl}" />`,
       `<meta property="og:url" content="${canonicalUrl}" />`,
-      routeMetadata ? `<title>${routeMetadata.title}</title>` : '',
-      routeMetadata ? `<meta name="description" content="${routeMetadata.description}" />` : '',
-      routeMetadata ? `<meta property="og:title" content="${routeMetadata.title}" />` : '',
-      routeMetadata ? `<meta property="og:description" content="${routeMetadata.description}" />` : '',
+      `<title>${routeMetadata.title}</title>`,
+      `<meta name="description" content="${routeMetadata.description}" />`,
+      `<meta name="robots" content="${isPublic ? 'index,follow' : 'noindex,nofollow'}" />`,
+      `<meta property="og:title" content="${routeMetadata.title}" />`,
+      `<meta property="og:description" content="${routeMetadata.description}" />`,
+      `<meta property="og:type" content="website" />`,
+      `<meta property="og:image" content="${OG_IMAGE_URL}" />`,
+      `<meta name="twitter:card" content="summary_large_image" />`,
+      `<meta name="twitter:title" content="${routeMetadata.title}" />`,
+      `<meta name="twitter:description" content="${routeMetadata.description}" />`,
+      `<meta name="twitter:image" content="${OG_IMAGE_URL}" />`,
+      structuredData.length
+        ? `<script type="application/ld+json">${JSON.stringify(structuredData.length === 1 ? structuredData[0] : { '@context': 'https://schema.org', '@graph': structuredData })}</script>`
+        : '',
     ].join('');
-    const withoutGenericTitle = routeMetadata
-      ? html.replace(/<title\b[^>]*>[\s\S]*?<\/title>/gi, '')
-      : html;
+    const metadata = isPublic
+      ? publicMetadata
+      : '<meta name="robots" content="noindex,nofollow" />';
+    const withoutGenericTitle = html
+      .replace(/<title\b[^>]*>[\s\S]*?<\/title>/gi, '')
+      .replace(/<link\b[^>]*rel=["']canonical["'][^>]*>/gi, '')
+      .replace(/<meta\b[^>]*name=["']description["'][^>]*>/gi, '');
     const updated = withoutGenericTitle.replace('</head>', `${metadata}</head>`);
     if (updated !== html) fs.writeFileSync(filePath, updated);
   }
+}
+
+function writePublicCrawlFiles() {
+  const logoSource = path.join(projectRoot, 'assets/images/brandthread-logo.png');
+  if (fs.existsSync(logoSource)) fs.copyFileSync(logoSource, path.join(outputDir, 'brandthread-logo.png'));
+
+  const sitemap = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ...PUBLIC_ROUTES.map((route) => [
+      '  <url>',
+      `    <loc>${CANONICAL_ORIGIN}${route}</loc>`,
+      `    <changefreq>${route === '/' ? 'weekly' : 'yearly'}</changefreq>`,
+      `    <priority>${route === '/' ? '1.0' : '0.5'}</priority>`,
+      '  </url>',
+    ].join('\n')),
+    '</urlset>',
+    '',
+  ].join('\n');
+  fs.writeFileSync(path.join(outputDir, 'sitemap.xml'), sitemap);
+  fs.writeFileSync(path.join(outputDir, 'robots.txt'), [
+    'User-agent: *',
+    'Allow: /',
+    'Disallow: /api/',
+    'Disallow: /sign-in',
+    'Disallow: /onboarding',
+    'Disallow: /settings',
+    'Disallow: /orders',
+    'Disallow: /buyer/',
+    'Disallow: /tabs/',
+    'Disallow: /chat/',
+    'Disallow: /team',
+    'Disallow: /manufacturer-hub',
+    `Sitemap: ${CANONICAL_ORIGIN}/sitemap.xml`,
+    '',
+  ].join('\n'));
 }
 
 const env = {
@@ -121,4 +226,5 @@ if (!fs.existsSync(path.join(outputDir, 'index.html'))) {
 }
 
 addCanonicalMetadata();
+writePublicCrawlFiles();
 console.log('Web export complete.');

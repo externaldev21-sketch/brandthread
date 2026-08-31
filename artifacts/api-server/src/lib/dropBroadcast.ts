@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { db, dropAlertSubscriptions, dropBroadcasts, drops, follows } from "@workspace/db";
-import { sendPushToUser } from "./push";
+import { sendPushToUser, stableNotificationId } from "./push";
 
 export interface DropBroadcastResult {
   sent: number;
@@ -77,8 +77,13 @@ export async function deliverDropBroadcast(
     sendPushToUser(followerId, {
       title: "Drop is live!",
       body: `${claimedDrop.name} is available now — limited stock. Tap to shop.`,
-      data: { dropId: claimedDrop.id, sellerId, type: "drop_live" },
-    }, "drop")
+      data: {
+        notificationId: stableNotificationId("drop-live", claimedDrop.claimId, followerId),
+        dropId: claimedDrop.id,
+        sellerId,
+        type: "drop_live",
+      },
+    }, "drop", sellerId)
   ));
   const sent = results.filter((result) => result.status === "fulfilled").length;
   const errors = results.length - sent;

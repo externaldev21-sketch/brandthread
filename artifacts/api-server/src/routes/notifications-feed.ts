@@ -10,7 +10,11 @@ import { Router } from "express";
 import { db, notificationsFeed } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { normalizePushEventCategory, sendPushToUser } from "../lib/push";
+import {
+  normalizePushEventCategory,
+  sendPushToUser,
+  type PushEventCategory,
+} from "../lib/push";
 
 export const router = Router();
 
@@ -50,11 +54,11 @@ buyerRouter.get("/", async (req, res) => {
 buyerRouter.patch("/read-all", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   await db.update(notificationsFeed).set({ isRead: true })
-    .where(eq(notificationsFeed.userId, userId));
+    .where(and(eq(notificationsFeed.id, req.params.id), eq(notificationsFeed.userId, userId)));
   return res.json({ ok: true });
 });
 
-buyerRouter.patch("/:id/read", async (req, res) => {
+buyerRouter.delete("/:id", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   await db.update(notificationsFeed).set({ isRead: true })
     .where(and(eq(notificationsFeed.id, req.params.id), eq(notificationsFeed.userId, userId)));
@@ -83,10 +87,12 @@ export async function publishNotification(n: {
   targetId?:    string;
   targetType?:  string;
   cta?:         string;
+  analyticsOwnerId?: string;
+  pushCategory?: PushEventCategory;
   pushSound?: string | null;
   pushChannelId?: string;
 }): Promise<void> {
-  const pushCategory = normalizePushEventCategory(n.category);
+  const pushCategory = n.pushCategory ?? normalizePushEventCategory(n.category);
 
   const [notification] = await db
     .insert(notificationsFeed)
@@ -118,6 +124,7 @@ export async function publishNotification(n: {
       title: n.title,
       body: n.body ?? "",
       data: {
+        notificationId: notification.id,
         type: n.type,
         targetId: n.targetId,
         targetType: n.targetType,
@@ -125,7 +132,7 @@ export async function publishNotification(n: {
       },
       sound: n.pushSound,
       channelId: n.pushChannelId,
-    }, pushCategory);
+    }, pushCategory, n.analyticsOwnerId);
   }
 }
 

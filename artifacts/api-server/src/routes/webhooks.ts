@@ -25,7 +25,7 @@ import {
   sendOrderConfirmationEmail,
 } from "../lib/brandthreadEmail";
 import { publishNotification } from "./notifications-feed";
-import { sendPushToUser } from "../lib/push";
+import { sendPushToUser, stableNotificationId } from "../lib/push";
 import { connectReadiness } from "./manufacturer-connect";
 import { recordPaidPhysicalOrder } from "../lib/sellerTaxLedger";
 import {
@@ -113,7 +113,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
     return;
   }
 
-  let event: any;
+  const event = req.body?.event ?? req.body;
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_WEBHOOK_SECRET);
   } catch (err: any) {
@@ -995,6 +995,7 @@ export async function handleSubscriptionTrialWillEnd(sub: any, eventId: string):
       title: "Your free trial ends soon",
       body: `Your 5-day trial ends in 3 days — you'll be charged ${amount} on ${trialEnd} unless you cancel.`,
       data: {
+        notificationId: stableNotificationId("subscription-trial-ending", sub.id, seller.clerkId),
         type: "subscription_trial_will_end",
         route: "/subscription",
       },
@@ -1093,6 +1094,7 @@ export async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
       title: "Payment failed",
       body: "Update your card to keep your Brandthread features.",
       data: {
+        notificationId: notification.id,
         type: notificationType,
         route: "/subscription",
         invoiceId: invoice.id ?? null,

@@ -30,7 +30,7 @@ const SECTIONS: LegalSection[] = [
       'Notifications: your device permission state, push token, platform, and notification preferences so we can deliver account, order, message, verification, and other notifications you request.',
       'Technical and service information: IP address, request and event timestamps, app/browser type, route and feature interactions, request identifiers, errors, security signals, and similar operational logs needed to run, secure, and troubleshoot the service.',
       'Location: Brandthread currently uses addresses you enter, shipment tracking locations, business locations, customer-region summaries, and optional location text you add to content. Although a location library is installed, our audit found no active request for GPS-derived precise or coarse device location. We will update this policy and request permission before collecting device location.',
-      'Brandthread does not currently request your address book, use an advertising identifier, request App Tracking Transparency permission, or track your activity across other companies’ apps and websites for advertising.',
+      'Brandthread does not currently request your address book, use a native advertising identifier, or request App Tracking Transparency permission. The native app does not track your activity across other companies’ apps and websites for advertising. On the public website, optional Meta and TikTok measurement scripts load only when Brandthread has a real provider ID configured and you explicitly allow Marketing cookies; otherwise they remain disabled.',
     ],
   },
   {

@@ -22,6 +22,9 @@ import {
 import type { Notification, NotificationCategory } from '@/services/socialTypes';
 import { BrandedLoadingState, EmptyState, ThreadDivider } from '@/components/BrandthreadUI';
 import SwipeActionRow from '@/components/SwipeActionRow';
+import { useApi } from '@/lib/api';
+import { captureNotificationEvent } from '@/lib/notificationEventOutbox';
+import { useUser } from '@clerk/expo';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -195,6 +198,8 @@ export default function BuyerNotifications() {
   const styles = makeStyles(theme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const api = useApi();
+  const { user } = useUser();
 
   const [notifs, setNotifs] = useState<Notification[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<NotificationCategory | undefined>(undefined);
@@ -236,6 +241,13 @@ export default function BuyerNotifications() {
   }
 
   const handleTap = async (notif: Notification) => {
+    void captureNotificationEvent(api, user?.id, {
+      notificationId: notif.id,
+      eventType: 'tap',
+      occurredAt: new Date().toISOString(),
+    }).catch(() => {
+      // In-app navigation must remain available if analytics capture fails.
+    });
     await markNotificationRead(notif.id);
     setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
     notifNavigation(notif, router);

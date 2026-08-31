@@ -48,6 +48,7 @@ import financeRouter from "./finance";
 import taxesRouter from "./taxes";
 import teamRouter from "./team";
 import { requireRole, teamContext } from "../middlewares/requireRole";
+import notificationEventsRouter from "./notification-events";
 
 /** Lazily-resolved team context for routes that don't mount it themselves.
  *  `resolveTeamContext` is idempotent (cached on req.teamContext), so applying
@@ -135,6 +136,7 @@ router.use("/buyer/products",            buyerProductsRouter);
 router.use("/buyer/saved",               savedRouter);
 router.use("/buyer/cart",                cartDbRouter);
 router.use("/buyer/notifications",       notificationsFeedRouter);
+router.use("/notifications",             notificationEventsRouter);
 router.use("/buyer",                     buyerRouter);
 router.use("/conversations",             conversationsRouter);
 router.use("/seller/connect",            requireRole("owner"), connectRouter);      // payouts: owner only; requireRole resolves tc internally

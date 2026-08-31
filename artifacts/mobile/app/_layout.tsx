@@ -35,6 +35,9 @@ import { FeatureFlagProvider, FeatureFlagKey, useFeatureFlags } from '@/contexts
 import { UndoToastProvider } from '@/components/BrandthreadUI';
 import { CookieConsentProvider } from '@/contexts/CookieConsentContext';
 import { createNotificationResponseHandler } from '@/lib/notificationNavigation';
+import { useCanUseMarketing } from '@/contexts/CookieConsentContext';
+import { setMarketingPixelConsent, trackMarketingPixelEvent } from '@/lib/marketingPixels';
+import { captureNotificationEvent, flushNotificationEvents } from '@/lib/notificationEventOutbox';
 
 // Push notifications are native-only. Importing the package is safe for the
 // web bundle, but registering a handler/listener there produces unsupported
@@ -421,9 +424,28 @@ function PushRegistrar() {
   return null;
 }
 
+function MarketingPixelTracker() {
+  const canUseMarketing = useCanUseMarketing();
+  const segments = useSegments();
+  const routeKey = `/${segments.join('/')}`;
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const initialized = setMarketingPixelConsent(canUseMarketing);
+    if (!canUseMarketing || !initialized) return;
+    trackMarketingPixelEvent('PageView', {
+      path: typeof window !== 'undefined' ? window.location.pathname : routeKey,
+    });
+  }, [canUseMarketing, routeKey]);
+
+  return null;
+}
+
 function RootLayoutNav() {
   const segments = useSegments();
   const router = useRouter();
+  const api = useApi();
+  const { userId } = useAuth();
   const { isEnabled } = useFeatureFlags();
   const handledNotificationIdsRef = useRef(new Set<string>());
   const route = segments[segments.length - 1] ?? '';
@@ -435,29 +457,73 @@ function RootLayoutNav() {
   const feature = gatedRoutes[route];
 
   useEffect(() => {
+    void flushNotificationEvents(api, userId);
+  }, [api, userId]);
+
+  useEffect(() => {
     if (Platform.OS === 'web') return;
+    // Leave Expo's last response intact until Clerk has resolved the account
+    // that owns the account-scoped durable event outbox.
+    if (!userId) return;
+
+    const trackNotificationEvent = (
+      notification: Notifications.Notification,
+      eventType: 'receipt' | 'open' | 'tap',
+    ) => {
+      const notificationId = notification.request.content.data?.notificationId;
+      if (typeof notificationId !== 'string' || !notificationId) return Promise.resolve();
+      return captureNotificationEvent(api, userId, {
+        notificationId,
+        eventType,
+        occurredAt: new Date().toISOString(),
+      });
+    };
 
     const navigateFromNotification = createNotificationResponseHandler(
       { push: (href) => router.push(href as never) },
       handledNotificationIdsRef.current,
     );
 
+    const handleNotificationResponse = (response: Notifications.NotificationResponse) => {
+      void Promise.all([
+        trackNotificationEvent(response.notification, 'open'),
+        trackNotificationEvent(response.notification, 'tap'),
+      ]).catch(() => {
+        // Navigation remains available if local analytics persistence fails.
+      });
+      navigateFromNotification(response);
+    };
+
     const subscription = Notifications.addNotificationResponseReceivedListener(
-      navigateFromNotification,
+      handleNotificationResponse,
+    );
+    const receiptSubscription = Notifications.addNotificationReceivedListener(
+      (notification) => {
+        void trackNotificationEvent(notification, 'receipt').catch(() => {});
+      },
     );
     void Notifications.getLastNotificationResponseAsync()
-      .then((response) => {
+      .then(async (response) => {
         if (!response) return;
+        // Expo's last response is the only recoverable cold-start record. Do
+        // not clear it until both events are durably written to the outbox.
+        await Promise.all([
+          trackNotificationEvent(response.notification, 'open'),
+          trackNotificationEvent(response.notification, 'tap'),
+        ]);
         navigateFromNotification(response);
-        void Notifications.clearLastNotificationResponseAsync().catch(() => {});
+        await Notifications.clearLastNotificationResponseAsync();
       })
       .catch(() => {
         // Notification response handling is best-effort; normal app startup
         // should never be blocked by an unavailable native notification API.
       });
 
-    return () => subscription.remove();
-  }, [router]);
+    return () => {
+      subscription.remove();
+      receiptSubscription.remove();
+    };
+  }, [api, router, userId]);
 
   if (feature && !isEnabled(feature)) {
     return (
@@ -702,6 +768,7 @@ function RootLayoutNav() {
       <AuthGate />
       <ServiceConfigurer />
       <PushRegistrar />
+      <MarketingPixelTracker />
     </View>
   );
 }
