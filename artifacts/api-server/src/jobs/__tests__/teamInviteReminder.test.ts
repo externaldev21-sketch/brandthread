@@ -122,6 +122,7 @@ beforeEach(() => {
   state.persistSuccess = true;
   state.noCandidates = false;
   state.infoMessages = [];
+  state.candidate.inviteToken = "current-token";
   state.candidate.expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 });
 
@@ -179,5 +180,26 @@ describe("team invite reminder job", () => {
       fields: { job: "teamInviteReminder", candidates: 0 },
       message: "No invite reminders due",
     });
+  });
+
+  it("reminds once for a re-issued invite link after prior reminder tracking is reset", async () => {
+    await runTeamInviteReminder();
+    expect(state.sendOptions).toHaveLength(1);
+
+    // Regeneration rotates the token and clears both reminder fields. The
+    // replacement link must be eligible for its own reminder exactly once.
+    state.candidate.inviteToken = "renewed-token";
+    state.reminderSentAt = null;
+    state.reminderClaimedAt = null;
+
+    await Promise.all([runTeamInviteReminder(), runTeamInviteReminder()]);
+
+    expect(state.sendOptions).toHaveLength(2);
+    expect(state.sendOptions[1]).toEqual({
+      reminder: true,
+      idempotencyKey: "team-invite-reminder/invite-123/renewed-token",
+    });
+    expect(state.reminderSentAt).toBeInstanceOf(Date);
+    expect(state.reminderClaimedAt).toBeNull();
   });
 });
