@@ -18,7 +18,8 @@ import { formatCents } from '@/lib/money';
 import { reportNetworkError } from '@/lib/networkNotice';
 import { useRevenueCat } from '@/lib/revenueCat';
 import { getBillingRecoveryTarget, isSubscriptionPaymentRecoveryRequired } from '@/lib/subscriptionRecovery';
-import { clearBadge, getBadgeCount, initFromStorage, subscribe } from '@/lib/orderBadgeStore';
+import { initFromStorage, subscribe } from '@/lib/orderBadgeStore';
+import { getSellerOrderBadgeCount, openSellerOrders } from '@/lib/sellerOrderBadge';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -298,7 +299,7 @@ export default function SellerHomeScreen() {
     readyToShip: number;
   } | null>(null);
   const [unseenOrderCount, setUnseenOrderCount] = useState(() =>
-    userId ? getBadgeCount(userId) : 0,
+    getSellerOrderBadgeCount(userId),
   );
   const [invStats, setInvStats] = useState<{
     lowStockCount: number;
@@ -330,7 +331,7 @@ export default function SellerHomeScreen() {
 
     let active = true;
     const syncCount = () => {
-      if (active) setUnseenOrderCount(getBadgeCount(userId));
+      if (active) setUnseenOrderCount(getSellerOrderBadgeCount(userId));
     };
 
     syncCount();
@@ -508,8 +509,7 @@ export default function SellerHomeScreen() {
   }
 
   function handleOpenOrders() {
-    if (userId) clearBadge(userId);
-    nav('/(tabs)/orders');
+    openSellerOrders(userId, nav);
   }
 
   async function handleOpenBillingPortal() {

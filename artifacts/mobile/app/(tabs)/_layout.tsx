@@ -23,12 +23,12 @@ import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import {
-  getBadgeCount,
   getLastViewedAt,
   setBadgeCount,
   subscribe,
   initFromStorage,
 } from '@/lib/orderBadgeStore';
+import { getSellerOrderBadgeCount } from '@/lib/sellerOrderBadge';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
 import SellerCreateFAB from '@/components/SellerCreateFAB';
 
@@ -60,7 +60,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
   // clears immediately when orders.tsx calls clearBadge(userId), without
   // waiting for the next poll cycle.
   const [newOrderCount, setNewOrderCount] = useState(() =>
-    userId ? getBadgeCount(userId) : 0,
+    getSellerOrderBadgeCount(userId),
   );
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const consecutiveFailuresRef = useRef(0);
@@ -77,7 +77,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
     consecutiveFailuresRef.current = 0;
 
     // Subscribe to store changes → re-render on any badge update.
-    const unsub = subscribe(() => setNewOrderCount(getBadgeCount(userId)));
+    const unsub = subscribe(() => setNewOrderCount(getSellerOrderBadgeCount(userId)));
 
     let cancelled = false;
 
