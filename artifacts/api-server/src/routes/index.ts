@@ -77,6 +77,7 @@ import loyaltyRouter   from "./loyalty";
 import callRouter      from "./call";
 import featureFlagsRouter from "./feature-flags";
 import ipCasesRouter from "./ip-cases";
+import shopifyImportRouter from "./shopify-import";
 
 const router = Router();
 
@@ -155,6 +156,7 @@ router.use("/taxes",                     tc, taxesRouter);
 router.use("/team",                      tc, teamRouter);
 router.use("/store/ai",                  tc, storeAiRouter);
 router.use("/store",                     tc, storeRouter);
+router.use("/shopify-imports",           tc, shopifyImportRouter);
 
 // ─── Freelancer marketplace (Community tab) ───────────────────────────────────
 // Connect sub-path BEFORE the generic /freelancers router so /connect/* isn't

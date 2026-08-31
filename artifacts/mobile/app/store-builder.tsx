@@ -1,8 +1,9 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  RefreshControl, ActivityIndicator, Alert } from 'react-native';
+  RefreshControl, ActivityIndicator, Alert, Modal, TextInput,
+  KeyboardAvoidingView, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -16,7 +17,11 @@ import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   IconButton, FilterChip, StatusBadge, SectionHeader,
   EmptyState, StatCard } from '@/components/BrandthreadUI';
-import { getStorefront, applyTheme, generateAISuggestions } from '@/services/storeService';
+import {
+  getStorefront, applyTheme, generateAISuggestions,
+  startShopifyImport, getLatestShopifyImport, getShopifyImport, continueShopifyImport,
+  syncShopifyImportedStorefront, ShopifyImportJob,
+} from '@/services/storeService';
 import {
   Storefront, StorePublishStatus, THREAD_THEME_ID, THREAD_THEME_NAME,
   THREAD_THEME_LIGHT_PALETTE,
@@ -66,12 +71,27 @@ export default function StoreBuilderScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [startingTheme, setStartingTheme] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [shopifyUrl, setShopifyUrl] = useState('');
+  const [importJob, setImportJob] = useState<ShopifyImportJob | null>(null);
+  const [importError, setImportError] = useState('');
+  const [submittingImport, setSubmittingImport] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
       const localStore = await getStorefront();
       setStore(localStore);
       setLoading(false);
+      getLatestShopifyImport().then(async (latest) => {
+        if (!latest) return;
+        if (latest.status === 'complete' || latest.status === 'needs_continuation') {
+          setStore(await syncShopifyImportedStorefront());
+        }
+        if (latest.status !== 'complete') {
+          setImportJob(latest);
+          setTransferOpen(true);
+        }
+      }).catch(() => {});
 
       // Suggestions are secondary content. Do not keep the entire builder on a
       // spinner while they refresh or when the authenticated API is unavailable.
@@ -90,6 +110,65 @@ export default function StoreBuilderScreen() {
     setLoading(true);
     loadData();
   }, [loadData]));
+
+  useEffect(() => {
+    if (!importJob || !['queued', 'running'].includes(importJob.status)) return;
+    let active = true;
+    const poll = async () => {
+      try {
+        const next = await getShopifyImport(importJob.id);
+        if (!active) return;
+        setImportJob(next);
+        if (next.status === 'complete' || next.status === 'needs_continuation') {
+          await syncShopifyImportedStorefront();
+          if (active) loadData();
+        }
+      } catch {
+        if (active) setImportError('We lost the progress connection. Your import is still saved; close and reopen this screen to retry.');
+      }
+    };
+    const timer = setInterval(poll, 1200);
+    void poll();
+    return () => { active = false; clearInterval(timer); };
+  }, [importJob?.id, importJob?.status, loadData]);
+
+  const submitShopifyImport = async () => {
+    if (submittingImport) return;
+    setSubmittingImport(true);
+    setImportError('');
+    try {
+      const job = await startShopifyImport(shopifyUrl);
+      setImportJob(job);
+    } catch (error) {
+      setImportError(error instanceof Error
+        ? error.message.replace(/^API \d{3}:\s*/, '')
+        : 'We could not start the Shopify transfer.');
+    } finally {
+      setSubmittingImport(false);
+    }
+  };
+
+  const continueImport = async () => {
+    if (!importJob || submittingImport) return;
+    setSubmittingImport(true);
+    setImportError('');
+    try {
+      setImportJob(await continueShopifyImport(importJob.id));
+    } catch (error) {
+      setImportError(error instanceof Error ? error.message.replace(/^API \d{3}:\s*/, '') : 'We could not continue the transfer.');
+    } finally {
+      setSubmittingImport(false);
+    }
+  };
+
+  const importStageLabel: Record<ShopifyImportJob['stage'], string> = {
+    validating: 'Validating the store',
+    fetching_products: 'Fetching products',
+    counting_products: 'Counting products',
+    analyzing_brand: 'Analyzing the brand',
+    creating_listings: 'Creating listings',
+    building_storefront: 'Building the Thread Theme storefront',
+  };
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -277,6 +356,18 @@ export default function StoreBuilderScreen() {
                 </TouchableOpacity>
               </View>
             </BrandthreadCard>
+
+            <BrandthreadCard style={s.shopifyCard} onPress={() => setTransferOpen(true)}>
+              <View style={s.shopifyLogo}>
+                <Text style={s.shopifyLogoText}>S</Text>
+              </View>
+              <View style={s.shopifyCopy}>
+                <Text style={s.shopifyEyebrow}>SHOPIFY TRANSFER</Text>
+                <Text style={s.shopifyTitle}>Transfer Shopify Store to Brandthread</Text>
+                <Text style={s.shopifyDesc}>Copy your public products and collections, then build them into Thread Theme.</Text>
+              </View>
+              <Feather name="arrow-right" size={ICON.md} color={FG} />
+            </BrandthreadCard>
           </View>
 
           {/* STORE MANAGEMENT */}
@@ -369,6 +460,78 @@ export default function StoreBuilderScreen() {
           </View>
         </View>
       </ScrollView>
+
+      <Modal visible={transferOpen} transparent animationType="slide" onRequestClose={() => setTransferOpen(false)}>
+        <KeyboardAvoidingView style={s.modalBackdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={[s.transferSheet, { paddingBottom: insets.bottom + SP.lg }]}>
+            <View style={s.transferHeader}>
+              <View style={s.shopifyLogo}><Text style={s.shopifyLogoText}>S</Text></View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.transferTitle}>Transfer Shopify Store</Text>
+                <Text style={s.transferSubtitle}>Public catalog only. No Shopify login or credentials required.</Text>
+              </View>
+              <IconButton name="x" onPress={() => setTransferOpen(false)} />
+            </View>
+
+            {!importJob ? (
+              <>
+                <Text style={s.inputLabel}>Shopify store URL</Text>
+                <TextInput
+                  value={shopifyUrl}
+                  onChangeText={setShopifyUrl}
+                  placeholder="https://your-store.com"
+                  placeholderTextColor={SUBTLE}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  textContentType="URL"
+                  accessibilityLabel="Shopify store URL"
+                  style={s.urlInput}
+                />
+                <Text style={s.transferNote}>The first transfer imports up to 250 public products. If more remain, you can continue with the next batch.</Text>
+                {!!importError && <Text style={s.importError}>{importError}</Text>}
+                <PrimaryButton label={submittingImport ? 'Starting transfer…' : 'Start transfer'} onPress={submitShopifyImport} disabled={submittingImport || !shopifyUrl.trim()} />
+              </>
+            ) : (
+              <View style={s.progressPanel}>
+                {['queued', 'running'].includes(importJob.status) && (
+                  <>
+                    <ActivityIndicator color="#95BF47" size="large" />
+                    <Text style={s.progressTitle}>{importStageLabel[importJob.stage]}</Text>
+                    <Text style={s.progressDesc}>Keep this screen open to watch progress. The job is saved if you leave.</Text>
+                  </>
+                )}
+                {importJob.status === 'failed' && (
+                  <>
+                    <View style={[s.resultIcon, { backgroundColor: RED_DIM }]}><Feather name="alert-circle" size={ICON.lg} color={RED} /></View>
+                    <Text style={s.progressTitle}>Transfer stopped</Text>
+                    <Text style={s.importError}>{importJob.errorMessage || 'We could not import this store.'}</Text>
+                    <SecondaryButton label="Try another URL" onPress={() => { setImportJob(null); setImportError(''); }} />
+                  </>
+                )}
+                {(importJob.status === 'complete' || importJob.status === 'needs_continuation') && (
+                  <>
+                    <View style={[s.resultIcon, { backgroundColor: SUCCESS_DIM }]}><Feather name="check" size={ICON.lg} color={SUCCESS} /></View>
+                    <Text style={s.progressTitle}>{importJob.importedCount} products transferred</Text>
+                    <Text style={s.progressDesc}>
+                      {importJob.failedCount > 0 ? `${importJob.failedCount} products could not be converted. ` : ''}
+                      Your catalog and Thread Theme storefront are ready.
+                    </Text>
+                    {importJob.status === 'needs_continuation' && (
+                      <PrimaryButton label={submittingImport ? 'Continuing…' : 'Import next 250 products'} onPress={continueImport} disabled={submittingImport} />
+                    )}
+                    <View style={s.resultActions}>
+                      <SecondaryButton label="View catalog" onPress={() => { setTransferOpen(false); router.push('/(tabs)/products' as never); }} style={{ flex: 1 }} />
+                      <PrimaryButton label="Open Store Editor" onPress={() => { setTransferOpen(false); router.push('/store-editor' as never); }} style={{ flex: 1 }} />
+                    </View>
+                  </>
+                )}
+                {!!importError && <Text style={s.importError}>{importError}</Text>}
+              </View>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -575,6 +738,57 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     fontFamily: FONT.bold,
     letterSpacing: 0.2,
   },
+  shopifyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SP.md,
+    borderColor: '#95BF47',
+  },
+  shopifyLogo: {
+    width: 42,
+    height: 42,
+    borderRadius: RADIUS.sm,
+    backgroundColor: '#95BF47',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  shopifyLogoText: { color: '#142000', fontSize: 21, fontFamily: FONT.bold },
+  shopifyCopy: { flex: 1, gap: 3 },
+  shopifyEyebrow: { color: '#95BF47', fontSize: 9, letterSpacing: 1.2, fontFamily: FONT.bold },
+  shopifyTitle: { color: FG, fontSize: FS.base, lineHeight: 21, fontFamily: FONT.bold },
+  shopifyDesc: { color: MUTED, fontSize: FS.xs, lineHeight: 17, fontFamily: FONT.regular },
+  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+  transferSheet: {
+    backgroundColor: SURFACE,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    borderWidth: 1,
+    borderColor: BORDER,
+    padding: SP.lg,
+    gap: SP.md,
+  },
+  transferHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
+  transferTitle: { color: FG, fontSize: FS.md, fontFamily: FONT.bold },
+  transferSubtitle: { color: MUTED, fontSize: FS.xs, lineHeight: 17, fontFamily: FONT.regular, marginTop: 3 },
+  inputLabel: { color: FG, fontSize: FS.sm, fontFamily: FONT.semibold, marginTop: SP.sm },
+  urlInput: {
+    minHeight: 50,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: BORDER_ACTIVE,
+    backgroundColor: CARD,
+    color: FG,
+    paddingHorizontal: SP.md,
+    fontSize: FS.base,
+    fontFamily: FONT.regular,
+  },
+  transferNote: { color: MUTED, fontSize: FS.xs, lineHeight: 18, fontFamily: FONT.regular },
+  importError: { color: RED, fontSize: FS.sm, lineHeight: 20, textAlign: 'center', fontFamily: FONT.medium },
+  progressPanel: { alignItems: 'stretch', gap: SP.md, paddingVertical: SP.md },
+  progressTitle: { color: FG, fontSize: FS.md, textAlign: 'center', fontFamily: FONT.bold },
+  progressDesc: { color: MUTED, fontSize: FS.sm, lineHeight: 20, textAlign: 'center', fontFamily: FONT.regular },
+  resultIcon: { width: 54, height: 54, borderRadius: 27, alignSelf: 'center', alignItems: 'center', justifyContent: 'center' },
+  resultActions: { flexDirection: 'row', gap: SP.sm },
   // Hero card
   heroCard: { marginBottom: SP.sm },
   heroCardBadgeRow: { flexDirection: 'row', marginBottom: SP.sm },

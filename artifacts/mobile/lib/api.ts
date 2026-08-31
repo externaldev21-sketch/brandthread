@@ -383,6 +383,20 @@ export interface LocalUserProfile {
   brandName: string | null;
 }
 
+export interface ShopifyImportJob {
+  id: string;
+  sourceUrl: string;
+  status: 'queued' | 'running' | 'needs_continuation' | 'complete' | 'failed';
+  stage: 'validating' | 'fetching_products' | 'counting_products' | 'analyzing_brand' | 'creating_listings' | 'building_storefront';
+  importedCount: number;
+  failedCount: number;
+  hasMore: boolean;
+  sourceStoreName: string | null;
+  errorCode: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 export interface PostAnalyticsResponse {
   post: {
     id: string;
@@ -1493,6 +1507,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       previewHtml:  () => getText('/api/store/preview'),
       sharePreview: () => post<{ token: string; url: string; expiresAt: string; ttlSeconds: number }>('/api/store/share-preview', {}),
       revokePreview: () => del<{ ok: boolean; revokedAt: string }>('/api/store/share-preview'),
+    },
+    shopifyImports: {
+      start: (url: string) => post<ShopifyImportJob>('/api/shopify-imports', { url }),
+      latest: () => get<ShopifyImportJob | null>('/api/shopify-imports/latest'),
+      get: (id: string) => get<ShopifyImportJob>(`/api/shopify-imports/${encodeURIComponent(id)}`),
+      continue: (id: string) => post<ShopifyImportJob>(`/api/shopify-imports/${encodeURIComponent(id)}/continue`, {}),
     },
     /** Disputes / chargebacks — Stripe dispute data and evidence submission */
     disputes: {

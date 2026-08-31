@@ -459,6 +459,24 @@ export const productVariantsRelations = relations(productVariants, ({ one, many 
   orderItems: many(orderItems),
 }));
 
+export const shopifyImportJobs = pgTable('shopify_import_jobs', {
+  id:              uuid('id').primaryKey().defaultRandom(),
+  ownerId:         text('owner_id').notNull(),
+  sourceUrl:       text('source_url').notNull(),
+  status:          text('status').notNull().default('queued'),
+  stage:           text('stage').notNull().default('validating'),
+  importedCount:   integer('imported_count').notNull().default(0),
+  failedCount:     integer('failed_count').notNull().default(0),
+  nextCursor:      text('next_cursor'),
+  hasMore:         boolean('has_more').notNull().default(false),
+  sourceStoreName: text('source_store_name'),
+  errorCode:       text('error_code'),
+  errorMessage:    text('error_message'),
+  createdAt:       timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt:       timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  ownerCreatedIdx: index('shopify_import_jobs_owner_created_idx').on(table.ownerId, table.createdAt),
+}));
 export const customersRelations = relations(customers, ({ many }) => ({
   orders: many(orders),
 }));
@@ -1041,3 +1059,32 @@ export const sellerTaxConfig = pgTable('seller_tax_config', {
   createdAt:           timestamp('created_at').defaultNow().notNull(),
   updatedAt:           timestamp('updated_at').defaultNow().notNull(),
 });
+
+export const shopifyImportCollections = pgTable('shopify_import_collections', {
+  id:                 uuid('id').primaryKey().defaultRandom(),
+  ownerId:            text('owner_id').notNull(),
+  sourceUrl:          text('source_url').notNull(),
+  importJobId:        uuid('import_job_id').notNull().references(() => shopifyImportJobs.id, { onDelete: 'cascade' }),
+  sourceCollectionId: text('source_collection_id').notNull(),
+  title:              text('title').notNull(),
+  handle:             text('handle'),
+  sourceProductIds:   json('source_product_ids').notNull().default([]),
+  createdAt:          timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  sourceCollectionUnique: uniqueIndex('shopify_import_source_collection_unique')
+    .on(table.ownerId, table.sourceUrl, table.sourceCollectionId),
+}));
+
+export const shopifyImportProductMappings = pgTable('shopify_import_product_mappings', {
+  id:              uuid('id').primaryKey().defaultRandom(),
+  ownerId:         text('owner_id').notNull(),
+  sourceUrl:       text('source_url').notNull(),
+  sourceProductId: text('source_product_id').notNull(),
+  importJobId:     uuid('import_job_id').notNull().references(() => shopifyImportJobs.id, { onDelete: 'cascade' }),
+  productId:       uuid('product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
+  createdAt:       timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => ({
+  sourceProductUnique: uniqueIndex('shopify_import_source_product_unique')
+    .on(table.ownerId, table.sourceUrl, table.sourceProductId),
+  jobIdx: index('shopify_import_product_mappings_job_idx').on(table.importJobId),
+}));

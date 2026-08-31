@@ -3,7 +3,7 @@
 // Mock generation is separated into pure functions — never placed in UI code.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { api } from '@/lib/api';
+import { api, ShopifyImportJob } from '@/lib/api';
 import {
   Storefront, StoreSection, StoreSectionType, StoreSectionSettings,
   StoreCollection, StorePage, StorePolicy, StoreMenu, StoreMenuItem,
@@ -20,6 +20,61 @@ import {
 
 const STORE_KEY = 'bt:store:v1';
 const DRAFT_ANSWERS_KEY = 'bt:store:draft_answers:v1';
+
+export type { ShopifyImportJob };
+export const startShopifyImport = (url: string) => api.shopifyImports.start(url);
+export const getLatestShopifyImport = () => api.shopifyImports.latest();
+export const getShopifyImport = (id: string) => api.shopifyImports.get(id);
+export const continueShopifyImport = (id: string) => api.shopifyImports.continue(id);
+
+export async function syncShopifyImportedStorefront(): Promise<Storefront> {
+  const remote = await api.store.get();
+  const store = await getStorefront();
+  const now = new Date().toISOString();
+  const remoteSections = Array.isArray(remote?.sections) ? remote.sections : [];
+  store.settings.storeName = String(remote?.title ?? store.settings.storeName ?? '');
+  store.publishStatus = 'draft';
+  store.themeSettings = defaultThemeSettings(THREAD_THEME_ID);
+  store.branding = {
+    ...defaultBranding(),
+    logoUri: store.branding.logoUri,
+  };
+  store.sections = remoteSections.map((section: any, index: number) => ({
+    id: String(section.id ?? uid('sec')),
+    type: (section.type ?? 'product_grid') as StoreSectionType,
+    label: String(section.title ?? section.label ?? 'Section'),
+    enabled: section.enabled !== false,
+    order: Number.isInteger(section.order) ? section.order : index,
+    settings: section.settings && typeof section.settings === 'object' ? section.settings : {},
+    createdAt: now,
+    updatedAt: now,
+  }));
+  store.collections = remoteSections
+    .filter((section: any) => section.type === 'product_grid' && String(section.id ?? '').startsWith('shopify-collection-'))
+    .map((section: any) => ({
+      id: String(section.id),
+      type: 'manual' as const,
+      name: String(section.title ?? section.settings?.heading ?? 'Imported collection'),
+      description: String(section.settings?.description ?? ''),
+      productIds: Array.isArray(section.settings?.productIds)
+        ? section.settings.productIds.filter((id: unknown): id is string => typeof id === 'string')
+        : [],
+      productOrder: 'manual' as const,
+      conditions: [],
+      conditionMatch: 'all' as const,
+      handle: typeof section.settings?.sourceHandle === 'string'
+        ? section.settings.sourceHandle
+        : String(section.title ?? 'collection').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
+      status: 'active' as const,
+      createdAt: now,
+      updatedAt: now,
+    }));
+  if (remote?.seo && typeof remote.seo === 'object') {
+    store.seo.homepageTitle = String(remote.seo.metaTitle ?? '');
+    store.seo.homepageDescription = String(remote.seo.metaDescription ?? '');
+  }
+  return saveStorefront(store);
+}
 
 export type StoreApplyFailure = {
   kind: 'network' | 'server' | 'unknown';
