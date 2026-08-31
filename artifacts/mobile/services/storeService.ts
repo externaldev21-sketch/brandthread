@@ -47,7 +47,15 @@ export function getStoreApplyFailure(error: unknown): StoreApplyFailure {
   }
 
   const message = error instanceof Error ? error.message : String(error ?? '');
-  if (/^API\s+\d{3}:/i.test(message)) {
+  const status =
+    typeof error === 'object' &&
+    error !== null &&
+    'status' in error &&
+    typeof error.status === 'number'
+      ? error.status
+      : Number(message.match(/^API\s+(\d{3}):/i)?.[1]);
+
+  if (Number.isInteger(status) && status >= 100 && status <= 599) {
     return {
       kind: 'server',
       message: 'Our store service could not save this design. Please try again in a moment.',
