@@ -347,6 +347,7 @@ export default function AIPhotographyChatScreen() {
         {outfitSwapEnabled && <TouchableOpacity
           activeOpacity={0.82}
           onPress={() => setMode('free')}
+          testID="ai-photography-mode-free"
           style={[styles.modeChip, mode === 'free' && { backgroundColor: colors.primary }]}
         >
           <Feather name="edit-3" size={14} color={mode === 'free' ? colors.primaryForeground : colors.mutedForeground} />
@@ -357,6 +358,7 @@ export default function AIPhotographyChatScreen() {
         <TouchableOpacity
           activeOpacity={0.82}
           onPress={() => setMode('outfitSwap')}
+          testID="ai-photography-mode-outfit-swap"
           style={[styles.modeChip, mode === 'outfitSwap' && { backgroundColor: colors.primary }]}
         >
           <Feather name="refresh-cw" size={14} color={mode === 'outfitSwap' ? colors.primaryForeground : colors.mutedForeground} />
@@ -491,6 +493,8 @@ export default function AIPhotographyChatScreen() {
                 style={[styles.trayRemove, { backgroundColor: colors.destructive }]}
                 onPress={() => removePhoto(p.id)}
                 activeOpacity={0.8}
+                testID={`ai-photography-remove-${p.id}`}
+                accessibilityLabel="Remove photo"
               >
                 <Feather name="x" size={11} color="#FFF" />
               </TouchableOpacity>
@@ -507,6 +511,7 @@ export default function AIPhotographyChatScreen() {
             activeOpacity={0.8}
             disabled={(mode === 'free' ? photos.length >= MAX_PHOTOS : (heroPhoto ? garments.length >= MAX_GARMENTS : false)) || loading}
             style={styles.attachBtn}
+            testID="ai-photography-attach"
           >
             <Feather
               name="camera"
@@ -518,6 +523,7 @@ export default function AIPhotographyChatScreen() {
           </TouchableOpacity>
           <TextInput
             style={[styles.input, { color: colors.foreground }]}
+            testID="ai-photography-input"
             placeholder={mode === 'outfitSwap' ? 'Add outfit notes (optional)...' : 'Describe the shot you want...'}
             placeholderTextColor={colors.mutedForeground}
             value={input}
@@ -535,6 +541,7 @@ export default function AIPhotographyChatScreen() {
             style={[styles.sendBtn, {
               backgroundColor: (mode === 'free' ? photos.length > 0 : !!heroPhoto) && !loading ? colors.primary : colors.secondary,
             }]}
+            testID="ai-photography-send"
           >
             <Feather
               name="send"
