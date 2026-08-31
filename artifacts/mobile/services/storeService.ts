@@ -77,9 +77,12 @@ export async function syncShopifyImportedStorefront(): Promise<Storefront> {
 }
 
 export type StoreApplyFailure = {
-  kind: 'network' | 'server' | 'unknown';
+  kind: 'network' | 'server' | 'payload-too-large' | 'unknown';
   message: string;
 };
+
+export const STORE_VISUAL_IMPORT_SIZE_MESSAGE =
+  'This visual import is too large. Resize the image to 1024 px or smaller, or replace it with a smaller image, then try again.';
 
 export class StoreApplyError extends Error {
   readonly kind: StoreApplyFailure['kind'];
@@ -109,6 +112,20 @@ export function getStoreApplyFailure(error: unknown): StoreApplyFailure {
     typeof error.status === 'number'
       ? error.status
       : Number(message.match(/^API\s+(\d{3}):/i)?.[1]);
+
+  const code =
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string'
+      ? error.code
+      : undefined;
+  if (status === 413 || code === 'PAYLOAD_TOO_LARGE' || /^API 413\b/i.test(message)) {
+    return {
+      kind: 'payload-too-large',
+      message: STORE_VISUAL_IMPORT_SIZE_MESSAGE,
+    };
+  }
 
   if (Number.isInteger(status) && status >= 100 && status <= 599) {
     return {
@@ -1356,7 +1373,11 @@ export async function generateFromLogo(logoUri: string, base64?: string | null):
           source: 'ai',
         };
       }
-    } catch { /* fall through to mock */ }
+    } catch (error) {
+      // Do not hide a rejected visual import behind the deterministic fallback.
+      if (getStoreApplyFailure(error).kind === 'payload-too-large') throw error;
+      /* fall through to mock */
+    }
   }
   try {
     const aiData = await api.store.fromLogo(logoUri, {});
@@ -1373,7 +1394,10 @@ export async function generateFromLogo(logoUri: string, base64?: string | null):
         source: 'ai',
       };
     }
-  } catch { /* fall through to mock */ }
+  } catch (error) {
+    if (getStoreApplyFailure(error).kind === 'payload-too-large') throw error;
+    /* fall through to mock */
+  }
 
   // Deterministic mock fallback — AI could not read the image
   await new Promise(r => setTimeout(r, 800));
@@ -1419,7 +1443,10 @@ export async function generateFromMoodBoard(imageUris: string[], base64List?: st
           source: 'ai',
         };
       }
-    } catch { /* fall through */ }
+    } catch (error) {
+      if (getStoreApplyFailure(error).kind === 'payload-too-large') throw error;
+      /* fall through */
+    }
   }
   try {
     const aiData = await api.store.fromMoodboard(imageUris, {});
@@ -1436,7 +1463,10 @@ export async function generateFromMoodBoard(imageUris: string[], base64List?: st
         source: 'ai',
       };
     }
-  } catch { /* fall through to mock */ }
+  } catch (error) {
+    if (getStoreApplyFailure(error).kind === 'payload-too-large') throw error;
+    /* fall through to mock */
+  }
 
   // Mock fallback — AI could not read the images
   await new Promise(r => setTimeout(r, 1000));

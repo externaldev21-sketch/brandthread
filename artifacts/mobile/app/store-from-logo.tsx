@@ -109,6 +109,7 @@ export default function StoreFromLogoScreen() {
   const [analyzing, setAnalyzing] = useState(false);
   const [applying, setApplying] = useState(false);
   const [restoringAnalysis, setRestoringAnalysis] = useState(true);
+  const [analysisFailure, setAnalysisFailure] = useState<StoreApplyFailure | null>(null);
   const [applyFailure, setApplyFailure] = useState<StoreApplyFailure | null>(null);
   const [result, setResult] = useState<LogoAnalysisResult | null>(null);
   const inputChangedRef = useRef(false);
@@ -198,6 +199,7 @@ export default function StoreFromLogoScreen() {
       // Resize to ≤1024 px before encoding — keeps payload well under the 10 MB
       // server limit and reduces GPT-5 vision latency (detail:"low" only needs ~512 px).
       setResult(null);
+      setAnalysisFailure(null);
       setApplyFailure(null);
       setPreparingLogo(true);
       try {
@@ -218,6 +220,7 @@ export default function StoreFromLogoScreen() {
   const handleAnalyze = async () => {
     if (!logoUri || restoringAnalysis || preparingLogo) return;
     setAnalyzing(true);
+    setAnalysisFailure(null);
     try {
       const r = await generateFromLogo(logoUri, logoBase64 ?? undefined);
       setResult(r);
@@ -227,8 +230,13 @@ export default function StoreFromLogoScreen() {
           JSON.stringify({ logoUri, result: r } satisfies LogoAnalysisCache),
         ).catch(() => {});
       }
-    } catch {
-      Alert.alert('Analysis failed', 'Could not analyze logo. Please try again.');
+    } catch (error) {
+      const failure = getStoreApplyFailure(error);
+      if (failure.kind === 'payload-too-large') {
+        setAnalysisFailure(failure);
+      } else {
+        Alert.alert('Analysis failed', 'Could not analyze logo. Please try again.');
+      }
     } finally {
       setAnalyzing(false);
     }
@@ -326,6 +334,28 @@ export default function StoreFromLogoScreen() {
           </View>
         )}
 
+        {analysisFailure && (
+          <BrandthreadCard style={[fl.card, fl.importFailureCard]}>
+            <View style={fl.bannerRow}>
+              <Feather name="image" size={ICON.sm} color={PURPLE_LIGHT} />
+              <View style={fl.applyFailureCopy}>
+                <Text style={fl.applyFailureTitle}>Image too large</Text>
+                <Text style={fl.applyFailureText}>{analysisFailure.message}</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={fl.applyRetryBtn}
+              onPress={handleAnalyze}
+              disabled={analyzing || restoringAnalysis || preparingLogo}
+              accessibilityRole="button"
+              accessibilityLabel="Retry analyzing this logo"
+            >
+              <Feather name="refresh-cw" size={ICON.sm} color={PURPLE_LIGHT} />
+              <Text style={fl.applyRetryText}>Retry analysis</Text>
+            </TouchableOpacity>
+          </BrandthreadCard>
+        )}
+
         {result && (
           <>
             {/* Fallback warning */}
@@ -408,6 +438,8 @@ export default function StoreFromLogoScreen() {
                     <Text style={fl.applyFailureTitle}>
                       {applyFailure.kind === 'network'
                         ? 'Connection problem'
+                        : applyFailure.kind === 'payload-too-large'
+                          ? 'Image too large'
                         : applyFailure.kind === 'server'
                           ? 'Store service problem'
                           : 'Couldn’t apply design'}
@@ -499,6 +531,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   actionBtn: { marginHorizontal: SP.md, marginBottom: SP.sm },
   applyFailureCard: { borderColor: PURPLE_DIM, backgroundColor: SURFACE },
+  importFailureCard: { borderColor: PURPLE_DIM, backgroundColor: SURFACE },
   applyFailureCopy: { flex: 1, gap: 3 },
   applyFailureTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   applyFailureText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 18 },

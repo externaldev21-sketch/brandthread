@@ -16,7 +16,7 @@ import {
   FONT, FS, SP, RADIUS, ICON,
 } from '@/lib/theme';
 import { BrandthreadCard, PrimaryButton, SecondaryButton, FilterChip } from '@/components/BrandthreadUI';
-import { generateFromSocial } from '@/services/storeService';
+import { generateFromSocial, getStoreApplyFailure, StoreApplyFailure } from '@/services/storeService';
 import { useApi } from '@/lib/api';
 
 type TabMode = 'upload' | 'posts' | 'url';
@@ -73,6 +73,7 @@ export default function StoreFromSocialScreen() {
   const [selectedPostIds, setSelectedPostIds] = useState<string[]>([]);
   const [sellerPosts, setSellerPosts] = useState<SellerPost[]>(FALLBACK_POSTS);
   const [analyzing, setAnalyzing] = useState(false);
+  const [analysisFailure, setAnalysisFailure] = useState<StoreApplyFailure | null>(null);
 
   // Load real seller posts
   useEffect(() => {
@@ -98,6 +99,7 @@ export default function StoreFromSocialScreen() {
     });
     if (!res.canceled && res.assets.length > 0) {
       const imageUris = res.assets.slice(0, remainingSlots).map(asset => asset.uri);
+      setAnalysisFailure(null);
       try {
         const imageBase64s = await Promise.all(imageUris.map(resizeToBase64));
         if (imageBase64s.some(base64 => !base64)) {
@@ -117,6 +119,7 @@ export default function StoreFromSocialScreen() {
   const removeScreenshot = (idx: number) => {
     setScreenshots(prev => prev.filter((_, i) => i !== idx));
     setScreenshotBase64s(prev => prev.filter((_, i) => i !== idx));
+    setAnalysisFailure(null);
   };
 
   const togglePost = (id: string) => {
@@ -131,6 +134,7 @@ export default function StoreFromSocialScreen() {
       return;
     }
     setAnalyzing(true);
+    setAnalysisFailure(null);
     try {
       const validBase64s = screenshotBase64s.filter(Boolean);
       await generateFromSocial(
@@ -139,9 +143,14 @@ export default function StoreFromSocialScreen() {
         { screenshotCount: screenshots.length },
       );
       router.push('/store-editor' as never);
-    } catch {
-      // Fall back: redirect to moodboard flow with the screenshots
-      Alert.alert('Analysis failed', 'Could not analyze screenshots. Try the mood board flow instead.');
+    } catch (error) {
+      const failure = getStoreApplyFailure(error);
+      if (failure.kind === 'payload-too-large') {
+        setAnalysisFailure(failure);
+      } else {
+        // Keep the existing handling for non-size-related analysis failures.
+        Alert.alert('Analysis failed', 'Could not analyze screenshots. Try the mood board flow instead.');
+      }
     } finally {
       setAnalyzing(false);
     }
@@ -242,6 +251,27 @@ export default function StoreFromSocialScreen() {
             </View>
             {screenshots.length === 0 && (
               <Text style={ss.hintText}>Screenshot your Instagram grid, product pages, or any visual references.</Text>
+            )}
+            {analysisFailure && (
+              <BrandthreadCard style={[ss.card, ss.importFailureCard]}>
+                <View style={ss.bannerRow}>
+                  <Feather name="image" size={ICON.sm} color={PURPLE_LIGHT} />
+                  <View style={ss.failureCopy}>
+                    <Text style={ss.failureTitle}>Images too large</Text>
+                    <Text style={ss.failureText}>{analysisFailure.message}</Text>
+                  </View>
+                </View>
+                <TouchableOpacity
+                  style={ss.retryBtn}
+                  onPress={handleAnalyzeScreenshots}
+                  disabled={analyzing}
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry analyzing these screenshots"
+                >
+                  <Feather name="refresh-cw" size={ICON.sm} color={PURPLE_LIGHT} />
+                  <Text style={ss.retryText}>Retry analysis</Text>
+                </TouchableOpacity>
+              </BrandthreadCard>
             )}
             <PrimaryButton
               label={analyzing ? 'Analyzing...' : `Analyze ${screenshots.length > 0 ? screenshots.length + ' ' : ''}Screenshot${screenshots.length !== 1 ? 's' : ''}`}
@@ -349,8 +379,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   scroll: { paddingBottom: 80, paddingTop: SP.md },
   subtitle: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginHorizontal: SP.md, marginBottom: SP.md, lineHeight: 20 },
   card: { marginHorizontal: SP.md, marginBottom: SP.sm, gap: SP.md },
+  importFailureCard: { borderColor: PURPLE_DIM, backgroundColor: SURFACE },
   bannerRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start' },
   bannerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 18 },
+  failureCopy: { flex: 1, gap: 3 },
+  failureTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
+  failureText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 18 },
   tabRow: { flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md, marginBottom: SP.md, flexWrap: 'wrap' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm, marginHorizontal: SP.md, marginBottom: SP.md },
   gridWrap: { position: 'relative' },
@@ -396,5 +430,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   loadingText: { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   actionBtn: { marginHorizontal: SP.md, marginBottom: SP.sm },
   altBtn: { marginHorizontal: SP.md, marginTop: SP.md },
+  retryBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: SP.xs,
+    alignSelf: 'flex-start', paddingVertical: SP.xs, paddingHorizontal: SP.sm,
+  },
+  retryText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
   });
 };

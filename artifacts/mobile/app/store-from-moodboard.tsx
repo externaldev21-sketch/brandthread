@@ -121,6 +121,7 @@ export default function StoreFromMoodboardScreen() {
   const [analyzing, setAnalyzing] = useState(false);
   const [applying, setApplying] = useState(false);
   const [restoringAnalysis, setRestoringAnalysis] = useState(true);
+  const [analysisFailure, setAnalysisFailure] = useState<StoreApplyFailure | null>(null);
   const [applyFailure, setApplyFailure] = useState<StoreApplyFailure | null>(null);
   const [result, setResult] = useState<MoodboardAnalysisResult | null>(null);
   const inputChangedRef = useRef(false);
@@ -216,6 +217,7 @@ export default function StoreFromMoodboardScreen() {
       // Resize each image to ≤1024 px before base64 encoding — keeps total
       // payload under the 10 MB server limit even for 8-image moodboards.
       setResult(null);
+      setAnalysisFailure(null);
       setApplyFailure(null);
       setPreparingImages(true);
       try {
@@ -239,6 +241,7 @@ export default function StoreFromMoodboardScreen() {
     setImageUris(prev => prev.filter((_, i) => i !== idx));
     setImageBase64s(prev => prev.filter((_, i) => i !== idx));
     setResult(null);
+    setAnalysisFailure(null);
   };
 
   const handleAnalyze = async () => {
@@ -248,6 +251,7 @@ export default function StoreFromMoodboardScreen() {
       return;
     }
     setAnalyzing(true);
+    setAnalysisFailure(null);
     try {
       const r = await generateFromMoodBoard(imageUris, imageBase64s.filter(Boolean));
       setResult(r);
@@ -257,8 +261,13 @@ export default function StoreFromMoodboardScreen() {
           JSON.stringify({ imageUris, result: r } satisfies MoodboardAnalysisCache),
         ).catch(() => {});
       }
-    } catch {
-      Alert.alert('Analysis failed', 'Could not analyze mood board. Please try again.');
+    } catch (error) {
+      const failure = getStoreApplyFailure(error);
+      if (failure.kind === 'payload-too-large') {
+        setAnalysisFailure(failure);
+      } else {
+        Alert.alert('Analysis failed', 'Could not analyze mood board. Please try again.');
+      }
     } finally {
       setAnalyzing(false);
     }
@@ -364,6 +373,28 @@ export default function StoreFromMoodboardScreen() {
           </View>
         )}
 
+        {analysisFailure && (
+          <BrandthreadCard style={[mb.card, mb.importFailureCard]}>
+            <View style={mb.bannerRow}>
+              <Feather name="image" size={ICON.sm} color={PURPLE_LIGHT} />
+              <View style={mb.applyFailureCopy}>
+                <Text style={mb.applyFailureTitle}>Images too large</Text>
+                <Text style={mb.applyFailureText}>{analysisFailure.message}</Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={mb.applyRetryBtn}
+              onPress={handleAnalyze}
+              disabled={analyzing || restoringAnalysis || preparingImages}
+              accessibilityRole="button"
+              accessibilityLabel="Retry analyzing this mood board"
+            >
+              <Feather name="refresh-cw" size={ICON.sm} color={PURPLE_LIGHT} />
+              <Text style={mb.applyRetryText}>Retry analysis</Text>
+            </TouchableOpacity>
+          </BrandthreadCard>
+        )}
+
         {result && (
           <>
             {/* Fallback warning */}
@@ -440,6 +471,8 @@ export default function StoreFromMoodboardScreen() {
                     <Text style={mb.applyFailureTitle}>
                       {applyFailure.kind === 'network'
                         ? 'Connection problem'
+                        : applyFailure.kind === 'payload-too-large'
+                          ? 'Images too large'
                         : applyFailure.kind === 'server'
                           ? 'Store service problem'
                           : 'Couldn’t apply design'}
@@ -532,6 +565,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: SP.sm },
   actionBtn: { marginHorizontal: SP.md, marginBottom: SP.sm },
   applyFailureCard: { borderColor: PURPLE_DIM, backgroundColor: SURFACE },
+  importFailureCard: { borderColor: PURPLE_DIM, backgroundColor: SURFACE },
   applyFailureCopy: { flex: 1, gap: 3 },
   applyFailureTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG },
   applyFailureText: { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, lineHeight: 18 },

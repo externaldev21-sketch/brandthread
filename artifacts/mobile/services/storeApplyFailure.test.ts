@@ -1,20 +1,54 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@/lib/networkNotice';
+
+const { fromLogoMock, fromMoodboardMock } = vi.hoisted(() => ({
+  fromLogoMock: vi.fn(),
+  fromMoodboardMock: vi.fn(),
+}));
 
 vi.mock('@react-native-async-storage/async-storage', () => ({
   default: {},
 }));
 
 vi.mock('@/lib/api', () => ({
-  api: {},
+  api: {
+    store: {
+      fromLogo: fromLogoMock,
+      fromMoodboard: fromMoodboardMock,
+    },
+  },
 }));
 
 import {
+  generateFromLogo,
+  generateFromMoodBoard,
   StoreApplyError,
+  STORE_VISUAL_IMPORT_SIZE_MESSAGE,
   getStoreApplyFailure,
 } from './storeService';
 
 describe('store apply failure guidance', () => {
+  beforeEach(() => {
+    fromLogoMock.mockReset();
+    fromMoodboardMock.mockReset();
+  });
+
+  it.each([
+    new ApiError(413, JSON.stringify({
+      error: { code: 'PAYLOAD_TOO_LARGE', message: 'The request is too large.' },
+      requestId: 'req-test',
+    })),
+    new ApiError(400, JSON.stringify({
+      error: { code: 'PAYLOAD_TOO_LARGE', message: 'The request is too large.' },
+      requestId: 'req-test',
+    })),
+  ])('gives actionable resize guidance for oversized visual imports', (error) => {
+    expect(getStoreApplyFailure(error)).toEqual({
+      kind: 'payload-too-large',
+      message: STORE_VISUAL_IMPORT_SIZE_MESSAGE,
+    });
+  });
+
   it.each([
     new TypeError('Failed to fetch'),
     new Error('Network request failed'),
@@ -44,5 +78,27 @@ describe('store apply failure guidance', () => {
     };
 
     expect(getStoreApplyFailure(new StoreApplyError(failure))).toEqual(failure);
+  });
+
+  it('does not hide an oversized logo response behind the analysis fallback', async () => {
+    const error = new ApiError(413, JSON.stringify({
+      error: { code: 'PAYLOAD_TOO_LARGE', message: 'The request is too large.' },
+    }));
+    fromLogoMock.mockRejectedValueOnce(error);
+
+    await expect(generateFromLogo('file:///logo.png', 'oversized-base64')).rejects.toBe(error);
+    expect(fromLogoMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not hide an oversized mood board response behind the analysis fallback', async () => {
+    const error = new ApiError(413, JSON.stringify({
+      error: { code: 'PAYLOAD_TOO_LARGE', message: 'The request is too large.' },
+    }));
+    fromMoodboardMock.mockRejectedValueOnce(error);
+
+    await expect(
+      generateFromMoodBoard(['file:///mood.png'], ['oversized-base64']),
+    ).rejects.toBe(error);
+    expect(fromMoodboardMock).toHaveBeenCalledTimes(1);
   });
 });

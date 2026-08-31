@@ -54,11 +54,11 @@ buyerRouter.get("/", async (req, res) => {
 buyerRouter.patch("/read-all", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   await db.update(notificationsFeed).set({ isRead: true })
-    .where(and(eq(notificationsFeed.id, req.params.id), eq(notificationsFeed.userId, userId)));
+    .where(eq(notificationsFeed.userId, userId));
   return res.json({ ok: true });
 });
 
-buyerRouter.delete("/:id", async (req, res) => {
+buyerRouter.patch("/:id/read", async (req, res) => {
   const userId = (req as any).clerkUserId as string;
   await db.update(notificationsFeed).set({ isRead: true })
     .where(and(eq(notificationsFeed.id, req.params.id), eq(notificationsFeed.userId, userId)));

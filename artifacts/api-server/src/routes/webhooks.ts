@@ -113,7 +113,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
     return;
   }
 
-  let event: Stripe.Event;
+  let event: any;
   try {
     event = stripe.webhooks.constructEvent(req.body, sig, STRIPE_WEBHOOK_SECRET);
   } catch (err: any) {
