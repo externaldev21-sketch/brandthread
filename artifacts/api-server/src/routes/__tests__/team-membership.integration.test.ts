@@ -18,6 +18,10 @@ const testState = vi.hoisted(() => ({
   userId: "",
 }));
 
+vi.mock("@clerk/express", () => ({
+  getAuth: () => ({ userId: testState.userId }),
+}));
+
 vi.mock("../../middlewares/requireAuth", () => ({
   requireAuth: (req: any, _res: any, next: any) => {
     req.clerkUserId = testState.userId;
@@ -26,6 +30,7 @@ vi.mock("../../middlewares/requireAuth", () => ({
 }));
 
 import teamRouter from "../team";
+import { teamContext } from "../../middlewares/requireRole";
 
 const suffix = crypto.randomBytes(4).toString("hex");
 const olderOwnerId = `team-membership-older-owner-${suffix}`;
@@ -49,6 +54,15 @@ let baseUrl = "";
 async function getMembership(userId: string) {
   testState.userId = userId;
   const response = await fetch(`${baseUrl}/api/team/my-membership`);
+  return {
+    status: response.status,
+    body: await response.json(),
+  };
+}
+
+async function getContext(userId: string) {
+  testState.userId = userId;
+  const response = await fetch(`${baseUrl}/api/team-context`);
   return {
     status: response.status,
     body: await response.json(),
@@ -147,6 +161,12 @@ beforeAll(async () => {
     next();
   });
   app.use("/api/team", teamRouter);
+  app.get("/api/team-context", teamContext(), (req, res) => {
+    res.json({
+      actingStoreOwner: (req as any).clerkUserId,
+      actorRole: (req as any).actorRole,
+    });
+  });
 
   await new Promise<void>((resolve) => {
     server = app.listen(0, "127.0.0.1", () => resolve());
@@ -199,6 +219,16 @@ describe("authenticated team membership discovery", () => {
         },
       });
     }
+  });
+
+  it("resolves the same owner and role when active memberships share an acceptance timestamp", async () => {
+    const result = await getContext(equalMemberId);
+
+    expect(result.status).toBe(200);
+    expect(result.body).toEqual({
+      actingStoreOwner: equalOwnerAId,
+      actorRole: "manager",
+    });
   });
 
   it("returns a null membership for an authenticated user without an active membership", async () => {
