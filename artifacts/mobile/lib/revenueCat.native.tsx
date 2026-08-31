@@ -60,7 +60,7 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
     if (!sessionGuard.isCurrent(generation)) return;
     setCustomerInfo(info);
     setPackages(offerings.current?.availablePackages.filter((pkg) =>
-      pkg.identifier === '$bt_starter' || pkg.identifier === '$bt_growth' || pkg.identifier === '$bt_scale',
+      pkg.identifier === '$bt_starter' || pkg.identifier === '$bt_growth' || pkg.identifier === '$bt_pro',
     ) ?? []);
   }, [available, isSignedIn, sessionGuard]);
 
@@ -97,7 +97,7 @@ export function RevenueCatProvider({ children }: { children: React.ReactNode }) 
         if (!sessionGuard.isCurrent(generation)) return;
         setCustomerInfo(info);
         setPackages(offerings.current?.availablePackages.filter((pkg) =>
-          pkg.identifier === '$bt_starter' || pkg.identifier === '$bt_growth' || pkg.identifier === '$bt_scale',
+          pkg.identifier === '$bt_starter' || pkg.identifier === '$bt_growth' || pkg.identifier === '$bt_pro',
         ) ?? []);
         if (clerkId) void sync(generation).catch(() => {});
       } catch { /* Billing remains unavailable until RevenueCat is reachable. */ }

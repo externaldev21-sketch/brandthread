@@ -13,7 +13,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useApi } from '@/lib/api';
 
-export type PlanId = 'starter' | 'growth' | 'scale' | 'pro';
+export type PlanId = 'starter' | 'growth' | 'pro';
 
 /**
  * Development-only visual companion to the server-controlled test override.
@@ -84,7 +84,7 @@ export function useSubscriptionPlan() {
           .then((data: any) => {
             const p: PlanId =
               data.plan === 'growth' ? 'growth'
-              : data.plan === 'scale' ? 'scale'
+              : data.plan === 'scale' ? 'pro'
               : data.plan === 'pro'  ? 'pro'
               : 'starter';
             _cache = p;
@@ -127,7 +127,7 @@ export function useSubscriptionPlan() {
   function hasPlan(minPlan: PlanId): boolean {
     if (ALLOW_TEST_SUBSCRIPTION_BYPASS) return true;
 
-    const order: Record<PlanId, number> = { starter: 0, growth: 1, scale: 2, pro: 2 };
+    const order: Record<PlanId, number> = { starter: 0, growth: 1, pro: 2 };
     return (order[plan ?? 'starter'] ?? 0) >= (order[minPlan] ?? 1);
   }
 

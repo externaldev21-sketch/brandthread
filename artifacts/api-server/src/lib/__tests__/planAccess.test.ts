@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
-  planId: "starter" as "starter" | "growth" | "scale",
+  planId: "starter" as "starter" | "growth" | "pro",
   provider: "stripe" as "stripe" | "revenuecat" | "none",
   unavailable: false,
 }));
@@ -37,11 +37,11 @@ describe("plan access catalogue", () => {
     });
   });
 
-  it("uses a resolved native Scale entitlement for the highest tier limits", async () => {
-    state.planId = "scale";
+  it("uses a resolved native Pro entitlement for the highest tier limits", async () => {
+    state.planId = "pro";
     state.provider = "revenuecat";
     await expect(getVerifiedPlanAccess("owner")).resolves.toEqual({
-      planId: "scale",
+      planId: "pro",
       limits: { products: null, teamSeats: null },
     });
   });

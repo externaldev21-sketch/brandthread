@@ -142,7 +142,7 @@ describe("useSubscriptionPlan invalidation", () => {
     expect(second.hasPlan("pro")).toBe(true);
   });
 
-  it("preserves Scale access after checkout polling observes delayed activation", async () => {
+  it("preserves Pro access after checkout polling observes delayed activation", async () => {
     statusMock.mockResolvedValueOnce({ plan: "starter", status: "none" });
     let latest!: HookResult;
 
@@ -155,13 +155,13 @@ describe("useSubscriptionPlan invalidation", () => {
 
     statusMock
       .mockResolvedValueOnce({ plan: "starter", status: "none" })
-      .mockResolvedValueOnce({ plan: "scale", status: "trialing" })
-      .mockResolvedValueOnce({ plan: "scale", status: "trialing" });
+      .mockResolvedValueOnce({ plan: "pro", status: "trialing" })
+      .mockResolvedValueOnce({ plan: "pro", status: "trialing" });
 
     const refreshed = await pollSubscriptionStatus<{ plan: string; status: string }>({
       loadStatus: statusMock,
       shouldStop: (status) =>
-        status.plan === "scale"
+        status.plan === "pro"
         && (status.status === "trialing" || status.status === "active"),
       wait: async () => {},
     });
@@ -173,9 +173,9 @@ describe("useSubscriptionPlan invalidation", () => {
       await Promise.resolve();
     });
 
-    expect(latest.plan).toBe("scale");
+    expect(latest.plan).toBe("pro");
     expect(latest.hasPlan("growth")).toBe(true);
-    expect(latest.hasPlan("scale")).toBe(true);
+    expect(latest.hasPlan("pro")).toBe(true);
     expect(statusMock).toHaveBeenCalledTimes(4);
   });
 });

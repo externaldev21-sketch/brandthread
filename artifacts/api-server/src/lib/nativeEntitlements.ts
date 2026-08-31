@@ -3,17 +3,20 @@ import { db, sellerSubscriptionEntitlements, users } from "@workspace/db";
 import { and, desc, eq, sql } from "drizzle-orm";
 
 export type NativeEntitlementStatus = "active" | "trial" | "grace" | "expired";
-export type SellerPlanId = "starter" | "growth" | "scale";
+export type SellerPlanId = "starter" | "growth" | "pro";
 
 const PRODUCT_TO_PLAN: Record<string, SellerPlanId> = {
   brandthread_starter_monthly: "starter",
   "brandthread_starter_monthly:monthly": "starter",
   brandthread_growth_monthly: "growth",
   "brandthread_growth_monthly:monthly": "growth",
-  brandthread_scale_monthly: "scale",
-  "brandthread_scale_monthly:monthly": "scale",
+  brandthread_pro_monthly: "pro",
+  "brandthread_pro_monthly:monthly": "pro",
+  // Compatibility aliases for purchases made before the top tier was renamed.
+  brandthread_scale_monthly: "pro",
+  "brandthread_scale_monthly:monthly": "pro",
 };
-const PLAN_RANK: Record<SellerPlanId, number> = { starter: 0, growth: 1, scale: 2 };
+const PLAN_RANK: Record<SellerPlanId, number> = { starter: 0, growth: 1, pro: 2 };
 const connectors = new ReplitConnectors();
 
 type ProviderSubscription = Record<string, unknown>;
@@ -165,7 +168,9 @@ type LegacySubscription = {
 type NativeSubscription = typeof sellerSubscriptionEntitlements.$inferSelect | null | undefined;
 
 function sellerPlanId(value: unknown): SellerPlanId | null {
-  if (value === "starter" || value === "growth" || value === "scale") return value;
+  if (value === "starter" || value === "growth" || value === "pro") return value;
+  // Persisted values from the former top-tier name retain their access.
+  if (value === "scale") return "pro";
   return null;
 }
 
@@ -191,7 +196,7 @@ export function resolveEffectiveEntitlement(
     && !!native.expiresAt
     && native.expiresAt.valueOf() > now.valueOf();
 
-  const legacyPlan = legacy?.planId === "pro" ? "scale" : sellerPlanId(legacy?.planId);
+  const legacyPlan = sellerPlanId(legacy?.planId);
   const legacyStatus = typeof legacy?.status === "string" ? legacy.status.toLowerCase() : "";
   const stripeActive = !!legacyPlan && ["active", "trialing", "past_due"].includes(legacyStatus);
 

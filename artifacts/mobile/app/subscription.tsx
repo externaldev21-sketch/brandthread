@@ -4,7 +4,7 @@
  * Tiers (matching the three-tier catalogue):
  *   starter  $29/mo
  *   growth   $79/mo
- *   scale   $199/mo
+ *   pro     $199/mo
  *
  * All plans carry a 5% platform commission on sales.
  * New subscriptions start with a 5-day free trial (card collected upfront).
@@ -79,7 +79,7 @@ export default function SubscriptionScreen() {
 
   // Derive the active plan id from loaded data
   const selectedPlan = currentPlan.name.toLowerCase();
-  const hasGrowthAccess = selectedPlan === 'growth' || selectedPlan === 'scale';
+  const hasGrowthAccess = selectedPlan === 'growth' || selectedPlan === 'pro';
 
   const externalSessionOpenedRef = useRef<
     { kind: 'checkout'; expectedPlan: string } | { kind: 'portal' } | null
@@ -183,7 +183,7 @@ export default function SubscriptionScreen() {
         await fetchStatus();
         return;
       }
-      const { url } = await api.seller.subscription.checkout(planId as 'starter' | 'growth' | 'scale');
+      const { url } = await api.seller.subscription.checkout(planId as 'starter' | 'growth' | 'pro');
       externalSessionOpenedRef.current = { kind: 'checkout', expectedPlan: planId };
       await Linking.openURL(url);
     } catch (e: any) {

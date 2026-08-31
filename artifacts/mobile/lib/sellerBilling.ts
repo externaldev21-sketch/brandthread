@@ -1,7 +1,7 @@
 export const SELLER_PACKAGE_IDS = {
   starter: '$bt_starter',
   growth: '$bt_growth',
-  scale: '$bt_scale',
+  pro: '$bt_pro',
 } as const;
 
 export type SellerPlanId = keyof typeof SELLER_PACKAGE_IDS;

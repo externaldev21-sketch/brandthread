@@ -1127,7 +1127,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         /** Returns the seller's current plan, subscription status, renewal date,
          *  and payment-method label. */
         status: () => get<{
-          plan: string;               // 'starter' | 'growth' | 'scale'
+          plan: string;               // 'starter' | 'growth' | 'pro'
           status: string;             // 'active' | 'trialing' | 'past_due' | 'canceled' | 'none'
           trialEnd: string | null;    // formatted date when in trial, null otherwise
           renewsOn: string | null;    // e.g. "Aug 14, 2026"
@@ -1148,7 +1148,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         }>('/api/seller/subscription/invoices'),
         /** Create a Stripe Checkout Session in subscription mode.
          *  Returns { url } for the mobile client to open in the system browser. */
-        checkout: (planId: 'starter' | 'growth' | 'scale') =>
+        checkout: (planId: 'starter' | 'growth' | 'pro') =>
           post<{ url: string }>('/api/seller/subscription/checkout', { planId }),
         /** Create a Stripe Billing Portal session so the seller can manage their
          *  payment method, view invoices, or cancel. Returns { url }. */

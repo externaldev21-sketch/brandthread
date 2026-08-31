@@ -1,7 +1,7 @@
 import React, { createContext, useContext } from 'react';
 
 export type RevenueCatPackage = {
-  identifier: '$bt_starter' | '$bt_growth' | '$bt_scale';
+  identifier: '$bt_starter' | '$bt_growth' | '$bt_pro';
   product: { priceString: string; introPrice?: { priceString: string; periodNumberOfUnits: number; periodUnit: string } | null };
 };
 

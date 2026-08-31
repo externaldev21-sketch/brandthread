@@ -343,7 +343,7 @@ export default function ManufacturerMessagesScreen() {
     const rejection = getEntitlementRejection(error);
     if (!rejection) return false;
     Alert.alert(
-      `Upgrade to ${rejection.requiredPlan === 'growth' ? 'Growth' : 'Scale'}`,
+      `Upgrade to ${rejection.requiredPlan === 'growth' ? 'Growth' : 'Pro'}`,
       rejection.message,
       [
         { text: 'Not now', style: 'cancel', onPress: () => router.back() },

@@ -197,7 +197,7 @@ export default function TechPackGeneratorScreen() {
       const rejection = getEntitlementRejection(error);
       if (rejection) {
         Alert.alert(
-          `Upgrade to ${rejection.requiredPlan === 'growth' ? 'Growth' : 'Scale'}`,
+          `Upgrade to ${rejection.requiredPlan === 'growth' ? 'Growth' : 'Pro'}`,
           rejection.message,
           [
             { text: 'Not now', style: 'cancel' },

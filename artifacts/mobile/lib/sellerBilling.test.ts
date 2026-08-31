@@ -7,7 +7,7 @@ describe('seller native billing boundaries', () => {
     expect(SELLER_PACKAGE_IDS).toEqual({
       starter: '$bt_starter',
       growth: '$bt_growth',
-      scale: '$bt_scale',
+      pro: '$bt_pro',
     });
     expect(isSellerRevenueCatPackage('$bt_growth')).toBe(true);
     expect(isSellerRevenueCatPackage('$rc_monthly')).toBe(false);

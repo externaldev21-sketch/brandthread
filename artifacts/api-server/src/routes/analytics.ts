@@ -274,7 +274,7 @@ router.get("/notifications", async (req, res) => {
 // GET /api/analytics/customers?limit=10
 // Top customers by total spend + repeat-buyer stats derived from real orders.
 // Returns topCustomers list and aggregate stats (totalCustomers, repeatRate).
-router.get("/customers", requirePlan("scale"), async (req, res) => {
+router.get("/customers", requirePlan("pro"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const limit   = Math.min(parseInt((req.query.limit as string) ?? "10", 10) || 10, 50);
 

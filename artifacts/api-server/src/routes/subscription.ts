@@ -6,7 +6,7 @@
  *   starter  $29/mo  — storefront, AI store builder, 25 products, standard checkout
  *   growth   $79/mo  — everything in starter + unlimited products, AI Design Studio,
  *                       manufacturer hub, live shopping, 3 team seats, boosts
- *   scale   $199/mo  — everything in growth + unlimited team seats, advanced analytics,
+ *   pro     $199/mo  — everything in growth + unlimited team seats, advanced analytics,
  *                       priority manufacturer intros, white-glove support, early access
  *
  * All subscriptions start with a 5-day free trial. Card is collected upfront so the
@@ -269,7 +269,7 @@ router.get("/invoices", requireRole("owner"), async (req, res) => {
 
 /**
  * POST /api/seller/subscription/checkout
- * Body: { planId: 'starter' | 'growth' | 'scale' }
+ * Body: { planId: 'starter' | 'growth' | 'pro' }
  *
  * • If the seller already has an active or trialing subscription, updates it
  *   in-place (Stripe subscription items update + prorations) instead of creating
@@ -286,7 +286,7 @@ router.post("/checkout", requireRole("owner"), async (req, res) => {
     const { planId } = req.body;
 
     if (!isSellerPlanId(planId)) {
-      res.status(400).json({ error: "planId must be 'starter', 'growth', or 'scale'" });
+      res.status(400).json({ error: "planId must be 'starter', 'growth', or 'pro'" });
       return;
     }
 

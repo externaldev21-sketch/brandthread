@@ -28,9 +28,9 @@ interface Props {
   onClose: () => void;
   onUpgrade: () => void;
   featureName: string;
-  requiredPlan?: 'growth' | 'scale';
+  requiredPlan?: 'growth' | 'pro';
 }
-const SCALE_FEATURES = [
+const PRO_FEATURES = [
   'Everything in Growth',
   'Advanced analytics',
   'Priority support',
@@ -63,9 +63,9 @@ export default function PlanUpsellModal({
     onClose();
   }
 
-  // For Growth plan, show the rich tool list; for Scale, fall back to the
+  // For Growth plan, show the rich tool list; for Pro, fall back to the
   // original plain-text list.
-  const isGrowth = requiredPlan !== 'scale';
+  const isGrowth = requiredPlan !== 'pro';
 
   return (
     <Modal
@@ -161,7 +161,7 @@ export default function PlanUpsellModal({
             ) : (
               <>
                 <Text style={s.sectionLabel}>What you'll unlock</Text>
-                {SCALE_FEATURES.map((f) => (
+                {PRO_FEATURES.map((f) => (
                   <View key={f} style={s.perkRow}>
                     <View style={s.checkCircle}>
                       <Feather name="check" size={12} color={SUCCESS} />

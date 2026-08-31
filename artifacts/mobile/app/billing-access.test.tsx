@@ -172,7 +172,7 @@ vi.mock('@/lib/growthTools', () => ({
 }));
 
 vi.mock('@/lib/sellerBilling', () => ({
-  SELLER_PACKAGE_IDS: { starter: '$bt_starter', growth: '$bt_growth', scale: '$bt_scale' },
+  SELLER_PACKAGE_IDS: { starter: '$bt_starter', growth: '$bt_growth', pro: '$bt_pro' },
 }));
 
 vi.mock('@/components/ScreenHeader', () => ({
@@ -310,7 +310,7 @@ describe('seller financial role boundaries', () => {
       'seller-billing-view-breakdown',
       'seller-billing-payment-method',
       'seller-subscription-change-growth',
-      'seller-subscription-change-scale',
+      'seller-subscription-change-pro',
       'seller-subscription-cancel',
       'seller-subscription-manage-billing',
       'seller-payouts-bank-account',
@@ -345,7 +345,7 @@ describe('seller financial role boundaries', () => {
     expect(hasTestId(billing, 'seller-billing-plan-menu')).toBe(true);
     expect(hasTestId(billing, 'seller-billing-payment-method')).toBe(true);
     expect(hasTestId(subscription, 'seller-subscription-change-growth')).toBe(true);
-    expect(hasTestId(subscription, 'seller-subscription-change-scale')).toBe(true);
+    expect(hasTestId(subscription, 'seller-subscription-change-pro')).toBe(true);
     expect(hasTestId(subscription, 'seller-subscription-cancel')).toBe(true);
     expect(screenText(finance)).toContain('Download Statement (CSV)');
 

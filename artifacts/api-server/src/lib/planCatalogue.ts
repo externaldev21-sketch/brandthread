@@ -1,4 +1,4 @@
-export type SellerPlanId = "starter" | "growth" | "scale";
+export type SellerPlanId = "starter" | "growth" | "pro";
 
 export type SellerPlanLimits = {
   products: number | null;
@@ -26,11 +26,14 @@ export const PLAN_CATALOGUE: Record<SellerPlanId, {
     lookupKey: "brandthread_growth_monthly",
     limits: { products: null, teamSeats: 3 },
   },
-  scale: {
+  pro: {
     rank: 2,
     amountCents: 19900,
-    name: "Brandthread Scale Plan",
-    lookupKey: "brandthread_scale_monthly",
+    name: "Brandthread Pro Plan",
+    // Stripe previously used brandthread_pro_monthly for the retired $79 tier.
+    // Keep the new $199 web price distinct; native stores use the requested
+    // brandthread_pro_monthly identifier through RevenueCat.
+    lookupKey: "brandthread_pro_199_monthly",
     limits: { products: null, teamSeats: null },
   },
 };

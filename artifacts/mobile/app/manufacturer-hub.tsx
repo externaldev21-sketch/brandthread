@@ -133,7 +133,7 @@ function showManufacturerUpgrade(error: unknown, router: ReturnType<typeof useRo
   const rejection = getEntitlementRejection(error);
   if (!rejection) return false;
   Alert.alert(
-    `Upgrade to ${rejection.requiredPlan === 'growth' ? 'Growth' : 'Scale'}`,
+    `Upgrade to ${rejection.requiredPlan === 'growth' ? 'Growth' : 'Pro'}`,
     rejection.message,
     [
       { text: 'Not now', style: 'cancel' },

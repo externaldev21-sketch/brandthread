@@ -47,7 +47,7 @@ beforeAll(async () => {
     state.downstreamCalls += 1;
     res.json({ ok: true });
   });
-  app.get("/scale", requirePlan("scale"), (_req, res) => res.json({ ok: true }));
+  app.get("/pro", requirePlan("pro"), (_req, res) => res.json({ ok: true }));
   await new Promise<void>((resolve) => {
     server = app.listen(0, "127.0.0.1", () => resolve());
   });
@@ -102,11 +102,11 @@ describe("requirePlan native entitlements", () => {
     expect(state.downstreamCalls).toBe(0);
   });
 
-  it("grants Scale endpoints from a server-verified native Scale entitlement", async () => {
-    state.planId = "scale";
+  it("grants Pro endpoints from a server-verified native Pro entitlement", async () => {
+    state.planId = "pro";
     state.provider = "revenuecat";
     state.status = "active";
-    expect((await fetch(`${base}/scale`)).status).toBe(200);
+    expect((await fetch(`${base}/pro`)).status).toBe(200);
   });
 
   it("uses the resolved Stripe Growth entitlement when native access is expired", async () => {
@@ -115,15 +115,15 @@ describe("requirePlan native entitlements", () => {
     state.status = "active";
 
     expect((await fetch(`${base}/growth`)).status).toBe(200);
-    expect((await fetch(`${base}/scale`)).status).toBe(403);
+    expect((await fetch(`${base}/pro`)).status).toBe(403);
   });
 
-  it("uses the resolved native Scale entitlement when legacy Stripe is canceled", async () => {
-    state.planId = "scale";
+  it("uses the resolved native Pro entitlement when legacy Stripe is canceled", async () => {
+    state.planId = "pro";
     state.provider = "revenuecat";
     state.status = "active";
 
-    expect((await fetch(`${base}/scale`)).status).toBe(200);
+    expect((await fetch(`${base}/pro`)).status).toBe(200);
   });
 
   it("denies access with 503 when the subscription plan lookup fails", async () => {

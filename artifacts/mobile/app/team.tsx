@@ -125,7 +125,7 @@ export default function TeamScreen() {
       if (rejection) {
         setInviteVisible(false);
         Alert.alert(
-          `Upgrade to ${rejection.requiredPlan === 'growth' ? 'Growth' : 'Scale'}`,
+          `Upgrade to ${rejection.requiredPlan === 'growth' ? 'Growth' : 'Pro'}`,
           rejection.message,
           [
             { text: 'Not now', style: 'cancel' },

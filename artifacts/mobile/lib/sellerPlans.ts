@@ -44,8 +44,8 @@ export const SELLER_PLANS: SellerPlanDefinition[] = [
     notIncluded: ['Team operations', 'Live shopping', 'Promotion management'],
   },
   {
-    id: 'scale',
-    name: 'Scale',
+    id: 'pro',
+    name: 'Pro',
     tagline: 'Operate and promote a growing brand',
     priceCents: 19900,
     priceLabel: '$199',
@@ -63,12 +63,11 @@ export const SELLER_PLANS: SellerPlanDefinition[] = [
 /**
  * Resolve a plan returned by billing services to the public catalogue.
  *
- * Stripe webhooks already translate the retired `pro` lookup key to Growth,
- * but keeping this boundary tolerant protects older mobile/API responses
- * without putting the legacy label back on an upgrade surface.
+ * Normalize the former top-tier ID so cached older API responses still render
+ * the current public plan without restoring the retired label.
  */
 export function getSellerPlan(planId: string | null | undefined): SellerPlanDefinition | undefined {
-  const normalizedId = planId === 'pro' ? 'growth' : planId;
+  const normalizedId = planId === 'scale' ? 'pro' : planId;
   return SELLER_PLANS.find((plan) => plan.id === normalizedId);
 }
 
@@ -107,7 +106,7 @@ export interface SellerPlanRecommendation {
 
 export function recommendSellerPlan(stage: string, goals: string[]): SellerPlanRecommendation {
   const score = (STAGE_SCORES[stage] ?? 0) + goals.reduce((total, goal) => total + (GOAL_WEIGHTS[goal] ?? 0), 0);
-  const planId: SellerPlanId = score >= 6 ? 'scale' : score >= 2 ? 'growth' : 'starter';
+  const planId: SellerPlanId = score >= 6 ? 'pro' : score >= 2 ? 'growth' : 'starter';
   const plan = SELLER_PLANS.find((candidate) => candidate.id === planId)!;
   const strongestGoals = goals
     .filter((goal) => (GOAL_WEIGHTS[goal] ?? 0) > 0)

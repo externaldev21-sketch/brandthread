@@ -23,7 +23,7 @@ const OFFERING_LOOKUP_KEY = "default";
 const PLANS = [
   { id: "starter", name: "Starter", amountMicros: 29_000_000 },
   { id: "growth", name: "Growth", amountMicros: 79_000_000 },
-  { id: "scale", name: "Scale", amountMicros: 199_000_000 },
+  { id: "pro", name: "Pro", amountMicros: 199_000_000 },
 ] as const;
 
 const connectors = new ReplitConnectors();

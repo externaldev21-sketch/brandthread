@@ -19,10 +19,10 @@ describe('getEntitlementRejection', () => {
   it('maps exhausted limits to the next plan', () => {
     const error = new ApiError(403, JSON.stringify({
       code: 'PLAN_LIMIT_REACHED',
-      requiredPlan: 'scale',
+      requiredPlan: 'pro',
       message: 'Upgrade to add more.',
     }));
-    expect(getEntitlementRejection(error)?.requiredPlan).toBe('scale');
+    expect(getEntitlementRejection(error)?.requiredPlan).toBe('pro');
   });
 
   it('does not turn unrelated failures into upgrade prompts', () => {

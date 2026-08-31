@@ -423,7 +423,7 @@ async function handleAccept(req: any, res: any) {
     sendPlanLimitReached(res, {
       resource: "teamSeats",
       currentPlan: access.planId,
-      requiredPlan: access.planId === "starter" ? "growth" : "scale",
+      requiredPlan: access.planId === "starter" ? "growth" : "pro",
       limit: access.limits.teamSeats!,
     });
     return;
@@ -574,7 +574,7 @@ router.post("/invite", requireRole("owner"), async (req, res) => {
     sendPlanLimitReached(res, {
       resource: "teamSeats",
       currentPlan: access.planId,
-      requiredPlan: access.planId === "starter" ? "growth" : "scale",
+      requiredPlan: access.planId === "starter" ? "growth" : "pro",
       limit: access.limits.teamSeats!,
     });
     return;
@@ -642,7 +642,7 @@ router.post("/invite/:id/regenerate", requireRole("owner"), async (req, res) => 
     sendPlanLimitReached(res, {
       resource: "teamSeats",
       currentPlan: access.planId,
-      requiredPlan: access.planId === "starter" ? "growth" : "scale",
+      requiredPlan: access.planId === "starter" ? "growth" : "pro",
       limit: access.limits.teamSeats!,
     });
     return;

@@ -4,7 +4,7 @@
  * Tiers:
  *   Starter  $29/mo  — storefront, AI store builder, 25 products, basic analytics
  *   Growth   $79/mo  — unlimited products, AI Design Studio, manufacturer hub, live shopping
- *   Scale   $199/mo  — everything in Growth + unlimited team, advanced analytics, white-glove
+ *   Pro     $199/mo  — everything in Growth + unlimited team, advanced analytics, white-glove
  *
  * All tiers carry a 5% platform commission on sales.
  * Every new subscription starts with a 5-day free trial (card required upfront).

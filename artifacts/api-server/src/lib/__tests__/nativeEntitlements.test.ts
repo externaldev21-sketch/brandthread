@@ -15,7 +15,7 @@ const now = new Date("2026-08-31T12:00:00.000Z");
 
 function native(overrides: Record<string, unknown> = {}) {
   return {
-    planId: "scale",
+    planId: "pro",
     status: "active",
     expiresAt: new Date("2026-09-30T12:00:00.000Z"),
     ...overrides,
@@ -33,14 +33,14 @@ function stripe(overrides: Record<string, unknown> = {}) {
 describe("resolveEffectiveEntitlement", () => {
   it("keeps the strongest valid native entitlement when Stripe is lower", () => {
     expect(resolveEffectiveEntitlement(stripe(), native(), now)).toMatchObject({
-      planId: "scale",
+      planId: "pro",
       provider: "revenuecat",
     });
   });
 
   it("keeps native access when the legacy Stripe subscription is canceled", () => {
     expect(resolveEffectiveEntitlement(
-      stripe({ planId: "scale", status: "canceled" }),
+      stripe({ planId: "pro", status: "canceled" }),
       native({ planId: "growth" }),
       now,
     )).toMatchObject({
@@ -50,11 +50,22 @@ describe("resolveEffectiveEntitlement", () => {
   });
 
   it("keeps the strongest valid Stripe entitlement when native is lower", () => {
-    expect(resolveEffectiveEntitlement(stripe({ planId: "scale" }), native({ planId: "growth" }), now))
+    expect(resolveEffectiveEntitlement(stripe({ planId: "pro" }), native({ planId: "growth" }), now))
       .toMatchObject({
-        planId: "scale",
+        planId: "pro",
         provider: "stripe",
       });
+  });
+
+  it("normalizes persisted Scale records to the renamed Pro tier", () => {
+    expect(resolveEffectiveEntitlement(
+      stripe({ planId: "scale" }),
+      native({ planId: "scale" }),
+      now,
+    )).toMatchObject({
+      planId: "pro",
+      provider: "revenuecat",
+    });
   });
 
   it("keeps valid Stripe access when the native provider has no available snapshot", () => {
@@ -88,8 +99,8 @@ describe("resolveEffectiveEntitlement", () => {
 
   it("fails closed when neither provider has a valid entitlement", () => {
     expect(resolveEffectiveEntitlement(
-      { planId: "scale", status: "canceled" },
-      native({ planId: "scale", status: "expired", expiresAt: new Date("2026-08-30T12:00:00.000Z") }),
+      { planId: "pro", status: "canceled" },
+      native({ planId: "pro", status: "expired", expiresAt: new Date("2026-08-30T12:00:00.000Z") }),
       now,
     )).toMatchObject({
       planId: "starter",

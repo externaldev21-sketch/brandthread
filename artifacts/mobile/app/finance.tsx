@@ -138,7 +138,7 @@ export default function FinanceScreen() {
           <View style={styles.subCardLeft}>
             <Text style={[styles.subCardLabel, { color: colors.mutedForeground }]}>Platform subscription</Text>
             <Text style={[styles.subCardPlan, { color: colors.foreground }]}>
-              {subStatus.plan === 'growth' ? 'Growth' : subStatus.plan === 'scale' ? 'Scale' : 'Starter'}
+              {subStatus.plan === 'growth' ? 'Growth' : subStatus.plan === 'pro' ? 'Pro' : 'Starter'}
               {' '}
               <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular' }}>
                  {subStatus.amountCents > 0 ? `${formatCents(subStatus.amountCents)}/mo` : formatCents(2900) + '/mo'}

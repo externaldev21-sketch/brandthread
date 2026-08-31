@@ -179,10 +179,10 @@ router.use("/buyer/payment-methods",     buyerPaymentsRouter);
 
 // ─── Live shopping ─────────────────────────────────────────────────────────────
 import liveRouter from "./live";
-router.use("/live",                      tc, requirePlan("scale"), liveRouter);
+router.use("/live",                      tc, requirePlan("pro"), liveRouter);
 
 // ─── Paid boosts, vacation mode, loyalty/rewards ──────────────────────────────
-router.use("/boosts",                    tc, requirePlan("scale"), boostsRouter);
+router.use("/boosts",                    tc, requirePlan("pro"), boostsRouter);
 router.use("/seller/vacation",          tc, vacationRouter);
 router.use("/seller/notification-prefs", tc, notificationPrefsRouter);
 router.use("/loyalty",             loyaltyRouter); // buyer-scoped; no tc
