@@ -20,7 +20,7 @@
  */
 import { Router } from "express";
 import { db, teamMembers, teamActivityLogs, users } from "@workspace/db";
-import { eq, and, ne, or, desc, gt, sql } from "drizzle-orm";
+import { eq, and, ne, or, asc, desc, gt, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext, requireRole } from "../middlewares/requireRole";
 import { logActivity, reqActor } from "../lib/activityLog";
@@ -212,7 +212,9 @@ router.get("/my-membership", async (req, res) => {
       })
       .from(teamMembers)
       .where(and(eq(teamMembers.memberClerkId, userId), eq(teamMembers.status, "active")))
-      .orderBy(desc(teamMembers.acceptedAt))
+      // Prefer the newest membership; ownerId and id make equal timestamps
+      // deterministic instead of depending on the database's tie ordering.
+      .orderBy(desc(teamMembers.acceptedAt), asc(teamMembers.ownerId), asc(teamMembers.id))
       .limit(1);
 
     if (!membership || membership.ownerId === userId) {

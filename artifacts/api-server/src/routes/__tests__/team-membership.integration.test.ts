@@ -32,10 +32,16 @@ const olderOwnerId = `team-membership-older-owner-${suffix}`;
 const newerOwnerId = `team-membership-newer-owner-${suffix}`;
 const memberId = `team-membership-member-${suffix}`;
 const noMembershipUserId = `team-membership-none-${suffix}`;
+const equalOwnerAId = `team-membership-equal-a-${suffix}`;
+const equalOwnerBId = `team-membership-equal-b-${suffix}`;
+const equalMemberId = `team-membership-equal-member-${suffix}`;
 const olderOwnerEmail = `${olderOwnerId}@test.local`;
 const newerOwnerEmail = `${newerOwnerId}@test.local`;
+const equalOwnerAEmail = `${equalOwnerAId}@test.local`;
+const equalOwnerBEmail = `${equalOwnerBId}@test.local`;
 const olderAcceptedAt = new Date("2026-08-31T12:34:56.000Z");
 const newerAcceptedAt = new Date("2026-08-31T13:45:00.000Z");
+const equalAcceptedAt = new Date("2026-08-31T14:00:00.000Z");
 
 let server: Server;
 let baseUrl = "";
@@ -67,6 +73,22 @@ beforeAll(async () => {
       role: "seller",
       accountType: "seller",
     },
+    {
+      clerkId: equalOwnerAId,
+      email: equalOwnerAEmail,
+      name: "Equal timestamp owner A fallback name",
+      displayName: "Equal Timestamp Store A",
+      role: "seller",
+      accountType: "seller",
+    },
+    {
+      clerkId: equalOwnerBId,
+      email: equalOwnerBEmail,
+      name: "Equal timestamp owner B fallback name",
+      displayName: "Equal Timestamp Store B",
+      role: "seller",
+      accountType: "seller",
+    },
   ]);
 
   await db.insert(teamMembers).values({
@@ -88,6 +110,27 @@ beforeAll(async () => {
     status: "active",
     acceptedAt: newerAcceptedAt,
   });
+
+  await db.insert(teamMembers).values([
+    {
+      ownerId: equalOwnerBId,
+      memberClerkId: equalMemberId,
+      email: `${equalMemberId}@test.local`,
+      name: "Joined equal timestamp team B",
+      role: "staff",
+      status: "active",
+      acceptedAt: equalAcceptedAt,
+    },
+    {
+      ownerId: equalOwnerAId,
+      memberClerkId: equalMemberId,
+      email: `${equalMemberId}@test.local`,
+      name: "Joined equal timestamp team A",
+      role: "manager",
+      status: "active",
+      acceptedAt: equalAcceptedAt,
+    },
+  ]);
 
   await db.insert(teamMembers).values({
     ownerId: olderOwnerId,
@@ -114,8 +157,12 @@ beforeAll(async () => {
 afterAll(async () => {
   await db.delete(teamMembers).where(eq(teamMembers.ownerId, olderOwnerId));
   await db.delete(teamMembers).where(eq(teamMembers.ownerId, newerOwnerId));
+  await db.delete(teamMembers).where(eq(teamMembers.ownerId, equalOwnerAId));
+  await db.delete(teamMembers).where(eq(teamMembers.ownerId, equalOwnerBId));
   await db.delete(users).where(eq(users.clerkId, olderOwnerId));
   await db.delete(users).where(eq(users.clerkId, newerOwnerId));
+  await db.delete(users).where(eq(users.clerkId, equalOwnerAId));
+  await db.delete(users).where(eq(users.clerkId, equalOwnerBId));
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
@@ -133,6 +180,25 @@ describe("authenticated team membership discovery", () => {
         ownerName: "Newest Store Owner Display Name",
       },
     });
+  });
+
+  it("selects the same membership when active memberships share an acceptance timestamp", async () => {
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () => getMembership(equalMemberId)),
+    );
+
+    for (const result of results) {
+      expect(result.status).toBe(200);
+      expect(result.body).toEqual({
+        membership: {
+          id: expect.any(String),
+          ownerId: equalOwnerAId,
+          role: "manager",
+          acceptedAt: equalAcceptedAt.toISOString(),
+          ownerName: "Equal Timestamp Store A",
+        },
+      });
+    }
   });
 
   it("returns a null membership for an authenticated user without an active membership", async () => {
