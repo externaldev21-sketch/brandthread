@@ -23,6 +23,9 @@ import type {
   AttachmentReceipt,
   BulkPaymentOptions,
   BulkWalletPaymentInput,
+  CallCredentials,
+  CallTokenInput,
+  CallTokenRenewalInput,
   DropBroadcastPreview,
   HealthStatus,
   ListPublicManufacturersParams,
@@ -47,6 +50,7 @@ import type {
   MessageThread,
   ProductionOrderInput,
   PublicManufacturer,
+  RenewCallToken200,
   SampleCheckoutSession,
   SampleCheckoutSessionInput,
   SampleDetailDecisionInput,
@@ -152,12 +156,145 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+export const getCreateCallTokenUrl = () => {
+
+
+
+
+  return `/api/call/token`
+}
+
+/**
+ * @summary Create short-lived credentials for an authorized call participant
+ */
+export const createCallToken = async (callTokenInput: CallTokenInput, options?: RequestInit): Promise<CallCredentials> => {
+
+  return customFetch<CallCredentials>(getCreateCallTokenUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(callTokenInput)
+  }
+);}
+
+
+
+
+export const getCreateCallTokenMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCallToken>>, TError,{data: BodyType<CallTokenInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createCallToken>>, TError,{data: BodyType<CallTokenInput>}, TContext> => {
+
+const mutationKey = ['createCallToken'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createCallToken>>, {data: BodyType<CallTokenInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createCallToken(data,requestOptions)
+        }
 
 
 
 
 
 
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateCallTokenMutationResult = NonNullable<Awaited<ReturnType<typeof createCallToken>>>
+    export type CreateCallTokenMutationBody = BodyType<CallTokenInput>
+    export type CreateCallTokenMutationError = ErrorType<void>
+
+    /**
+ * @summary Create short-lived credentials for an authorized call participant
+ */
+export const useCreateCallToken = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createCallToken>>, TError,{data: BodyType<CallTokenInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createCallToken>>,
+        TError,
+        {data: BodyType<CallTokenInput>},
+        TContext
+      > => {
+      return useMutation(getCreateCallTokenMutationOptions(options));
+    }
+
+export const getRenewCallTokenUrl = () => {
+
+
+
+
+  return `/api/call/token/renew`
+}
+
+/**
+ * @summary Renew credentials after re-authorizing the same manufacturer thread participant
+ */
+export const renewCallToken = async (callTokenRenewalInput: CallTokenRenewalInput, options?: RequestInit): Promise<RenewCallToken200> => {
+
+  return customFetch<RenewCallToken200>(getRenewCallTokenUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(callTokenRenewalInput)
+  }
+);}
+
+
+
+
+export const getRenewCallTokenMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof renewCallToken>>, TError,{data: BodyType<CallTokenRenewalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof renewCallToken>>, TError,{data: BodyType<CallTokenRenewalInput>}, TContext> => {
+
+const mutationKey = ['renewCallToken'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof renewCallToken>>, {data: BodyType<CallTokenRenewalInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  renewCallToken(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RenewCallTokenMutationResult = NonNullable<Awaited<ReturnType<typeof renewCallToken>>>
+    export type RenewCallTokenMutationBody = BodyType<CallTokenRenewalInput>
+    export type RenewCallTokenMutationError = ErrorType<void>
+
+    /**
+ * @summary Renew credentials after re-authorizing the same manufacturer thread participant
+ */
+export const useRenewCallToken = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof renewCallToken>>, TError,{data: BodyType<CallTokenRenewalInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof renewCallToken>>,
+        TError,
+        {data: BodyType<CallTokenRenewalInput>},
+        TContext
+      > => {
+      return useMutation(getRenewCallTokenMutationOptions(options));
+    }
 
 export const getGetDropBroadcastPreviewUrl = (id: string,) => {
 
@@ -229,13 +366,6 @@ export function useGetDropBroadcastPreview<TData = Awaited<ReturnType<typeof get
 
   return withQueryKey(query, queryOptions.queryKey);
 }
-
-
-
-
-
-
-
 export const getGetMyManufacturerProfileUrl = () => {
 
 

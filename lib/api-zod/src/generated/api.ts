@@ -17,6 +17,60 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary Create short-lived credentials for an authorized call participant
+ */
+export const CreateCallTokenBody = zod.object({
+  "conversationId": zod.string(),
+  "threadId": zod.string().optional(),
+  "mode": zod.enum(['voice', 'video'])
+})
+
+
+
+
+export const CreateCallTokenResponse = zod.object({
+  "appId": zod.string(),
+  "token": zod.string(),
+  "channelName": zod.string(),
+  "uid": zod.number().min(1),
+  "mode": zod.enum(['voice', 'video']),
+  "expiresAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Renew credentials after re-authorizing the same manufacturer thread participant
+ */
+export const renewCallTokenBodyClientRenewalIdMin = 8;
+export const renewCallTokenBodyClientRenewalIdMax = 128;
+
+
+export const renewCallTokenBodyClientRenewalIdRegExp = new RegExp('^[A-Za-z0-9_-]+$');
+
+
+export const RenewCallTokenBody = zod.object({
+  "threadId": zod.string().uuid(),
+  "mode": zod.enum(['voice', 'video']),
+  "clientRenewalId": zod.string().min(renewCallTokenBodyClientRenewalIdMin).max(renewCallTokenBodyClientRenewalIdMax).regex(renewCallTokenBodyClientRenewalIdRegExp)
+})
+
+
+
+
+export const RenewCallTokenResponse = zod.object({
+  "appId": zod.string(),
+  "token": zod.string(),
+  "channelName": zod.string(),
+  "uid": zod.number().min(1),
+  "mode": zod.enum(['voice', 'video']),
+  "expiresAt": zod.coerce.date()
+}).and(zod.object({
+  "renewed": zod.boolean(),
+  "duplicate": zod.boolean()
+}))
+
+
+/**
  * @summary Preview the audience for a drop notification
  */
 export const GetDropBroadcastPreviewParams = zod.object({

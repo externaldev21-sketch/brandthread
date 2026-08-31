@@ -115,6 +115,8 @@ function NativeCallScreen() {
 
   const engineRef  = useRef<any>(null);
   const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+  const renewalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const renewalInFlightRef = useRef(false);
   const callStartedRef = useRef(false);
   const credentialsIssuedRef = useRef(false);
   const remoteJoinedRef = useRef(false);
@@ -147,6 +149,60 @@ function NativeCallScreen() {
     }).catch(() => {});
   }
 
+  function closeAfterRenewalFailure() {
+    if (renewalTimerRef.current) clearTimeout(renewalTimerRef.current);
+    renewalTimerRef.current = null;
+    setUnavailableReason('The call lost its secure connection and could not be renewed. Media was closed. Return to messages and start a new call.');
+    setStatus('unavailable');
+    try {
+      engineRef.current?.leaveChannel();
+      engineRef.current?.release();
+    } catch {}
+    engineRef.current = null;
+    emitTerminalEvent('failed');
+  }
+
+  async function renewCallToken() {
+    const engine = engineRef.current;
+    if (
+      params.manufacturerCall !== '1'
+      || !engine
+      || !callStartedRef.current
+      || renewalInFlightRef.current
+    ) return;
+
+    renewalInFlightRef.current = true;
+    try {
+      const renewed = await api.call.renew({
+        threadId: params.conversationId,
+        mode,
+        clientRenewalId: randomUUID(),
+      });
+      if (engineRef.current !== engine || !callStartedRef.current) return;
+      const result = engine.renewToken(renewed.token);
+      if (typeof result === 'number' && result < 0) {
+        throw new Error(`Agora token renewal failed (${result})`);
+      }
+      scheduleTokenRenewal(renewed.expiresAt);
+    } catch {
+      if (engineRef.current === engine) closeAfterRenewalFailure();
+    } finally {
+      renewalInFlightRef.current = false;
+    }
+  }
+
+  function scheduleTokenRenewal(expiresAt?: string) {
+    if (renewalTimerRef.current) clearTimeout(renewalTimerRef.current);
+    renewalTimerRef.current = null;
+    if (params.manufacturerCall !== '1' || !expiresAt) return;
+    const expiry = new Date(expiresAt).getTime();
+    if (!Number.isFinite(expiry)) return;
+    renewalTimerRef.current = setTimeout(
+      () => void renewCallToken(),
+      Math.max(1_000, expiry - Date.now() - 60_000),
+    );
+  }
+
   // ── Fetch token + init Agora ─────────────────────────────────────────────────
 
   const initCall = useCallback(async () => {
@@ -163,7 +219,13 @@ function NativeCallScreen() {
       return;
     }
 
-    let tokenData: { appId: string; token: string; channelName: string; uid: number } | null = null;
+    let tokenData: {
+      appId: string;
+      token: string;
+      channelName: string;
+      uid: number;
+      expiresAt?: string;
+    } | null = null;
     try {
       tokenData = await api.call.token({
         conversationId: params.conversationId,
@@ -235,6 +297,9 @@ function NativeCallScreen() {
           emitTerminalEvent('ended');
           setTimeout(() => router.back(), 1500);
         },
+        onTokenPrivilegeWillExpire: () => {
+          void renewCallToken();
+        },
         onError: (err: any) => {
           console.warn('[Agora call error]', err);
           clearInterval(timerRef.current!);
@@ -253,6 +318,7 @@ function NativeCallScreen() {
 
       engineRef.current = engine;
       setStatus('ringing');
+      scheduleTokenRenewal(tokenData.expiresAt);
     } catch (e) {
       console.warn('[Agora init]', e);
       setUnavailableReason('Calling is not supported by this device or app build. Continue the conversation by message.');
@@ -265,6 +331,8 @@ function NativeCallScreen() {
     initCall();
     return () => {
       clearInterval(timerRef.current!);
+      if (renewalTimerRef.current) clearTimeout(renewalTimerRef.current);
+      renewalTimerRef.current = null;
       if (callStartedRef.current || credentialsIssuedRef.current) {
         emitTerminalEvent(remoteJoinedRef.current ? 'ended' : 'declined');
       }
@@ -308,6 +376,8 @@ function NativeCallScreen() {
 
   function handleHangUp() {
     clearInterval(timerRef.current!);
+    if (renewalTimerRef.current) clearTimeout(renewalTimerRef.current);
+    renewalTimerRef.current = null;
     emitTerminalEvent(remoteJoinedRef.current ? 'ended' : 'declined');
     try {
       engineRef.current?.leaveChannel();

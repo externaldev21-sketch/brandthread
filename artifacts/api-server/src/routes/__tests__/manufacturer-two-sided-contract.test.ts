@@ -6,7 +6,12 @@ import { isDefinitiveTransferRejection } from "../sample-orders";
 import { connectReadiness, isAllowedOnboardingUrl } from "../manufacturer-connect";
 import { isAllowedCheckoutReturnUrl } from "../sample-orders";
 import { getWebOrigin } from "../../lib/webOrigin";
-import { CALL_TOKEN_TTL_SECONDS, isAuthorizedManufacturerThreadParticipant, isValidCallClientEventId } from "../call";
+import {
+  CALL_TOKEN_RENEWAL_LEAD_SECONDS,
+  CALL_TOKEN_TTL_SECONDS,
+  isAuthorizedManufacturerThreadParticipant,
+  isValidCallClientEventId,
+} from "../call";
 import { reversalDeltaCents } from "../webhooks";
 
 const route = fs.readFileSync(path.resolve(__dirname, "..", "manufacturers.ts"), "utf8");
@@ -230,6 +235,27 @@ describe("manufacturer two-sided authorization contract", () => {
     expect(callRoute).toContain("providerEventId = `call:${threadId}:${callerId}:${clientEventId}`");
     expect(callRoute).toContain("duplicate: true");
     expect(callRoute).toContain("if (!recorded)");
+  });
+
+  it("renews manufacturer call credentials before expiry with idempotent audit outcomes", () => {
+    const callRoute = fs.readFileSync(path.resolve(__dirname, "..", "call.ts"), "utf8");
+    const mobileCall = fs.readFileSync(path.resolve(__dirname, "../../../../mobile/app/call-screen.tsx"), "utf8");
+    const portalCall = fs.readFileSync(path.resolve(__dirname, "../../../../manufacturer-portal/src/components/thread-call.tsx"), "utf8");
+    expect(CALL_TOKEN_RENEWAL_LEAD_SECONDS).toBeGreaterThan(0);
+    expect(CALL_TOKEN_RENEWAL_LEAD_SECONDS).toBeLessThan(CALL_TOKEN_TTL_SECONDS);
+    expect(callRoute).toContain('router.post("/token/renew"');
+    expect(callRoute).toContain("credential_renewal_attempt");
+    expect(callRoute).toContain("credential_renewed");
+    expect(callRoute).toContain("credential_renewal_failed");
+    expect(callRoute).toContain("credential_renewal_denied");
+    expect(callRoute.match(/`\$\{renewalKey\}:outcome`/g)).toHaveLength(4);
+    expect(callRoute).toContain("onConflictDoNothing({ target: manufacturerActivityEvents.providerEventId })");
+    expect(mobileCall).toContain("onTokenPrivilegeWillExpire");
+    expect(mobileCall).toContain("engine.renewToken(renewed.token)");
+    expect(mobileCall).toContain("closeAfterRenewalFailure");
+    expect(portalCall).toContain('"token-privilege-will-expire"');
+    expect(portalCall).toContain("await client.renewToken(credentials.token)");
+    expect(portalCall).toContain('await cleanup("failed")');
   });
 
   it("keeps ordinary buyer and seller conversation calls backward compatible", () => {

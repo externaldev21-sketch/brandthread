@@ -4,6 +4,9 @@
  * POST /api/call/token
  *   Body: { conversationId: string, mode?: 'voice' | 'video' }
  *   Returns: { appId, token, channelName, uid, mode }
+ * POST /api/call/token/renew
+ *   Body: { threadId: string, mode?: 'voice' | 'video', clientRenewalId: string }
+ *   Returns: { appId, token, channelName, uid, mode, expiresAt }
  *
  * The channel name is deterministic (call_{conversationId}) so both
  * participants independently derive the same channel and join it.
@@ -21,6 +24,7 @@ router.use(requireAuth);
 // ─── Helpers (shared with live.ts pattern) ────────────────────────────────────
 
 export const CALL_TOKEN_TTL_SECONDS = 15 * 60;
+export const CALL_TOKEN_RENEWAL_LEAD_SECONDS = 60;
 
 function generateToken(
   appId: string,
@@ -48,6 +52,46 @@ function uidFromClerkId(clerkId: string): number {
     h = (Math.imul(31, h) + clerkId.charCodeAt(i)) | 0;
   }
   return Math.abs(h) % 999999 + 1;
+}
+
+type ManufacturerCallThread = {
+  id: string;
+  manufacturerId: string;
+  buyerClerkId: string;
+  manufacturerClerkId: string | null;
+};
+
+async function getManufacturerCallThread(threadId: string): Promise<ManufacturerCallThread | undefined> {
+  const [thread] = await db.select({
+    id: manufacturerThreads.id,
+    manufacturerId: manufacturerThreads.manufacturerId,
+    buyerClerkId: manufacturerThreads.buyerClerkId,
+    manufacturerClerkId: manufacturers.clerkId,
+  }).from(manufacturerThreads)
+    .innerJoin(manufacturers, eq(manufacturerThreads.manufacturerId, manufacturers.id))
+    .where(eq(manufacturerThreads.id, threadId))
+    .limit(1);
+  return thread;
+}
+
+async function recordRenewalEvent(
+  thread: ManufacturerCallThread,
+  callerId: string,
+  type: "credential_renewal_attempt" | "credential_renewed" | "credential_renewal_failed" | "credential_renewal_denied",
+  providerEventId: string,
+  metadata: Record<string, unknown>,
+): Promise<boolean> {
+  const [recorded] = await db.insert(manufacturerActivityEvents).values({
+    manufacturerId: thread.manufacturerId,
+    threadId: thread.id,
+    actorClerkId: callerId,
+    category: "call",
+    type,
+    providerEventId,
+    metadata,
+  }).onConflictDoNothing({ target: manufacturerActivityEvents.providerEventId })
+    .returning({ id: manufacturerActivityEvents.id });
+  return !!recorded;
 }
 
 export function isAuthorizedManufacturerThreadParticipant(
@@ -130,6 +174,107 @@ router.post("/token", async (req, res) => {
   }
 
   return res.json({ appId, token, channelName, uid, mode, expiresAt: expiresAt.toISOString() });
+});
+
+// ─── POST /api/call/token/renew ───────────────────────────────────────────────
+//
+// Renewal is intentionally manufacturer-thread-only. Unlike the initial token
+// endpoint's legacy DM fallback, a renewal must prove that the caller is still
+// one of the two participants on the same authoritative thread.
+router.post("/token/renew", async (req, res) => {
+  const callerId = (req as any).clerkUserId as string;
+  const {
+    threadId,
+    mode = "video",
+    clientRenewalId,
+  } = req.body ?? {};
+
+  if (
+    typeof threadId !== "string"
+    || (mode !== "voice" && mode !== "video")
+    || !isValidCallClientEventId(clientRenewalId)
+  ) {
+    return res.status(400).json({
+      error: "threadId, valid mode, and an 8–128 character clientRenewalId are required",
+    });
+  }
+
+  const thread = await getManufacturerCallThread(threadId);
+  if (!thread) {
+    return res.status(403).json({ error: "Not a participant in this conversation" });
+  }
+
+  const renewalKey = `call:renewal:${threadId}:${callerId}:${clientRenewalId}`;
+  const recordedAttempt = await recordRenewalEvent(
+    thread,
+    callerId,
+    "credential_renewal_attempt",
+    `${renewalKey}:attempt`,
+    { mode, clientRenewalId },
+  );
+  if (!isAuthorizedManufacturerThreadParticipant(callerId, thread)) {
+    await recordRenewalEvent(
+      thread,
+      callerId,
+      "credential_renewal_denied",
+      `${renewalKey}:outcome`,
+      { mode, clientRenewalId, outcome: "denied", reason: "PARTICIPANT_ACCESS_REVOKED" },
+    );
+    return res.status(403).json({ error: "Not a participant in this conversation" });
+  }
+
+  const appId = process.env.AGORA_APP_ID ?? "";
+  const appCert = process.env.AGORA_APP_CERTIFICATE ?? "";
+  if (!appId || !appCert) {
+    await recordRenewalEvent(
+      thread,
+      callerId,
+      "credential_renewal_failed",
+      `${renewalKey}:outcome`,
+      { mode, clientRenewalId, outcome: "failed", reason: "CALLING_NOT_CONFIGURED" },
+    );
+    return res.status(503).json({
+      error: "Calling is unavailable because secure call credentials are not configured",
+      code: "CALLING_NOT_CONFIGURED",
+    });
+  }
+
+  const channelName = `mfr_${threadId.replaceAll("-", "")}`;
+  const uid = uidFromClerkId(callerId);
+  try {
+    const token = generateToken(appId, appCert, channelName, uid, 1 /* PUBLISHER */);
+    const expiresAt = new Date(Date.now() + CALL_TOKEN_TTL_SECONDS * 1000);
+    await recordRenewalEvent(
+      thread,
+      callerId,
+      "credential_renewed",
+      `${renewalKey}:outcome`,
+      { mode, clientRenewalId, outcome: "renewed", expiresAt: expiresAt.toISOString() },
+    );
+    return res.json({
+      renewed: true,
+      duplicate: !recordedAttempt,
+      appId,
+      token,
+      channelName,
+      uid,
+      mode,
+      expiresAt: expiresAt.toISOString(),
+    });
+  } catch (error) {
+    await recordRenewalEvent(
+      thread,
+      callerId,
+      "credential_renewal_failed",
+      `${renewalKey}:outcome`,
+      { mode, clientRenewalId, outcome: "failed", reason: "TOKEN_GENERATION_FAILED" },
+    );
+    req.log.error({ err: error, threadId, callerId }, "Agora call token renewal failed");
+    return res.status(503).json({
+      error: "The secure call connection could not be renewed",
+      code: "CALL_TOKEN_RENEWAL_FAILED",
+    });
+  }
 });
 
 router.post("/events", async (req, res) => {

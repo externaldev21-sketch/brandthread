@@ -6,7 +6,16 @@ import { Button } from "@/components/ui/button";
 
 type CallMode = "voice" | "video";
 type CallEvent = "started" | "ended" | "declined" | "failed";
-type CallCredentials = { appId: string; token: string; channelName: string; uid: number; mode: CallMode };
+type CallCredentials = {
+  appId: string;
+  token: string;
+  channelName: string;
+  uid: number;
+  mode: CallMode;
+  expiresAt?: string;
+};
+
+const CALL_TOKEN_RENEWAL_LEAD_MS = 60_000;
 
 const errorMessage = (error: unknown) => {
   const message = error instanceof Error ? error.message : "Unable to start the call.";
@@ -27,6 +36,8 @@ export function ThreadCall({ threadId }: { threadId: string }) {
   const localVideoRef = useRef<HTMLDivElement | null>(null);
   const terminalEvents = useRef(new Set<CallEvent>());
   const eventIdsRef = useRef(new Map<CallEvent, string>());
+  const renewalTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const renewalInFlightRef = useRef(false);
   const joinedRef = useRef(false);
   const callModeRef = useRef<CallMode | null>(null);
   const [mode, setMode] = useState<CallMode | null>(null);
@@ -74,6 +85,8 @@ export function ThreadCall({ threadId }: { threadId: string }) {
     const client = clientRef.current;
     const microphone = microphoneRef.current;
     const camera = cameraRef.current;
+    if (renewalTimerRef.current) clearTimeout(renewalTimerRef.current);
+    renewalTimerRef.current = null;
     clientRef.current = null;
     microphoneRef.current = null;
     cameraRef.current = null;
@@ -90,6 +103,52 @@ export function ThreadCall({ threadId }: { threadId: string }) {
     setRemoteJoined(false);
     if (event && callMode) void record(event, callMode);
   }, [record]);
+
+  const handleRenewalFailure = useCallback(async () => {
+    if (renewalTimerRef.current) clearTimeout(renewalTimerRef.current);
+    renewalTimerRef.current = null;
+    setError("The call lost its secure connection and could not be renewed. Media was closed. Start a new call from this conversation.");
+    await cleanup("failed");
+  }, [cleanup]);
+
+  const renewCallToken = useCallback(async () => {
+    const client = clientRef.current;
+    const callMode = callModeRef.current;
+    if (!client || !joinedRef.current || !callMode || renewalInFlightRef.current) return;
+
+    renewalInFlightRef.current = true;
+    try {
+      const credentials = await authorizedRequest<CallCredentials>("/api/call/token/renew", {
+        threadId: threadIdRef.current,
+        mode: callMode,
+        clientRenewalId: crypto.randomUUID(),
+      });
+      if (clientRef.current !== client || !joinedRef.current) return;
+      await client.renewToken(credentials.token);
+      if (credentials.expiresAt) {
+        const delay = Math.max(
+          1_000,
+          new Date(credentials.expiresAt).getTime() - Date.now() - CALL_TOKEN_RENEWAL_LEAD_MS,
+        );
+        renewalTimerRef.current = setTimeout(() => void renewCallToken(), delay);
+      }
+    } catch {
+      await handleRenewalFailure();
+    } finally {
+      renewalInFlightRef.current = false;
+    }
+  }, [authorizedRequest, handleRenewalFailure]);
+
+  const scheduleTokenRenewal = useCallback((expiresAt?: string) => {
+    if (renewalTimerRef.current) clearTimeout(renewalTimerRef.current);
+    renewalTimerRef.current = null;
+    if (!expiresAt) return;
+    const delay = Math.max(
+      1_000,
+      new Date(expiresAt).getTime() - Date.now() - CALL_TOKEN_RENEWAL_LEAD_MS,
+    );
+    renewalTimerRef.current = setTimeout(() => void renewCallToken(), delay);
+  }, [renewCallToken]);
 
   const startCall = async (callMode: CallMode) => {
     if (starting || mode) return;
@@ -120,6 +179,7 @@ export function ThreadCall({ threadId }: { threadId: string }) {
         if (mediaType === "video") setRemoteJoined(false);
       });
       client.on("user-left", () => setRemoteJoined(false));
+      client.on("token-privilege-will-expire", () => void renewCallToken());
 
       // These APIs run only after the caller pressed a call button.
       const microphone = await AgoraRTC.createMicrophoneAudioTrack();
@@ -130,6 +190,7 @@ export function ThreadCall({ threadId }: { threadId: string }) {
       joinedRef.current = true;
       await client.publish(camera ? [microphone, camera] : [microphone]);
       setMode(callMode);
+      scheduleTokenRenewal(credentials.expiresAt);
       if (camera && localVideoRef.current) camera.play(localVideoRef.current);
       await record("started", callMode);
     } catch (callError) {

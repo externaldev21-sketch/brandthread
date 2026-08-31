@@ -9,6 +9,57 @@ export interface HealthStatus {
   status: string;
 }
 
+export type CallTokenInputMode = typeof CallTokenInputMode[keyof typeof CallTokenInputMode];
+
+
+export const CallTokenInputMode = {
+  voice: 'voice',
+  video: 'video',
+} as const;
+
+export interface CallTokenInput {
+  conversationId: string;
+  threadId?: string;
+  mode: CallTokenInputMode;
+}
+
+export type CallTokenRenewalInputMode = typeof CallTokenRenewalInputMode[keyof typeof CallTokenRenewalInputMode];
+
+
+export const CallTokenRenewalInputMode = {
+  voice: 'voice',
+  video: 'video',
+} as const;
+
+export interface CallTokenRenewalInput {
+  threadId: string;
+  mode: CallTokenRenewalInputMode;
+  /**
+     * @minLength 8
+     * @maxLength 128
+     * @pattern ^[A-Za-z0-9_-]+$
+     */
+  clientRenewalId: string;
+}
+
+export type CallCredentialsMode = typeof CallCredentialsMode[keyof typeof CallCredentialsMode];
+
+
+export const CallCredentialsMode = {
+  voice: 'voice',
+  video: 'video',
+} as const;
+
+export interface CallCredentials {
+  appId: string;
+  token: string;
+  channelName: string;
+  /** @minimum 1 */
+  uid: number;
+  mode: CallCredentialsMode;
+  expiresAt: string;
+}
+
 export interface DropBroadcastPreview {
   /** @minimum 0 */
   followers: number;
@@ -487,6 +538,11 @@ export interface ManufacturerPaymentActivity {
   metadata: ManufacturerPaymentActivityMetadata;
   createdAt: string;
 }
+
+export type RenewCallToken200 = CallCredentials & {
+  renewed: true;
+  duplicate: boolean;
+};
 
 export type ListPublicManufacturersParams = {
 q?: string;

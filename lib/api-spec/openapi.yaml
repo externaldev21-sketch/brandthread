@@ -9,6 +9,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: calls
+    description: Secure voice and video call operations
   - name: manufacturers
     description: Manufacturer portal operations
 
@@ -25,6 +27,58 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /call/token:
+    post:
+      operationId: createCallToken
+      tags: [calls]
+      summary: Create short-lived credentials for an authorized call participant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CallTokenInput"
+      responses:
+        "200":
+          description: Short-lived call credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CallCredentials"
+        "403":
+          description: Caller is not a conversation participant
+        "503":
+          description: Secure calling is unavailable
+
+  /call/token/renew:
+    post:
+      operationId: renewCallToken
+      tags: [calls]
+      summary: Renew credentials after re-authorizing the same manufacturer thread participant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CallTokenRenewalInput"
+      responses:
+        "200":
+          description: Renewed short-lived call credentials
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/CallCredentials"
+                  - type: object
+                    required: [renewed, duplicate]
+                    properties:
+                      renewed: { type: boolean, const: true }
+                      duplicate: { type: boolean }
+        "403":
+          description: Caller is no longer a manufacturer thread participant
+        "503":
+          description: Secure call renewal failed
 
   /drops/{id}/broadcast-preview:
     get:
@@ -630,6 +684,37 @@ components:
         status:
           type: string
       required: [status]
+
+    CallTokenInput:
+      type: object
+      required: [conversationId, mode]
+      properties:
+        conversationId: { type: string }
+        threadId: { type: string }
+        mode: { type: string, enum: [voice, video] }
+
+    CallTokenRenewalInput:
+      type: object
+      required: [threadId, mode, clientRenewalId]
+      properties:
+        threadId: { type: string, format: uuid }
+        mode: { type: string, enum: [voice, video] }
+        clientRenewalId:
+          type: string
+          minLength: 8
+          maxLength: 128
+          pattern: "^[A-Za-z0-9_-]+$"
+
+    CallCredentials:
+      type: object
+      required: [appId, token, channelName, uid, mode, expiresAt]
+      properties:
+        appId: { type: string }
+        token: { type: string }
+        channelName: { type: string }
+        uid: { type: integer, minimum: 1 }
+        mode: { type: string, enum: [voice, video] }
+        expiresAt: { type: string, format: date-time }
 
     DropBroadcastPreview:
       type: object

@@ -949,6 +949,21 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<{ appId: string; token: string; channelName: string; uid: number; mode: string; expiresAt?: string }>(
           '/api/call/token', body
         ),
+      renew: (body: {
+        threadId: string;
+        mode: 'voice' | 'video';
+        clientRenewalId: string;
+      }) =>
+        post<{
+          renewed: true;
+          duplicate: boolean;
+          appId: string;
+          token: string;
+          channelName: string;
+          uid: number;
+          mode: string;
+          expiresAt: string;
+        }>('/api/call/token/renew', body),
       event: (body: {
         threadId: string;
         type: 'started' | 'ended' | 'declined' | 'failed';
