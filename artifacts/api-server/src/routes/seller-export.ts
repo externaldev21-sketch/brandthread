@@ -6,14 +6,17 @@ import { Router } from "express";
 import { db, products, orders, customers } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
+import { requireRole, teamContext } from "../middlewares/requireRole";
 
 const router = Router();
 router.use(requireAuth);
+router.use(teamContext());
 
-function toCSV(rows: Record<string, unknown>[], fields: string[]): string {
+export function toCSV(rows: Record<string, unknown>[], fields: string[]): string {
   const escape = (v: unknown): string => {
     if (v === null || v === undefined) return "";
-    const s = typeof v === "object" ? JSON.stringify(v) : String(v);
+    const raw = typeof v === "object" ? JSON.stringify(v) : String(v);
+    const s = /^\s*[=+\-@]/.test(raw) ? `'${raw}` : raw;
     return s.includes(",") || s.includes('"') || s.includes("\n")
       ? `"${s.replace(/"/g, '""')}"`
       : s;
@@ -23,7 +26,7 @@ function toCSV(rows: Record<string, unknown>[], fields: string[]): string {
   return [header, ...lines].join("\n");
 }
 
-router.post("/", async (req, res) => {
+router.post("/", requireRole("owner"), async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const {
     format = "json",
@@ -32,6 +35,11 @@ router.post("/", async (req, res) => {
     format?: "json" | "csv";
     include?: ("products" | "orders" | "customers")[];
   };
+  const allowed = new Set(["products", "orders", "customers"]);
+  if (!["json", "csv"].includes(format) || !Array.isArray(include) || include.length === 0 || include.some((key) => !allowed.has(key))) {
+    res.status(400).json({ error: "Choose a valid format and at least one export category" });
+    return;
+  }
 
   const result: Record<string, unknown[]> = {};
 

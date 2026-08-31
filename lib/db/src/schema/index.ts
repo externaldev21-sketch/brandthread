@@ -304,8 +304,21 @@ export const orderItems = pgTable('order_items', {
   variantIdx: index('order_items_variant_id_idx').on(table.variantId),
 }));
 
-// ─── Posts ────────────────────────────────────────────────────────────────────
-
+export const shippingLabelQuotes = pgTable('shipping_label_quotes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  ownerId: text('owner_id').notNull(),
+  providerShipmentId: text('provider_shipment_id').notNull(),
+  providerRateId: text('provider_rate_id').notNull(),
+  carrier: text('carrier').notNull(),
+  service: text('service').notNull(),
+  priceCents: integer('price_cents').notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  orderIdx: index('shipping_label_quotes_order_idx').on(table.orderId),
+  rateUnique: uniqueIndex('shipping_label_quotes_rate_unique').on(table.ownerId, table.providerRateId),
+}));
 export const posts = pgTable('posts', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: text('user_id').notNull(), // Clerk user ID of poster
@@ -1145,4 +1158,46 @@ export const shopifyImportProductMappings = pgTable('shopify_import_product_mapp
   sourceProductUnique: uniqueIndex('shopify_import_source_product_unique')
     .on(table.ownerId, table.sourceUrl, table.sourceProductId),
   jobIdx: index('shopify_import_product_mappings_job_idx').on(table.importJobId),
+}));
+
+export const shippingLabels = pgTable('shipping_labels', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  ownerId: text('owner_id').notNull(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  provider: text('provider').notNull().default('shippo'),
+  providerShipmentId: text('provider_shipment_id'),
+  providerTransactionId: text('provider_transaction_id'),
+  providerRateId: text('provider_rate_id').notNull(),
+  carrier: text('carrier'),
+  service: text('service'),
+  trackingNumber: text('tracking_number'),
+  labelUrl: text('label_url'),
+  priceCents: integer('price_cents').notNull(),
+  status: text('status').notNull().default('purchasing'), // purchasing|active|failed|void_pending|voided
+  failureReason: text('failure_reason'),
+  previousOrderStatus: text('previous_order_status'),
+  refundedAt: timestamp('refunded_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orderIdx: index('shipping_labels_order_idx').on(table.orderId),
+  ownerIdx: index('shipping_labels_owner_idx').on(table.ownerId),
+  idempotencyUnique: uniqueIndex('shipping_labels_owner_idempotency_unique')
+    .on(table.ownerId, table.idempotencyKey),
+}));
+
+export const orderFundReservations = pgTable('order_fund_reservations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  orderId: uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }),
+  ownerId: text('owner_id').notNull(),
+  shippingLabelId: uuid('shipping_label_id').notNull().references(() => shippingLabels.id, { onDelete: 'cascade' }),
+  amountCents: integer('amount_cents').notNull(),
+  status: text('status').notNull().default('reserved'), // reserved|spent|released|refunded
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (table) => ({
+  orderIdx: index('order_fund_reservations_order_idx').on(table.orderId),
+  ownerIdx: index('order_fund_reservations_owner_idx').on(table.ownerId),
+  labelUnique: uniqueIndex('order_fund_reservations_label_unique').on(table.shippingLabelId),
 }));

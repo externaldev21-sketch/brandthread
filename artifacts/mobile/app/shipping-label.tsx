@@ -1,9 +1,9 @@
 /**
- * Shipping Label — buy a demo shipping label for an order
+ * Shipping Label — purchase a carrier label from pending order funds
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, ActivityIndicator, Switch, FlatList } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert, ActivityIndicator, Switch, FlatList, Linking, Share } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,7 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GRAD_CARD_GLOW, FONT, FS, SP, RADIUS, ICON, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, StatusBadge, SectionHeader } from '@/components/BrandthreadUI';
-import { getOrder, getDemoShippingRates, buyDemoLabel, voidLabel } from '@/services/orderService';
+import { getOrder, getShippingRates, purchaseShippingLabel, voidShippingLabel } from '@/services/orderService';
 import { Order, ShippingRate, ShippingLabel } from '@/services/orderTypes';
 import { formatCents } from '@/lib/money';
 
@@ -43,11 +43,12 @@ export default function ShippingLabelScreen() {
   const [rates, setRates] = useState<ShippingRate[]>([]);
   const [selectedRateId, setSelectedRateId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadingRates, setLoadingRates] = useState(true);
+  const [loadingRates, setLoadingRates] = useState(false);
   const [buying, setBuying] = useState(false);
   const [bought, setBought] = useState(false);
   const [label, setLabel] = useState<ShippingLabel | null>(null);
   const [voided, setVoided] = useState(false);
+  const [purchaseKey] = useState(() => `label-${orderId}-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
   // Package details
   const [packageType, setPackageType] = useState<PackageType>('parcel');
@@ -64,30 +65,52 @@ export default function ShippingLabelScreen() {
     setOrder(o ?? null);
     setLoading(false);
 
-    setLoadingRates(true);
-    const r = await getDemoShippingRates();
-    setRates(r);
-    setLoadingRates(false);
   }, [orderId]);
 
   useEffect(() => { load(); }, [load]);
 
   const selectedRate = rates.find(r => r.id === selectedRateId) ?? null;
 
+  async function handleLoadRates() {
+    if (!order?.fulfillment.fromAddress || !weight || !length || !width || !height) {
+      Alert.alert('Package details required', 'Enter the package weight and dimensions before loading rates.');
+      return;
+    }
+    setLoadingRates(true);
+    try {
+      const nextRates = await getShippingRates(orderId, {
+        fromAddress: order.fulfillment.fromAddress,
+        weight, length, width, height,
+      });
+      setRates(nextRates);
+      setSelectedRateId(nextRates[0]?.id ?? null);
+    } catch (err: any) {
+      Alert.alert('Rates unavailable', err?.message ?? 'Could not load carrier rates.');
+    } finally {
+      setLoadingRates(false);
+    }
+  }
+
   async function handleBuyLabel() {
-    if (!selectedRateId) {
+    if (!selectedRateId || !selectedRate) {
       Alert.alert('Select a rate', 'Please select a shipping service first.');
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setBuying(true);
-    const lbl = await buyDemoLabel(orderId, selectedRateId);
-    setBuying(false);
-    if (lbl) {
+    try {
+      const lbl = await purchaseShippingLabel(orderId, selectedRate, purchaseKey);
       setLabel(lbl);
       setBought(true);
-    } else {
-      Alert.alert('Error', 'Could not purchase label. Please try again.');
+    } catch (err: any) {
+      Alert.alert(
+        'Label not purchased',
+        err?.message?.toLowerCase().includes('pending')
+          ? 'This order does not have enough pending funds for the selected label. No card was charged.'
+          : err?.message ?? 'Could not purchase label. Please try again.',
+      );
+    } finally {
+      setBuying(false);
     }
   }
 
@@ -102,8 +125,14 @@ export default function ShippingLabelScreen() {
           text: 'Void Label',
           style: 'destructive',
           onPress: async () => {
-            await voidLabel(orderId, label.id);
-            setVoided(true);
+            try {
+              const updated = await voidShippingLabel(orderId, label.id);
+              setLabel(updated);
+              setVoided(updated.status === 'voided');
+              if (updated.refundPending) Alert.alert('Void requested', 'The carrier is processing the label refund.');
+            } catch (err: any) {
+              Alert.alert('Could not void label', err?.message ?? 'Try again later.');
+            }
           },
         },
       ]
@@ -171,7 +200,7 @@ export default function ShippingLabelScreen() {
                   <Feather name="check-circle" size={ICON.xxl} color={SUCCESS} />
                 </View>
                 <Text style={s.successTitle}>Label Purchased</Text>
-                <Text style={s.demoNotice}>Demo — no real carrier transaction occurred</Text>
+                <Text style={s.demoNotice}>Paid from pending funds for this order</Text>
               </View>
 
               <View style={s.labelInfoGrid}>
@@ -203,12 +232,16 @@ export default function ShippingLabelScreen() {
             <>
               <SecondaryButton
                 label="Download Label"
-                onPress={() => Alert.alert('Download', 'Label download will be available in the next release.')}
+                onPress={() => label.labelUrl
+                  ? Linking.openURL(label.labelUrl)
+                  : Alert.alert('Label unavailable', 'The carrier did not return a downloadable label.')}
                 icon="download"
               />
               <SecondaryButton
                 label="Share Label"
-                onPress={() => Alert.alert('Share', 'Label sharing will be available in the next release.')}
+                onPress={() => label.labelUrl
+                  ? Share.share({ title: `Shipping label ${order.orderNumber}`, message: label.labelUrl })
+                  : Alert.alert('Label unavailable', 'The carrier did not return a shareable label.')}
                 icon="share-2"
               />
               <SecondaryButton
@@ -254,12 +287,12 @@ export default function ShippingLabelScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Demo notice */}
+        {/* Funding notice */}
         <GradientCard colors={[theme.secondaryDim, theme.accentDim]} style={{ borderColor: theme.secondary }}>
           <View style={s.demoRow}>
             <Feather name="info" size={ICON.sm} color={CYAN} />
             <Text style={s.demoText}>
-              Label generated via Brandthread. Purchase confirms a real carrier transaction.
+              This label is paid from pending funds for this order, including eligible preorder funds. Brandthread will not fall back to a card.
             </Text>
           </View>
         </GradientCard>
@@ -397,6 +430,12 @@ export default function ShippingLabelScreen() {
 
         {/* Carrier Rates */}
         <SectionHeader title="Carrier Rates" />
+        <SecondaryButton
+          label={loadingRates ? 'Loading Rates…' : 'Load Carrier Rates'}
+          icon="refresh-cw"
+          onPress={handleLoadRates}
+          disabled={loadingRates}
+        />
         {loadingRates ? (
           <View style={s.ratesLoading}>
             <ActivityIndicator color={PURPLE} />

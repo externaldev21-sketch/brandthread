@@ -518,6 +518,70 @@ export async function getDemoShippingRates(): Promise<ShippingRate[]> {
   return new Promise(resolve => setTimeout(() => resolve(DEMO_CARRIER_RATES), 800));
 }
 
+export async function getShippingRates(orderId: string, parcel: {
+  fromAddress: OrderAddress;
+  weight: string;
+  length: string;
+  width: string;
+  height: string;
+}): Promise<ShippingRate[]> {
+  const result = await serviceRequest(`/api/shipping-labels/${encodeURIComponent(orderId)}/rates`, {
+    method: 'POST',
+    body: JSON.stringify(parcel),
+  }) as { rates: ShippingRate[] };
+  return result.rates;
+}
+
+export async function purchaseShippingLabel(
+  orderId: string,
+  rate: ShippingRate,
+  idempotencyKey: string,
+): Promise<ShippingLabel> {
+  const result = await serviceRequest(`/api/shipping-labels/${encodeURIComponent(orderId)}/purchase`, {
+    method: 'POST',
+    body: JSON.stringify({ rateId: rate.id, priceCents: rate.priceCents, idempotencyKey }),
+  }) as { label: any; fundingSource: 'pending_order_funds'; purchasePending?: boolean };
+  if (result.purchasePending) {
+    throw Object.assign(new Error('The carrier is still processing this label. Try again shortly.'), {
+      code: 'LABEL_PURCHASE_PENDING',
+    });
+  }
+  return {
+    id: result.label.id,
+    orderId,
+    carrier: result.label.carrier ?? rate.carrier,
+    service: result.label.service ?? rate.service,
+    trackingNumber: result.label.trackingNumber ?? '',
+    labelUrl: result.label.labelUrl ?? undefined,
+    priceCents: result.label.priceCents,
+    status: result.label.status,
+    isDemo: false,
+    fundingSource: result.fundingSource,
+    purchasedAt: result.label.createdAt,
+  };
+}
+
+export async function voidShippingLabel(orderId: string, labelId: string): Promise<ShippingLabel> {
+  const result = await serviceRequest(
+    `/api/shipping-labels/${encodeURIComponent(orderId)}/${encodeURIComponent(labelId)}/void`,
+    { method: 'POST', body: JSON.stringify({}) },
+  ) as { label: any; refundPending: boolean };
+  return {
+    id: result.label.id,
+    orderId,
+    carrier: result.label.carrier ?? '',
+    service: result.label.service ?? '',
+    trackingNumber: result.label.trackingNumber ?? '',
+    labelUrl: result.label.labelUrl ?? undefined,
+    priceCents: result.label.priceCents,
+    status: result.label.status,
+    isDemo: false,
+    fundingSource: 'pending_order_funds',
+    refundPending: result.refundPending,
+    purchasedAt: result.label.createdAt,
+  };
+}
+
 export async function buyDemoLabel(orderId: string, rateId: string): Promise<ShippingLabel | undefined> {
   await ensureInitialized();
   const o = _orders.find(x => x.id === orderId);

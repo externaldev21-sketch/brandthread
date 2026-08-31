@@ -47,13 +47,20 @@ export async function recordPaidPhysicalOrder(
   }).onConflictDoNothing({ target: sellerTaxLedger.orderId });
 }
 
-export const FEDERAL_1099K_GROSS_THRESHOLD_CENTS = 2_000_000;
-export const FEDERAL_1099K_TRANSACTION_THRESHOLD = 200;
+export const FEDERAL_1099K_GROSS_THRESHOLD_CENTS = 60_000;
+export const FEDERAL_1099K_TRANSACTION_THRESHOLD = null;
 
 export function federal1099KRuleForYear(year: number) {
-  // IRS transitional relief used a $5,000 gross-only threshold for tax year
-  // 2024. Federal law restored the longstanding $20,000 AND 200-transaction
-  // threshold for 2025 onward. State thresholds may be lower.
+  // Federal transition thresholds are gross-only. State thresholds may be
+  // lower, and this progress indicator is informational rather than tax advice.
+  if (year < 2024) {
+    return {
+      grossPaymentThresholdCents: 2_000_000,
+      transactionThreshold: 200,
+      rule: "PRE_2024_20000_AND_200" as const,
+      summary: "More than $20,000 and more than 200 transactions",
+    };
+  }
   if (year === 2024) {
     return {
       grossPaymentThresholdCents: 500_000,
@@ -62,11 +69,19 @@ export function federal1099KRuleForYear(year: number) {
       summary: "More than $5,000 in gross payments",
     };
   }
+  if (year === 2025) {
+    return {
+      grossPaymentThresholdCents: 250_000,
+      transactionThreshold: null,
+      rule: "2025_TRANSITION_2500_GROSS" as const,
+      summary: "More than $2,500 in gross payments",
+    };
+  }
   return {
     grossPaymentThresholdCents: FEDERAL_1099K_GROSS_THRESHOLD_CENTS,
     transactionThreshold: FEDERAL_1099K_TRANSACTION_THRESHOLD,
-    rule: "RESTORED_20000_AND_200" as const,
-    summary: "More than $20,000 and more than 200 transactions",
+    rule: "2026_600_GROSS" as const,
+    summary: "More than $600 in gross payments",
   };
 }
 

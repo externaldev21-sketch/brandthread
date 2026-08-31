@@ -10,8 +10,8 @@
  */
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { users } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { users, orderFundReservations } from "@workspace/db";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { requireRole, teamContext } from "../middlewares/requireRole";
 import { stripe } from "../lib/stripe";
@@ -237,15 +237,37 @@ router.post("/payout", requireRole("owner"), async (req, res) => {
     if (!stripe || !accountId) {
       res.status(400).json({ error: "Stripe not connected" }); return;
     }
+    const stripeClient = stripe;
 
-    const payout = await stripe.payouts.create(
-      {
-        amount:   amount ?? undefined, // undefined = full available balance
-        currency,
-        method:   "instant",
-      },
-      { stripeAccount: accountId },
-    );
+    const payout = await db.transaction(async (tx) => {
+      // Label reservations and payouts share this seller-scoped lock, so neither
+      // can observe and spend the same funds while the other is in flight.
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${sellerId}))`);
+      const [balance, reservationRows] = await Promise.all([
+        stripeClient.balance.retrieve({}, { stripeAccount: accountId }),
+        tx.select({ reserved: sql<number>`COALESCE(SUM(${orderFundReservations.amountCents}), 0)::int` })
+          .from(orderFundReservations)
+          .where(and(
+            eq(orderFundReservations.ownerId, sellerId),
+            inArray(orderFundReservations.status, ["reserved", "spent"]),
+          )),
+      ]);
+      const currencyBalance = balance.available.find((entry) => entry.currency === currency);
+      const providerAvailable = currencyBalance?.amount ?? 0;
+      const reserved = Number(reservationRows[0]?.reserved ?? 0);
+      const payoutAmount = amount ?? Math.max(0, providerAvailable - reserved);
+      if (!Number.isInteger(payoutAmount) || payoutAmount <= 0 || payoutAmount > providerAvailable - reserved) {
+        throw Object.assign(new Error("Requested payout would spend funds reserved for shipping labels"), {
+          status: 409,
+          code: "FUNDS_RESERVED_FOR_LABELS",
+          availableAfterReservations: Math.max(0, providerAvailable - reserved),
+        });
+      }
+      return stripeClient.payouts.create(
+        { amount: payoutAmount, currency, method: "instant" },
+        { stripeAccount: accountId },
+      );
+    });
 
     res.status(201).json({
       id:          payout.id,
@@ -257,7 +279,11 @@ router.post("/payout", requireRole("owner"), async (req, res) => {
     });
   } catch (err: any) {
     req.log.error({ err }, "Failed to request payout");
-    res.status(err.status ?? 500).json({ error: err.message ?? "Payout failed" });
+    res.status(err.status ?? 500).json({
+      error: err.message ?? "Payout failed",
+      ...(err.code && { code: err.code }),
+      ...(err.availableAfterReservations !== undefined && { availableAfterReservations: err.availableAfterReservations }),
+    });
   }
 });
 

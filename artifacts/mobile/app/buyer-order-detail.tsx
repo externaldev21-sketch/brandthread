@@ -29,9 +29,7 @@ import {
 } from '@/components/BrandthreadUI';
 import { formatCents } from '@/lib/money';
 import { visibleOrderForBuyer } from '@/lib/buyerOrdersVisibility';
-
-// 60-minute cancellation window (mirrors server enforcement)
-const CANCEL_WINDOW_MS = 60 * 60 * 1000;
+import { canBuyerCancel } from '@/services/orderPolicy';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -178,7 +176,7 @@ function adaptOrderDetail(row: any): BuyerOrderView {
     sellerId:          row.ownerId ?? '',
     sellerName:        row.sellerDisplayName ?? 'Seller',
     sellerHandle:      '',
-    status:            (row.status === 'pending' ? 'new' : (row.status ?? 'new')) as OrderStatus,
+    status:            (row.status === 'pending' ? 'new' : row.status === 'fulfilled' ? 'ready_to_ship' : (row.status ?? 'new')) as OrderStatus,
     paymentStatus:     row.stripePaymentIntentId ? 'paid' : 'pending',
     fulfillmentStatus: 'unfulfilled',
     lineItems: items.map((item: any) => ({
@@ -803,9 +801,8 @@ export default function BuyerOrderDetailScreen() {
         <View style={{ paddingHorizontal: SP.md, gap: SP.sm, marginBottom: SP.md }}>
           <Text style={[sc.title, { paddingHorizontal: 0 }]}>Actions</Text>
 
-          {/* Cancel button — only visible within the 60-min window while pending */}
-          {order.status === 'new' &&
-            (Date.now() - new Date(order.createdAt).getTime()) < CANCEL_WINDOW_MS && (
+          {/* Cancellation disappears immediately once the order ships or is delivered. */}
+          {canBuyerCancel(order.status, order.createdAt) && (
             <SecondaryButton
               label={cancelling ? 'Cancelling…' : 'Cancel Order'}
               icon="x-circle"

@@ -8,6 +8,7 @@ import { teamContext, requireRole } from "../middlewares/requireRole";
 import { logActivity, reqActor } from "../lib/activityLog";
 import { publishNotification } from "./notifications-feed";
 import { reversePurchasePointsOnce } from "./loyalty";
+import { buildOrderStatusUpdate, orderStatusTransitionConflict } from "../lib/orderStatusPolicy";
 import { logger } from "../lib/logger";
 import { sendOrderShippingEmail } from "../lib/brandthreadEmail";
 
@@ -325,11 +326,7 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
   }
 
   // Build the update payload — include cancellation fields when cancelling
-  const updatePayload: Record<string, any> = { status, updatedAt: new Date() };
-  if (status === "cancelled") {
-    updatePayload.cancellationReason = reason;
-    updatePayload.cancellationNotes  = (notes as string | undefined)?.trim() || null;
-  }
+  const updatePayload = buildOrderStatusUpdate(status, reason, notes);
 
   // Atomically update only when status is actually changing — prevents duplicate
   // notifications. Cancellation also reverses any purchase award in this same
@@ -342,6 +339,7 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
         eq(orders.id, req.params.id),
         eq(orders.ownerId, ownerId),
         ne(orders.status, "cancelled"),        // buyer/seller cancellation is terminal
+        ne(orders.status, "label_purchasing"), // carrier purchase owns the order transition
         ne(orders.status, status),           // skip the write if already at target status
       ))
       .returning();
@@ -360,8 +358,13 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
   if (!transitioned) {
     // Either not found, or order was already at the requested status (idempotent).
     const [current] = await db.select().from(orders)
-      .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId))).limit(1);
+      .where(and(eq(orders.id, req.params.id), eq(orders.ownerId, ownerId)))
+      .limit(1);
     if (!current) { res.status(404).json({ error: "Not found" }); return; }
+    const conflict = orderStatusTransitionConflict(current.status);
+    if (conflict) {
+      res.status(409).json({ error: conflict }); return;
+    }
     res.json(current); return;  // Already at target status — no notification needed
   }
 
@@ -482,6 +485,7 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
       .where(and(
         eq(orders.id, req.params.id),
         eq(orders.ownerId, ownerId),
+        ne(orders.status, "label_purchasing"),
         ne(orders.status, "shipped"),        // skip write if already shipped
       ))
       .returning({ id: orders.id, buyerId: orders.buyerId, orderNumber: orders.orderNumber, dropId: orders.dropId, ownerId: orders.ownerId, subtotalCents: orders.subtotalCents });
@@ -515,6 +519,7 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
     .where(and(
       eq(orders.id, req.params.id),
       eq(orders.ownerId, ownerId),
+      ne(orders.status, "label_purchasing"),
       sql`(${trackingNumberChanged} OR ${carrierChanged} OR ${trackingStatusChanged} OR ${estimatedDeliveryChanged})`,
     ))
     .returning();

@@ -6,7 +6,7 @@ import { Router } from "express";
 import {
   db, checkoutSessions, orders, orderItems, productVariants, products, users, shippingRates, discountCodes, buyerAddresses,
 } from "@workspace/db";
-import { eq, and, desc, sql, isNull } from "drizzle-orm";
+import { eq, and, desc, sql, isNull, inArray } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import {
   requireStripe,
@@ -26,6 +26,10 @@ import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { logger } from "../lib/logger";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
+import {
+  BUYER_CANCELLABLE_ORDER_STATUSES,
+  buyerCancellationEligibility,
+} from "../lib/buyerCancellationPolicy";
 
 const router = Router();
 router.use(requireAuth);
@@ -1086,8 +1090,8 @@ router.get("/orders/:id", async (req, res) => {
 // ─── Buyer Order Cancellation ────────────────────────────────────────────────
 /**
  * POST /api/buyer/orders/:id/cancel
- * Allows a buyer to cancel their own order within a 60-minute window while
- * the order is still in 'pending' status. Automatically issues a full Stripe
+ * Allows a buyer to cancel their own order through day 21 while it remains
+ * pre-shipment. Automatically issues a full Stripe
  * refund via the stored payment intent. Fails explicitly if Stripe errors —
  * we never mark an order cancelled without confirming the refund.
  */
@@ -1095,7 +1099,7 @@ router.post("/orders/:id/cancel", validateRequest({ params: uuidParamsSchema }),
   const id = req.params.id as string;
   try {
     const buyerId = (req as any).clerkUserId as string;
-    const CANCEL_WINDOW_MS = 60 * 60 * 1000; // 60 minutes
+    const PRE_SHIPMENT_STATUSES = [...BUYER_CANCELLABLE_ORDER_STATUSES];
     const result = await db.transaction(async (tx) => {
       // Lock the order before checking eligibility. Seller fulfillment updates
       // must wait, so exactly one side wins the race.
@@ -1120,14 +1124,13 @@ router.post("/orders/:id/cancel", validateRequest({ params: uuidParamsSchema }),
       if (order.status === "cancelled") {
         return { cancelled: true, refunded: Boolean(order.stripe_payment_intent_id), orderNumber: order.order_number };
       }
-      if (order.status !== "pending") {
-        throw Object.assign(new Error(`Only pending orders can be cancelled. Current status: ${order.status}.`), { status: 409 });
+      const eligibility = buyerCancellationEligibility(order.status, order.created_at);
+      if (eligibility.reason === "shipped_or_ineligible") {
+        throw Object.assign(new Error(`Only pre-shipment orders can be cancelled. Current status: ${order.status}.`), { status: 409 });
       }
-
-      const ageMs = Date.now() - new Date(order.created_at).getTime();
-      if (ageMs > CANCEL_WINDOW_MS) {
+      if (eligibility.reason === "window_expired") {
         throw Object.assign(
-          new Error("Orders can only be cancelled within 60 minutes of placement. Contact the seller to request a cancellation."),
+          new Error("Orders can only be cancelled through day 21 after placement. Contact the seller to request a cancellation."),
           { status: 409 },
         );
       }
@@ -1161,10 +1164,10 @@ router.post("/orders/:id/cancel", validateRequest({ params: uuidParamsSchema }),
         .set({
           status: "cancelled",
           cancellationReason: "buyer_requested",
-          cancellationNotes: "Cancelled by buyer within the 60-minute cancellation window.",
+          cancellationNotes: "Cancelled by buyer within the 21-day cancellation window.",
           updatedAt: new Date(),
         })
-        .where(and(eq(orders.id, id), eq(orders.status, "pending")));
+        .where(and(eq(orders.id, id), inArray(orders.status, PRE_SHIPMENT_STATUSES)));
 
       // Checkout fulfillment reserves stock when the paid order is created.
       // A grace-period cancellation releases that reservation exactly once

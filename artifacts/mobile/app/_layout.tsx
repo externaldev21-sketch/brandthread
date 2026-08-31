@@ -625,6 +625,7 @@ function RootLayoutNav() {
         <Stack.Screen name="buyer-login-activity"  options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-account-control" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-download-data"   options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="seller-data-export"    options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-close-friends"   options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-your-activity"   options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-archive"         options={{ headerShown: false, animation: 'slide_from_right' }} />

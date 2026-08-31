@@ -82,6 +82,7 @@
 - [Premium image acceptance](premium-image-acceptance.md) — customer-facing AI images require premium generation plus operation-specific, fail-closed visual QA with one bounded correction pass.
 - [Verified post analytics](verified-post-analytics.md) — optional post metrics expose tracked/null explicitly; never infer views, retention, or conversion rates from unrelated activity.
 - [Payment API security boundaries](payment-api-security-boundaries.md) — entitlement failures deny access; distributed limits fail closed; Stripe dispatch uses retryable, heartbeat-fenced event claims.
+- [Order-funded label boundary](order-funded-label-boundary.md) — carrier quotes and purchase operations are order-bound; label claims serialize with cancellation, fulfillment, and payout spending.
 - [Thread pagination boundary](thread-feed-pagination.md) — independently paginated followed/public sources need separate raw cursors, cross-source seen IDs, and refresh generations.
 - [Tax reporting boundaries](tax-reporting-boundaries.md) — annual gross uses successful-payment UTC year; preserve Stripe tax, gross, and final destination without inferring compliance.
 - [Notification response deduplication](notification-response-deduplication.md) — warm listeners and cold-start recovery can surface the same Expo response; dedupe navigation by request identifier.

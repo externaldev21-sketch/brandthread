@@ -145,8 +145,10 @@ export interface ShippingLabel {
   trackingNumber: string;
   labelUrl?: string;
   priceCents: number;
-  status: 'active' | 'voided';
+  status: 'purchasing' | 'active' | 'failed' | 'void_pending' | 'voided';
   isDemo: boolean;
+  fundingSource?: 'pending_order_funds';
+  refundPending?: boolean;
   purchasedAt: string;
 }
 
