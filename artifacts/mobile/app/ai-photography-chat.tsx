@@ -38,6 +38,9 @@ interface Message {
   photoLabels?: string[];
   image?: string; // base64 result
   error?: boolean;
+  retryGarment?: UploadedPhoto;
+  garmentIndex?: number;
+  retryPrompt?: string;
 }
 
 const MAX_PHOTOS = 4;
@@ -61,6 +64,7 @@ export default function AIPhotographyChatScreen() {
   const [heroPhoto, setHeroPhoto] = useState<UploadedPhoto | null>(null);
   const [garments, setGarments] = useState<UploadedPhoto[]>([]);
   const [loading, setLoading] = useState(false);
+  const [retryingMessageId, setRetryingMessageId] = useState<string | null>(null);
   const flatRef = useRef<FlatList>(null);
 
   const bottomPad = Platform.OS === 'web' ? 34 : insets.bottom;
@@ -227,25 +231,35 @@ export default function AIPhotographyChatScreen() {
       const heroDataUrl = `data:${heroPhoto.mime};base64,${heroPhoto.base64}`;
       const garmentDataUrls = attachedGarments.map((p) => `data:${p.mime};base64,${p.base64}`);
       const result = await api.photography.generateOutfitSwap(heroDataUrl, garmentDataUrls, text.trim());
-      const resultMessages: Message[] = (result?.results ?? []).map((item: { b64_json?: string; garmentIndex?: number }, index: number) => ({
-        id: `${Date.now()}-result-${index}`,
-        role: 'assistant',
-        content: item.b64_json
-          ? `Outfit Swap result ${index + 1} of ${attachedGarments.length} — garment ${item.garmentIndex ?? index + 1} on the locked hero scene.`
-          : `Garment ${item.garmentIndex ?? index + 1} could not be generated.`,
-        image: item.b64_json,
-        error: !item.b64_json,
-      }));
-      if (resultMessages.length === 0) {
+      const resultMessages: Message[] = (result?.results ?? []).map((item: { b64_json?: string; garmentIndex?: number }, index: number) => {
+        const garmentIndex = item.garmentIndex ?? index + 1;
+        return {
+          id: `${Date.now()}-result-${index}`,
+          role: 'assistant',
+          content: item.b64_json
+            ? `Outfit Swap result ${index + 1} of ${attachedGarments.length} — garment ${garmentIndex} on the locked hero scene.`
+            : `Garment ${garmentIndex} could not be generated.`,
+          image: item.b64_json,
+          error: !item.b64_json,
+          garmentIndex,
+          retryGarment: attachedGarments[garmentIndex - 1],
+          retryPrompt: text.trim(),
+        };
+      });
+      if (resultMessages.length === 0 && !result?.errors?.length) {
         throw new Error('No outfit swap results were returned. Please try again.');
       }
       if (result?.errors?.length) {
         result.errors.forEach((failure: { garmentIndex?: number }) => {
+          const garmentIndex = failure.garmentIndex ?? resultMessages.length + 1;
           resultMessages.push({
             id: `${Date.now()}-error-${failure.garmentIndex ?? resultMessages.length}`,
             role: 'assistant',
-            content: `Garment ${failure.garmentIndex ?? resultMessages.length + 1} could not be generated. Please try that design again.`,
+            content: `Garment ${garmentIndex} could not be generated. Please try that design again.`,
             error: true,
+            garmentIndex,
+            retryGarment: attachedGarments[garmentIndex - 1],
+            retryPrompt: text.trim(),
           });
         });
       }
@@ -259,6 +273,48 @@ export default function AIPhotographyChatScreen() {
       }, ...prev]);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function retryOutfitSwap(message: Message) {
+    if (!heroPhoto || !message.retryGarment || retryingMessageId) return;
+
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setRetryingMessageId(message.id);
+    setMessages((prev) => prev.map((item) => item.id === message.id
+      ? { ...item, content: `Retrying garment ${message.garmentIndex ?? ''}…`.replace('  ', ' '), error: true }
+      : item));
+
+    try {
+      const heroDataUrl = `data:${heroPhoto.mime};base64,${heroPhoto.base64}`;
+      const garmentDataUrl = `data:${message.retryGarment.mime};base64,${message.retryGarment.base64}`;
+      const result = await api.photography.retryOutfitSwap(
+        heroDataUrl,
+        garmentDataUrl,
+        message.garmentIndex ?? 1,
+        message.retryPrompt ?? '',
+      );
+      if (!result?.b64_json) {
+        throw new Error('This garment could not be generated. Please try again.');
+      }
+      setMessages((prev) => prev.map((item) => item.id === message.id
+        ? {
+            ...item,
+            content: `Outfit Swap result — garment ${message.garmentIndex ?? 1} on the locked hero scene.`,
+            image: result.b64_json,
+            error: false,
+          }
+        : item));
+    } catch (err: any) {
+      setMessages((prev) => prev.map((item) => item.id === message.id
+        ? {
+            ...item,
+            content: err?.message ?? 'This garment could not be generated. Please try again.',
+            error: true,
+          }
+        : item));
+    } finally {
+      setRetryingMessageId(null);
     }
   }
 
@@ -373,6 +429,31 @@ export default function AIPhotographyChatScreen() {
                 style={styles.resultImage}
                 resizeMode="cover"
               />
+            )}
+            {msg.error && msg.retryGarment && (
+              <TouchableOpacity
+                style={[
+                  styles.retryBtn,
+                  { borderColor: colors.destructive, backgroundColor: colors.background },
+                ]}
+                onPress={() => retryOutfitSwap(msg)}
+                disabled={retryingMessageId !== null}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={`Retry garment ${msg.garmentIndex ?? ''}`}
+              >
+                {retryingMessageId === msg.id ? (
+                  <View style={styles.retryLoadingRow}>
+                    <View style={[styles.retrySpinner, { borderColor: colors.mutedForeground, borderTopColor: colors.primary }]} />
+                    <Text style={[styles.retryBtnText, { color: colors.mutedForeground }]}>Retrying…</Text>
+                  </View>
+                ) : (
+                  <>
+                    <Feather name="refresh-cw" size={13} color={colors.primary} />
+                    <Text style={[styles.retryBtnText, { color: colors.primary }]}>Retry</Text>
+                  </>
+                )}
+              </TouchableOpacity>
             )}
           </View>
         )}
@@ -496,6 +577,10 @@ const styles = StyleSheet.create({
   loadingDots: { flexDirection: 'row', gap: 6 },
   loadDot: { width: 7, height: 7, borderRadius: 3.5, opacity: 0.6 },
   loadingText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  retryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, minHeight: 34, marginTop: 10, paddingHorizontal: 12, borderRadius: 17, borderWidth: 1 },
+  retryBtnText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  retryLoadingRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  retrySpinner: { width: 13, height: 13, borderRadius: 7, borderWidth: 2 },
   trayThumbWrap: { position: 'relative' },
   trayThumb: { width: 56, height: 56, borderRadius: 10 },
   lockedHeroTray: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, marginBottom: 8, padding: 8, borderRadius: 12, borderWidth: 1 },

@@ -638,6 +638,15 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         results: { garmentIndex: number; b64_json: string }[];
         errors?: { garmentIndex: number }[];
       }>('/api/photography/outfit-swap', { heroImage, garmentImages, prompt }),
+      retryOutfitSwap: (
+        heroImage: string,
+        garmentImage: string,
+        garmentIndex: number,
+        prompt: string,
+      ) => post<{
+        garmentIndex: number;
+        b64_json: string;
+      }>('/api/photography/outfit-swap/retry', { heroImage, garmentImage, garmentIndex, prompt }),
     },
     bgRemoval: {
       /**

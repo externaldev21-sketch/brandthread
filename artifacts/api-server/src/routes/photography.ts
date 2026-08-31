@@ -220,6 +220,12 @@ router.post("/outfit-swap", async (req, res) => {
       }
     }
 
+    if (results.length === 0 && errors.length > 0) {
+      // Return each failed garment so the client can offer targeted retries,
+      // including when every garment in the batch fails.
+      res.json({ results, errors });
+      return;
+    }
     if (results.length === 0) {
       res.status(502).json({ error: "Outfit Swap generation failed. Please try again." });
       return;
@@ -228,6 +234,65 @@ router.post("/outfit-swap", async (req, res) => {
   } catch (_err) {
     // Do not leak upstream provider error details to the client.
     res.status(502).json({ error: "Outfit Swap generation failed. Please try again." });
+  } finally {
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+// POST /api/photography/outfit-swap/retry
+// { heroImage: string, garmentImage: string, garmentIndex: number, prompt?: string }
+// Retry only the failed garment so successful edits do not run again.
+router.post("/outfit-swap/retry", async (req, res) => {
+  const userId = (req as any).auth?.userId ?? (req as any).auth?.sub ?? "anon";
+  const { heroImage, garmentImage, garmentIndex, prompt } = req.body ?? {};
+
+  if (typeof heroImage !== "string" || typeof garmentImage !== "string") {
+    res.status(400).json({ error: "A hero photo and garment design are required for this retry." });
+    return;
+  }
+  if (!Number.isInteger(garmentIndex) || garmentIndex < 1 || garmentIndex > MAX_IMAGES) {
+    res.status(400).json({ error: "The garment being retried is not valid." });
+    return;
+  }
+  if (!checkRateLimit(userId)) {
+    res.status(429).json({ error: "Too many generations. Please wait a minute and try again." });
+    return;
+  }
+
+  const safeDescription =
+    typeof prompt === "string" && prompt.trim().length > 0
+      ? prompt.trim().slice(0, 500)
+      : "";
+  const heroBuffer = decodeDataUrl(heroImage);
+  const garmentBuffer = decodeDataUrl(garmentImage);
+  if (!heroBuffer || !garmentBuffer) {
+    res.status(400).json({ error: "One or more Outfit Swap images are not valid. Please re-upload." });
+    return;
+  }
+  if (heroBuffer.length > MAX_IMAGE_BYTES || garmentBuffer.length > MAX_IMAGE_BYTES) {
+    res.status(400).json({ error: "Each photo must be under 8MB." });
+    return;
+  }
+  if (heroBuffer.length + garmentBuffer.length > MAX_TOTAL_BYTES) {
+    res.status(400).json({ error: "Total photo size is too large. Please upload smaller images." });
+    return;
+  }
+
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "outfit-swap-retry-"));
+  try {
+    const heroFile = path.join(tmpDir, `${randomUUID()}-hero.png`);
+    const garmentFile = path.join(tmpDir, `${randomUUID()}-garment-${garmentIndex}.png`);
+    await fs.writeFile(heroFile, heroBuffer);
+    await fs.writeFile(garmentFile, garmentBuffer);
+    const editPrompt = `This is an Outfit Swap edit. Image 1 is the locked base hero photo and Image 2 is the new garment design. Create one photorealistic fashion photo by replacing only the clothing on the model in Image 1 with the garment design from Image 2. Preserve the exact same model identity, face, hair, body proportions, pose, hand position, camera angle, crop, framing, lighting, shadows, location, background, and composition from Image 1. Do not change the model, pose, scene, background, or camera. Make the garment fit naturally on the existing model with realistic fabric texture, drape, seams, and shadows. Do not add logos or design details that are not present in Image 2. ${
+      safeDescription ? `Additional direction from the brand owner: "${safeDescription}".` : ""
+    }`;
+    const buffer = await editImages([heroFile, garmentFile], editPrompt);
+    res.json({ garmentIndex, b64_json: buffer.toString("base64") });
+  } catch (_err) {
+    // Keep the existing successful results on the client and expose only a
+    // concise retry-safe message rather than provider details.
+    res.status(502).json({ error: "This garment could not be generated. Please try again." });
   } finally {
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }
