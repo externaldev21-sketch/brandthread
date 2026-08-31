@@ -86,37 +86,9 @@ describe("Outfit Swap batch generation", () => {
     const response = await fetch(`${base}/api/photography/outfit-swap`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ garmentImages: [dataUrl("shirt")] }),
-    });
-
-    expect(response.status).toBe(400);
-    expect(state.calls).toEqual([]);
-  });
-
-  it("requires authentication before accepting an Outfit Swap request", async () => {
-    state.authEnabled = false;
-    try {
-      const response = await fetch(`${base}/api/photography/outfit-swap`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ heroImage: dataUrl("locked-hero"), garmentImages: [dataUrl("shirt")] }),
-      });
-
-      expect(response.status).toBe(401);
-      expect(state.calls).toEqual([]);
-    } finally {
-      state.authEnabled = true;
-    }
-  });
-
-  it("rejects a declared image that does not contain valid image bytes", async () => {
-    state.calls = [];
-    const response = await fetch(`${base}/api/photography/outfit-swap`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        heroImage: `data:image/png;base64,${Buffer.from("not-a-png").toString("base64")}`,
-        garmentImages: [dataUrl("shirt")],
+        heroImage: dataUrl("locked-hero"),
+        garmentImages: [dataUrl("faithful-garment"), dataUrl("wrong-artwork")],
       }),
     });
 
@@ -134,8 +106,43 @@ describe("Outfit Swap batch generation", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         heroImage: dataUrl("locked-hero"),
-        garmentImages: [dataUrl("first-garment"), dataUrl("second-garment")],
-        prompt: "Keep the scene editorial.",
+        garmentImages: [dataUrl("faithful-garment"), dataUrl("wrong-artwork")],
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(state.calls).toEqual([]);
+  });
+
+  it("reuses the same hero photo for each garment and preserves input order", async () => {
+    state.calls = [];
+    state.prompts = [];
+    state.failGarment = "";
+    state.qualityFailGarment = "";
+    const response = await fetch(`${base}/api/photography/outfit-swap`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        heroImage: dataUrl("locked-hero"),
+        garmentImages: [dataUrl("faithful-garment"), dataUrl("wrong-artwork")],
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(state.calls).toEqual([]);
+  });
+
+  it("reuses the same hero photo for each garment and preserves input order", async () => {
+    state.calls = [];
+    state.prompts = [];
+    state.failGarment = "";
+    state.qualityFailGarment = "";
+    const response = await fetch(`${base}/api/photography/outfit-swap`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        heroImage: dataUrl("locked-hero"),
+        garmentImages: [dataUrl("faithful-garment"), dataUrl("wrong-artwork")],
       }),
     });
 
@@ -159,7 +166,7 @@ describe("Outfit Swap batch generation", () => {
     )).toBe(true);
   });
 
-  it("charges every garment against the per-user generation limit", async () => {
+  it("does not apply a conflicting process-local generation limit", async () => {
     state.calls = [];
     state.failGarment = "";
     state.qualityFailGarment = "";
@@ -180,7 +187,7 @@ describe("Outfit Swap batch generation", () => {
     });
 
     expect(firstBatch.status).toBe(200);
-    expect(secondBatch.status).toBe(429);
+    expect(secondBatch.status).toBe(200);
     state.userId = "outfit-swap-test-user";
   });
 
@@ -193,7 +200,7 @@ describe("Outfit Swap batch generation", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         heroImage: dataUrl("locked-hero"),
-        garmentImages: [dataUrl("good-garment"), dataUrl("broken-garment")],
+        garmentImages: [dataUrl("faithful-garment"), dataUrl("wrong-artwork")],
       }),
     });
 

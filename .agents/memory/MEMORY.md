@@ -81,3 +81,4 @@
 - [Drop broadcast claim boundary](drop-broadcast-claim-boundary.md) — manual and scheduled launch notifications share one locked, eligibility-checked claim and clear pending state atomically.
 - [Premium image acceptance](premium-image-acceptance.md) — customer-facing AI images require premium generation plus operation-specific, fail-closed visual QA with one bounded correction pass.
 - [Verified post analytics](verified-post-analytics.md) — optional post metrics expose tracked/null explicitly; never infer views, retention, or conversion rates from unrelated activity.
+- [Payment API security boundaries](payment-api-security-boundaries.md) — entitlement failures deny access; distributed limits fail closed; Stripe dispatch uses retryable, heartbeat-fenced event claims.

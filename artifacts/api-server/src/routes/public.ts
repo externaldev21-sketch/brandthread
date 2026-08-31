@@ -11,6 +11,11 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { containsSearchPattern, normalizeSearchTerm } from "../lib/search";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
+import {
+  paginationMetadata,
+  parsePagination,
+  setPaginationHeaders,
+} from "../lib/pagination";
 
 // ─── In-flight guard for synchronous cache-miss computation ──────────────────
 // Prevents concurrent requests from each triggering an independent full
@@ -68,35 +73,48 @@ export function rankRelatedProducts<T extends {
 // Optional query params: ?category=apparel&tag=streetwear&ownerId=user_xxx&limit=50&offset=0
 router.get("/products", async (req, res) => {
   try {
-    const { category, tag, ownerId, limit = "50", offset = "0" } = req.query as Record<string, string>;
-    const lim = Math.min(parseInt(limit, 10) || 50, 100);
-    const off = parseInt(offset, 10) || 0;
-
-    // Fetch active products, optionally scoped to a specific seller
-    const whereClause = ownerId
-      ? and(eq(products.status, "active"), isNull(products.deletedAt), eq(products.ownerId, ownerId))
-      : and(eq(products.status, "active"), isNull(products.deletedAt));
-
-    const rows = await db
-      .select()
-      .from(products)
-      .where(whereClause)
-      .orderBy(desc(products.createdAt))
-      .limit(lim)
-      .offset(off);
-
-    // Filter by category / tag in JS (keeps query simple; replace with DB filter for scale)
-    let filtered = rows;
-    if (category) {
-      filtered = filtered.filter((p) => p.category === category);
+    const category = singleQueryValue(req.query.category);
+    const tag = singleQueryValue(req.query.tag);
+    const ownerId = singleQueryValue(req.query.ownerId);
+    const page = parsePagination(req.query, { limit: 50 });
+    if (
+      !page.success ||
+      category === null ||
+      tag === null ||
+      ownerId === null ||
+      (category?.length ?? 0) > 160 ||
+      (tag?.length ?? 0) > 160 ||
+      (ownerId?.length ?? 0) > 160
+    ) {
+      res.status(400).json({ error: "Invalid product list query", code: "VALIDATION_ERROR" });
+      return;
     }
-    if (tag) {
-      filtered = filtered.filter(
-        (p) =>
-          (p.tags as string[]).includes(tag) ||
-          (p.styleTags as string[]).includes(tag)
-      );
-    }
+    const { limit: lim, offset: off } = page.data;
+    const whereClause = and(
+      eq(products.status, "active"),
+      isNull(products.deletedAt),
+      ownerId ? eq(products.ownerId, ownerId) : undefined,
+      category ? eq(products.category, category) : undefined,
+      tag
+        ? or(
+          sql`${products.tags}::jsonb @> ${JSON.stringify([tag])}::jsonb`,
+          sql`${products.styleTags}::jsonb @> ${JSON.stringify([tag])}::jsonb`,
+        )
+        : undefined,
+    );
+
+    const [rows, [{ total }]] = await Promise.all([
+      db
+        .select()
+        .from(products)
+        .where(whereClause)
+        .orderBy(desc(products.createdAt), asc(products.id))
+        .limit(lim)
+        .offset(off),
+      db.select({ total: count() }).from(products).where(whereClause),
+    ]);
+    const filtered = rows;
+    setPaginationHeaders(res, page.data, rows.length, Number(total));
 
     if (filtered.length === 0) {
       res.json([]);
@@ -282,6 +300,7 @@ router.get("/search", async (req, res): Promise<void> => {
 
     // Do not SQL-limit joined variants: first collapse each product to its
     // lowest price, then filter/sort products, and only then apply the limit.
+    const productPrice = sql<number>`min(${productVariants.priceCents})`;
     const [sellers, prods] = await Promise.all([
       db.select({
         clerkId:     users.clerkId,
@@ -301,11 +320,16 @@ router.get("/search", async (req, res): Promise<void> => {
         category:   products.category,
         images:     products.images,
         createdAt:  products.createdAt,
-        priceCents: productVariants.priceCents,
+        priceCents: productPrice,
       }).from(products)
         .leftJoin(productVariants, eq(productVariants.productId, products.id))
         .where(and(eq(products.status, "active"), isNull(products.deletedAt), ilike(products.name, pattern),
-          category ? eq(products.category, category) : undefined)),
+          category ? eq(products.category, category) : undefined))
+        .groupBy(products.id)
+        .having(and(
+          minPriceCents === undefined ? undefined : sql`min(${productVariants.priceCents}) >= ${minPriceCents}`,
+          maxPriceCents === undefined ? undefined : sql`min(${productVariants.priceCents}) <= ${maxPriceCents}`,
+        )),
     ]);
 
     // Fetch seller display names for product results
@@ -350,20 +374,13 @@ router.get("/search", async (req, res): Promise<void> => {
       });
     }
 
-    // Products — collapse variants to one row with the minimum price
+    // Products arrive collapsed and price-filtered by the database.
     const prodMap = new Map<string, { id: string; name: string; ownerId: string; category: string; images: string[]; createdAt: Date; minPrice: number }>();
     for (const p of prods) {
-      const price = p.priceCents ?? 0;
-      const prev = prodMap.get(p.id);
-      if (!prev) {
-        prodMap.set(p.id, { id: p.id, name: p.name, ownerId: p.ownerId, category: p.category, images: Array.isArray(p.images) ? p.images.filter((image): image is string => typeof image === "string") : [], createdAt: p.createdAt, minPrice: price });
-      } else if (price < prev.minPrice) {
-        prev.minPrice = price;
-      }
+      const price = Number(p.priceCents ?? 0);
+      prodMap.set(p.id, { id: p.id, name: p.name, ownerId: p.ownerId, category: p.category, images: Array.isArray(p.images) ? p.images.filter((image): image is string => typeof image === "string") : [], createdAt: p.createdAt, minPrice: price });
     }
     const filteredProducts = [...prodMap.values()]
-      .filter((product) => (minPriceCents === undefined || product.minPrice >= minPriceCents) &&
-        (maxPriceCents === undefined || product.minPrice <= maxPriceCents))
       .sort((a, b) => {
         if (sort === "price_asc") return a.minPrice - b.minPrice || b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id);
         if (sort === "price_desc") return b.minPrice - a.minPrice || b.createdAt.getTime() - a.createdAt.getTime() || a.id.localeCompare(b.id);
@@ -390,7 +407,11 @@ router.get("/search", async (req, res): Promise<void> => {
       });
     }
 
-    res.json({ results: results.slice(0, lim) });
+    const limited = results.slice(0, lim);
+    res.json({
+      results: limited,
+      pagination: paginationMetadata({ limit: lim, offset: 0 }, limited.length),
+    });
   } catch (err) {
     req.log.error({ err }, "Public search failed");
     res.status(500).json({ error: "Search failed" });
@@ -647,9 +668,12 @@ router.post("/sellers/:sellerId/visit", requireAuth, async (req, res): Promise<v
 // Query params: ?ownerId=seller_xxx&limit=30&offset=0
 router.get("/posts", async (req, res) => {
   try {
-    const ownerId = req.query.ownerId as string | undefined;
-    const lim = Math.min(parseInt((req.query.limit as string) || "30", 10) || 30, 50);
-    const off = Math.max(parseInt((req.query.offset as string) || "0", 10) || 0, 0);
+    const ownerId = singleQueryValue(req.query.ownerId);
+    const page = parsePagination(req.query, { limit: 30 });
+    if (!page.success || ownerId === null || (ownerId?.length ?? 0) > 160 || page.data.limit > 50) {
+      return res.status(400).json({ error: "Invalid posts query", code: "VALIDATION_ERROR" });
+    }
+    const { limit: lim, offset: off } = page.data;
 
     // Fetch posts newest-first, joined with seller display info
     const rows = await db
@@ -657,7 +681,6 @@ router.get("/posts", async (req, res) => {
         id:          posts.id,
         userId:      posts.userId,
         mediaUrl:    posts.mediaUrl,
-        thumbnailUrl: posts.thumbnailUrl,
         mediaType:   posts.mediaType,
         caption:     posts.caption,
         styleTags:   posts.styleTags,
@@ -672,9 +695,10 @@ router.get("/posts", async (req, res) => {
       .from(posts)
       .leftJoin(users, eq(users.clerkId, posts.userId))
       .where(ownerId ? eq(posts.userId, ownerId) : undefined)
-      .orderBy(desc(posts.createdAt))
+      .orderBy(desc(posts.createdAt), asc(posts.id))
       .limit(lim)
       .offset(off);
+    setPaginationHeaders(res, page.data, rows.length);
 
     if (rows.length === 0) {
       return res.json([]);
@@ -733,7 +757,6 @@ router.get("/posts", async (req, res) => {
       id:             p.id,
       userId:         p.userId,
       mediaUrl:       p.mediaUrl,
-      thumbnailUrl:   p.thumbnailUrl,
       mediaType:      p.mediaType,
       caption:        p.caption,
       styleTags:      p.styleTags,
@@ -770,7 +793,11 @@ router.get("/posts", async (req, res) => {
 // Query params: ?limit=20
 router.get("/trending", async (req, res) => {
   try {
-    const lim   = Math.min(parseInt((req.query.limit as string) || "20", 10) || 20, 50);
+    const page = parsePagination(req.query, { limit: 20 });
+    if (!page.success || page.data.limit > 50 || page.data.offset !== 0) {
+      return res.status(400).json({ error: "Invalid trending query", code: "VALIDATION_ERROR" });
+    }
+    const lim = page.data.limit;
     const today = new Date().toISOString().slice(0, 10); // 'YYYY-MM-DD' UTC
 
     // ── Attempt cache read ───────────────────────────────────────────────────

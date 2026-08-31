@@ -8,8 +8,35 @@ import { requireAuth } from "../middlewares/requireAuth";
 import { awardLoyaltyPointsOnce } from "./loyalty";
 import { sendWelcomeEmail } from "../lib/brandthreadEmail";
 import { hasDeletionConfirmation } from "../lib/accountDeletion";
+import { z } from "@workspace/api-zod";
+import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
 
 const router = Router();
+const usernameSchema = z.string().trim().regex(/^[a-zA-Z0-9_]{3,30}$/);
+const optionalProfileText = z.string().trim().max(160).optional();
+const syncBodySchema = z.object({
+  name: requestPrimitives.shortText.optional(),
+  accountType: z.enum(["buyer", "seller"]).optional(),
+}).passthrough();
+const onboardingBodySchema = z.object({
+  brandName: requestPrimitives.shortText,
+  brandType: optionalProfileText,
+  brandStage: optionalProfileText,
+  sellModel: optionalProfileText,
+  username: usernameSchema.optional(),
+}).passthrough();
+const profileBodySchema = z.object({
+  displayName: optionalProfileText,
+  brandName: optionalProfileText,
+  bio: z.string().trim().max(5_000).optional(),
+  website: z.union([z.literal(""), requestPrimitives.url]).optional(),
+  name: optionalProfileText,
+  username: usernameSchema.optional(),
+  accountType: z.enum(["buyer", "seller"]).optional(),
+}).passthrough();
+const privacyBodySchema = z.object({
+  dmPrivacy: z.enum(["requests", "followers_only"]),
+}).passthrough();
 
 // ─── Username validation ──────────────────────────────────────────────────────
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,30}$/;
@@ -30,7 +57,7 @@ function normalizeProfileName(value: unknown): string | undefined {
 
 // ─── POST /api/auth/sync ──────────────────────────────────────────────────────
 // Create or update the user record from Clerk data.
-router.post("/sync", requireAuth, async (req, res) => {
+router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
   try {
     const preferredName = normalizeProfileName(req.body?.name);
@@ -342,7 +369,7 @@ router.delete("/account", requireAuth, async (req, res) => {
 // ─── PATCH /api/auth/onboarding ───────────────────────────────────────────────
 // Save brand setup answers and mark onboarding complete.
 // Accepts optional username; validates format and uniqueness if provided.
-router.patch("/onboarding", requireAuth, async (req, res) => {
+router.patch("/onboarding", requireAuth, validateRequest({ body: onboardingBodySchema }), async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
   const { brandName, brandType, brandStage, sellModel, username } = req.body;
 
@@ -395,7 +422,7 @@ router.patch("/onboarding", requireAuth, async (req, res) => {
 
 // ─── PATCH /api/auth/profile ──────────────────────────────────────────────────
 // Update editable profile fields. Validates and enforces uniqueness on username.
-router.patch("/profile", requireAuth, async (req, res) => {
+router.patch("/profile", requireAuth, validateRequest({ body: profileBodySchema }), async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
   const { displayName, brandName, bio, website, name, username, accountType } = req.body as {
     displayName?: string;
@@ -508,7 +535,7 @@ router.get("/privacy", requireAuth, async (req, res) => {
 // ─── PATCH /api/auth/privacy ─────────────────────────────────────────────────
 // Update server-side privacy settings. Currently exposes dmPrivacy; extensible
 // — add more fields here as the product grows.
-router.patch("/privacy", requireAuth, async (req, res) => {
+router.patch("/privacy", requireAuth, validateRequest({ body: privacyBodySchema }), async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
   const { dmPrivacy } = req.body as { dmPrivacy?: string };
 

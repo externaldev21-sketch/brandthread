@@ -11,11 +11,47 @@ import {
 import { and, eq, isNull } from "drizzle-orm";
 import { computeApplicationFeeCents, mapStripeError, requireStripe } from "../lib/stripe";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
+import { z } from "@workspace/api-zod";
+import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
 
 const router = Router();
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const tokenHash = (token: string) => crypto.createHash("sha256").update(token).digest("hex");
 const guestTokenSecret = process.env.SESSION_SECRET;
+const shippingAddressSchema = z.object({
+  name: requestPrimitives.shortText.optional(),
+  recipientName: requestPrimitives.shortText.optional(),
+  street: requestPrimitives.shortText,
+  line2: z.string().trim().max(160).nullable().optional(),
+  city: requestPrimitives.shortText,
+  state: requestPrimitives.shortText,
+  zip: z.string().trim().min(2).max(20).optional(),
+  postalCode: z.string().trim().min(2).max(20).optional(),
+  country: z.string().trim().length(2).default("US"),
+}).refine((value) => Boolean(value.name ?? value.recipientName), {
+  message: "A recipient name is required",
+  path: ["name"],
+}).refine((value) => Boolean(value.zip ?? value.postalCode), {
+  message: "A postal code is required",
+  path: ["zip"],
+});
+const guestCheckoutSchema = z.object({
+  items: z.array(z.object({
+    productId: requestPrimitives.uuid,
+    variantId: requestPrimitives.uuid,
+    quantity: z.coerce.number().int().min(1).max(100),
+  })).min(1).max(100),
+  successUrl: requestPrimitives.url,
+  cancelUrl: requestPrimitives.url,
+  contactEmail: requestPrimitives.email,
+  shippingAddress: shippingAddressSchema,
+  clientIdempotencyKey: z.string().trim().min(8).max(160),
+  dropId: requestPrimitives.uuid.nullable().optional(),
+}).passthrough();
+const guestVerifyParamsSchema = z.object({ sessionId: requestPrimitives.id });
+const guestVerifyBodySchema = z.object({
+  guestAccessToken: z.string().min(32).max(512),
+});
 
 function guestAccessToken(checkoutId: string): string {
   if (!guestTokenSecret) {
@@ -53,7 +89,7 @@ function shipping(raw: any) {
   };
 }
 
-router.post("/session", async (req, res) => {
+router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (req, res) => {
   let checkoutId: string | null = null;
   let stripeStarted = false;
   try {
@@ -179,17 +215,21 @@ router.post("/session", async (req, res) => {
   }
 });
 
-router.post("/session/:sessionId/verify", async (req, res) => {
+router.post(
+  "/session/:sessionId/verify",
+  validateRequest({ params: guestVerifyParamsSchema, body: guestVerifyBodySchema }),
+  async (req, res) => {
+  const sessionId = req.params.sessionId as string;
   const supplied = req.body?.guestAccessToken;
   if (typeof supplied !== "string" || supplied.length < 32) return res.status(401).json({ error: "Guest checkout access token required" });
   const [checkout] = await db.select().from(checkoutSessions).where(and(
-    eq(checkoutSessions.stripeSessionId, req.params.sessionId),
+    eq(checkoutSessions.stripeSessionId, sessionId),
     eq(checkoutSessions.guestAccessTokenHash, tokenHash(supplied)),
   )).limit(1);
   if (!checkout || checkout.buyerId) return res.status(404).json({ error: "Checkout session not found" });
-  const session = await requireStripe().checkout.sessions.retrieve(req.params.sessionId);
+  const session = await requireStripe().checkout.sessions.retrieve(sessionId);
   const [order] = await db.select({ id: orders.id, orderNumber: orders.orderNumber, status: orders.status })
-    .from(orders).where(eq(orders.stripeCheckoutSessionId, req.params.sessionId)).limit(1);
+    .from(orders).where(eq(orders.stripeCheckoutSessionId, sessionId)).limit(1);
   return void res.json({
     status: session.status,
     paymentStatus: session.payment_status,
@@ -198,6 +238,7 @@ router.post("/session/:sessionId/verify", async (req, res) => {
     orderNumber: order?.orderNumber ?? null,
     orderStatus: order?.status ?? null,
   });
-});
+  },
+);
 
 export default router;

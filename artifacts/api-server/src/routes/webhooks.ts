@@ -26,6 +26,15 @@ import {
 import { publishNotification } from "./notifications-feed";
 import { sendPushToUser } from "../lib/push";
 import { connectReadiness } from "./manufacturer-connect";
+import {
+  claimStripeWebhookEvent,
+  completeStripeWebhookEvent,
+  failStripeWebhookEvent,
+  renewStripeWebhookLease,
+  STRIPE_WEBHOOK_HEARTBEAT_MS,
+  waitForStripeWebhookOutcome,
+  type StripeWebhookClaim,
+} from "../lib/stripeWebhookLedger";
 
 const router = Router();
 
@@ -111,7 +120,65 @@ router.post("/stripe", async (req: Request, res: Response) => {
     return;
   }
 
+  if (
+    !event ||
+    typeof event.id !== "string" ||
+    event.id.length < 1 ||
+    event.id.length > 255 ||
+    typeof event.type !== "string" ||
+    event.type.length < 1 ||
+    event.type.length > 255 ||
+    !event.data ||
+    typeof event.data !== "object" ||
+    !("object" in event.data)
+  ) {
+    res.status(400).json({
+      error: "Invalid Stripe event",
+      code: "VALIDATION_ERROR",
+    });
+    return;
+  }
+
+  let claim: StripeWebhookClaim | undefined;
+  let leaseHeartbeat: ReturnType<typeof setInterval> | undefined;
   try {
+    claim = await claimStripeWebhookEvent(event.id, event.type);
+    if (!claim.claimed) {
+      if (claim.reason === "processed") {
+        res.json({ received: true, duplicate: true });
+        return;
+      }
+      const outcome = await waitForStripeWebhookOutcome(event.id);
+      if (outcome === "processed") {
+        res.json({ received: true, duplicate: true });
+        return;
+      }
+      res.status(503).json({
+        error: "Webhook event is still processing",
+        code: "WEBHOOK_IN_FLIGHT",
+      });
+      return;
+    }
+    const attemptCount = claim.attemptCount;
+    leaseHeartbeat = setInterval(() => {
+      void renewStripeWebhookLease(event.id, attemptCount)
+        .then((renewed) => {
+          if (!renewed) {
+            req.log.error(
+              { eventId: event.id, attemptCount },
+              "Stripe webhook lease ownership was lost",
+            );
+          }
+        })
+        .catch((err) => {
+          req.log.error(
+            { err, eventId: event.id, attemptCount },
+            "Stripe webhook lease renewal failed",
+          );
+        });
+    }, STRIPE_WEBHOOK_HEARTBEAT_MS);
+    leaseHeartbeat.unref?.();
+
     switch (event.type) {
       // Synchronous payment (cards, wallets) — already captured at session completion
       case "checkout.session.completed":
@@ -212,8 +279,17 @@ router.post("/stripe", async (req: Request, res: Response) => {
         break;
     }
 
+    clearInterval(leaseHeartbeat);
+    leaseHeartbeat = undefined;
+    await completeStripeWebhookEvent(event.id, claim.attemptCount);
     res.json({ received: true });
   } catch (err) {
+    if (leaseHeartbeat) clearInterval(leaseHeartbeat);
+    if (claim?.claimed) {
+      await failStripeWebhookEvent(event.id, claim.attemptCount, err).catch((ledgerErr) => {
+        req.log.error({ err: ledgerErr, eventId: event.id }, "Could not release failed Stripe webhook event");
+      });
+    }
     req.log.error({ err, eventType: event.type, eventId: event.id }, "Stripe webhook handler failed");
     res.status(500).json({ error: "Webhook handler failed" });
   }

@@ -10,13 +10,15 @@ const state = vi.hoisted(() => {
   process.env.NODE_ENV = "test";
   process.env.ENABLE_TEST_SUBSCRIPTION_BYPASS = "true";
   return {
-    planId: "starter" as "starter" | "growth" | "scale",
+    planId: "starter" as string,
     lookupError: false,
+    authUserId: "native-seller" as string | null,
+    downstreamCalls: 0,
   };
 });
 
 vi.mock("@clerk/express", () => ({
-  getAuth: () => ({ userId: "native-seller" }),
+  getAuth: () => ({ userId: state.authUserId }),
 }));
 vi.mock("@workspace/db", () => ({ db: {}, users: {} }));
 vi.mock("drizzle-orm", () => ({ eq: vi.fn() }));
@@ -39,7 +41,10 @@ let base = "";
 
 beforeAll(async () => {
   const app = express();
-  app.get("/growth", requirePlan("growth"), (_req, res) => res.json({ ok: true }));
+  app.get("/growth", requirePlan("growth"), (_req, res) => {
+    state.downstreamCalls += 1;
+    res.json({ ok: true });
+  });
   app.get("/scale", requirePlan("scale"), (_req, res) => res.json({ ok: true }));
   await new Promise<void>((resolve) => {
     server = app.listen(0, "127.0.0.1", () => resolve());
@@ -54,6 +59,8 @@ afterAll(async () => {
 describe("requirePlan native entitlements", () => {
   beforeEach(() => {
     state.lookupError = false;
+    state.authUserId = "native-seller";
+    state.downstreamCalls = 0;
   });
 
   it("grants Growth endpoints from a server-verified native Growth entitlement", async () => {
@@ -72,6 +79,22 @@ describe("requirePlan native entitlements", () => {
     expect(response.status).toBe(403);
   });
 
+  it("denies a missing or unknown plan", async () => {
+    for (const plan of ["", "unknown"]) {
+      state.planId = plan;
+      const response = await fetch(`${base}/growth`);
+      expect(response.status).toBe(403);
+    }
+    expect(state.downstreamCalls).toBe(0);
+  });
+
+  it("returns 401 without authentication", async () => {
+    state.authUserId = null;
+    const response = await fetch(`${base}/growth`);
+    expect(response.status).toBe(401);
+    expect(state.downstreamCalls).toBe(0);
+  });
+
   it("grants Scale endpoints from a server-verified native Scale entitlement", async () => {
     state.planId = "scale";
     expect((await fetch(`${base}/scale`)).status).toBe(200);
@@ -85,8 +108,9 @@ describe("requirePlan native entitlements", () => {
     expect(response.status).toBe(503);
     expect(body).toMatchObject({
       error: "Unable to verify subscription plan",
-      code: "PLAN_LOOKUP_UNAVAILABLE",
+      code: "PLAN_CHECK_UNAVAILABLE",
       requiredPlan: "growth",
     });
+    expect(state.downstreamCalls).toBe(0);
   });
 });

@@ -14,23 +14,6 @@ import { eq, and, desc, asc, inArray, sql } from "drizzle-orm";
 
 const router = Router();
 
-// Simple per-user rate limiter
-const userHits = new Map<string, { count: number; resetAt: number }>();
-const WINDOW_MS      = 60_000;
-const MAX_PER_WINDOW = 30;
-
-function checkRateLimit(userId: string): boolean {
-  const now = Date.now();
-  const rec = userHits.get(userId);
-  if (!rec || now >= rec.resetAt) {
-    userHits.set(userId, { count: 1, resetAt: now + WINDOW_MS });
-    return true;
-  }
-  if (rec.count >= MAX_PER_WINDOW) return false;
-  rec.count += 1;
-  return true;
-}
-
 // ─── System prompt builder ─────────────────────────────────────────────────────
 
 function buildSystemPrompt(context: Record<string, unknown>, brandMemory?: Record<string, string>): string {
@@ -84,12 +67,7 @@ function buildSystemPrompt(context: Record<string, unknown>, brandMemory?: Recor
 // ─── POST /api/ai/chat ─────────────────────────────────────────────────────────
 
 router.post("/chat", requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const userId: string = (req as any).auth?.userId ?? (req as any).auth?.sub ?? "anon";
-
-  if (!checkRateLimit(userId)) {
-    res.status(429).json({ error: "Rate limit reached — please wait a moment." });
-    return;
-  }
+  const userId = (req as Request & { clerkUserId?: string }).clerkUserId!;
 
   const { messages, context, brandMemory, maxTokens } = req.body as {
     messages?: { role: string; content: string }[];

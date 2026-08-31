@@ -11,25 +11,10 @@ const router = Router();
 router.use(requireAuth);
 
 // Tech pack generation is heavier (text + PDF render); keep the limit tighter.
-const userHits = new Map<string, { count: number; resetAt: number }>();
-const WINDOW_MS = 60_000;
-const MAX_PER_WINDOW = 3;
 const MAX_PHOTOS = 6;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB per photo
 const MAX_TOTAL_BYTES = 30 * 1024 * 1024; // 30MB across all photos
 const MAX_TEXT_FIELD = 1000;
-
-function checkRateLimit(userId: string): boolean {
-  const now = Date.now();
-  const rec = userHits.get(userId);
-  if (!rec || now >= rec.resetAt) {
-    userHits.set(userId, { count: 1, resetAt: now + WINDOW_MS });
-    return true;
-  }
-  if (rec.count >= MAX_PER_WINDOW) return false;
-  rec.count += 1;
-  return true;
-}
 
 const BASE64_RE = /^[A-Za-z0-9+/]+=*$/;
 
@@ -274,13 +259,6 @@ function buildPdf(opts: {
 
 // POST /api/techpack/generate
 router.post("/generate", async (req, res) => {
-  const userId = (req as any).auth?.userId ?? (req as any).auth?.sub ?? "anon";
-
-  if (!checkRateLimit(userId)) {
-    res.status(429).json({ error: "Too many tech pack generations. Please wait a minute and try again." });
-    return;
-  }
-
   const body = req.body ?? {};
   const productName = sanitizeText(body.productName, 100);
   const brandName = sanitizeText(body.brandName, 100);

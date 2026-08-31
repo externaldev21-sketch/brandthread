@@ -172,9 +172,9 @@ describe("Task 252 manufacturer route integration", () => {
     expect((await request(`/api/seller-hub/quote-requests/${quote.id}`)).status).toBe(404);
     expect((await request(`/api/seller-hub/quote-requests/${quote.id}`, "PATCH", { status: "cancelled" })).status).toBe(404);
     auth.userId = users.sellerA;
-    const updated = await request(`/api/seller-hub/quote-requests/${quote.id}`, "PATCH", { status: "accepted", notes: "Proceed" });
+    const updated = await request(`/api/seller-hub/quote-requests/${quote.id}`, "PATCH", { status: "cancelled" });
     expect(updated.status).toBe(200);
-    expect(await updated.json()).toMatchObject({ id: quote.id, status: "accepted", notes: "Proceed" });
+    expect(await updated.json()).toMatchObject({ id: quote.id, status: "cancelled" });
   });
 
   it("enforces invite seller ownership and invite resolve/register boundaries", async () => {

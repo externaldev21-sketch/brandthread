@@ -16,6 +16,7 @@ import {
   normalizeErrorResponses,
 } from "./middlewares/errorHandling";
 import { appRateLimiter } from "./middlewares/rateLimit";
+import { validateMutationEnvelope } from "./middlewares/validateRequest";
 
 const app: Express = express();
 app.set("trust proxy", 1);
@@ -61,6 +62,7 @@ app.use("/api/v1/store/ai", express.json({ limit: "10mb" }));
 // photos (e.g. AI product photography uploads) don't get rejected.
 app.use(express.json({ limit: "45mb" }));
 app.use(express.urlencoded({ extended: true, limit: "45mb" }));
+app.use(validateMutationEnvelope);
 
 // Clerk session middleware — handles both cookie (web) and Bearer token (mobile)
 app.use(

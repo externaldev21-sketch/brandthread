@@ -24,9 +24,47 @@ import {
 } from "./loyalty";
 import { getSellerVacationStatus } from "../lib/sellerAvailability";
 import { logger } from "../lib/logger";
+import { z } from "@workspace/api-zod";
+import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
 
 const router = Router();
 router.use(requireAuth);
+
+const addressBodySchema = z.object({
+  label: requestPrimitives.shortText.optional(),
+  recipientName: requestPrimitives.shortText,
+  street: requestPrimitives.shortText,
+  line2: z.string().trim().max(160).nullable().optional(),
+  city: requestPrimitives.shortText,
+  state: requestPrimitives.shortText,
+  postalCode: z.string().trim().min(2).max(20),
+  country: z.string().trim().length(2).default("US"),
+  phone: z.string().trim().min(7).max(32).nullable().optional(),
+  isDefault: z.boolean().optional(),
+}).passthrough();
+const addressPatchSchema = addressBodySchema.partial();
+const uuidParamsSchema = z.object({ id: requestPrimitives.uuid });
+const checkoutItemSchema = z.object({
+  id: requestPrimitives.id.optional(),
+  variantId: requestPrimitives.uuid,
+  productId: requestPrimitives.uuid,
+  quantity: z.coerce.number().int().min(1).max(100),
+  price: z.number().nonnegative().optional(),
+}).passthrough();
+const checkoutBodySchema = z.object({
+  items: z.array(checkoutItemSchema).min(1).max(100),
+  successUrl: requestPrimitives.url,
+  cancelUrl: requestPrimitives.url,
+  contactEmail: z.union([z.literal(""), requestPrimitives.email]).optional(),
+  shippingAddress: addressBodySchema.omit({ label: true, isDefault: true }).optional(),
+  clientIdempotencyKey: z.string().trim().min(8).max(160).optional(),
+  dropId: requestPrimitives.uuid.nullable().optional(),
+  loyaltyToken: z.string().trim().min(1).max(512).optional(),
+}).passthrough();
+const cartValidationBodySchema = z.object({
+  items: z.array(checkoutItemSchema).min(1).max(100),
+  discountCodes: z.array(z.string().trim().min(1).max(64)).max(20).optional(),
+}).passthrough();
 
 type AddressInput = {
   label?: unknown; recipientName?: unknown; street?: unknown; line2?: unknown;
@@ -78,7 +116,7 @@ router.get("/addresses", async (req, res) => {
   res.json(rows);
 });
 
-router.post("/addresses", async (req, res) => {
+router.post("/addresses", validateRequest({ body: addressBodySchema }), async (req, res) => {
   try {
     const buyerId = (req as any).clerkUserId as string;
     const address = normalizeAddress(req.body ?? {});
@@ -99,13 +137,17 @@ router.post("/addresses", async (req, res) => {
   }
 });
 
-router.patch("/addresses/:id", async (req, res) => {
+router.patch(
+  "/addresses/:id",
+  validateRequest({ params: uuidParamsSchema, body: addressPatchSchema }),
+  async (req, res) => {
   try {
     const buyerId = (req as any).clerkUserId as string;
+    const addressId = req.params.id as string;
     const updated = await db.transaction(async (tx) => {
       await lockBuyerAddressBook(tx, buyerId);
       const [existing] = await tx.select().from(buyerAddresses)
-        .where(and(eq(buyerAddresses.id, req.params.id), eq(buyerAddresses.buyerId, buyerId))).limit(1);
+        .where(and(eq(buyerAddresses.id, addressId), eq(buyerAddresses.buyerId, buyerId))).limit(1);
       if (!existing) throw Object.assign(new Error("Address not found"), { status: 404 });
       // Body values are allowed only for address fields; buyerId is deliberately ignored.
       const address = normalizeAddress({ ...existing, ...(req.body ?? {}) });
@@ -129,14 +171,16 @@ router.patch("/addresses/:id", async (req, res) => {
   } catch (err: any) {
     res.status(err.status ?? 500).json({ error: err.status ? err.message : "Failed to update address" });
   }
-});
+  },
+);
 
-router.post("/addresses/:id/default", async (req, res) => {
+router.post("/addresses/:id/default", validateRequest({ params: uuidParamsSchema }), async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
+  const addressId = req.params.id as string;
   const result = await db.transaction(async (tx) => {
     await lockBuyerAddressBook(tx, buyerId);
     const [target] = await tx.select({ id: buyerAddresses.id }).from(buyerAddresses)
-      .where(and(eq(buyerAddresses.id, req.params.id), eq(buyerAddresses.buyerId, buyerId))).limit(1);
+      .where(and(eq(buyerAddresses.id, addressId), eq(buyerAddresses.buyerId, buyerId))).limit(1);
     if (!target) return null;
     await tx.update(buyerAddresses).set({ isDefault: false, updatedAt: new Date() })
       .where(and(eq(buyerAddresses.buyerId, buyerId), eq(buyerAddresses.isDefault, true)));
@@ -151,12 +195,13 @@ router.post("/addresses/:id/default", async (req, res) => {
   res.json(result);
 });
 
-router.delete("/addresses/:id", async (req, res) => {
+router.delete("/addresses/:id", validateRequest({ params: uuidParamsSchema }), async (req, res) => {
   const buyerId = (req as any).clerkUserId as string;
+  const addressId = req.params.id as string;
   const deleted = await db.transaction(async (tx) => {
     await lockBuyerAddressBook(tx, buyerId);
     const [target] = await tx.select().from(buyerAddresses)
-      .where(and(eq(buyerAddresses.id, req.params.id), eq(buyerAddresses.buyerId, buyerId))).limit(1);
+      .where(and(eq(buyerAddresses.id, addressId), eq(buyerAddresses.buyerId, buyerId))).limit(1);
     if (!target) return null;
     await tx.delete(buyerAddresses).where(and(eq(buyerAddresses.id, target.id), eq(buyerAddresses.buyerId, buyerId)));
     if (target.isDefault) {
@@ -193,7 +238,7 @@ router.delete("/addresses/:id", async (req, res) => {
  * final payment boundary; this route exists to return human-readable fixes
  * before the buyer reaches Stripe.
  */
-router.post("/cart/validate", async (req, res) => {
+router.post("/cart/validate", validateRequest({ body: cartValidationBodySchema }), async (req, res) => {
   const items = req.body?.items;
   const discountCodeValues = Array.isArray(req.body?.discountCodes) ? req.body.discountCodes : [];
   if (!Array.isArray(items) || items.length === 0) {
@@ -305,7 +350,7 @@ router.post("/cart/validate", async (req, res) => {
  *  4. Cart is persisted server-side in checkout_sessions; only the record UUID
  *     is passed to Stripe, avoiding the 50-key metadata limit.
  */
-router.post("/checkout/session", async (req, res) => {
+router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), async (req, res) => {
   let loyaltyReservation: { buyerId: string; token: string; reservationId: string } | null = null;
   let checkoutRecordId: string | null = null;
   let checkoutIdempotencyKey: string | null = null;
@@ -1035,8 +1080,8 @@ router.get("/orders/:id", async (req, res) => {
  * refund via the stored payment intent. Fails explicitly if Stripe errors —
  * we never mark an order cancelled without confirming the refund.
  */
-router.post("/orders/:id/cancel", async (req, res) => {
-  const { id } = req.params;
+router.post("/orders/:id/cancel", validateRequest({ params: uuidParamsSchema }), async (req, res) => {
+  const id = req.params.id as string;
   try {
     const buyerId = (req as any).clerkUserId as string;
     const CANCEL_WINDOW_MS = 60 * 60 * 1000; // 60 minutes

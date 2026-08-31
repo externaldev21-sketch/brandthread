@@ -13,28 +13,9 @@ import {
 } from "@workspace/integrations-openai-ai-server/image";
 
 const router = Router();
-router.use(requireAuth);
-
-// Simple in-process rate limiter: max 5 generations per user per minute.
-const userHits = new Map<string, { count: number; resetAt: number }>();
-const WINDOW_MS = 60_000;
-const MAX_PER_WINDOW = 5;
 const MAX_IMAGES_PER_GROUP = 4;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB per photo
 const MAX_TOTAL_BYTES = 30 * 1024 * 1024; // 30MB across all photos
-
-function checkRateLimit(userId: string): boolean {
-  const now = Date.now();
-  const rec = userHits.get(userId);
-  if (!rec || now >= rec.resetAt) {
-    userHits.set(userId, { count: 1, resetAt: now + WINDOW_MS });
-    return true;
-  }
-  if (rec.count >= MAX_PER_WINDOW) return false;
-  rec.count += 1;
-  return true;
-}
-
 const BASE64_RE = /^[A-Za-z0-9+/]+=*$/;
 
 function decodeDataUrl(input: string): Buffer | null {
@@ -67,16 +48,6 @@ function validateImageGroup(images: unknown, label: string, res: import("express
   }
   return images as string[];
 }
-
-// POST /api/lifestyle/generate  { referenceImages: string[], productImages: string[], prompt?: string }
-router.post("/generate", async (req, res) => {
-  const userId = (req as any).auth?.userId ?? (req as any).auth?.sub ?? "anon";
-
-  if (!checkRateLimit(userId)) {
-    res.status(429).json({ error: "Too many generations. Please wait a minute and try again." });
-    return;
-  }
-
   const { referenceImages, productImages, prompt } = req.body ?? {};
 
   const refs = validateImageGroup(referenceImages, "reference", res);
@@ -95,7 +66,13 @@ router.post("/generate", async (req, res) => {
   const decoded: Buffer[] = [];
   let totalBytes = 0;
   for (const img of allImages) {
-    const buffer = decodeDataUrl(img);
+    const buffer = await generateWithVisualQa({
+      operation: "lifestyle",
+      prompt: editPrompt,
+      brief: safeDescription,
+      references: decoded,
+      generate: (retryPrompt) => editImages(tmpFiles, retryPrompt),
+    });
     if (!buffer) {
       res.status(400).json({ error: "One or more photos are not valid images. Please re-upload." });
       return;

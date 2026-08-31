@@ -2,6 +2,7 @@ import { pgTable, uuid, text, integer, timestamp, date, json, boolean, primaryKe
 export * from './manufacturers';
 export * from './freelancers';
 export * from './subscriptionEntitlements';
+export * from './security';
 import { manufacturers } from './manufacturers';
 import { relations } from 'drizzle-orm';
 

@@ -17,16 +17,6 @@ import { logger } from "../lib/logger";
 const router = Router();
 router.use(requireAuth);
 
-// ─── Rate limiter ─────────────────────────────────────────────────────────────
-const hits = new Map<string, { count: number; resetAt: number }>();
-function rateOk(userId: string): boolean {
-  const now = Date.now();
-  const r = hits.get(userId);
-  if (!r || now >= r.resetAt) { hits.set(userId, { count: 1, resetAt: now + 60_000 }); return true; }
-  if (r.count >= 20) return false;
-  r.count++; return true;
-}
-
 // ─── Context fetcher ──────────────────────────────────────────────────────────
 async function buildUserContext(clerkId: string): Promise<{ role: string; summary: string }> {
   try {
@@ -242,12 +232,6 @@ function buildSupportPrompt(role: string, accountSummary: string): string {
 // ─── POST /api/support-chat/message ──────────────────────────────────────────
 router.post("/message", async (req: Request, res: Response): Promise<void> => {
   const clerkId = (req as any).clerkUserId as string;
-
-  if (!rateOk(clerkId)) {
-    res.status(429).json({ error: "Rate limit reached — please wait a moment." });
-    return;
-  }
-
   const { messages } = req.body as {
     messages?: { role: string; content: string }[];
   };

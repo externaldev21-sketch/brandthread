@@ -16,26 +16,9 @@ import {
 const router = Router();
 router.use(requireAuth);
 
-// Simple in-process rate limiter: max 5 provider image edits per user per minute.
-const userHits = new Map<string, { count: number; resetAt: number }>();
-const WINDOW_MS = 60_000;
-const MAX_PER_WINDOW = 5;
 const MAX_IMAGES = 4;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB per photo
 const MAX_TOTAL_BYTES = 20 * 1024 * 1024; // 20MB across all photos
-
-function checkRateLimit(userId: string, cost = 1): boolean {
-  const now = Date.now();
-  const rec = userHits.get(userId);
-  if (!rec || now >= rec.resetAt) {
-    if (cost > MAX_PER_WINDOW) return false;
-    userHits.set(userId, { count: cost, resetAt: now + WINDOW_MS });
-    return true;
-  }
-  if (rec.count + cost > MAX_PER_WINDOW) return false;
-  rec.count += cost;
-  return true;
-}
 
 const BASE64_RE = /^[A-Za-z0-9+/]+=*$/;
 const ALLOWED_IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -71,14 +54,7 @@ function decodeDataUrl(input: string): Buffer | null {
 
 // POST /api/photography/generate  { images: string[] (base64/data-url), prompt?: string }
 router.post("/generate", async (req, res) => {
-  const userId = (req as any).auth?.userId ?? (req as any).auth?.sub ?? "anon";
-
-  if (!checkRateLimit(userId)) {
-    res.status(429).json({ error: "Too many generations. Please wait a minute and try again." });
-    return;
-  }
-
-  const { images, prompt, mode } = req.body ?? {};
+  const { images, prompt } = req.body ?? {};
   if (!Array.isArray(images) || images.length === 0) {
     res.status(400).json({ error: "At least one reference or product photo is required." });
     return;
@@ -177,13 +153,6 @@ router.post("/outfit-swap", async (req, res) => {
     res.status(400).json({ error: `Please upload at most ${MAX_IMAGES} garment designs.` });
     return;
   }
-  // An Outfit Swap with N garments invokes the provider N times, so it must
-  // consume N quota slots rather than bypassing the per-image generation cap.
-  if (!checkRateLimit(userId, garmentImages.length)) {
-    res.status(429).json({ error: "Too many generations. Please wait a minute and try again." });
-    return;
-  }
-
   const safeDescription =
     typeof prompt === "string" && prompt.trim().length > 0
       ? prompt.trim().slice(0, 500)
@@ -294,7 +263,6 @@ router.post("/outfit-swap", async (req, res) => {
 // { heroImage: string, garmentImage: string, garmentIndex: number, prompt?: string }
 // Retry only the failed garment so successful edits do not run again.
 router.post("/outfit-swap/retry", async (req, res) => {
-  const userId = (req as any).auth?.userId ?? (req as any).auth?.sub ?? "anon";
   const { heroImage, garmentImage, garmentIndex, prompt } = req.body ?? {};
 
   if (typeof heroImage !== "string" || typeof garmentImage !== "string") {
@@ -305,11 +273,6 @@ router.post("/outfit-swap/retry", async (req, res) => {
     res.status(400).json({ error: "The garment being retried is not valid." });
     return;
   }
-  if (!checkRateLimit(userId)) {
-    res.status(429).json({ error: "Too many generations. Please wait a minute and try again." });
-    return;
-  }
-
   const safeDescription =
     typeof prompt === "string" && prompt.trim().length > 0
       ? prompt.trim().slice(0, 500)

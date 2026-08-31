@@ -108,7 +108,7 @@ export function requirePlan(minPlan: SellerPlanId) {
         .log?.error({ err, requiredPlan: minPlan }, "Subscription plan lookup failed");
       res.status(503).json({
         error: "Unable to verify subscription plan",
-        code: "PLAN_LOOKUP_UNAVAILABLE",
+        code: "PLAN_CHECK_UNAVAILABLE",
         requiredPlan: minPlan,
         message: "Subscription access could not be verified. Please try again.",
       });

@@ -20,25 +20,7 @@ router.use(requireAuth);
 
 const BUCKET_ID = (process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID ?? "").trim();
 const PRIVATE_DIR = (process.env.PRIVATE_OBJECT_DIR ?? "").trim(); // e.g. /bucket/.private
-
-// Rate limiter: 5 per user per minute
-const userHits = new Map<string, { count: number; resetAt: number }>();
-const WINDOW_MS = 60_000;
-const MAX_PER_WINDOW = 5;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8 MB
-
-function checkRateLimit(userId: string): boolean {
-  const now = Date.now();
-  const rec = userHits.get(userId);
-  if (!rec || now >= rec.resetAt) {
-    userHits.set(userId, { count: 1, resetAt: now + WINDOW_MS });
-    return true;
-  }
-  if (rec.count >= MAX_PER_WINDOW) return false;
-  rec.count += 1;
-  return true;
-}
-
 const BASE64_RE = /^[A-Za-z0-9+/]+=*$/;
 const ACCEPTED_MIMES = new Set(["image/png", "image/jpeg", "image/jpg", "image/webp"]);
 const DATA_URL_RE = /^data:(image\/[a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/]+=*)$/;
@@ -134,12 +116,7 @@ async function serveFromGCS(
 // ─── POST /api/bg-removal/remove ────────────────────────────────────────────
 
 router.post("/remove", async (req, res) => {
-  const userId: string = (req as any).auth?.userId ?? (req as any).auth?.sub ?? "anon";
-
-  if (!checkRateLimit(userId)) {
-    res.status(429).json({ error: "Rate limit reached. Please wait a minute and try again." });
-    return;
-  }
+  const userId: string = (req as any).auth?.userId ?? (req as any).auth?.sub ?? "";
 
   const { image } = req.body ?? {};
   if (typeof image !== "string") {
@@ -160,7 +137,7 @@ router.post("/remove", async (req, res) => {
   }
 
   const uuid = randomUUID();
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "bg-removal-"));
+  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "bg-replace-"));
   const tmpFile = path.join(tmpDir, `${uuid}.png`);
 
   try {
@@ -172,13 +149,11 @@ router.post("/remove", async (req, res) => {
       "Keep only the main subject/product in the same position and framing with clean, precise edges. Add no background, shadow, texture, or new detail.",
     );
     const resultBuffer = await generateWithVisualQa({
-      operation: "background_remove",
-      prompt,
-      brief: "Remove only the background and preserve the complete foreground subject.",
-      references: [decoded.buffer],
-      generate: (retryPrompt) => editImages([tmpFile], retryPrompt, undefined, {
-        background: "transparent",
-      }),
+      operation: "background_replace",
+      prompt: editPrompt,
+      brief: direction,
+      references,
+      generate: (retryPrompt) => editImages(files, retryPrompt),
     });
 
     const resultSize = resultBuffer.length;
@@ -186,7 +161,7 @@ router.post("/remove", async (req, res) => {
     const createdAt = new Date().toISOString();
 
     // Save to GCS (non-blocking — failure is non-fatal)
-    const storageKey = await saveToGCS(resultBuffer, userId, uuid);
+  const storageKey = (req.params as any).storageKey as string | undefined;
 
     res.json({
       b64_json: b64Json,
@@ -218,11 +193,7 @@ router.post("/remove", async (req, res) => {
 // Image 1 is always the locked source subject. Image 2, when supplied, is the
 // replacement background reference.
 router.post("/replace", async (req, res) => {
-  const userId: string = (req as any).auth?.userId ?? (req as any).auth?.sub ?? "anon";
-  if (!checkRateLimit(userId)) {
-    res.status(429).json({ error: "Rate limit reached. Please wait a minute and try again." });
-    return;
-  }
+  const userId: string = (req as any).auth?.userId ?? (req as any).auth?.sub ?? "";
 
   const { image, backgroundImage, prompt, color, bgType } = req.body ?? {};
   const source = decodeDataUrl(image);

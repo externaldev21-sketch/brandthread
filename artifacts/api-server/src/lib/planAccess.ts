@@ -19,7 +19,7 @@ export function sendPlanLookupUnavailable(req: Request, res: Response, error: un
   req.log?.error({ err: error }, "Subscription plan lookup failed");
   res.status(503).json({
     error: "Unable to verify subscription plan",
-    code: "PLAN_LOOKUP_UNAVAILABLE",
+    code: "PLAN_CHECK_UNAVAILABLE",
     message: "Subscription access could not be verified. Please try again.",
   });
 }

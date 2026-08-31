@@ -1,27 +1,42 @@
 import { getAuth } from "@clerk/express";
-import type { RequestHandler } from "express";
+import { db } from "@workspace/db";
+import { sql } from "drizzle-orm";
+import type { Request, RequestHandler } from "express";
 
-type RateLimitPolicy = {
-  id: string;
+export type RateLimitPolicyName =
+  | "authentication"
+  | "checkout"
+  | "webhook"
+  | "expensive"
+  | "mutation"
+  | "authenticated-read"
+  | "public-read";
+
+export type RateLimitPolicy = {
+  id: RateLimitPolicyName;
   limit: number;
   windowMs: number;
   message: string;
 };
 
-type Counter = {
-  count: number;
-  resetAt: number;
-};
-
-const counters = new Map<string, Counter>();
-let lastSweepAt = 0;
-
-const POLICIES = {
+export const RATE_LIMIT_POLICIES: Record<RateLimitPolicyName, RateLimitPolicy> = {
   authentication: {
     id: "authentication",
     limit: 30,
     windowMs: 10 * 60_000,
-    message: "Too many sign-in requests. Please wait before trying again.",
+    message: "Too many authentication requests. Please wait before trying again.",
+  },
+  checkout: {
+    id: "checkout",
+    limit: 20,
+    windowMs: 5 * 60_000,
+    message: "Too many checkout requests. Please wait before trying again.",
+  },
+  webhook: {
+    id: "webhook",
+    limit: 300,
+    windowMs: 60_000,
+    message: "Too many webhook deliveries. Please retry shortly.",
   },
   expensive: {
     id: "expensive",
@@ -35,88 +50,173 @@ const POLICIES = {
     windowMs: 60_000,
     message: "Too many changes were submitted. Please wait a moment and try again.",
   },
-  read: {
-    id: "read",
+  "authenticated-read": {
+    id: "authenticated-read",
     limit: 600,
     windowMs: 5 * 60_000,
     message: "Too many requests. Please wait a moment and try again.",
   },
-  anonymousRead: {
-    id: "anonymous-read",
+  "public-read": {
+    id: "public-read",
     limit: 240,
     windowMs: 5 * 60_000,
     message: "Too many requests. Please wait a moment and try again.",
   },
-} satisfies Record<string, RateLimitPolicy>;
+};
 
 const EXPENSIVE_PATH =
   /\/(ai|logo|mockup|photography|lifestyle|techpack|bg-removal|store\/ai)(\/|$)/;
-const AUTH_PATH = /\/auth\/(sync|username\/check|profile)(\/|$)/;
+const AUTH_PATH = /\/auth(?:\/|$)/;
+const CHECKOUT_PATH = /\/(?:guest\/checkout|buyer\/checkout|checkout)(?:\/|$)/;
+const WEBHOOK_PATH = /\/webhooks(?:\/|$)/;
+const MUTATION_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
-function policyFor(method: string, path: string, authenticated: boolean): RateLimitPolicy {
-  if (AUTH_PATH.test(path)) return POLICIES.authentication;
-  if (EXPENSIVE_PATH.test(path)) return POLICIES.expensive;
-  if (!["GET", "HEAD", "OPTIONS"].includes(method)) return POLICIES.mutation;
-  return authenticated ? POLICIES.read : POLICIES.anonymousRead;
+export function normalizeClientIp(value: string | undefined): string {
+  const first = (value ?? "unknown").split(",")[0]?.trim().toLowerCase() || "unknown";
+  return first.startsWith("::ffff:") ? first.slice(7) : first;
 }
 
-function identityFor(req: Parameters<RequestHandler>[0]): string {
-  const userId = getAuth(req).userId;
+function authenticatedUserId(req: Request): string | null {
+  const scopedOwner = (req as Request & { clerkUserId?: string }).clerkUserId;
+  if (scopedOwner) return scopedOwner;
+  try {
+    return getAuth(req).userId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function rateLimitIdentity(req: Request, policy: RateLimitPolicy): string {
+  const userId = authenticatedUserId(req);
   if (userId) return `user:${userId}`;
-  return `ip:${req.ip || req.socket.remoteAddress || "unknown"}`;
+
+  const ip = normalizeClientIp(req.ip || req.socket.remoteAddress);
+  if (policy.id === "webhook") {
+    return `webhook:ip:${ip}`;
+  }
+  return `ip:${ip}`;
 }
 
-function sweepExpired(now: number): void {
-  if (now - lastSweepAt < 60_000) return;
-  lastSweepAt = now;
-  for (const [key, counter] of counters) {
-    if (counter.resetAt <= now) counters.delete(key);
+export function rateLimitPolicyFor(
+  method: string,
+  path: string,
+  authenticated: boolean,
+): RateLimitPolicy | null {
+  if (WEBHOOK_PATH.test(path)) return RATE_LIMIT_POLICIES.webhook;
+  if (AUTH_PATH.test(path)) return RATE_LIMIT_POLICIES.authentication;
+  if (CHECKOUT_PATH.test(path)) return RATE_LIMIT_POLICIES.checkout;
+  if (EXPENSIVE_PATH.test(path)) return RATE_LIMIT_POLICIES.expensive;
+  if (MUTATION_METHODS.has(method)) return RATE_LIMIT_POLICIES.mutation;
+  if (authenticated && (method === "GET" || method === "HEAD")) {
+    return RATE_LIMIT_POLICIES["authenticated-read"];
   }
+  if (!authenticated && (method === "GET" || method === "HEAD")) {
+    return RATE_LIMIT_POLICIES["public-read"];
+  }
+  return null;
 }
 
-export const appRateLimiter: RequestHandler = (req, res, next) => {
-  if (
-    req.method === "OPTIONS" ||
-    req.path.endsWith("/health") ||
-    req.path.endsWith("/healthz") ||
-    req.path.includes("/webhooks/")
-  ) {
-    next();
-    return;
-  }
+export async function consumeRateLimitBucket(
+  bucketKey: string,
+  policy: RateLimitPolicy,
+): Promise<{ count: number; resetAt: Date }> {
+  const result = await db.execute(sql`
+    WITH expired_cleanup AS (
+      DELETE FROM rate_limit_buckets
+      WHERE expires_at < now() - interval '1 hour'
+    )
+    INSERT INTO rate_limit_buckets (
+      bucket_key, request_count, window_started_at, expires_at
+    )
+    VALUES (
+      ${bucketKey}, 1, now(), now() + (${policy.windowMs} * interval '1 millisecond')
+    )
+    ON CONFLICT (bucket_key) DO UPDATE SET
+      request_count = CASE
+        WHEN rate_limit_buckets.expires_at <= now() THEN 1
+        ELSE rate_limit_buckets.request_count + 1
+      END,
+      window_started_at = CASE
+        WHEN rate_limit_buckets.expires_at <= now() THEN now()
+        ELSE rate_limit_buckets.window_started_at
+      END,
+      expires_at = CASE
+        WHEN rate_limit_buckets.expires_at <= now()
+          THEN now() + (${policy.windowMs} * interval '1 millisecond')
+        ELSE rate_limit_buckets.expires_at
+      END
+    RETURNING request_count, expires_at
+  `);
+  const row = result.rows[0] as { request_count: number | string; expires_at: Date | string } | undefined;
+  if (!row) throw new Error("Rate limit bucket did not return a result");
+  return {
+    count: Number(row.request_count),
+    resetAt: row.expires_at instanceof Date ? row.expires_at : new Date(row.expires_at),
+  };
+}
 
-  const now = Date.now();
-  sweepExpired(now);
-  const identity = identityFor(req);
-  const authenticated = identity.startsWith("user:");
-  const policy = policyFor(req.method, req.path, authenticated);
-  const key = `${policy.id}:${identity}`;
-  const current = counters.get(key);
-  const counter =
-    !current || current.resetAt <= now
-      ? { count: 1, resetAt: now + policy.windowMs }
-      : { count: current.count + 1, resetAt: current.resetAt };
-  counters.set(key, counter);
+function middlewareForPolicy(explicitPolicy?: RateLimitPolicyName): RequestHandler {
+  return async (req, res, next) => {
+    if (
+      req.method === "OPTIONS" ||
+      req.path.endsWith("/health") ||
+      req.path.endsWith("/healthz")
+    ) {
+      next();
+      return;
+    }
 
-  const remaining = Math.max(0, policy.limit - counter.count);
-  const retryAfterSeconds = Math.max(1, Math.ceil((counter.resetAt - now) / 1000));
-  res.setHeader("RateLimit-Limit", String(policy.limit));
-  res.setHeader("RateLimit-Remaining", String(remaining));
-  res.setHeader("RateLimit-Reset", String(Math.ceil(counter.resetAt / 1000)));
+    const userId = authenticatedUserId(req);
+    const policy = explicitPolicy
+      ? RATE_LIMIT_POLICIES[explicitPolicy]
+      : rateLimitPolicyFor(req.method, req.path, Boolean(userId));
+    if (!policy) {
+      next();
+      return;
+    }
 
-  if (counter.count > policy.limit) {
-    res.setHeader("Retry-After", String(retryAfterSeconds));
-    res.status(429).json({
-      code: "RATE_LIMITED",
-      message: policy.message,
-      retryAfterSeconds,
-    });
-    return;
-  }
-  next();
-};
+    const identity = rateLimitIdentity(req, policy);
+    const key = `${policy.id}:${identity}`;
+    try {
+      const counter = await consumeRateLimitBucket(key, policy);
+      const remaining = Math.max(0, policy.limit - counter.count);
+      const retryAfterSeconds = Math.max(
+        1,
+        Math.ceil((counter.resetAt.getTime() - Date.now()) / 1000),
+      );
+      res.setHeader("RateLimit-Limit", String(policy.limit));
+      res.setHeader("RateLimit-Remaining", String(remaining));
+      res.setHeader("RateLimit-Reset", String(Math.ceil(counter.resetAt.getTime() / 1000)));
+
+      if (counter.count > policy.limit) {
+        res.setHeader("Retry-After", String(retryAfterSeconds));
+        res.status(429).json({
+          error: "Rate limit exceeded",
+          code: "RATE_LIMITED",
+          message: policy.message,
+          retryAfterSeconds,
+        });
+        return;
+      }
+      next();
+    } catch (err) {
+      req.log?.error({ err, policy: policy.id }, "Persistent rate limit check failed");
+      res.status(503).json({
+        error: "Request rate could not be verified",
+        code: "RATE_LIMIT_UNAVAILABLE",
+        message: "Please try again shortly.",
+      });
+    }
+  };
+}
+
+export const appRateLimiter = middlewareForPolicy();
+
+/** Route-level override for stricter policies. Do not combine with appRateLimiter. */
+export function rateLimit(policy: RateLimitPolicyName): RequestHandler {
+  return middlewareForPolicy(policy);
+}
 
 export function resetRateLimitStateForTests(): void {
-  counters.clear();
-  lastSweepAt = 0;
+  // Intentionally no process-local state. Test suites should use unique identities.
 }
