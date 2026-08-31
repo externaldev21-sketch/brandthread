@@ -3,8 +3,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useRef } from "react";
-import { Save, Factory, CheckCircle2, Upload, X, MessageSquare } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Save, Factory, CheckCircle2, Upload, X, MessageSquare, ArrowLeft, ArrowRight, Trash2, Loader2 } from "lucide-react";
 import { useAuth } from "@clerk/react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ export default function Profile() {
   const queryClient = useQueryClient();
   const { getToken } = useAuth();
   const initialized = useRef(false);
+  const [photoMutation, setPhotoMutation] = useState<string | null>(null);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -121,6 +122,61 @@ export default function Profile() {
       toast.success("Factory photo uploaded");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Photo upload failed");
+    }
+  };
+
+  const reorderPhotos = async (fromIndex: number, toIndex: number) => {
+    if (!profile || photoMutation || fromIndex === toIndex) return;
+    const photos = profile.photos ?? [];
+    const photoOrder = photos.map((_photo, index) => index);
+    const [moved] = photoOrder.splice(fromIndex, 1);
+    photoOrder.splice(toIndex, 0, moved);
+    setPhotoMutation(`reorder-${fromIndex}-${toIndex}`);
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/manufacturers/me/photos", {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ expectedRevision: profile.revision, photoOrder }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Photo order could not be saved.");
+      queryClient.setQueryData(getGetMyManufacturerProfileQueryKey(), body);
+      toast.success("Factory photo order updated");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Photo order could not be saved.");
+      await queryClient.invalidateQueries({ queryKey: getGetMyManufacturerProfileQueryKey() });
+    } finally {
+      setPhotoMutation(null);
+    }
+  };
+
+  const deletePhoto = async (photoIndex: number) => {
+    if (!profile || photoMutation) return;
+    if (!window.confirm("Remove this factory photo from your profile?")) return;
+    setPhotoMutation(`delete-${photoIndex}`);
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/manufacturers/me/photos/${photoIndex}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ expectedRevision: profile.revision }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || "Photo could not be removed.");
+      queryClient.setQueryData(getGetMyManufacturerProfileQueryKey(), body);
+      toast.success("Factory photo removed");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Photo could not be removed.");
+      await queryClient.invalidateQueries({ queryKey: getGetMyManufacturerProfileQueryKey() });
+    } finally {
+      setPhotoMutation(null);
     }
   };
 
@@ -278,16 +334,58 @@ export default function Profile() {
             <div className="flex items-center gap-2 border-b border-border/50 pb-2 text-primary font-mono text-sm tracking-wider uppercase">
               <Upload className="w-4 h-4" /> Factory photos
             </div>
-            <p className="text-sm text-muted-foreground">Add up to eight JPEG, PNG, or WebP photos. Files stay protected and are shown on your published manufacturer profile.</p>
-            <label className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card px-4 text-sm text-muted-foreground hover:border-primary">
+            <p className="text-sm text-muted-foreground">Add up to eight JPEG, PNG, or WebP photos. Files stay protected and are shown on your published manufacturer profile. Move the first photo into the lead position.</p>
+            <label className={`flex min-h-28 flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card px-4 text-sm text-muted-foreground hover:border-primary ${(profile?.photos?.length ?? 0) >= 8 || photoMutation ? "cursor-not-allowed opacity-60" : "cursor-pointer"}`}>
               <Upload className="mb-2 h-5 w-5" />
-              Choose production photos
-              <input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(event) => { uploadPhotos(event.target.files); event.currentTarget.value = ""; }} />
+              {(profile?.photos?.length ?? 0) >= 8 ? "Photo limit reached" : "Choose production photos"}
+              <input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={(profile?.photos?.length ?? 0) >= 8 || !!photoMutation} onChange={(event) => { uploadPhotos(event.target.files); event.currentTarget.value = ""; }} />
             </label>
             {(profile?.photos?.length ?? 0) > 0 && (
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                {profile!.photos!.map((photo) => (
-                  <img key={photo} src={photo.startsWith("/objects/") ? `/api/storage${photo}` : photo} alt="Factory production" className="aspect-[4/3] w-full rounded-md border border-border object-cover" />
+                {profile!.photos!.map((photo, index) => (
+                  <div key={`${photo}-${index}`} className="group relative overflow-hidden rounded-md border border-border bg-card">
+                    <img src={photo.startsWith("/objects/") ? `/api/storage${photo}` : photo} alt={`Factory production ${index + 1}`} className="aspect-[4/3] w-full object-cover" />
+                    <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-background/85 p-1.5">
+                      <span className="truncate px-1 text-xs font-medium text-foreground">
+                        {index === 0 ? "Lead image" : `Photo ${index + 1}`}
+                      </span>
+                      <div className="flex items-center gap-0.5">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          aria-label={`Move photo ${index + 1} left`}
+                          disabled={index === 0 || !!photoMutation}
+                          onClick={() => reorderPhotos(index, index - 1)}
+                        >
+                          {photoMutation === `reorder-${index}-${index - 1}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowLeft className="h-3.5 w-3.5" />}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          aria-label={`Move photo ${index + 1} right`}
+                          disabled={index === profile!.photos!.length - 1 || !!photoMutation}
+                          onClick={() => reorderPhotos(index, index + 1)}
+                        >
+                          {photoMutation === `reorder-${index}-${index + 1}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowRight className="h-3.5 w-3.5" />}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          aria-label={`Remove photo ${index + 1}`}
+                          disabled={!!photoMutation}
+                          onClick={() => deletePhoto(index)}
+                        >
+                          {photoMutation === `delete-${index}` ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}

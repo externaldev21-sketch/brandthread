@@ -131,6 +131,18 @@ export interface ManufacturerUpdate {
   contactPhone?: string;
 }
 
+export interface ManufacturerPhotoReorder {
+  /** @minimum 1 */
+  expectedRevision: number;
+  /** Complete zero-based permutation of the current photo list; index zero becomes the lead image. */
+  photoOrder: number[];
+}
+
+export interface ManufacturerPhotoDelete {
+  /** @minimum 1 */
+  expectedRevision: number;
+}
+
 export interface PublicManufacturer {
   id: string;
   businessName: string;
@@ -553,4 +565,3 @@ specialty?: string;
 export type UploadManufacturerThreadAttachment201 = {
   objectPath: string;
 };
-

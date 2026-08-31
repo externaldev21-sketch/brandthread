@@ -20,6 +20,9 @@ import {
   UpdateMyManufacturerProfileBody,
   SendThreadMessageBody,
   SetupManufacturerPaymentBody,
+  ReorderMyManufacturerPhotosBody,
+  DeleteMyManufacturerPhotoBody,
+  DeleteMyManufacturerPhotoParams,
 } from "@workspace/api-zod";
 import { requireAuth, requirePlan } from "../middlewares/requireAuth";
 import { teamContext } from "../middlewares/requireRole";
@@ -40,6 +43,31 @@ async function signedProfilePhotos(storedPhotos: unknown): Promise<string[]> {
     .filter((path): path is string => typeof path === "string" && path.startsWith("/objects/"))
     .map((path) => objectStorage.getObjectEntityDownloadURL(path)));
 }
+
+function storedProfilePhotos(storedPhotos: unknown): string[] {
+  if (!Array.isArray(storedPhotos)) return [];
+  return storedPhotos.filter((path): path is string =>
+    typeof path === "string" && path.startsWith("/objects/"),
+  );
+}
+
+async function serializeMyManufacturer(mfr: typeof manufacturers.$inferSelect) {
+  return {
+    ...mfr,
+    photos: await signedProfilePhotos(mfr.photos),
+    verifiedAt: mfr.verifiedAt?.toISOString() ?? null,
+    createdAt: mfr.createdAt.toISOString(),
+    updatedAt: mfr.updatedAt.toISOString(),
+  };
+}
+
+function profilePhotoConflict(res: express.Response) {
+  return res.status(409).json({
+    error: "Profile changed since it was loaded; refresh and review the latest photos",
+    code: "STALE_WRITE",
+  });
+}
+
 const requireGrowthSeller = [requireAuth, teamContext(), requirePlan("growth")] as const;
 
 function isSupportedImage(buffer: Buffer): boolean {
@@ -634,6 +662,109 @@ router.post(
     }
   },
 );
+
+router.patch("/me/photos", requireAuth, async (req, res) => {
+  const parsed = ReorderMyManufacturerPhotosBody.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: parsed.error.flatten() });
+  }
+
+  try {
+    const clerkId = (req as any).clerkUserId as string;
+    const mfr = await resolveManufacturer(clerkId);
+    if (!mfr) return res.status(404).json({ error: "Manufacturer profile not found" });
+    if (mfr.revision !== parsed.data.expectedRevision) {
+      return profilePhotoConflict(res);
+    }
+
+    const photos = storedProfilePhotos(mfr.photos);
+    const { photoOrder } = parsed.data;
+    const isCompletePermutation =
+      photoOrder.length === photos.length
+      && new Set(photoOrder).size === photos.length
+      && photoOrder.every((index) => Number.isInteger(index) && index >= 0 && index < photos.length);
+    if (!isCompletePermutation) {
+      return res.status(400).json({
+        error: "photoOrder must include each current photo exactly once",
+      });
+    }
+
+    const orderedPhotos = photoOrder.map((index) => photos[index]);
+    const [updated] = await db
+      .update(manufacturers)
+      .set({
+        photos: orderedPhotos,
+        updatedAt: new Date(),
+        revision: sql`${manufacturers.revision} + 1`,
+      })
+      .where(and(
+        eq(manufacturers.id, mfr.id),
+        eq(manufacturers.revision, parsed.data.expectedRevision),
+      ))
+      .returning();
+    if (!updated) return profilePhotoConflict(res);
+
+    return res.json(await serializeMyManufacturer(updated));
+  } catch (error) {
+    req.log.error({ err: error }, "Manufacturer photo reorder failed");
+    return res.status(500).json({ error: "Unable to reorder factory photos" });
+  }
+});
+
+router.delete("/me/photos/:photoIndex", requireAuth, async (req, res) => {
+  const parsedParams = DeleteMyManufacturerPhotoParams.safeParse(req.params);
+  const parsedBody = DeleteMyManufacturerPhotoBody.safeParse(req.body);
+  if (!parsedParams.success) {
+    return res.status(400).json({ error: parsedParams.error.flatten() });
+  }
+  if (!parsedBody.success) {
+    return res.status(400).json({ error: parsedBody.error.flatten() });
+  }
+
+  try {
+    const clerkId = (req as any).clerkUserId as string;
+    const mfr = await resolveManufacturer(clerkId);
+    if (!mfr) return res.status(404).json({ error: "Manufacturer profile not found" });
+    if (mfr.revision !== parsedBody.data.expectedRevision) {
+      return profilePhotoConflict(res);
+    }
+
+    const photos = storedProfilePhotos(mfr.photos);
+    const photoIndex = parsedParams.data.photoIndex;
+    if (!Number.isInteger(photoIndex) || photoIndex < 0 || photoIndex >= photos.length) {
+      return res.status(400).json({ error: "That factory photo no longer exists" });
+    }
+
+    const removedObjectPath = photos[photoIndex];
+    const remainingPhotos = photos.filter((_photo, index) => index !== photoIndex);
+    const [updated] = await db
+      .update(manufacturers)
+      .set({
+        photos: remainingPhotos,
+        updatedAt: new Date(),
+        revision: sql`${manufacturers.revision} + 1`,
+      })
+      .where(and(
+        eq(manufacturers.id, mfr.id),
+        eq(manufacturers.revision, parsedBody.data.expectedRevision),
+      ))
+      .returning();
+    if (!updated) return profilePhotoConflict(res);
+
+    // The database is authoritative. Only remove an object after its path is
+    // no longer referenced by the successfully updated profile.
+    if (!remainingPhotos.includes(removedObjectPath)) {
+      await objectStorage.deleteObjectEntity(removedObjectPath).catch((error) => {
+        req.log.warn({ err: error, objectPath: removedObjectPath }, "Deleted factory photo from profile but could not remove its object");
+      });
+    }
+
+    return res.json(await serializeMyManufacturer(updated));
+  } catch (error) {
+    req.log.error({ err: error }, "Manufacturer photo deletion failed");
+    return res.status(500).json({ error: "Unable to delete factory photo" });
+  }
+});
 
 router.patch("/me", async (req, res) => {
   const { userId } = getAuth(req);

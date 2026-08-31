@@ -171,6 +171,89 @@ export const UpdateMyManufacturerProfileResponse = zod.object({
 
 
 /**
+ * @summary Reorder current manufacturer's factory photos
+ */
+
+
+
+export const ReorderMyManufacturerPhotosBody = zod.object({
+  "expectedRevision": zod.number().min(1),
+  "photoOrder": zod.array(zod.number()).describe('Complete zero-based permutation of the current photo list; index zero becomes the lead image.')
+})
+
+
+
+
+export const ReorderMyManufacturerPhotosResponse = zod.object({
+  "id": zod.string(),
+  "clerkId": zod.string(),
+  "businessName": zod.string(),
+  "country": zod.string(),
+  "city": zod.string().nullish(),
+  "specialty": zod.string(),
+  "description": zod.string().nullish(),
+  "yearsInBusiness": zod.number().optional(),
+  "moq": zod.number(),
+  "priceRange": zod.string(),
+  "bulkTurnaround": zod.string(),
+  "sampleTurnaround": zod.string(),
+  "photos": zod.array(zod.string().url()).optional(),
+  "website": zod.string().nullish(),
+  "contactEmail": zod.string().nullish(),
+  "contactPhone": zod.string().nullish(),
+  "status": zod.string(),
+  "verifiedAt": zod.string().nullish(),
+  "paymentSetup": zod.boolean().optional(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "revision": zod.number().min(1)
+})
+
+
+/**
+ * @summary Delete a factory photo from the current manufacturer's profile
+ */
+export const DeleteMyManufacturerPhotoParams = zod.object({
+  "photoIndex": zod.coerce.number().describe('Zero-based index from the latest manufacturer profile revision.')
+})
+
+
+
+
+export const DeleteMyManufacturerPhotoBody = zod.object({
+  "expectedRevision": zod.number().min(1)
+})
+
+
+
+
+export const DeleteMyManufacturerPhotoResponse = zod.object({
+  "id": zod.string(),
+  "clerkId": zod.string(),
+  "businessName": zod.string(),
+  "country": zod.string(),
+  "city": zod.string().nullish(),
+  "specialty": zod.string(),
+  "description": zod.string().nullish(),
+  "yearsInBusiness": zod.number().optional(),
+  "moq": zod.number(),
+  "priceRange": zod.string(),
+  "bulkTurnaround": zod.string(),
+  "sampleTurnaround": zod.string(),
+  "photos": zod.array(zod.string().url()).optional(),
+  "website": zod.string().nullish(),
+  "contactEmail": zod.string().nullish(),
+  "contactPhone": zod.string().nullish(),
+  "status": zod.string(),
+  "verifiedAt": zod.string().nullish(),
+  "paymentSetup": zod.boolean().optional(),
+  "createdAt": zod.string(),
+  "updatedAt": zod.string(),
+  "revision": zod.number().min(1)
+})
+
+
+/**
  * @summary Register as a manufacturer
  */
 export const RegisterManufacturerBody = zod.object({
@@ -1107,5 +1190,3 @@ export const ListManufacturerPaymentActivityResponseItem = zod.object({
   "createdAt": zod.coerce.date()
 })
 export const ListManufacturerPaymentActivityResponse = zod.array(ListManufacturerPaymentActivityResponseItem)
-
-

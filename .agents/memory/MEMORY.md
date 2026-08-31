@@ -88,3 +88,4 @@
 - [Notification response deduplication](notification-response-deduplication.md) — warm listeners and cold-start recovery can surface the same Expo response; dedupe navigation by request identifier.
 - [Notification measurement integrity](notification-measurement-integrity.md) — Expo tickets are provider results, not receipts; client events need stable IDs and an account-scoped durable outbox.
 - [Post-merge setup timeout](post-merge-timeout.md) — allow five minutes for cold or forced pnpm relinks before migrations and the API build.
+- [OpenAPI integer validation](openapi-integer-validation.md) — generated validators may accept fractions for integer fields; enforce integer semantics at sensitive server boundaries.

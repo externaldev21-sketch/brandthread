@@ -203,6 +203,127 @@ describe("manufacturer revision concurrency", () => {
     expect(ownPayload.photos).not.toContain(storedPath);
   });
 
+  it("reorders factory photos with a revision and exposes the new lead publicly", async () => {
+    state.userId = manufacturerUserId;
+    const originalPhotos = [
+      "/objects/factory-cutting",
+      "/objects/factory-sewing",
+      "/objects/factory-finishing",
+    ];
+    const [before] = await db.update(manufacturers)
+      .set({ photos: originalPhotos })
+      .where(eq(manufacturers.id, manufacturerId))
+      .returning();
+
+    const response = await patch("/api/manufacturers/me/photos", {
+      expectedRevision: before.revision,
+      photoOrder: [2, 0, 1],
+    });
+    expect(response.status).toBe(200);
+    const payload = await response.json() as { photos: string[]; revision: number };
+    expect(payload.photos).toEqual([
+      "https://storage.test/objects/factory-finishing",
+      "https://storage.test/objects/factory-cutting",
+      "https://storage.test/objects/factory-sewing",
+    ]);
+    expect(payload.revision).toBe(before.revision + 1);
+
+    const [stored] = await db.select({ photos: manufacturers.photos })
+      .from(manufacturers).where(eq(manufacturers.id, manufacturerId)).limit(1);
+    expect(stored.photos).toEqual([
+      "/objects/factory-finishing",
+      "/objects/factory-cutting",
+      "/objects/factory-sewing",
+    ]);
+
+    const publicResponse = await fetch(`${base}/api/manufacturers/public/${manufacturerId}`);
+    expect(publicResponse.status).toBe(200);
+    const publicPayload = await publicResponse.json() as { photos: string[] };
+    expect(publicPayload.photos[0]).toBe("https://storage.test/objects/factory-finishing");
+  });
+
+  it("rejects a fractional photo order without changing stored paths", async () => {
+    state.userId = manufacturerUserId;
+    const [before] = await db.select().from(manufacturers)
+      .where(eq(manufacturers.id, manufacturerId)).limit(1);
+    const photosBefore = [...before.photos];
+
+    const response = await patch("/api/manufacturers/me/photos", {
+      expectedRevision: before.revision,
+      photoOrder: [0.5, 1, 2],
+    });
+    expect(response.status).toBe(400);
+
+    const [after] = await db.select().from(manufacturers)
+      .where(eq(manufacturers.id, manufacturerId)).limit(1);
+    expect(after.photos).toEqual(photosBefore);
+    expect(after.revision).toBe(before.revision);
+  });
+
+  it("deletes the selected factory photo only after a successful revision update", async () => {
+    state.userId = manufacturerUserId;
+    const photos = [
+      "/objects/factory-current",
+      "/objects/factory-outdated",
+      "/objects/factory-secondary",
+    ];
+    const [before] = await db.update(manufacturers)
+      .set({ photos })
+      .where(eq(manufacturers.id, manufacturerId))
+      .returning();
+    const deletedBefore = uploads.deleted.length;
+
+    const stale = await fetch(`${base}/api/manufacturers/me/photos/1`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ expectedRevision: before.revision - 1 }),
+    });
+    expect(stale.status).toBe(409);
+    expect(uploads.deleted).toHaveLength(deletedBefore);
+
+    const response = await fetch(`${base}/api/manufacturers/me/photos/1`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ expectedRevision: before.revision }),
+    });
+    expect(response.status).toBe(200);
+    const payload = await response.json() as { photos: string[]; revision: number };
+    expect(payload.photos).toEqual([
+      "https://storage.test/objects/factory-current",
+      "https://storage.test/objects/factory-secondary",
+    ]);
+    expect(payload.revision).toBe(before.revision + 1);
+    expect(uploads.deleted.slice(deletedBefore)).toEqual(["/objects/factory-outdated"]);
+
+    const [stored] = await db.select({ photos: manufacturers.photos })
+      .from(manufacturers).where(eq(manufacturers.id, manufacturerId)).limit(1);
+    expect(stored.photos).toEqual([
+      "/objects/factory-current",
+      "/objects/factory-secondary",
+    ]);
+  });
+
+  it("rejects a fractional delete index without changing revision or storage", async () => {
+    state.userId = manufacturerUserId;
+    const [before] = await db.select().from(manufacturers)
+      .where(eq(manufacturers.id, manufacturerId)).limit(1);
+    const photosBefore = [...before.photos];
+    const deletedBefore = uploads.deleted.length;
+
+    const response = await fetch(`${base}/api/manufacturers/me/photos/0.5`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ expectedRevision: before.revision }),
+    });
+    expect(response.status).toBe(400);
+
+    const [after] = await db.select().from(manufacturers)
+      .where(eq(manufacturers.id, manufacturerId)).limit(1);
+    expect(after.photos).toEqual(photosBefore);
+    expect(after.revision).toBe(before.revision);
+    expect(uploads.deleted).toHaveLength(deletedBefore);
+  });
+
   it("does not publicly serialize pending or private profiles", async () => {
     const [pending] = await db.insert(manufacturers).values({
       businessName: "Pending Private Factory", country: "US", specialty: "Knits",

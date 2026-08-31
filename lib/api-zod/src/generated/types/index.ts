@@ -36,6 +36,8 @@ export * from './manufacturerPaymentActivityCategory';
 export * from './manufacturerPaymentActivityMetadata';
 export * from './manufacturerPaymentActivityOrderType';
 export * from './manufacturerPaymentInput';
+export * from './manufacturerPhotoDelete';
+export * from './manufacturerPhotoReorder';
 export * from './manufacturerRelationship';
 export * from './manufacturerRelationshipInput';
 export * from './manufacturerRelationshipStatus';

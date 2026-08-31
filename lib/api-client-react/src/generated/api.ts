@@ -40,6 +40,8 @@ import type {
   ManufacturerPayment,
   ManufacturerPaymentActivity,
   ManufacturerPaymentInput,
+  ManufacturerPhotoDelete,
+  ManufacturerPhotoReorder,
   ManufacturerRelationship,
   ManufacturerRelationshipInput,
   ManufacturerSampleOrderStatusUpdate,
@@ -156,6 +158,13 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
+
 export const getCreateCallTokenUrl = () => {
 
 
@@ -366,6 +375,13 @@ export function useGetDropBroadcastPreview<TData = Awaited<ReturnType<typeof get
 
   return withQueryKey(query, queryOptions.queryKey);
 }
+
+
+
+
+
+
+
 export const getGetMyManufacturerProfileUrl = () => {
 
 
@@ -511,6 +527,147 @@ export const useUpdateMyManufacturerProfile = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getUpdateMyManufacturerProfileMutationOptions(options));
+    }
+
+export const getReorderMyManufacturerPhotosUrl = () => {
+
+
+
+
+  return `/api/manufacturers/me/photos`
+}
+
+/**
+ * @summary Reorder current manufacturer's factory photos
+ */
+export const reorderMyManufacturerPhotos = async (manufacturerPhotoReorder: ManufacturerPhotoReorder, options?: RequestInit): Promise<Manufacturer> => {
+
+  return customFetch<Manufacturer>(getReorderMyManufacturerPhotosUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(manufacturerPhotoReorder)
+  }
+);}
+
+
+
+
+export const getReorderMyManufacturerPhotosMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reorderMyManufacturerPhotos>>, TError,{data: BodyType<ManufacturerPhotoReorder>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof reorderMyManufacturerPhotos>>, TError,{data: BodyType<ManufacturerPhotoReorder>}, TContext> => {
+
+const mutationKey = ['reorderMyManufacturerPhotos'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof reorderMyManufacturerPhotos>>, {data: BodyType<ManufacturerPhotoReorder>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  reorderMyManufacturerPhotos(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ReorderMyManufacturerPhotosMutationResult = NonNullable<Awaited<ReturnType<typeof reorderMyManufacturerPhotos>>>
+    export type ReorderMyManufacturerPhotosMutationBody = BodyType<ManufacturerPhotoReorder>
+    export type ReorderMyManufacturerPhotosMutationError = ErrorType<void>
+
+    /**
+ * @summary Reorder current manufacturer's factory photos
+ */
+export const useReorderMyManufacturerPhotos = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof reorderMyManufacturerPhotos>>, TError,{data: BodyType<ManufacturerPhotoReorder>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof reorderMyManufacturerPhotos>>,
+        TError,
+        {data: BodyType<ManufacturerPhotoReorder>},
+        TContext
+      > => {
+      return useMutation(getReorderMyManufacturerPhotosMutationOptions(options));
+    }
+
+export const getDeleteMyManufacturerPhotoUrl = (photoIndex: number,) => {
+
+
+
+
+  return `/api/manufacturers/me/photos/${photoIndex}`
+}
+
+/**
+ * @summary Delete a factory photo from the current manufacturer's profile
+ */
+export const deleteMyManufacturerPhoto = async (photoIndex: number,
+    manufacturerPhotoDelete: ManufacturerPhotoDelete, options?: RequestInit): Promise<Manufacturer> => {
+
+  return customFetch<Manufacturer>(getDeleteMyManufacturerPhotoUrl(photoIndex),
+  {
+    ...options,
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(manufacturerPhotoDelete)
+  }
+);}
+
+
+
+
+export const getDeleteMyManufacturerPhotoMutationOptions = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMyManufacturerPhoto>>, TError,{photoIndex: number;data: BodyType<ManufacturerPhotoDelete>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteMyManufacturerPhoto>>, TError,{photoIndex: number;data: BodyType<ManufacturerPhotoDelete>}, TContext> => {
+
+const mutationKey = ['deleteMyManufacturerPhoto'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteMyManufacturerPhoto>>, {photoIndex: number;data: BodyType<ManufacturerPhotoDelete>}> = (props) => {
+          const {photoIndex,data} = props ?? {};
+
+          return  deleteMyManufacturerPhoto(photoIndex,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteMyManufacturerPhotoMutationResult = NonNullable<Awaited<ReturnType<typeof deleteMyManufacturerPhoto>>>
+    export type DeleteMyManufacturerPhotoMutationBody = BodyType<ManufacturerPhotoDelete>
+    export type DeleteMyManufacturerPhotoMutationError = ErrorType<void>
+
+    /**
+ * @summary Delete a factory photo from the current manufacturer's profile
+ */
+export const useDeleteMyManufacturerPhoto = <TError = ErrorType<void>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteMyManufacturerPhoto>>, TError,{photoIndex: number;data: BodyType<ManufacturerPhotoDelete>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteMyManufacturerPhoto>>,
+        TError,
+        {photoIndex: number;data: BodyType<ManufacturerPhotoDelete>},
+        TContext
+      > => {
+      return useMutation(getDeleteMyManufacturerPhotoMutationOptions(options));
     }
 
 export const getRegisterManufacturerUrl = () => {

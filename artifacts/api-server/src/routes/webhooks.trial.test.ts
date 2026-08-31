@@ -9,6 +9,7 @@ const { dbMock, fetchMock, table } = vi.hoisted(() => {
     dbMock: {
       select: vi.fn(),
       insert: vi.fn(),
+      delete: vi.fn(),
     },
     fetchMock: vi.fn(),
     table,

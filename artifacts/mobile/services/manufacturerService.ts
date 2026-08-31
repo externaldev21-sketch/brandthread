@@ -43,6 +43,13 @@ function assertCanonicalManufacturerId(id: string): void {
   }
 }
 
+function mapFreshPublicManufacturer(row: any): Manufacturer {
+  const orderedPhotos = Array.isArray(row?.photos)
+    ? row.photos.filter((photo: unknown): photo is string => typeof photo === 'string')
+    : [];
+  return mapPublicManufacturer({ ...row, photos: orderedPhotos });
+}
+
 async function readDrafts(): Promise<QuoteRequest[]> {
   try {
     const value = await AsyncStorage.getItem(DRAFTS_KEY);
@@ -139,7 +146,7 @@ export async function searchManufacturers(opts: {
   if (opts.category) params.set('specialty', opts.category);
   const rows = await serviceRequest<any[]>(`/api/manufacturers/public${params.toString() ? `?${params}` : ''}`);
   if (!Array.isArray(rows)) throw new Error('Manufacturer directory returned an invalid response.');
-  let results = rows.map(mapPublicManufacturer);
+  let results = rows.map(mapFreshPublicManufacturer);
   if (opts.moqMax !== undefined) results = results.filter((item) => item.moq <= opts.moqMax!);
   if (opts.unitPriceMaxCents !== undefined) results = results.filter((item) => item.unitPriceMinCents <= opts.unitPriceMaxCents!);
   if (opts.leadTimeDaysMax !== undefined) results = results.filter((item) => item.leadTimeDays <= opts.leadTimeDaysMax!);
@@ -150,7 +157,9 @@ export async function searchManufacturers(opts: {
 export async function getManufacturer(id: string): Promise<Manufacturer | undefined> {
   assertCanonicalManufacturerId(id);
   const row = await serviceRequest<any>(`/api/manufacturers/public/${encodeURIComponent(id)}`);
-  return row?.id ? mapPublicManufacturer(row) : undefined;
+  // Public profile requests are intentionally uncached. Preserve the server's
+  // array order so a refetch immediately picks up the manufacturer's new lead.
+  return row?.id ? mapFreshPublicManufacturer(row) : undefined;
 }
 
 export async function getFavoriteManufacturerIds(): Promise<string[]> {
