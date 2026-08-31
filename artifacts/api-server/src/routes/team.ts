@@ -24,6 +24,7 @@ import { eq, and, ne, or, asc, desc, gt, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { teamContext, requireRole } from "../middlewares/requireRole";
 import { logActivity, reqActor } from "../lib/activityLog";
+import { teamMembershipOrderBy } from "../lib/teamMembership";
 import {
   inviteUrls,
   resetTeamInviteReminderTracking,
@@ -212,9 +213,7 @@ router.get("/my-membership", async (req, res) => {
       })
       .from(teamMembers)
       .where(and(eq(teamMembers.memberClerkId, userId), eq(teamMembers.status, "active")))
-      // Prefer the newest membership; ownerId and id make equal timestamps
-      // deterministic instead of depending on the database's tie ordering.
-      .orderBy(desc(teamMembers.acceptedAt), asc(teamMembers.ownerId), asc(teamMembers.id))
+      .orderBy(...teamMembershipOrderBy())
       .limit(1);
 
     if (!membership || membership.ownerId === userId) {

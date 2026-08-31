@@ -51,12 +51,27 @@ const equalAcceptedAt = new Date("2026-08-31T14:00:00.000Z");
 let server: Server;
 let baseUrl = "";
 
+type MembershipResponse = {
+  membership: {
+    id: string;
+    ownerId: string;
+    role: string;
+    acceptedAt: string;
+    ownerName: string;
+  } | null;
+};
+
+type ContextResponse = {
+  actingStoreOwner: string;
+  actorRole: string;
+};
+
 async function getMembership(userId: string) {
   testState.userId = userId;
   const response = await fetch(`${baseUrl}/api/team/my-membership`);
   return {
     status: response.status,
-    body: await response.json(),
+    body: await response.json() as MembershipResponse,
   };
 }
 
@@ -65,7 +80,7 @@ async function getContext(userId: string) {
   const response = await fetch(`${baseUrl}/api/team-context`);
   return {
     status: response.status,
-    body: await response.json(),
+    body: await response.json() as ContextResponse,
   };
 }
 
@@ -202,32 +217,23 @@ describe("authenticated team membership discovery", () => {
     });
   });
 
-  it("selects the same membership when active memberships share an acceptance timestamp", async () => {
-    const results = await Promise.all(
-      Array.from({ length: 5 }, () => getMembership(equalMemberId)),
-    );
+  it("resolves the same owner and role across discovery and request context for equal timestamps", async () => {
+    const membershipResult = await getMembership(equalMemberId);
+    const contextResult = await getContext(equalMemberId);
+    const membership = membershipResult.body.membership;
 
-    for (const result of results) {
-      expect(result.status).toBe(200);
-      expect(result.body).toEqual({
-        membership: {
-          id: expect.any(String),
-          ownerId: equalOwnerAId,
-          role: "manager",
-          acceptedAt: equalAcceptedAt.toISOString(),
-          ownerName: "Equal Timestamp Store A",
-        },
-      });
-    }
-  });
-
-  it("resolves the same owner and role when active memberships share an acceptance timestamp", async () => {
-    const result = await getContext(equalMemberId);
-
-    expect(result.status).toBe(200);
-    expect(result.body).toEqual({
-      actingStoreOwner: equalOwnerAId,
-      actorRole: "manager",
+    expect(membershipResult.status).toBe(200);
+    expect(contextResult.status).toBe(200);
+    expect(membership).not.toBeNull();
+    expect(membership).toMatchObject({
+      ownerId: equalOwnerAId,
+      role: "manager",
+      acceptedAt: equalAcceptedAt.toISOString(),
+      ownerName: "Equal Timestamp Store A",
+    });
+    expect(contextResult.body).toEqual({
+      actingStoreOwner: membership!.ownerId,
+      actorRole: membership!.role,
     });
   });
 

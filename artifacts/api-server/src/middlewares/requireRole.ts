@@ -19,7 +19,8 @@
 import { getAuth } from "@clerk/express";
 import type { Request, RequestHandler } from "express";
 import { db, teamMembers } from "@workspace/db";
-import { and, eq, desc, asc } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+import { teamMembershipOrderBy } from "../lib/teamMembership";
 
 export type TeamRole = "owner" | "manager" | "staff";
 
@@ -69,9 +70,7 @@ async function resolveTeamContext(req: Request): Promise<TeamContext | null> {
         })
         .from(teamMembers)
         .where(and(eq(teamMembers.memberClerkId, userId), eq(teamMembers.status, "active")))
-        // Keep selection aligned with /api/team/my-membership: newest first,
-        // then stable owner/id tie-breakers for equal acceptance timestamps.
-        .orderBy(desc(teamMembers.acceptedAt), asc(teamMembers.ownerId), asc(teamMembers.id))
+        .orderBy(...teamMembershipOrderBy())
         .limit(1);
 
       if (membership && membership.ownerId !== userId) {
