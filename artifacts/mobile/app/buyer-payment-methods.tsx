@@ -62,6 +62,7 @@ export default function BuyerPaymentMethodsScreen() {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [settingDefault, setSettingDefault] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = async () => {
@@ -78,6 +79,20 @@ export default function BuyerPaymentMethodsScreen() {
   };
 
   useFocusEffect(useCallback(() => { load(); }, []));
+
+  async function setDefault(pm: PaymentMethod) {
+    if (pm.isDefault || settingDefault) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSettingDefault(pm.id);
+    try {
+      await api.reviews.setDefaultPaymentMethod(pm.id);
+      setPaymentMethods(prev => prev.map(p => ({ ...p, isDefault: p.id === pm.id })));
+    } catch {
+      Alert.alert('Error', 'Could not make this card your default. Please try again.');
+    } finally {
+      setSettingDefault(null);
+    }
+  }
 
   function confirmRemove(pm: PaymentMethod) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -162,11 +177,28 @@ export default function BuyerPaymentMethodsScreen() {
                         {pm.funding ? pm.funding.charAt(0).toUpperCase() + pm.funding.slice(1) + ' card' : 'Card'}
                         {pm.expMonth && pm.expYear ? ` · Exp ${String(pm.expMonth).padStart(2, '0')}/${String(pm.expYear).slice(-2)}` : ''}
                       </Text>
+                      {!pm.isDefault && (
+                        <TouchableOpacity
+                          onPress={() => setDefault(pm)}
+                          activeOpacity={0.7}
+                          disabled={settingDefault !== null}
+                          style={s.setDefaultBtn}
+                        >
+                          {settingDefault === pm.id ? (
+                            <ActivityIndicator size="small" color={theme.accent} />
+                          ) : (
+                            <Text style={[s.setDefaultText, { color: theme.accent }]}>Make default</Text>
+                          )}
+                        </TouchableOpacity>
+                      )}
                     </View>
-                    {removing === pm.id ? (
-                      <ActivityIndicator size="small" color={MUTED} />
-                    ) : (
-                      <TouchableOpacity onPress={() => confirmRemove(pm)} activeOpacity={0.7} style={s.removeBtn}>
+                    {removing === pm.id ? <ActivityIndicator size="small" color={MUTED} /> : (
+                      <TouchableOpacity
+                        onPress={() => confirmRemove(pm)}
+                        activeOpacity={0.7}
+                        style={s.removeBtn}
+                        disabled={settingDefault !== null}
+                      >
                         <Feather name="trash-2" size={16} color={MUTED} />
                       </TouchableOpacity>
                     )}
@@ -210,6 +242,8 @@ const s = StyleSheet.create({
   defaultBadge: { backgroundColor: SUCCESS_DIM, borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 3 },
   defaultBadgeText: { fontSize: FS.xs, fontFamily: FONT.semibold, color: SUCCESS },
   pmMeta: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
+  setDefaultBtn: { alignSelf: 'flex-start', marginTop: 7, minHeight: 24, justifyContent: 'center' },
+  setDefaultText: { fontSize: FS.xs, fontFamily: FONT.semibold },
   removeBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   securityNote: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', paddingHorizontal: SP.sm },
   securityNoteText: { flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, lineHeight: 18 },

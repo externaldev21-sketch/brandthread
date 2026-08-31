@@ -1,6 +1,7 @@
 /**
  * Buyer Payment Methods — saved Stripe payment methods.
  * GET    /api/buyer/payment-methods        — list cards on file
+ * POST   /api/buyer/payment-methods/:pmId/default — make a card the default
  * DELETE /api/buyer/payment-methods/:pmId  — detach a card
  */
 import { Router } from "express";
@@ -58,6 +59,37 @@ router.get("/", async (req, res) => {
     }
 
     return res.json({ paymentMethods });
+  } catch (e: any) {
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── POST /api/buyer/payment-methods/:pmId/default ───────────────────────────
+router.post("/:pmId/default", async (req, res) => {
+  const clerkId = (req as any).clerkUserId as string;
+  const { pmId } = req.params;
+
+  try {
+    const [user] = await db.select({ stripeCustomerId: users.stripeCustomerId })
+      .from(users).where(eq(users.clerkId, clerkId)).limit(1);
+
+    if (!user?.stripeCustomerId) {
+      return res.status(404).json({ error: "No payment account found" });
+    }
+
+    const stripe = getStripe();
+
+    // Verify the PM belongs to this customer before changing Stripe defaults.
+    const pm = await stripe.paymentMethods.retrieve(pmId);
+    if (pm.customer !== user.stripeCustomerId) {
+      return res.status(403).json({ error: "Not your payment method" });
+    }
+
+    await stripe.customers.update(user.stripeCustomerId, {
+      invoice_settings: { default_payment_method: pmId },
+    });
+
+    return res.json({ ok: true, paymentMethodId: pmId });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
   }

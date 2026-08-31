@@ -903,6 +903,10 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<any>(`/api/reviews/${encodeURIComponent(reviewId)}/reply`, { replyText }),
       /** Buyer Payment Methods — Stripe-backed saved cards */
       paymentMethods:      () => get<{ paymentMethods: any[] }>('/api/buyer/payment-methods'),
+      setDefaultPaymentMethod: (pmId: string) =>
+        post<{ ok: boolean; paymentMethodId: string }>(
+          `/api/buyer/payment-methods/${encodeURIComponent(pmId)}/default`, {},
+        ),
       removePaymentMethod: (pmId: string) => del<{ ok: boolean }>(`/api/buyer/payment-methods/${encodeURIComponent(pmId)}`),
     },
     seller: {

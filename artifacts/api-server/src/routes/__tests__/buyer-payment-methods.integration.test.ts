@@ -14,6 +14,7 @@ const OTHER_CUSTOMER_ID = `cus_other_${TEST_SUFFIX}`;
 
 const fakeStripe = vi.hoisted(() => {
   const detached: string[] = [];
+  const customerUpdates: Array<{ id: string; params: any }> = [];
   const methods = new Map([
     [
       "pm_owner",
@@ -45,6 +46,21 @@ const fakeStripe = vi.hoisted(() => {
         },
       },
     ],
+    [
+      "pm_second",
+      {
+        id: "pm_second",
+        customer: "",
+        card: {
+          brand: "amex",
+          last4: "0005",
+          exp_month: 8,
+          exp_year: 2032,
+          funding: "credit",
+          country: "US",
+        },
+      },
+    ],
   ]);
 
   const client = {
@@ -66,17 +82,24 @@ const fakeStripe = vi.hoisted(() => {
           default_payment_method: id.includes("buyer") ? "pm_owner" : "pm_other",
         },
       }),
+      update: async (id: string, params: any) => {
+        customerUpdates.push({ id, params });
+        return { id, ...params };
+      },
     },
   };
 
   return {
     client,
+    customerUpdates,
     detached,
     methods,
     reset(ownerCustomerId: string, otherCustomerId: string) {
+      customerUpdates.length = 0;
       detached.length = 0;
       methods.get("pm_owner")!.customer = ownerCustomerId;
       methods.get("pm_other")!.customer = otherCustomerId;
+      methods.get("pm_second")!.customer = "";
     },
   };
 });
@@ -177,6 +200,41 @@ describe("buyer payment methods", () => {
 
     expect(result).toEqual({ status: 200, body: { ok: true } });
     expect(fakeStripe.detached).toEqual(["pm_owner"]);
+  });
+
+  it("makes an owned card the Stripe Customer default", async () => {
+    fakeStripe.methods.get("pm_second")!.customer = BUYER_CUSTOMER_ID;
+
+    const result = await request(
+      "/api/buyer/payment-methods/pm_second/default",
+      BUYER_ID,
+      "POST",
+    );
+
+    expect(result).toEqual({
+      status: 200,
+      body: { ok: true, paymentMethodId: "pm_second" },
+    });
+    expect(fakeStripe.customerUpdates).toEqual([
+      {
+        id: BUYER_CUSTOMER_ID,
+        params: {
+          invoice_settings: { default_payment_method: "pm_second" },
+        },
+      },
+    ]);
+  });
+
+  it("refuses to make another buyer's card the default", async () => {
+    const result = await request(
+      "/api/buyer/payment-methods/pm_other/default",
+      BUYER_ID,
+      "POST",
+    );
+
+    expect(result.status).toBe(403);
+    expect(result.body.error).toBe("Not your payment method");
+    expect(fakeStripe.customerUpdates).toEqual([]);
   });
 
   it("refuses to detach another buyer's card", async () => {
