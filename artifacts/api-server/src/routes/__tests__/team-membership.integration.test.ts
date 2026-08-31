@@ -28,11 +28,14 @@ vi.mock("../../middlewares/requireAuth", () => ({
 import teamRouter from "../team";
 
 const suffix = crypto.randomBytes(4).toString("hex");
-const ownerId = `team-membership-owner-${suffix}`;
+const olderOwnerId = `team-membership-older-owner-${suffix}`;
+const newerOwnerId = `team-membership-newer-owner-${suffix}`;
 const memberId = `team-membership-member-${suffix}`;
 const noMembershipUserId = `team-membership-none-${suffix}`;
-const ownerEmail = `${ownerId}@test.local`;
-const acceptedAt = new Date("2026-08-31T12:34:56.000Z");
+const olderOwnerEmail = `${olderOwnerId}@test.local`;
+const newerOwnerEmail = `${newerOwnerId}@test.local`;
+const olderAcceptedAt = new Date("2026-08-31T12:34:56.000Z");
+const newerAcceptedAt = new Date("2026-08-31T13:45:00.000Z");
 
 let server: Server;
 let baseUrl = "";
@@ -47,27 +50,47 @@ async function getMembership(userId: string) {
 }
 
 beforeAll(async () => {
-  await db.insert(users).values({
-    clerkId: ownerId,
-    email: ownerEmail,
-    name: "Store owner fallback name",
-    displayName: "Store Owner Display Name",
-    role: "seller",
-    accountType: "seller",
-  });
+  await db.insert(users).values([
+    {
+      clerkId: olderOwnerId,
+      email: olderOwnerEmail,
+      name: "Older store owner fallback name",
+      displayName: "Older Store Owner Display Name",
+      role: "seller",
+      accountType: "seller",
+    },
+    {
+      clerkId: newerOwnerId,
+      email: newerOwnerEmail,
+      name: "Newest store owner fallback name",
+      displayName: "Newest Store Owner Display Name",
+      role: "seller",
+      accountType: "seller",
+    },
+  ]);
 
   await db.insert(teamMembers).values({
-    ownerId,
+    ownerId: olderOwnerId,
     memberClerkId: memberId,
     email: `${memberId}@test.local`,
-    name: "Joined team member",
+    name: "Joined older team",
     role: "staff",
     status: "active",
-    acceptedAt,
+    acceptedAt: olderAcceptedAt,
   });
 
   await db.insert(teamMembers).values({
-    ownerId,
+    ownerId: newerOwnerId,
+    memberClerkId: memberId,
+    email: `${memberId}@test.local`,
+    name: "Joined newest team",
+    role: "manager",
+    status: "active",
+    acceptedAt: newerAcceptedAt,
+  });
+
+  await db.insert(teamMembers).values({
+    ownerId: olderOwnerId,
     memberClerkId: noMembershipUserId,
     email: `${noMembershipUserId}@test.local`,
     name: "Pending team member",
@@ -89,23 +112,25 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await db.delete(teamMembers).where(eq(teamMembers.ownerId, ownerId));
-  await db.delete(users).where(eq(users.clerkId, ownerId));
+  await db.delete(teamMembers).where(eq(teamMembers.ownerId, olderOwnerId));
+  await db.delete(teamMembers).where(eq(teamMembers.ownerId, newerOwnerId));
+  await db.delete(users).where(eq(users.clerkId, olderOwnerId));
+  await db.delete(users).where(eq(users.clerkId, newerOwnerId));
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
 describe("authenticated team membership discovery", () => {
-  it("returns the active member role, store owner, acceptance time, and display name", async () => {
+  it("returns the newest active membership with its matching store details", async () => {
     const result = await getMembership(memberId);
 
     expect(result.status).toBe(200);
     expect(result.body).toEqual({
       membership: {
         id: expect.any(String),
-        ownerId,
-        role: "staff",
-        acceptedAt: acceptedAt.toISOString(),
-        ownerName: "Store Owner Display Name",
+        ownerId: newerOwnerId,
+        role: "manager",
+        acceptedAt: newerAcceptedAt.toISOString(),
+        ownerName: "Newest Store Owner Display Name",
       },
     });
   });

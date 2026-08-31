@@ -8,6 +8,7 @@ const { dbMock, fetchMock, table } = vi.hoisted(() => {
   return {
     dbMock: {
       select: vi.fn(),
+      insert: vi.fn(),
     },
     fetchMock: vi.fn(),
     table,
@@ -33,6 +34,7 @@ vi.mock("@workspace/db", () => ({
   sampleOrders: table(),
   manufacturerActivityEvents: table(),
   pushTokens: table(),
+  stripeTrialWarningEvents: table(),
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -103,6 +105,19 @@ const trialEnd = Math.floor(new Date("2026-09-14T12:00:00.000Z").getTime() / 100
 describe("customer.subscription.trial_will_end webhook", () => {
   beforeEach(() => {
     dbMock.select.mockReset();
+    dbMock.insert.mockReset();
+    dbMock.insert.mockImplementation(() => {
+      let eventId = "";
+      const query = {
+        values: vi.fn((values: { eventId: string }) => {
+          eventId = values.eventId;
+          return query;
+        }),
+        onConflictDoNothing: vi.fn(() => query),
+        returning: vi.fn(() => Promise.resolve([{ eventId }])),
+      };
+      return query;
+    });
     fetchMock.mockReset();
     fetchMock.mockResolvedValue({ ok: true });
     vi.stubGlobal("fetch", fetchMock);
@@ -122,7 +137,7 @@ describe("customer.subscription.trial_will_end webhook", () => {
           { quantity: 2, price: { unit_amount: 500 } },
         ],
       },
-    });
+    }, "evt_trial_will_end_123");
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [, request] = fetchMock.mock.calls[0] as [
@@ -151,7 +166,7 @@ describe("customer.subscription.trial_will_end webhook", () => {
       customer: "cus_seller_123",
       trial_end: trialEnd,
       items: { data: [{ price: { unit_amount: 2999 } }] },
-    })).resolves.toBeUndefined();
+    }, "evt_trial_will_end_no_token")).resolves.toBeUndefined();
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
