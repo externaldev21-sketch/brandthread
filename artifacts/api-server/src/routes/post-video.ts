@@ -18,6 +18,7 @@ const FILTERS = new Set(["none", "warm", "cool", "mono"]);
 const MAX_CLIP_BYTES = 80 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 240 * 1024 * 1024;
 const MAX_CLIPS = 12;
+const COMPOSED_PREVIEW_TTL_SECONDS = 60 * 60;
 
 async function isSeller(clerkId: string): Promise<boolean> {
   const [user] = await db.select({ accountType: users.accountType })
@@ -51,7 +52,7 @@ async function hasAudio(path: string): Promise<boolean> {
   return String(stdout).trim().length > 0;
 }
 
-function mediaUrl(req: express.Request, path: string): string {
+export function mediaUrl(req: express.Request, path: string): string {
   return `${req.protocol}://${req.get("host")}/api/posts/media/${path.replace(/^\/objects\//, "")}`;
 }
 
@@ -191,10 +192,14 @@ router.post("/compose-video", requireAuth, async (req, res) => {
       storage.trySetObjectEntityAclPolicy(outputObject, { owner: clerkId, visibility: "private" }),
       storage.trySetObjectEntityAclPolicy(thumbnailObject, { owner: clerkId, visibility: "private" }),
     ]);
+    const [previewMediaUrl, previewThumbnailUrl] = await Promise.all([
+      storage.getObjectEntityDownloadURL(outputObject, COMPOSED_PREVIEW_TTL_SECONDS),
+      storage.getObjectEntityDownloadURL(thumbnailObject, COMPOSED_PREVIEW_TTL_SECONDS),
+    ]);
     return res.json({
-      mediaUrl: mediaUrl(req, outputObject),
+      mediaUrl: previewMediaUrl,
       mediaPath: outputObject,
-      thumbnailUrl: mediaUrl(req, thumbnailObject),
+      thumbnailUrl: previewThumbnailUrl,
       thumbnailPath: thumbnailObject,
       duration: outputDuration,
       clipCount: clips.length,

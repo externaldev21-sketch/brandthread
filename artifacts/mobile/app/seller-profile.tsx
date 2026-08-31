@@ -25,16 +25,7 @@ import type { Product } from '@/services/productTypes';
 import { useApi } from '@/hooks/useApi';
 import { useColors } from '@/hooks/useColors';
 import { formatCents } from '@/lib/money';
-
-// ─── Design Tokens ─────────────────────────────────────────────────────────────
-const BG        = '#07070F';
-const CARD      = '#12121F';
-const BORDER    = 'rgba(255,255,255,0.07)';
-const FG        = '#F4F4FF';
-const MUTED     = 'rgba(244,244,255,0.50)';
-const BLUE      = '#3B82F6';
-const ORANGE    = '#F97316';
-const ERR       = '#F87171';
+import { BG, SURFACE, CARD, BORDER, FG, MUTED, BLUE, ORANGE, RED, FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -43,10 +34,10 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TILE_SIZE = Math.floor((SCREEN_WIDTH - 2) / 3);
 
 const GRADIENT_PAIRS: [string, string][] = [
-  ['#1F3A5F', '#0A1828'],
-  ['#1F3A5F', '#0A1828'],
-  ['#3D1F0F', '#1A0A05'],
-  ['#1A1A1A', '#0A0A0A'],
+  [CARD, BG],
+  [SURFACE, BG],
+  [CARD, SURFACE],
+  [SURFACE, CARD],
 ];
 
 function formatCount(n: number): string {
@@ -62,10 +53,20 @@ function typeIcon(type: string): keyof typeof Feather.glyphMap {
   return 'image';
 }
 
+function tabIcon(tab: string): keyof typeof Feather.glyphMap {
+  switch (tab) {
+    case 'Posts': return 'grid';
+    case 'Products': return 'shopping-bag';
+    case 'Tagged': return 'at-sign';
+    case 'Reposts': return 'repeat';
+    case 'Saved': return 'bookmark';
+    default: return 'circle';
+  }
+}
 function statusBadgeColor(status: string): string {
   if (status === 'draft') return ORANGE;
   if (status === 'scheduled') return BLUE;
-  if (status === 'failed') return ERR;
+  if (status === 'failed') return RED;
   return MUTED;
 }
 
@@ -489,8 +490,8 @@ export default function SellerProfileScreen() {
   if (profileError) {
     return (
       <View style={[styles.root, { alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 28 }]}>
-        <Feather name="alert-circle" size={32} color={ERR} />
-        <Text style={{ color: FG, fontSize: 16, fontFamily: 'Inter_600SemiBold' }}>Couldn’t load profile</Text>
+        <Feather name="alert-circle" size={32} color={RED} />
+        <Text style={{ color: FG, fontSize: 16, fontFamily: FONT.semibold }}>Couldn’t load profile</Text>
         <Text style={{ color: MUTED, textAlign: 'center' }}>{profileError}</Text>
         <TouchableOpacity
           style={styles.followBtn}
@@ -529,11 +530,19 @@ export default function SellerProfileScreen() {
       >
         {/* 0: Cover Area */}
         <LinearGradient
-          colors={[profile.avatarColor, BG]}
+          colors={[BG, SURFACE, FG, SURFACE, BG]}
+          locations={[0, 0.28, 0.52, 0.72, 1]}
           style={styles.cover}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-        />
+          start={{ x: 0.05, y: 0 }}
+          end={{ x: 0.95, y: 1 }}
+        >
+          <View style={styles.coverContent}>
+            <View style={styles.coverRule} />
+            <Text style={styles.coverKicker}>THREAD THEME / EDITION 01</Text>
+            <Text style={styles.coverTitle} numberOfLines={1}>{profile.brandName}</Text>
+            <Text style={styles.coverSubline}>THE ORIGINALS</Text>
+          </View>
+        </LinearGradient>
 
         {/* 1: Profile Info */}
         <View style={styles.profileSection}>
@@ -542,7 +551,7 @@ export default function SellerProfileScreen() {
             {/* Avatar */}
             {profile.verified ? (
               <View style={styles.verifiedRing}>
-                <View style={[styles.avatar, { backgroundColor: profile.avatarColor }]}>
+                <View style={styles.avatar}>
                   {profileImageUrl ? (
                     <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} accessibilityLabel={`${profile.brandName} avatar`} />
                   ) : (
@@ -551,7 +560,7 @@ export default function SellerProfileScreen() {
                 </View>
               </View>
             ) : (
-              <View style={[styles.avatar, { backgroundColor: profile.avatarColor }]}>
+              <View style={styles.avatar}>
                 {profileImageUrl ? (
                   <Image source={{ uri: profileImageUrl }} style={styles.avatarImage} accessibilityLabel={`${profile.brandName} avatar`} />
                 ) : (
@@ -752,6 +761,11 @@ export default function SellerProfileScreen() {
                 style={styles.tabItem}
                 onPress={() => setActiveTab(i)}
               >
+                <Feather
+                  name={tabIcon(tab)}
+                  size={14}
+                  color={activeTab === i ? FG : MUTED}
+                />
                 <Text style={[styles.tabText, activeTab === i && styles.tabTextActive]}>
                   {tab}
                 </Text>
@@ -783,21 +797,30 @@ export default function SellerProfileScreen() {
 
           {/* ── PRODUCTS TAB ─────────────────────────────────────────────── */}
           {activeTab === 1 && (
-            <View style={styles.productsGrid}>
-              {productsLoading ? (
-                <ActivityIndicator color={colors.primary} style={{ marginTop: 40, alignSelf: 'center' }} />
-              ) : displayProducts.length === 0 ? (
-                <EmptyState icon="shopping-bag" title="No products available" />
-              ) : (
-                displayProducts.map((product, i) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product as Product}
-                    index={i}
-                    onPress={(id) => router.push((isOwner ? '/product-detail?id=' : '/buyer-product-detail?productId=') + id as never)}
-                  />
-                ))
-              )}
+            <View>
+              <View style={styles.collectionHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.collectionKicker}>THE COLLECTION</Text>
+                  <Text style={styles.collectionTitle}>{isOwner ? 'Your products' : 'Shop the edit'}</Text>
+                </View>
+                <Text style={styles.collectionCount}>{displayProducts.length} piece{displayProducts.length === 1 ? '' : 's'}</Text>
+              </View>
+              <View style={styles.productsGrid}>
+                {productsLoading ? (
+                  <ActivityIndicator color={colors.primary} style={{ marginTop: 40, alignSelf: 'center' }} />
+                ) : displayProducts.length === 0 ? (
+                  <EmptyState icon="shopping-bag" title="No products available" />
+                ) : (
+                  displayProducts.map((product, i) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product as Product}
+                      index={i}
+                      onPress={(id) => router.push((isOwner ? '/product-detail?id=' : '/buyer-product-detail?productId=') + id as never)}
+                    />
+                  ))
+                )}
+              </View>
             </View>
           )}
 
@@ -926,7 +949,7 @@ export default function SellerProfileScreen() {
             <ActionRow
               icon="trash-2"
               label="Delete post"
-              color={ERR}
+              color={RED}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 handleActionSheetClose();
@@ -1003,74 +1026,128 @@ const createStyles = (colorsTheme: ReturnType<typeof useColors>) => StyleSheet.c
 
   // ── Cover ──
   cover: {
-    height: 200,
+    height: 230,
+    overflow: 'hidden',
+  },
+  coverContent: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
+    paddingHorizontal: SP.lg,
+    paddingBottom: 54,
+  },
+  coverRule: {
+    width: 54,
+    height: 2,
+    backgroundColor: FG,
+    marginBottom: SP.sm,
+    shadowColor: BG,
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
+  },
+  coverKicker: {
+    color: FG,
+    fontFamily: FONT.bold,
+    fontSize: 9,
+    letterSpacing: 1.4,
+    textShadowColor: BG,
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  coverTitle: {
+    maxWidth: '88%',
+    color: FG,
+    fontFamily: FONT.extrabold,
+    fontSize: FS.h1,
+    lineHeight: 40,
+    letterSpacing: -1.5,
+    textAlign: 'right',
+    textTransform: 'uppercase',
+    textShadowColor: BG,
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
+  },
+  coverSubline: {
+    color: FG,
+    fontFamily: FONT.medium,
+    fontSize: 10,
+    letterSpacing: 2.2,
+    textShadowColor: BG,
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
   },
 
   // ── Profile Section ──
   profileSection: {
-    paddingHorizontal: 20,
-    marginTop: -30,
-    paddingBottom: 16,
+    paddingHorizontal: SP.md,
+    marginTop: -44,
+    paddingBottom: SP.lg,
   },
   avatarActionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
-    marginBottom: 12,
+    gap: SP.sm,
+    marginBottom: SP.md,
   },
   verifiedRing: {
     borderWidth: 1.5,
     borderColor: colorsTheme.primary,
-    borderRadius: 40,
+    borderRadius: RADIUS.pill,
     padding: 2,
   },
   avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 3,
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    borderWidth: 4,
     borderColor: BG,
+    backgroundColor: FG,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 33,
+    borderRadius: 42,
   },
   avatarInitials: {
     color: BG,
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: FS.xxl,
+    fontFamily: FONT.extrabold,
+    letterSpacing: -1,
   },
   actionButtons: {
+    flex: 1,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'flex-end',
+    gap: 6,
   },
   outlineBtn: {
     borderWidth: 1,
     borderColor: BORDER,
-    borderRadius: 20,
-    paddingHorizontal: 14,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: 11,
     paddingVertical: 7,
   },
   outlineBtnText: {
     color: FG,
-    fontSize: 13,
-    fontWeight: '500',
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
   },
   gradientBtnWrap: {
-    borderRadius: 20,
+    borderRadius: RADIUS.pill,
   },
   gradientBtnInner: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 11,
     paddingVertical: 7,
   },
   gradientBtnText: {
     color: BG,
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: FS.xs,
+    fontFamily: FONT.bold,
   },
   followBtn: {
     borderWidth: 1,
@@ -1103,17 +1180,20 @@ const createStyles = (colorsTheme: ReturnType<typeof useColors>) => StyleSheet.c
   brandNameRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 2,
+    marginBottom: 3,
   },
   brandName: {
     color: FG,
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: FS.h2,
+    lineHeight: 34,
+    fontFamily: FONT.extrabold,
+    letterSpacing: -1,
   },
   username: {
     color: MUTED,
-    fontSize: 14,
-    marginBottom: 8,
+    fontSize: FS.sm,
+    fontFamily: FONT.medium,
+    marginBottom: SP.md,
   },
   vacationBanner: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 8,
@@ -1124,9 +1204,11 @@ const createStyles = (colorsTheme: ReturnType<typeof useColors>) => StyleSheet.c
   vacationText: { color: FG, fontSize: 12, lineHeight: 18 },
   bio: {
     color: FG,
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 8,
+    fontSize: FS.base,
+    fontFamily: FONT.regular,
+    lineHeight: 23,
+    marginBottom: SP.md,
+    maxWidth: 560,
   },
   bioMore: {
     color: MUTED,
@@ -1136,7 +1218,7 @@ const createStyles = (colorsTheme: ReturnType<typeof useColors>) => StyleSheet.c
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    marginBottom: 4,
+    marginBottom: SP.sm,
   },
   websiteText: {
     color: colorsTheme.primary,
@@ -1148,27 +1230,32 @@ const createStyles = (colorsTheme: ReturnType<typeof useColors>) => StyleSheet.c
   },
   categoryBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: BORDER,
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    marginTop: 8,
+    backgroundColor: SURFACE,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: BORDER,
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    marginTop: SP.xs,
   },
   categoryBadgeText: {
     color: FG,
-    fontSize: 12,
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
 
   // ── Stats Row ──
   statsRow: {
     flexDirection: 'row',
-    backgroundColor: CARD,
-    marginHorizontal: 20,
-    borderRadius: 16,
-    borderWidth: 1,
+    backgroundColor: SURFACE,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
     borderColor: BORDER,
-    marginBottom: 12,
-    paddingVertical: 14,
+    marginBottom: SP.md,
+    paddingVertical: SP.md,
+    paddingHorizontal: SP.sm,
   },
   statItem: {
     flex: 1,
@@ -1176,12 +1263,13 @@ const createStyles = (colorsTheme: ReturnType<typeof useColors>) => StyleSheet.c
   },
   statNumber: {
     color: FG,
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: FS.md,
+    fontFamily: FONT.bold,
   },
   statLabel: {
     color: MUTED,
-    fontSize: 11,
+    fontSize: 10,
+    fontFamily: FONT.medium,
     marginTop: 2,
   },
   statDivider: {
@@ -1213,7 +1301,9 @@ const createStyles = (colorsTheme: ReturnType<typeof useColors>) => StyleSheet.c
 
   // ── Tab Bar ──
   tabBar: {
-    backgroundColor: CARD,
+    backgroundColor: SURFACE,
+    borderTopWidth: 1,
+    borderTopColor: BORDER,
     borderBottomWidth: 1,
     borderBottomColor: BORDER,
   },
@@ -1221,8 +1311,10 @@ const createStyles = (colorsTheme: ReturnType<typeof useColors>) => StyleSheet.c
     paddingHorizontal: 20,
   },
   tabItem: {
-    paddingVertical: 12,
-    marginRight: 24,
+    flexDirection: 'row',
+    gap: 6,
+    paddingVertical: 14,
+    marginRight: 22,
     position: 'relative',
     alignItems: 'center',
   },
@@ -1315,24 +1407,26 @@ const createStyles = (colorsTheme: ReturnType<typeof useColors>) => StyleSheet.c
   productsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 12,
-    gap: 12,
+    paddingHorizontal: SP.md,
+    paddingBottom: SP.lg,
+    gap: SP.sm,
   },
   productCard: {
-    width: (SCREEN_WIDTH - 36) / 2,
-    backgroundColor: CARD,
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: 16,
+    width: (SCREEN_WIDTH - 40) / 2,
+    backgroundColor: BG,
+    borderRadius: RADIUS.sm,
     overflow: 'hidden',
   },
   productImageContainer: {
     position: 'relative',
-    height: 80,
+    height: 176,
     width: '100%',
+    borderRadius: RADIUS.sm,
+    overflow: 'hidden',
+    backgroundColor: CARD,
   },
   productImagePlaceholder: {
-    height: 80,
+    height: 176,
     width: '100%',
   },
   productStatusBadge: {
@@ -1353,12 +1447,15 @@ const createStyles = (colorsTheme: ReturnType<typeof useColors>) => StyleSheet.c
     textTransform: 'capitalize',
   },
   productInfo: {
-    padding: 10,
+    paddingHorizontal: 2,
+    paddingTop: 10,
+    paddingBottom: SP.md,
   },
   productName: {
     color: FG,
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: FS.sm,
+    lineHeight: 18,
+    fontFamily: FONT.semibold,
     marginBottom: 4,
   },
   productPriceRow: {
@@ -1368,9 +1465,9 @@ const createStyles = (colorsTheme: ReturnType<typeof useColors>) => StyleSheet.c
     marginBottom: 6,
   },
   productPrice: {
-    color: colorsTheme.primary,
-    fontSize: 14,
-    fontWeight: '700',
+    color: FG,
+    fontSize: FS.sm,
+    fontFamily: FONT.bold,
   },
   productCompare: {
     color: MUTED,
@@ -1392,8 +1489,35 @@ const createStyles = (colorsTheme: ReturnType<typeof useColors>) => StyleSheet.c
     fontWeight: '600',
   },
   productStock: {
-    fontSize: 12,
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
     marginTop: 2,
+  },
+  collectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: SP.md,
+    paddingTop: SP.lg,
+    paddingBottom: SP.md,
+  },
+  collectionKicker: {
+    color: colorsTheme.primary,
+    fontSize: 9,
+    fontFamily: FONT.bold,
+    letterSpacing: 1.4,
+    marginBottom: 4,
+  },
+  collectionTitle: {
+    color: FG,
+    fontSize: FS.xl,
+    fontFamily: FONT.extrabold,
+    letterSpacing: -0.6,
+  },
+  collectionCount: {
+    color: MUTED,
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    marginBottom: 3,
   },
 
   // ── Empty State ──

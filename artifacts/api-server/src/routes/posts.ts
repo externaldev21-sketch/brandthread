@@ -15,7 +15,7 @@ import {
 import { eq, and, inArray, count, sql, desc, lte, lt, gte, or } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
-import postVideoRouter, { publishComposedMedia } from "./post-video";
+import postVideoRouter, { mediaUrl as composedMediaUrl, publishComposedMedia } from "./post-video";
 
 const router = Router();
 
@@ -320,7 +320,7 @@ router.post("/", requireAuth, async (req, res) => {
   // ───────────────────────────────────────────────────────────────────────────
 
   const {
-    mediaUrl, thumbnailUrl, mediaPath, thumbnailPath, mediaUrls, mediaType, aspectRatio, caption, hashtags, styleTags,
+    mediaUrl: requestedMediaUrl, thumbnailUrl: requestedThumbnailUrl, mediaPath, thumbnailPath, mediaUrls, mediaType, aspectRatio, caption, hashtags, styleTags,
     sound, visibility, taggedProductIds, isDraft, scheduledAt,
   } = req.body as {
     mediaUrl?:          string;
@@ -387,11 +387,13 @@ router.post("/", requireAuth, async (req, res) => {
       ? "scheduled"
       : "published";
 
+  const mediaUrl = mediaPath ? composedMediaUrl(req, mediaPath) : (requestedMediaUrl ?? "");
+  const thumbnailUrl = thumbnailPath ? composedMediaUrl(req, thumbnailPath) : requestedThumbnailUrl;
   const [post] = await db.insert(posts).values({
     userId:    clerkId,
-    mediaUrl:  mediaUrl  ?? "",
+    mediaUrl,
     thumbnailUrl: thumbnailUrl ?? null,
-    mediaUrls: mediaUrls ?? (mediaUrl ? [mediaUrl] : []),
+    mediaUrls: mediaPath ? [mediaUrl] : (mediaUrls ?? (mediaUrl ? [mediaUrl] : [])),
     mediaType: (mediaType as any) ?? "photo",
     aspectRatio: aspectRatio ?? "9:16",
     caption:   caption   ?? "",

@@ -57,6 +57,9 @@ vi.mock("../../lib/objectStorage", () => ({
     async deleteObjectEntity(path: string) {
       videoStorage.objects.delete(path);
     }
+    async getObjectEntityDownloadURL(path: string) {
+      return `https://signed-preview.test/${encodeURIComponent(path)}`;
+    }
   },
 }));
 
@@ -174,8 +177,17 @@ describe("seller post management", () => {
       }),
     });
     expect(published.status).toBe(201);
+    expect(published.body.mediaUrl).toContain("/api/posts/media/");
+    expect(published.body.mediaUrl).not.toContain("signed-preview.test");
+    expect(published.body.mediaUrls).toEqual([published.body.mediaUrl]);
+    expect(published.body.thumbnailUrl).toContain("/api/posts/media/");
+    expect(published.body.thumbnailUrl).not.toContain("signed-preview.test");
     expect(videoStorage.objects.get(composed.body.mediaPath)?.visibility).toBe("public");
     expect(videoStorage.objects.get(composed.body.thumbnailPath)?.visibility).toBe("public");
+    const publicPost = await request(`/api/posts/${published.body.id}`);
+    expect(publicPost.status).toBe(200);
+    expect(publicPost.body.mediaUrls).toEqual([published.body.mediaUrl]);
+    expect(publicPost.body.mediaUrls.join(" ")).not.toContain("signed-preview.test");
     await db.delete(posts).where(eq(posts.id, published.body.id));
   });
 

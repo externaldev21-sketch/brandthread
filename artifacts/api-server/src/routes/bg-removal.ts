@@ -149,11 +149,16 @@ router.post("/remove", async (req, res) => {
       "Keep only the main subject/product in the same position and framing with clean, precise edges. Add no background, shadow, texture, or new detail.",
     );
     const resultBuffer = await generateWithVisualQa({
-      operation: "background_replace",
-      prompt: editPrompt,
-      brief: direction,
-      references,
-      generate: (retryPrompt) => editImages(files, retryPrompt),
+      operation: "background_remove",
+      prompt,
+      brief: "Remove the background completely while preserving the subject exactly.",
+      references: [decoded.buffer],
+      generate: (retryPrompt) => editImages(
+        [tmpFile],
+        retryPrompt,
+        undefined,
+        { background: "transparent" },
+      ),
     });
 
     const resultSize = resultBuffer.length;

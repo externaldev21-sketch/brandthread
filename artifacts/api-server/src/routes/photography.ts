@@ -104,7 +104,7 @@ router.post("/generate", async (req, res) => {
       tmpFiles.push(filePath);
     }
 
-    const operation: ImageOperation = mode === "mockup_to_model" ? "mockup_to_model" : "photoshoot";
+    const operation: ImageOperation = "photoshoot";
     const editPrompt = buildFashionPrompt(
       operation,
       safeDescription,

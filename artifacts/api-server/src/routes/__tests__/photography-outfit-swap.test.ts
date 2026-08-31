@@ -87,8 +87,43 @@ describe("Outfit Swap batch generation", () => {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
+        garmentImages: [dataUrl("first-garment")],
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(state.calls).toEqual([]);
+  });
+
+  it("rejects a batch without a garment", async () => {
+    state.calls = [];
+    state.prompts = [];
+    state.failGarment = "";
+    state.qualityFailGarment = "";
+    const response = await fetch(`${base}/api/photography/outfit-swap`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
         heroImage: dataUrl("locked-hero"),
-        garmentImages: [dataUrl("faithful-garment"), dataUrl("wrong-artwork")],
+        garmentImages: [],
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(state.calls).toEqual([]);
+  });
+
+  it("rejects a batch above the garment limit", async () => {
+    state.calls = [];
+    state.prompts = [];
+    state.failGarment = "";
+    state.qualityFailGarment = "";
+    const response = await fetch(`${base}/api/photography/outfit-swap`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        heroImage: dataUrl("locked-hero"),
+        garmentImages: ["one", "two", "three", "four", "five"].map(dataUrl),
       }),
     });
 
@@ -106,43 +141,8 @@ describe("Outfit Swap batch generation", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         heroImage: dataUrl("locked-hero"),
-        garmentImages: [dataUrl("faithful-garment"), dataUrl("wrong-artwork")],
-      }),
-    });
-
-    expect(response.status).toBe(400);
-    expect(state.calls).toEqual([]);
-  });
-
-  it("reuses the same hero photo for each garment and preserves input order", async () => {
-    state.calls = [];
-    state.prompts = [];
-    state.failGarment = "";
-    state.qualityFailGarment = "";
-    const response = await fetch(`${base}/api/photography/outfit-swap`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        heroImage: dataUrl("locked-hero"),
-        garmentImages: [dataUrl("faithful-garment"), dataUrl("wrong-artwork")],
-      }),
-    });
-
-    expect(response.status).toBe(400);
-    expect(state.calls).toEqual([]);
-  });
-
-  it("reuses the same hero photo for each garment and preserves input order", async () => {
-    state.calls = [];
-    state.prompts = [];
-    state.failGarment = "";
-    state.qualityFailGarment = "";
-    const response = await fetch(`${base}/api/photography/outfit-swap`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        heroImage: dataUrl("locked-hero"),
-        garmentImages: [dataUrl("faithful-garment"), dataUrl("wrong-artwork")],
+        garmentImages: [dataUrl("first-garment"), dataUrl("second-garment")],
+        prompt: "Keep the scene editorial.",
       }),
     });
 
@@ -200,7 +200,7 @@ describe("Outfit Swap batch generation", () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         heroImage: dataUrl("locked-hero"),
-        garmentImages: [dataUrl("faithful-garment"), dataUrl("wrong-artwork")],
+        garmentImages: [dataUrl("good-garment"), dataUrl("broken-garment")],
       }),
     });
 

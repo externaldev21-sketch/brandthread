@@ -12,7 +12,7 @@ import { useApi } from '@/hooks/useApi';
 import { getSetupState, markSetupStarted, dismissWelcome, completionPercent, nextTask, nextBestAction, dismissTip, markFeatureOpened, type SetupState } from '@/lib/setupStore';
 import { deriveHubStats, deriveInventoryStats, deriveOrderStats } from '@/lib/sellerDashboardStats';
 import { AnimatedEntrance, BrandthreadScreen, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SearchBar, StatCard, QuickActionCard, SectionHeader, ProgressCard, NavigationCard, GuidedTip, NewFeatureBadge, LoadingSkeleton, EmptyState, StatusBadge, PressableScale } from '@/components/BrandthreadUI';
-import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, GREEN_BRIGHT, BLUE, ORANGE, RED, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
+import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_SUBTLE, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, GREEN_BRIGHT, BLUE, ORANGE, RED, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { reportNetworkError } from '@/lib/networkNotice';
@@ -69,6 +69,171 @@ function timeAgo(dateStr: string): string {
   return dateStr;
 }
 
+type RevenueTrendPoint = { day: string; totalCents: number };
+
+function getTrendSummary(points: RevenueTrendPoint[]): {
+  direction: 'up' | 'down' | 'flat';
+  label: string;
+} | null {
+  if (points.length < 2) return null;
+  const windowSize = Math.floor(points.length / 2);
+  const earlier = points.slice(0, windowSize).reduce((sum, point) => sum + point.totalCents, 0);
+  const recent = points.slice(-windowSize).reduce((sum, point) => sum + point.totalCents, 0);
+
+  if (earlier === 0) {
+    return recent > 0
+      ? { direction: 'up', label: 'Up from no earlier sales' }
+      : { direction: 'flat', label: 'No movement yet' };
+  }
+
+  const change = ((recent - earlier) / earlier) * 100;
+  if (Math.abs(change) < 0.5) return { direction: 'flat', label: 'Holding steady' };
+  return {
+    direction: change > 0 ? 'up' : 'down',
+    label: `${change > 0 ? 'Up' : 'Down'} ${Math.abs(change).toFixed(0)}% vs earlier days`,
+  };
+}
+
+function normalizeRevenueTrend(rows: unknown[]): RevenueTrendPoint[] {
+  if (rows.length === 0) return [];
+  const totalsByDay = new Map<string, number>();
+
+  rows.forEach((row) => {
+    if (!row || typeof row !== 'object') throw new Error('Invalid revenue trend response.');
+    const candidate = row as { day?: unknown; date?: unknown; total_cents?: unknown };
+    const day = typeof candidate.day === 'string'
+      ? candidate.day
+      : typeof candidate.date === 'string'
+        ? candidate.date
+        : '';
+    const totalCents = candidate.total_cents;
+    const date = new Date(day);
+    if (!day || Number.isNaN(date.getTime()) || !Number.isSafeInteger(totalCents)) {
+      throw new Error('Invalid revenue trend response.');
+    }
+    const key = date.toISOString().slice(0, 10);
+    totalsByDay.set(key, (totalsByDay.get(key) ?? 0) + (totalCents as number));
+  });
+
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(today);
+    date.setUTCDate(today.getUTCDate() - (6 - index));
+    const key = date.toISOString().slice(0, 10);
+    return { day: key, totalCents: totalsByDay.get(key) ?? 0 };
+  });
+}
+
+function trendDateRange(points: RevenueTrendPoint[]): string {
+  if (points.length === 0) return 'Last 7 days';
+  const start = new Date(points[0].day);
+  const end = new Date(points[points.length - 1].day);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 'Last 7 days';
+  const format = (date: Date) => date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  });
+  return `${format(start)} – ${format(end)}`;
+}
+
+function RevenueTrendChart({
+  points,
+  loading,
+  error,
+  accent,
+  accentLight,
+}: {
+  points: RevenueTrendPoint[] | null;
+  loading: boolean;
+  error: boolean;
+  accent: string;
+  accentLight: string;
+}) {
+  const animation = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    animation.setValue(0);
+    if (points && points.length > 0) {
+      Animated.timing(animation, {
+        toValue: 1,
+        duration: 700,
+        useNativeDriver: false,
+      }).start();
+    }
+    return () => animation.stopAnimation();
+  }, [animation, points]);
+
+  if (error) {
+    return (
+      <View style={s.revenueChartEmpty}>
+        <Feather name="alert-circle" size={16} color={ORANGE} />
+        <Text style={s.revenueChartEmptyText}>Revenue trend unavailable</Text>
+      </View>
+    );
+  }
+
+  if (loading) {
+    return (
+      <View style={s.revenueChart}>
+        {Array.from({ length: 7 }).map((_, index) => (
+          <View key={index} style={s.revenueBarColumn}>
+            <View style={[s.revenueBarTrack, { height: 84 }]}>
+              <View style={[s.revenueBar, { height: 28, backgroundColor: accent, opacity: 0.14 }]} />
+            </View>
+            <Text style={s.revenueDay}>—</Text>
+          </View>
+        ))}
+      </View>
+    );
+  }
+
+  if (!points || points.length === 0) {
+    return (
+      <View style={s.revenueChartEmpty}>
+        <Feather name="bar-chart-2" size={16} color={SUBTLE} />
+        <Text style={s.revenueChartEmptyText}>No sales in this period yet</Text>
+      </View>
+    );
+  }
+
+  const maxCents = Math.max(...points.map((point) => point.totalCents), 1);
+  const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const today = new Date().toISOString().slice(0, 10);
+
+  return (
+    <View style={s.revenueChart}>
+      {points.map((point, index) => {
+        const date = new Date(point.day);
+        const isToday = point.day.slice(0, 10) === today;
+        const dayLabel = Number.isNaN(date.getTime()) ? '·' : (dayLabels[date.getUTCDay()] ?? '·');
+        const targetHeight = point.totalCents === 0
+          ? 0
+          : Math.max(8, (point.totalCents / maxCents) * 84);
+        return (
+          <View key={`${point.day}-${index}`} style={s.revenueBarColumn}>
+            <View style={s.revenueBarTrack}>
+              <Animated.View
+                style={[
+                  s.revenueBar,
+                  {
+                    height: animation.interpolate({ inputRange: [0, 1], outputRange: [4, targetHeight] }),
+                    minHeight: targetHeight === 0 ? 0 : 4,
+                    backgroundColor: isToday ? accentLight : accent,
+                    opacity: isToday ? 1 : 0.62,
+                  },
+                ]}
+              />
+            </View>
+            <Text style={[s.revenueDay, isToday && { color: accentLight }]}>{dayLabel}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
 // ─── Command Menu items ────────────────────────────────────────────────────────
 
 const COMMAND_ITEMS = [
@@ -117,6 +282,7 @@ export default function SellerHomeScreen() {
     storefrontVisits: number;
     completedOrders: number;
   } | null>(null);
+  const [dashStatsError, setDashStatsError] = useState(false);
   const [searchModal, setSearchModal] = useState(false);
   const [commandModal, setCommandModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -146,6 +312,7 @@ export default function SellerHomeScreen() {
   const [searchOrders, setSearchOrders] = useState<any[]>([]);
   const [payoutInfo,   setPayoutInfo]   = useState<any | null>(null);
   const [salesTrend,   setSalesTrend]   = useState<Array<{ day: string; totalCents: number }> | null>(null);
+  const [salesTrendError, setSalesTrendError] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
   const [subscriptionProvider, setSubscriptionProvider] = useState<'stripe' | 'revenuecat' | 'none'>('none');
   const [billingPortalLoading, setBillingPortalLoading] = useState(false);
@@ -196,18 +363,35 @@ export default function SellerHomeScreen() {
     // Show skeleton for at least 500ms
     const minLoad = setTimeout(() => {}, 500);
     setStatsError(false);
+    setDashStatsError(false);
+    setSalesTrendError(false);
+    setDashStats(null);
+    setSalesTrend(null);
     // ── Real per-seller dashboard stats (revenue, orders, conversion rate) ──
     api.analytics.dashboard().then((data: any) => {
-      if (!data || typeof data !== 'object') return;
+      const revenueCents = data?.revenue?.totalCents;
+      const orders = data?.orders?.total;
+      const storefrontVisits = data?.storefrontVisits;
+      const completedOrders = data?.completedOrders;
+      if (
+        !Number.isSafeInteger(revenueCents)
+        || !Number.isSafeInteger(orders)
+        || !Number.isSafeInteger(storefrontVisits)
+        || !Number.isSafeInteger(completedOrders)
+      ) {
+        throw new Error('Invalid dashboard analytics response.');
+      }
       setDashStats({
-        revenueCents:     typeof data.revenue?.totalCents === 'number' ? data.revenue.totalCents : 0,
-        orders:           typeof data.orders?.total        === 'number' ? data.orders.total        : 0,
-        storefrontVisits: typeof data.storefrontVisits     === 'number' ? data.storefrontVisits     : 0,
-        completedOrders:  typeof data.completedOrders      === 'number' ? data.completedOrders      : 0,
+        revenueCents,
+        orders,
+        storefrontVisits,
+        completedOrders,
       });
+      setDashStatsError(false);
     }).catch((error) => {
       // Leave dashStats as null — chips show '—' rather than a fabricated number
       setDashStats(null);
+      setDashStatsError(true);
       setStatsError(true);
       reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
@@ -258,13 +442,14 @@ export default function SellerHomeScreen() {
       reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
     api.analytics.revenue('last7').then((data: any) => {
-      const daily = Array.isArray(data?.daily) ? data.daily : [];
-      setSalesTrend(daily.map((d: any) => ({
-        day: String(d.day ?? d.date ?? ''),
-        totalCents: typeof d.total_cents === 'number' ? d.total_cents : 0,
-      })));
+      if (!data || typeof data !== 'object' || !Array.isArray(data.daily)) {
+        throw new Error('Invalid revenue analytics response.');
+      }
+      setSalesTrend(normalizeRevenueTrend(data.daily));
+      setSalesTrendError(false);
     }).catch((error) => {
       setSalesTrend(null);
+      setSalesTrendError(true);
       setStatsError(true);
       reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
@@ -479,6 +664,94 @@ export default function SellerHomeScreen() {
         )}
       >
 
+        {/* ── Revenue command center ─────────────────────────────────────── */}
+        {(() => {
+          const trend = salesTrend ? getTrendSummary(salesTrend) : null;
+          const trendColor = trend?.direction === 'down' ? RED : trend?.direction === 'up' ? GREEN_BRIGHT : MUTED;
+          return (
+            <AnimatedEntrance style={{ paddingHorizontal: SP.md, paddingTop: SP.md, marginBottom: SP.md }}>
+              <PressableScale
+                style={s.revenueHero}
+                onPress={() => nav('/(tabs)/analytics')}
+                accessibilityRole="button"
+                accessibilityLabel="Open revenue analytics"
+              >
+                <View style={s.revenueHeroHeader}>
+                  <View style={s.revenueHeroEyebrow}>
+                    <View style={[s.revenueLiveDot, { backgroundColor: dashStatsError ? ORANGE : GREEN_BRIGHT }]} />
+                    <Text style={s.revenueEyebrowText}>BUSINESS PULSE</Text>
+                  </View>
+                  <View style={s.revenueAnalyticsLink}>
+                    <Text style={[s.revenueAnalyticsText, { color: theme.accentLight }]}>Analytics</Text>
+                    <Feather name="arrow-up-right" size={14} color={theme.accentLight} />
+                  </View>
+                </View>
+
+                <View style={s.revenueHeadlineRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.revenueLabel}>Revenue</Text>
+                    <Text style={s.revenueValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.64}>
+                      {dashStats === null ? '—' : formatCents(dashStats.revenueCents)}
+                    </Text>
+                    <Text style={s.revenueContext}>
+                      {dashStatsError ? 'Live revenue is unavailable' : dashStats === null ? 'Loading live revenue…' : 'All time'}
+                    </Text>
+                  </View>
+                  {trend && (
+                    <View style={[
+                      s.revenueTrendPill,
+                      {
+                        borderColor: trend?.direction === 'flat' ? BORDER : `${trendColor}66`,
+                        backgroundColor: trend?.direction === 'flat' ? 'rgba(255,255,255,0.06)' : `${trendColor}16`,
+                      },
+                    ]}>
+                      <Feather
+                        name={trend.direction === 'up' ? 'trending-up' : trend.direction === 'down' ? 'trending-down' : 'minus'}
+                        size={15}
+                        color={trendColor}
+                      />
+                      <Text style={[s.revenueTrendText, { color: trendColor }]}>{trend.label}</Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={s.revenueChartHeader}>
+                  <Text style={s.revenueChartTitle}>Revenue trend</Text>
+                  <Text style={s.revenueChartDate}>{trendDateRange(salesTrend ?? [])}</Text>
+                </View>
+                <RevenueTrendChart
+                  points={salesTrend}
+                  loading={salesTrend === null && !salesTrendError}
+                  error={salesTrendError}
+                  accent={theme.accent}
+                  accentLight={theme.accentLight}
+                />
+
+                <View style={s.revenueMetricsRow}>
+                  <View style={s.revenueMetric}>
+                    <Text style={s.revenueMetricValue}>{dashStats === null ? '—' : String(dashStats.orders)}</Text>
+                    <Text style={s.revenueMetricLabel}>Orders</Text>
+                  </View>
+                  <View style={s.revenueMetricDivider} />
+                  <View style={s.revenueMetric}>
+                    <Text style={s.revenueMetricValue}>{dashStats === null ? '—' : String(dashStats.storefrontVisits)}</Text>
+                    <Text style={s.revenueMetricLabel}>Visitors</Text>
+                  </View>
+                  <View style={s.revenueMetricDivider} />
+                  <View style={s.revenueMetric}>
+                    <Text style={s.revenueMetricValue}>
+                      {dashStats === null || dashStats.storefrontVisits === 0
+                        ? '—'
+                        : `${(dashStats.completedOrders / dashStats.storefrontVisits * 100).toFixed(1)}%`}
+                    </Text>
+                    <Text style={s.revenueMetricLabel}>Conversion</Text>
+                  </View>
+                </View>
+              </PressableScale>
+            </AnimatedEntrance>
+          );
+        })()}
+
         {/* ── Hero Card: Available Balance + Next Payout ───────────────── */}
         <AnimatedEntrance style={{ paddingHorizontal: SP.md, paddingTop: SP.md, marginBottom: SP.sm }}>
           <LinearGradient
@@ -661,84 +934,6 @@ export default function SellerHomeScreen() {
             </BrandthreadCard>
           </View>
         )}
-
-        {/* ── Zone A: Key Stats (3 chips — real per-seller data) ───────── */}
-        <View style={s.statsRow}>
-          {/* Revenue: all-time non-cancelled order total from DB */}
-          <View style={s.statChip}>
-            <Text style={s.statChipVal}>
-              {dashStats === null
-                ? '—'
-                : formatCents(dashStats.revenueCents)}
-            </Text>
-            <Text style={s.statChipLbl}>Revenue</Text>
-          </View>
-          {/* Orders: all-time order count from DB */}
-          <View style={s.statChip}>
-            <Text style={s.statChipVal}>
-              {dashStats === null ? '—' : String(dashStats.orders)}
-            </Text>
-            <Text style={s.statChipLbl}>Orders</Text>
-          </View>
-          {/* Conversion: completed orders / storefront visits — real tracked values.
-              Shows '—' when no visit data exists yet (honest, not fabricated). */}
-          <View style={s.statChip}>
-            <Text style={s.statChipVal}>
-              {dashStats === null || dashStats.storefrontVisits === 0
-                ? '—'
-                : (dashStats.completedOrders / dashStats.storefrontVisits * 100).toFixed(1) + '%'}
-            </Text>
-            <Text style={s.statChipLbl}>Conversion</Text>
-          </View>
-        </View>
-
-        {/* ── 7-Day Revenue Trend ──────────────────────────────────────── */}
-        <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
-          <View style={s.trendHeaderRow}>
-            <Text style={s.trendTitle}>7-day revenue</Text>
-            {salesTrend !== null && salesTrend.length > 0 && (
-              <Text style={s.trendWeekTotal}>
-                {formatCents(salesTrend.reduce((sum, d) => sum + d.totalCents, 0))} this week
-              </Text>
-            )}
-          </View>
-          <View style={s.trendChart}>
-            {salesTrend === null ? (
-              // Loading placeholders
-              Array.from({ length: 7 }).map((_, i) => (
-                <View key={i} style={s.trendBarWrap}>
-                  <View style={[s.trendBar, { height: 8 + i * 3, opacity: 0.18, backgroundColor: BLUE }]} />
-                  <Text style={s.trendDay}>—</Text>
-                </View>
-              ))
-            ) : salesTrend.length === 0 ? (
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontSize: FS.xs, color: SUBTLE, fontFamily: FONT.regular }}>No sales this week yet</Text>
-              </View>
-            ) : (() => {
-              const maxCents  = Math.max(...salesTrend.map(d => d.totalCents), 1);
-              const MAX_BAR   = 50;
-              const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-              const todayStr  = new Date().toDateString();
-              return salesTrend.map((d) => {
-                const barH    = Math.max(4, (d.totalCents / maxCents) * MAX_BAR);
-                const date    = new Date(d.day);
-                const dayLbl  = DAY_LABELS[date.getDay()] ?? '·';
-                const isToday = date.toDateString() === todayStr;
-                return (
-                  <View key={d.day} style={s.trendBarWrap}>
-                    <View style={[s.trendBar, {
-                      height: barH,
-                      backgroundColor: isToday ? GREEN_BRIGHT : BLUE,
-                      opacity: isToday ? 1 : 0.55,
-                    }]} />
-                    <Text style={[s.trendDay, isToday && { color: GREEN_BRIGHT }]}>{dayLbl}</Text>
-                  </View>
-                );
-              });
-            })()}
-          </View>
-        </View>
 
         {/* ── Zone B: Action Zone — Quick Actions (established sellers only) ── */}
         {!showWelcome && !showProgress && (
@@ -1214,7 +1409,189 @@ const s = StyleSheet.create({
     color: MUTED,
   },
 
-  // Zone A — compact stats row
+  // ── Revenue command center ───────────────────────────────────────────────
+  revenueHero: {
+    backgroundColor: CARD_ELEVATED,
+    borderRadius: RADIUS.xl,
+    borderWidth: 1,
+    borderColor: BORDER_ACTIVE,
+    padding: SP.lg,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+  revenueHeroHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: SP.lg,
+  },
+  revenueHeroEyebrow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  revenueLiveDot: {
+    width: 7,
+    height: 7,
+    borderRadius: RADIUS.pill,
+  },
+  revenueEyebrowText: {
+    fontSize: 10,
+    fontFamily: FONT.bold,
+    color: MUTED,
+    letterSpacing: 1.2,
+  },
+  revenueAnalyticsLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  revenueAnalyticsText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.semibold,
+  },
+  revenueHeadlineRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: SP.sm,
+    marginBottom: SP.lg,
+  },
+  revenueLabel: {
+    fontSize: FS.sm,
+    fontFamily: FONT.medium,
+    color: MUTED,
+    marginBottom: 3,
+  },
+  revenueValue: {
+    fontSize: 42,
+    lineHeight: 48,
+    fontFamily: FONT.extrabold,
+    color: FG,
+    letterSpacing: -1.5,
+  },
+  revenueContext: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: SUBTLE,
+    marginTop: 2,
+  },
+  revenueTrendPill: {
+    maxWidth: 132,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderWidth: 1,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginBottom: 4,
+  },
+  revenueTrendText: {
+    flexShrink: 1,
+    fontSize: 10,
+    lineHeight: 13,
+    fontFamily: FONT.semibold,
+  },
+  revenueChartHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SP.sm,
+  },
+  revenueChartTitle: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    color: FG,
+  },
+  revenueChartDate: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: MUTED,
+  },
+  revenueChart: {
+    height: 120,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: BORDER_SUBTLE,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-around',
+    paddingHorizontal: SP.sm,
+    paddingTop: SP.sm,
+    paddingBottom: 10,
+  },
+  revenueBarColumn: {
+    flex: 1,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  revenueBarTrack: {
+    height: 84,
+    width: '58%',
+    minWidth: 10,
+    maxWidth: 22,
+    justifyContent: 'flex-end',
+    borderRadius: RADIUS.pill,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    overflow: 'hidden',
+  },
+  revenueBar: {
+    width: '100%',
+    borderRadius: RADIUS.pill,
+  },
+  revenueDay: {
+    fontSize: 9,
+    fontFamily: FONT.bold,
+    color: SUBTLE,
+    textTransform: 'uppercase' as const,
+  },
+  revenueChartEmpty: {
+    height: 120,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SP.sm,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: BORDER_SUBTLE,
+  },
+  revenueChartEmptyText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: MUTED,
+  },
+  revenueMetricsRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    marginTop: SP.lg,
+  },
+  revenueMetric: {
+    flex: 1,
+    gap: 3,
+  },
+  revenueMetricDivider: {
+    width: 1,
+    backgroundColor: BORDER,
+    marginHorizontal: SP.sm,
+  },
+  revenueMetricValue: {
+    fontSize: FS.lg,
+    fontFamily: FONT.bold,
+    color: FG,
+  },
+  revenueMetricLabel: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: MUTED,
+  },
+
+  // Legacy compact stats tokens retained for existing consumers.
   statsRow: {
     flexDirection: 'row',
     gap: 8,
