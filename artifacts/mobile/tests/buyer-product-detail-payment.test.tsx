@@ -6,12 +6,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   addToCartMock,
+  alertMock,
   apiMock,
+  createBuyNowSessionMock,
+  getCartMock,
   invalidatePaymentCacheMock,
   routerMock,
   useLocalSearchParamsMock,
 } = vi.hoisted(() => ({
   addToCartMock: vi.fn(),
+  alertMock: vi.fn(),
   apiMock: {
     publicProducts: {
       get: vi.fn(),
@@ -24,6 +28,8 @@ const {
       forProduct: vi.fn(),
     },
   },
+  createBuyNowSessionMock: vi.fn(),
+  getCartMock: vi.fn(),
   invalidatePaymentCacheMock: vi.fn(),
   routerMock: {
     back: vi.fn(),
@@ -53,7 +59,7 @@ vi.mock('react-native', () => {
 
   return {
     ActivityIndicator: nativeComponent('ActivityIndicator'),
-    Alert: { alert: vi.fn() },
+    Alert: { alert: alertMock },
     Animated: {
       FlatList: nativeComponent('AnimatedFlatList'),
       Image: nativeComponent('AnimatedImage'),
@@ -176,8 +182,8 @@ vi.mock('@/lib/theme', () => ({
 
 vi.mock('@/services/cartService', () => ({
   addToCart: addToCartMock,
-  createBuyNowSession: vi.fn(),
-  getCart: vi.fn(),
+  createBuyNowSession: createBuyNowSessionMock,
+  getCart: getCartMock,
   replaceCartItemVariant: vi.fn(),
 }));
 
@@ -238,6 +244,9 @@ describe('buyer product detail when seller payments are unavailable', () => {
       success: true,
       cart: { id: 'cart-1', items: [], savedItems: [], updatedAt: '2026-08-31T00:00:00.000Z' },
     });
+    alertMock.mockReset();
+    createBuyNowSessionMock.mockReset();
+    getCartMock.mockReset();
     apiMock.publicProducts.get.mockReset();
     apiMock.publicProducts.get.mockResolvedValue(product);
     apiMock.publicProducts.related.mockReset();
@@ -292,6 +301,43 @@ describe('buyer product detail when seller payments are unavailable', () => {
 
     expect(addToCartMock).toHaveBeenCalledOnce();
     expect(textContent(renderer.root)).toContain('View Cart');
+    expect(routerMock.push).not.toHaveBeenCalledWith('/buyer-checkout?source=buynow');
+  });
+
+  it('keeps Add to Cart available when payment verification rejects, but blocks Buy Now with an unable-to-verify message', async () => {
+    apiMock.buyer.sellerPaymentStatus.mockRejectedValue(new Error('payment status unavailable'));
+    renderer = await renderScreen();
+
+    await act(async () => {
+      findTouchableByText(renderer, 'M').props.onPress();
+      await flushPromises();
+    });
+
+    const addToCart = findTouchableByText(renderer, 'Add to Cart');
+    expect(addToCart.props.disabled).toBe(false);
+
+    await act(async () => {
+      await addToCart.props.onPress();
+      await flushPromises();
+    });
+
+    expect(addToCartMock).toHaveBeenCalledOnce();
+    expect(textContent(renderer.root)).toContain('View Cart');
+
+    const buyNow = renderer.root.findByProps({ accessibilityLabel: 'Buy now' });
+    expect(buyNow.props.disabled).toBe(false);
+
+    await act(async () => {
+      await buyNow.props.onPress();
+      await flushPromises();
+    });
+
+    expect(alertMock).toHaveBeenCalledWith(
+      'Unable to verify payments',
+      'We could not confirm this seller can accept payments. Check your connection and try again.',
+    );
+    expect(getCartMock).not.toHaveBeenCalled();
+    expect(createBuyNowSessionMock).not.toHaveBeenCalled();
     expect(routerMock.push).not.toHaveBeenCalledWith('/buyer-checkout?source=buynow');
   });
 });

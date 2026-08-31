@@ -4,6 +4,7 @@
  */
 import { Router, type Request, type Response } from "express";
 import crypto from "crypto";
+import type Stripe from "stripe";
 import {
   db, checkoutSessions, orders, orderItems, productVariants, products, users, notificationsFeed, disputes,
   dropWallets, dropWalletTransactions, freelancers, freelancerJobs,
@@ -39,6 +40,10 @@ import {
 } from "../lib/stripeWebhookLedger";
 
 const router = Router();
+
+function stripeReferenceId(reference: string | { id: string } | null | undefined): string | null {
+  return typeof reference === "string" ? reference : reference?.id ?? null;
+}
 
 function authorizationMatches(actual: string | undefined, expected: string): boolean {
   const candidates = [expected, `Bearer ${expected}`];
@@ -213,7 +218,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
         break;
       case "charge.refunded":
         await handleManufacturerCardReversal({
-          paymentIntentId: event.data.object.payment_intent ?? null,
+          paymentIntentId: stripeReferenceId(event.data.object.payment_intent),
           chargeId: event.data.object.id ?? null,
           cumulativeReversedCents: event.data.object.amount_refunded,
           providerEventId: event.id,
@@ -257,8 +262,8 @@ router.post("/stripe", async (req: Request, res: Response) => {
       // ── Stripe Disputes / Chargebacks ─────────────────────────────────────
       case "charge.dispute.created":
         if (!await handleManufacturerCardReversal({
-          paymentIntentId: event.data.object.payment_intent ?? null,
-          chargeId: event.data.object.charge ?? null,
+          paymentIntentId: stripeReferenceId(event.data.object.payment_intent),
+          chargeId: stripeReferenceId(event.data.object.charge),
           cumulativeReversedCents: event.data.object.amount,
           providerEventId: event.id,
           source: "dispute",
@@ -266,13 +271,19 @@ router.post("/stripe", async (req: Request, res: Response) => {
         break;
 
       case "charge.dispute.updated":
-        if (!await isManufacturerCardPayment(event.data.object.payment_intent ?? null, event.data.object.charge ?? null)) {
+        if (!await isManufacturerCardPayment(
+          stripeReferenceId(event.data.object.payment_intent),
+          stripeReferenceId(event.data.object.charge),
+        )) {
           await handleDisputeUpdated(event.data.object);
         }
         break;
 
       case "charge.dispute.closed":
-        if (!await isManufacturerCardPayment(event.data.object.payment_intent ?? null, event.data.object.charge ?? null)) {
+        if (!await isManufacturerCardPayment(
+          stripeReferenceId(event.data.object.payment_intent),
+          stripeReferenceId(event.data.object.charge),
+        )) {
           await handleDisputeClosed(event.data.object);
         }
         break;
