@@ -22,3 +22,13 @@ export const stripeWebhookEvents = pgTable("stripe_webhook_events", {
   statusStartedIdx: index("stripe_webhook_events_status_started_idx")
     .on(table.status, table.processingStartedAt),
 }));
+
+/**
+ * Trial-ending warnings have an external side effect (push delivery) that
+ * happens before the general webhook ledger can be marked processed. Keep a
+ * durable event marker so a replay cannot send the same warning twice.
+ */
+export const stripeTrialWarningEvents = pgTable("stripe_trial_warning_events", {
+  eventId: text("event_id").primaryKey(),
+  recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
+});

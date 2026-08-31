@@ -8,6 +8,7 @@ import {
   db, checkoutSessions, orders, orderItems, productVariants, products, users, notificationsFeed, disputes,
   dropWallets, dropWalletTransactions, freelancers, freelancerJobs,
   revenueCatWebhookEvents, manufacturers, sampleOrders, manufacturerActivityEvents,
+  stripeTrialWarningEvents,
 } from "@workspace/db";
 import { eq, and, ne, sql } from "drizzle-orm";
 import { stripe, STRIPE_WEBHOOK_SECRET } from "../lib/stripe";
@@ -228,7 +229,7 @@ router.post("/stripe", async (req: Request, res: Response) => {
         break;
 
       case "customer.subscription.trial_will_end":
-        await handleSubscriptionTrialWillEnd(event.data.object);
+        await handleSubscriptionTrialWillEnd(event.data.object, event.id);
         break;
 
       case "invoice.payment_failed":
@@ -933,7 +934,7 @@ async function handleSubscriptionUpdated(sub: any) {
  * subscription. Push delivery is optional: sendPushToUser silently returns
  * when the seller has no registered device token.
  */
-export async function handleSubscriptionTrialWillEnd(sub: any): Promise<void> {
+export async function handleSubscriptionTrialWillEnd(sub: any, eventId: string): Promise<void> {
   const customerId: string =
     typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
   if (!customerId) {
@@ -976,17 +977,46 @@ export async function handleSubscriptionTrialWillEnd(sub: any): Promise<void> {
     year: "numeric",
   });
 
-  await sendPushToUser(seller.clerkId, {
-    title: "Your free trial ends soon",
-    body: `Your 5-day trial ends in 3 days — you'll be charged ${amount} on ${trialEnd} unless you cancel.`,
-    data: {
-      type: "subscription_trial_will_end",
-      route: "/subscription",
-    },
-  });
+  const [recorded] = await db
+    .insert(stripeTrialWarningEvents)
+    .values({ eventId })
+    .onConflictDoNothing()
+    .returning({ eventId: stripeTrialWarningEvents.eventId });
+  if (!recorded) {
+    logger.info(
+      { eventId, subscriptionId: sub.id, customerId },
+      "Skipping replayed seller trial-ending push notification",
+    );
+    return;
+  }
+
+  try {
+    await sendPushToUser(seller.clerkId, {
+      title: "Your free trial ends soon",
+      body: `Your 5-day trial ends in 3 days — you'll be charged ${amount} on ${trialEnd} unless you cancel.`,
+      data: {
+        type: "subscription_trial_will_end",
+        route: "/subscription",
+      },
+    });
+  } catch (err) {
+    // The marker must not turn a failed attempt into a permanently suppressed
+    // warning. The outer Stripe ledger will also mark this delivery failed so
+    // Stripe can retry it.
+    await db
+      .delete(stripeTrialWarningEvents)
+      .where(eq(stripeTrialWarningEvents.eventId, eventId))
+      .catch((cleanupErr) => {
+        logger.error(
+          { err: cleanupErr, eventId },
+          "Could not release failed trial-warning event marker",
+        );
+      });
+    throw err;
+  }
 
   logger.info(
-    { subscriptionId: sub.id, customerId, clerkId: seller.clerkId, trialEnd, amountCents },
+    { eventId, subscriptionId: sub.id, customerId, clerkId: seller.clerkId, trialEnd, amountCents },
     "Seller trial-ending push notification sent",
   );
 }
