@@ -71,7 +71,7 @@ vi.mock('@/hooks/useColors', () => ({
   }),
 }));
 
-import LoginMethods from './login-methods';
+import LoginMethods from '@/app/login-methods';
 
 type ExternalAccount = {
   id: string;

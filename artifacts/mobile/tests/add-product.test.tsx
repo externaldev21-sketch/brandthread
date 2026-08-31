@@ -162,7 +162,7 @@ vi.mock('@/lib/money', () => ({
   parseDecimalToCents: vi.fn(() => undefined),
 }));
 
-import AddProductScreen from './add-product';
+import AddProductScreen from '@/app/add-product';
 
 type AlertButton = {
   text?: string;

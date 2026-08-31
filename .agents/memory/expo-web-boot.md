@@ -5,6 +5,7 @@ description: Why the mobile app white-screened on web and the invariants that ke
 
 ## The rule
 The app must render something visible at every moment of boot, and every AuthGate branch must account for the bare `/` route (empty `segments`).
+Keep test and spec modules outside Expo Router's `app/` directory.
 
 **Why:** The web preview showed a stark white screen for signed-in users. Three stacked causes: (1) no `app/index.tsx`, so `/` matched nothing; (2) the entire tree was gated behind `<ClerkLoaded>` with a `null`/blank fallback while clerk-js hotloads from CDN (~1-2s on web); (3) the AuthGate's completed-onboarding redirect only fired from auth screens, so signed-in users at `/` were never redirected — stuck blank forever. Signed-out users redirected fine, which made the bug look intermittent.
 
@@ -12,6 +13,7 @@ The app must render something visible at every moment of boot, and every AuthGat
 - `app/index.tsx` renders `components/BootScreen.tsx` (branded dark view); AuthGate redirects away using the `atRoot` check (`!segments[0]`). Any new AuthGate branch must consider `atRoot` — at `/`, `segments[0]` is `undefined`, so all `inXGroup` booleans are false.
 - Font gate and `<ClerkLoading>` both render `BootScreen`, never `null`.
 - Web body background is painted dark at module scope in `_layout.tsx` (guarded for SSR).
+- Put route regression tests in a top-level test directory, never beside route files under `app/`. Expo Router can evaluate those files while building the route graph; a Vitest import outside its runner makes static rendering return HTTP 500.
 
 ## Dev preview bypass (?bt_preview)
 Opening the web app with `?bt_preview=buyer` or `?bt_preview=seller` (dev builds, web only, handled in the root layout) seeds local onboarding/role state at module scope and skips the Clerk gate + auth redirects, so any auth-gated screen can be loaded directly by URL with no sign-in. Group segments are stripped from web URLs (`/(buyer)/discover` → `/discover`); bare `/` auto-redirects to the previewed role's home.
