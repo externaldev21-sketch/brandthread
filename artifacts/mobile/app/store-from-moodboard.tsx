@@ -329,6 +329,7 @@ export default function StoreFromMoodboardScreen() {
           ))}
           {imageUris.length < MAX_IMAGES && (
             <TouchableOpacity
+              testID="store-from-moodboard-add"
               style={[mb.addTile, preparingImages && mb.disabledTile]}
               onPress={addImages}
               activeOpacity={0.7}

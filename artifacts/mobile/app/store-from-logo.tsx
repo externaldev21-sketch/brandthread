@@ -282,6 +282,7 @@ export default function StoreFromLogoScreen() {
 
         {/* Upload Area */}
         <TouchableOpacity
+          testID="store-from-logo-upload"
           style={[fl.uploadArea, preparingLogo && fl.disabledUploadArea]}
           onPress={pickLogo}
           activeOpacity={0.7}
