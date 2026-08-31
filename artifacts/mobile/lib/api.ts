@@ -460,6 +460,9 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
         post<{ ok: boolean; sent: number; errors: number; followers: number }>(
           `/api/drops/${encodeURIComponent(dropId)}/broadcast`, {}
         ),
+      /** Schedule the follower broadcast for the drop's releaseAt. */
+      scheduleBroadcast: (dropId: string, scheduledBroadcastAt: string) =>
+        patch<any>(`/api/drops/${encodeURIComponent(dropId)}`, { scheduledBroadcastAt }),
     },
     analytics: {
       dashboard:  () => get('/api/analytics/dashboard'),

@@ -3,6 +3,7 @@ import { logger } from "./lib/logger";
 import { startAbandonedCartJob } from "./jobs/abandonedCartRecovery";
 import { startTrendingJob }       from "./jobs/computeTrending";
 import { startTeamInviteReminderJob } from "./jobs/teamInviteReminder";
+import { startScheduledDropBroadcastJob } from "./jobs/scheduledDropBroadcasts";
 import { ensureWebhookEvents } from "./lib/ensureWebhookEvents";
 
 const rawPort = process.env["PORT"];
@@ -37,4 +38,5 @@ app.listen(port, (err) => {
   startAbandonedCartJob();
   startTrendingJob();
   startTeamInviteReminderJob();
+  startScheduledDropBroadcastJob();
 });

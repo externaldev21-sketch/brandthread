@@ -24,6 +24,8 @@ interface Drop {
   totalCollectedCents: number;
   payoutDate: string;
   status: DropStatus;
+  releaseAt?: string;
+  scheduledBroadcastAt?: string;
   releaseDate?: string;
   mfgProgress?: number;
 }
@@ -106,7 +108,8 @@ const statusConfig: Record<DropStatus, { variant: 'success' | 'warning' | 'info'
 
 // ─── Drop Card ────────────────────────────────────────────────────────────────
 
-type BroadcastState = 'idle' | 'loading' | 'sent' | 'already_sent';
+type BroadcastState = 'idle' | 'loading' | 'sent' | 'already_sent' | 'scheduled';
+
 interface BroadcastPreview {
   followers: number;
 }
@@ -130,6 +133,18 @@ function DropCard({ drop, colors, isDark, isLast, broadcastState, broadcastPrevi
   const typeBg      = isPreOrder ? colors.accent : 'rgba(16,185,129,0.09)';
   const typeBorder  = isPreOrder ? colors.primary : 'rgba(16,185,129,0.20)';
   const progressBg  = isDark ? '#33302A' : '#E8E1CF';
+  const launchAt = drop.releaseAt ? new Date(drop.releaseAt) : null;
+  const hasFutureLaunch = Boolean(
+    launchAt &&
+    !Number.isNaN(launchAt.getTime()) &&
+    launchAt.getTime() > Date.now()
+  );
+  const canSchedule = Boolean(
+    hasFutureLaunch &&
+    !drop.scheduledBroadcastAt &&
+    broadcastState === 'idle',
+  );
+  const notificationScheduled = broadcastState === 'scheduled' || Boolean(drop.scheduledBroadcastAt);
 
   return (
     <View style={[
@@ -214,10 +229,17 @@ function DropCard({ drop, colors, isDark, isLast, broadcastState, broadcastPrevi
         </View>
       )}
 
-      {/* Notify Followers broadcast button — only for active (live) drops */}
+      {/* Notify/schedule follower broadcast — only for active (live) drops */}
       {drop.status === 'processing' && (
         <View style={[styles.broadcastWrap, { borderTopColor: colors.border }]}>
-          {broadcastPreview?.followers === 0 && broadcastState === 'idle' ? (
+          {notificationScheduled ? (
+            <View style={[styles.scheduledNotice, { backgroundColor: 'rgba(16,185,129,0.10)', borderColor: 'rgba(16,185,129,0.25)' }]}>
+              <Feather name="clock" size={14} color={colors.success} />
+              <Text style={[styles.scheduledNoticeText, { color: colors.success }]}>
+                Notification scheduled for {fmtDate(drop.scheduledBroadcastAt ?? drop.releaseAt!)}
+              </Text>
+            </View>
+          ) : broadcastPreview?.followers === 0 && broadcastState === 'idle' && !hasFutureLaunch ? (
             <View style={styles.zeroAudience}>
               <Feather name="users" size={14} color={colors.mutedForeground} />
               <Text style={[styles.zeroAudienceText, { color: colors.mutedForeground }]}>
@@ -259,7 +281,8 @@ function DropCard({ drop, colors, isDark, isLast, broadcastState, broadcastPrevi
                 ]}>
                   {broadcastState === 'sent' ? 'Followers notified' :
                    broadcastState === 'already_sent' ? 'Already notified' :
-                   broadcastState === 'loading' ? 'Sending…' :
+                   broadcastState === 'loading' ? (hasFutureLaunch ? 'Scheduling…' : 'Sending…') :
+                   canSchedule ? 'Schedule for launch' :
                    'Notify Followers'}
                 </Text>
               </TouchableOpacity>
@@ -345,9 +368,19 @@ export default function PaymentsScreen() {
   }, []);
 
   const handleBroadcast = useCallback(async (dropId: string, dropName: string) => {
+    const drop = drops.find((item) => item.id === dropId);
     setBroadcastStates((prev) => ({ ...prev, [dropId]: 'loading' }));
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
+      if (drop?.releaseAt && new Date(drop.releaseAt).getTime() > Date.now()) {
+        await api.drops.scheduleBroadcast(dropId, drop.releaseAt);
+        setDrops((prev) => prev.map((item) =>
+          item.id === dropId ? { ...item, scheduledBroadcastAt: drop.releaseAt } : item,
+        ));
+        setBroadcastStates((prev) => ({ ...prev, [dropId]: 'scheduled' }));
+        showToast(`Notification scheduled for ${fmtDate(drop.releaseAt)}`);
+        return;
+      }
       const res = await api.drops.broadcast(dropId);
       setBroadcastStates((prev) => ({ ...prev, [dropId]: 'sent' }));
       if (res.sent === 0) {
@@ -365,7 +398,7 @@ export default function PaymentsScreen() {
         showToast('Failed to send — please try again');
       }
     }
-  }, [api, showToast]);
+  }, [api, drops, showToast]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -384,10 +417,16 @@ export default function PaymentsScreen() {
            totalCollectedCents: d.totalCents ?? 0,
           payoutDate:     d.releaseAt ? fmtDate(d.releaseAt) : '—',
           status:         dropStatusFromApiStatus(d.status ?? 'active'),
+          releaseAt:      d.releaseAt ?? undefined,
+          scheduledBroadcastAt: d.scheduledBroadcastAt ?? undefined,
           releaseDate:    d.releaseAt ? fmtDate(d.releaseAt) : undefined,
           mfgProgress:    d.mfgProgress ?? undefined,
         }));
         setDrops(mapped);
+        setBroadcastStates((prev) => mapped.reduce<Record<string, BroadcastState>>((states, drop) => {
+          if (drop.scheduledBroadcastAt) states[drop.id] = 'scheduled';
+          return states;
+        }, { ...prev }));
       }
       const activeDrops = mapped.filter((drop) => drop.status === 'processing');
       const previewEntries = await Promise.all(activeDrops.map(async (drop) => {
@@ -673,6 +712,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10, paddingHorizontal: 14,
   },
   broadcastBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  scheduledNotice: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 10, borderWidth: 1, paddingVertical: 10, paddingHorizontal: 14 },
+  scheduledNoticeText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
 
   // Shared card container
   section: { borderRadius: 14, borderWidth: 1, marginBottom: 24 },

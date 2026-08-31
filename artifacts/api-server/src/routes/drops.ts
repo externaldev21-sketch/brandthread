@@ -1,8 +1,16 @@
 import { Router } from "express";
-import { db, drops, orders, customers, follows, dropAlertSubscriptions, dropBroadcasts } from "@workspace/db";
-import { eq, desc, and } from "drizzle-orm";
+import {
+  db,
+  drops,
+  orders,
+  customers,
+  follows,
+  dropAlertSubscriptions,
+  dropBroadcasts,
+} from "@workspace/db";
+import { eq, desc, and, notExists } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { sendPushToUser } from "../lib/push";
+import { deliverDropBroadcast } from "../lib/dropBroadcast";
 
 const router = Router();
 router.use(requireAuth);
@@ -70,7 +78,11 @@ router.get("/:id", async (req, res) => {
 // PATCH /api/drops/:id
 router.patch("/:id", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const { name, status, mfgProgress, payoutStatus, estimatedShipDate, stripePayoutId } = req.body;
+  const {
+    name, status, mfgProgress, payoutStatus, estimatedShipDate, stripePayoutId,
+    scheduledBroadcastAt,
+  } = req.body;
+  const scheduleWasProvided = Object.prototype.hasOwnProperty.call(req.body, "scheduledBroadcastAt");
 
   // Validate mfgProgress range
   if (mfgProgress !== undefined && (!Number.isInteger(mfgProgress) || mfgProgress < 0 || mfgProgress > 100)) {
@@ -81,6 +93,60 @@ router.patch("/:id", async (req, res) => {
     res.status(400).json({ error: `status must be one of: ${validStatuses.join(", ")}` }); return;
   }
 
+  const [currentDrop] = await db.select({
+    id: drops.id,
+    status: drops.status,
+    releaseAt: drops.releaseAt,
+  }).from(drops)
+    .where(and(eq(drops.id, req.params.id), eq(drops.ownerId, ownerId)))
+    .limit(1);
+  if (!currentDrop) { res.status(404).json({ error: "Not found" }); return; }
+
+  let scheduledBroadcastDate: Date | null | undefined;
+  if (scheduleWasProvided) {
+    if (scheduledBroadcastAt === null) {
+      scheduledBroadcastDate = null;
+    } else {
+      if (typeof scheduledBroadcastAt !== "string") {
+        res.status(400).json({ error: "scheduledBroadcastAt must be an ISO date or null" }); return;
+      }
+      const parsed = new Date(scheduledBroadcastAt);
+      if (Number.isNaN(parsed.getTime())) {
+        res.status(400).json({ error: "scheduledBroadcastAt must be a valid ISO date" }); return;
+      }
+      const effectiveStatus = status ?? currentDrop.status;
+      if (effectiveStatus !== "active") {
+        res.status(400).json({ error: "Only active drops can schedule a follower notification.", code: "DROP_NOT_ACTIVE" }); return;
+      }
+      if (!currentDrop.releaseAt || currentDrop.releaseAt.getTime() <= Date.now()) {
+        res.status(400).json({ error: "Only drops with a future releaseAt can schedule a launch notification.", code: "DROP_RELEASE_NOT_FUTURE" }); return;
+      }
+      if (parsed.getTime() !== currentDrop.releaseAt.getTime()) {
+        res.status(400).json({ error: "scheduledBroadcastAt must match the drop releaseAt.", code: "SCHEDULE_MUST_MATCH_RELEASE" }); return;
+      }
+      const [existingBroadcast] = await db.select({ id: dropBroadcasts.id })
+        .from(dropBroadcasts)
+        .where(eq(dropBroadcasts.dropId, currentDrop.id))
+        .limit(1);
+      if (existingBroadcast) {
+        res.status(409).json({ error: "This drop has already been broadcast to your followers.", code: "ALREADY_BROADCAST" }); return;
+      }
+      scheduledBroadcastDate = parsed;
+    }
+  }
+
+  const updateConditions = [
+    eq(drops.id, req.params.id),
+    eq(drops.ownerId, ownerId),
+  ];
+  if (scheduledBroadcastDate) {
+    updateConditions.push(notExists(
+      db.select({ id: dropBroadcasts.id })
+        .from(dropBroadcasts)
+        .where(eq(dropBroadcasts.dropId, currentDrop.id)),
+    ));
+  }
+
   const [updated] = await db.update(drops)
     .set({
       ...(name             && { name }),
@@ -89,11 +155,17 @@ router.patch("/:id", async (req, res) => {
       ...(payoutStatus     && { payoutStatus }),
       ...(estimatedShipDate && { estimatedShipDate: new Date(estimatedShipDate) }),
       ...(stripePayoutId   && { stripePayoutId }),
+      ...(scheduleWasProvided && { scheduledBroadcastAt: scheduledBroadcastDate }),
       updatedAt: new Date(),
     })
-    .where(and(eq(drops.id, req.params.id), eq(drops.ownerId, ownerId)))
+    .where(and(...updateConditions))
     .returning();
-  if (!updated) { res.status(404).json({ error: "Not found" }); return; }
+  if (!updated) {
+    if (scheduledBroadcastDate) {
+      res.status(409).json({ error: "This drop has already been broadcast to your followers.", code: "ALREADY_BROADCAST" }); return;
+    }
+    res.status(404).json({ error: "Not found" }); return;
+  }
   res.json(updated);
 });
 
@@ -136,41 +208,11 @@ router.post("/:id/broadcast", async (req, res) => {
     return res.status(400).json({ error: "Only active drops can be broadcast to followers.", code: "DROP_NOT_ACTIVE" });
   }
 
-  // Check if already broadcast (one broadcast per drop)
-  const [existing] = await db
-    .select({ id: dropBroadcasts.id })
-    .from(dropBroadcasts)
-    .where(eq(dropBroadcasts.dropId, drop.id))
-    .limit(1);
-  if (existing) {
+  const result = await deliverDropBroadcast(drop.id, sellerId);
+  if (!result) {
     return res.status(409).json({ error: "This drop has already been broadcast to your followers.", code: "ALREADY_BROADCAST" });
   }
-
-  // Notify both followers and buyers who explicitly requested this drop alert.
-  const followerIds = await getBroadcastAudience(sellerId, drop.id);
-
-  if (followerIds.length === 0) {
-    return res.json({ ok: true, sent: 0, errors: 0, followers: 0, message: "No followers to notify yet." });
-  }
-
-  const results = await Promise.allSettled(followerIds.map((followerId) =>
-    sendPushToUser(followerId, {
-      title: "Drop is live!",
-      body: `${drop.name} is available now — limited stock. Tap to shop.`,
-      data: { dropId: drop.id, sellerId, type: "drop_live" },
-    }, "drop")
-  ));
-  const sent = results.filter((result) => result.status === "fulfilled").length;
-  const errors = results.length - sent;
-
-  // Record the broadcast (idempotency key)
-  await db.insert(dropBroadcasts).values({
-    dropId:    drop.id,
-    sellerId,
-    sentCount: sent,
-  }).onConflictDoNothing();
-
-  return res.json({ ok: true, sent, errors, followers: followerIds.length });
+  return res.json({ ok: true, ...result });
 });
 
 export default router;
