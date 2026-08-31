@@ -27,6 +27,7 @@ beforeAll(async () => {
     email: `${state.userId}@test.local`,
     name: "Profile Test Seller",
     displayName: "Profile Test Seller",
+    username: `profile_${state.userId.slice(-12)}`,
     role: "seller",
     accountType: "seller",
     brandName: "Original Brand",
@@ -52,6 +53,18 @@ afterAll(async () => {
 async function patchProfile(body: unknown) {
   const response = await fetch(`${base}/api/auth/profile`, {
     method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return {
+    status: response.status,
+    body: await response.json() as Record<string, unknown>,
+  };
+}
+
+async function requestJson(path: string, method: "PATCH" | "POST", body: unknown) {
+  const response = await fetch(`${base}/api/auth${path}`, {
+    method,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
@@ -103,6 +116,27 @@ describe("PATCH /api/auth/profile", () => {
     expect(saved).toEqual({
       brandName: "Threaded Studio",
       bio: "Thoughtful essentials for everyday wear.",
+    });
+  });
+});
+
+describe("onboarding completion ordering", () => {
+  it("keeps the account incomplete until the explicit final completion request", async () => {
+    const profileWrite = await requestJson("/onboarding", "PATCH", {
+      brandName: "Threaded Studio",
+      brandStage: "build",
+    });
+    expect(profileWrite.status).toBe(200);
+    expect(profileWrite.body.onboardingComplete).toBe(false);
+
+    const completion = await requestJson("/onboarding/complete", "POST", {
+      accountType: "seller",
+    });
+    expect(completion.status).toBe(200);
+    expect(completion.body).toMatchObject({
+      clerkId: state.userId,
+      accountType: "seller",
+      onboardingComplete: true,
     });
   });
 });

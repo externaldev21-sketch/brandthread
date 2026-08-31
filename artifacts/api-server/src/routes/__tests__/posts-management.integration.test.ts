@@ -96,6 +96,29 @@ async function request(path: string, options: RequestInit = {}) {
   };
 }
 
+function seedComposedMedia(owner: string, label: string) {
+  const mediaPath = `/objects/uploads/${label}.mp4`;
+  const thumbnailPath = `/objects/uploads/${label}.jpg`;
+  videoStorage.objects.set(mediaPath, {
+    bytes: Buffer.from(`${label}-video`),
+    contentType: "video/mp4",
+    owner,
+    visibility: "private",
+  });
+  videoStorage.objects.set(thumbnailPath, {
+    bytes: Buffer.from(`${label}-thumbnail`),
+    contentType: "image/jpeg",
+    owner,
+    visibility: "private",
+  });
+  return {
+    mediaPath,
+    thumbnailPath,
+    mediaUrl: `${base}/api/posts/media/${mediaPath.replace(/^\/objects\//, "")}`,
+    thumbnailUrl: `${base}/api/posts/media/${thumbnailPath.replace(/^\/objects\//, "")}`,
+  };
+}
+
 beforeAll(async () => {
   await db.insert(users).values([
     {
@@ -279,6 +302,84 @@ describe("seller post management", () => {
       body: JSON.stringify({ caption: "Too late", mediaUrl: "", scheduledAt: new Date(Date.now() - 1000).toISOString() }),
     });
     expect(invalidSchedule.status).toBe(400);
+  });
+
+  it("never exposes composed media before a post is public and published", async () => {
+    authState.clerkUserId = sellerA;
+    const draftMedia = seedComposedMedia(sellerA, `draft-${suffix}`);
+    const draft = await request("/api/posts", {
+      method: "POST",
+      body: JSON.stringify({ ...draftMedia, mediaType: "video", isDraft: true }),
+    });
+    expect(draft.status).toBe(201);
+    expect((await fetch(draftMedia.mediaUrl)).status).toBe(404);
+
+    const scheduledMedia = seedComposedMedia(sellerA, `scheduled-${suffix}`);
+    const scheduled = await request("/api/posts", {
+      method: "POST",
+      body: JSON.stringify({
+        ...scheduledMedia,
+        mediaType: "video",
+        scheduledAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      }),
+    });
+    expect(scheduled.status).toBe(201);
+    expect((await fetch(scheduledMedia.mediaUrl)).status).toBe(404);
+
+    const privateMedia = seedComposedMedia(sellerA, `private-${suffix}`);
+    const privatePost = await request("/api/posts", {
+      method: "POST",
+      body: JSON.stringify({
+        ...privateMedia,
+        mediaType: "video",
+        visibility: {
+          isPublic: false,
+          allowComments: true,
+          allowReposts: true,
+          showLikeCount: true,
+        },
+      }),
+    });
+    expect(privatePost.status).toBe(201);
+    expect((await fetch(privateMedia.mediaUrl)).status).toBe(404);
+
+    const archivedMedia = seedComposedMedia(sellerA, `archived-${suffix}`);
+    const published = await request("/api/posts", {
+      method: "POST",
+      body: JSON.stringify({ ...archivedMedia, mediaType: "video" }),
+    });
+    expect(published.status).toBe(201);
+    expect((await fetch(archivedMedia.mediaUrl)).status).toBe(200);
+    const archived = await request(`/api/posts/${published.body.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ postStatus: "archived" }),
+    });
+    expect(archived.status).toBe(200);
+    expect((await fetch(archivedMedia.mediaUrl)).status).toBe(404);
+
+    postIds.push(draft.body.id, scheduled.body.id, privatePost.body.id, published.body.id);
+  });
+
+  it("publishes composed media only when a scheduled public post becomes due", async () => {
+    authState.clerkUserId = sellerA;
+    const dueMedia = seedComposedMedia(sellerA, `due-${suffix}`);
+    const scheduled = await request("/api/posts", {
+      method: "POST",
+      body: JSON.stringify({
+        ...dueMedia,
+        mediaType: "video",
+        scheduledAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      }),
+    });
+    expect((await fetch(dueMedia.mediaUrl)).status).toBe(404);
+    await db.update(posts)
+      .set({ scheduledAt: new Date(Date.now() - 1000) })
+      .where(eq(posts.id, scheduled.body.id));
+
+    expect((await request(`/api/posts/${scheduled.body.id}`)).status).toBe(200);
+    expect((await fetch(dueMedia.mediaUrl)).status).toBe(200);
+    expect(videoStorage.objects.get(dueMedia.mediaPath)?.visibility).toBe("public");
+    postIds.push(scheduled.body.id);
   });
 
   it("allows only the owner to edit and delete a post", async () => {

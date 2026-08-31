@@ -10,13 +10,17 @@ import { sendWelcomeEmail } from "../lib/brandthreadEmail";
 import { hasDeletionConfirmation } from "../lib/accountDeletion";
 import { z } from "@workspace/api-zod";
 import { requestPrimitives, validateRequest } from "../middlewares/validateRequest";
+import {
+  getClerkEmailAddress,
+  normalizeProfileName,
+  preserveExistingEmail,
+} from "../lib/authProfile";
 
 const router = Router();
 const usernameSchema = z.string().trim().regex(/^[a-zA-Z0-9_]{3,30}$/);
 const optionalProfileText = z.string().trim().max(160).optional();
 const syncBodySchema = z.object({
   name: requestPrimitives.shortText.optional(),
-  accountType: z.enum(["buyer", "seller"]).optional(),
 }).passthrough();
 const onboardingBodySchema = z.object({
   brandName: requestPrimitives.shortText,
@@ -24,6 +28,9 @@ const onboardingBodySchema = z.object({
   brandStage: optionalProfileText,
   sellModel: optionalProfileText,
   username: usernameSchema.optional(),
+}).passthrough();
+const completeOnboardingBodySchema = z.object({
+  accountType: z.enum(["buyer", "seller"]),
 }).passthrough();
 const profileBodySchema = z.object({
   displayName: optionalProfileText,
@@ -49,30 +56,19 @@ function validateUsername(u: string): string | null {
   return null; // valid
 }
 
-function normalizeProfileName(value: unknown): string | undefined {
-  if (typeof value !== "string") return undefined;
-  const name = value.trim().replace(/\s+/g, " ");
-  return name || undefined;
-}
-
 // ─── POST /api/auth/sync ──────────────────────────────────────────────────────
 // Create or update the user record from Clerk data.
 router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
   try {
     const preferredName = normalizeProfileName(req.body?.name);
-    const accountType = req.body?.accountType;
     if (req.body?.name !== undefined && !preferredName) {
       res.status(400).json({ error: "name must not be blank" });
       return;
     }
-    if (accountType !== undefined && accountType !== "buyer" && accountType !== "seller") {
-      res.status(400).json({ error: "accountType must be buyer or seller" });
-      return;
-    }
 
     const clerkUser = await clerkClient.users.getUser(clerkUserId);
-    const email = clerkUser.emailAddresses[0]?.emailAddress ?? "";
+    const email = getClerkEmailAddress(clerkUser);
     const clerkName =
       [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
       email.split("@")[0];
@@ -93,7 +89,7 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
           email,
           name,
           displayName: name,
-          accountType: accountType ?? null,
+          accountType: null,
           avatarUrl,
           role: "owner",
         })
@@ -123,7 +119,11 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
         throw error;
       }
 
-      const updates: Record<string, unknown> = { email, avatarUrl, updatedAt: new Date() };
+      const updates: Record<string, unknown> = {
+        email: preserveExistingEmail(email, existing.email),
+        avatarUrl,
+        updatedAt: new Date(),
+      };
       if (preferredName) {
         updates.name = preferredName;
         // Preserve a deliberately edited display name, but initialize it for
@@ -132,7 +132,6 @@ router.post("/sync", requireAuth, validateRequest({ body: syncBodySchema }), asy
           updates.displayName = preferredName;
         }
       }
-      if (accountType) updates.accountType = accountType;
       const [updated] = await tx
         .update(users)
         .set(updates)
@@ -367,7 +366,8 @@ router.delete("/account", requireAuth, async (req, res) => {
 });
 
 // ─── PATCH /api/auth/onboarding ───────────────────────────────────────────────
-// Save brand setup answers and mark onboarding complete.
+// Save brand setup answers. Completion is committed separately only after every
+// required role-specific write succeeds.
 // Accepts optional username; validates format and uniqueness if provided.
 router.patch("/onboarding", requireAuth, validateRequest({ body: onboardingBodySchema }), async (req, res) => {
   const clerkUserId = (req as any).clerkUserId as string;
@@ -383,7 +383,6 @@ router.patch("/onboarding", requireAuth, validateRequest({ body: onboardingBodyS
     ...(brandType && { brandType }),
     ...(brandStage && { brandStage }),
     ...(sellModel && { sellModel }),
-    onboardingComplete: true,
     updatedAt: new Date(),
   };
 
@@ -419,6 +418,76 @@ router.patch("/onboarding", requireAuth, validateRequest({ body: onboardingBodyS
   }
   res.json(updated);
 });
+
+// ─── POST /api/auth/onboarding/complete ───────────────────────────────────────
+// This is deliberately separate from profile writes. Mobile calls it only after
+// every required role-specific server write succeeds, so a username collision
+// or interrupted brand save can never make a later login skip unfinished setup.
+router.post(
+  "/onboarding/complete",
+  requireAuth,
+  validateRequest({ body: completeOnboardingBodySchema }),
+  async (req, res) => {
+    const clerkUserId = (req as any).clerkUserId as string;
+    const accountType = req.body.accountType as "buyer" | "seller";
+    const result = await db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(users)
+        .where(eq(users.clerkId, clerkUserId))
+        .limit(1)
+        .for("update");
+      if (!existing) {
+        return {
+          status: 404,
+          body: { error: "User not found — call POST /auth/sync first" },
+        } as const;
+      }
+      if (existing.onboardingComplete) {
+        return {
+          status: 409,
+          body: { error: "Onboarding is already complete.", code: "ONBOARDING_ALREADY_COMPLETE" },
+        } as const;
+      }
+      if (existing.accountType !== accountType) {
+        return {
+          status: 409,
+          body: {
+            error: existing.accountType
+              ? "The requested role does not match the saved onboarding role."
+              : "Save the onboarding role before completing setup.",
+            code: "ONBOARDING_ROLE_MISMATCH",
+          },
+        } as const;
+      }
+      const hasIdentity =
+        existing.name.trim().length >= 2 &&
+        (existing.displayName?.trim().length ?? 0) >= 2 &&
+        (existing.username?.trim().length ?? 0) >= 3;
+      const hasSellerBrand =
+        accountType !== "seller" ||
+        ((existing.brandName?.trim().length ?? 0) > 0 &&
+          (existing.brandStage?.trim().length ?? 0) > 0);
+      if (!hasIdentity || !hasSellerBrand) {
+        return {
+          status: 409,
+          body: {
+            error: "Required onboarding profile fields are incomplete.",
+            code: "ONBOARDING_PROFILE_INCOMPLETE",
+          },
+        } as const;
+      }
+
+      const [updated] = await tx
+        .update(users)
+        .set({ onboardingComplete: true, updatedAt: new Date() })
+        .where(eq(users.clerkId, clerkUserId))
+        .returning();
+      return { status: 200, body: updated } as const;
+    });
+    res.status(result.status).json(result.body);
+  },
+);
 
 // ─── PATCH /api/auth/profile ──────────────────────────────────────────────────
 // Update editable profile fields. Validates and enforces uniqueness on username.

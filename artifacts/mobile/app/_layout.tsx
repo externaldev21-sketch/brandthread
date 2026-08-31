@@ -123,6 +123,7 @@ const PUBLIC_SCREENS = ['privacy', 'terms'];
 // ─── Auth gate ────────────────────────────────────────────────────────────────
 function AuthGate() {
   const { isSignedIn, isLoaded, signOut, userId } = useAuth();
+  const api      = useApi();
   const router   = useRouter();
   const segments = useSegments();
   const rootNavigationState = useRootNavigationState();
@@ -184,19 +185,57 @@ function AuthGate() {
   // Read AsyncStorage whenever auth state or top segment changes
   useEffect(() => {
     if (!isSignedIn) { setOnboardingChecked(false); return; }
+    let cancelled = false;
     setOnboardingChecked(false);
-    AsyncStorage.multiGet([ONBOARDING_KEY, 'user_role', ONBOARDING_OWNER_KEY]).then((pairs) => {
+    void (async () => {
+      const pairs = await AsyncStorage.multiGet([ONBOARDING_KEY, 'user_role', ONBOARDING_OWNER_KEY]);
       // These legacy keys remain readable for the current session, but a
       // completion is trusted only when it belongs to the signed-in Clerk user.
       // This prevents a shared device from routing account B into account A's
       // buyer/seller experience.
       const belongsToSignedInUser = pairs[2][1] === userId;
-      setOnboardingDone(belongsToSignedInUser && pairs[0][1] === 'true');
-      setStoredRole(belongsToSignedInUser ? pairs[1][1] : null);
+      let done = belongsToSignedInUser && pairs[0][1] === 'true';
+      let role = belongsToSignedInUser ? pairs[1][1] : null;
+
+      // Upgrade legitimately completed pre-server-marker installs. This runs
+      // only when completion is already bound to the same Clerk user locally.
+      if (done && (role === 'buyer' || role === 'seller')) {
+        void api.auth.completeOnboarding(role).catch(() => {});
+      }
+
+      // A returning user can sign in on a new device or after reinstalling,
+      // where AsyncStorage is empty. Restore completed role state from the
+      // server-authoritative profile instead of forcing duplicate onboarding.
+      if (!done) {
+        try {
+          const profile = await api.auth.sync();
+          const serverRole =
+            profile.accountType === 'buyer' || profile.accountType === 'seller'
+              ? profile.accountType
+              : null;
+          if (profile.onboardingComplete && serverRole) {
+            done = true;
+            role = serverRole;
+            await AsyncStorage.multiSet([
+              [ONBOARDING_KEY, 'true'],
+              [ONBOARDING_OWNER_KEY, profile.clerkId],
+              ['user_role', serverRole],
+            ]);
+          }
+        } catch {
+          // Keep the local result. AuthGate remains recoverable if the network
+          // is temporarily unavailable and will retry on the next route pass.
+        }
+      }
+
+      if (cancelled) return;
+      setOnboardingDone(done);
+      setStoredRole(role);
       setOnboardingChecked(true);
-    });
+    })();
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSignedIn, userId, topSegment]);
+  }, [isSignedIn, userId, topSegment, api]);
 
   useEffect(() => {
     // Expo Router's root navigator is mounted by the Stack below. Waiting for

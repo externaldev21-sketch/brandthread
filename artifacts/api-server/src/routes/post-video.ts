@@ -4,8 +4,8 @@ import { promises as fs } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
-import { db, users } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, posts, users } from "@workspace/db";
+import { eq, or, sql } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { ObjectPermission } from "../lib/objectAcl";
@@ -56,9 +56,10 @@ export function mediaUrl(req: express.Request, path: string): string {
   return `${req.protocol}://${req.get("host")}/api/posts/media/${path.replace(/^\/objects\//, "")}`;
 }
 
-export async function publishComposedMedia(
+export async function setComposedMediaVisibility(
   clerkId: string,
   paths: Array<string | null | undefined>,
+  visibility: "private" | "public",
 ): Promise<void> {
   for (const path of paths.filter((value): value is string => !!value)) {
     const file = await storage.getObjectEntityFile(path);
@@ -66,8 +67,15 @@ export async function publishComposedMedia(
       userId: clerkId, objectFile: file, requestedPermission: ObjectPermission.WRITE,
     });
     if (!allowed) throw new Error("Composed media is not owned by this seller");
-    await storage.trySetObjectEntityAclPolicy(path, { owner: clerkId, visibility: "public" });
+    await storage.trySetObjectEntityAclPolicy(path, { owner: clerkId, visibility });
   }
+}
+
+export async function publishComposedMedia(
+  clerkId: string,
+  paths: Array<string | null | undefined>,
+): Promise<void> {
+  return setComposedMediaVisibility(clerkId, paths, "public");
 }
 
 router.post(
@@ -219,7 +227,31 @@ router.get("/media/*path", async (req, res) => {
   const suffix = Array.isArray(raw) ? raw.join("/") : String(raw ?? "");
   if (!suffix || suffix.includes("..")) return res.status(404).end();
   try {
-    const file = await storage.getObjectEntityFile(`/objects/${suffix}`);
+    const objectPath = `/objects/${suffix}`;
+    const mediaSuffix = `%/api/posts/media/${suffix}`;
+    const [linkedPost] = await db
+      .select({
+        userId: posts.userId,
+        postStatus: posts.postStatus,
+        scheduledAt: posts.scheduledAt,
+        visibility: posts.visibility,
+      })
+      .from(posts)
+      .where(or(
+        sql`${posts.mediaUrl} LIKE ${mediaSuffix}`,
+        sql`${posts.thumbnailUrl} LIKE ${mediaSuffix}`,
+      ))
+      .limit(1);
+    const due = linkedPost?.postStatus === "scheduled" &&
+      !!linkedPost.scheduledAt &&
+      linkedPost.scheduledAt.getTime() <= Date.now();
+    const publiclyVisible = linkedPost?.visibility?.isPublic !== false &&
+      (linkedPost?.postStatus === "published" || due);
+    if (!linkedPost || !publiclyVisible) return res.status(404).end();
+
+    // Promote a due scheduled object only at its first eligible public read.
+    await publishComposedMedia(linkedPost.userId, [objectPath]);
+    const file = await storage.getObjectEntityFile(objectPath);
     const allowed = await storage.canAccessObjectEntity({
       objectFile: file, requestedPermission: ObjectPermission.READ,
     });

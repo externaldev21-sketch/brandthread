@@ -381,6 +381,7 @@ export interface LocalUserProfile {
   username: string | null;
   accountType: 'buyer' | 'seller' | null;
   brandName: string | null;
+  onboardingComplete: boolean;
 }
 
 export interface ShopifyImportJob {
@@ -452,10 +453,12 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       /** Create the matching local user record after Clerk authentication.
        * During onboarding, pass the name that the person explicitly entered so
        * it wins over incomplete OAuth provider profile data. */
-      sync:        (body: { name?: string; accountType?: 'buyer' | 'seller' } = {}) =>
+      sync:        (body: { name?: string } = {}) =>
         post<LocalUserProfile>('/api/auth/sync', body),
       me:          ()             => get<LocalUserProfile>('/api/auth/me'),
       onboarding:  (body: unknown) => patch('/api/auth/onboarding', body),
+      completeOnboarding: (accountType: 'buyer' | 'seller') =>
+        post<LocalUserProfile>('/api/auth/onboarding/complete', { accountType }),
       /** Check whether a username handle is available for the current user.
        *  Returns { available: true } if free (or already owned by this user),
        *  { available: false, error: string } if taken or invalid format. */

@@ -22,8 +22,10 @@ describe("post video publication contract", () => {
     expect(videoRoute).toContain("storage.canAccessObjectEntity");
     expect(videoRoute).toContain("requestedPermission: ObjectPermission.READ");
     expect(videoRoute).toContain("requestedPermission: ObjectPermission.WRITE");
-    expect(videoRoute).toContain('visibility: "public"');
-    expect(postsRoute).toContain("publishComposedMedia(clerkId, [mediaPath, thumbnailPath])");
+    expect(videoRoute).toContain("setComposedMediaVisibility");
+    expect(postsRoute).toContain("setComposedMediaVisibility(");
+    expect(postsRoute).toContain('nextMediaPaths, "private"');
+    expect(postsRoute).toContain('nextMediaPaths, "public"');
     expect(postsRoute).toContain("composedMediaUrl(req, mediaPath)");
     expect(postsRoute).toContain("composedMediaUrl(req, thumbnailPath)");
   });

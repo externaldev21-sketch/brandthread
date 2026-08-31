@@ -10,7 +10,7 @@ describe("seller onboarding identity handoff", () => {
     expect(finishSeller).toBeGreaterThan(-1);
 
     const sync = source.indexOf(
-      "const profile = await api.auth.sync({ name, accountType: 'seller' });",
+      "const profile = await api.auth.sync({ name });",
       finishSeller,
     );
     const brandWrite = source.indexOf("await api.auth.onboarding({", finishSeller);
@@ -20,5 +20,10 @@ describe("seller onboarding identity handoff", () => {
     expect(source.slice(brandWrite, brandWrite + 260)).toContain(
       "brandName: brandName.trim()",
     );
+    const complete = source.indexOf(
+      "await api.auth.completeOnboarding('seller');",
+      brandWrite,
+    );
+    expect(complete).toBeGreaterThan(brandWrite);
   });
 });

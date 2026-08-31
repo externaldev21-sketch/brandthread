@@ -45,6 +45,13 @@ import { SellerPlanRecommendationStep } from '@/components/onboarding/SellerPlan
 import { recommendSellerPlan } from '@/lib/sellerPlans';
 import type { SellerPlanId } from '@/lib/sellerBilling';
 import { registerGrantedPushToken } from '@/lib/contextualPushPermission';
+import {
+  APPLE_OAUTH_STRATEGY,
+  isOAuthCancellationError,
+  isOAuthFlowComplete,
+  makeBrandthreadRedirectUri,
+  mapOAuthError,
+} from '@/lib/oauthFlow';
 
 // ─── Palette ────────────────────────────────────────────────────────────────
 const BG      = '#07070F';
@@ -738,10 +745,14 @@ function AuthStep({
       if (result?.createdSessionId && result?.setActive) {
         await result.setActive({ session: result.createdSessionId });
       }
-      onAuthComplete();
+      if (isOAuthFlowComplete(result)) {
+        onAuthComplete();
+      } else if (result?.signUp) {
+        setError(`${provider} sign-in needs one more step. Please try again.`);
+      }
     } catch (e: any) {
-      if (e?.message?.includes('cancel') || e?.message?.includes('dismiss')) { setOAuth(''); return; }
-      setError(`${provider} sign-in failed. Please try again.`);
+      if (isOAuthCancellationError(e)) { setOAuth(''); return; }
+      setError(mapOAuthError(provider, e));
     } finally {
       setOAuth('');
     }
@@ -1075,8 +1086,8 @@ export default function OnboardingScreen() {
   const { user, isLoaded: userLoaded }                = useUser();
   const { signUp }              = useSignUp();
   const { startSSOFlow } = useSSO();
-  const startGoogleOAuth = useCallback(() => startSSOFlow({ strategy: 'oauth_google', redirectUrl: AuthSession.makeRedirectUri({ scheme: 'brandthread' }) }), [startSSOFlow]);
-  const startAppleOAuth  = useCallback(() => startSSOFlow({ strategy: 'oauth_apple',  redirectUrl: AuthSession.makeRedirectUri({ scheme: 'brandthread' }) }), [startSSOFlow]);
+  const startGoogleOAuth = useCallback(() => startSSOFlow({ strategy: 'oauth_google', redirectUrl: makeBrandthreadRedirectUri(AuthSession.makeRedirectUri) }), [startSSOFlow]);
+  const startAppleOAuth  = useCallback(() => startSSOFlow({ strategy: APPLE_OAUTH_STRATEGY, redirectUrl: makeBrandthreadRedirectUri(AuthSession.makeRedirectUri) }), [startSSOFlow]);
   const api = useApi();
 
   const router  = useRouter();
@@ -1259,7 +1270,7 @@ export default function OnboardingScreen() {
     try {
       const name = firstName.trim();
       const uname = username.trim().toLowerCase();
-      const profile = await api.auth.sync({ name, accountType: 'buyer' });
+      const profile = await api.auth.sync({ name });
       const updated = await api.auth.updateProfile({
         name,
         displayName: name,
@@ -1282,6 +1293,14 @@ export default function OnboardingScreen() {
           // Referral attribution is optional and must not strand account setup.
         });
       }
+      // Style interests improve recommendations but are not required identity
+      // data, so a temporary failure must not strand account creation.
+      if (styleInterests.length > 0) {
+        await api.seller.saveOnboardingData({ styleInterests }).catch(() => {});
+      }
+      // Commit completion only after every required server/profile write above
+      // succeeds. AuthGate can then safely restore this role on another device.
+      await api.auth.completeOnboarding('buyer');
       await AsyncStorage.multiSet([
         [ONBOARDING_KEY, 'true'],
         [ONBOARDING_OWNER_KEY, profile.clerkId],
@@ -1293,10 +1312,6 @@ export default function OnboardingScreen() {
       // Preserve registration for people who granted access in a prior install
       // or device setting without showing a prompt during onboarding.
       void registerGrantedPushToken(profile.clerkId, api);
-      // Style interest preferences — non-critical for buyer
-      if (styleInterests.length > 0) {
-        api.seller.saveOnboardingData({ styleInterests }).catch(() => {});
-      }
       router.replace('/(buyer)/' as never);
     } catch {
       setFinishing(false);
@@ -1314,7 +1329,7 @@ export default function OnboardingScreen() {
     try {
       const name = firstName.trim();
       const uname = username.trim().toLowerCase();
-      const profile = await api.auth.sync({ name, accountType: 'seller' });
+      const profile = await api.auth.sync({ name });
       // This is the actual seller profile write. The previous flow only
       // stored these answers locally and called the optional questionnaire API.
       await api.auth.onboarding({
@@ -1336,6 +1351,9 @@ export default function OnboardingScreen() {
       if (goals.length > 0 || brandStage) {
         await api.seller.saveOnboardingData({ goals, brandStage });
       }
+      // Seller brand/profile writes are now complete; make completion the final
+      // durable server transition before writing device-local routing state.
+      await api.auth.completeOnboarding('seller');
       await AsyncStorage.multiSet([
         [ONBOARDING_KEY, 'true'],
         [ONBOARDING_OWNER_KEY, profile.clerkId],

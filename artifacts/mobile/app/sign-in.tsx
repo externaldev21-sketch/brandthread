@@ -19,6 +19,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import {
+  APPLE_OAUTH_STRATEGY,
+  isOAuthCancellationError,
+  makeBrandthreadRedirectUri,
+  mapOAuthError,
+} from '@/lib/oauthFlow';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -107,7 +113,7 @@ export default function SignInScreen() {
     try {
       const result = await startSSOFlow({
         strategy,
-        redirectUrl: AuthSession.makeRedirectUri({ scheme: 'brandthread' }),
+        redirectUrl: makeBrandthreadRedirectUri(AuthSession.makeRedirectUri),
       });
       const { createdSessionId, setActive, signIn: ssoSignIn, signUp: ssoSignUp } = result as any;
 
@@ -122,10 +128,10 @@ export default function SignInScreen() {
       }
       // If user cancelled (result with no session) we fall through silently
     } catch (e: any) {
-      if (e?.message?.includes('cancel') || e?.message?.includes('dismiss')) {
+      if (isOAuthCancellationError(e)) {
         setOAuth(''); return;
       }
-      setError(`${provider} sign-in failed. Please try again.`);
+      setError(mapOAuthError(provider, e));
     } finally {
       setOAuth('');
     }

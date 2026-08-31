@@ -54,6 +54,7 @@ import authRouter from "./auth";
 const suffix = crypto.randomBytes(4).toString("hex");
 const buyerId = `signup-identity-buyer-${suffix}`;
 const sellerId = `signup-identity-seller-${suffix}`;
+const incompleteSellerId = `signup-identity-incomplete-${suffix}`;
 
 let server: Server;
 let baseUrl = "";
@@ -100,6 +101,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await db.delete(users).where(eq(users.clerkId, buyerId));
   await db.delete(users).where(eq(users.clerkId, sellerId));
+  await db.delete(users).where(eq(users.clerkId, incompleteSellerId));
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
@@ -107,7 +109,6 @@ describe("signup identity synchronization", () => {
   it("uses the onboarding name and buyer role on a first-time local sync", async () => {
     const result = await request(buyerId, "POST", "/api/auth/sync", {
       name: "  Avery   Stone ",
-      accountType: "buyer",
     });
 
     expect(result.status).toBe(201);
@@ -115,7 +116,8 @@ describe("signup identity synchronization", () => {
       clerkId: buyerId,
       name: "Avery Stone",
       displayName: "Avery Stone",
-      accountType: "buyer",
+      accountType: null,
+      onboardingComplete: false,
     });
     expect(result.body.name).not.toBe("OAuth Fallback");
 
@@ -128,8 +130,24 @@ describe("signup identity synchronization", () => {
       clerkId: buyerId,
       name: "Avery Stone",
       displayName: "Avery Stone",
+      accountType: null,
+    });
+
+    const profile = await request(buyerId, "PATCH", "/api/auth/profile", {
+      name: "Avery Stone",
+      displayName: "Avery Stone",
+      username: `avery_${suffix}`,
       accountType: "buyer",
     });
+    expect(profile.status).toBe(200);
+    const completed = await request(
+      buyerId,
+      "POST",
+      "/api/auth/onboarding/complete",
+      { accountType: "buyer" },
+    );
+    expect(completed.status).toBe(200);
+    expect(completed.body.onboardingComplete).toBe(true);
   });
 
   it("requires the local seller user before saving the onboarding brand name", async () => {
@@ -144,13 +162,12 @@ describe("signup identity synchronization", () => {
 
     const sync = await request(sellerId, "POST", "/api/auth/sync", {
       name: "Mila Chen",
-      accountType: "seller",
     });
     expect(sync.status).toBe(201);
     expect(sync.body).toMatchObject({
       clerkId: sellerId,
       name: "Mila Chen",
-      accountType: "seller",
+      accountType: null,
     });
 
     const onboarding = await request(sellerId, "PATCH", "/api/auth/onboarding", {
@@ -161,10 +178,70 @@ describe("signup identity synchronization", () => {
     expect(onboarding.body).toMatchObject({
       clerkId: sellerId,
       name: "Mila Chen",
-      accountType: "seller",
+      accountType: null,
       brandName: "Night Shift Studio",
       brandStage: "idea",
+      onboardingComplete: false,
+    });
+    const profile = await request(sellerId, "PATCH", "/api/auth/profile", {
+      name: "Mila Chen",
+      displayName: "Mila Chen",
+      username: `mila_${suffix}`,
+      accountType: "seller",
+    });
+    expect(profile.status).toBe(200);
+
+    const completed = await request(
+      sellerId,
+      "POST",
+      "/api/auth/onboarding/complete",
+      { accountType: "seller" },
+    );
+    expect(completed.status).toBe(200);
+    expect(completed.body).toMatchObject({
+      clerkId: sellerId,
+      accountType: "seller",
       onboardingComplete: true,
     });
+  });
+
+  it("rejects skipped setup, missing seller fields, and completed-account role changes", async () => {
+    const sync = await request(incompleteSellerId, "POST", "/api/auth/sync", {
+      name: "Incomplete Seller",
+    });
+    expect(sync.status).toBe(201);
+
+    const direct = await request(
+      incompleteSellerId,
+      "POST",
+      "/api/auth/onboarding/complete",
+      { accountType: "seller" },
+    );
+    expect(direct.status).toBe(409);
+    expect(direct.body.code).toBe("ONBOARDING_ROLE_MISMATCH");
+
+    const profile = await request(incompleteSellerId, "PATCH", "/api/auth/profile", {
+      displayName: "Incomplete Seller",
+      username: `incomplete_${suffix}`,
+      accountType: "seller",
+    });
+    expect(profile.status).toBe(200);
+    const missingBrand = await request(
+      incompleteSellerId,
+      "POST",
+      "/api/auth/onboarding/complete",
+      { accountType: "seller" },
+    );
+    expect(missingBrand.status).toBe(409);
+    expect(missingBrand.body.code).toBe("ONBOARDING_PROFILE_INCOMPLETE");
+
+    const roleChange = await request(
+      sellerId,
+      "POST",
+      "/api/auth/onboarding/complete",
+      { accountType: "buyer" },
+    );
+    expect(roleChange.status).toBe(409);
+    expect(roleChange.body.code).toBe("ONBOARDING_ALREADY_COMPLETE");
   });
 });

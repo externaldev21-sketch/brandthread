@@ -15,7 +15,10 @@ import {
 import { eq, and, inArray, count, sql, desc, lte, lt, gte, or } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
-import postVideoRouter, { mediaUrl as composedMediaUrl, publishComposedMedia } from "./post-video";
+import postVideoRouter, {
+  mediaUrl as composedMediaUrl,
+  setComposedMediaVisibility,
+} from "./post-video";
 
 const router = Router();
 
@@ -39,6 +42,28 @@ function parseScheduledAt(value: unknown): Date | null | undefined {
   if (typeof value !== "string") return undefined;
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+}
+
+function composedMediaPath(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const pathname = new URL(value, "https://brandthread.invalid").pathname;
+    const marker = "/api/posts/media/";
+    const index = pathname.indexOf(marker);
+    if (index < 0) return null;
+    const suffix = decodeURIComponent(pathname.slice(index + marker.length));
+    if (!suffix || suffix.includes("..")) return null;
+    return `/objects/${suffix.replace(/^\/+/, "")}`;
+  } catch {
+    return null;
+  }
+}
+
+function composedMediaPaths(post: Pick<typeof posts.$inferSelect, "mediaUrl" | "thumbnailUrl">) {
+  return [
+    composedMediaPath(post.mediaUrl),
+    composedMediaPath(post.thumbnailUrl),
+  ];
 }
 
 async function sellerExists(clerkId: string): Promise<boolean> {
@@ -389,6 +414,12 @@ router.post("/", requireAuth, async (req, res) => {
 
   const mediaUrl = mediaPath ? composedMediaUrl(req, mediaPath) : (requestedMediaUrl ?? "");
   const thumbnailUrl = thumbnailPath ? composedMediaUrl(req, thumbnailPath) : requestedThumbnailUrl;
+  const resolvedVisibility = visibility ?? {
+    isPublic: true,
+    allowComments: true,
+    allowReposts: true,
+    showLikeCount: true,
+  };
   const [post] = await db.insert(posts).values({
     userId:    clerkId,
     mediaUrl,
@@ -400,12 +431,7 @@ router.post("/", requireAuth, async (req, res) => {
     hashtags: hashtags ?? [],
     styleTags: styleTags ?? [],
     sound: sound ?? null,
-    visibility: visibility ?? {
-      isPublic: true,
-      allowComments: true,
-      allowReposts: true,
-      showLikeCount: true,
-    },
+    visibility: resolvedVisibility,
     postStatus,
     scheduledAt: postStatus === "scheduled" ? parsedScheduledAt : null,
     publishedAt: postStatus === "published" ? now : null,
@@ -414,7 +440,13 @@ router.post("/", requireAuth, async (req, res) => {
 
   if (mediaPath || thumbnailPath) {
     try {
-      await publishComposedMedia(clerkId, [mediaPath, thumbnailPath]);
+      await setComposedMediaVisibility(
+        clerkId,
+        [mediaPath, thumbnailPath],
+        postStatus === "published" && resolvedVisibility.isPublic !== false
+          ? "public"
+          : "private",
+      );
     } catch (err) {
       await db.delete(posts).where(eq(posts.id, post.id)).catch(() => {});
       req.log.error({ err, clerkId, postId: post.id }, "Could not publish composed post media");
@@ -582,6 +614,11 @@ router.patch("/:id", requireAuth, async (req, res) => {
   updates.scheduledAt = nextStatus === "scheduled" ? scheduled : null;
   updates.publishedAt = nextStatus === "published" ? (existing.publishedAt ?? now) : existing.publishedAt;
   updates.updatedAt = now;
+  const nextVisibility = (updates.visibility ?? existing.visibility) as typeof posts.$inferInsert.visibility;
+  const nextMediaPaths = composedMediaPaths({
+    mediaUrl: (updates.mediaUrl as string | undefined) ?? existing.mediaUrl,
+    thumbnailUrl: (updates.thumbnailUrl as string | null | undefined) ?? existing.thumbnailUrl,
+  });
 
   const taggedProductIds = body.taggedProductIds;
   if (taggedProductIds !== undefined && (
@@ -591,6 +628,12 @@ router.patch("/:id", requireAuth, async (req, res) => {
   }
 
   try {
+    // Demote before the database transition; promote only after it. This keeps
+    // failures closed rather than exposing unpublished composed objects.
+    const shouldBePublic = nextStatus === "published" && nextVisibility?.isPublic !== false;
+    if (!shouldBePublic) {
+      await setComposedMediaVisibility(clerkId, nextMediaPaths, "private");
+    }
     const updated = await db.transaction(async (tx) => {
       const [post] = await tx.update(posts).set(updates).where(eq(posts.id, id)).returning();
       if (taggedProductIds !== undefined) {
@@ -608,6 +651,9 @@ router.patch("/:id", requireAuth, async (req, res) => {
       }
       return post;
     });
+    if (shouldBePublic) {
+      await setComposedMediaVisibility(clerkId, nextMediaPaths, "public");
+    }
     return res.json((await postDetails([updated]))[0]);
   } catch (err) {
     req.log.error({ err, clerkId, postId: id }, "Failed to update seller post");
