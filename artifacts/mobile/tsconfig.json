@@ -5,13 +5,13 @@
     "moduleSuffixes": [".native", ""],
     "strict": true,
     "paths": {
-      "react": [
-        "./node_modules/@types/react"
-      ],
       "@/*": [
         "./*"
       ]
-    }
+    },
+    "typeRoots": [
+      "./node_modules/@types"
+    ]
   },
   "include": [
     "**/*.ts",
