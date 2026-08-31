@@ -74,3 +74,4 @@
 - [Buyer cancellation boundary](buyer-cancellation-boundary.md) — the 60-minute buyer cancellation is a locked terminal transition that must beat fulfillment, refund idempotently, and restore reserved stock once.
 - [Runtime infrastructure controls](runtime-infrastructure-controls.md) — current clients use API v1; legacy /api remains compatible, flags fail open to safe defaults, and offline caches are account-scoped.
 - [Trust and recovery boundaries](trust-recovery-boundaries.md) — product deletion has a five-minute server recovery window; IP status uses hashed capabilities; verified status is always derived.
+- [Expo platform modules in Vitest](expo-platform-modules-vitest.md) — Vitest does not resolve suffix-only Expo modules; renderer-tested imports need a neutral fallback.

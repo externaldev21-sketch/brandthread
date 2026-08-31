@@ -368,6 +368,7 @@ export default function SubscriptionScreen() {
         {(['plan', 'usage', 'billing'] as const).map((t) => (
           <TouchableOpacity
             key={t}
+            testID={`seller-subscription-tab-${t}`}
             style={[styles.tab, activeTab === t && styles.tabActive]}
             onPress={() => { haptic(); setActiveTab(t); }}
           >
@@ -466,6 +467,7 @@ export default function SubscriptionScreen() {
                   </View>
                    {!isReadOnly && !isCurrent && (
                     <TouchableOpacity
+                      testID={`seller-subscription-change-${plan.id}`}
                       style={[styles.changePlanBtn, plan.id === 'starter' && styles.changePlanBtnOutline]}
                       onPress={() => handleChangePlan(plan.id)}
                     >
@@ -548,7 +550,7 @@ export default function SubscriptionScreen() {
             </View>
 
              {!isReadOnly && (
-               <TouchableOpacity style={styles.cancelBtn} onPress={handleOpenPortal}>
+                <TouchableOpacity testID="seller-subscription-cancel" style={styles.cancelBtn} onPress={handleOpenPortal}>
                   <Text style={styles.cancelText}>{Platform.OS === 'web' ? 'Manage or cancel subscription' : 'Manage subscription'}</Text>
                </TouchableOpacity>
              )}
@@ -640,7 +642,7 @@ export default function SubscriptionScreen() {
                 </View>
 
                  {!isReadOnly && (
-                   <TouchableOpacity style={styles.manageBillingBtn} onPress={handleOpenPortal}>
+                    <TouchableOpacity testID="seller-subscription-manage-billing" style={styles.manageBillingBtn} onPress={handleOpenPortal}>
                      <Feather name="external-link" size={16} color={PURPLE} />
                       <Text style={styles.manageBillingText}>{Platform.OS === 'web' ? 'Manage billing & invoices' : 'Manage subscription'}</Text>
                      <Feather name="chevron-right" size={16} color={MUTED} />

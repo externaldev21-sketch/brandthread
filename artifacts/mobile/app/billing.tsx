@@ -139,7 +139,7 @@ export default function BillingScreen() {
       <ScreenHeader
         title="Billing"
         rightElement={!isReadOnly ? (
-          <TouchableOpacity onPress={() => router.push('/plan-details' as never)} activeOpacity={0.7} style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <TouchableOpacity testID="seller-billing-plan-menu" onPress={() => router.push('/plan-details' as never)} activeOpacity={0.7} style={[styles.headerBtn, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name="more-horizontal" size={17} color={colors.foreground} />
           </TouchableOpacity>
         ) : undefined}
@@ -165,7 +165,7 @@ export default function BillingScreen() {
           <View style={styles.rowBetween}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Upcoming bill</Text>
             {!isReadOnly && (
-              <TouchableOpacity onPress={() => router.push('/plan-details' as never)} activeOpacity={0.7}>
+              <TouchableOpacity testID="seller-billing-view-bill" onPress={() => router.push('/plan-details' as never)} activeOpacity={0.7}>
                 <Text style={[styles.linkText, { color: colors.foreground }]}>View bill</Text>
               </TouchableOpacity>
             )}
@@ -190,7 +190,7 @@ export default function BillingScreen() {
             <View style={{ flex: 1 }}>
               <Text style={[styles.infoText, { color: colors.foreground }]}>$20.00 in discounts may apply to relevant charges on your next bill.</Text>
               {!isReadOnly && (
-                <TouchableOpacity onPress={() => router.push('/plan-details' as never)} activeOpacity={0.7}>
+                <TouchableOpacity testID="seller-billing-view-breakdown" onPress={() => router.push('/plan-details' as never)} activeOpacity={0.7}>
                   <Text style={[styles.infoLink, { color: colors.primary }]}>View breakdown</Text>
                 </TouchableOpacity>
               )}
@@ -205,7 +205,7 @@ export default function BillingScreen() {
               <Text style={[styles.cardText, { color: colors.foreground }]}>{billingStatus.paymentMethodLabel ?? 'No payment method on file'}</Text>
             </View>
           ) : (
-            <TouchableOpacity onPress={() => openBillingPortal()} activeOpacity={0.7} style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TouchableOpacity testID="seller-billing-payment-method" onPress={() => openBillingPortal()} activeOpacity={0.7} style={[styles.cardRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={styles.cardBrand}>
                 <Feather name="credit-card" size={18} color="#FFFFFF" />
               </View>

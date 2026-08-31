@@ -219,6 +219,7 @@ export default function PayoutsScreen() {
         {(['payouts', 'settings'] as const).map((t) => (
           <TouchableOpacity
             key={t}
+            testID={`seller-payouts-tab-${t}`}
             style={[styles.tab, activeTab === t && styles.tabActive]}
             onPress={() => { haptic(); setActiveTab(t); }}
           >
@@ -315,6 +316,7 @@ export default function PayoutsScreen() {
 
            {!isReadOnly && (
              <TouchableOpacity
+                testID="seller-payouts-bank-account"
                style={styles.addBankBtn}
                onPress={() => { haptic(); void openConnectOnboarding(); }}
                disabled={isConnecting}

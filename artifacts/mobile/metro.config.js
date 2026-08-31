@@ -8,6 +8,7 @@ const config = getDefaultConfig(__dirname);
 // a fatal ENOENT crash in Metro's FallbackWatcher.
 config.resolver.blockList = [
   /node_modules\/.*_tmp_.*/,
+  /.*\.test\.[jt]sx?$/,
 ];
 
 // Alias react-native-agora → a no-op shim on web.
