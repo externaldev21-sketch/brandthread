@@ -83,3 +83,4 @@
 - [Verified post analytics](verified-post-analytics.md) — optional post metrics expose tracked/null explicitly; never infer views, retention, or conversion rates from unrelated activity.
 - [Payment API security boundaries](payment-api-security-boundaries.md) — entitlement failures deny access; distributed limits fail closed; Stripe dispatch uses retryable, heartbeat-fenced event claims.
 - [Thread pagination boundary](thread-feed-pagination.md) — independently paginated followed/public sources need separate raw cursors, cross-source seen IDs, and refresh generations.
+- [Tax reporting boundaries](tax-reporting-boundaries.md) — annual gross uses successful-payment UTC year; preserve Stripe tax, gross, and final destination without inferring compliance.

@@ -26,6 +26,7 @@ import {
 import { publishNotification } from "./notifications-feed";
 import { sendPushToUser } from "../lib/push";
 import { connectReadiness } from "./manufacturer-connect";
+import { recordPaidPhysicalOrder } from "../lib/sellerTaxLedger";
 import {
   claimStripeWebhookEvent,
   completeStripeWebhookEvent,
@@ -183,14 +184,14 @@ router.post("/stripe", async (req: Request, res: Response) => {
       // Synchronous payment (cards, wallets) — already captured at session completion
       case "checkout.session.completed":
         if (event.data.object.payment_status === "paid") {
-          await handleCheckoutPaid(event.data.object, event.id);
+          await handleCheckoutPaid(event.data.object, event.id, new Date(event.created * 1000));
         }
         // payment_status === 'unpaid' means async method chosen → wait for below
         break;
 
       // Delayed payment method (ACH bank debit, etc.) captured successfully
       case "checkout.session.async_payment_succeeded":
-        await handleCheckoutPaid(event.data.object, event.id);
+        await handleCheckoutPaid(event.data.object, event.id, new Date(event.created * 1000));
         break;
 
       // Delayed payment failed — release any unused rewards reservation.
@@ -395,7 +396,11 @@ async function releaseCheckoutLoyaltyRedemption(session: any) {
  * The unique index on stripe_checkout_session_id plus the early-exit guard
  * ensure at-most-once order creation even on webhook retries.
  */
-export async function handleCheckoutPaid(session: any, providerEventId?: string) {
+export async function handleCheckoutPaid(
+  session: any,
+  providerEventId?: string,
+  successfulPaymentAt: Date = new Date(),
+) {
   const sessionId: string   = session.id;
   const piId:      string | null = session.payment_intent ?? null;
   const metadata:  Record<string, string> = session.metadata ?? {};
@@ -426,13 +431,22 @@ export async function handleCheckoutPaid(session: any, providerEventId?: string)
     .select({
       id: orders.id,
       buyerId: orders.buyerId,
+      ownerId: orders.ownerId,
       totalCents: orders.totalCents,
+      grossChargedCents: orders.grossChargedCents,
+      taxCents: orders.taxCents,
+      shippingCents: orders.shippingCents,
+      stripePaymentIntentId: orders.stripePaymentIntentId,
+      stripeCheckoutSessionId: orders.stripeCheckoutSessionId,
+      paidAt: orders.paidAt,
+      createdAt: orders.createdAt,
       status: orders.status,
     })
     .from(orders)
     .where(eq(orders.stripeCheckoutSessionId, sessionId))
     .limit(1);
   if (existing) {
+    await recordPaidPhysicalOrder(existing);
     await awardPurchasePoints(existing);
     try {
       await sendOrderConfirmationForOrder(existing.id);
@@ -505,17 +519,36 @@ export async function handleCheckoutPaid(session: any, providerEventId?: string)
   // Use Stripe's authoritative charged total; fall back to computed subtotal if absent.
   // This ensures the stored order total always matches the amount Stripe captured.
   const totalCents    = typeof session.amount_total === "number" ? session.amount_total : subtotalCents;
+  const totalDetails = session.total_details ?? {};
+  const loyaltyDiscountCents = Math.max(0, csRecord.loyaltyDiscountCents ?? 0);
+  const taxCents = Number.isInteger(totalDetails.amount_tax)
+    ? Math.max(0, totalDetails.amount_tax)
+    : 0;
+  const stripeDiscountCents = Number.isInteger(totalDetails.amount_discount)
+    ? Math.max(0, totalDetails.amount_discount)
+    : loyaltyDiscountCents;
   // Derive shipping from the pre-discount total. A loyalty discount otherwise
   // makes shipping look like zero (or negative) in the persisted order.
-  const loyaltyDiscountCents = Math.max(0, csRecord.loyaltyDiscountCents ?? 0);
-  const shippingCents = Math.max(0, totalCents + loyaltyDiscountCents - subtotalCents);
+  const shippingCents = Number.isInteger(totalDetails.amount_shipping)
+    ? Math.max(0, totalDetails.amount_shipping)
+    : Math.max(0, totalCents + stripeDiscountCents - subtotalCents - taxCents);
 
-  // Prefer the buyer-provided address stored in the server-side checkout record
-  // (captured before Stripe was opened, so it always has the address).
-  // Fall back to session.shipping_details if the csRecord address is missing
-  // (e.g. older sessions or sessions created with shipping_address_collection).
+  // Stripe's final Checkout destination is authoritative because it is the
+  // address used for automatic tax. Fall back to the pre-Checkout snapshot
+  // only for legacy sessions where Stripe did not return shipping details.
   let shippingAddress: { name?: string; street: string; line2?: string | null; city: string; state: string; zip: string; country: string } | undefined;
-  if (csRecord.shippingAddress && (csRecord.shippingAddress as any).street) {
+  const shipDetails = session.shipping_details;
+  if (shipDetails?.address) {
+    shippingAddress = {
+      name:    shipDetails.name ?? undefined,
+      street:  shipDetails.address.line1 ?? "",
+      line2:   shipDetails.address.line2 ?? null,
+      city:    shipDetails.address.city ?? "",
+      state:   shipDetails.address.state ?? "",
+      zip:     shipDetails.address.postal_code ?? "",
+      country: shipDetails.address.country ?? "US",
+    };
+  } else if (csRecord.shippingAddress && (csRecord.shippingAddress as any).street) {
     const sa = csRecord.shippingAddress as any;
     shippingAddress = {
       name:    sa.name    ?? undefined,
@@ -526,19 +559,6 @@ export async function handleCheckoutPaid(session: any, providerEventId?: string)
       zip:     sa.zip,
       country: sa.country ?? "US",
     };
-  } else {
-    const shipDetails = session.shipping_details;
-    if (shipDetails?.address) {
-      shippingAddress = {
-        name:    shipDetails.name ?? undefined,
-        street:  shipDetails.address.line1 ?? "",
-        line2:   shipDetails.address.line2 ?? null,
-        city:    shipDetails.address.city ?? "",
-        state:   shipDetails.address.state ?? "",
-        zip:     shipDetails.address.postal_code ?? "",
-        country: shipDetails.address.country ?? "US",
-      };
-    }
   }
 
   // ── All-or-nothing stock reservation inside transaction ───────────────────
@@ -587,6 +607,10 @@ export async function handleCheckoutPaid(session: any, providerEventId?: string)
         totalCents,
         subtotalCents,
         shippingCents,
+        taxCents,
+        grossChargedCents: totalCents,
+        paidAt: successfulPaymentAt,
+        discountAmountCents: stripeDiscountCents,
         stripePaymentIntentId:   piId,
         stripeCheckoutSessionId: sessionId,
         ...(shippingAddress && { shippingAddress }),
@@ -594,6 +618,19 @@ export async function handleCheckoutPaid(session: any, providerEventId?: string)
       })
       .returning();
     createdOrderId = order.id;
+
+    await recordPaidPhysicalOrder({
+      ...order,
+      ownerId,
+      totalCents,
+      grossChargedCents: totalCents,
+      taxCents,
+      shippingCents,
+      stripePaymentIntentId: piId,
+      stripeCheckoutSessionId: sessionId,
+      paidAt: successfulPaymentAt,
+      paidAtSource: "stripe_event",
+    }, tx);
 
     // A redemption is consumed only once a paid session has produced a valid
     // order. This transaction boundary means a webhook retry cannot spend the

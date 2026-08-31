@@ -463,6 +463,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         price_data: {
           currency: "usd",
           unit_amount: row.priceCents,
+          tax_behavior: "exclusive",
           product_data: {
             name: row.productName,
             ...(variantLabel && { description: variantLabel }),
@@ -525,13 +526,14 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
 
     // Validated shipping DTO (set once, used below)
     const validatedShipping = shippingAddress && typeof shippingAddress === "object"
-      && shippingAddress.street && shippingAddress.city && shippingAddress.state && shippingAddress.zip
+      && shippingAddress.street && shippingAddress.city && shippingAddress.state && shippingAddress.postalCode
       ? {
-          name:    shippingAddress.name ?? undefined,
+          name:    shippingAddress.recipientName,
           street:  shippingAddress.street,
+          line2:   shippingAddress.line2 ?? null,
           city:    shippingAddress.city,
           state:   shippingAddress.state,
-          zip:     shippingAddress.zip,
+          zip:     shippingAddress.postalCode,
           country: shippingAddress.country ?? "US",
         }
       : undefined;
@@ -652,6 +654,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
       stripe,
       buyerId,
       normalizedContactEmail || undefined,
+      validatedShipping,
     );
 
     // ── Compute platform application fee (5% of order subtotal) ──────────
@@ -675,6 +678,7 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         price_data: {
           currency: "usd",
           unit_amount: shippingCents,
+          tax_behavior: "exclusive",
           product_data: { name: configuredShippingRate?.name ?? "Shipping" },
         },
         quantity: 1,
@@ -807,7 +811,14 @@ router.post("/checkout/session", validateRequest({ body: checkoutBodySchema }), 
         // Stripe remains the final authority for tax. This replaces the old
         // client-side state-rate table and keeps the charged tax aligned with
         // the seller's Stripe Tax configuration.
-        automatic_tax: { enabled: true },
+        automatic_tax: {
+          enabled: true,
+          liability: { type: "account", account: seller.stripeAccountId },
+        },
+        shipping_address_collection: {
+          allowed_countries: [validatedShipping?.country ?? "US"],
+        },
+        customer_update: { shipping: "auto" },
         ...(loyaltyCouponId ? { discounts: [{ coupon: loyaltyCouponId }] } : {}),
         success_url: successUrl,
         cancel_url: cancelUrl,

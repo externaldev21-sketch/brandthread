@@ -153,6 +153,14 @@ describe("guest checkout", () => {
     expect(verified.body.amountTotal).toBe(2_500);
     expect(fakeStripe.creates[0].params.customer).toBeUndefined();
     expect(fakeStripe.creates[0].params.payment_intent_data.setup_future_usage).toBeUndefined();
+    expect(fakeStripe.creates[0].params.automatic_tax).toMatchObject({
+      enabled: true,
+      liability: { type: "account", account: `acct_guest_${suffix}` },
+    });
+    expect(fakeStripe.creates[0].params.shipping_address_collection).toEqual({
+      allowed_countries: ["US"],
+    });
+    expect(fakeStripe.creates[0].params.line_items[0].price_data.tax_behavior).toBe("exclusive");
   });
 
   it("rejects a soft-deleted product before creating a Stripe session", async () => {

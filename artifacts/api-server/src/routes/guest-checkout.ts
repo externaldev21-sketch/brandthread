@@ -126,7 +126,7 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
       sellerId = variant.sellerId;
       const variantLabel = [variant.size, variant.color].filter(Boolean).join(" / ");
       cartItems.push({ variantId: variant.variantId, productName: variant.productName, variantLabel, quantity, priceCents: variant.priceCents });
-      lineItems.push({ price_data: { currency: "usd", unit_amount: variant.priceCents, product_data: {
+      lineItems.push({ price_data: { currency: "usd", unit_amount: variant.priceCents, tax_behavior: "exclusive", product_data: {
         name: variant.productName, ...(variantLabel ? { description: variantLabel } : {}),
         ...(Array.isArray(variant.images) && variant.images[0] ? { images: [variant.images[0]] } : {}),
       } }, quantity });
@@ -161,7 +161,12 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
     const subtotalCents = cartItems.reduce((n, item) => n + item.priceCents * item.quantity, 0);
     const [rate] = await db.select().from(shippingRates).where(and(eq(shippingRates.sellerId, sellerId), eq(shippingRates.active, true))).limit(1);
     const shippingCents = !rate || (rate.freeAboveCents != null && subtotalCents >= rate.freeAboveCents) ? 0 : rate.flatRateCents;
-    if (shippingCents) lineItems.push({ price_data: { currency: "usd", unit_amount: shippingCents, product_data: { name: rate?.name ?? "Shipping" } }, quantity: 1 });
+    if (shippingCents) lineItems.push({ price_data: {
+      currency: "usd",
+      unit_amount: shippingCents,
+      tax_behavior: "exclusive",
+      product_data: { name: rate?.name ?? "Shipping" },
+    }, quantity: 1 });
     const checkoutIdValue = crypto.randomUUID();
     const accessToken = guestAccessToken(checkoutIdValue);
     let checkout: { id: string };
@@ -197,7 +202,14 @@ router.post("/session", validateRequest({ body: guestCheckoutSchema }), async (r
     const validDropId = typeof dropId === "string" && dropId.trim() ? dropId.trim() : undefined;
     stripeStarted = true;
     const session = await stripe.checkout.sessions.create({
-      mode: "payment", line_items: lineItems, automatic_tax: { enabled: true }, success_url: successUrl, cancel_url: cancelUrl,
+      mode: "payment",
+      line_items: lineItems,
+      automatic_tax: {
+        enabled: true,
+        liability: { type: "account", account: seller.stripeAccountId },
+      },
+      shipping_address_collection: { allowed_countries: [shippingAddressValue.country] },
+      success_url: successUrl, cancel_url: cancelUrl,
       customer_email: email,
       metadata: { csRef: checkout.id, guest: "true", ...(validDropId ? { dropId: validDropId } : {}) },
       payment_intent_data: {

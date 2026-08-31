@@ -12,6 +12,7 @@ import {
   orders,
   productVariants,
   products,
+  sellerTaxLedger,
   users,
 } from "@workspace/db";
 import {
@@ -170,7 +171,7 @@ type PaidCartFixture = {
   };
 };
 
-async function seedPaidCartFixture(options: { stock: number; totalCents: number }): Promise<PaidCartFixture> {
+async function seedPaidCartFixture(options: { stock: number; totalCents: number; guest?: boolean }): Promise<PaidCartFixture> {
   const buyerId = `loyalty-checkout-buyer-${crypto.randomUUID()}`;
   const sellerId = `loyalty-checkout-seller-${crypto.randomUUID()}`;
   const productName = "Paid checkout loyalty test product";
@@ -229,7 +230,8 @@ async function seedPaidCartFixture(options: { stock: number; totalCents: number 
     .insert(checkoutSessions)
     .values({
       stripeSessionId: sessionId,
-      buyerId,
+      buyerId: options.guest ? null : buyerId,
+      ...(options.guest ? { guestEmail: `${buyerId}@guest.test` } : {}),
       sellerId,
       items: [orderItem],
     })
@@ -241,6 +243,86 @@ async function seedPaidCartFixture(options: { stock: number; totalCents: number 
 }
 
 describe("paid cart checkout rewards", () => {
+  it("persists authoritative tax, shipping, gross charge, and one guest ledger row across retries and refunds", async () => {
+    const fixture = await seedPaidCartFixture({ stock: 2, totalCents: 10_000, guest: true });
+    const successfulPaymentAt = new Date("2025-01-01T00:00:02.000Z");
+    const session = {
+      id: fixture.sessionId,
+      payment_intent: "pi_tax_ledger_guest",
+      payment_status: "paid",
+      amount_total: 11_250,
+      total_details: {
+        amount_discount: 0,
+        amount_shipping: 500,
+        amount_tax: 750,
+      },
+      shipping_details: {
+        name: "Final Guest Destination",
+        address: {
+          line1: "900 Final Tax Avenue",
+          line2: "Suite 2",
+          city: "Vancouver",
+          state: "BC",
+          postal_code: "V6B 1A1",
+          country: "CA",
+        },
+      },
+      metadata: {},
+    };
+
+    await handleCheckoutPaid(session, "evt_tax_ledger_guest", successfulPaymentAt);
+    await handleCheckoutPaid(session, "evt_tax_ledger_guest_retry", successfulPaymentAt);
+
+    const [order] = await db
+      .select()
+      .from(orders)
+      .where(eq(orders.stripeCheckoutSessionId, fixture.sessionId))
+      .limit(1);
+    expect(order).toMatchObject({
+      buyerId: null,
+      subtotalCents: 10_000,
+      shippingCents: 500,
+      taxCents: 750,
+      totalCents: 11_250,
+      grossChargedCents: 11_250,
+      paidAt: successfulPaymentAt,
+      shippingAddress: {
+        name: "Final Guest Destination",
+        street: "900 Final Tax Avenue",
+        line2: "Suite 2",
+        city: "Vancouver",
+        state: "BC",
+        zip: "V6B 1A1",
+        country: "CA",
+      },
+    });
+
+    const ledgerRows = await db
+      .select()
+      .from(sellerTaxLedger)
+      .where(eq(sellerTaxLedger.orderId, order.id));
+    expect(ledgerRows).toHaveLength(1);
+    expect(ledgerRows[0]).toMatchObject({
+      sellerId: fixture.sellerId,
+      grossPaymentCents: 11_250,
+      taxCents: 750,
+      shippingCents: 500,
+      stripePaymentIntentId: "pi_tax_ledger_guest",
+      stripeCheckoutSessionId: fixture.sessionId,
+      calendarYear: 2025,
+      paidAt: successfulPaymentAt,
+      paidAtSource: "stripe_event",
+    });
+
+    await db.update(orders).set({ status: "cancelled" }).where(eq(orders.id, order.id));
+    const afterRefund = await db
+      .select()
+      .from(sellerTaxLedger)
+      .where(eq(sellerTaxLedger.orderId, order.id));
+    expect(afterRefund).toHaveLength(1);
+    expect(afterRefund[0]?.grossPaymentCents).toBe(11_250);
+  });
+
   it("awards floor(totalCents / 100) once through the paid Checkout Session handler", async () => {
     const fixture = await seedPaidCartFixture({ stock: 2, totalCents: 12_399 });
     const session = {

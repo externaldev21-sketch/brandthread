@@ -1541,11 +1541,20 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     /** Taxes & Duties — Stripe Tax integration */
     taxes: {
-      status:    () => get<any>('/api/taxes/status'),
+      status:    () => get<{
+        stripeTaxEnabled: boolean;
+        provider: string;
+        providerConfigured: boolean;
+        providerStatus: string;
+        automaticTaxAtCheckout: boolean;
+        complianceNote: string;
+        chargeShippingTax: boolean;
+        chargeVat: boolean;
+      }>('/api/taxes/status'),
       enable:    () => post<any>('/api/taxes/enable', {}),
       config:    (data: { collectDuties?: boolean; chargeShippingTax?: boolean; chargeVat?: boolean }) =>
         patch<any>('/api/taxes/config', data),
-      forms1099: () => get<any>('/api/taxes/1099'),
+      forms1099: (year?: number) => get<any>(`/api/taxes/1099${year ? `?year=${year}` : ''}`),
       calculate: (data: { lineItems: any[]; shippingAddress: any; currency?: string; shippingCents?: number }) =>
         post<any>('/api/taxes/calculate', data),
     },

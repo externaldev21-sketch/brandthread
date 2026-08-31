@@ -32,6 +32,15 @@ export async function ensureStripeCustomer(
   stripeClient: Pick<Stripe, "customers">,
   clerkUserId: string,
   preferredEmail?: string,
+  shippingAddress?: {
+    name?: string;
+    street: string;
+    line2?: string | null;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+  },
 ): Promise<string> {
   return db.transaction(async (tx) => {
     const [user] = await tx
@@ -49,9 +58,22 @@ export async function ensureStripeCustomer(
       throw Object.assign(new Error("User not found"), { status: 404 });
     }
     if (user.stripeCustomerId) {
-      if (preferredEmail) {
+      if (preferredEmail || shippingAddress) {
         await stripeClient.customers.update(user.stripeCustomerId, {
-          email: preferredEmail,
+          ...(preferredEmail ? { email: preferredEmail } : {}),
+          ...(shippingAddress ? {
+            shipping: {
+              name: shippingAddress.name ?? user.name,
+              address: {
+                line1: shippingAddress.street,
+                ...(shippingAddress.line2 ? { line2: shippingAddress.line2 } : {}),
+                city: shippingAddress.city,
+                state: shippingAddress.state,
+                postal_code: shippingAddress.zip,
+                country: shippingAddress.country,
+              },
+            },
+          } : {}),
         });
       }
       return user.stripeCustomerId;
@@ -61,6 +83,19 @@ export async function ensureStripeCustomer(
       email: preferredEmail ?? user.email,
       name: user.name,
       metadata: { clerkUserId },
+      ...(shippingAddress ? {
+        shipping: {
+          name: shippingAddress.name ?? user.name,
+          address: {
+            line1: shippingAddress.street,
+            ...(shippingAddress.line2 ? { line2: shippingAddress.line2 } : {}),
+            city: shippingAddress.city,
+            state: shippingAddress.state,
+            postal_code: shippingAddress.zip,
+            country: shippingAddress.country,
+          },
+        },
+      } : {}),
     });
 
     await tx

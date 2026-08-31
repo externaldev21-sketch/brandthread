@@ -248,6 +248,12 @@ export const orders = pgTable('orders', {
   totalCents: integer('total_cents').notNull(),
   subtotalCents: integer('subtotal_cents').notNull(),
   shippingCents: integer('shipping_cents').notNull().default(0),
+  // Stripe's authoritative tax result and the actual amount captured. Both
+  // remain explicit integer-cent values so tax is never inferred from
+  // shipping or a locally configured rate.
+  taxCents: integer('tax_cents').notNull().default(0),
+  grossChargedCents: integer('gross_charged_cents').notNull().default(0),
+  paidAt: timestamp('paid_at'),
   notes: text('notes'),
   shippingAddress: json('shipping_address').$type<{
     name?: string;
@@ -1085,6 +1091,28 @@ export const sellerTaxConfig = pgTable('seller_tax_config', {
   createdAt:           timestamp('created_at').defaultNow().notNull(),
   updatedAt:           timestamp('updated_at').defaultNow().notNull(),
 });
+
+// One immutable payment record per physical-goods order. A paid order remains
+// in this ledger even if it is later refunded; 1099-K preparation reports gross
+// payment volume rather than net-after-refund proceeds.
+export const sellerTaxLedger = pgTable('seller_tax_ledger', {
+  id:                     uuid('id').primaryKey().defaultRandom(),
+  sellerId:               text('seller_id').notNull(),
+  orderId:                uuid('order_id').notNull().references(() => orders.id, { onDelete: 'cascade' }).unique(),
+  calendarYear:           integer('calendar_year').notNull(),
+  grossPaymentCents:      integer('gross_payment_cents').notNull(),
+  taxCents:               integer('tax_cents').notNull().default(0),
+  shippingCents:          integer('shipping_cents').notNull().default(0),
+  currency:               text('currency').notNull().default('usd'),
+  stripePaymentIntentId:  text('stripe_payment_intent_id'),
+  stripeCheckoutSessionId: text('stripe_checkout_session_id'),
+  paidAt:                 timestamp('paid_at').notNull(),
+  paidAtSource:           text('paid_at_source').notNull().default('stripe_event'),
+  createdAt:              timestamp('created_at').defaultNow().notNull(),
+}, (table) => ({
+  sellerYearIdx: index('seller_tax_ledger_seller_year_idx').on(table.sellerId, table.calendarYear),
+  checkoutIdx: index('seller_tax_ledger_checkout_idx').on(table.stripeCheckoutSessionId),
+}));
 
 export const shopifyImportCollections = pgTable('shopify_import_collections', {
   id:                 uuid('id').primaryKey().defaultRandom(),

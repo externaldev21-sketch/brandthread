@@ -221,7 +221,17 @@ afterAll(async () => {
 
 describe("POST /api/buyer/checkout/session", () => {
   it("creates a session for a valid cart and persists the server-side cart", async () => {
-    const result = await postCheckout(checkoutBody());
+    const result = await postCheckout(checkoutBody({
+      shippingAddress: {
+        recipientName: "Checkout Buyer",
+        street: "123 Tax Street",
+        line2: "Unit 4",
+        city: "Portland",
+        state: "OR",
+        postalCode: "97205",
+        country: "US",
+      },
+    }));
 
     expect(result.status).toBe(200);
     expect(result.body).toEqual({
@@ -233,9 +243,28 @@ describe("POST /api/buyer/checkout/session", () => {
     expect(fakeStripe.customerCreates[0].params).toMatchObject({
       email: "buyer@test.local",
       name: "Checkout Integration Buyer",
+      shipping: {
+        name: "Checkout Buyer",
+        address: {
+          line1: "123 Tax Street",
+          line2: "Unit 4",
+          city: "Portland",
+          state: "OR",
+          postal_code: "97205",
+          country: "US",
+        },
+      },
     });
     expect(fakeStripe.sessionCreates[0].params.customer).toBe("cus_checkout_test_1");
     expect(fakeStripe.sessionCreates[0].params.payment_intent_data.setup_future_usage).toBe("off_session");
+    expect(fakeStripe.sessionCreates[0].params.automatic_tax).toMatchObject({
+      enabled: true,
+      liability: { type: "account", account: SELLER_ACCOUNT_ID },
+    });
+    expect(fakeStripe.sessionCreates[0].params.shipping_address_collection).toEqual({
+      allowed_countries: ["US"],
+    });
+    expect(fakeStripe.sessionCreates[0].params.line_items[0].price_data.tax_behavior).toBe("exclusive");
 
     const [savedCheckout] = await db
       .select()
@@ -245,6 +274,12 @@ describe("POST /api/buyer/checkout/session", () => {
 
     expect(savedCheckout?.buyerId).toBe(BUYER_ID);
     expect(savedCheckout?.sellerId).toBe(SELLER_ID);
+    expect(savedCheckout?.shippingAddress).toMatchObject({
+      name: "Checkout Buyer",
+      street: "123 Tax Street",
+      zip: "97205",
+      country: "US",
+    });
     expect(savedCheckout?.items).toEqual([
       {
         variantId,

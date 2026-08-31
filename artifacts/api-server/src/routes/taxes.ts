@@ -14,6 +14,10 @@ import { sellerTaxConfig, users } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { stripe } from "../lib/stripe";
+import {
+  federal1099KProgress,
+  getSellerTaxYearTotals,
+} from "../lib/sellerTaxLedger";
 
 const router = Router();
 router.use(requireAuth);
@@ -56,15 +60,21 @@ router.get("/status", async (req, res) => {
 
       if (user?.stripeAccountId) {
         try {
-          stripeSettings = await (stripe as any).tax.settings.retrieve({
-            stripeAccount: user.stripeAccountId,
-          });
+          stripeSettings = await (stripe as any).tax.settings.retrieve(
+            {},
+            { stripeAccount: user.stripeAccountId },
+          );
         } catch { /* Tax settings may not exist for new accounts */ }
       }
     }
 
     res.json({
       stripeTaxEnabled:    config.stripeTaxEnabled,
+      provider:            "stripe_tax",
+      providerConfigured:  Boolean(stripeSettings),
+      providerStatus:      stripeSettings ? "configured" : "not_configured",
+      automaticTaxAtCheckout: true,
+      complianceNote: "Stripe calculates tax when an applicable registration and destination are configured. This setting is not a nexus determination or filing registration.",
       collectDuties:       config.collectDuties,
       chargeShippingTax:   config.chargeShippingTax,
       chargeVat:           config.chargeVat,
@@ -83,13 +93,7 @@ router.post("/enable", async (req, res) => {
   const sellerId = getSellerId(req);
   try {
     if (!stripe) {
-      // Gracefully fall through if Stripe not configured
-      const [updated] = await db
-        .update(sellerTaxConfig)
-        .set({ stripeTaxEnabled: true, updatedAt: new Date() })
-        .where(eq(sellerTaxConfig.sellerId, sellerId))
-        .returning();
-      res.json({ enabled: true, config: updated });
+      res.status(503).json({ error: "Stripe Tax is not configured" });
       return;
     }
 
@@ -105,19 +109,14 @@ router.post("/enable", async (req, res) => {
     }
 
     // Update Stripe Tax settings on the Connect account
-    try {
-      await (stripe as any).tax.settings.update(
-        {
-          defaults: {
-            tax_behavior: "exclusive",  // tax added on top of price
-          },
+    await (stripe as any).tax.settings.update(
+      {
+        defaults: {
+          tax_behavior: "exclusive",
         },
-        { stripeAccount: user.stripeAccountId },
-      );
-    } catch (taxErr: any) {
-      // Stripe Tax may not be available in test mode on all accounts
-      req.log.warn({ err: taxErr, sellerId }, "Stripe Tax settings update failed");
-    }
+      },
+      { stripeAccount: user.stripeAccountId },
+    );
 
     await db
       .insert(sellerTaxConfig)
@@ -127,7 +126,13 @@ router.post("/enable", async (req, res) => {
         set:    { stripeTaxEnabled: true, updatedAt: new Date() },
       });
 
-    res.json({ enabled: true });
+    res.json({
+      enabled: true,
+      provider: "stripe_tax",
+      providerConfigured: true,
+      providerStatus: "configured",
+      complianceNote: "Configuration does not determine nexus, registration, or filing obligations.",
+    });
   } catch (err) {
     req.log.error({ err, sellerId }, "Failed to enable Stripe Tax");
     res.status(500).json({ error: "Failed to enable Stripe Tax" });
@@ -170,10 +175,22 @@ router.patch("/config", async (req, res) => {
 router.get("/1099", async (req, res) => {
   const sellerId = getSellerId(req);
   try {
-    if (!stripe) {
-      res.json({ available: false, forms: [], message: "Stripe not configured" });
-      return;
-    }
+    const years = await getSellerTaxYearTotals(sellerId);
+    const requestedYear = Number(req.query.year);
+    const currentYear = new Date().getUTCFullYear();
+    const selectedYear = Number.isInteger(requestedYear) && requestedYear >= 2000 && requestedYear <= currentYear
+      ? requestedYear
+      : currentYear;
+    const selectedTotals = years.find((row) => row.year === selectedYear) ?? {
+      year: selectedYear,
+      grossPaymentCents: 0,
+      transactionCount: 0,
+    };
+    const threshold = federal1099KProgress(
+      selectedYear,
+      selectedTotals.grossPaymentCents,
+      selectedTotals.transactionCount,
+    );
 
     const [user] = await db
       .select({ stripeAccountId: users.stripeAccountId })
@@ -181,36 +198,47 @@ router.get("/1099", async (req, res) => {
       .where(eq(users.clerkId, sellerId))
       .limit(1);
 
-    if (!user?.stripeAccountId) {
-      res.json({ available: false, forms: [], message: "Connect Stripe to access tax forms" });
-      return;
-    }
-
     let forms: any[] = [];
-    try {
-      const result = await (stripe as any).tax.forms.list(
-        { type: "1099-K" },
-        { stripeAccount: user.stripeAccountId },
-      );
-      forms = (result.data ?? []).map((f: any) => ({
-        id:              f.id,
-        taxYear:         f.tax_year,
-        status:          f.status,
-        pdfUrl:          f.pdf ?? null,
-        correctedAmount: f.corrected_amount_cents ? f.corrected_amount_cents / 100 : null,
-        filedAt:         f.filing_date ?? null,
-      }));
-    } catch {
-      // Tax forms API requires specific permissions; handle gracefully
+    let stripeFormsMessage: string | null = null;
+    if (stripe && user?.stripeAccountId) {
+      try {
+        const result = await (stripe as any).tax.forms.list(
+          { type: "1099-K" },
+          { stripeAccount: user.stripeAccountId },
+        );
+        forms = (result.data ?? []).map((f: any) => ({
+          id:              f.id,
+          taxYear:         f.tax_year,
+          status:          f.status,
+          pdfUrl:          f.pdf ?? null,
+          correctedAmount: f.corrected_amount_cents ? f.corrected_amount_cents / 100 : null,
+          filedAt:         f.filing_date ?? null,
+        }));
+      } catch {
+        stripeFormsMessage = "Stripe tax forms are not available for this connected account or permission.";
+      }
+    } else if (!stripe) {
+      stripeFormsMessage = "Stripe is not configured; Brandthread totals are still available.";
+    } else {
+      stripeFormsMessage = "Connect Stripe to access Stripe-generated forms. Brandthread totals are still available.";
     }
 
     res.json({
       available:      forms.length > 0,
       forms,
-      stripeAccountId: user.stripeAccountId,
-      message:        forms.length === 0
-        ? "1099-K forms will appear here once Stripe generates them (typically in January for the prior tax year)"
-        : null,
+      stripeAccountId: user?.stripeAccountId ?? null,
+      year: selectedYear,
+      grossPaymentCents: selectedTotals.grossPaymentCents,
+      transactionCount: selectedTotals.transactionCount,
+      threshold,
+      years: years.map((row) => ({ ...row, threshold: federal1099KProgress(row.year, row.grossPaymentCents, row.transactionCount) })),
+      stripeFormsMessage: forms.length > 0 ? null : stripeFormsMessage ??
+        "Stripe-generated forms appear when Stripe makes them available.",
+      preparationOnly: true,
+      complianceWarnings: [
+        "This report is preparation support, not tax advice and not a filed 1099-K.",
+        "Marketplace-facilitator, nexus, registration, and state filing obligations require qualified accountant review.",
+      ],
     });
   } catch (err) {
     req.log.error({ err, sellerId }, "Failed to load tax forms");

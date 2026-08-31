@@ -12,6 +12,7 @@ import {
   renewStripeWebhookLease,
 } from "../stripeWebhookLedger";
 import webhookRouter from "../../routes/webhooks";
+import { stripe, STRIPE_WEBHOOK_SECRET } from "../stripe";
 
 const eventIds: string[] = [];
 const eventId = () => {
@@ -116,6 +117,55 @@ describe("Stripe webhook event ledger", () => {
         WHERE event_id = ${id}
       `);
       expect(Number((result.rows[0] as { count: number }).count)).toBe(0);
+    } finally {
+      await new Promise<void>((resolve) => server!.close(() => resolve()));
+    }
+  });
+
+  it("verifies and processes a valid signed event through the HTTP entry point", async () => {
+    if (!stripe || !STRIPE_WEBHOOK_SECRET) return;
+    const id = eventId();
+    const payload = JSON.stringify({
+      id,
+      type: "test.tax_ledger_entrypoint",
+      created: Math.floor(Date.now() / 1000),
+      data: { object: {} },
+    });
+    const signature = stripe.webhooks.generateTestHeaderString({
+      payload,
+      secret: STRIPE_WEBHOOK_SECRET,
+    });
+    const app = express();
+    app.use(express.raw({ type: "application/json" }));
+    app.use((req, _res, next) => {
+      (req as any).log = { error: () => {}, warn: () => {}, info: () => {} };
+      next();
+    });
+    app.use(webhookRouter);
+    let server: Server;
+    await new Promise<void>((resolve) => {
+      server = app.listen(0, "127.0.0.1", () => resolve());
+    });
+    try {
+      const response = await fetch(
+        `http://127.0.0.1:${(server!.address() as AddressInfo).port}/stripe`,
+        {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "stripe-signature": signature,
+          },
+          body: payload,
+        },
+      );
+      expect(response.status).toBe(200);
+      expect(await response.json()).toMatchObject({ received: true });
+      const result = await db.execute(sql`
+        SELECT status
+        FROM stripe_webhook_events
+        WHERE event_id = ${id}
+      `);
+      expect((result.rows[0] as { status: string }).status).toBe("processed");
     } finally {
       await new Promise<void>((resolve) => server!.close(() => resolve()));
     }
