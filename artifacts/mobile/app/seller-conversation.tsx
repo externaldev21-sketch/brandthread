@@ -16,6 +16,7 @@ import { useApi } from '@/lib/api';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
 import { formatCents } from '@/lib/money';
+import { notifyConversationReadFailure } from '@/lib/conversationReadEvents';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -177,7 +178,9 @@ export default function SellerConversationScreen() {
     // independent of loading the conversation/messages so a slow or failed
     // read request cannot leave the seller's inbox badge stale.
     if (id) {
-      api.conversations.markRead(id).catch(() => {});
+      api.conversations.markRead(id).catch(() => {
+        notifyConversationReadFailure(id);
+      });
     }
     loadAll(generation);
     pollRef.current = setInterval(() => loadMessages(generation), 15_000);

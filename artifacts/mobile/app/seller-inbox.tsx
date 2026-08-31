@@ -3,7 +3,7 @@
  * Reads GET /api/conversations (auth = current Clerk seller user).
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, ActivityIndicator, ListRenderItemInfo } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,6 +14,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { reportNetworkError } from '@/lib/networkNotice';
 import { requestContextualPushPermission } from '@/lib/contextualPushPermission';
+import { subscribeConversationReadFailure } from '@/lib/conversationReadEvents';
 
 interface Participant {
   userId: string; name: string; handle: string;
@@ -61,6 +62,10 @@ export default function SellerInboxScreen() {
   const consecutiveFailuresRef = useRef(0);
   const generationRef = useRef(0);
   const requestGenerationRef = useRef<number | null>(null);
+  // A list response can have been queued before the conversation screen's
+  // mark-as-read request completes. Keep those older unread counts suppressed
+  // until a response contains a message newer than the one we opened.
+  const optimisticReadsRef = useRef(new Map<string, number>());
 
   const load = useCallback(async (generation: number, silent = false) => {
     // Keep one request in flight per focus cycle so a slow request cannot
@@ -71,9 +76,26 @@ export default function SellerInboxScreen() {
       const list = await api.conversations.list();
       if (generationRef.current !== generation) return;
       // Sellers only handle buyer↔seller threads
-      const relevant = (list as ConvView[]).filter(
+      const relevant = (list as ConvView[])
+        .filter(
         (c) => c.type !== 'buyer_to_buyer',
-      );
+        )
+        .map((conversation) => {
+          const openedMessageTs = optimisticReadsRef.current.get(conversation.id);
+          if (openedMessageTs === undefined) return conversation;
+
+          if (
+            conversation.lastMessageTs !== undefined
+            && conversation.lastMessageTs > openedMessageTs
+          ) {
+            optimisticReadsRef.current.delete(conversation.id);
+            return conversation;
+          }
+
+          return conversation.unreadCount > 0
+            ? { ...conversation, unreadCount: 0 }
+            : conversation;
+        });
       setConvs(relevant);
       // Only a buyer-originated unread thread is an inbound buyer message.
       // This list is server-backed, not the manufacturer/demo conversation data.
@@ -100,6 +122,14 @@ export default function SellerInboxScreen() {
       }
     }
   }, [api]);
+
+  useEffect(() => subscribeConversationReadFailure((conversationId) => {
+    // A failed mark-as-read must not leave the inbox suppressing the server's
+    // unread count indefinitely. Refetch so returning to this screen reflects
+    // the authoritative participant count.
+    if (!optimisticReadsRef.current.delete(conversationId)) return;
+    void load(generationRef.current, true);
+  }), [load]);
 
   useFocusEffect(useCallback(() => {
     const generation = ++generationRef.current;
@@ -128,6 +158,13 @@ export default function SellerInboxScreen() {
   function openConversation(conversationId: string) {
     // Keep the inbox truthful while the conversation screen completes its
     // server-side mark-as-read request and avoid an inflated header total.
+    const openedConversation = convs.find((conversation) => conversation.id === conversationId);
+    if ((openedConversation?.unreadCount ?? 0) > 0) {
+      optimisticReadsRef.current.set(
+        conversationId,
+        openedConversation?.lastMessageTs ?? Date.now(),
+      );
+    }
     setConvs((current) =>
       current.map((conversation) =>
         conversation.id === conversationId
@@ -144,6 +181,7 @@ export default function SellerInboxScreen() {
     const hasUnread = item.unreadCount > 0;
     return (
       <TouchableOpacity
+        testID={`seller-conversation-${item.id}`}
         style={s.row}
         activeOpacity={0.7}
         onPress={() => openConversation(item.id)}
@@ -171,7 +209,7 @@ export default function SellerInboxScreen() {
               {previewText(item.lastMessage)}
             </Text>
             {hasUnread && (
-              <View style={s.unreadBadge}>
+              <View testID={`seller-unread-badge-${item.id}`} style={s.unreadBadge}>
                 <Text style={s.unreadText}>{item.unreadCount > 9 ? '9+' : item.unreadCount}</Text>
               </View>
             )}
