@@ -35,6 +35,48 @@ export type PushEventCategory =
   | "payout"
   | "dispute";
 
+const PUSH_CATEGORY_BY_FEED_CATEGORY: Readonly<Record<string, PushEventCategory>> = {
+  drop: "drop",
+  drops: "drop",
+  message: "message",
+  messages: "message",
+  order: "order",
+  orders: "order",
+  social: "social",
+  production: "production",
+  payout: "payout",
+  payouts: "payout",
+  finance: "payout",
+  dispute: "dispute",
+  disputes: "dispute",
+};
+
+/**
+ * Feed categories are presentation labels and may be pluralized, while push
+ * preferences are keyed by event categories. Keep that translation here so a
+ * publisher cannot accidentally create an in-app-only notification.
+ *
+ * An unmapped category is a programming error. Throwing outside production
+ * makes it visible during development and CI; production keeps the feed
+ * notification but logs the problem rather than inventing a preference key.
+ */
+export function normalizePushEventCategory(
+  feedCategory: string,
+): PushEventCategory | undefined {
+  const normalizedCategory = feedCategory.trim().toLowerCase();
+  const pushCategory = PUSH_CATEGORY_BY_FEED_CATEGORY[normalizedCategory];
+  if (pushCategory) {
+    return pushCategory;
+  }
+
+  const message = `No push event category mapping for notification feed category "${feedCategory}"`;
+  if (process.env.NODE_ENV !== "production") {
+    throw new Error(message);
+  }
+  logger.warn({ feedCategory }, message);
+  return undefined;
+}
+
 export interface ExpoPushMessage {
   to: string;
   title: string;

@@ -389,7 +389,6 @@ router.patch("/:id/status", requireRole("staff"), async (req, res) => {
     publishNotification({
       userId:     transitioned.buyerId,
       category:   "orders",
-      pushCategory: "order",
       type:       notif.type,
       title:      notif.title,
       body:       notif.body,
@@ -549,7 +548,6 @@ router.patch("/:id/tracking", requireRole("staff"), async (req, res) => {
     publishNotification({
       userId:     statusTransition.buyerId,
       category:   "orders",
-      pushCategory: "order",
       type:       "order_shipped",
       title:      "Your order has shipped! 🚚",
       body:       `Order #${statusTransition.orderNumber} is on its way via ${carrierLabel} — tracking: ${updated.trackingNumber ?? "not available yet"}`,

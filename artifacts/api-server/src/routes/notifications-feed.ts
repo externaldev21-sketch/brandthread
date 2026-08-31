@@ -10,7 +10,7 @@ import { Router } from "express";
 import { db, notificationsFeed } from "@workspace/db";
 import { eq, and, desc } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
-import { sendPushToUser, type PushEventCategory } from "../lib/push";
+import { normalizePushEventCategory, sendPushToUser } from "../lib/push";
 
 export const router = Router();
 
@@ -83,10 +83,11 @@ export async function publishNotification(n: {
   targetId?:    string;
   targetType?:  string;
   cta?:         string;
-  pushCategory?: PushEventCategory;
   pushSound?: string | null;
   pushChannelId?: string;
 }): Promise<void> {
+  const pushCategory = normalizePushEventCategory(n.category);
+
   await db.insert(notificationsFeed).values({
     userId:       n.userId,
     category:     n.category,
@@ -101,16 +102,7 @@ export async function publishNotification(n: {
     targetType:   n.targetType   ?? null,
     cta:          n.cta          ?? null,
   });
-  const inferredCategory: PushEventCategory | undefined = n.pushCategory
-    ?? (n.category === "social" ? "social"
-      : n.category === "message" || n.category === "messages" ? "message"
-      : n.category === "order" ? "order"
-      : n.category === "drop" || n.category === "drops" ? "drop"
-      : n.category === "production" ? "production"
-      : n.category === "payout" || n.category === "finance" ? "payout"
-      : n.category === "dispute" || n.category === "disputes" ? "dispute"
-      : undefined);
-  if (inferredCategory) {
+  if (pushCategory) {
     await sendPushToUser(n.userId, {
       title: n.title,
       body: n.body ?? "",
@@ -122,7 +114,7 @@ export async function publishNotification(n: {
       },
       sound: n.pushSound,
       channelId: n.pushChannelId,
-    }, inferredCategory);
+    }, pushCategory);
   }
 }
 

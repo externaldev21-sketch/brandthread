@@ -1,10 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { buildExpoPushMessages, preferenceKey } from "./push";
+import {
+  buildExpoPushMessages,
+  normalizePushEventCategory,
+  preferenceKey,
+} from "./push";
 
 describe("push notification delivery contract", () => {
-  it("enables message delivery through the correct buyer and seller preferences", () => {
+  it("normalizes plural feed labels to push event categories", () => {
+    expect(normalizePushEventCategory("orders")).toBe("order");
+    expect(normalizePushEventCategory("messages")).toBe("message");
+    expect(normalizePushEventCategory("drops")).toBe("drop");
+    expect(normalizePushEventCategory("disputes")).toBe("dispute");
+  });
+
+  it("enables buyer and seller delivery through their role-specific preferences", () => {
     expect(preferenceKey("buyer", "message")).toBe("messages");
     expect(preferenceKey("seller", "message")).toBe("customer_messages");
+    expect(preferenceKey("buyer", "order")).toBe("order_updates");
+    expect(preferenceKey("seller", "order")).toBe("new_orders");
+    expect(preferenceKey("buyer", "drop")).toBe("new_drops");
+    expect(preferenceKey("seller", "production")).toBe("production_milestones");
+  });
+
+  it("fails visibly for an unmapped feed category outside production", () => {
+    expect(() => normalizePushEventCategory("new_category")).toThrow(
+      'No push event category mapping for notification feed category "new_category"',
+    );
   });
 
   it("keeps message notifications on the platform default sound", () => {

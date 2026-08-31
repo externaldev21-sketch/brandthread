@@ -741,7 +741,6 @@ export async function handleCheckoutPaid(session: any, providerEventId?: string)
             body: `Order #${createdOrder.orderNumber} for $${(createdOrder.totalCents / 100).toFixed(2)} is ready to review.`,
             targetId: createdOrderId,
             targetType: "order",
-            pushCategory: "order",
             pushSound: "order-received.wav",
             pushChannelId: "orders",
           });

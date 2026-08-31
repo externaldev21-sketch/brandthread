@@ -581,7 +581,6 @@ router.post("/:id/messages", async (req, res) => {
             actorColor:    sender.color,
             targetId:      id,
             targetType:    "conversation",
-            pushCategory:  "message",
           });
         }
       } catch { /* non-critical */ }
