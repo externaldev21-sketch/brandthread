@@ -19,7 +19,7 @@ import { Order, PAYOUT_MILESTONES, CANCELLATION_REASONS, CancellationReason, Ret
 
 // ─── API → Order adapter ──────────────────────────────────────────────────────
 
-function adaptApiOrder(raw: any): Order {
+export function adaptApiOrder(raw: any): Order {
   const rawCustomer = raw.customer && typeof raw.customer === 'object' ? raw.customer : {};
   let parsedShippingAddress: any = null;
   if (raw.shippingAddress) {
