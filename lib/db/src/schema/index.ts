@@ -4,7 +4,7 @@ export * from './freelancers';
 export * from './subscriptionEntitlements';
 export * from './security';
 import { manufacturers } from './manufacturers';
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 
 // ─── Users (brand team members + buyers, linked to Clerk) ─────────────────────
 
@@ -690,7 +690,11 @@ export const notificationsFeed = pgTable('notifications_feed', {
   targetType:    text('target_type'),
   cta:           text('cta'),
   createdAt:     timestamp('created_at').defaultNow().notNull(),
-});
+}, (table) => ({
+  subscriptionPaymentFailureUnique: uniqueIndex('notifications_feed_subscription_payment_failed_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} = 'subscription_payment_failed' AND ${table.targetId} IS NOT NULL`),
+}));
 
 // ─── Reviews (buyer → seller/product rating after delivered order) ──────────────
 

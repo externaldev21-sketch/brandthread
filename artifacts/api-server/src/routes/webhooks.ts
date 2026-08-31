@@ -996,7 +996,7 @@ export async function handleSubscriptionTrialWillEnd(sub: any): Promise<void> {
  * Stripe will emit subscription.updated with the authoritative subscription
  * status; this event is responsible for making the recovery path visible.
  */
-async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
+export async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
   const customerId: string | undefined =
     typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
   const invoiceSubscriptionId: string | undefined =
@@ -1039,18 +1039,9 @@ async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
   }
 
   const notificationType = "subscription_payment_failed";
-  const existing = await db
-    .select({ id: notificationsFeed.id })
-    .from(notificationsFeed)
-    .where(and(
-      eq(notificationsFeed.userId, seller.clerkId),
-      eq(notificationsFeed.type, notificationType),
-      eq(notificationsFeed.targetId, invoice.id),
-    ))
-    .limit(1);
-
-  if (existing.length === 0) {
-    await db.insert(notificationsFeed).values({
+  const [notification] = await db
+    .insert(notificationsFeed)
+    .values({
       userId: seller.clerkId,
       category: "system",
       type: notificationType,
@@ -1059,8 +1050,15 @@ async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
       targetId: invoice.id ?? null,
       targetType: "subscription_invoice",
       cta: "Update card",
-    });
+    })
+    // The database's partial unique index is the idempotency boundary. Do not
+    // specify a conflict target: PostgreSQL can then match that partial
+    // index, while unrelated notification uniqueness constraints remain
+    // unaffected.
+    .onConflictDoNothing()
+    .returning({ id: notificationsFeed.id });
 
+  if (notification) {
     await sendPushToUser(seller.clerkId, {
       title: "Payment failed",
       body: "Update your card to keep your Brandthread features.",
@@ -1081,7 +1079,7 @@ async function handleInvoicePaymentFailed(invoice: any): Promise<void> {
       subscriptionId: invoiceSubscriptionId,
       attemptCount: invoice.attempt_count,
       nextPaymentAttempt: invoice.next_payment_attempt,
-      notificationSent: existing.length === 0,
+      notificationSent: Boolean(notification),
     },
     "Seller subscription payment failed",
   );
