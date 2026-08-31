@@ -10,6 +10,10 @@ import { Badge } from '@/components/Badge';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
 import { formatCents } from '@/lib/money';
+import {
+  getInitialDropBroadcastStates,
+  type DropBroadcastState,
+} from '@/lib/dropBroadcastState';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -108,7 +112,7 @@ const statusConfig: Record<DropStatus, { variant: 'success' | 'warning' | 'info'
 
 // ─── Drop Card ────────────────────────────────────────────────────────────────
 
-type BroadcastState = 'idle' | 'loading' | 'sent' | 'already_sent' | 'scheduled';
+type BroadcastState = DropBroadcastState | 'scheduled';
 
 interface BroadcastPreview {
   followers: number;
@@ -409,6 +413,8 @@ export default function PaymentsScreen() {
       const usingDemoFallback = raw.length === 0;
       let mapped: Drop[] = DROPS_FALLBACK;
       if (raw.length > 0) {
+        const initialBroadcastStates: Record<string, BroadcastState> =
+          getInitialDropBroadcastStates(raw);
         mapped = raw.map((d: any) => ({
           id:             d.id,
           name:           d.name ?? d.title ?? 'Drop',
@@ -423,10 +429,14 @@ export default function PaymentsScreen() {
           mfgProgress:    d.mfgProgress ?? undefined,
         }));
         setDrops(mapped);
-        setBroadcastStates((prev) => mapped.reduce<Record<string, BroadcastState>>((states, drop) => {
-          if (drop.scheduledBroadcastAt) states[drop.id] = 'scheduled';
+        setBroadcastStates(mapped.reduce<Record<string, BroadcastState>>((states, drop) => {
+          if (states[drop.id] !== 'already_sent' && drop.scheduledBroadcastAt) {
+            states[drop.id] = 'scheduled';
+          }
           return states;
-        }, { ...prev }));
+        }, initialBroadcastStates));
+      } else {
+        setBroadcastStates({});
       }
       const activeDrops = mapped.filter((drop) => drop.status === 'processing');
       const previewEntries = await Promise.all(activeDrops.map(async (drop) => {

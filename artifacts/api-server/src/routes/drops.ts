@@ -15,6 +15,24 @@ import { deliverDropBroadcast } from "../lib/dropBroadcast";
 const router = Router();
 router.use(requireAuth);
 
+const dropFields = {
+  id: drops.id,
+  ownerId: drops.ownerId,
+  name: drops.name,
+  type: drops.type,
+  status: drops.status,
+  releaseAt: drops.releaseAt,
+  scheduledBroadcastAt: drops.scheduledBroadcastAt,
+  estimatedShipDate: drops.estimatedShipDate,
+  totalCollectedCents: drops.totalCollectedCents,
+  orderCount: drops.orderCount,
+  mfgProgress: drops.mfgProgress,
+  payoutStatus: drops.payoutStatus,
+  estimatedPayoutDate: drops.estimatedPayoutDate,
+  stripePayoutId: drops.stripePayoutId,
+  createdAt: drops.createdAt,
+  updatedAt: drops.updatedAt,
+};
 async function getBroadcastAudience(sellerId: string, dropId: string): Promise<string[]> {
   const [followerRows, alertRows] = await Promise.all([
     db.select({ userId: follows.followerId }).from(follows).where(eq(follows.followingId, sellerId)),
@@ -28,7 +46,21 @@ async function getBroadcastAudience(sellerId: string, dropId: string): Promise<s
 // GET /api/drops
 router.get("/", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const rows = await db.select().from(drops).where(eq(drops.ownerId, ownerId)).orderBy(desc(drops.createdAt));
+  const rows = await db
+    .select({
+      ...dropFields,
+      broadcastSentAt: dropBroadcasts.sentAt,
+    })
+    .from(drops)
+    .leftJoin(
+      dropBroadcasts,
+      and(
+        eq(dropBroadcasts.dropId, drops.id),
+        eq(dropBroadcasts.sellerId, ownerId),
+      ),
+    )
+    .where(eq(drops.ownerId, ownerId))
+    .orderBy(desc(drops.createdAt));
   res.json(rows);
 });
 
@@ -57,7 +89,19 @@ router.post("/", async (req, res) => {
 // GET /api/drops/:id
 router.get("/:id", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
-  const [drop] = await db.select().from(drops)
+  const [drop] = await db
+    .select({
+      ...dropFields,
+      broadcastSentAt: dropBroadcasts.sentAt,
+    })
+    .from(drops)
+    .leftJoin(
+      dropBroadcasts,
+      and(
+        eq(dropBroadcasts.dropId, drops.id),
+        eq(dropBroadcasts.sellerId, ownerId),
+      ),
+    )
     .where(and(eq(drops.id, req.params.id), eq(drops.ownerId, ownerId)))
     .limit(1);
   if (!drop) { res.status(404).json({ error: "Not found" }); return; }
@@ -78,6 +122,7 @@ router.get("/:id", async (req, res) => {
 // PATCH /api/drops/:id
 router.patch("/:id", async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
+
   const {
     name, status, mfgProgress, payoutStatus, estimatedShipDate, stripePayoutId,
     scheduledBroadcastAt,
@@ -175,8 +220,9 @@ router.patch("/:id", async (req, res) => {
 router.get("/:id/broadcast-preview", async (req, res): Promise<void> => {
   const sellerId = (req as any).clerkUserId as string;
 
+  // Verify the drop belongs to this seller
   const [drop] = await db
-    .select({ id: drops.id })
+    .select({ id: drops.id, name: drops.name, status: drops.status })
     .from(drops)
     .where(and(eq(drops.id, req.params.id), eq(drops.ownerId, sellerId)))
     .limit(1);
