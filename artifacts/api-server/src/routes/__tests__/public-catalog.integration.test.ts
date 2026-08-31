@@ -152,6 +152,29 @@ describe("public catalog search and related products", () => {
     expect(visits).toHaveLength(1);
   });
 
+  it("deduplicates simultaneous signed-in visits for one seller and UTC day", async () => {
+    authState.clerkUserId = visitor;
+    const responses = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        fetch(`${base}/api/public/sellers/${sellerB}/visit`, { method: "POST" }),
+      ),
+    );
+
+    expect(responses.map((response) => response.status)).toEqual(Array(8).fill(204));
+
+    const [seller] = await db
+      .select({ storefrontVisitCount: users.storefrontVisitCount })
+      .from(users)
+      .where(eq(users.clerkId, sellerB));
+    const visits = await db
+      .select({ id: storefrontVisits.id })
+      .from(storefrontVisits)
+      .where(eq(storefrontVisits.sellerId, sellerB));
+
+    expect(seller.storefrontVisitCount).toBe(1);
+    expect(visits).toHaveLength(1);
+  });
+
   it("does not record a seller visiting their own storefront", async () => {
     authState.clerkUserId = sellerA;
     const response = await fetch(`${base}/api/public/sellers/${sellerA}/visit`, { method: "POST" });
