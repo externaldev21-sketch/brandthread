@@ -62,7 +62,7 @@ const SECTIONS: LegalSection[] = [
     title: 'Retention and deletion',
     paragraphs: [
       'We retain information for as long as reasonably needed to provide Brandthread, maintain transaction and tax records, resolve disputes, prevent fraud, enforce agreements, and meet legal obligations. Different records require different periods. [A FINAL RETENTION SCHEDULE MUST BE APPROVED BEFORE LAUNCH.] Backups and provider systems may retain residual copies for a limited period.',
-      'The app supports deletion of certain conversations, addresses, payment methods, integrations, and other records. To request account deletion or a broader data request, contact [PRIVACY CONTACT — REQUIRED BEFORE LAUNCH]. Deleting an account may not remove public content copied by others or records we must retain for legal, payment, safety, or dispute purposes.',
+      'The app supports deletion of certain conversations, addresses, payment methods, integrations, and other records. To request account deletion or a broader data request, contact Brandthread Support at support@brandthread.app. Deleting an account may not remove public content copied by others or records we must retain for legal, payment, safety, or dispute purposes.',
     ],
   },
   {
@@ -70,8 +70,16 @@ const SECTIONS: LegalSection[] = [
     bullets: [
       'Edit profile information and content, adjust social and notification preferences, revoke device permissions in system settings, or deregister push notifications by signing out.',
       'Manage payment methods and applicable subscriptions through Stripe or the app-store provider shown at purchase.',
+      'Change cookie and similar-storage preferences at any time using “Change cookie preferences.” Necessary storage remains on because it supports security, consent records, and core service functions; optional analytics and marketing storage can be turned off.',
       'Request access, correction, deletion, portability, restriction, or objection where applicable law provides those rights. We may need to verify your identity before responding.',
       'Appeal or complain to an applicable privacy regulator where local law provides that right.',
+    ],
+  },
+  {
+    title: 'Intellectual-property reports and rights cases',
+    paragraphs: [
+      'If you believe content on Brandthread infringes your copyright, trademark, or other rights, submit a report through the in-app IP reporting form or email support@brandthread.app. A report should identify the listing or content, describe the rights you own or represent, explain why it is infringing, include supporting evidence, and provide your full name and a working contact email.',
+      'By submitting a report, you certify that you are the rights holder or authorized to act for the rights holder, that the information is accurate, and that you have a good-faith belief the use is unauthorized. We may request additional information, notify the affected user, restrict or remove content, or close a case without action. We may retain case information and share it with affected users, service providers, professional advisers, law enforcement, or other parties when needed to review the claim, prevent abuse, or comply with law. Knowingly false or misleading reports may lead to account action.',
     ],
   },
   {
@@ -90,7 +98,7 @@ const SECTIONS: LegalSection[] = [
   {
     title: 'Changes and contact',
     paragraphs: [
-      'We may update this policy as Brandthread changes. We will revise the effective date and provide additional notice when required. Questions and privacy requests should be sent to [PRIVACY CONTACT EMAIL AND POSTAL ADDRESS — REQUIRED BEFORE LAUNCH].',
+      'We may update this policy as Brandthread changes. We will revise the effective date and provide additional notice when required. Questions, privacy requests, and questions about intellectual-property reports should be sent to Brandthread Support at support@brandthread.app.',
     ],
   },
 ];

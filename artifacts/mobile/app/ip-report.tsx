@@ -58,7 +58,7 @@ export default function IpReportScreen() {
   return <BrandthreadScreen>
     <BrandthreadHeader title="Report IP infringement" onBack={() => router.back()} />
     <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
-      <Text style={s.legal}>PLACEHOLDER LEGAL COPY — pending legal review. Submit only accurate rights-holder information and evidence. This report is not legal advice.</Text>
+      <Text style={s.legal}>Only a rights holder or an authorized agent may submit this report. By submitting, you certify that you are authorized to act, that the information is accurate, and that you have a good-faith belief the reported listing infringes your copyright, trademark, or other rights. Include the listing, the rights you own or represent, and supporting evidence. Brandthread may request more information, notify the seller, restrict or remove content, or close the case without action. Knowingly false or misleading reports may lead to account action. Questions about an IP case can be sent to support@brandthread.app.</Text>
       <Text style={s.label}>Your full name</Text><TextInput value={name} onChangeText={setName} style={s.input} placeholder="Rights holder or authorized agent" placeholderTextColor={SUBTLE} />
       <Text style={s.label}>Contact email</Text><TextInput value={email} onChangeText={setEmail} style={s.input} keyboardType="email-address" autoCapitalize="none" placeholder="you@example.com" placeholderTextColor={SUBTLE} />
       <Text style={s.label}>Type of report</Text>
