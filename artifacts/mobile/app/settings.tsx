@@ -6,6 +6,8 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
+import { useRole } from '@/contexts/RoleContext';
+import { SETTINGS_CATALOG, SettingsCatalogGroup, SettingsCatalogItem } from '@/services/settingsCatalog';
 
 
 interface SettingsItem {
@@ -84,6 +86,7 @@ export default function SettingsScreen() {
   const insets  = useSafeAreaInsets();
   const router  = useRouter();
   const { signOut } = useAuth();
+  const { role, isLoaded: isRoleLoaded } = useRole();
   const [query, setQuery]       = useState('');
 
   const topPad = Platform.OS === 'web' ? 24 : insets.top;
@@ -91,7 +94,7 @@ export default function SettingsScreen() {
   function haptic() { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }
   function handleClose() { haptic(); router.back(); }
 
-  async function handleItem(item: SettingsItem) {
+  async function handleItem(item: SettingsItem | SettingsCatalogItem) {
     haptic();
     if (item.action === 'sign-out') {
       Alert.alert('Sign out', 'Are you sure you want to sign out?', [
@@ -113,14 +116,22 @@ export default function SettingsScreen() {
     if (item.route) router.push(item.route as never);
   }
 
-  const filteredGroups = useMemo(() => {
+  const filteredGroups = useMemo<SettingsCatalogGroup[]>(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return STATIC_GROUPS;
-    return STATIC_GROUPS.map((g) => ({
+    const visible = SETTINGS_CATALOG.map((group) => ({
+      ...group,
+      items: group.items.filter((item) =>
+        item.audience === 'shared' || (isRoleLoaded && item.audience === role),
+      ),
+    })).filter((group) => group.items.length > 0);
+    if (!q) return visible;
+    return visible.map((g) => ({
       ...g,
-      items: g.items.filter((i) => i.label.toLowerCase().includes(q)),
+      items: g.items.filter((i) =>
+        `${i.label} ${i.description} ${i.aliases.join(' ')}`.toLowerCase().includes(q),
+      ),
     })).filter((g) => g.items.length > 0);
-  }, [query]);
+  }, [query, role, isRoleLoaded]);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -175,12 +186,19 @@ export default function SettingsScreen() {
                     color={item.destructive ? '#EF4444' : colors.foreground}
                     style={{ width: 22 }}
                   />
-                  <Text
-                    style={[styles.rowLabel, { color: item.destructive ? '#EF4444' : colors.foreground }]}
-                    numberOfLines={1}
-                  >
-                    {item.label}
-                  </Text>
+                  <View style={styles.rowCopy}>
+                    <Text
+                      style={[styles.rowLabel, { color: item.destructive ? '#EF4444' : colors.foreground }]}
+                      numberOfLines={1}
+                    >
+                      {item.label}
+                    </Text>
+                    {'description' in item && (
+                      <Text style={[styles.rowDescription, { color: colors.mutedForeground }]} numberOfLines={1}>
+                        {item.description}
+                      </Text>
+                    )}
+                  </View>
                   {!item.destructive && <Feather name="chevron-right" size={18} color={colors.mutedForeground} />}
                 </TouchableOpacity>
               ))}
@@ -214,6 +232,8 @@ const styles = StyleSheet.create({
   groupTitle: { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.3 },
   listCard: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 14 },
-  rowLabel: { flex: 1, fontSize: 14, fontFamily: 'Inter_500Medium' },
+  rowCopy: { flex: 1 },
+  rowLabel: { fontSize: 14, fontFamily: 'Inter_500Medium' },
+  rowDescription: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
   versionText: { fontSize: 12, fontFamily: 'Inter_400Regular', textAlign: 'center', marginTop: 4 },
 });

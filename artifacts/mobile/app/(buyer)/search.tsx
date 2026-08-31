@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Platform, TextInput, Image as RNImage,
+  Platform, TextInput, Image as RNImage, Modal, Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -17,6 +17,7 @@ import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { reportNetworkError } from '@/lib/networkNotice';
 import { EmptyState, SearchResultsSkeleton } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 
 type PersonResult = {
   userId: string; name: string; username: string | null;
@@ -85,6 +86,10 @@ export default function SearchScreen() {
   const [maxPrice, setMaxPrice] = useState<string>('');
   const [category, setCategory] = useState<string>('');
   const [showFilters, setShowFilters] = useState(false);
+  const [draftSort, setDraftSort] = useState('');
+  const [draftMinPrice, setDraftMinPrice] = useState('');
+  const [draftMaxPrice, setDraftMaxPrice] = useState('');
+  const [draftCategory, setDraftCategory] = useState('');
 
   const [results, setResults] = useState<SearchResult[]>([]);
   const [people,  setPeople]  = useState<PersonResult[]>([]);
@@ -109,6 +114,26 @@ export default function SearchScreen() {
     setMinPrice('');
     setMaxPrice('');
     setCategory('');
+  };
+  const openFilters = () => {
+    setDraftSort(sort);
+    setDraftMinPrice(minPrice);
+    setDraftMaxPrice(maxPrice);
+    setDraftCategory(category);
+    setShowFilters(true);
+  };
+  const applyFilters = () => {
+    setSort(draftSort);
+    setMinPrice(draftMinPrice);
+    setMaxPrice(draftMaxPrice);
+    setCategory(draftCategory);
+    setShowFilters(false);
+  };
+  const clearDraftFilters = () => {
+    setDraftSort('');
+    setDraftMinPrice('');
+    setDraftMaxPrice('');
+    setDraftCategory('');
   };
 
   useEffect(() => {
@@ -262,56 +287,65 @@ export default function SearchScreen() {
         <TouchableOpacity
           onPress={() => {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            setShowFilters(!showFilters);
+            openFilters();
           }}
           hitSlop={8}
           accessibilityRole="button"
-          accessibilityLabel="Toggle filters"
+          accessibilityLabel="Open search filters"
         >
           <Feather name="sliders" size={20} color={hasActiveFilters ? primary : fg} />
         </TouchableOpacity>
       </View>
 
-      {showFilters && (
-        <View style={[styles.filterPanel, { backgroundColor: card, borderBottomColor: border }]}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
-            <SortChip label="Relevance" active={!sort} onPress={() => setSort('')} />
-            <SortChip label="Price: Low-High" active={sort === 'price_asc'} onPress={() => setSort('price_asc')} />
-            <SortChip label="Price: High-Low" active={sort === 'price_desc'} onPress={() => setSort('price_desc')} />
-            <SortChip label="Newest" active={sort === 'newest'} onPress={() => setSort('newest')} />
-          </ScrollView>
-          <View style={styles.filterRow}>
-            <TextInput
-              style={[styles.filterInput, { color: fg, borderColor: border }]}
-              placeholder="Min $"
-              placeholderTextColor={muted}
-              keyboardType="numeric"
-              value={minPrice}
-              onChangeText={setMinPrice}
-            />
-            <TextInput
-              style={[styles.filterInput, { color: fg, borderColor: border }]}
-              placeholder="Max $"
-              placeholderTextColor={muted}
-              keyboardType="numeric"
-              value={maxPrice}
-              onChangeText={setMaxPrice}
-            />
-            <TextInput
-              style={[styles.filterInput, { color: fg, borderColor: border }]}
-              placeholder="Category"
-              placeholderTextColor={muted}
-              value={category}
-              onChangeText={setCategory}
-            />
+      <Modal
+        visible={showFilters}
+        transparent
+        animationType="slide"
+        statusBarTranslucent
+        onRequestClose={() => setShowFilters(false)}
+      >
+        <KeyboardAvoidingView style={styles.modalRoot} behavior="padding">
+          <Pressable
+            style={styles.sheetBackdrop}
+            onPress={() => setShowFilters(false)}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss search filters"
+          />
+          <View style={[styles.filterSheet, { backgroundColor: card, borderColor: border, paddingBottom: Math.max(insets.bottom, 16) }]}>
+            <View style={styles.sheetHandle} />
+            <View style={styles.sheetTitleRow}>
+              <View>
+                <Text style={[styles.sheetTitle, { color: fg }]}>Filter and sort</Text>
+                <Text style={[styles.sheetSubtitle, { color: muted }]}>Changes apply when you tap Apply.</Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowFilters(false)} style={styles.sheetClose} accessibilityLabel="Close filters">
+                <Feather name="x" size={20} color={muted} />
+              </TouchableOpacity>
+            </View>
+            <Text style={[styles.filterLabel, { color: muted }]}>SORT BY</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 18 }} keyboardShouldPersistTaps="handled">
+              <SortChip label="Relevance" active={!draftSort} onPress={() => setDraftSort('')} />
+              <SortChip label="Price: Low-High" active={draftSort === 'price_asc'} onPress={() => setDraftSort('price_asc')} />
+              <SortChip label="Price: High-Low" active={draftSort === 'price_desc'} onPress={() => setDraftSort('price_desc')} />
+              <SortChip label="Newest" active={draftSort === 'newest'} onPress={() => setDraftSort('newest')} />
+            </ScrollView>
+            <Text style={[styles.filterLabel, { color: muted }]}>PRODUCT FILTERS</Text>
+            <View style={styles.filterRow}>
+              <TextInput style={[styles.filterInput, { color: fg, borderColor: border }]} placeholder="Min $" placeholderTextColor={muted} keyboardType="numeric" value={draftMinPrice} onChangeText={setDraftMinPrice} />
+              <TextInput style={[styles.filterInput, { color: fg, borderColor: border }]} placeholder="Max $" placeholderTextColor={muted} keyboardType="numeric" value={draftMaxPrice} onChangeText={setDraftMaxPrice} />
+            </View>
+            <TextInput style={[styles.filterInput, styles.categoryInput, { color: fg, borderColor: border }]} placeholder="Category" placeholderTextColor={muted} value={draftCategory} onChangeText={setDraftCategory} />
+            <View style={styles.sheetActions}>
+              <TouchableOpacity onPress={clearDraftFilters} style={[styles.sheetAction, { borderColor: border }]} accessibilityRole="button">
+                <Text style={[styles.clearBtnText, { color: fg }]}>Clear all</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={applyFilters} style={[styles.sheetAction, { backgroundColor: primary, borderColor: primary }]} accessibilityRole="button">
+                <Text style={[styles.applyText, { color: theme.onAccent }]}>Apply</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          {hasActiveFilters && (
-            <TouchableOpacity onPress={clearFilters} style={styles.clearBtn}>
-              <Text style={[styles.clearBtnText, { color: primary }]}>Clear All</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
+        </KeyboardAvoidingView>
+      </Modal>
 
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 40 }}>
         {query.trim().length === 0 ? (
@@ -529,11 +563,23 @@ const styles = StyleSheet.create({
   masonryBrand: { color: MUTED, fontSize: 11, fontFamily: 'Inter_500Medium', flex: 1 },
   followingBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1 },
   followingBadgeText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-  filterPanel: { padding: 16, borderBottomWidth: 1 },
+  modalRoot: { flex: 1, justifyContent: 'flex-end' },
+  sheetBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.62)' },
+  filterSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, borderWidth: 1, paddingHorizontal: 18, paddingTop: 10 },
+  sheetHandle: { width: 42, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginBottom: 18 },
+  sheetTitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
+  sheetTitle: { fontSize: 21, fontFamily: 'Inter_700Bold' },
+  sheetSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 3 },
+  sheetClose: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  filterLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.8, marginBottom: 9 },
   filterRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   filterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, marginRight: 8 },
   filterChipText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  filterInput: { flex: 1, height: 36, borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  filterInput: { flex: 1, height: 46, borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  categoryInput: { flex: 0, marginBottom: 22 },
+  sheetActions: { flexDirection: 'row', gap: 10 },
+  sheetAction: { flex: 1, minHeight: 48, borderWidth: 1, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  applyText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
   clearBtn: { alignSelf: 'flex-end', paddingVertical: 4 },
   clearBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
 });

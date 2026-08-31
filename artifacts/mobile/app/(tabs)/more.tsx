@@ -333,7 +333,7 @@ export default function MoreScreen() {
             <View style={[styles.progressFill, { width: `${percent}%` }]} />
           </View>
           <TouchableOpacity
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/seller-settings' as any); }}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/settings' as any); }}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             <Text style={styles.continueSetup}>Continue setup →</Text>

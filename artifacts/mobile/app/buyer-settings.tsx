@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, TextInput, StyleSheet, Alert } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -78,6 +78,10 @@ const GROUPS: Group[] = [
 export default function BuyerSettingsScreen() {
   useAppTheme();
   const router = useRouter();
+  // Preserve the legacy deep link while keeping one shared settings index.
+  useEffect(() => {
+    router.replace('/settings' as never);
+  }, [router]);
   const insets = useSafeAreaInsets();
   const { signOut } = useAuth();
   const [query, setQuery] = useState('');

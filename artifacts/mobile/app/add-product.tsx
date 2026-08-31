@@ -1329,7 +1329,7 @@ export default function AddProductScreen() {
       >
         <ScrollView
           style={s.scrollView}
-          contentContainerStyle={[s.scrollContent, { paddingBottom: insets.bottom + 40 }]}
+          contentContainerStyle={[s.scrollContent, { paddingBottom: 32 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -1418,34 +1418,30 @@ export default function AddProductScreen() {
             {renderStorefront()}
           </CollapsibleSection>
 
-          {/* ═══ PUBLISH BLOCK ═══════════════════════════════════════════════ */}
-          <View style={s.publishBlock}>
-            {liveWarnings.length > 0 && (
-              <BrandthreadCard style={s.warningsCard}>
-                {liveWarnings.map((w, i) => (
-                  <View key={i} style={s.warningRow}>
-                    <Feather name="alert-circle" size={14} color={ORANGE} />
-                    <Text style={s.warningText}>{w}</Text>
-                  </View>
-                ))}
-              </BrandthreadCard>
-            )}
-            <View style={s.publishButtons}>
-              <SecondaryButton
-                label="Save draft"
-                onPress={handleSaveDraftAndExit}
-                style={{ flex: 1 }}
-              />
-              <PrimaryButton
-                label={publishing ? 'Publishing...' : 'Publish'}
-                disabled={publishing}
-                onPress={handlePublish}
-                style={{ flex: 1 }}
-              />
-            </View>
-          </View>
-
         </ScrollView>
+        {/* The action area is outside the scroll view so publishing is always
+            available without losing the form's draft state or scroll position. */}
+        <View style={[s.stickyFooter, { paddingBottom: Math.max(insets.bottom, SP.sm) }]}>
+          {liveWarnings.length > 0 && (
+            <BrandthreadCard style={s.warningsCard}>
+              {liveWarnings.map((w, i) => (
+                <View key={i} style={s.warningRow}>
+                  <Feather name="alert-circle" size={14} color={ORANGE} />
+                  <Text style={s.warningText}>{w}</Text>
+                </View>
+              ))}
+            </BrandthreadCard>
+          )}
+          <View style={s.publishButtons}>
+            <SecondaryButton label="Save draft" onPress={handleSaveDraftAndExit} style={{ flex: 1 }} />
+            <PrimaryButton
+              label={publishing ? 'Publishing...' : 'Publish'}
+              disabled={publishing}
+              onPress={handlePublish}
+              style={{ flex: 1 }}
+            />
+          </View>
+        </View>
       </KeyboardAvoidingView>
     </View>
   );
@@ -1559,15 +1555,14 @@ const s = StyleSheet.create({
     gap: SP.md,
   },
 
-  // Publish block
-  publishBlock: {
+  // Sticky actions stay above the safe area while the form scrolls behind it.
+  stickyFooter: {
     paddingHorizontal: SP.md,
-    paddingTop: SP.lg,
-    paddingBottom: SP.xl,
+    paddingTop: SP.sm,
     gap: SP.sm,
     borderTopWidth: 1,
     borderTopColor: BORDER,
-    marginTop: SP.sm,
+    backgroundColor: BG,
   },
   warningsCard: {
     gap: SP.xs,

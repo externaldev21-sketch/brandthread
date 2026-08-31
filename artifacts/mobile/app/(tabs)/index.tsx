@@ -246,7 +246,7 @@ const COMMAND_ITEMS = [
   { label: 'Inventory',         icon: 'layers'       as const, route: '/inventory'        },
   { label: 'Store Builder',     icon: 'layout'       as const, route: '/store-builder'    },
   { label: 'Analytics',         icon: 'bar-chart-2'  as const, route: '/(tabs)/analytics' },
-  { label: 'Settings',          icon: 'settings'     as const, route: '/seller-settings'  },
+  { label: 'Settings',          icon: 'settings'     as const, route: '/settings'  },
 ];
 
 // ─── Default setup state ──────────────────────────────────────────────────────

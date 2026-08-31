@@ -528,7 +528,7 @@ export default function ProfileScreen() {
         <SheetRow icon="gift" label="Rewards & Points" onPress={() => { setMenuOpen(false); router.push('/loyalty' as any); }} />
         <SheetRow icon="bookmark" label="Saved Items" onPress={() => { setMenuOpen(false); router.push('/buyer-saved' as any); }} />
         <SheetRow icon="grid" label="QR Code" onPress={() => { setMenuOpen(false); router.push('/buyer-qr-code' as any); }} />
-        <SheetRow icon="settings" label="Settings" onPress={() => { setMenuOpen(false); router.push('/buyer-settings' as any); }} />
+        <SheetRow icon="settings" label="Settings" onPress={() => { setMenuOpen(false); router.push('/settings' as any); }} />
         <View style={styles.sheetDivider} />
         <SheetRow icon="log-out" label="Sign Out" destructive onPress={handleSignOut} />
       </BottomSheet>

@@ -269,7 +269,7 @@ export default function ProfileScreen() {
           <TouchableOpacity style={s.headerIconBtn} onPress={() => nav('/notifications-settings')} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel="Notification settings">
             <Feather name="bell" size={18} color={FG} />
           </TouchableOpacity>
-          <TouchableOpacity style={s.headerIconBtn} onPress={() => nav('/seller-settings')} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel="Seller settings">
+          <TouchableOpacity style={s.headerIconBtn} onPress={() => nav('/settings')} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel="Seller settings">
             <Feather name="settings" size={18} color={FG} />
           </TouchableOpacity>
         </View>

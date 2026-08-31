@@ -119,6 +119,12 @@ export default function SellerSettingsScreen() {
     Object.fromEntries(SECTIONS.map(s => [s.key, true])),
   );
 
+  // Keep the old deep link alive, but make the shared hub the only settings
+  // index so buyers and sellers do not encounter competing navigation trees.
+  useEffect(() => {
+    router.replace('/settings' as never);
+  }, [router]);
+
   useEffect(() => {
     getSetupState().then(s => setSetupPct(completionPercent(s)));
   }, []);

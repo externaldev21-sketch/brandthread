@@ -9,12 +9,13 @@ import {
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
 import { BG, BORDER, CARD, FG, FONT, FS, MUTED, RADIUS, SP } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useRole } from '@/contexts/RoleContext';
 
 const ACTIONS = [
   { label: 'New post', description: 'Share content with your audience', icon: 'video' as const, route: '/create-post' },
@@ -25,8 +26,10 @@ const ACTIONS = [
 
 export default function SellerCreateFAB() {
   const router = useRouter();
+  const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const { theme } = useAppTheme();
+  const { role, isLoaded: isRoleLoaded } = useRole();
   const [open, setOpen] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 
@@ -36,7 +39,21 @@ export default function SellerCreateFAB() {
     return () => { show.remove(); hide.remove(); };
   }, []);
 
-  if (keyboardVisible || Platform.OS === 'web') return null;
+  const blockedRoute = [
+    '/add-product',
+    '/create-post',
+    '/buyer-checkout',
+    '/camera',
+    '/capture',
+    '/live',
+    '/store-preview',
+    '/design-canvas',
+    '/onboarding',
+    '/sign-in',
+    '/sign-up',
+  ].some(route => pathname.includes(route));
+
+  if (!isRoleLoaded || role !== 'seller' || keyboardVisible || Platform.OS === 'web' || blockedRoute) return null;
 
   const choose = (route: string) => {
     setOpen(false);

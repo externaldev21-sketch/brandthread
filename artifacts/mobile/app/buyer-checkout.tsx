@@ -31,6 +31,11 @@ import {
   SP, SUCCESS, SUCCESS_DIM, SUBTLE, COMP, ICON
 } from '@/lib/theme';
 import { formatCents } from '@/lib/money';
+import {
+  getCheckoutBlockingSection,
+  getFirstIncompleteCheckoutSection,
+  mergeCheckoutFormState,
+} from '@/lib/checkoutReadiness';
 import { CheckoutSkeleton, HapticSwitch } from '@/components/BrandthreadUI';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 
@@ -66,6 +71,41 @@ function Progress({ step }: { step: CheckoutStep }) {
       {STEPS.slice(0, 3).map((item, itemIndex) => (
         <View key={item} style={[styles.progressSegment, itemIndex <= index && styles.progressSegmentActive]} />
       ))}
+    </View>
+  );
+}
+
+type GuidedCheckoutSection = 'information' | 'delivery' | 'review';
+
+function GuidedSection({ title, summary, expanded, complete, onPress, children }: {
+  title: string;
+  summary: string;
+  expanded: boolean;
+  complete: boolean;
+  onPress: () => void;
+  children: React.ReactNode;
+}) {
+  const { theme } = useAppTheme();
+  const styles = makeStyles(theme);
+  return (
+    <View style={styles.guidedSection}>
+      <TouchableOpacity
+        style={styles.guidedHeader}
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+        accessibilityLabel={`${title}. ${summary}`}
+      >
+        <View style={[styles.guidedStatus, complete && styles.guidedStatusComplete]}>
+          <Feather name={complete ? 'check' : 'circle'} size={14} color={complete ? BG : MUTED} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.guidedTitle}>{title}</Text>
+          <Text style={styles.guidedSummary} numberOfLines={1}>{summary}</Text>
+        </View>
+        <Feather name={expanded ? 'chevron-up' : 'chevron-down'} size={19} color={MUTED} />
+      </TouchableOpacity>
+      {expanded && <View style={styles.guidedBody}>{children}</View>}
     </View>
   );
 }
@@ -465,6 +505,7 @@ export default function BuyerCheckoutScreen() {
   const [canRetryPayment, setCanRetryPayment] = useState(false);
   const [orders, setOrders] = useState<string[]>([]);
   const [pendingSessionIds, setPendingSessionIds] = useState<string[]>([]);
+  const [expandedSection, setExpandedSection] = useState<GuidedCheckoutSection>('information');
   const paid = useRef(new Map<string, string>());
 
   useEffect(() => { (async () => {
@@ -475,8 +516,14 @@ export default function BuyerCheckoutScreen() {
       next = await createCheckoutSession(cart, source === 'buynow');
     }
     if (next.step === 'contact' || next.step === 'shipping' || next.step === 'discounts' || next.step === 'payment') next.step = 'information';
-    setSession(next); setContact(next.contact ?? { orderUpdates: 'email', marketingConsent: false });
-    setAddress(next.shippingAddress ?? { country: 'US', saveAddress: true });
+    const restoredContact: Partial<CheckoutContact> = next.contact ?? { orderUpdates: 'email', marketingConsent: false };
+    const restoredAddress: Partial<CheckoutAddress> & { saveAddress?: boolean; label?: string } =
+      next.shippingAddress ?? { country: 'US', saveAddress: true };
+    const firstIncomplete = getFirstIncompleteCheckoutSection(restoredContact, restoredAddress, next);
+    if (next.step !== 'confirmation') next.step = firstIncomplete;
+    setSession(next); setContact(restoredContact);
+    setAddress(restoredAddress);
+    setExpandedSection(firstIncomplete);
     const restoredOrders: string[] = [];
     const restoredPending: string[] = [];
     for (const [sellerId, payment] of Object.entries(next.paidGroups ?? {})) {
@@ -523,7 +570,11 @@ export default function BuyerCheckoutScreen() {
     });
   };
 
-  const persist = async (next: CheckoutSession) => { setSession(next); await saveCheckoutProgress(next); };
+  const persist = async (next: CheckoutSession) => {
+    const snapshot = mergeCheckoutFormState(next, contact, address);
+    setSession(snapshot);
+    await saveCheckoutProgress(snapshot);
+  };
   const current = session as CheckoutSession;
   const validateInformation = () => {
     const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email ?? '');
@@ -552,16 +603,36 @@ export default function BuyerCheckoutScreen() {
     if (current.step === 'information') {
       if (!validateInformation() || !await validateServerCart()) return;
       await persist({ ...current, contact: contact as CheckoutContact, shippingAddress: address as CheckoutAddress, step: 'delivery' });
+      setExpandedSection('delivery');
       return;
     }
     if (current.step === 'delivery') {
+      if (current.deliveryGroups.some(group => !group.selectedMethodId)) {
+        Alert.alert('Choose delivery', 'Select a delivery option for every seller before reviewing your order.');
+        return;
+      }
       if (!await validateServerCart()) return;
       await persist({ ...current, step: 'review' });
+      setExpandedSection('review');
       return;
     }
     if (current.step === 'review') {
-      if (current.acknowledgments.some(ack => ack.required && !ack.acknowledged) || !await validateServerCart()) {
-        if (current.acknowledgments.some(ack => ack.required && !ack.acknowledged)) Alert.alert('Acknowledgment required', 'Please accept the required policies before paying.');
+      const blockingSection = getCheckoutBlockingSection(contact, address, current);
+      if (blockingSection === 'information') {
+        setExpandedSection('information');
+        validateInformation();
+        return;
+      }
+      if (blockingSection === 'delivery') {
+        setExpandedSection('delivery');
+        Alert.alert('Choose delivery', 'Select a delivery option for every seller before paying.');
+        return;
+      }
+      if (blockingSection === 'acknowledgments' || !await validateServerCart()) {
+        if (blockingSection === 'acknowledgments') {
+          setExpandedSection('review');
+          Alert.alert('Acknowledgment required', 'Please accept the required policies before paying.');
+        }
         return;
       }
       await pay();
@@ -699,16 +770,34 @@ export default function BuyerCheckoutScreen() {
     setPlacing(false);
   }, [api, current, orders, pendingSessionIds]);
   if (loading || !session) return <CheckoutSkeleton />;
+  const informationComplete = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email ?? '')
+    && !!address.firstName && !!address.lastName && !!address.line1 && !!address.city
+    && !!address.state && (address.postalCode ?? '').trim().length >= 3 && !!address.country;
+  const deliveryComplete = current.deliveryGroups.every(group => !!group.selectedMethodId);
+  const reviewComplete = current.acknowledgments.every(ack => !ack.required || ack.acknowledged);
+  const openSection = (step: GuidedCheckoutSection) => {
+    setExpandedSection(step);
+  };
   const label = current.step === 'review'
     ? canRetryPayment ? 'Try a different card' : `Continue to Stripe · ${money(current.summary.totalCents)}`
     : 'Continue';
   return (
     <KeyboardAvoidingView style={styles.root} behavior="padding" keyboardVerticalOffset={0}>
-       {current.step !== 'confirmation' && <View style={[styles.header, { paddingTop: insets.top + SP.xs }]}><TouchableOpacity style={styles.back} onPress={() => { const index = STEPS.indexOf(current.step); if (index <= 0) router.back(); else void persist({ ...current, step: STEPS[index - 1] }); }} accessibilityRole="button" accessibilityLabel="Back"><Feather name="chevron-left" size={ICON.md} color={FG} /></TouchableOpacity><View style={{ flex: 1, alignItems: 'center' }}><Text style={styles.stepLabel}>{current.step === 'information' ? 'Information' : current.step === 'delivery' ? 'Delivery' : 'Review & Pay'}</Text><Progress step={current.step} /></View><View style={styles.back} /></View>}
+       {current.step !== 'confirmation' && <View style={[styles.header, { paddingTop: insets.top + SP.xs }]}><TouchableOpacity style={styles.back} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back"><Feather name="chevron-left" size={ICON.md} color={FG} /></TouchableOpacity><View style={{ flex: 1, alignItems: 'center' }}><Text style={styles.stepLabel}>Secure checkout</Text><Progress step={current.step} /></View><View style={styles.back} /></View>}
       <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + (current.step === 'confirmation' ? 30 : 105) }} keyboardShouldPersistTaps="handled">
-        {current.step === 'information' && <Information contact={contact} address={address} onContact={setContact} onAddress={setAddress} savedAddresses={savedAddresses} onSelectAddress={handleSelectAddress} />}
-        {current.step === 'delivery' && <Delivery session={current} onSelect={(sellerId, methodId) => void persist({ ...current, deliveryGroups: current.deliveryGroups.map(group => group.sellerId === sellerId ? { ...group, selectedMethodId: methodId } : group) })} onApply={async code => { const discount = await applyDiscount(code, current.summary.subtotalCents, current.discounts); await persist({ ...current, discounts: [...current.discounts.filter(item => item.code !== discount.code), discount] }); }} onRemove={code => void removeDiscount(code, current.discounts).then(discounts => persist({ ...current, discounts }))} />}
-        {current.step === 'review' && <Review session={current} onAck={(key, checked) => void persist({ ...current, acknowledgments: current.acknowledgments.map(ack => ack.key === key ? { ...ack, acknowledged: checked } : ack) })} />}
+         {current.step !== 'confirmation' && (
+           <>
+             <GuidedSection title="Contact & shipping address" summary={informationComplete ? `${contact.email} · ${address.city}, ${address.state}` : 'Add your contact and delivery address'} expanded={expandedSection === 'information'} complete={informationComplete} onPress={() => openSection('information')}>
+               <Information contact={contact} address={address} onContact={setContact} onAddress={setAddress} savedAddresses={savedAddresses} onSelectAddress={handleSelectAddress} />
+             </GuidedSection>
+             <GuidedSection title="Delivery & promo" summary={deliveryComplete ? `${current.deliveryGroups.length} delivery choice${current.deliveryGroups.length === 1 ? '' : 's'} selected` : 'Choose delivery and add a promo code'} expanded={expandedSection === 'delivery'} complete={deliveryComplete} onPress={() => openSection('delivery')}>
+               <Delivery session={current} onSelect={(sellerId, methodId) => void persist({ ...current, deliveryGroups: current.deliveryGroups.map(group => group.sellerId === sellerId ? { ...group, selectedMethodId: methodId } : group) })} onApply={async code => { const discount = await applyDiscount(code, current.summary.subtotalCents, current.discounts); await persist({ ...current, discounts: [...current.discounts.filter(item => item.code !== discount.code), discount] }); }} onRemove={code => void removeDiscount(code, current.discounts).then(discounts => persist({ ...current, discounts }))} />
+             </GuidedSection>
+             <GuidedSection title="Review & policies" summary={`${money(current.summary.totalCents)} · Stripe secure payment`} expanded={expandedSection === 'review'} complete={reviewComplete} onPress={() => openSection('review')}>
+               <Review session={current} onAck={(key, checked) => void persist({ ...current, acknowledgments: current.acknowledgments.map(ack => ack.key === key ? { ...ack, acknowledged: checked } : ack) })} />
+             </GuidedSection>
+           </>
+         )}
         {current.step === 'confirmation' && <Confirmation session={current} orderNumbers={orders} finalizing={pendingSessionIds.length > 0} onRefresh={refreshOrders} refreshing={placing} />}
          {!!error && <View style={styles.error}>
            <Feather name="alert-circle" size={16} color={RED} style={{ marginTop: 2 }} />
@@ -733,6 +822,13 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   root: { flex: 1, backgroundColor: BG }, loading: { flex: 1, backgroundColor: BG, justifyContent: 'center', alignItems: 'center' },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingBottom: SP.sm }, back: { width: COMP.minTouchTarget, height: COMP.minTouchTarget, justifyContent: 'center', alignItems: 'center' }, stepLabel: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, marginBottom: 5 }, progress: { flexDirection: 'row', gap: 4, width: 120 }, progressSegment: { height: 4, flex: 1, borderRadius: 2, backgroundColor: CARD_ELEVATED }, progressSegmentActive: { backgroundColor: PURPLE },
    card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md, marginBottom: SP.md }, sectionTitle: { fontFamily: FONT.semibold, fontSize: FS.base, color: FG, marginBottom: SP.sm }, field: { marginBottom: SP.sm }, fieldLabel: { color: MUTED, fontFamily: FONT.semibold, fontSize: FS.xs, textTransform: 'uppercase', marginBottom: 4 }, input: { minHeight: COMP.inputH, borderRadius: RADIUS.md, backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, paddingHorizontal: SP.md, paddingVertical: SP.sm }, twoCol: { flexDirection: 'row', gap: SP.sm }, toggleRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingTop: SP.sm }, toggleTitle: { color: FG, fontFamily: FONT.medium, fontSize: FS.sm }, muted: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19 },
+   guidedSection: { borderWidth: 1, borderColor: BORDER, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.lg, overflow: 'hidden', marginBottom: SP.sm },
+   guidedHeader: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm },
+   guidedStatus: { width: 26, height: 26, borderRadius: 13, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+   guidedStatusComplete: { backgroundColor: SUCCESS, borderColor: SUCCESS },
+   guidedTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },
+   guidedSummary: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: 3 },
+   guidedBody: { paddingHorizontal: SP.sm, paddingBottom: SP.sm },
   method: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.sm, borderRadius: RADIUS.md, marginBottom: 6 }, methodActive: { backgroundColor: PURPLE_DIM }, radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: MUTED }, radioActive: { borderColor: PURPLE, backgroundColor: PURPLE }, methodTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm }, promoToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm }, promoRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'center' }, applyButton: { backgroundColor: PURPLE_DIM, borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: 13 }, applyText: { color: PURPLE_LIGHT, fontFamily: FONT.bold, fontSize: FS.sm }, discountRow: { flexDirection: 'row', justifyContent: 'space-between', gap: SP.sm, marginTop: SP.sm }, discountText: { flex: 1, color: SUCCESS, fontFamily: FONT.regular, fontSize: FS.sm }, removeText: { color: PURPLE_LIGHT, fontFamily: FONT.semibold, fontSize: FS.sm },
    address: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, marginBottom: SP.md }, line: { flexDirection: 'row', justifyContent: 'space-between', gap: SP.sm, paddingVertical: 5 }, lineName: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm }, divider: { height: 1, backgroundColor: BORDER, marginVertical: SP.sm }, total: { color: FG, fontFamily: FONT.bold, fontSize: FS.lg }, multiSeller: { flexDirection: 'row', gap: SP.sm, backgroundColor: CYAN_DIM, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md }, multiSellerText: { flex: 1, color: CYAN, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 }, ack: { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', minHeight: COMP.minTouchTarget, marginBottom: SP.sm }, checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1, borderColor: MUTED, alignItems: 'center', justifyContent: 'center', marginTop: 1 }, checkboxActive: { backgroundColor: PURPLE, borderColor: PURPLE }, ackText: { flex: 1, color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
   bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: SP.md, backgroundColor: BG, borderTopWidth: 1, borderColor: BORDER }, continue: { overflow: 'hidden', borderRadius: RADIUS.lg, ...SHADOW_PURPLE }, continueGradient: { height: COMP.buttonH, alignItems: 'center', justifyContent: 'center' }, continueText: { fontFamily: FONT.bold, fontSize: FS.base }, error: { flexDirection: 'row', gap: SP.sm, backgroundColor: RED_DIM, padding: SP.md, borderRadius: RADIUS.md }, errorText: { color: RED, flex: 1, fontFamily: FONT.medium, fontSize: FS.sm, lineHeight: 20 }, retryButton: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: SP.sm, paddingVertical: 7, paddingHorizontal: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: RED }, retryText: { color: RED, fontFamily: FONT.semibold, fontSize: FS.sm },
