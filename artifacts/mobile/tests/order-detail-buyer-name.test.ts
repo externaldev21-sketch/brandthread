@@ -71,15 +71,23 @@ vi.mock('@/lib/theme', () => ({
 import { adaptApiOrder } from '@/app/order-detail';
 
 describe('seller order detail buyer identity adapter', () => {
-  it('keeps the buyer display name when Stripe order responses have no customer record', () => {
+  it('keeps the guest shipping name when no customer record exists', () => {
     const order = adaptApiOrder({
-      id: 'stripe-order-1',
+      id: 'guest-order-1',
       ownerId: 'seller-1',
-      buyerId: 'buyer-1',
+      buyerId: null,
       customerId: null,
       customer: null,
-      customerName: 'Stripe Checkout Buyer',
-      orderNumber: 'BT-STRIPE-0001',
+      guestEmail: 'guest@example.com',
+      shippingAddress: {
+        name: 'Guest Checkout Buyer',
+        street: '123 Test Street',
+        city: 'Portland',
+        state: 'OR',
+        zip: '97205',
+        country: 'US',
+      },
+      orderNumber: 'BT-GUEST-0001',
       status: 'processing',
       totalCents: 2500,
       subtotalCents: 2500,
@@ -89,9 +97,10 @@ describe('seller order detail buyer identity adapter', () => {
     });
 
     expect(order.customer).toMatchObject({
-      id: 'buyer-1',
-      name: 'Stripe Checkout Buyer',
+      id: '',
+      name: 'Guest Checkout Buyer',
+      email: 'guest@example.com',
     });
-    expect(order.customer.initials).toBe('SC');
+    expect(order.customer.initials).toBe('GC');
   });
 });

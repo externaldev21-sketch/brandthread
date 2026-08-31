@@ -3,12 +3,11 @@ import express from "express";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
 import crypto from "node:crypto";
-import { db, orders, users } from "@workspace/db";
+import { db, orders } from "@workspace/db";
 import { eq } from "drizzle-orm";
 
 const suffix = crypto.randomBytes(6).toString("hex");
 const sellerId = `order-detail-seller-${suffix}`;
-const buyerId = `order-detail-buyer-${suffix}`;
 let orderId = "";
 let server: Server;
 let base = "";
@@ -34,23 +33,23 @@ async function getOrder(id: string) {
 }
 
 beforeAll(async () => {
-  await db.insert(users).values({
-    clerkId: buyerId,
-    email: `${buyerId}@test.local`,
-    name: "Stripe Buyer Account",
-    displayName: "Stripe Checkout Buyer",
-    role: "buyer",
-    accountType: "buyer",
-  });
-
   const [order] = await db.insert(orders).values({
     ownerId: sellerId,
-    buyerId,
+    buyerId: null,
+    guestEmail: `guest-${suffix}@test.local`,
     orderNumber: `STRIPE-${suffix}`,
     status: "processing",
     totalCents: 2500,
     subtotalCents: 2500,
     stripeCheckoutSessionId: `cs_order_detail_${suffix}`,
+    shippingAddress: {
+      name: "Guest Checkout Buyer",
+      street: "123 Test Street",
+      city: "Portland",
+      state: "OR",
+      zip: "97205",
+      country: "US",
+    },
   }).returning({ id: orders.id });
   orderId = order.id;
 
@@ -66,20 +65,25 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await db.delete(orders).where(eq(orders.id, orderId));
-  await db.delete(users).where(eq(users.clerkId, buyerId));
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
 describe("GET /api/orders/:id buyer identity", () => {
-  it("resolves a Stripe-originated order's buyerId when customerId is missing", async () => {
+  it("keeps guest checkout identity when buyerId and customerId are missing", async () => {
     const response = await getOrder(orderId);
 
     expect(response.status).toBe(200);
+    expect(response.body.buyerId).toBeNull();
     expect(response.body.customerId).toBeNull();
+    expect(response.body.guestEmail).toBe(`guest-${suffix}@test.local`);
+    expect(response.body.shippingAddress).toMatchObject({
+      name: "Guest Checkout Buyer",
+      street: "123 Test Street",
+    });
     expect(response.body.customer).toMatchObject({
-      id: expect.any(String),
-      name: "Stripe Checkout Buyer",
-      email: `${buyerId}@test.local`,
+      id: "",
+      name: "Guest Checkout Buyer",
+      email: `guest-${suffix}@test.local`,
     });
   });
 });

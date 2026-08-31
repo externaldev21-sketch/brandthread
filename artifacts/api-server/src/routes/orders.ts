@@ -287,6 +287,26 @@ router.get("/:id", async (req, res) => {
     }
   }
 
+  // Guest checkouts have no customer or user row. Keep their checkout identity
+  // in the same payload used by the seller detail screen so the UI does not
+  // replace a supplied shipping name with a generic customer label.
+  if (!customer && !order.buyerId) {
+    const guestName = typeof order.shippingAddress?.name === "string"
+      ? order.shippingAddress.name.trim()
+      : "";
+    const guestEmail = typeof order.guestEmail === "string"
+      ? order.guestEmail.trim()
+      : "";
+    customer = {
+      id: "",
+      name: guestName || "Guest Customer",
+      email: guestEmail,
+      orderCount: 1,
+      totalSpentCents: 0,
+      tags: [],
+    };
+  }
+
   res.json({ ...order, items, customer });
 });
 
