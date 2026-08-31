@@ -99,7 +99,7 @@ export const MY_USER_ID = 'me';
 export const MY_NAME    = 'Jordan';
 export const MY_HANDLE  = '@jordan';
 export const MY_INITIALS = 'J';
-export const MY_COLOR    = '#C7CDD5';
+export const MY_COLOR    = '#8B5CF6';
 
 // ─── Pub/Sub ─────────────────────────────────────────────────────────────────
 
@@ -427,6 +427,7 @@ export interface SellerThreadPost {
   feedEligibility:   'thread_eligible';
   caption:           string;
   hashtags:          string[];
+  styleTags?:        string[];
   mediaUris:         string[];
   thumbnailUri?:     string;
   aspectRatio:       '9:16' | '3:4' | '1:1';
@@ -437,7 +438,7 @@ export interface SellerThreadPost {
   isDeleted:         boolean;
   sound?:            SellerPostSound;
   productTags:       SellerPostProductTag[];
-  visibility:        { allowComments: boolean; allowReposts: boolean; showLikeCount: boolean };
+  visibility:        { isPublic?: boolean; allowComments: boolean; allowReposts: boolean; showLikeCount: boolean };
   scheduledAt:       string | null;
   publishedAt?:      string;
   createdAt:         string;
@@ -456,6 +457,62 @@ async function ensureSellerPostsSeed(k: SocialKeys = K()): Promise<void> {
 }
 
 // ─── CRUD ──────────────────────────────────────────────────────────────────────
+
+function mapOwnedApiPost(p: any, userId: string): SellerThreadPost {
+  const now = iso();
+  const status = (['draft', 'scheduled', 'published', 'archived', 'deleted'].includes(p.postStatus)
+    ? p.postStatus
+    : 'published') as SellerThreadPost['postStatus'];
+  const authorName = p.seller?.brandName ?? p.seller?.displayName ?? 'Seller';
+  return {
+    id:              p.id,
+    authorId:        p.userId ?? userId,
+    authorAccountType: 'seller',
+    authorName,
+    authorHandle:    '@' + authorName.toLowerCase().replace(/[^a-z0-9]/g, ''),
+    authorInitials:  authorName.slice(0, 2).toUpperCase(),
+    authorColor:     '#8B5CF6',
+    sellerId:        p.userId ?? userId,
+    brandId:         p.userId ?? userId,
+    feedEligibility: 'thread_eligible',
+    caption:         p.caption ?? '',
+    hashtags:        Array.isArray(p.hashtags) ? p.hashtags : [],
+    styleTags:       Array.isArray(p.styleTags) ? p.styleTags : [],
+    mediaUris:       Array.isArray(p.mediaUrls) && p.mediaUrls.length > 0
+      ? p.mediaUrls
+      : Array.isArray(p.mediaUris) && p.mediaUris.length > 0
+        ? p.mediaUris
+        : (p.mediaUrl ? [p.mediaUrl] : []),
+    thumbnailUri:    p.thumbnailUrl ?? p.thumbnailUri ?? undefined,
+    aspectRatio:     p.aspectRatio ?? '9:16',
+    contentType:     p.mediaType ?? p.contentType ?? 'video',
+    postStatus:      status,
+    isDraft:         status === 'draft',
+    isArchived:      status === 'archived',
+    isDeleted:       status === 'deleted',
+    sound:           p.sound ?? undefined,
+    productTags:     (Array.isArray(p.taggedProducts) ? p.taggedProducts : p.productTags ?? []).map((tag: any) => ({
+      productId: tag.productId,
+      productName: tag.productName ?? tag.name ?? 'Product',
+      priceCents: typeof tag.priceCents === 'number' ? tag.priceCents : 0,
+      variantId: tag.variantId,
+      slideIndex: tag.slideIndex,
+      timestamp: tag.timestamp,
+    })),
+    visibility:      p.visibility ?? { allowComments: true, allowReposts: true, showLikeCount: true },
+    scheduledAt:     p.scheduledAt ?? null,
+    publishedAt:     p.publishedAt ?? (status === 'published' ? p.createdAt ?? now : undefined),
+    createdAt:       p.createdAt ?? now,
+    updatedAt:       p.updatedAt ?? p.createdAt ?? now,
+    likesCount:      p.likesCount ?? 0,
+    commentsCount:   p.commentsCount ?? 0,
+    repostsCount:    p.repostsCount ?? 0,
+    savedCount:      p.savedCount ?? 0,
+    likedByMe:       false,
+    savedByMe:       false,
+    repostedByMe:    false,
+  };
+}
 
 export async function createSellerPost(params: {
   contentType: string;
@@ -479,64 +536,42 @@ export async function createSellerPost(params: {
   scheduledAt?: string | null;
 }): Promise<SellerThreadPost> {
   const k = K();
-  if (params.isDraft) {
-    throw new Error('Saving drafts is not available yet. Please keep editing this post and publish when it is ready.');
-  }
-  if (params.scheduledAt) {
-    throw new Error('Scheduling posts is not available yet. Choose “Publish now” to continue.');
-  }
-
   const created = await serviceRequest<any>('/api/posts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       mediaUrl: params.mediaUrl ?? params.mediaUris?.[0],
+      thumbnailUrl: params.thumbnailUri,
       mediaPath: params.mediaPath,
       thumbnailPath: params.thumbnailPath,
+      mediaUrls: params.mediaUris ?? [],
       mediaType: params.contentType,
+      aspectRatio: params.aspectRatio ?? '9:16',
       caption: params.caption,
-      styleTags: [...(params.styleTags ?? []), ...params.hashtags],
+      hashtags: params.hashtags,
+      styleTags: params.styleTags ?? [],
+      sound: params.sound ?? null,
+      visibility: params.visibility,
       taggedProductIds: (params.productTags ?? [])
         .map(t => t.productId)
         .filter(id => /^[0-9a-f-]{36}$/i.test(id)),
+      isDraft: params.isDraft === true,
+      scheduledAt: params.isDraft ? null : (params.scheduledAt ?? null),
     }),
   });
 
-  const profile = await getMyProfile(k);
   const existing = await load<SellerThreadPost[]>(k.sellerPosts, []);
-  const now = iso();
-  const post: SellerThreadPost = {
-    id: created.id,
-    authorId: k.userId,
-    authorAccountType: 'seller',
-    authorName: profile.name,
-    authorHandle: '@' + profile.username,
-    authorInitials: profile.avatarInitials,
-    authorColor: profile.avatarColor,
-    sellerId: k.userId,
-    brandId: k.userId,
-    feedEligibility: 'thread_eligible',
-    caption: params.caption,
-    hashtags: params.hashtags,
-     mediaUris: created.mediaUrl ? [created.mediaUrl] : params.mediaUrl ? [params.mediaUrl] : (params.mediaUris ?? []),
+  const post = {
+    ...mapOwnedApiPost(created, k.userId),
+    mediaUris: created.mediaUrl ? [created.mediaUrl] : params.mediaUris ?? [],
     thumbnailUri: created.thumbnailUrl ?? params.thumbnailUri,
     aspectRatio: params.aspectRatio ?? '9:16',
-    contentType: params.contentType,
-    postStatus: 'published',
-    isDraft: false,
-    isArchived: false,
-    isDeleted: false,
+    styleTags: params.styleTags ?? [],
     sound: params.sound ?? undefined,
     productTags: params.productTags ?? [],
     visibility: params.visibility ?? { allowComments: true, allowReposts: true, showLikeCount: true },
-    scheduledAt: null,
-    publishedAt: created.createdAt ?? now,
-    createdAt: created.createdAt ?? now,
-    updatedAt: created.updatedAt ?? created.createdAt ?? now,
-    likesCount: 0, commentsCount: 0, repostsCount: 0, savedCount: 0,
-    likedByMe: false, savedByMe: false, repostedByMe: false,
   };
-  await save(k.sellerPosts, [post, ...existing]);
+  if (_socialUserId === k.userId) await save(k.sellerPosts, [post, ...existing.filter(p => p.id !== post.id)]);
   notify();
   return post;
 }
@@ -544,19 +579,49 @@ export async function createSellerPost(params: {
 export async function updateSellerPost(
   id: string,
   patch: Partial<Pick<SellerThreadPost,
-    'caption' | 'hashtags' | 'mediaUris' | 'thumbnailUri' | 'aspectRatio' |
+    'caption' | 'hashtags' | 'styleTags' | 'mediaUris' | 'thumbnailUri' | 'aspectRatio' |
     'contentType' | 'postStatus' | 'isDraft' | 'isArchived' | 'isDeleted' |
     'sound' | 'productTags' | 'visibility' | 'scheduledAt' | 'publishedAt'
   >>,
-): Promise<void> {
+): Promise<SellerThreadPost> {
   const k = K();
-  await ensureSellerPostsSeed(k);
+  const updated = await serviceRequest<any>(`/api/posts/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      mediaUrl: patch.mediaUris?.[0],
+      mediaUrls: patch.mediaUris,
+      mediaType: patch.contentType,
+      aspectRatio: patch.aspectRatio,
+      caption: patch.caption,
+      hashtags: patch.hashtags,
+      styleTags: patch.styleTags,
+      sound: patch.sound,
+      visibility: patch.visibility,
+      taggedProductIds: patch.productTags?.map(tag => tag.productId),
+      isDraft: patch.isDraft,
+      postStatus: patch.postStatus,
+      scheduledAt: patch.scheduledAt,
+    }),
+  });
+  const canonical = mapOwnedApiPost(updated, k.userId);
   const posts = await load<SellerThreadPost[]>(k.sellerPosts, []);
   const idx = posts.findIndex(p => p.id === id);
-  if (idx < 0) return;
-  posts[idx] = { ...posts[idx], ...patch, updatedAt: iso() };
-  await save(k.sellerPosts, posts);
+  const merged = {
+    ...(idx >= 0 ? posts[idx] : canonical),
+    ...canonical,
+    mediaUris: patch.mediaUris ?? canonical.mediaUris,
+    productTags: patch.productTags ?? canonical.productTags,
+    aspectRatio: patch.aspectRatio ?? canonical.aspectRatio,
+    styleTags: patch.styleTags ?? canonical.styleTags,
+    sound: patch.sound ?? (idx >= 0 ? posts[idx].sound : canonical.sound),
+    visibility: patch.visibility ?? (idx >= 0 ? posts[idx].visibility : canonical.visibility),
+    thumbnailUri: patch.thumbnailUri ?? (idx >= 0 ? posts[idx].thumbnailUri : canonical.thumbnailUri),
+  };
+  if (idx >= 0) posts[idx] = merged;
+  else posts.unshift(merged);
+  if (_socialUserId === k.userId) await save(k.sellerPosts, posts);
   notify();
+  return merged;
 }
 
 export async function archiveSellerPost(id: string): Promise<void> {
@@ -564,7 +629,11 @@ export async function archiveSellerPost(id: string): Promise<void> {
 }
 
 export async function deleteSellerPost(id: string): Promise<void> {
-  await updateSellerPost(id, { isDeleted: true, postStatus: 'deleted' });
+  const k = K();
+  await serviceRequest(`/api/posts/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  const posts = await load<SellerThreadPost[]>(k.sellerPosts, []);
+  if (_socialUserId === k.userId) await save(k.sellerPosts, posts.filter(post => post.id !== id));
+  notify();
 }
 
 export async function likeSellerPost(id: string): Promise<void> {
@@ -593,57 +662,15 @@ export async function getSellerPosts(): Promise<SellerThreadPost[]> {
   const k = K();
   if (k.userId === 'anon') return [];
 
-  const apiPosts = await serviceRequest<any[]>(
-    `/api/public/posts?ownerId=${encodeURIComponent(k.userId)}`,
-  );
-  const now = iso();
-  const mapped: SellerThreadPost[] = (Array.isArray(apiPosts) ? apiPosts : []).map(p => ({
-    id:              p.id,
-    authorId:        p.userId ?? k.userId,
-    authorAccountType: 'seller' as const,
-    authorName:      p.seller?.brandName ?? p.seller?.displayName ?? 'Seller',
-    authorHandle:    '@' + (p.seller?.brandName ?? p.seller?.displayName ?? 'seller').toLowerCase().replace(/[^a-z0-9]/g, ''),
-    authorInitials:  (p.seller?.brandName ?? p.seller?.displayName ?? 'S').slice(0, 2).toUpperCase(),
-    authorColor:     '#C7CDD5',
-    sellerId:        p.userId ?? k.userId,
-    brandId:         p.userId ?? k.userId,
-    feedEligibility: 'thread_eligible' as const,
-    caption:         p.caption ?? '',
-    hashtags:        p.styleTags ?? [],
-    mediaUris:       p.mediaUrl ? [p.mediaUrl] : [],
-    thumbnailUri:    p.thumbnailUrl ?? undefined,
-    aspectRatio:     '9:16',
-    contentType:     (p.mediaType ?? 'video') as SellerThreadPost['contentType'],
-    postStatus:      'published' as const,
-    isDraft:         false,
-    isArchived:      false,
-    isDeleted:       false,
-    sound:           undefined,
-    productTags:     (p.taggedProducts ?? []).map((tag: any) => ({
-      productId: tag.productId,
-      productName: tag.name ?? 'Product',
-      priceCents: typeof tag.priceCents === 'number' ? tag.priceCents : 0,
-    })),
-    visibility:      { allowComments: true, allowReposts: true, showLikeCount: true },
-    scheduledAt:     null,
-    publishedAt:     p.createdAt ?? now,
-    createdAt:       p.createdAt ?? now,
-    updatedAt:       p.updatedAt ?? p.createdAt ?? now,
-    likesCount:      p.likesCount ?? 0,
-    commentsCount:   p.commentsCount ?? 0,
-    repostsCount:    p.repostsCount ?? 0,
-    savedCount:      0,
-    likedByMe:       false,
-    savedByMe:       false,
-    repostedByMe:    false,
-  }));
+  const apiPosts = await serviceRequest<any[]>('/api/posts/mine');
+  const mapped = (Array.isArray(apiPosts) ? apiPosts : []).map(post => mapOwnedApiPost(post, k.userId));
   if (_socialUserId === k.userId) await save(k.sellerPosts, mapped);
   return mapped;
 }
 
 /** Maps a raw API post object from /api/posts/feed to a SellerThreadPost. */
 function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
-  const ACCENT_POOL = ['#C7CDD5','#0F766E','#BE185D','#B45309','#1D4ED8','#0891B2','#059669'];
+  const ACCENT_POOL = ['#7C3AED','#0F766E','#BE185D','#B45309','#1D4ED8','#0891B2','#059669'];
   const now = iso();
   const authorName     = p.seller?.brandName ?? p.seller?.displayName ?? 'Seller';
   const authorHandle   = '@' + authorName.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -661,22 +688,23 @@ function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
     brandId:           p.userId,
     feedEligibility:   'thread_eligible' as const,
     caption:           p.caption   ?? '',
-    hashtags:          p.styleTags ?? [],
-    mediaUris:         p.mediaUrl  ? [p.mediaUrl] : [],
-    thumbnailUri:      p.thumbnailUrl ?? undefined,
-    aspectRatio:       '9:16' as SellerThreadPost['aspectRatio'],
+    hashtags:          p.hashtags ?? [],
+    styleTags:         p.styleTags ?? [],
+    mediaUris:         Array.isArray(p.mediaUrls) && p.mediaUrls.length > 0 ? p.mediaUrls : (p.mediaUrl ? [p.mediaUrl] : []),
+    thumbnailUri:      undefined,
+    aspectRatio:       (p.aspectRatio ?? '9:16') as SellerThreadPost['aspectRatio'],
     contentType:       (p.mediaType ?? 'video') as SellerThreadPost['contentType'],
     postStatus:        'published' as const,
     isDraft:           false,
     isArchived:        false,
     isDeleted:         false,
-    sound:             undefined,
+    sound:             p.sound ?? undefined,
     productTags:       (p.taggedProducts ?? []).map((t: any) => ({
       productId:   t.productId,
       productName: t.name ?? '',
       priceCents: typeof t.priceCents === 'number' ? t.priceCents : 0,
     })),
-    visibility:    { allowComments: true, allowReposts: true, showLikeCount: true },
+    visibility:    p.visibility ?? { allowComments: true, allowReposts: true, showLikeCount: true },
     scheduledAt:   null,
     publishedAt:   p.createdAt ?? now,
     createdAt:     p.createdAt ?? now,
@@ -887,7 +915,7 @@ export async function createOrGetConversation(params: {
       participant: {
         userId: params.participant.userId, name: params.participant.name,
         handle: params.participant.handle ?? '', initials: params.participant.initials ?? '',
-         color: params.participant.color ?? '#C7CDD5', accountType: params.participant.accountType ?? 'seller',
+        color: params.participant.color ?? '#8B5CF6', accountType: params.participant.accountType ?? 'seller',
       },
       myInfo: { name: profile.name, handle: `@${profile.username}`, initials: profile.avatarInitials, color: profile.avatarColor, accountType: 'buyer' },
       contextOrderId: params.contextOrderId, contextOrderNumber: params.contextOrderNumber,

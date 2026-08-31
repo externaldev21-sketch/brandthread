@@ -20,7 +20,10 @@ import { Feather } from '@expo/vector-icons';
 import { FONT, FS } from '@/lib/theme';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { getTaggableProducts } from '@/services/productService';
-import { createSellerPost } from '@/services/socialService';
+import {
+  createSellerPost, getSellerPosts, updateSellerPost,
+  type SellerThreadPost,
+} from '@/services/socialService';
 import StyleTagsPicker from '@/components/StyleTagsPicker';
 import type { Product } from '@/services/productTypes';
 import type {
@@ -133,8 +136,9 @@ export default function CreatePostScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
-  const params = useLocalSearchParams<{ accountType?: string }>();
+  const params = useLocalSearchParams<{ accountType?: string; editId?: string }>();
   const isBuyer = params.accountType === 'buyer';
+  const editId = typeof params.editId === 'string' ? params.editId : undefined;
 
   // ── Step ──
   const [step, setStep] = useState<Step>('media-pick');
@@ -194,6 +198,8 @@ export default function CreatePostScreen() {
 
   // ── Publishing ──
   const [isPublishing, setIsPublishing] = useState(false);
+  const [editingPost, setEditingPost] = useState<SellerThreadPost | null>(null);
+  const [loadingEdit, setLoadingEdit] = useState(!!editId);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   const topPad = Platform.OS === 'web' ? 20 : insets.top;
@@ -209,6 +215,63 @@ export default function CreatePostScreen() {
   }
 
   useEffect(() => { fetchTaggableProducts(); }, []);
+
+  useEffect(() => {
+    if (!editId) return;
+    let active = true;
+    setLoadingEdit(true);
+    getSellerPosts()
+      .then((posts) => {
+        if (!active) return;
+        const post = posts.find(item => item.id === editId);
+        if (!post) {
+          Alert.alert('Post not found', 'This post may have been deleted.', [
+            { text: 'OK', onPress: () => router.back() },
+          ]);
+          return;
+        }
+        setEditingPost(post);
+        setCaption(post.caption);
+        setHashtags(post.hashtags.map(tag => ({ tag })));
+        setStyleTags(post.styleTags ?? []);
+        setProductTags(post.productTags.map(tag => ({
+          productId: tag.productId,
+          productName: tag.productName,
+          priceCents: tag.priceCents,
+        })));
+        setSelectedSound(post.sound ?? null);
+        setVisibility({ isPublic: true, ...post.visibility });
+        setScheduledAt(post.scheduledAt);
+        setScheduledDateInput(post.scheduledAt ?? '');
+        setScheduleMode(post.postStatus === 'scheduled' ? 'schedule' : 'now');
+        if (post.contentType === 'video' && post.mediaUris[0]) {
+          setVideoClips([{
+            uri: post.mediaUris[0],
+            duration: 0,
+            id: `edit-video-${post.id}`,
+            speed: 1,
+            filter: 'none',
+          }]);
+          setSlidePhotos([]);
+        } else {
+          setSlidePhotos(post.mediaUris.map((uri, index) => ({
+            uri,
+            id: `edit-photo-${post.id}-${index}`,
+          })));
+          setVideoClips([]);
+        }
+        setActivePurpose(PURPOSE_CHIPS.find(chip => chip.contentType === post.contentType) ?? null);
+        setStep('post-details');
+      })
+      .catch(() => {
+        if (!active) return;
+        Alert.alert('Could not load post', 'Check your connection and try again.', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      })
+      .finally(() => { if (active) setLoadingEdit(false); });
+    return () => { active = false; };
+  }, [editId]);
 
   // Pick up camera capture result on focus-return
   useFocusEffect(
@@ -358,6 +421,52 @@ export default function CreatePostScreen() {
     setProductTags([]); setSelectedSound(null); setOverlayTexts([]);
   }
 
+  async function persistSellerPost(isDraft: boolean): Promise<void> {
+    const contentType = inferContentType();
+    const postStatus: SellerThreadPost['postStatus'] = isDraft
+      ? 'draft'
+      : scheduleMode === 'schedule' && scheduledAt
+        ? 'scheduled'
+        : 'published';
+    const mediaUris = composedVideo
+      ? [composedVideo.mediaUrl]
+      : videoClips.length > 0
+        ? videoClips.map(clip => clip.uri)
+        : slidePhotos.map(photo => photo.uri);
+    const values = {
+      contentType,
+      caption,
+      hashtags: hashtags.map(hashtag => hashtag.tag),
+      styleTags,
+      mediaUris,
+      mediaUrl: composedVideo?.mediaUrl ?? mediaUris[0],
+      mediaPath: composedVideo?.mediaPath,
+      thumbnailPath: composedVideo?.thumbnailPath,
+      thumbnailUri: composedVideo?.thumbnailUrl ?? editingPost?.thumbnailUri,
+      aspectRatio: '9:16' as const,
+      productTags: productTags.map(product => ({
+        productId: product.productId,
+        productName: product.productName,
+        priceCents: product.priceCents,
+      })),
+      sound: selectedSound ?? undefined,
+      visibility,
+      isDraft,
+      scheduledAt: isDraft || scheduleMode === 'now' ? null : scheduledAt,
+    };
+    if (editId) await updateSellerPost(editId, { ...values, postStatus });
+    else await createSellerPost(values);
+  }
+
+  if (loadingEdit) {
+    return (
+      <View style={[s.root, s.center, { paddingTop: topPad, paddingBottom: botPad }]}>
+        <ActivityIndicator color={colors.primary} />
+        <Text style={[s.doneSub, { marginTop: 12 }]}>Loading post…</Text>
+      </View>
+    );
+  }
+
   const totalVideoDuration = videoClips.reduce((sum, clip) => sum + clip.duration / clip.speed, 0);
 
   function updateTrim(nextStart: number, nextEnd: number) {
@@ -417,7 +526,7 @@ export default function CreatePostScreen() {
           <TouchableOpacity onPress={() => haptic(() => router.back())} style={s.iconBtn}>
             <Feather name="arrow-left" size={22} color={FG} />
           </TouchableOpacity>
-          <Text style={s.headerTitle}>{isBuyer ? 'Add to Story' : 'Create Post'}</Text>
+          <Text style={s.headerTitle}>{isBuyer ? 'Add to Story' : editId ? 'Edit Post' : 'Create Post'}</Text>
           <View style={{ width: 38 }} />
         </View>
 
@@ -760,7 +869,7 @@ export default function CreatePostScreen() {
             <TouchableOpacity onPress={() => haptic(() => setStep(videoClips.length > 0 ? 'video-edit' : 'media-pick'))} style={s.iconBtn}>
               <Feather name="arrow-left" size={22} color={FG} />
             </TouchableOpacity>
-            <Text style={s.headerTitle}>Post Details</Text>
+            <Text style={s.headerTitle}>{editId ? 'Edit Post' : 'Post Details'}</Text>
             <View style={{ width: 38 }} />
           </View>
 
@@ -985,22 +1094,7 @@ export default function CreatePostScreen() {
               onPress={async () => {
                 haptic(() => {});
                 try {
-                  await createSellerPost({
-                    contentType: ct,
-                    caption,
-                    hashtags: hashtags.map(h => h.tag),
-                    styleTags,
-                    mediaUris: videoClips.length > 0 && composedVideo ? [composedVideo.mediaUrl] : slidePhotos.map(p => p.uri),
-                    mediaUrl: composedVideo?.mediaUrl,
-                    mediaPath: composedVideo?.mediaPath,
-                    thumbnailPath: composedVideo?.thumbnailPath,
-                    thumbnailUri: composedVideo?.thumbnailUrl,
-                    aspectRatio: '9:16',
-                    productTags: productTags.map(p => ({ productId: p.productId, productName: p.productName, priceCents: p.priceCents })),
-                    sound: selectedSound ?? undefined,
-                    visibility,
-                    isDraft: true,
-                  });
+                  await persistSellerPost(true);
                   Alert.alert('Draft saved', 'Your draft has been saved.', [{ text: 'OK', onPress: () => router.back() }]);
                  } catch (error) {
                    Alert.alert('Draft not saved', error instanceof Error ? error.message : 'Could not save draft. Please try again.');
@@ -1018,26 +1112,20 @@ export default function CreatePostScreen() {
               onPress={async () => {
                 haptic(() => {});
                 if (isPublishing) return;
+                if (scheduleMode === 'schedule') {
+                  const scheduledTime = scheduledAt ? new Date(scheduledAt).getTime() : Number.NaN;
+                  if (!Number.isFinite(scheduledTime) || scheduledTime <= Date.now()) {
+                    Alert.alert(
+                      'Choose a future time',
+                      'Enter a valid date and time in the future before scheduling this post.',
+                    );
+                    return;
+                  }
+                }
                 setIsPublishing(true);
                 setStep('publishing');
                 try {
-                  await createSellerPost({
-                    contentType: ct,
-                    caption,
-                    hashtags: hashtags.map(h => h.tag),
-                    styleTags,
-                    mediaUris: videoClips.length > 0 && composedVideo ? [composedVideo.mediaUrl] : slidePhotos.map(p => p.uri),
-                    mediaUrl: composedVideo?.mediaUrl,
-                    mediaPath: composedVideo?.mediaPath,
-                    thumbnailPath: composedVideo?.thumbnailPath,
-                    thumbnailUri: composedVideo?.thumbnailUrl,
-                    aspectRatio: '9:16',
-                    productTags: productTags.map(p => ({ productId: p.productId, productName: p.productName, priceCents: p.priceCents })),
-                    sound: selectedSound ?? undefined,
-                    visibility,
-                    isDraft: false,
-                    scheduledAt: scheduleMode === 'schedule' ? scheduledAt : null,
-                  });
+                  await persistSellerPost(false);
                   setStep('done');
                  } catch (error) {
                   setStep('post-details');
@@ -1049,7 +1137,9 @@ export default function CreatePostScreen() {
             >
               <LinearGradient colors={theme.primaryGradient} style={s.publishBtn}>
                 <Feather name="send" size={16} color={theme.onAccent} style={{ marginRight: 8 }} />
-                <Text style={[s.publishBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Publish now</Text>
+                <Text style={[s.publishBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
+                  {scheduleMode === 'schedule' ? 'Schedule post' : editId ? 'Save changes' : 'Publish now'}
+                </Text>
               </LinearGradient>
             </TouchableOpacity>
           </ScrollView>
@@ -1097,8 +1187,12 @@ export default function CreatePostScreen() {
         <LinearGradient colors={[colors.accent, colors.accent]} style={s.bigCircleGrad}>
           <Feather name="check" size={44} color={colors.primary} />
         </LinearGradient>
-        <Text style={s.doneTitle}>Posted!</Text>
-        <Text style={s.doneSub}>Your post has been saved and will appear on your profile.</Text>
+        <Text style={s.doneTitle}>{editId ? 'Post updated!' : scheduleMode === 'schedule' ? 'Post scheduled!' : 'Posted!'}</Text>
+        <Text style={s.doneSub}>
+          {scheduleMode === 'schedule'
+            ? 'Your post is saved and will appear when its scheduled time arrives.'
+            : 'Your post has been saved and will appear on your profile.'}
+        </Text>
         <TouchableOpacity
           style={{ marginTop: 24 }}
           activeOpacity={0.85}

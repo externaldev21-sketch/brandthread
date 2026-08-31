@@ -305,10 +305,35 @@ export const posts = pgTable('posts', {
   userId: text('user_id').notNull(), // Clerk user ID of poster
   mediaUrl: text('media_url').notNull(),
   thumbnailUrl: text('thumbnail_url'),
+  mediaUrls: json('media_urls').$type<string[]>().notNull().default([]),
   mediaType: text('media_type').notNull().default('photo'), // 'photo' | 'video' | 'slideshow'
+  aspectRatio: text('aspect_ratio').notNull().default('9:16'),
   caption: text('caption'),
+  hashtags: json('hashtags').$type<string[]>().notNull().default([]),
   styleTags: json('style_tags').$type<string[]>().notNull().default([]),
+  sound: json('sound').$type<{
+    soundId: string;
+    soundTitle: string;
+    artist: string;
+    startTime: number;
+    volume: number;
+  } | null>(),
+  visibility: json('visibility').$type<{
+    isPublic?: boolean;
+    allowComments: boolean;
+    allowReposts: boolean;
+    showLikeCount: boolean;
+  }>().notNull().default({
+    isPublic: true,
+    allowComments: true,
+    allowReposts: true,
+    showLikeCount: true,
+  }),
+  postStatus: text('post_status').notNull().default('published'), // 'draft' | 'scheduled' | 'published' | 'archived' | 'deleted'
+  scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
+  publishedAt: timestamp('published_at', { withTimezone: true }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
 // ─── Interactions ─────────────────────────────────────────────────────────────

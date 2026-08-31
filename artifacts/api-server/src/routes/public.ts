@@ -4,7 +4,7 @@
  */
 import { Router } from "express";
 import { db, products, productVariants, users, drops, dropAlertSubscriptions, posts, postTaggedProducts, interactions, storefrontVisits, trendingCache, boosts } from "@workspace/db";
-import { eq, and, asc, desc, ne, inArray, or, ilike, sql, count, gte, isNull } from "drizzle-orm";
+import { eq, and, asc, desc, ne, inArray, or, ilike, sql, count, gte, lte, isNull } from "drizzle-orm";
 import { computeTrendingForToday, isCacheFresh } from "../jobs/computeTrending";
 import { ObjectStorageService } from "../lib/objectStorage";
 import { requireAuth } from "../middlewares/requireAuth";
@@ -457,7 +457,14 @@ router.get("/sellers/:sellerId", async (req, res) => {
     db
       .select()
       .from(posts)
-      .where(eq(posts.userId, sellerId))
+      .where(and(
+        eq(posts.userId, sellerId),
+        sql<boolean>`coalesce((${posts.visibility}->>'isPublic')::boolean, true) = true`,
+        or(
+          eq(posts.postStatus, "published"),
+          and(eq(posts.postStatus, "scheduled"), lte(posts.scheduledAt, new Date())),
+        ),
+      ))
       .orderBy(desc(posts.createdAt))
       .limit(30),
   ]);
@@ -681,9 +688,15 @@ router.get("/posts", async (req, res) => {
         id:          posts.id,
         userId:      posts.userId,
         mediaUrl:    posts.mediaUrl,
+        thumbnailUrl: posts.thumbnailUrl,
+        mediaUrls:   posts.mediaUrls,
         mediaType:   posts.mediaType,
+        aspectRatio: posts.aspectRatio,
         caption:     posts.caption,
+        hashtags:    posts.hashtags,
         styleTags:   posts.styleTags,
+        sound:       posts.sound,
+        visibility:  posts.visibility,
         createdAt:   posts.createdAt,
         displayName: users.displayName,
         brandName:   users.brandName,
@@ -694,7 +707,15 @@ router.get("/posts", async (req, res) => {
       })
       .from(posts)
       .leftJoin(users, eq(users.clerkId, posts.userId))
-      .where(ownerId ? eq(posts.userId, ownerId) : undefined)
+      .where(and(
+        ownerId ? eq(posts.userId, ownerId) : undefined,
+        eq(users.accountType, "seller"),
+        sql<boolean>`coalesce((${posts.visibility}->>'isPublic')::boolean, true) = true`,
+        or(
+          eq(posts.postStatus, "published"),
+          and(eq(posts.postStatus, "scheduled"), lte(posts.scheduledAt, new Date())),
+        ),
+      ))
       .orderBy(desc(posts.createdAt), asc(posts.id))
       .limit(lim)
       .offset(off);
@@ -757,9 +778,15 @@ router.get("/posts", async (req, res) => {
       id:             p.id,
       userId:         p.userId,
       mediaUrl:       p.mediaUrl,
+      thumbnailUrl:   p.thumbnailUrl,
+      mediaUrls:      p.mediaUrls,
       mediaType:      p.mediaType,
+      aspectRatio:    p.aspectRatio,
       caption:        p.caption,
+      hashtags:       p.hashtags,
       styleTags:      p.styleTags,
+      sound:          p.sound,
+      visibility:     p.visibility,
       createdAt:      p.createdAt,
       seller: {
         displayName: p.displayName,
@@ -772,7 +799,7 @@ router.get("/posts", async (req, res) => {
         name:      t.name,
         images:    t.images,
       })),
-      likesCount:    likesByPost[p.id]    ?? 0,
+      likesCount:    p.visibility?.showLikeCount === false ? null : likesByPost[p.id] ?? 0,
       repostsCount:  repostsByPost[p.id]  ?? 0,
       commentsCount: commentsByPost[p.id] ?? 0,
     }));

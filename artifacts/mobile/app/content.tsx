@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import {
   ScrollView, View, Text, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Platform,
+  ActivityIndicator, Platform, Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -10,7 +10,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import type { ContentPost, ContentType, ContentStatus } from '@/services/types';
-import { getSellerPosts } from '@/services/socialService';
+import {
+  archiveSellerPost, deleteSellerPost, getSellerPosts, updateSellerPost,
+} from '@/services/socialService';
 import { useColors } from '@/hooks/useColors';
 
 const BG     = '#07070F';
@@ -21,7 +23,7 @@ const MUTED  = 'rgba(244,244,255,0.50)';
 const GREEN  = '#22C55E';
 const BLUE   = '#3B82F6';
 const ORANGE = '#F97316';
-type FilterTab = 'all' | 'draft' | 'scheduled' | 'published';
+type FilterTab = 'all' | ContentStatus;
 
 const getContentTypes = (primary: string, secondary: string): { type: ContentType; label: string; icon: keyof typeof Feather.glyphMap; color: string }[] => [
   { type: 'video',        label: 'Video Post',      icon: 'video',        color: primary },
@@ -39,6 +41,7 @@ function statusColor(s: ContentStatus): string {
     case 'published':  return GREEN;
     case 'scheduled':  return BLUE;
     case 'draft':      return MUTED;
+    case 'archived':   return ORANGE;
   }
 }
 
@@ -61,6 +64,7 @@ export default function ContentScreen() {
   const [content, setContent] = useState<ContentPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
 
   function back() { router.back(); }
 
@@ -72,7 +76,13 @@ export default function ContentScreen() {
       setContent(posts.map((post): ContentPost => ({
         id: post.id,
         type: post.contentType as ContentType,
-        status: post.postStatus === 'scheduled' ? 'scheduled' : post.isDraft ? 'draft' : 'published',
+        status: post.postStatus === 'archived'
+          ? 'archived'
+          : post.postStatus === 'scheduled'
+            ? 'scheduled'
+            : post.isDraft
+              ? 'draft'
+              : 'published',
         caption: post.caption,
         hashtags: post.hashtags,
         scheduledFor: post.scheduledAt ?? undefined,
@@ -100,11 +110,79 @@ export default function ContentScreen() {
     published: content.filter(p => p.status === 'published').length,
     scheduled: content.filter(p => p.status === 'scheduled').length,
     drafts:    content.filter(p => p.status === 'draft').length,
+    archived:  content.filter(p => p.status === 'archived').length,
   };
 
   function createPost(type: ContentType) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     router.push(('/create-post?type=' + type) as never);
+  }
+
+  function openPostActions(post: ContentPost) {
+    Haptics.selectionAsync();
+    Alert.alert('Manage post', post.caption || 'Untitled post', [
+      {
+        text: 'Edit',
+        onPress: () => router.push(('/create-post?editId=' + encodeURIComponent(post.id)) as never),
+      },
+      {
+        text: post.status === 'archived' ? 'Restore' : 'Archive',
+        onPress: async () => {
+          setDeletingPostId(post.id);
+          try {
+            if (post.status === 'archived') {
+              await updateSellerPost(post.id, {
+                postStatus: 'published',
+                isArchived: false,
+                scheduledAt: null,
+              });
+              setContent(current => current.map(item => (
+                item.id === post.id ? { ...item, status: 'published' } : item
+              )));
+            } else {
+              await archiveSellerPost(post.id);
+              setContent(current => current.map(item => (
+                item.id === post.id ? { ...item, status: 'archived' } : item
+              )));
+            }
+          } catch {
+            Alert.alert(
+              post.status === 'archived' ? 'Post not restored' : 'Post not archived',
+              'Check your connection and try again.',
+            );
+          } finally {
+            setDeletingPostId(null);
+          }
+        },
+      },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => Alert.alert(
+          'Delete this post?',
+          'It will be removed from your content library and will no longer appear to buyers.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Delete',
+              style: 'destructive',
+              onPress: async () => {
+                setDeletingPostId(post.id);
+                try {
+                  await deleteSellerPost(post.id);
+                  setContent(current => current.filter(item => item.id !== post.id));
+                } catch {
+                  Alert.alert('Post not deleted', 'Check your connection and try again.');
+                } finally {
+                  setDeletingPostId(null);
+                }
+              },
+            },
+          ],
+        ),
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   }
 
   return (
@@ -142,6 +220,7 @@ export default function ContentScreen() {
               { label: 'Published',  value: stats.published,                             color: GREEN  },
               { label: 'Scheduled',  value: stats.scheduled,                             color: BLUE   },
               { label: 'Drafts',     value: stats.drafts,                                color: ORANGE },
+              { label: 'Archived',   value: stats.archived,                              color: MUTED },
             ].map(item => (
               <View key={item.label} style={s.statCard}>
                 <Text style={[s.statValue, { color: item.color }]}>{item.value}</Text>
@@ -175,7 +254,7 @@ export default function ContentScreen() {
 
         {/* Filter tabs */}
         <View style={s.filterRow}>
-          {(['all', 'published', 'scheduled', 'draft'] as FilterTab[]).map(t => (
+          {(['all', 'published', 'scheduled', 'draft', 'archived'] as FilterTab[]).map(t => (
             <TouchableOpacity
               key={t}
               style={[s.filterTab, tab === t && [s.filterTabActive, { backgroundColor: colors.accent, borderColor: colors.primary }]]}
@@ -250,7 +329,17 @@ export default function ContentScreen() {
                     <Text style={s.scheduledText}>Scheduled: {post.scheduledFor}</Text>
                   )}
                 </View>
-                <Feather name="more-horizontal" size={16} color={MUTED} />
+                <TouchableOpacity
+                  style={s.moreBtn}
+                  onPress={() => openPostActions(post)}
+                  disabled={deletingPostId === post.id}
+                  accessibilityRole="button"
+                  accessibilityLabel="Manage post"
+                >
+                  {deletingPostId === post.id
+                    ? <ActivityIndicator size="small" color={MUTED} />
+                    : <Feather name="more-horizontal" size={16} color={MUTED} />}
+                </TouchableOpacity>
               </TouchableOpacity>
             ))
           )}
@@ -285,6 +374,7 @@ const s = StyleSheet.create({
   filterText:{ fontSize: 12, fontFamily: 'Inter_500Medium', color: MUTED },
   filterTextActive: { color: GREEN },
   postCard:  { flexDirection: 'row', gap: 12, backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, padding: 14, marginBottom: 10 },
+  moreBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', marginRight: -8 },
   postThumb: { width: 56, height: 56, borderRadius: 12, backgroundColor: '#12121F', alignItems: 'center', justifyContent: 'center' },
   postTopRow:{ flexDirection: 'row', alignItems: 'center', gap: 8 },
   statusBadge:{ borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3, borderWidth: 1 },

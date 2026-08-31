@@ -123,7 +123,7 @@ vi.mock("@/lib/entitlementError", () => ({
   getEntitlementRejection: () => null,
 }));
 
-import TeamScreen from "./team";
+import TeamScreen from "../app/team";
 
 async function renderScreen(): Promise<ReactTestRenderer> {
   let renderer!: ReactTestRenderer;
@@ -168,7 +168,7 @@ describe("team expired invite presentation", () => {
   });
 
   it("hides expired invites until the collapsed section is opened", async () => {
-    const renderer = await renderScreen();
+      const renderer = await renderScreen();
 
     expect(hasText(renderer, "Expired invites (1)")).toBe(true);
     expect(hasText(renderer, "Expired invite")).toBe(false);

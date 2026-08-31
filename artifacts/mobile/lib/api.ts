@@ -1204,7 +1204,7 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     /** Thread-feed posts — create with product tags, read, like/repost */
     posts: {
       create: (body: {
-        mediaUrl?: string; mediaPath?: string; thumbnailPath?: string; mediaType?: string; caption?: string;
+        mediaUrl?: string; thumbnailUrl?: string; mediaPath?: string; thumbnailPath?: string; mediaType?: string; caption?: string;
         styleTags?: string[]; taggedProductIds?: string[];
       }) => post<any>('/api/posts', body),
       uploadVideoClip: (uri: string, mimeType?: string | null) =>
