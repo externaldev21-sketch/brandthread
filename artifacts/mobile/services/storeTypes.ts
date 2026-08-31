@@ -568,7 +568,7 @@ export const TYPOGRAPHY_STYLES: { value: TypographyStyle; label: string; heading
 export const COLOR_PRESETS: { label: string; colors: StoreColorPalette }[] = [
   { label: 'Midnight', colors: { primary: '#1a1a2e', secondary: '#16213e', accent: '#e94560', background: '#0f0f0f', text: '#f4f4f4', buttonText: '#ffffff' } },
   { label: 'Alabaster', colors: { primary: '#f0ede6', secondary: '#d9d3c6', accent: '#2d2d2d', background: '#faf8f4', text: '#1a1a1a', buttonText: '#f0ede6' } },
-  { label: 'Chrome', colors: { primary: '#c0c0c0', secondary: '#808080', accent: '#7c3aed', background: '#121212', text: '#f4f4f4', buttonText: '#121212' } },
+  { label: 'Chrome', colors: { primary: '#c0c0c0', secondary: '#808080', accent: '#f8fafc', background: '#121212', text: '#f4f4f4', buttonText: '#121212' } },
   { label: 'Tokyo', colors: { primary: '#ff0054', secondary: '#ff5400', accent: '#ffbd00', background: '#0d0d0d', text: '#ffffff', buttonText: '#0d0d0d' } },
   { label: 'Linen', colors: { primary: '#e8dcc8', secondary: '#c4a882', accent: '#2c1810', background: '#f9f4ec', text: '#2c1810', buttonText: '#f9f4ec' } },
   { label: 'Cobalt', colors: { primary: '#003f8a', secondary: '#0066cc', accent: '#ffd700', background: '#001a3a', text: '#f0f4ff', buttonText: '#001a3a' } },

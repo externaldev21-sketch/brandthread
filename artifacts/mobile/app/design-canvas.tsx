@@ -50,15 +50,15 @@ const DRAW_BRUSHES = [
 
 const DEFAULT_PALETTE = [
   '#FFFFFF', '#000000', '#EF4444', '#F97316', '#EAB308',
-  '#22C55E', '#0EA5E9', '#8B5CF6', '#EC4899', '#6B7280',
+  '#22C55E', '#0EA5E9', '#0F766E', '#EC4899', '#6B7280',
   '#FF6B6B', '#FFD93D', '#6BCB77', '#4D96FF', '#FF6FC8',
-  '#C084FC', '#34D399', '#FBBF24', '#F472B6', '#A78BFA',
+  '#0C4A6E', '#34D399', '#FBBF24', '#F472B6', '#0EA5E9',
 ];
 
 const GARMENT_COLORS = [
   '#000000','#FFFFFF','#1E3A5F','#6B7280','#EF4444',
   '#22C55E','#3B82F6','#EAB308','#F97316','#EC4899',
-  '#8B5CF6','#F5E6C8',
+  '#0EA5E9','#F5E6C8',
 ];
 
 let _uid = 0;

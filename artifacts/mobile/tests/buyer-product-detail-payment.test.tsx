@@ -114,13 +114,13 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({
     theme: {
-      accent: '#8B5CF6',
-      accentDim: '#2E1B55',
-      accentLight: '#C4B5FD',
-      primaryGradient: ['#8B5CF6', '#A78BFA'],
+      accent: '#C7CDD5',
+      accentDim: '#34383E',
+      accentLight: '#F8FAFC',
+      primaryGradient: ['#727A84', '#F8FAFC'],
       secondary: '#22D3EE',
       secondaryDim: '#164E63',
-      shadowColor: '#8B5CF6',
+      shadowColor: '#C7CDD5',
     },
   }),
 }));
@@ -131,8 +131,8 @@ vi.mock('@/hooks/useApi', () => ({
 
 vi.mock('@/hooks/useColors', () => ({
   useColors: () => ({
-    accent: '#6D28D9',
-    primary: '#8B5CF6',
+    accent: '#727A84',
+    primary: '#C7CDD5',
   }),
 }));
 

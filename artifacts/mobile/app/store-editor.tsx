@@ -699,7 +699,7 @@ export default function StoreEditor() {
               <StyledInput
                 value={ab.backgroundColor}
                 onChange={v => handleThemeUpdate({ announcementBar: { ...ab, backgroundColor: v } })}
-                placeholder="#7c3aed"
+                placeholder="#0f766e"
               />
             </FieldRow>
             <FieldRow>

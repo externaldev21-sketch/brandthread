@@ -25,7 +25,7 @@ type ApiCustomer = {
   createdAt: string;
 };
 
-const AVATAR_COLORS = ['#8B5CF6', '#4A6FA5', '#22D3EE', '#B98A2E', '#EF4444', '#A78BFA', '#F59E0B', '#6D28D9'];
+const AVATAR_COLORS = ['#0F766E', '#4A6FA5', '#22D3EE', '#B98A2E', '#EF4444', '#0EA5E9', '#F59E0B', '#1D4ED8'];
 
 function getInitials(name: string): string {
   return name.split(' ').map((p) => p[0] ?? '').join('').slice(0, 2).toUpperCase();

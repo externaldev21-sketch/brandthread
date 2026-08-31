@@ -304,7 +304,7 @@ export default function CameraCapture() {
 const s = StyleSheet.create({
   root: { flex: 1 },
   webFallback: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
-  webFallbackIcon: { width: 76, height: 76, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(139,92,246,0.14)', marginBottom: 20 },
+  webFallbackIcon: { width: 76, height: 76, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(14,165,233,0.14)', marginBottom: 20 },
   webFallbackTitle: { fontSize: 24, fontWeight: '700', textAlign: 'center', marginBottom: 10 },
   webFallbackText: { maxWidth: 520, fontSize: 15, lineHeight: 22, textAlign: 'center', marginBottom: 24 },
   webFallbackButton: { borderRadius: 14, paddingHorizontal: 20, paddingVertical: 14 },

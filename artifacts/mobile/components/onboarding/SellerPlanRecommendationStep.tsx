@@ -25,7 +25,7 @@ export function SellerPlanRecommendationStep({
 
   return (
     <ScrollView contentContainerStyle={styles.root} showsVerticalScrollIndicator={false}>
-      <Text style={styles.eyebrow}>YOUR PERSONALIZED PLAN</Text>
+      <Text style={[styles.eyebrow, { color: theme.secondary }]}>YOUR PERSONALIZED PLAN</Text>
       <Text style={styles.title}>We recommend {SELLER_PLANS.find((plan) => plan.id === recommendation.planId)?.onboardingName}</Text>
       <Text style={styles.reason}>{recommendation.reason}</Text>
       <Text style={styles.guidance}>This is guidance, not a gate. Pick any plan, and change it before subscribing.</Text>
@@ -85,7 +85,7 @@ export function SellerPlanRecommendationStep({
 
 const styles = StyleSheet.create({
   root: { flexGrow: 1, paddingTop: 10, paddingBottom: 40 },
-  eyebrow: { color: '#A78BFA', fontSize: 11, fontFamily: 'Inter_700Bold', letterSpacing: 1.2, marginBottom: 8 },
+  eyebrow: { fontSize: 11, fontFamily: 'Inter_700Bold', letterSpacing: 1.2, marginBottom: 8 },
   title: { color: '#FFF', fontSize: 30, lineHeight: 36, fontFamily: 'Inter_700Bold', letterSpacing: -0.7 },
   reason: { color: 'rgba(255,255,255,0.72)', fontSize: 14, lineHeight: 21, fontFamily: 'Inter_500Medium', marginTop: 10 },
   guidance: { color: 'rgba(255,255,255,0.45)', fontSize: 12, lineHeight: 18, fontFamily: 'Inter_400Regular', marginTop: 8 },

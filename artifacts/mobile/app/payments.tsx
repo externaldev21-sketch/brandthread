@@ -301,7 +301,7 @@ function DropCard({ drop, colors, isDark, isLast, broadcastState, broadcastPrevi
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 const METHOD_CHIPS = [
-  { label: 'Shop', bg: '#5A31F4', text: '#FFFFFF' },
+  { label: 'Shop', bg: '#0F766E', text: '#FFFFFF' },
   { label: 'VISA', bg: '#1A1F71', text: '#FFFFFF' },
   { label: 'MC',   bg: '#EB5C2E', text: '#FFFFFF' },
   { label: 'AMEX', bg: '#016FD0', text: '#FFFFFF' },

@@ -110,8 +110,8 @@ export default function KlaviyoIntegrationScreen() {
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
         <View style={[styles.hero, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <View style={[styles.heroIcon, { backgroundColor: '#5A31F422' }]}>
-            <Feather name="zap" size={22} color="#8C6DF5" />
+          <View style={[styles.heroIcon, { backgroundColor: `${colors.primary}22` }]}>
+            <Feather name="zap" size={22} color={colors.primary} />
           </View>
           <Text style={[styles.heroTitle, { color: colors.foreground }]}>Klaviyo: Email Marketing & SMS</Text>
           <Text style={[styles.heroSub, { color: colors.mutedForeground }]}>

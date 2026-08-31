@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   readOnly: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs, marginTop: SP.md },
   walletHelp: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, marginBottom: SP.sm },
   wallet: { borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.md, padding: SP.sm, marginBottom: SP.xs, flexDirection: 'row', justifyContent: 'space-between' },
-  walletSelected: { borderColor: PURPLE, backgroundColor: 'rgba(124,58,237,0.12)' },
+  walletSelected: { borderColor: PURPLE, backgroundColor: 'rgba(14,165,233,0.12)' },
   walletDisabled: { opacity: 0.5 },
   walletError: { color: '#F97316', fontFamily: FONT.medium, fontSize: FS.sm, marginBottom: SP.sm },
   processing: { color: PURPLE_LIGHT, fontFamily: FONT.medium, fontSize: FS.sm, marginBottom: SP.sm },

@@ -29,8 +29,8 @@ const GALLERY_H = 380;
 const CATEGORY_GRADS: Record<string, readonly [string, string]> = {
   'T-shirt':    ['#1a1a2e', '#16213e'],
   'Hoodie':     ['#0f3460', '#16213e'],
-  'Jacket':     ['#1a1a2e', '#533483'],
-  'Sweatpants': ['#0f3460', '#533483'],
+  'Jacket':     ['#1a1a2e', '#0F766E'],
+  'Sweatpants': ['#0f3460', '#0F766E'],
   default:      ['#12121F', '#1a1a2e'],
 };
 

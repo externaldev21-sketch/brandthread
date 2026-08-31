@@ -42,8 +42,8 @@ const IMAGE_RATIOS: { value: ImageRatioKind; label: string }[] = [
 ];
 
 const GRAD_PALETTES: Record<number, readonly [string, string]> = {
-  0: ['#8B5CF6', '#22D3EE'],
-  1: ['#F97316', '#8B5CF6'],
+  0: ['#0F766E', '#22D3EE'],
+  1: ['#F97316', '#0EA5E9'],
   2: ['#22D3EE', '#3B82F6'],
   3: ['#F59E0B', '#F97316'],
 };

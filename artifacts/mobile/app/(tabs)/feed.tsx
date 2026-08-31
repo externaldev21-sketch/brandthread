@@ -86,7 +86,7 @@ function LiveStreamPage({ stream, onJoin }: { stream: LiveStreamFeedItem; onJoin
   return (
     <View style={{ width: SCREEN_W, height: SCREEN_H, backgroundColor: '#0a0209' }}>
       {/* Gradient background */}
-      <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(80,20,100,0.18)' }} />
+      <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(10,80,100,0.18)' }} />
       {/* Centre glow */}
       <View style={{ position: 'absolute', top: SCREEN_H * 0.25, alignSelf: 'center', width: 280, height: 280, borderRadius: 140, backgroundColor: theme.accentDim }} />
 

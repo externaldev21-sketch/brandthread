@@ -188,7 +188,7 @@
         "expo-notifications",
         {
           "icon": "./assets/images/icon.png",
-          "color": "#8B5CF6",
+          "color": "#C7CDD5",
           "sounds": [
             "./assets/sounds/order-received.wav"
           ],

@@ -99,7 +99,7 @@ export const MY_USER_ID = 'me';
 export const MY_NAME    = 'Jordan';
 export const MY_HANDLE  = '@jordan';
 export const MY_INITIALS = 'J';
-export const MY_COLOR    = '#8B5CF6';
+export const MY_COLOR    = '#C7CDD5';
 
 // ─── Pub/Sub ─────────────────────────────────────────────────────────────────
 
@@ -598,7 +598,7 @@ export async function getSellerPosts(): Promise<SellerThreadPost[]> {
     authorName:      p.seller?.brandName ?? p.seller?.displayName ?? 'Seller',
     authorHandle:    '@' + (p.seller?.brandName ?? p.seller?.displayName ?? 'seller').toLowerCase().replace(/[^a-z0-9]/g, ''),
     authorInitials:  (p.seller?.brandName ?? p.seller?.displayName ?? 'S').slice(0, 2).toUpperCase(),
-    authorColor:     '#8B5CF6',
+    authorColor:     '#C7CDD5',
     sellerId:        p.userId ?? k.userId,
     brandId:         p.userId ?? k.userId,
     feedEligibility: 'thread_eligible' as const,
@@ -637,7 +637,7 @@ export async function getSellerPosts(): Promise<SellerThreadPost[]> {
 
 /** Maps a raw API post object from /api/posts/feed to a SellerThreadPost. */
 function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
-  const ACCENT_POOL = ['#7C3AED','#0F766E','#BE185D','#B45309','#1D4ED8','#0891B2','#059669'];
+  const ACCENT_POOL = ['#C7CDD5','#0F766E','#BE185D','#B45309','#1D4ED8','#0891B2','#059669'];
   const now = iso();
   const authorName     = p.seller?.brandName ?? p.seller?.displayName ?? 'Seller';
   const authorHandle   = '@' + authorName.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -881,7 +881,7 @@ export async function createOrGetConversation(params: {
       participant: {
         userId: params.participant.userId, name: params.participant.name,
         handle: params.participant.handle ?? '', initials: params.participant.initials ?? '',
-        color: params.participant.color ?? '#8B5CF6', accountType: params.participant.accountType ?? 'seller',
+         color: params.participant.color ?? '#C7CDD5', accountType: params.participant.accountType ?? 'seller',
       },
       myInfo: { name: profile.name, handle: `@${profile.username}`, initials: profile.avatarInitials, color: profile.avatarColor, accountType: 'buyer' },
       contextOrderId: params.contextOrderId, contextOrderNumber: params.contextOrderNumber,

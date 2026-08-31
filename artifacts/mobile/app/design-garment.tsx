@@ -32,7 +32,7 @@ const GARMENT_SWATCH_COLORS = [
   { label: 'Yellow', hex: '#EAB308' },
   { label: 'Orange', hex: '#F97316' },
   { label: 'Pink',   hex: '#EC4899' },
-  { label: 'Purple', hex: '#8B5CF6' },
+  { label: 'Teal',   hex: '#0F766E' },
   { label: 'Cream',  hex: '#F5E6C8' },
 ];
 
@@ -111,7 +111,7 @@ export default function DesignGarmentScreen() {
   }
 
   // Determine if garment is light or dark for text contrast
-  const isDarkGarment = ['#000000', '#1E3A5F', '#6B7280', '#EF4444', '#3B82F6', '#8B5CF6', '#22C55E', '#F97316', '#EC4899'].includes(garmentColor);
+  const isDarkGarment = ['#000000', '#1E3A5F', '#6B7280', '#EF4444', '#3B82F6', '#0F766E', '#22C55E', '#F97316', '#EC4899'].includes(garmentColor);
   const garmentTextColor = isDarkGarment ? '#FFFFFF' : '#111111';
 
   return (

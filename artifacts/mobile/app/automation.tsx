@@ -32,7 +32,7 @@ const AUTOMATIONS: Automation[] = [
 const CATEGORY_COLORS: Record<string, string> = {
   Inventory: '#B98A2E',
   Orders: '#4A6FA5',
-  CRM: '#6D28D9',
+  CRM: '#0F766E',
 };
 
 const TEMPLATES = [

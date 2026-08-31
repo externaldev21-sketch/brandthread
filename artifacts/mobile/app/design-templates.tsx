@@ -38,30 +38,30 @@ interface DesignTemplate {
 const TEMPLATES: DesignTemplate[] = [
   // Garments
   { id: 'gt1', name: 'Classic T-Shirt', category: 'Garments', subcategory: 'tshirt', dimensions: 'Front + Back', views: 4, garmentType: 'tshirt', gradColors: ['#1E3A5F', '#3B82F6'] },
-  { id: 'gt2', name: 'Pullover Hoodie', category: 'Garments', subcategory: 'hoodie', dimensions: 'Front + Back', views: 3, garmentType: 'hoodie', gradColors: ['#2D1B69', '#8B5CF6'] },
+  { id: 'gt2', name: 'Pullover Hoodie', category: 'Garments', subcategory: 'hoodie', dimensions: 'Front + Back', views: 3, garmentType: 'hoodie', gradColors: ['#0C4A6E', '#0EA5E9'] },
   { id: 'gt3', name: 'Crewneck Sweatshirt', category: 'Garments', subcategory: 'sweatshirt', dimensions: 'Front + Back', views: 3, garmentType: 'sweatshirt', gradColors: ['#134E4A', '#10B981'] },
   { id: 'gt4', name: 'Bomber Jacket', category: 'Garments', subcategory: 'jacket', dimensions: 'Front + Back + Side', views: 4, garmentType: 'jacket', gradColors: ['#451A03', '#F97316'] },
   { id: 'gt5', name: 'Snapback Cap', category: 'Garments', subcategory: 'hat', dimensions: 'Front + Back + Side', views: 4, garmentType: 'hat', gradColors: ['#1C1917', '#78716C'] },
   { id: 'gt6', name: 'Tote Bag', category: 'Garments', subcategory: 'bag', dimensions: 'Front + Back', views: 3, garmentType: 'bag', gradColors: ['#0F172A', '#475569'] },
   { id: 'gt7', name: 'Polo Shirt', category: 'Garments', subcategory: 'polo', dimensions: 'Front + Back', views: 3, garmentType: 'polo', gradColors: ['#0C4A6E', '#22D3EE'] },
-  { id: 'gt8', name: 'Athletic Tank', category: 'Garments', subcategory: 'tank', dimensions: 'Front + Back', views: 2, garmentType: 'tank', gradColors: ['#4C1D95', '#A78BFA'] },
+  { id: 'gt8', name: 'Athletic Tank', category: 'Garments', subcategory: 'tank', dimensions: 'Front + Back', views: 2, garmentType: 'tank', gradColors: ['#164E63', '#67E8F9'] },
 
   // Social
-  { id: 'st1', name: 'Instagram Story', category: 'Social', subcategory: 'story', dimensions: '1080 × 1920', presetId: 'ig_story', gradColors: ['#7C3AED', '#EC4899'] },
-  { id: 'st2', name: 'Instagram Post', category: 'Social', subcategory: 'post', dimensions: '1080 × 1080', presetId: 'ig_post', gradColors: ['#0EA5E9', '#8B5CF6'] },
+  { id: 'st1', name: 'Instagram Story', category: 'Social', subcategory: 'story', dimensions: '1080 × 1920', presetId: 'ig_story', gradColors: ['#0EA5E9', '#EC4899'] },
+  { id: 'st2', name: 'Instagram Post', category: 'Social', subcategory: 'post', dimensions: '1080 × 1080', presetId: 'ig_post', gradColors: ['#0EA5E9', '#0F766E'] },
   { id: 'st3', name: 'IG Landscape', category: 'Social', subcategory: 'landscape', dimensions: '1080 × 566', presetId: 'ig_land', gradColors: ['#059669', '#22D3EE'] },
   { id: 'st4', name: 'Facebook Post', category: 'Social', subcategory: 'facebook', dimensions: '1200 × 630', presetId: 'fb_post', gradColors: ['#1D4ED8', '#60A5FA'] },
   { id: 'st5', name: 'Twitter / X Post', category: 'Social', subcategory: 'twitter', dimensions: '1600 × 900', presetId: 'twitter_post', gradColors: ['#0F172A', '#3B82F6'] },
 
   // Product
-  { id: 'pt1', name: 'Product Card', category: 'Product', subcategory: 'product_card', dimensions: '800 × 1000', presetId: 'product_card', gradColors: ['#1E1B4B', '#8B5CF6'] },
+  { id: 'pt1', name: 'Product Card', category: 'Product', subcategory: 'product_card', dimensions: '800 × 1000', presetId: 'product_card', gradColors: ['#0F172A', '#0EA5E9'] },
   { id: 'pt2', name: 'Campaign Banner', category: 'Product', subcategory: 'banner', dimensions: '1200 × 400', presetId: 'banner', gradColors: ['#7C2D12', '#EA580C'] },
   { id: 'pt3', name: 'Email Banner', category: 'Product', subcategory: 'email', dimensions: '600 × 200', presetId: 'email_banner', gradColors: ['#134E4A', '#34D399'] },
 
   // Packaging
   { id: 'pk1', name: 'Product Box', category: 'Packaging', subcategory: 'box', dimensions: 'Custom', presetId: 'custom', gradColors: ['#312E81', '#6366F1'] },
   { id: 'pk2', name: 'Hang Tag', category: 'Packaging', subcategory: 'tag', dimensions: 'Custom', presetId: 'custom', gradColors: ['#1F2937', '#9CA3AF'] },
-  { id: 'pk3', name: 'Mailer Bag', category: 'Packaging', subcategory: 'mailer', dimensions: 'Custom', presetId: 'custom', gradColors: ['#701A75', '#E879F9'] },
+  { id: 'pk3', name: 'Mailer Bag', category: 'Packaging', subcategory: 'mailer', dimensions: 'Custom', presetId: 'custom', gradColors: ['#7C2D12', '#F97316'] },
 ];
 
 const CATEGORIES: TemplateCategory[] = ['Garments', 'Social', 'Product', 'Packaging'];

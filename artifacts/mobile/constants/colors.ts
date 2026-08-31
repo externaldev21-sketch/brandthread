@@ -1,17 +1,17 @@
 /**
- * Brandthread design tokens — "Deep Purple" premium theme.
+ * Brandthread design tokens — Chrome/Silver neutral theme.
  *
  * These values are consumed by the legacy `useColors()` hook used in
  * secondary/settings screens. They must match the canonical tokens in
  * `lib/theme.ts` so the whole app is visually consistent.
  *
  * Key mappings to lib/theme constants:
- *   background      → BG           #07070F
- *   foreground      → FG           #F4F4FF
- *   card            → CARD         #12121F
- *   primary         → PURPLE       #8B5CF6
- *   tint            → PURPLE       #8B5CF6
- *   mutedForeground → MUTED        rgba(244,244,255,0.50)
+ *   background      → BG           #07080A
+ *   foreground      → FG           #F8FAFC
+ *   card            → CARD         #17191D
+ *   primary         → Chrome       #C7CDD5
+ *   tint            → Chrome       #C7CDD5
+ *   mutedForeground → MUTED        rgba(248,250,252,0.50)
  *   border          → BORDER       rgba(255,255,255,0.07)
  *   success         → SUCCESS      #10B981
  *   destructive     → RED          #F87171
@@ -20,24 +20,24 @@
 const colors = {
   /** Light palette — not used in the app (forced dark), kept for completeness. */
   light: {
-    text:                '#0B0B1A',
-    tint:                '#8B5CF6',
-    background:          '#F6F4FF',
-    foreground:          '#0B0B1A',
+    text:                '#17191D',
+    tint:                '#727A84',
+    background:          '#F8FAFC',
+    foreground:          '#17191D',
     card:                '#FFFFFF',
-    cardForeground:      '#0B0B1A',
-    primary:             '#8B5CF6',
+    cardForeground:      '#17191D',
+    primary:             '#727A84',
     primaryForeground:   '#FFFFFF',
-    secondary:           '#EDE9FE',
-    secondaryForeground: '#3B1FA3',
-    muted:               '#F3F0FE',
+    secondary:           '#E5E7EB',
+    secondaryForeground: '#34383E',
+    muted:               '#F1F5F9',
     mutedForeground:     '#6B7280',
-    accent:              '#DDD6FE',
-    accentForeground:    '#4C1D95',
+    accent:              '#DDE2E8',
+    accentForeground:    '#34383E',
     destructive:         '#EF4444',
     destructiveForeground: '#FFFFFF',
     border:              'rgba(0,0,0,0.08)',
-    input:               '#F3F0FE',
+    input:               '#F1F5F9',
     success:             '#10B981',
     warning:             '#F59E0B',
     info:                '#22D3EE',
@@ -45,24 +45,24 @@ const colors = {
 
   /** Dark palette — the active Brandthread theme. */
   dark: {
-    text:                '#F4F4FF',
-    tint:                '#8B5CF6',
-    background:          '#07070F',
-    foreground:          '#F4F4FF',
-    card:                '#12121F',
-    cardForeground:      '#F4F4FF',
-    primary:             '#8B5CF6',
+    text:                '#F8FAFC',
+    tint:                '#C7CDD5',
+    background:          '#07080A',
+    foreground:          '#F8FAFC',
+    card:                '#17191D',
+    cardForeground:      '#F8FAFC',
+    primary:             '#C7CDD5',
     primaryForeground:   '#FFFFFF',
-    secondary:           '#18182E',
-    secondaryForeground: '#F4F4FF',
-    muted:               '#18182E',
-    mutedForeground:     'rgba(244,244,255,0.50)',
-    accent:              '#2D1B6B',
-    accentForeground:    '#A78BFA',
+    secondary:           '#34383E',
+    secondaryForeground: '#F8FAFC',
+    muted:               '#34383E',
+    mutedForeground:     'rgba(248,250,252,0.50)',
+    accent:              '#34383E',
+    accentForeground:    '#F8FAFC',
     destructive:         '#F87171',
     destructiveForeground: '#FFFFFF',
     border:              'rgba(255,255,255,0.07)',
-    input:               '#12121F',
+    input:               '#17191D',
     success:             '#10B981',
     warning:             '#F59E0B',
     info:                '#22D3EE',

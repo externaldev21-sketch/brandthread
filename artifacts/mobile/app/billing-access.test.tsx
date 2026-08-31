@@ -105,12 +105,12 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 
 const theme = {
-  accent: '#8B5CF6',
-  accentDim: '#2E1B55',
-  accentLight: '#C4B5FD',
+  accent: '#C7CDD5',
+  accentDim: '#34383E',
+  accentLight: '#F8FAFC',
   secondary: '#172554',
   secondaryDim: '#172554',
-  primaryGradient: ['#8B5CF6', '#6366F1'],
+  primaryGradient: ['#C7CDD5', '#727A84'],
   onAccent: '#FFFFFF',
 };
 

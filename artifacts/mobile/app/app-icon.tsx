@@ -14,11 +14,11 @@ interface IconOption {
 
 const ICONS: IconOption[] = [
   { id: 'default', label: 'Default', colors: ['#727A84', '#F8FAFC'] },
-  { id: 'spring26', label: "Spring '26", colors: ['#38BDF8', '#7C3AED'] },
-  { id: 'winter26', label: "Winter '26", colors: ['#C9A96E', '#9333EA'] },
-  { id: 'summer25', label: "Summer '25", colors: ['#A855F7', '#EC4899'] },
+  { id: 'spring26', label: "Spring '26", colors: ['#38BDF8', '#0F766E'] },
+  { id: 'winter26', label: "Winter '26", colors: ['#C9A96E', '#B45309'] },
+  { id: 'summer25', label: "Summer '25", colors: ['#0EA5E9', '#EC4899'] },
   { id: 'winter25', label: "Winter '25", colors: ['#FACC15', '#EA580C'] },
-  { id: 'summer24', label: "Summer '24", colors: ['#14B8A6', '#7C3AED'] },
+  { id: 'summer24', label: "Summer '24", colors: ['#14B8A6', '#0EA5E9'] },
   { id: 'winter24', label: "Winter '24", colors: ['#1F2937', '#111827'] },
   { id: 'summer23', label: "Summer '23", colors: ['#3B82F6', '#6366F1'] },
   { id: 'winter23', label: "Winter '23", colors: ['#F97316', '#B45309'] },

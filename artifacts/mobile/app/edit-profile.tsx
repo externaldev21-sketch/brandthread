@@ -147,7 +147,7 @@ export default function EditProfileScreen() {
               {avatarUri ? (
                 <Image source={{ uri: avatarUri }} style={styles.avatar} />
               ) : (
-                <LinearGradient colors={['#9F7AEA', '#5B3FA0']} style={styles.avatar}>
+                <LinearGradient colors={['#0EA5E9', '#075985']} style={styles.avatar}>
                   <Text style={styles.avatarText}>BT</Text>
                 </LinearGradient>
               )}

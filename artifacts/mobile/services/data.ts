@@ -351,7 +351,7 @@ export interface Priority {
 }
 
 export const TODAY_PRIORITIES: Priority[] = [
-  { id: 'tp1', title: 'Approve manufacturer quote',   category: 'Manufacturing', icon: 'check-circle', color: '#8B5CF6', due: 'today',    done: false, route: '/manufacturer' },
+  { id: 'tp1', title: 'Approve manufacturer quote',   category: 'Manufacturing', icon: 'check-circle', color: '#C7CDD5', due: 'today',    done: false, route: '/manufacturer' },
   { id: 'tp2', title: 'Ship 3 ready orders',          category: 'Orders',        icon: 'package',      color: '#3B82F6', due: 'overdue',  done: false, route: '/orders' },
   { id: 'tp3', title: 'Review sample photos',         category: 'Production',    icon: 'camera',       color: '#06B6D4', due: 'today',    done: false, route: '/manufacturer' },
   { id: 'tp4', title: 'Restock Vintage Washed Tee M', category: 'Inventory',     icon: 'alert-circle', color: '#F97316', due: 'overdue',  done: false, route: '/inventory' },
@@ -374,7 +374,7 @@ export interface ActivityItem {
 
 export const RECENT_ACTIVITY: ActivityItem[] = [
   { id: 'a1', type: 'order',        title: 'New order — #BT-78291',        desc: 'Jonah B. — $152.45',          time: '2 min ago',  icon: 'shopping-bag',  color: '#39FF88', route: '/order-detail', unread: true  },
-  { id: 'a2', type: 'manufacturer', title: 'Quote received from Stitch Labs', desc: 'Graphic Zip Hoodie — $28/unit (MOQ 150)', time: '1 hr ago',   icon: 'tool',          color: '#8B5CF6', route: '/manufacturer', unread: true  },
+  { id: 'a2', type: 'manufacturer', title: 'Quote received from Stitch Labs', desc: 'Graphic Zip Hoodie — $28/unit (MOQ 150)', time: '1 hr ago',   icon: 'tool',          color: '#C7CDD5', route: '/manufacturer', unread: true  },
   { id: 'a3', type: 'inventory',    title: 'Low stock: Vintage Washed Tee M', desc: '3 units remaining',             time: '3 hrs ago',  icon: 'alert-triangle',color: '#F97316', route: '/inventory',   unread: false },
   { id: 'a4', type: 'payout',       title: 'Payout processed',              desc: '$3,920.00 sent to your bank',  time: 'Yesterday',  icon: 'dollar-sign',   color: '#06B6D4', route: '/payments',    unread: false },
   { id: 'a5', type: 'review',       title: 'New 5-star review',             desc: '"Perfect quality, fast ship"',  time: 'Yesterday',  icon: 'star',          color: '#FBBF24', route: '/customers',   unread: false },

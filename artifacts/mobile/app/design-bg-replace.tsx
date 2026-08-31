@@ -40,7 +40,7 @@ const COLOR_SWATCHES = [
   { label: 'Warm Sand',    hex: '#C4A882' },
   { label: 'Charcoal',     hex: '#2C2C2C' },
   { label: 'Sage',         hex: '#87A878' },
-  { label: 'Lavender',     hex: '#B89FD8' },
+  { label: 'Sky Blue',     hex: '#7DD3FC' },
 ];
 
 const GRADIENT_PRESETS = [
@@ -70,7 +70,7 @@ export default function DesignBgReplaceScreen() {
   const [customColor, setCustomColor] = useState('#000000');
   const [bgTab, setBgTab] = useState<BgTab>('color');
   const [selectedGradient, setSelectedGradient] = useState(0);
-  const [customGradFrom, setCustomGradFrom] = useState('#8B5CF6');
+  const [customGradFrom, setCustomGradFrom] = useState('#0EA5E9');
   const [customGradTo, setCustomGradTo] = useState('#22D3EE');
   const [uploadedBgUri, setUploadedBgUri] = useState<string | null>(null);
   const [selectedScene, setSelectedScene] = useState<string | null>(null);
@@ -207,7 +207,7 @@ export default function DesignBgReplaceScreen() {
             <View style={s.customGradRow}>
               <View style={s.customGradField}>
                 <Text style={s.hexLabel}>From</Text>
-                <TextInput value={customGradFrom} onChangeText={setCustomGradFrom} placeholder="#8B5CF6" placeholderTextColor={SUBTLE} style={s.hexInput} autoCapitalize="characters" />
+                <TextInput value={customGradFrom} onChangeText={setCustomGradFrom} placeholder="#0EA5E9" placeholderTextColor={SUBTLE} style={s.hexInput} autoCapitalize="characters" />
               </View>
               <View style={s.customGradField}>
                 <Text style={s.hexLabel}>To</Text>

@@ -523,7 +523,7 @@ export default function ProfileScreen() {
               style={s.gridTile}
               activeOpacity={0.85}
             >
-              <LinearGradient colors={['#4A3B7A', '#1E1540']} style={s.gridInner}>
+              <LinearGradient colors={['#1F3A5F', '#0A1828']} style={s.gridInner}>
                 <View style={[s.gridMenuBtn, { opacity: 0.7 }]}>
                   <Feather name={post.contentType === 'video' ? 'video' : 'image'} size={11} color="#FFF" />
                 </View>

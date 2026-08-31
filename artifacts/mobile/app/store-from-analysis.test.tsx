@@ -98,8 +98,8 @@ vi.mock('@/hooks/useHeaderTopInset', () => ({
 
 vi.mock('@/hooks/useColors', () => ({
   useColors: () => ({
-    primary: '#8B5CF6',
-    accent: '#8B5CF6',
+    primary: '#C7CDD5',
+    accent: '#C7CDD5',
     accentForeground: '#FFFFFF',
     info: '#38BDF8',
   }),
@@ -108,10 +108,10 @@ vi.mock('@/hooks/useColors', () => ({
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({
     theme: {
-      accent: '#8B5CF6',
-      accentDim: '#2E1B55',
-      accentLight: '#C4B5FD',
-      primaryGradient: ['#8B5CF6', '#6366F1'],
+      accent: '#C7CDD5',
+      accentDim: '#34383E',
+      accentLight: '#F8FAFC',
+      primaryGradient: ['#C7CDD5', '#727A84'],
       onAccent: '#FFFFFF',
     },
   }),
@@ -125,9 +125,9 @@ vi.mock('@/lib/theme', () => ({
   FG: '#FAFAFA',
   MUTED: '#A1A1AA',
   SUBTLE: '#71717A',
-  PURPLE: '#8B5CF6',
-  PURPLE_LIGHT: '#C4B5FD',
-  PURPLE_DIM: '#2E1B55',
+  PURPLE: '#C7CDD5',
+  PURPLE_LIGHT: '#F8FAFC',
+  PURPLE_DIM: '#34383E',
   CYAN: '#38BDF8',
   SUCCESS: '#22C55E',
   FONT: { regular: 'Inter', medium: 'Inter', semibold: 'Inter', bold: 'Inter' },
@@ -172,7 +172,7 @@ const logoResult = {
   suggestedPalette: {
     primary: '#111111',
     secondary: '#222222',
-    accent: '#8B5CF6',
+    accent: '#C7CDD5',
     background: '#FFFFFF',
     text: '#111111',
     buttonText: '#FFFFFF',
@@ -188,7 +188,7 @@ const moodboardResult = {
   colorPalette: {
     primary: '#111111',
     secondary: '#222222',
-    accent: '#8B5CF6',
+    accent: '#C7CDD5',
     background: '#FFFFFF',
     text: '#111111',
     buttonText: '#FFFFFF',

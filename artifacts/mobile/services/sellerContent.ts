@@ -265,7 +265,7 @@ export const DEMO_PRODUCTS_FOR_TAG = DEMO_PRODUCTS.filter(
   priceCents: p.priceCents,
   status: p.status,
   salesModel: p.salesModel,
-  colors: ['#4A3B7A', '#1E1540'] as [string, string],
+  colors: ['#727A84', '#17191D'] as [string, string],
 }));
 
 // ─── Suggested hashtags ───────────────────────────────────────────────────────

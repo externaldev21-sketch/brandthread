@@ -97,16 +97,16 @@ vi.mock("@/lib/api", () => ({
 vi.mock("@/hooks/useColors", () => ({
   useColors: () => ({
     background: "#09090B",
-    primary: "#8B5CF6",
+    primary: "#C7CDD5",
   }),
 }));
 
 vi.mock("@/contexts/AppThemeContext", () => ({
   useAppTheme: () => ({
     theme: {
-      accent: "#8B5CF6",
-      accentDim: "#2E1B55",
-      accentLight: "#C4B5FD",
+      accent: "#C7CDD5",
+      accentDim: "#34383E",
+      accentLight: "#F8FAFC",
       secondary: "#172554",
       onAccent: "#FFFFFF",
     },

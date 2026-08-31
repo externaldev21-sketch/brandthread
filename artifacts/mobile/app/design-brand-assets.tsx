@@ -89,7 +89,7 @@ export default function DesignBrandAssetsScreen() {
       {
         text: 'Brand Color',
         onPress: () => {
-          Alert.prompt('Brand Color', 'Enter hex color (e.g. #8B5CF6):', async (hex) => {
+          Alert.prompt('Brand Color', 'Enter hex color (e.g. #0EA5E9):', async (hex) => {
             if (!hex?.trim()) return;
             const color = hex.startsWith('#') ? hex : '#' + hex;
             const newAsset = await addBrandAsset({ name: color, type: 'color', color, tags: [] });

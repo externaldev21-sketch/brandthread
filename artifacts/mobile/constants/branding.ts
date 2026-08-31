@@ -23,5 +23,5 @@ export const LOGO_SIZE = {
 } as const;
 
 // ── Glow defaults ─────────────────────────────────────────────────────────────
-export const LOGO_GLOW_COLOR   = '#8B5CF6';
+export const LOGO_GLOW_COLOR   = '#DDE2E8';
 export const LOGO_GLOW_ENABLED = true;

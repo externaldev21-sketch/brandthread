@@ -43,7 +43,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TILE_SIZE = Math.floor((SCREEN_WIDTH - 2) / 3);
 
 const GRADIENT_PAIRS: [string, string][] = [
-  ['#4A3B7A', '#1E1540'],
+  ['#1F3A5F', '#0A1828'],
   ['#1F3A5F', '#0A1828'],
   ['#3D1F0F', '#1A0A05'],
   ['#1A1A1A', '#0A0A0A'],
@@ -125,7 +125,7 @@ function mapApiProfile(profile: any, postsCount = 0, productsCount = 0): import(
     username: profile.username ?? brandName.toLowerCase().replace(/[^a-z0-9]/g, ''),
     bio: profile.bio ?? '',
     website: profile.website ?? undefined,
-    avatarColor: '#8B5CF6',
+    avatarColor: '#0F766E',
     initials: brandName.slice(0, 2).toUpperCase(),
     // Only an explicit server boolean grants this public credential.
     verified: profile.verified === true,

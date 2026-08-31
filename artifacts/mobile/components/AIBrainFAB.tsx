@@ -1,7 +1,7 @@
 /**
  * Brandthread AI Brain — Floating Action Button (Side Tab Edition)
  *
- * Default state: a flat purple tab sitting flush against the right edge.
+ * Default state: a flat Chrome/Silver tab sitting flush against the right edge.
  * Tapping the tab slides the full circular button into view (tap 1).
  * Tapping the expanded button opens the AI Brain screen (tap 2).
  * Auto-collapses back to the tab after 3 s if the user doesn't proceed.

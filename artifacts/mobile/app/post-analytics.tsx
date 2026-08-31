@@ -51,7 +51,7 @@ function formatPeakHour(hour: number): string {
 }
 
 function postTypeGradient(type: string, primary: string): [string, string] {
-  if (type === 'video' || type === 'behind_scenes') return [primary, '#1E1540'];
+  if (type === 'video' || type === 'behind_scenes') return [primary, '#0A1828'];
   if (type === 'slideshow') return [BLUE, '#0A1828'];
   if (type === 'announcement') return [GREEN, 'rgba(16,185,129,0.18)'];
   return ['#3D1F0F', '#1A0A05'];

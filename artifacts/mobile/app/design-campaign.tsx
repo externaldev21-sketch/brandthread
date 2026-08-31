@@ -31,18 +31,18 @@ import type { AIStyleKind, CampaignFormatKind, CampaignProject, CampaignAsset } 
 const COLOR_SWATCHES = [
   '#000000', '#FFFFFF', '#6B7280', '#F5F0E8',
   '#1E3A5F', '#2D5016', '#8B0000', '#F4A7B9',
-  '#C4A882', '#2C2C2C', '#87A878', '#B89FD8',
+  '#C4A882', '#2C2C2C', '#87A878', '#7DD3FC',
 ];
 
 // Map campaign format values to gradient colors for asset thumbnails
 const FORMAT_GRAD: Record<string, readonly [string, string]> = {
-  thread_post:   ['#8B5CF6', '#22D3EE'],
-  story:         ['#F97316', '#8B5CF6'],
-  store_hero:    ['#EC4899', '#8B5CF6'],
+  thread_post:   ['#0F766E', '#22D3EE'],
+  story:         ['#F97316', '#0EA5E9'],
+  store_hero:    ['#EC4899', '#0EA5E9'],
   product_banner:['#3B82F6', '#22D3EE'],
   email_banner:  ['#F59E0B', '#F97316'],
   ad_creative:   ['#10B981', '#22D3EE'],
-  square_post:   ['#2C2C2C', '#8B5CF6'],
+  square_post:   ['#2C2C2C', '#0F766E'],
   portrait_post: ['#1E3A5F', '#3B82F6'],
 };
 
@@ -243,7 +243,7 @@ function AssetCard({ asset, router, formatGrad }: {
   const { accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
   const s = createStyles(theme);
   const fmt = CAMPAIGN_FORMATS.find((f) => f.value === asset.format);
-  const gradColors = formatGrad[asset.format] ?? (['#8B5CF6', '#22D3EE'] as const);
+  const gradColors = formatGrad[asset.format] ?? (['#0F766E', '#22D3EE'] as const);
   return (
     <BrandthreadCard style={s.assetCard}>
       <LinearGradient colors={gradColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.assetThumb}>

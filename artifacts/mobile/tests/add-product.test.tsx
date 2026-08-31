@@ -79,9 +79,9 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({
     theme: {
-      accent: '#7c3aed',
-      accentDim: '#2e1b55',
-      accentLight: '#c4b5fd',
+      accent: '#c7cdd5',
+      accentDim: '#34383e',
+      accentLight: '#f8fafc',
       secondaryDim: '#172554',
     },
   }),

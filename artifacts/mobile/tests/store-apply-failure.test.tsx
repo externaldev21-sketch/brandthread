@@ -82,9 +82,9 @@ vi.mock('expo-router', () => ({
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({
     theme: {
-      accent: '#7c3aed',
-      accentDim: '#2e1b55',
-      accentLight: '#c4b5fd',
+      accent: '#c7cdd5',
+      accentDim: '#34383e',
+      accentLight: '#f8fafc',
       secondaryDim: '#172554',
     },
   }),
@@ -92,8 +92,8 @@ vi.mock('@/contexts/AppThemeContext', () => ({
 
 vi.mock('@/hooks/useColors', () => ({
   useColors: () => ({
-    primary: '#7c3aed',
-    accent: '#6d28d9',
+    primary: '#c7cdd5',
+    accent: '#727a84',
     accentForeground: '#ffffff',
     info: '#22d3ee',
   }),
@@ -111,9 +111,9 @@ vi.mock('@/lib/theme', () => ({
   FG: '#fafafa',
   MUTED: '#a1a1aa',
   SUBTLE: '#71717a',
-  PURPLE: '#7c3aed',
-  PURPLE_LIGHT: '#c4b5fd',
-  PURPLE_DIM: '#2e1b55',
+  PURPLE: '#c7cdd5',
+  PURPLE_LIGHT: '#f8fafc',
+  PURPLE_DIM: '#34383e',
   CYAN: '#22d3ee',
   CYAN_DIM: '#164e63',
   SUCCESS: '#22c55e',

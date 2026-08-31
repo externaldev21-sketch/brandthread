@@ -95,14 +95,14 @@ vi.mock('@/hooks/useApi', () => ({
 
 vi.mock('@/hooks/useColors', () => ({
   useColors: () => ({
-    accent: '#2e1b55',
+    accent: '#34383E',
     background: '#09090b',
     border: '#27272a',
     card: '#18181b',
     destructive: '#ef4444',
     foreground: '#fafafa',
     mutedForeground: '#a1a1aa',
-    primary: '#8b5cf6',
+    primary: '#C7CDD5',
     primaryForeground: '#ffffff',
     secondary: '#27272a',
     success: '#22c55e',

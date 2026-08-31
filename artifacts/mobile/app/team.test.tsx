@@ -88,7 +88,7 @@ vi.mock("@/hooks/useColors", () => ({
     border: "#333",
     foreground: "#fff",
     mutedForeground: "#aaa",
-    primary: "#8b5cf6",
+    primary: "#c7cdd5",
     primaryForeground: "#fff",
     secondary: "#222",
     success: "#10b981",

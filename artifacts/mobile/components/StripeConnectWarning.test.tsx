@@ -73,8 +73,8 @@ vi.mock('@/hooks/useApi', () => ({
 vi.mock('@/contexts/AppThemeContext', () => ({
   useAppTheme: () => ({
     theme: {
-      accent: '#7c3aed',
-      accentDim: '#2e1b55',
+      accent: '#C7CDD5',
+      accentDim: '#34383E',
       onAccent: '#ffffff',
     },
   }),

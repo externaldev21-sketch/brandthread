@@ -2,7 +2,7 @@
  * StyleTagsPicker — reusable curated-taxonomy chip selector.
  *
  * Renders a wrapping grid of emoji+label chips from the STYLE_TAGS vocabulary.
- * Selected chips get a solid purple fill; unselected get a dim border.
+ * Selected chips use the active Chrome/Silver fill; unselected get a dim border.
  * Pass `max` to cap how many can be selected at once (default: unlimited).
  *
  * Usage:

@@ -98,10 +98,10 @@ const STUDIO_TOOLS: StudioTool[] = [
 ];
 
 const TEMPLATES = [
-  { label: 'T-Shirt',      colors: ['#7C3AED', '#4F46E5'] as [string,string] },
+  { label: 'T-Shirt',      colors: ['#0EA5E9', '#1D4ED8'] as [string,string] },
   { label: 'Hoodie',       colors: ['#0EA5E9', '#6366F1'] as [string,string] },
-  { label: 'Product Card', colors: ['#8B5CF6', '#3B82F6'] as [string,string] },
-  { label: 'Story Reel',   colors: ['#22D3EE', '#8B5CF6'] as [string,string] },
+  { label: 'Product Card', colors: ['#0F766E', '#3B82F6'] as [string,string] },
+  { label: 'Story Reel',   colors: ['#22D3EE', '#0EA5E9'] as [string,string] },
   { label: 'Lookbook',     colors: ['#F97316', '#F59E0B'] as [string,string] },
 ];
 
@@ -251,7 +251,7 @@ export default function StudioScreen() {
 
         {/* ── INFO BANNER ── */}
         <LinearGradient
-          colors={['#1E1040', '#0E1830']}
+          colors={[theme.accentDim, '#0E1830']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={s.banner}

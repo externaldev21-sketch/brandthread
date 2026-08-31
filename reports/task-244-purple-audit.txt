@@ -1,0 +1,165 @@
+Task 244 — changed purple occurrence report (current lines)
+Generated from the rebased task diff against main-repl/main.
+
+CHANGED_PURPLE_OCCURRENCES 142
+artifacts/mobile/app.json:191 — replaced #8B5CF6
+artifacts/mobile/app/(buyer)/discover.tsx:32 — replaced #8B5CF6
+artifacts/mobile/app/(buyer)/discover.tsx:58 — replaced #7C3AED
+artifacts/mobile/app/(buyer)/discover.tsx:85 — replaced #8B5CF6
+artifacts/mobile/app/(buyer)/discover.tsx:90 — replaced #8B5CF6
+artifacts/mobile/app/(tabs)/following.tsx:71 — replaced #8B5CF6, #7C3AED
+artifacts/mobile/app/(tabs)/profile.tsx:526 — replaced #4A3B7A, #1E1540
+artifacts/mobile/app/(tabs)/studio.tsx:101 — replaced #7C3AED
+artifacts/mobile/app/(tabs)/studio.tsx:103 — replaced #8B5CF6
+artifacts/mobile/app/(tabs)/studio.tsx:104 — replaced #8B5CF6
+artifacts/mobile/app/app-icon.tsx:17 — replaced #7C3AED
+artifacts/mobile/app/app-icon.tsx:21 — replaced #7C3AED
+artifacts/mobile/app/automation.tsx:35 — replaced #6D28D9
+artifacts/mobile/app/billing-access.test.tsx:108 — replaced #8B5CF6
+artifacts/mobile/app/billing-access.test.tsx:109 — replaced #2E1B55
+artifacts/mobile/app/billing-access.test.tsx:110 — replaced #C4B5FD
+artifacts/mobile/app/billing-access.test.tsx:113 — replaced #8B5CF6
+artifacts/mobile/app/camera-capture.tsx:307 — replaced rgba(139,92,246,0.14)
+artifacts/mobile/app/create-post.tsx:930 — replaced #8B5CF6
+artifacts/mobile/app/customers.tsx:28 — replaced #8B5CF6, #A78BFA, #6D28D9
+artifacts/mobile/app/design-ai-photoshoot.tsx:59 — replaced #8B5CF6
+artifacts/mobile/app/design-ai-photoshoot.tsx:60 — replaced #8B5CF6
+artifacts/mobile/app/design-bg-replace.tsx:43 — replaced #B89FD8
+artifacts/mobile/app/design-bg-replace.tsx:73 — replaced #8B5CF6
+artifacts/mobile/app/design-bg-replace.tsx:210 — replaced #8B5CF6
+artifacts/mobile/app/design-brand-assets.tsx:92 — replaced #8B5CF6
+artifacts/mobile/app/design-campaign.tsx:34 — replaced #B89FD8
+artifacts/mobile/app/design-campaign.tsx:39 — replaced #8B5CF6
+artifacts/mobile/app/design-campaign.tsx:40 — replaced #8B5CF6
+artifacts/mobile/app/design-campaign.tsx:41 — replaced #8B5CF6
+artifacts/mobile/app/design-campaign.tsx:45 — replaced #8B5CF6
+artifacts/mobile/app/design-campaign.tsx:246 — replaced #8B5CF6
+artifacts/mobile/app/design-canvas.tsx:53 — replaced #8B5CF6
+artifacts/mobile/app/design-canvas.tsx:55 — replaced #C084FC, #A78BFA
+artifacts/mobile/app/design-canvas.tsx:61 — replaced #8B5CF6
+artifacts/mobile/app/design-garment.tsx:35 — replaced #8B5CF6
+artifacts/mobile/app/design-garment.tsx:114 — replaced #8B5CF6
+artifacts/mobile/app/design-mockup-to-model.tsx:45 — replaced #8B5CF6
+artifacts/mobile/app/design-mockup-to-model.tsx:46 — replaced #8B5CF6
+artifacts/mobile/app/design-templates.tsx:41 — replaced #2D1B69, #8B5CF6
+artifacts/mobile/app/design-templates.tsx:47 — replaced #4C1D95, #A78BFA
+artifacts/mobile/app/design-templates.tsx:50 — replaced #7C3AED
+artifacts/mobile/app/design-templates.tsx:51 — replaced #8B5CF6
+artifacts/mobile/app/design-templates.tsx:57 — replaced #8B5CF6
+artifacts/mobile/app/design-templates.tsx:64 — replaced #701A75, #E879F9
+artifacts/mobile/app/design-text-to-design.tsx:39 — replaced #8B5CF6
+artifacts/mobile/app/design-text-to-design.tsx:40 — replaced #8B5CF6
+artifacts/mobile/app/design-upload-sketch.tsx:41 — replaced #8B5CF6
+artifacts/mobile/app/design-upload-sketch.tsx:42 — replaced #8B5CF6
+artifacts/mobile/app/edit-profile.tsx:150 — replaced #9F7AEA, #5B3FA0
+artifacts/mobile/app/integrations/klaviyo.tsx:113 — replaced #5A31F422
+artifacts/mobile/app/integrations/klaviyo.tsx:114 — replaced #8C6DF5
+artifacts/mobile/app/payments.tsx:304 — replaced #5A31F4
+artifacts/mobile/app/post-analytics.tsx:54 — replaced #1E1540
+artifacts/mobile/app/product-store.tsx:32 — replaced #533483
+artifacts/mobile/app/product-store.tsx:33 — replaced #533483
+artifacts/mobile/app/seller-profile.tsx:46 — replaced #4A3B7A, #1E1540
+artifacts/mobile/app/seller-profile.tsx:128 — replaced #8B5CF6
+artifacts/mobile/app/store-editor.tsx:702 — replaced #7c3aed
+artifacts/mobile/app/store-from-analysis.test.tsx:101 — replaced #8B5CF6
+artifacts/mobile/app/store-from-analysis.test.tsx:102 — replaced #8B5CF6
+artifacts/mobile/app/store-from-analysis.test.tsx:111 — replaced #8B5CF6
+artifacts/mobile/app/store-from-analysis.test.tsx:112 — replaced #2E1B55
+artifacts/mobile/app/store-from-analysis.test.tsx:113 — replaced #C4B5FD
+artifacts/mobile/app/store-from-analysis.test.tsx:114 — replaced #8B5CF6
+artifacts/mobile/app/store-from-analysis.test.tsx:128 — replaced #8B5CF6
+artifacts/mobile/app/store-from-analysis.test.tsx:129 — replaced #C4B5FD
+artifacts/mobile/app/store-from-analysis.test.tsx:130 — replaced #2E1B55
+artifacts/mobile/app/store-from-analysis.test.tsx:175 — replaced #8B5CF6
+artifacts/mobile/app/store-from-analysis.test.tsx:191 — replaced #8B5CF6
+artifacts/mobile/app/store-generate.tsx:35 — replaced #7c3aed
+artifacts/mobile/app/store-generate.tsx:36 — replaced #5b21b6
+artifacts/mobile/app/store-generate.tsx:37 — replaced #a78bfa
+artifacts/mobile/app/store-generating.tsx:34 — replaced #7c3aed
+artifacts/mobile/app/store-generating.tsx:35 — replaced #5b21b6
+artifacts/mobile/app/store-generating.tsx:36 — replaced #a78bfa
+artifacts/mobile/app/team.test.tsx:91 — replaced #8b5cf6
+artifacts/mobile/app/team.tsx:45 — replaced #8B5CF6
+artifacts/mobile/app/website.tsx:35 — replaced #8B5CF6
+artifacts/mobile/app/website.tsx:37 — replaced #8B5CF6
+artifacts/mobile/app/website.tsx:44 — replaced #8B5CF6
+artifacts/mobile/components/StripeConnectWarning.test.tsx:76 — replaced #7c3aed
+artifacts/mobile/components/StripeConnectWarning.test.tsx:77 — replaced #2e1b55
+artifacts/mobile/components/onboarding/SellerPlanRecommendationStep.tsx:88 — replaced #A78BFA
+artifacts/mobile/constants/branding.ts:26 — replaced #8B5CF6
+artifacts/mobile/constants/colors.ts:9 — replaced #8B5CF6
+artifacts/mobile/constants/colors.ts:10 — replaced #8B5CF6
+artifacts/mobile/constants/colors.ts:23 — replaced #8B5CF6
+artifacts/mobile/constants/colors.ts:28 — replaced #8B5CF6
+artifacts/mobile/constants/colors.ts:31 — replaced #3B1FA3
+artifacts/mobile/constants/colors.ts:35 — replaced #4C1D95
+artifacts/mobile/constants/colors.ts:48 — replaced #8B5CF6
+artifacts/mobile/constants/colors.ts:49 — replaced #8B5CF6
+artifacts/mobile/constants/colors.ts:56 — replaced #2D1B6B
+artifacts/mobile/constants/colors.ts:57 — replaced #A78BFA
+artifacts/mobile/lib/billingPermissions.test.tsx:95 — replaced #7c3aed
+artifacts/mobile/lib/billingPermissions.test.tsx:106 — replaced #7c3aed
+artifacts/mobile/lib/billingPermissions.test.tsx:107 — replaced #2e1b55
+artifacts/mobile/lib/billingPermissions.test.tsx:108 — replaced #c4b5fd
+artifacts/mobile/lib/billingPermissions.test.tsx:111 — replaced #7c3aed, #4c1d95
+artifacts/mobile/lib/billingPermissions.test.tsx:168 — replaced #7c3aed
+artifacts/mobile/lib/billingPermissions.test.tsx:169 — replaced #2e1b55
+artifacts/mobile/lib/billingPermissions.test.tsx:170 — replaced #c4b5fd
+artifacts/mobile/lib/searchData.ts:35 — replaced #7C3AED
+artifacts/mobile/lib/searchData.ts:51 — replaced #7C3AED
+artifacts/mobile/services/aiService.ts:614 — replaced #8B5CF6
+artifacts/mobile/services/aiService.ts:618 — replaced #A78BFA
+artifacts/mobile/services/aiService.ts:626 — replaced #8B5CF6
+artifacts/mobile/services/aiService.ts:640 — replaced #8B5CF6
+artifacts/mobile/services/data.ts:354 — replaced #8B5CF6
+artifacts/mobile/services/data.ts:377 — replaced #8B5CF6
+artifacts/mobile/services/sellerContent.ts:268 — replaced #4A3B7A, #1E1540
+artifacts/mobile/services/socialService.identity.test.ts:81 — replaced #8B5CF6
+artifacts/mobile/services/socialService.ts:102 — replaced #8B5CF6
+artifacts/mobile/services/socialService.ts:601 — replaced #8B5CF6
+artifacts/mobile/services/socialService.ts:640 — replaced #7C3AED
+artifacts/mobile/services/socialService.ts:884 — replaced #8B5CF6
+artifacts/mobile/services/storeTypes.ts:571 — replaced #7c3aed
+artifacts/mobile/tests/add-product.test.tsx:82 — replaced #7c3aed
+artifacts/mobile/tests/add-product.test.tsx:83 — replaced #2e1b55
+artifacts/mobile/tests/add-product.test.tsx:84 — replaced #c4b5fd
+artifacts/mobile/tests/ai-photography-chat.test.tsx:98 — replaced #2e1b55
+artifacts/mobile/tests/ai-photography-chat.test.tsx:105 — replaced #8b5cf6
+artifacts/mobile/tests/buyer-product-detail-payment.test.tsx:117 — replaced #8B5CF6
+artifacts/mobile/tests/buyer-product-detail-payment.test.tsx:118 — replaced #2E1B55
+artifacts/mobile/tests/buyer-product-detail-payment.test.tsx:119 — replaced #C4B5FD
+artifacts/mobile/tests/buyer-product-detail-payment.test.tsx:120 — replaced #8B5CF6, #A78BFA
+artifacts/mobile/tests/buyer-product-detail-payment.test.tsx:123 — replaced #8B5CF6
+artifacts/mobile/tests/buyer-product-detail-payment.test.tsx:134 — replaced #6D28D9
+artifacts/mobile/tests/buyer-product-detail-payment.test.tsx:135 — replaced #8B5CF6
+artifacts/mobile/tests/profile-save.test.tsx:100 — replaced #8B5CF6
+artifacts/mobile/tests/profile-save.test.tsx:107 — replaced #8B5CF6
+artifacts/mobile/tests/profile-save.test.tsx:108 — replaced #2E1B55
+artifacts/mobile/tests/profile-save.test.tsx:109 — replaced #C4B5FD
+artifacts/mobile/tests/store-apply-failure.test.tsx:85 — replaced #7c3aed
+artifacts/mobile/tests/store-apply-failure.test.tsx:86 — replaced #2e1b55
+artifacts/mobile/tests/store-apply-failure.test.tsx:87 — replaced #c4b5fd
+artifacts/mobile/tests/store-apply-failure.test.tsx:95 — replaced #7c3aed
+artifacts/mobile/tests/store-apply-failure.test.tsx:96 — replaced #6d28d9
+artifacts/mobile/tests/store-apply-failure.test.tsx:114 — replaced #7c3aed
+artifacts/mobile/tests/store-apply-failure.test.tsx:115 — replaced #c4b5fd
+artifacts/mobile/tests/store-apply-failure.test.tsx:116 — replaced #2e1b55
+
+FINAL ALLOWLIST HUE SCAN (.ts, .tsx, .json)
+NON_ALLOWLIST_MATCHES 0
+
+ALLOWLIST_MATCHES 14
+artifacts/mobile/contexts/AppThemeContext.tsx:46: #8B5CF6 h=258.3 s=0.63 v=0.96
+artifacts/mobile/contexts/AppThemeContext.tsx:46: #A78BFA h=255.1 s=0.44 v=0.98
+artifacts/mobile/contexts/AppThemeContext.tsx:46: rgba(139,92,246,0.18) h=258.3 s=0.63 v=0.96
+artifacts/mobile/contexts/AppThemeContext.tsx:46: #A78BFA h=255.1 s=0.44 v=0.98
+artifacts/mobile/contexts/AppThemeContext.tsx:46: rgba(139,92,246,0.10) h=258.3 s=0.63 v=0.96
+artifacts/mobile/contexts/AppThemeContext.tsx:46: #6D28D9 h=263.4 s=0.82 v=0.85
+artifacts/mobile/contexts/AppThemeContext.tsx:46: #8B5CF6 h=258.3 s=0.63 v=0.96
+artifacts/mobile/contexts/AppThemeContext.tsx:46: #A78BFA h=255.1 s=0.44 v=0.98
+artifacts/mobile/contexts/AppThemeContext.tsx:46: #4C1D95 h=263.5 s=0.81 v=0.58
+artifacts/mobile/contexts/AppThemeContext.tsx:46: #8B5CF6 h=258.3 s=0.63 v=0.96
+artifacts/mobile/contexts/AppThemeContext.tsx:46: #A78BFA h=255.1 s=0.44 v=0.98
+artifacts/mobile/contexts/AppThemeContext.tsx:46: rgba(139,92,246,0.24) h=258.3 s=0.63 v=0.96
+artifacts/mobile/contexts/AppThemeContext.tsx:46: rgba(167,139,250,0.04) h=255.1 s=0.44 v=0.98
+artifacts/mobile/contexts/AppThemeContext.tsx:46: #8B5CF6 h=258.3 s=0.63 v=0.96

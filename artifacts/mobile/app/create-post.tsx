@@ -927,7 +927,7 @@ function TextModal({ visible, onClose, newTextInput, setNewTextInput, newTextCol
   const colors = useColors();
   const PURPLE = colors.primary;
   const sm = React.useMemo(() => createModalStyles(colors), [colors]);
-  const SWATCHES = ['#FFFFFF', '#000000', '#F87171', '#8B5CF6', '#3B82F6', '#FBBF24', '#22D3EE'];
+  const SWATCHES = ['#FFFFFF', '#000000', '#F87171', '#0F766E', '#3B82F6', '#FBBF24', '#22D3EE'];
   return (
     <Modal visible={visible} animationType="slide" presentationStyle={Platform.OS === 'android' ? 'fullScreen' : 'pageSheet'} onRequestClose={onClose}>
       <View style={[sm.root, { paddingBottom: insets.bottom + 16 }]}>

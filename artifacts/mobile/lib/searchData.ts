@@ -32,7 +32,7 @@ export const SEARCH_BRANDS: SearchBrand[] = [
   { id: 'b-ag', kind: 'brand', name: 'Atlas Goods',    handle: '@atlasgoods',    color: '#1D4ED8', initials: 'AG' },
   { id: 'b-cf', kind: 'brand', name: 'Coldform',       handle: '@coldform',      color: '#065F46', initials: 'CF' },
   { id: 'b-rt', kind: 'brand', name: 'Rawthread',      handle: '@rawthread',     color: '#92400E', initials: 'RT' },
-  { id: 'b-fs', kind: 'brand', name: 'Fernweh Supply', handle: '@fernwehsupply', color: '#7C3AED', initials: 'FS' },
+  { id: 'b-fs', kind: 'brand', name: 'Fernweh Supply', handle: '@fernwehsupply', color: '#727A84', initials: 'FS' },
   { id: 'b-nl', kind: 'brand', name: 'Northloom',      handle: '@northloom',     color: '#0891B2', initials: 'NL' },
   { id: 'b-pl', kind: 'brand', name: 'Palisade',       handle: '@palisade',      color: '#9F1239', initials: 'PL' },
 ];
@@ -48,7 +48,7 @@ export const SEARCH_PRODUCTS: SearchProduct[] = [
   { id: 'p8',  kind: 'product', brand: 'Softwear__',     name: 'Oversized Crewneck',       priceCents: 8800,  color: '#BE185D', initials: 'SW' },
   { id: 'p9',  kind: 'product', brand: 'Meridian Co.',   name: 'Essential Tee — Sage',     priceCents: 4800,  color: '#0F766E', initials: 'MC' },
   { id: 'p10', kind: 'product', brand: 'Rawthread',      name: 'Boxy Flannel Shirt',       priceCents: 9600,  color: '#92400E', initials: 'RT' },
-  { id: 'p11', kind: 'product', brand: 'Fernweh Supply', name: 'Selvedge Trucker Jacket',  priceCents: 22500, color: '#7C3AED', initials: 'FS' },
+  { id: 'p11', kind: 'product', brand: 'Fernweh Supply', name: 'Selvedge Trucker Jacket',  priceCents: 22500, color: '#727A84', initials: 'FS' },
   { id: 'p12', kind: 'product', brand: 'Northloom',      name: 'Brushed Fleece Half-Zip',  priceCents: 14200, color: '#0891B2', initials: 'NL' },
   { id: 'p13', kind: 'product', brand: 'Palisade',       name: 'Wide-Leg Twill Trouser',   priceCents: 16800, color: '#9F1239', initials: 'PL' },
 ];

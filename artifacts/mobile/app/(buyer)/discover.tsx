@@ -29,7 +29,7 @@ const HERO_DROP = {
   brand: 'Vault Studio',
   handle: '@vaultstudio',
   initials: 'VS',
-  brandColor: '#8B5CF6',
+  brandColor: '#0F766E',
   name: 'Canvas Cargo Jacket',
   tag: 'DROPPING TODAY',
   price: '$189',
@@ -55,7 +55,7 @@ const FOR_YOU: ForYouItem[] = [
 ];
 
 const UNFOLLOWED_BRAND_POOL: ForYouItem[] = [
-  { id: 'u1',  brand: 'Fernweh Supply',  name: 'Selvedge Trucker Jacket', price: '$225', originalPrice: null,  color: '#7C3AED', initials: 'FS', tag: 'New' },
+  { id: 'u1',  brand: 'Fernweh Supply',  name: 'Selvedge Trucker Jacket', price: '$225', originalPrice: null,  color: '#0F766E', initials: 'FS', tag: 'New' },
   { id: 'u2',  brand: 'Northloom',       name: 'Brushed Fleece Half-Zip', price: '$142', originalPrice: null,  color: '#0891B2', initials: 'NL', tag: 'Archive' },
   { id: 'u3',  brand: 'Palisade',        name: 'Wide-Leg Twill Trouser',  price: '$168', originalPrice: '$210', color: '#9F1239', initials: 'PL', tag: 'Sale' },
   { id: 'u4',  brand: 'Grainhouse',      name: 'Heavyweight Canvas Tote', price: '$64',  originalPrice: null,  color: '#B45309', initials: 'GH', tag: 'New' },
@@ -82,12 +82,12 @@ const DROPPING_SOON = [
   { id: 'd1', brand: 'Meridian Co.',  name: 'Essential Tee — Sage',   price: '$48',  color: '#0F766E', initials: 'MC', inHours: 0,  live: true  },
   { id: 'd2', brand: 'NxGen Drops',   name: 'Cargo Trouser S/S',      price: '$134', color: '#B45309', initials: 'NX', inHours: 4,  live: false },
   { id: 'd3', brand: 'Rawthread',     name: 'Boxy Flannel Shirt',     price: '$96',  color: '#92400E', initials: 'RT', inHours: 9,  live: false },
-  { id: 'd4', brand: 'Vault Studio',  name: 'Fleece Zip Jacket',      price: '$220', color: '#8B5CF6', initials: 'VS', inHours: 23, live: false },
+  { id: 'd4', brand: 'Vault Studio',  name: 'Fleece Zip Jacket',      price: '$220', color: '#0F766E', initials: 'VS', inHours: 23, live: false },
 ];
 
 const TRENDING = [
   { id: 't1', rank: 1, brand: 'NxGen Drops',  name: 'Archive Hoodie Vol.3',   price: '$135', color: '#B45309', initials: 'NX', hype: '🔥 Hot'    },
-  { id: 't2', rank: 2, brand: 'Vault Studio',  name: 'Canvas Cargo Jacket',    price: '$189', color: '#8B5CF6', initials: 'VS', hype: '⚡ Live'   },
+  { id: 't2', rank: 2, brand: 'Vault Studio',  name: 'Canvas Cargo Jacket',    price: '$189', color: '#0F766E', initials: 'VS', hype: '⚡ Live'   },
   { id: 't3', rank: 3, brand: 'Atlas Goods',   name: 'Utility Vest — Slate',   price: '$220', color: '#1D4ED8', initials: 'AG', hype: '⏳ Limited' },
   { id: 't4', rank: 4, brand: 'Coldform',      name: 'Raw Denim Jacket',       price: '$310', color: '#065F46', initials: 'CF', hype: '💎 Grail'  },
 ];

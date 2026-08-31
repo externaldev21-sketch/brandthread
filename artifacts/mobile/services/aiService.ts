@@ -611,11 +611,11 @@ export async function getNextBestActions(authToken?: string | null): Promise<Nex
         const colorMap: Record<string, string> = {
           inventory: '#F87171',
           orders:    '#F97316',
-          content:   '#8B5CF6',
+          content:   '#C7CDD5',
           marketing: '#22D3EE',
           analytics: '#34D399',
           customers: '#60A5FA',
-          store:     '#A78BFA',
+          store:     '#F8FAFC',
           production:'#F59E0B',
         };
         return suggestions.slice(0, 5).map((s, i) => ({
@@ -623,7 +623,7 @@ export async function getNextBestActions(authToken?: string | null): Promise<Nex
           title:       s.title,
           subtitle:    s.reason,
           icon:        iconMap[s.category] ?? 'star',
-          accentColor: colorMap[s.category] ?? '#8B5CF6',
+          accentColor: colorMap[s.category] ?? '#C7CDD5',
           route:       s.actionRoute,
           priority:    i + 1,
           category:    s.category as NextBestAction['category'],
@@ -637,7 +637,7 @@ export async function getNextBestActions(authToken?: string | null): Promise<Nex
     { id: 'nba_ship',  title: 'Ship 3 orders before 5 PM',                       subtitle: 'Orders ready to ship',              icon: 'package', accentColor: '#F97316', route: '/(tabs)/orders',  priority: 1, category: 'orders'    },
     { id: 'nba_stock', title: 'Black medium hoodies: ~8-day supply',              subtitle: 'Consider placing reorder today',     icon: 'layers',  accentColor: '#F87171', route: '/inventory',     priority: 2, category: 'inventory' },
     { id: 'nba_quote', title: 'Manufacturer quote expires tomorrow',              subtitle: 'Pacific Thread QT-2041',            icon: 'clock',   accentColor: '#F59E0B', route: '/manufacturer-hub', priority: 3, category: 'production' },
-    { id: 'nba_video', title: 'Your latest video is driving product clicks',      subtitle: 'Create a follow-up post',           icon: 'video',   accentColor: '#8B5CF6', route: '/create-post',   priority: 4, category: 'content'   },
+    { id: 'nba_video', title: 'Your latest video is driving product clicks',      subtitle: 'Create a follow-up post',           icon: 'video',   accentColor: '#C7CDD5', route: '/create-post',   priority: 4, category: 'content'   },
     { id: 'nba_conv',  title: 'Canvas Cargo Jacket: high views, low add-to-cart', subtitle: 'Optimise the product page',        icon: 'trending-down', accentColor: '#22D3EE', route: '/(tabs)/products', priority: 5, category: 'analytics' },
   ];
 }

@@ -42,7 +42,7 @@ function initials(name: string) {
   return name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('');
 }
 
-const AVATAR_COLORS = ['#8B5CF6', '#4A6FA5', '#22D3EE', '#B98A2E', '#EC4899', '#10B981'];
+const AVATAR_COLORS = ['#0F766E', '#4A6FA5', '#22D3EE', '#B98A2E', '#EC4899', '#10B981'];
 
 function avatarColor(idx: number) { return AVATAR_COLORS[idx % AVATAR_COLORS.length]; }
 

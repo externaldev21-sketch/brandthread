@@ -78,7 +78,7 @@ describe("provisioned buyer identity hydration", () => {
         bio: "Demo profile",
         website: "",
         location: "",
-        avatarColor: "#8B5CF6",
+        avatarColor: "#C7CDD5",
         avatarInitials: "J",
         profileVisibility: "public",
         postsCount: 0,

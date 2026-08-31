@@ -31,9 +31,9 @@ const DEFAULT_ANSWERS: StoreGenerationAnswers = {
   secondaryStyles: [],
   moods: ['clean'],
   colors: {
-    primary: '#7c3aed',
-    secondary: '#5b21b6',
-    accent: '#a78bfa',
+    primary: '#0f766e',
+    secondary: '#0c4a6e',
+    accent: '#38bdf8',
     background: '#0f0f1a',
     text: '#f4f4ff',
     buttonText: '#0f0f1a',
