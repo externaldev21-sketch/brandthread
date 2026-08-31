@@ -8,7 +8,6 @@
  * GET  /api/posts/:id/analytics — owner-only verified performance (requireAuth)
  * POST /api/posts/:id/interact — toggle like / repost; record analytics events (requireAuth)
  */
-import { Router } from "express";
 import {
   db, posts, postTaggedProducts, products, users, interactions, follows, boosts,
   savedItems, orders,
@@ -16,17 +15,28 @@ import {
 import { eq, and, inArray, count, sql, desc, lt, gte } from "drizzle-orm";
 import { requireAuth } from "../middlewares/requireAuth";
 import { deriveSellerVerified } from "../lib/sellerEligibility";
+import express, { Router } from "express";
+import { execFile } from "node:child_process";
+import { promises as fs } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { promisify } from "node:util";
+import { ObjectStorageService } from "../lib/objectStorage";
+import { ObjectPermission } from "../lib/objectAcl";
 
 const router = Router();
 
+const objectStorage = new ObjectStorageService();
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// ─── GET /api/posts/feed ──────────────────────────────────────────────────────
-// Buyer's personalised Thread feed: posts from sellers the buyer follows,
-// newest-first. Requires auth so we can resolve the buyer's follows.
-// Query params: ?limit=30&offset=0
-router.get("/feed", requireAuth, async (req, res) => {
+const VIDEO_CONTENT_TYPES = new Set(["video/mp4", "video/quicktime", "video/webm"]);
   const clerkId = (req as any).clerkUserId as string;
+
+  const [seller] = await db.select({ accountType: users.accountType }).from(users)
+    .where(eq(users.clerkId, clerkId)).limit(1);
+
+  const [seller] = await db.select({ accountType: users.accountType }).from(users)
+    .where(eq(users.clerkId, clerkId)).limit(1);
   const lim = Math.min(parseInt((req.query.limit as string) || "30", 10) || 30, 50);
   const off = Math.max(parseInt((req.query.offset as string) || "0", 10) || 0, 0);
 
@@ -50,6 +60,7 @@ router.get("/feed", requireAuth, async (req, res) => {
         id:          posts.id,
         userId:      posts.userId,
         mediaUrl:    posts.mediaUrl,
+        thumbnailUrl: posts.thumbnailUrl,
         mediaType:   posts.mediaType,
         caption:     posts.caption,
         styleTags:   posts.styleTags,
@@ -152,6 +163,7 @@ router.get("/feed", requireAuth, async (req, res) => {
       id:        p.id,
       userId:    p.userId,
       mediaUrl:  p.mediaUrl,
+      thumbnailUrl: p.thumbnailUrl,
       mediaType: p.mediaType,
       caption:   p.caption,
       styleTags: p.styleTags,
@@ -190,6 +202,12 @@ router.get("/feed", requireAuth, async (req, res) => {
 router.post("/", requireAuth, async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
 
+  const [seller] = await db.select({ accountType: users.accountType }).from(users)
+    .where(eq(users.clerkId, clerkId)).limit(1);
+
+  const [seller] = await db.select({ accountType: users.accountType }).from(users)
+    .where(eq(users.clerkId, clerkId)).limit(1);
+
   // ── Seller-only gate ────────────────────────────────────────────────────────
   // Only seller accounts may publish to the Thread feed. This is enforced
   // server-side so a buyer cannot bypass it by calling the API directly.
@@ -199,31 +217,49 @@ router.post("/", requireAuth, async (req, res) => {
     .where(eq(users.clerkId, clerkId))
     .limit(1);
 
-  if (!poster || poster.accountType !== "seller") {
-    return res.status(403).json({
-      error: "Only seller accounts can post to the Thread feed.",
-      code:  "SELLER_ONLY",
-    });
-  }
-  // ───────────────────────────────────────────────────────────────────────────
-
   const {
-    mediaUrl, mediaType, caption, styleTags, taggedProductIds,
+    mediaUrl, mediaPath, thumbnailPath: requestedThumbnailPath, mediaType, caption, styleTags, taggedProductIds,
   } = req.body as {
     mediaUrl?:          string;
+    mediaPath?:         string;
+    thumbnailPath?:     string;
     mediaType?:         string;
     caption?:           string;
     styleTags?:         string[];
     taggedProductIds?:  string[];
   };
+  const [post] = await db.select().from(posts).where(eq(posts.id, id)).limit(1);
 
-  const [post] = await db.insert(posts).values({
-    userId:    clerkId,
-    mediaUrl:  mediaUrl  ?? "",
-    mediaType: (mediaType as any) ?? "photo",
-    caption:   caption   ?? "",
-    styleTags: styleTags ?? [],
-  }).returning();
+  if (pendingMediaPath) {
+    try {
+      await objectStorage.trySetObjectEntityAclPolicy(pendingMediaPath, {
+        owner: clerkId,
+        visibility: "public",
+      });
+    } catch (error) {
+      await db.delete(posts).where(eq(posts.id, post.id)).catch(() => {});
+      req.log.error({ err: error, clerkId, postId: post.id }, "Could not publish composed video");
+      return res.status(500).json({ error: "The video could not be published. You can retry without recomposing it." });
+    }
+  }
+  if (pendingThumbnailPath) {
+    try {
+      await objectStorage.trySetObjectEntityAclPolicy(pendingThumbnailPath, {
+        owner: clerkId,
+        visibility: "public",
+      });
+    } catch (error) {
+      await db.delete(posts).where(eq(posts.id, post.id)).catch(() => {});
+      if (pendingMediaPath) {
+        await objectStorage.trySetObjectEntityAclPolicy(pendingMediaPath, {
+          owner: clerkId,
+          visibility: "private",
+        }).catch(() => {});
+      }
+      req.log.error({ err: error, clerkId, postId: post.id }, "Could not publish video thumbnail");
+      return res.status(500).json({ error: "The video could not be published. You can retry without recomposing it." });
+    }
+  }
 
   // Validate + tag products (must belong to the posting seller)
   const taggedProducts: any[] = [];
@@ -263,21 +299,9 @@ router.post("/", requireAuth, async (req, res) => {
 router.get("/:id/analytics", requireAuth, async (req, res) => {
   const ownerId = (req as any).clerkUserId as string;
   const { id } = req.params;
-  if (typeof id !== "string" || !UUID_RE.test(id)) {
-    return res.status(404).json({ error: "Post analytics not found" });
-  }
+  if (!UUID_RE.test(id)) return res.status(404).json({ error: "Post not found" });
 
-  const [post] = await db
-    .select({
-      id: posts.id,
-      mediaType: posts.mediaType,
-      mediaUrl: posts.mediaUrl,
-      caption: posts.caption,
-      createdAt: posts.createdAt,
-    })
-    .from(posts)
-    .where(and(eq(posts.id, id), eq(posts.userId, ownerId)))
-    .limit(1);
+  const [post] = await db.select().from(posts).where(eq(posts.id, id)).limit(1);
 
   // Deliberately return the same response for a missing post and another
   // seller's post so this endpoint never reveals ownership information.
@@ -419,6 +443,12 @@ router.get("/:id", async (req, res) => {
 // ─── POST /api/posts/:id/interact ────────────────────────────────────────────
 router.post("/:id/interact", requireAuth, async (req, res) => {
   const clerkId = (req as any).clerkUserId as string;
+
+  const [seller] = await db.select({ accountType: users.accountType }).from(users)
+    .where(eq(users.clerkId, clerkId)).limit(1);
+
+  const [seller] = await db.select({ accountType: users.accountType }).from(users)
+    .where(eq(users.clerkId, clerkId)).limit(1);
   const { id } = req.params;
   if (typeof id !== "string" || !UUID_RE.test(id)) {
     return res.status(404).json({ error: "Post not found" });
@@ -464,3 +494,192 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
 });
 
 export default router;
+
+function validSpeed(value: unknown): value is 0.5 | 1 | 2 | 3 {
+  return value === 0.5 || value === 1 || value === 2 || value === 3;
+}
+
+const VIDEO_PATH_RE = /^\/objects\/uploads\/[a-zA-Z0-9_-]+$/;
+
+  const rawStorageKey = (req.params as any).storageKey;
+
+      const file = await objectStorage.getObjectEntityFile(clip.objectPath!);
+
+    let end = Math.max(0, size - 1);
+
+const MAX_TOTAL_DURATION_SECONDS = 600;
+
+  const clips = Array.isArray(body?.clips) ? body.clips : [];
+
+  let workDir: string | null = null;
+
+function isSupportedVideo(contentType: string, bytes: Buffer): boolean {
+  if (!VIDEO_CONTENT_TYPES.has(contentType)) return false;
+  // MP4 and MOV both use an ftyp box. WebM starts with the EBML signature.
+  const isFtyp = bytes.length >= 12 && bytes.subarray(4, 8).toString("ascii") === "ftyp";
+  const isWebm = bytes.length >= 4 && bytes.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]));
+  return isFtyp || isWebm;
+}
+
+    const inputs = inputPaths.flatMap((inputPath) => ["-i", inputPath]);
+
+    const contentType = String(req.get("content-type") ?? "").split(";")[0].toLowerCase();
+
+  const body = req.body as {
+    clips?: Array<{ objectPath?: string; duration?: number; speed?: number; filter?: string }>;
+    trimStart?: number;
+    trimEnd?: number;
+  };
+
+      const inputPath = join(workDir, `input-${i}.mp4`);
+
+  let pendingThumbnailPath: string | null = null;
+
+  const storageKey = Array.isArray(rawStorageKey)
+    ? rawStorageKey.join("/")
+    : String(rawStorageKey ?? "");
+
+const activeVideoCompositions = new Set<string>();
+
+    const size = Number(metadata.size ?? 0);
+
+      const [bytes] = await file.download();
+
+      const thumbnailFile = await objectStorage.getObjectEntityFile(requestedThumbnailPath);
+
+    const audioTracks: boolean[] = [];
+
+    const inputPaths: string[] = [];
+
+  let pendingMediaPath: string | null = null;
+
+  const requestedEnd = Number(body.trimEnd);
+
+function mediaUrlFor(req: express.Request, objectPath: string): string {
+  return `${req.protocol}://${req.get("host")}/api/posts/media/${objectPath.replace(/^\/objects\//, "")}`;
+}
+
+        const suffixLength = Number(match[2]);
+
+  let publishMediaUrl = mediaUrl ?? "";
+
+  const requestedStart = Number(body.trimStart);
+
+    for (let i = 0; i < clips.length; i += 1) {
+
+  let outputObjectPath: string | null = null;
+
+  let thumbnailObjectPath: string | null = null;
+
+  let outputPath = "";
+
+      const clip = clips[i];
+
+    const outputDuration = await probeDuration(outputPath);
+
+  const objectPath = `/objects/${storageKey}`;
+
+    const range = req.get("range");
+
+    const trimEnd = Math.min(requestedEnd, totalDuration);
+
+  let publishThumbnailUrl: string | null = null;
+
+    const speedFilters = inputPaths.map((_, i) => {
+      const speed = validSpeed(clips[i].speed) ? clips[i].speed : 1;
+      const colorFilter = clips[i].filter === "warm"
+        ? ",eq=saturation=1.12:contrast=1.04:brightness=0.02"
+        : clips[i].filter === "cool"
+          ? ",colorbalance=bs=.08"
+          : clips[i].filter === "mono"
+            ? ",hue=s=0"
+            : "";
+      return `[${i}:v]scale=720:1280:force_original_aspect_ratio=decrease,pad=720:1280:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30${colorFilter},setpts=PTS/${speed}[v${i}]`;
+    });
+
+    const audioFilters = inputPaths.map((_, i) => {
+      const speed = validSpeed(clips[i].speed) ? clips[i].speed : 1;
+      return audioTracks[i]
+        ? `[${i}:a]${audioTempoFilter(speed)},aformat=sample_rates=44100:channel_layouts=stereo[a${i}]`
+        : `anullsrc=channel_layout=stereo:sample_rate=44100,atrim=duration=${durations[i] / speed}[a${i}]`;
+    });
+
+const MAX_CLIP_BYTES = 80 * 1024 * 1024;
+
+const MAX_CLIPS = 12;
+
+  let thumbnailPath = "";
+
+    const totalDuration = durations.reduce((sum, duration, i) => {
+      const speed = validSpeed(clips[i].speed) ? clips[i].speed : 1;
+      return sum + duration / speed;
+    }, 0);
+
+    const concatInputs = inputPaths.map((_, i) => `[v${i}][a${i}]`).join("");
+
+    let totalBytes = 0;
+
+    let start = 0;
+
+    const bytes = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+
+const execFileAsync = promisify(execFile);
+
+    const [metadata] = await file.getMetadata();
+
+async function probeHasAudio(filePath: string): Promise<boolean> {
+  const { stdout } = await execFileAsync("ffprobe", [
+    "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=index",
+    "-of", "csv=p=0", filePath,
+  ], { maxBuffer: 1024 * 1024, timeout: 15_000 });
+  return String(stdout).trim().length > 0;
+}
+
+    const isPublic = await objectStorage.canAccessObjectEntity({
+      objectFile: file,
+      requestedPermission: ObjectPermission.READ,
+    });
+
+      const allowed = await objectStorage.canAccessObjectEntity({
+        userId: clerkId,
+        objectFile: thumbnailFile,
+        requestedPermission: ObjectPermission.READ,
+      });
+
+      const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+
+    const filter = [
+      ...speedFilters,
+      ...audioFilters,
+      `${concatInputs}concat=n=${inputPaths.length}:v=1:a=1[combinedv][combineda]`,
+      `[combinedv]trim=start=${requestedStart}:end=${trimEnd},setpts=PTS-STARTPTS[outv]`,
+      `[combineda]atrim=start=${requestedStart}:end=${trimEnd},asetpts=PTS-STARTPTS[outa]`,
+    ].join(";");
+
+    const outputStats = await fs.stat(outputPath);
+
+      const mediaFile = await objectStorage.getObjectEntityFile(mediaPath);
+
+const MAX_TOTAL_CLIP_BYTES = 240 * 1024 * 1024;
+
+const VIDEO_FILTERS = new Set(["none", "warm", "cool", "mono"]);
+
+    const thumbnailBytes = await fs.readFile(thumbnailPath);
+
+function audioTempoFilter(speed: 0.5 | 1 | 2 | 3): string {
+  if (speed === 3) return "atempo=1.5,atempo=2";
+  return `atempo=${speed}`;
+}
+
+    const outputBytes = await fs.readFile(outputPath);
+
+async function probeDuration(filePath: string): Promise<number> {
+  const { stdout } = await execFileAsync("ffprobe", [
+    "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", filePath,
+  ], { maxBuffer: 1024 * 1024, timeout: 15_000 });
+  const duration = Number.parseFloat(String(stdout).trim());
+  if (!Number.isFinite(duration) || duration <= 0) throw new Error("Video duration could not be read.");
+  return duration;
+}
+
+    const durations: number[] = [];

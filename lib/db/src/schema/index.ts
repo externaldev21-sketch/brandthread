@@ -303,6 +303,7 @@ export const posts = pgTable('posts', {
   id: uuid('id').primaryKey().defaultRandom(),
   userId: text('user_id').notNull(), // Clerk user ID of poster
   mediaUrl: text('media_url').notNull(),
+  thumbnailUrl: text('thumbnail_url'),
   mediaType: text('media_type').notNull().default('photo'), // 'photo' | 'video' | 'slideshow'
   caption: text('caption'),
   styleTags: json('style_tags').$type<string[]>().notNull().default([]),

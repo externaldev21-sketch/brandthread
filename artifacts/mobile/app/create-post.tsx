@@ -9,7 +9,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   TextInput, Modal, Animated, Dimensions, Platform,
-  ActivityIndicator, Alert, KeyboardAvoidingView, Switch, Image,
+  ActivityIndicator, Alert, KeyboardAvoidingView, Switch, Image, Pressable,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -30,6 +30,8 @@ import type {
 import { useColors } from '@/hooks/useColors';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
+import { useApi } from '@/lib/api';
+import { markVideoClipUploaded, normalizeTrimBounds } from '@/lib/videoEditing';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const BG     = '#07070F';
@@ -44,12 +46,22 @@ const PINK   = '#EC4899';
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-type Step = 'media-pick' | 'post-details' | 'publishing' | 'done';
+type Step = 'media-pick' | 'video-edit' | 'post-details' | 'publishing' | 'done';
 
 interface VideoClipLocal {
   uri: string;
   duration: number;
   id: string;
+  speed: 0.5 | 1 | 2 | 3;
+  filter: 'none' | 'warm' | 'cool' | 'mono';
+  objectPath?: string;
+}
+interface ComposedVideoLocal {
+  mediaUrl: string;
+  mediaPath: string;
+  thumbnailUrl: string;
+  thumbnailPath: string;
+  duration: number;
 }
 interface SlidePhotoLocal {
   uri: string;
@@ -90,8 +102,15 @@ const DEFAULT_VISIBILITY: PostVisibility = {
 };
 
 // ─── Video preview ────────────────────────────────────────────────────────────
-function VideoPreview({ uri }: { uri: string }) {
+function VideoPreview({ uri, seekTime, playbackRate = 1 }: { uri: string; seekTime?: number; playbackRate?: number }) {
   const player = useVideoPlayer(uri, (p) => { p.loop = true; p.play(); });
+  useEffect(() => {
+    if (seekTime === undefined || !Number.isFinite(seekTime)) return;
+    player.currentTime = Math.max(0, seekTime);
+  }, [player, seekTime]);
+  useEffect(() => {
+    player.playbackRate = playbackRate;
+  }, [playbackRate, player]);
   const PREVIEW_H = Math.min((screenWidth - 32) * 9 / 16, screenHeight * 0.35);
   return (
     <VideoView
@@ -113,6 +132,7 @@ export default function CreatePostScreen() {
   const s = React.useMemo(() => createStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const api = useApi();
   const params = useLocalSearchParams<{ accountType?: string }>();
   const isBuyer = params.accountType === 'buyer';
 
@@ -123,6 +143,15 @@ export default function CreatePostScreen() {
   const [videoClips, setVideoClips]   = useState<VideoClipLocal[]>([]);
   const [slidePhotos, setSlidePhotos] = useState<SlidePhotoLocal[]>([]);
   const [maxDuration, setMaxDuration] = useState<MaxVideoDuration>(30);
+  const [trimStart, setTrimStart] = useState(0);
+  const [trimEnd, setTrimEnd] = useState(0);
+  const [scrubTime, setScrubTime] = useState(0);
+  const [previewSeekTime, setPreviewSeekTime] = useState(0);
+  const [previewClipIndex, setPreviewClipIndex] = useState(0);
+  const [composedVideo, setComposedVideo] = useState<ComposedVideoLocal | null>(null);
+  const [processingPhase, setProcessingPhase] = useState<'idle' | 'uploading' | 'processing' | 'error' | 'ready'>('idle');
+  const [processingError, setProcessingError] = useState<string | null>(null);
+  const timelineWidthRef = useRef(1);
 
   // ── Purpose (seller text-only posts) ──
   const [activePurpose, setActivePurpose] = useState<typeof PURPOSE_CHIPS[0] | null>(null);
@@ -185,13 +214,38 @@ export default function CreatePostScreen() {
   useFocusEffect(
     React.useCallback(() => {
       const result = (global as any).__cameraCaptureResult as
-        | { type: 'video'; uri: string; duration: number }
+        | {
+            type: 'video';
+            clips?: Array<{
+              id: string;
+              uri: string;
+              duration: number;
+              speed: 0.5 | 1 | 2 | 3;
+              filter: 'none' | 'warm' | 'cool' | 'mono';
+            }>;
+            uri?: string;
+            duration: number;
+          }
         | { type: 'photo'; uri: string }
         | null | undefined;
       if (!result) return;
       (global as any).__cameraCaptureResult = null;
       if (result.type === 'video') {
-        setVideoClips([{ uri: result.uri, duration: result.duration, id: `cam_${Date.now()}` }]);
+        const captured = result.clips?.length
+          ? result.clips
+          : result.uri
+            ? [{ uri: result.uri, duration: result.duration, id: `cam_${Date.now()}`, speed: 1 as const, filter: 'none' as const }]
+            : [];
+        const total = captured.reduce((sum, clip) => sum + clip.duration / clip.speed, 0);
+        setVideoClips(captured);
+        setTrimStart(0);
+        setTrimEnd(total);
+        setScrubTime(0);
+        setPreviewSeekTime(0);
+        setPreviewClipIndex(0);
+        setComposedVideo(null);
+        setProcessingPhase('idle');
+        setProcessingError(null);
         setSlidePhotos([]);
       } else {
         setSlidePhotos(prev => [...prev, { uri: result.uri, id: `cam_${Date.now()}` }]);
@@ -247,7 +301,16 @@ export default function CreatePostScreen() {
 
     if (videos.length > 0) {
       // Video overrides photo selection
-      setVideoClips([{ uri: videos[0].uri, duration: videos[0].duration ?? 0, id: `clip-${Date.now()}` }]);
+      const durationSeconds = Math.max(0.1, (videos[0].duration ?? 0) / 1000);
+      setVideoClips([{ uri: videos[0].uri, duration: durationSeconds, id: `clip-${Date.now()}`, speed: 1, filter: 'none' }]);
+      setTrimStart(0);
+      setTrimEnd(durationSeconds);
+      setScrubTime(0);
+      setPreviewSeekTime(0);
+      setPreviewClipIndex(0);
+      setComposedVideo(null);
+      setProcessingPhase('idle');
+      setProcessingError(null);
       setSlidePhotos([]);
     } else {
       // Photos (1 = single photo post, 2+ = slideshow — both go as 'slideshow' type)
@@ -285,11 +348,61 @@ export default function CreatePostScreen() {
   function resetAll() {
     setStep('media-pick');
     setVideoClips([]); setSlidePhotos([]); setMaxDuration(30);
+    setTrimStart(0); setTrimEnd(0); setScrubTime(0);
+    setPreviewSeekTime(0); setPreviewClipIndex(0);
+    setComposedVideo(null); setProcessingPhase('idle'); setProcessingError(null);
     setActivePurpose(null);
     setCaption(''); setHashtags([]); setHashtagInput(''); setStyleTags([]);
     setLocation(''); setVisibility(DEFAULT_VISIBILITY);
     setScheduleMode('now'); setScheduledAt(null); setScheduledDateInput('');
     setProductTags([]); setSelectedSound(null); setOverlayTexts([]);
+  }
+
+  const totalVideoDuration = videoClips.reduce((sum, clip) => sum + clip.duration / clip.speed, 0);
+
+  function updateTrim(nextStart: number, nextEnd: number) {
+    const { start, end } = normalizeTrimBounds(totalVideoDuration, nextStart, nextEnd);
+    setTrimStart(start);
+    setTrimEnd(end);
+    setScrubTime(Math.max(start, Math.min(scrubTime, end)));
+    setComposedVideo(null);
+    setProcessingPhase('idle');
+    setProcessingError(null);
+  }
+
+  async function processVideo() {
+    if (videoClips.length === 0 || processingPhase === 'uploading' || processingPhase === 'processing') return;
+    setProcessingError(null);
+    setProcessingPhase('uploading');
+    const uploaded = [...videoClips];
+    try {
+      for (let i = 0; i < uploaded.length; i += 1) {
+        if (uploaded[i].objectPath) continue;
+        const result = await api.posts.uploadVideoClip(uploaded[i].uri);
+        const nextUploaded = markVideoClipUploaded(uploaded, uploaded[i].id, result.objectPath);
+        uploaded.splice(0, uploaded.length, ...nextUploaded);
+        setVideoClips([...uploaded]);
+      }
+      setProcessingPhase('processing');
+      const result = await api.posts.composeVideo({
+        clips: uploaded.map((clip) => ({
+          objectPath: clip.objectPath!,
+          duration: clip.duration,
+          speed: clip.speed,
+          filter: clip.filter,
+        })),
+        trimStart,
+        trimEnd,
+      });
+      setComposedVideo(result);
+      setScrubTime(0);
+      setPreviewSeekTime(0);
+      setProcessingPhase('ready');
+    } catch (error) {
+      setVideoClips([...uploaded]);
+      setProcessingPhase('error');
+      setProcessingError(error instanceof Error ? error.message : 'Video processing failed. Tap retry to keep working with these clips.');
+    }
   }
 
   // ─── SCREEN 1: Media Picker ───────────────────────────────────────────────
@@ -449,13 +562,15 @@ export default function CreatePostScreen() {
             style={[s.nextBtn, !canProceed && s.nextBtnDisabled]}
             activeOpacity={0.85}
             disabled={!canProceed}
-            onPress={() => haptic(() => setStep('post-details'))}
+            onPress={() => haptic(() => setStep(videoClips.length > 0 ? 'video-edit' : 'post-details'))}
           >
             <LinearGradient
               colors={canProceed ? [colors.primary, colors.accentForeground] : [BORDER, BORDER]}
               style={s.nextBtnGrad}
             >
-              <Text style={[s.nextBtnText, !canProceed && { color: MUTED }]}>Next →</Text>
+              <Text style={[s.nextBtnText, !canProceed && { color: MUTED }]}>
+                {videoClips.length > 0 ? 'Edit video →' : 'Next →'}
+              </Text>
             </LinearGradient>
           </TouchableOpacity>
           {!canProceed && (
@@ -463,6 +578,162 @@ export default function CreatePostScreen() {
               {isBuyer ? 'Add a photo or video to continue' : 'Add media or select a post type above'}
             </Text>
           )}
+        </View>
+      </View>
+    );
+  }
+
+  // ─── VIDEO EDIT: timeline, scrub, trim, upload + composition ───────────────
+  if (step === 'video-edit') {
+    const busy = processingPhase === 'uploading' || processingPhase === 'processing';
+    const previewClip = videoClips[Math.min(previewClipIndex, Math.max(0, videoClips.length - 1))];
+    const previewUri = composedVideo?.mediaUrl ?? previewClip?.uri;
+    const seekFromLocation = (locationX: number) => {
+      const width = Math.max(1, timelineWidthRef.current);
+      const rangeStart = composedVideo ? 0 : trimStart;
+      const rangeEnd = composedVideo ? composedVideo.duration : trimEnd;
+      const next = rangeStart + Math.max(0, Math.min(1, locationX / width)) * Math.max(0.1, rangeEnd - rangeStart);
+      setScrubTime(next);
+      if (composedVideo) {
+        setPreviewSeekTime(next);
+        return;
+      }
+      let elapsed = 0;
+      for (let index = 0; index < videoClips.length; index += 1) {
+        const outputDuration = videoClips[index].duration / videoClips[index].speed;
+        if (next <= elapsed + outputDuration || index === videoClips.length - 1) {
+          setPreviewClipIndex(index);
+          setPreviewSeekTime(Math.max(0, next - elapsed) * videoClips[index].speed);
+          break;
+        }
+        elapsed += outputDuration;
+      }
+    };
+    return (
+      <View style={[s.root, { paddingTop: topPad }]}>
+        <View style={s.header}>
+          <TouchableOpacity disabled={busy} onPress={() => haptic(() => setStep('media-pick'))} style={s.iconBtn}>
+            <Feather name="arrow-left" size={22} color={busy ? MUTED : FG} />
+          </TouchableOpacity>
+          <Text style={s.headerTitle}>Edit video</Text>
+          <View style={{ width: 38 }} />
+        </View>
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 120 }}>
+          {previewUri ? (
+            <VideoPreview
+              uri={previewUri}
+              seekTime={previewSeekTime}
+              playbackRate={composedVideo ? 1 : (previewClip?.speed ?? 1)}
+            />
+          ) : null}
+          <View style={s.editorMetaRow}>
+            <Text style={s.editorMetaText}>{videoClips.length} clip{videoClips.length === 1 ? '' : 's'}</Text>
+            <Text style={s.editorMetaText}>{(composedVideo?.duration ?? (trimEnd - trimStart)).toFixed(1)}s</Text>
+          </View>
+
+          <Text style={[s.sectionLabel, { marginTop: 18 }]}>Clip timeline · tap or drag to scrub</Text>
+          <Pressable
+            style={s.timeline}
+            onLayout={(event) => { timelineWidthRef.current = event.nativeEvent.layout.width; }}
+            onPress={(event) => seekFromLocation(event.nativeEvent.locationX)}
+            onTouchMove={(event) => seekFromLocation(event.nativeEvent.touches[0]?.locationX ?? 0)}
+          >
+            {videoClips.map((clip, index) => (
+              <View
+                key={clip.id}
+                style={[
+                  s.timelineClip,
+                  {
+                    flex: Math.max(0.05, (clip.duration / clip.speed) / Math.max(0.1, totalVideoDuration)),
+                    backgroundColor: index % 2 === 0 ? colors.primary : colors.info,
+                  },
+                ]}
+              >
+                <Text style={s.timelineClipText}>{index + 1}</Text>
+              </View>
+            ))}
+            <View
+              pointerEvents="none"
+              style={[
+                s.scrubber,
+                {
+                  left: `${Math.max(0, Math.min(100, (scrubTime / Math.max(0.1, composedVideo?.duration ?? totalVideoDuration)) * 100))}%` as any,
+                },
+              ]}
+            />
+          </Pressable>
+
+          <View style={s.trimReadout}>
+            <View>
+              <Text style={s.trimLabel}>START</Text>
+              <Text style={s.trimValue}>{trimStart.toFixed(1)}s</Text>
+            </View>
+            <View style={s.trimRangeLine} />
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={s.trimLabel}>END</Text>
+              <Text style={s.trimValue}>{trimEnd.toFixed(1)}s</Text>
+            </View>
+          </View>
+          <View style={s.trimControls}>
+            <TouchableOpacity style={s.trimButton} disabled={busy} onPress={() => updateTrim(trimStart - 0.5, trimEnd)}>
+              <Feather name="minus" size={14} color={FG} />
+              <Text style={s.trimButtonText}>Start</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.trimButton} disabled={busy} onPress={() => updateTrim(trimStart + 0.5, trimEnd)}>
+              <Feather name="plus" size={14} color={FG} />
+              <Text style={s.trimButtonText}>Start</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.trimButton} disabled={busy} onPress={() => updateTrim(trimStart, trimEnd - 0.5)}>
+              <Feather name="minus" size={14} color={FG} />
+              <Text style={s.trimButtonText}>End</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.trimButton} disabled={busy} onPress={() => updateTrim(trimStart, trimEnd + 0.5)}>
+              <Feather name="plus" size={14} color={FG} />
+              <Text style={s.trimButtonText}>End</Text>
+            </TouchableOpacity>
+          </View>
+          <Text style={s.helperText}>
+            Speed and capture filters stay attached to each clip. Brandthread composes and trims one uploadable video without leaving managed Expo.
+          </Text>
+
+          {processingError ? (
+            <View style={s.processingError}>
+              <Feather name="alert-circle" size={17} color={ORANGE} />
+              <Text style={s.processingErrorText}>{processingError}</Text>
+            </View>
+          ) : null}
+          {busy ? (
+            <View style={s.processingStatus}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={s.processingStatusText}>
+                {processingPhase === 'uploading' ? 'Uploading clips…' : 'Composing and trimming video…'}
+              </Text>
+            </View>
+          ) : null}
+          {composedVideo ? (
+            <View style={s.readyBanner}>
+              <Feather name="check-circle" size={17} color={colors.primary} />
+              <Text style={s.readyText}>Video ready · {composedVideo.duration.toFixed(1)}s</Text>
+            </View>
+          ) : null}
+        </ScrollView>
+        <View style={[s.bottomBar, { paddingBottom: botPad + 8 }]}>
+          <TouchableOpacity
+            style={[s.nextBtn, busy && s.nextBtnDisabled]}
+            disabled={busy}
+            onPress={() => {
+              if (composedVideo) setStep('post-details');
+              else void processVideo();
+            }}
+          >
+            <LinearGradient colors={theme.primaryGradient} style={s.nextBtnGrad}>
+              {busy ? <ActivityIndicator size="small" color={theme.onAccent} /> : (
+                <Text style={[s.nextBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>
+                  {processingPhase === 'error' ? 'Retry processing' : composedVideo ? 'Continue to caption →' : 'Process video'}
+                </Text>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -486,7 +757,7 @@ export default function CreatePostScreen() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={[s.root, { paddingTop: topPad }]}>
           <View style={s.header}>
-            <TouchableOpacity onPress={() => haptic(() => setStep('media-pick'))} style={s.iconBtn}>
+            <TouchableOpacity onPress={() => haptic(() => setStep(videoClips.length > 0 ? 'video-edit' : 'media-pick'))} style={s.iconBtn}>
               <Feather name="arrow-left" size={22} color={FG} />
             </TouchableOpacity>
             <Text style={s.headerTitle}>Post Details</Text>
@@ -506,13 +777,13 @@ export default function CreatePostScreen() {
                 <Text style={s.previewType}>{tLabel}</Text>
                 <Text style={s.previewSub}>
                   {videoClips.length > 0
-                    ? `${videoClips[0].duration.toFixed(1)}s · max ${maxDuration}s`
+                    ? `${(composedVideo?.duration ?? totalVideoDuration).toFixed(1)}s · ${videoClips.length} clip${videoClips.length === 1 ? '' : 's'}`
                     : slidePhotos.length > 0
                     ? `${slidePhotos.length} photo${slidePhotos.length > 1 ? 's' : ''}`
                     : activePurpose?.label ?? 'Text post'}
                 </Text>
               </View>
-              <TouchableOpacity onPress={() => haptic(() => setStep('media-pick'))} style={s.editBtn}>
+              <TouchableOpacity onPress={() => haptic(() => setStep(videoClips.length > 0 ? 'video-edit' : 'media-pick'))} style={s.editBtn}>
                 <Feather name="edit-2" size={14} color={MUTED} />
               </TouchableOpacity>
             </View>
@@ -719,7 +990,11 @@ export default function CreatePostScreen() {
                     caption,
                     hashtags: hashtags.map(h => h.tag),
                     styleTags,
-                    mediaUris: videoClips.length > 0 ? videoClips.map(c => c.uri) : slidePhotos.map(p => p.uri),
+                    mediaUris: videoClips.length > 0 && composedVideo ? [composedVideo.mediaUrl] : slidePhotos.map(p => p.uri),
+                    mediaUrl: composedVideo?.mediaUrl,
+                    mediaPath: composedVideo?.mediaPath,
+                    thumbnailPath: composedVideo?.thumbnailPath,
+                    thumbnailUri: composedVideo?.thumbnailUrl,
                     aspectRatio: '9:16',
                     productTags: productTags.map(p => ({ productId: p.productId, productName: p.productName, priceCents: p.priceCents })),
                     sound: selectedSound ?? undefined,
@@ -751,7 +1026,11 @@ export default function CreatePostScreen() {
                     caption,
                     hashtags: hashtags.map(h => h.tag),
                     styleTags,
-                    mediaUris: videoClips.length > 0 ? videoClips.map(c => c.uri) : slidePhotos.map(p => p.uri),
+                    mediaUris: videoClips.length > 0 && composedVideo ? [composedVideo.mediaUrl] : slidePhotos.map(p => p.uri),
+                    mediaUrl: composedVideo?.mediaUrl,
+                    mediaPath: composedVideo?.mediaPath,
+                    thumbnailPath: composedVideo?.thumbnailPath,
+                    thumbnailUri: composedVideo?.thumbnailUrl,
                     aspectRatio: '9:16',
                     productTags: productTags.map(p => ({ productId: p.productId, productName: p.productName, priceCents: p.priceCents })),
                     sound: selectedSound ?? undefined,
@@ -1123,6 +1402,27 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
   nextBtnGrad:    { paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },
   nextBtnText:    { fontSize: FS.base, fontFamily: FONT.bold, color: '#FFFFFF' },
   bottomHint:     { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', marginTop: 8 },
+
+  // Video editor
+  editorMetaRow:  { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 },
+  editorMetaText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
+  timeline:       { height: 58, flexDirection: 'row', borderRadius: 10, overflow: 'hidden', backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, position: 'relative' },
+  timelineClip:   { minWidth: 20, alignItems: 'center', justifyContent: 'center', borderRightWidth: 2, borderRightColor: BG },
+  timelineClipText:{ color: FG, fontSize: FS.xs, fontFamily: FONT.bold },
+  scrubber:       { position: 'absolute', top: 0, bottom: 0, width: 3, marginLeft: -1, backgroundColor: FG, shadowColor: '#000000', shadowOpacity: 0.5, shadowRadius: 3 },
+  trimReadout:    { flexDirection: 'row', alignItems: 'center', marginTop: 16 },
+  trimLabel:      { fontSize: 9, fontFamily: FONT.semibold, color: MUTED, letterSpacing: 0.8 },
+  trimValue:      { fontSize: FS.md, fontFamily: FONT.bold, color: FG, marginTop: 2 },
+  trimRangeLine:  { flex: 1, height: 1, backgroundColor: BORDER, marginHorizontal: 14 },
+  trimControls:   { flexDirection: 'row', gap: 6, marginTop: 10 },
+  trimButton:     { flex: 1, flexDirection: 'row', gap: 4, alignItems: 'center', justifyContent: 'center', backgroundColor: CARD, borderRadius: 9, borderWidth: 1, borderColor: BORDER, paddingVertical: 9 },
+  trimButtonText: { fontSize: FS.xs, fontFamily: FONT.medium, color: FG },
+  processingError:{ flexDirection: 'row', alignItems: 'flex-start', gap: 9, backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: ORANGE + '55', padding: 12, marginTop: 18 },
+  processingErrorText:{ flex: 1, fontSize: FS.xs, fontFamily: FONT.medium, color: ORANGE, lineHeight: 17 },
+  processingStatus:{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: CARD, borderRadius: 10, padding: 13, marginTop: 18 },
+  processingStatusText:{ fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
+  readyBanner:    { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.accent, borderRadius: 10, borderWidth: 1, borderColor: colors.primary + '55', padding: 12, marginTop: 18 },
+  readyText:      { fontSize: FS.sm, fontFamily: FONT.semibold, color: colors.primary },
 
   // Screen 2 — post details
   previewCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, padding: 14 },

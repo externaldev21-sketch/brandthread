@@ -464,6 +464,10 @@ export async function createSellerPost(params: {
   /** Curated style-taxonomy tags (from StyleTagsPicker). Stored separately from freeform hashtags. */
   styleTags?: string[];
   mediaUris?: string[];
+  /** Stable composed media URL returned by the video composition endpoint. */
+  mediaUrl?: string;
+  mediaPath?: string;
+  thumbnailPath?: string;
   thumbnailUri?: string;
   aspectRatio?: '9:16' | '3:4' | '1:1';
   productTags?: SellerPostProductTag[];
@@ -486,7 +490,9 @@ export async function createSellerPost(params: {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      mediaUrl: params.mediaUris?.[0],
+      mediaUrl: params.mediaUrl ?? params.mediaUris?.[0],
+      mediaPath: params.mediaPath,
+      thumbnailPath: params.thumbnailPath,
       mediaType: params.contentType,
       caption: params.caption,
       styleTags: [...(params.styleTags ?? []), ...params.hashtags],
@@ -512,8 +518,8 @@ export async function createSellerPost(params: {
     feedEligibility: 'thread_eligible',
     caption: params.caption,
     hashtags: params.hashtags,
-    mediaUris: params.mediaUris ?? [],
-    thumbnailUri: params.thumbnailUri,
+     mediaUris: created.mediaUrl ? [created.mediaUrl] : params.mediaUrl ? [params.mediaUrl] : (params.mediaUris ?? []),
+    thumbnailUri: created.thumbnailUrl ?? params.thumbnailUri,
     aspectRatio: params.aspectRatio ?? '9:16',
     contentType: params.contentType,
     postStatus: 'published',
@@ -605,7 +611,7 @@ export async function getSellerPosts(): Promise<SellerThreadPost[]> {
     caption:         p.caption ?? '',
     hashtags:        p.styleTags ?? [],
     mediaUris:       p.mediaUrl ? [p.mediaUrl] : [],
-    thumbnailUri:    undefined,
+    thumbnailUri:    p.thumbnailUrl ?? undefined,
     aspectRatio:     '9:16',
     contentType:     (p.mediaType ?? 'video') as SellerThreadPost['contentType'],
     postStatus:      'published' as const,
@@ -657,7 +663,7 @@ function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
     caption:           p.caption   ?? '',
     hashtags:          p.styleTags ?? [],
     mediaUris:         p.mediaUrl  ? [p.mediaUrl] : [],
-    thumbnailUri:      undefined,
+    thumbnailUri:      p.thumbnailUrl ?? undefined,
     aspectRatio:       '9:16' as SellerThreadPost['aspectRatio'],
     contentType:       (p.mediaType ?? 'video') as SellerThreadPost['contentType'],
     postStatus:        'published' as const,

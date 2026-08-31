@@ -288,7 +288,42 @@ async function uploadImage<T = any>(
   return data;
 }
 
-// ─── Freelancer marketplace types ────────────────────────────────────────────
+async function uploadVideo<T = any>(
+  path: string,
+  video: { uri: string; mimeType?: string | null },
+  getToken: GetToken,
+  getCacheScope: GetCacheScope = () => 'anonymous',
+): Promise<T> {
+  const source = await fetch(video.uri);
+  if (!source.ok) throw new Error("Could not read the recorded video.");
+  const videoBlob = await source.blob();
+  const contentType = video.mimeType || videoBlob.type || "video/mp4";
+  const token = await getToken();
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${versionApiPath(path)}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": contentType,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(_storeContext === "own" ? { "X-Store-Context": "own" } : {}),
+      },
+      body: videoBlob,
+    });
+  } catch (error) {
+    reportNetworkError(error);
+    throw error;
+  }
+  if (!res.ok) {
+    const error = new ApiError(res.status, await res.text());
+    reportNetworkError(error);
+    throw error;
+  }
+  dismissNetworkNotice();
+  const data = await res.json() as T;
+  await clearApiCache(await getCacheScope());
+  return data;
+}
 export interface Freelancer {
   id: string;
   userId: string;
@@ -1147,9 +1182,27 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     /** Thread-feed posts — create with product tags, read, like/repost */
     posts: {
       create: (body: {
-        mediaUrl?: string; mediaType?: string; caption?: string;
+        mediaUrl?: string; mediaPath?: string; thumbnailPath?: string; mediaType?: string; caption?: string;
         styleTags?: string[]; taggedProductIds?: string[];
       }) => post<any>('/api/posts', body),
+      uploadVideoClip: (uri: string, mimeType?: string | null) =>
+        uploadVideo<{
+          objectPath: string;
+          contentType: string;
+          size: number;
+        }>('/api/posts/video-clips', { uri, mimeType }, getToken, getCacheScope),
+      composeVideo: (body: {
+        clips: Array<{ objectPath: string; duration?: number; speed?: number; filter?: 'none' | 'warm' | 'cool' | 'mono' }>;
+        trimStart: number;
+        trimEnd: number;
+      }) => post<{
+        mediaUrl: string;
+        mediaPath: string;
+        thumbnailUrl: string;
+        thumbnailPath: string;
+        duration: number;
+        clipCount: number;
+      }>('/api/posts/compose-video', body),
       publicList: (ownerId?: string) =>
         get<any[]>(`/api/public/posts${ownerId ? `?ownerId=${encodeURIComponent(ownerId)}` : ''}`),
       get: (id: string) => get<any>(`/api/posts/${encodeURIComponent(id)}`),
