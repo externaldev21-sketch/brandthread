@@ -707,6 +707,9 @@ export const notificationsFeed = pgTable('notifications_feed', {
   subscriptionPaymentFailureUnique: uniqueIndex('notifications_feed_subscription_payment_failed_unique')
     .on(table.userId, table.type, table.targetId)
     .where(sql`${table.type} = 'subscription_payment_failed' AND ${table.targetId} IS NOT NULL`),
+  newOrderReceivedUnique: uniqueIndex('notifications_feed_new_order_received_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} = 'new_order_received' AND ${table.targetId} IS NOT NULL`),
 }));
 
 // ─── Reviews (buyer → seller/product rating after delivered order) ──────────────

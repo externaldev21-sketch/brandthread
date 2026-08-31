@@ -88,20 +88,31 @@ export async function publishNotification(n: {
 }): Promise<void> {
   const pushCategory = normalizePushEventCategory(n.category);
 
-  await db.insert(notificationsFeed).values({
-    userId:       n.userId,
-    category:     n.category,
-    type:         n.type,
-    title:        n.title,
-    body:         n.body   ?? "",
-    actorName:    n.actorName    ?? null,
-    actorHandle:  n.actorHandle  ?? null,
-    actorInitials: n.actorInitials ?? null,
-    actorColor:   n.actorColor   ?? null,
-    targetId:     n.targetId     ?? null,
-    targetType:   n.targetType   ?? null,
-    cta:          n.cta          ?? null,
-  });
+  const [notification] = await db
+    .insert(notificationsFeed)
+    .values({
+      userId:       n.userId,
+      category:     n.category,
+      type:         n.type,
+      title:        n.title,
+      body:         n.body   ?? "",
+      actorName:    n.actorName    ?? null,
+      actorHandle:  n.actorHandle  ?? null,
+      actorInitials: n.actorInitials ?? null,
+      actorColor:   n.actorColor   ?? null,
+      targetId:     n.targetId     ?? null,
+      targetType:   n.targetType   ?? null,
+      cta:          n.cta          ?? null,
+    })
+    // Order alerts are unique by seller, type, and order target. The
+    // database partial unique index is the concurrency-safe idempotency
+    // boundary for webhook retries.
+    .onConflictDoNothing()
+    .returning({ id: notificationsFeed.id });
+
+  // Do not send a second push when the in-app notification already existed.
+  if (!notification) return;
+
   if (pushCategory) {
     await sendPushToUser(n.userId, {
       title: n.title,
