@@ -7,7 +7,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { getThreadPosts, subscribeSocial } from '@/services/socialService';
+import {
+  createThreadFeedCursor,
+  getThreadPostsPage,
+  subscribeSocial,
+} from '@/services/socialService';
 import type { SellerThreadPost } from '@/services/socialService';
 import * as Haptics from 'expo-haptics';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -535,33 +539,42 @@ export default function FeedScreen() {
   const [feedError, setFeedError] = useState<string | null>(null);
   const [activeLiveStreams, setActiveLiveStreams] = useState<LiveStreamFeedItem[]>([]);
   const api = useApi();
-  const feedOffsetRef = useRef(0);
+  const feedCursorRef = useRef(createThreadFeedCursor());
+  const feedGenerationRef = useRef(0);
   const feedLoadingMoreRef = useRef(false);
   const feedHasMoreRef = useRef(true);
 
   // Load published seller posts and subscribe to real-time changes
   const loadFeed = useCallback(async (initial = false) => {
-    feedOffsetRef.current = 0;
+    const generation = feedGenerationRef.current + 1;
+    feedGenerationRef.current = generation;
+    const initialCursor = createThreadFeedCursor();
+    feedCursorRef.current = initialCursor;
     feedHasMoreRef.current = true;
     setFeedHasMore(true);
+    setFeedLoadingMore(false);
     if (initial) setFeedLoading(true);
     else setFeedRefreshing(true);
     setFeedError(null);
     try {
-      const rows = await getThreadPosts(0, THREAD_PAGE_SIZE);
+      const page = await getThreadPostsPage(initialCursor, THREAD_PAGE_SIZE);
+      if (feedGenerationRef.current !== generation) return;
+      const rows = page.posts;
       const mapped = (Array.isArray(rows) ? rows : [])
         .map(mapSellerPost)
         .filter((p): p is SpotlightItem => p !== null);
       setSellerFeedPosts(mapped);
-      feedOffsetRef.current = THREAD_PAGE_SIZE;
-      feedHasMoreRef.current = rows.length > 0;
-      setFeedHasMore(rows.length > 0);
+      feedCursorRef.current = page.cursor;
+      feedHasMoreRef.current = page.hasMore;
+      setFeedHasMore(page.hasMore);
     } catch {
+      if (feedGenerationRef.current !== generation) return;
       // Keep the current feed visible when a pull-to-refresh or social
       // notification fails; only the first load needs an empty state.
       if (initial) setSellerFeedPosts([]);
       setFeedError('We couldn’t load Thread. Check your connection and try again.');
     } finally {
+      if (feedGenerationRef.current !== generation) return;
       if (initial) setFeedLoading(false);
       else setFeedRefreshing(false);
     }
@@ -571,9 +584,12 @@ export default function FeedScreen() {
     if (feedLoadingMoreRef.current || !feedHasMoreRef.current || feedLoading || feedRefreshing) return;
     feedLoadingMoreRef.current = true;
     setFeedLoadingMore(true);
-    const offset = feedOffsetRef.current;
+    const generation = feedGenerationRef.current;
+    const cursor = feedCursorRef.current;
     try {
-      const rows = await getThreadPosts(offset, THREAD_PAGE_SIZE);
+      const page = await getThreadPostsPage(cursor, THREAD_PAGE_SIZE);
+      if (feedGenerationRef.current !== generation) return;
+      const rows = page.posts;
       const mapped = (Array.isArray(rows) ? rows : [])
         .map(mapSellerPost)
         .filter((p): p is SpotlightItem => p !== null);
@@ -587,14 +603,14 @@ export default function FeedScreen() {
         });
         return [...prev, ...additions];
       });
-      feedOffsetRef.current = offset + THREAD_PAGE_SIZE;
-      feedHasMoreRef.current = rows.length > 0;
-      setFeedHasMore(rows.length > 0);
+      feedCursorRef.current = page.cursor;
+      feedHasMoreRef.current = page.hasMore;
+      setFeedHasMore(page.hasMore);
     } catch {
       // Keep the current feed and cursor so a later scroll can retry the page.
     } finally {
       feedLoadingMoreRef.current = false;
-      setFeedLoadingMore(false);
+      if (feedGenerationRef.current === generation) setFeedLoadingMore(false);
     }
   }, [feedLoading, feedRefreshing]);
 
@@ -605,7 +621,7 @@ export default function FeedScreen() {
   }, [loadFeed]);
 
   const handleRefresh = useCallback(() => {
-    if (feedRefreshing || feedLoadingMoreRef.current) return;
+    if (feedRefreshing) return;
     void loadFeed();
   }, [feedRefreshing, loadFeed]);
 

@@ -82,3 +82,4 @@
 - [Premium image acceptance](premium-image-acceptance.md) — customer-facing AI images require premium generation plus operation-specific, fail-closed visual QA with one bounded correction pass.
 - [Verified post analytics](verified-post-analytics.md) — optional post metrics expose tracked/null explicitly; never infer views, retention, or conversion rates from unrelated activity.
 - [Payment API security boundaries](payment-api-security-boundaries.md) — entitlement failures deny access; distributed limits fail closed; Stripe dispatch uses retryable, heartbeat-fenced event claims.
+- [Thread pagination boundary](thread-feed-pagination.md) — independently paginated followed/public sources need separate raw cursors, cross-source seen IDs, and refresh generations.

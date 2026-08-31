@@ -125,7 +125,6 @@ async function save(key: string, value: unknown): Promise<void> {
 }
 
 
-
 const H24 = 24 * 3600 * 1000;
 
 // ─── Cache invalidation ───────────────────────────────────────────────────────
@@ -719,45 +718,19 @@ function mapApiPostToSellerThreadPost(p: any, idx: number): SellerThreadPost {
   };
 }
 
-/** Returns published seller posts for the buyer Thread feed, personalised so
- *  posts from sellers the buyer follows appear FIRST.
- *
- *  Sources (fetched in parallel):
- *  - GET /api/posts/feed    — followed sellers' posts (requires buyer Clerk token;
- *                             fails/empty for unauthenticated or new buyers)
- *  - GET /api/public/posts  — general feed of all seller posts, newest-first
- *
- *  Result: followed-seller posts first (recency order from the API), then the
- *  remaining general-feed posts (deduped by post id). If the personalised call
- *  fails or returns nothing, the general feed alone is returned. Never falls
- *  back to demo data.
- */
+export interface ThreadFeedCursor {
+  followedOffset: number;
+  generalOffset: number;
+  followedDone: boolean;
+  generalDone: boolean;
+  seenPostIds: string[];
+}
+/** Backwards-compatible one-shot page loader for non-paginated callers. */
 export async function getThreadPosts(offset = 0, limit = 30): Promise<SellerThreadPost[]> {
-  const pageOffset = Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0;
-  const pageLimit = Number.isFinite(limit) ? Math.min(50, Math.max(1, Math.floor(limit))) : 30;
-  const query = `?limit=${pageLimit}&offset=${pageOffset}`;
-
-  const [followed, general] = await Promise.all([
-    serviceRequest(`/api/posts/feed${query}`).then(
-      (r) => (Array.isArray(r) ? (r as any[]) : []),
-      () => [] as any[], // unauthenticated / API error → no personalised posts
-    ),
-    serviceRequest(`/api/public/posts${query}`).then(
-      (r) => (Array.isArray(r) ? (r as any[]) : []),
-      () => [] as any[],
-    ),
-  ]);
-
-  // Followed sellers' posts first, then general posts not already included.
-  // Apply the set to the full merge so malformed/duplicated API rows cannot
-  // produce duplicate cards within a page.
-  const seen = new Set<string>();
-  const merged = [...followed, ...general].filter((p) => {
-    if (typeof p.id !== 'string' || seen.has(p.id)) return false;
-    seen.add(p.id);
-    return true;
-  });
-  return merged.map((p, idx) => mapApiPostToSellerThreadPost(p, idx));
+  const cursor = createThreadFeedCursor();
+  cursor.followedOffset = Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0;
+  cursor.generalOffset = cursor.followedOffset;
+  return (await getThreadPostsPage(cursor, limit)).posts;
 }
 
 // ─── Friendships ──────────────────────────────────────────────────────────────
@@ -1259,4 +1232,99 @@ export async function searchProfiles(query: string): Promise<ProfileSearchResult
     `/api/social/search?q=${encodeURIComponent(query.trim())}`,
   );
   return Array.isArray(remote) ? remote : [];
+}
+
+/** Returns one stable page of published seller posts for the buyer Thread feed.
+ *  The two source offsets advance independently and followed posts are exhausted
+ *  before public posts are appended.
+ *
+ *  Sources:
+ *  - GET /api/posts/feed    — followed sellers' posts (requires buyer Clerk token;
+ *                             fails/empty for unauthenticated or new buyers)
+ *  - GET /api/public/posts  — general feed of all seller posts, newest-first
+ *
+ *  Public pages may overlap the followed source, so the cursor carries every ID
+ *  already emitted. Raw offsets advance by rows consumed, not rows emitted,
+ *  preventing an overlap from making later public posts get skipped.
+ */
+export async function getThreadPostsPage(
+  cursor: ThreadFeedCursor = createThreadFeedCursor(),
+  limit = 30,
+): Promise<ThreadFeedPage> {
+  const pageLimit = Number.isFinite(limit) ? Math.min(50, Math.max(1, Math.floor(limit))) : 30;
+  const next: ThreadFeedCursor = {
+    followedOffset: Math.max(0, Math.floor(cursor.followedOffset || 0)),
+    generalOffset: Math.max(0, Math.floor(cursor.generalOffset || 0)),
+    followedDone: Boolean(cursor.followedDone),
+    generalDone: Boolean(cursor.generalDone),
+    seenPostIds: Array.isArray(cursor.seenPostIds) ? [...cursor.seenPostIds] : [],
+  };
+  const seen = new Set(next.seenPostIds);
+  const rows: any[] = [];
+
+  const addUnique = (sourceRows: any[]) => {
+    for (const row of sourceRows) {
+      if (rows.length >= pageLimit) break;
+      if (typeof row?.id !== 'string' || seen.has(row.id)) continue;
+      seen.add(row.id);
+      rows.push(row);
+    }
+  };
+
+  while (rows.length < pageLimit && !next.followedDone) {
+    const followed = await requestThreadSource(
+      '/api/posts/feed',
+      next.followedOffset,
+      pageLimit,
+    );
+    next.followedOffset += followed.length;
+    addUnique(followed);
+    if (followed.length < pageLimit) next.followedDone = true;
+  }
+
+  while (rows.length < pageLimit && next.followedDone && !next.generalDone) {
+    const general = await requestThreadSource(
+      '/api/public/posts',
+      next.generalOffset,
+      pageLimit,
+    );
+    next.generalOffset += general.length;
+    addUnique(general);
+    if (general.length < pageLimit) next.generalDone = true;
+  }
+
+  next.seenPostIds = [...seen];
+  return {
+    posts: rows.map((post, index) => mapApiPostToSellerThreadPost(post, index)),
+    cursor: next,
+    hasMore: !next.followedDone || !next.generalDone,
+  };
+}
+
+export function createThreadFeedCursor(): ThreadFeedCursor {
+  return {
+    followedOffset: 0,
+    generalOffset: 0,
+    followedDone: false,
+    generalDone: false,
+    seenPostIds: [],
+  };
+}
+
+async function requestThreadSource(
+  path: '/api/posts/feed' | '/api/public/posts',
+  offset: number,
+  limit: number,
+): Promise<any[]> {
+  const query = `?limit=${limit}&offset=${offset}`;
+  return serviceRequest(`${path}${query}`).then(
+    (response) => (Array.isArray(response) ? response as any[] : []),
+    () => [] as any[],
+  );
+}
+
+export interface ThreadFeedPage {
+  posts: SellerThreadPost[];
+  cursor: ThreadFeedCursor;
+  hasMore: boolean;
 }
