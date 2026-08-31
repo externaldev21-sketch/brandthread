@@ -49,11 +49,11 @@ function QuantityControl({ value, max, onDec, onInc }: {
 }) {
   return (
     <View style={qc.root}>
-      <PressableScale style={qc.btn} onPress={onDec} >
+      <PressableScale style={qc.btn} onPress={onDec} accessibilityLabel="Decrease quantity">
         <Feather name="minus" size={13} color={FG} />
       </PressableScale>
       <Text style={qc.val}>{value}</Text>
-      <PressableScale style={[qc.btn, value >= max && qc.btnDisabled]} onPress={onInc} disabled={value >= max}>
+      <PressableScale style={[qc.btn, value >= max && qc.btnDisabled]} onPress={onInc} disabled={value >= max} accessibilityLabel="Increase quantity" accessibilityState={{ disabled: value >= max }}>
         <Feather name="plus" size={13} color={value >= max ? SUBTLE : FG} />
       </PressableScale>
     </View>
@@ -61,7 +61,7 @@ function QuantityControl({ value, max, onDec, onInc }: {
 }
 const qc = StyleSheet.create({
   root: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  btn:  { width: 28, height: 28, borderRadius: 8, backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  btn:  { width: COMP.minTouchTarget, height: COMP.minTouchTarget, borderRadius: 8, backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   btnDisabled: { opacity: 0.4 },
   val:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, minWidth: 20, textAlign: 'center' },
 });
@@ -93,7 +93,7 @@ function CartItemRow({
       {/* Details */}
       <View style={{ flex: 1 }}>
         <Text style={ir.name} numberOfLines={2}>{item.productName}</Text>
-        <PressableScale style={ir.variantRow} onPress={onEditVariant} >
+        <PressableScale style={ir.variantRow} onPress={onEditVariant} accessibilityLabel={`Change options for ${item.productName}. Current selection ${item.variantTitle}`}>
           <Text style={ir.variant}>{item.variantTitle}</Text>
           <Feather name="edit-2" size={11} color={theme.accentLight} />
         </PressableScale>
@@ -135,12 +135,12 @@ function CartItemRow({
 
         {/* Actions */}
         <View style={ir.actions}>
-          <PressableScale style={ir.actionBtn} onPress={onSaveForLater} >
+          <PressableScale style={ir.actionBtn} onPress={onSaveForLater} accessibilityLabel={`Save ${item.productName} for later`}>
             <Feather name="bookmark" size={12} color={MUTED} />
             <Text style={ir.actionText}>Save</Text>
           </PressableScale>
           <View style={ir.actionDivider} />
-          <PressableScale style={ir.actionBtn} onPress={onRemove} >
+          <PressableScale style={ir.actionBtn} onPress={onRemove} accessibilityLabel={`Remove ${item.productName} from cart`}>
             <Feather name="trash-2" size={12} color={RED} />
             <Text style={[ir.actionText, { color: RED }]}>Remove</Text>
           </PressableScale>
@@ -172,7 +172,7 @@ const ir = StyleSheet.create({
   price: { fontSize: FS.base, fontFamily: FONT.bold, color: FG },
   priceDiscounted: { color: SUCCESS },
   actions: { flexDirection: 'row', alignItems: 'center', marginTop: SP.xs },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4, paddingHorizontal: 8 },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: COMP.minTouchTarget, paddingVertical: 4, paddingHorizontal: 8 },
   actionText: { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED },
   actionDivider: { width: 1, height: 14, backgroundColor: BORDER },
 });
@@ -205,6 +205,7 @@ function SellerGroup({
         <PressableScale
           onPress={() => router.push(('/seller-profile?id=' + group.sellerId) as never)}
           style={[sg.visitBtn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}
+          accessibilityLabel={`Visit ${group.sellerName} store`}
         >
           <Text style={[sg.visitBtnText, { color: theme.accentLight }]}>Visit Store</Text>
         </PressableScale>
@@ -280,10 +281,10 @@ function SavedItemRow({ item, onMove, onRemove }: {
           <Text style={si.unavail}>No longer available</Text>
         )}
         <View style={si.actions}>
-          <PressableScale style={[si.btn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]} onPress={onMove} >
+          <PressableScale style={[si.btn, { backgroundColor: theme.accentDim, borderColor: theme.accent }]} onPress={onMove} accessibilityLabel={`Move ${item.productName} to cart`}>
             <Text style={[si.btnText, { color: theme.accentLight }, !item.isAvailable && { color: SUBTLE }]}>Move to Cart</Text>
           </PressableScale>
-          <PressableScale style={si.btnGhost} onPress={onRemove} >
+          <PressableScale style={si.btnGhost} onPress={onRemove} accessibilityLabel={`Remove ${item.productName} from saved items`}>
             <Text style={si.btnGhostText}>Remove</Text>
           </PressableScale>
         </View>
@@ -699,11 +700,14 @@ export default function CartScreen() {
                         placeholder="Points to use"
                         placeholderTextColor={SUBTLE}
                         style={s.pointsInput}
+                        accessibilityLabel="Loyalty points to use"
                       />
                       <PressableScale
                         style={[s.pointsApply, { backgroundColor: theme.accentDim, borderColor: theme.accent }, (redeemingPoints || groups.length !== 1) && s.pointsApplyDisabled]}
                         onPress={handleApplyPoints}
                         disabled={redeemingPoints || groups.length !== 1}
+                        accessibilityLabel="Apply loyalty points"
+                        accessibilityState={{ disabled: redeemingPoints || groups.length !== 1, busy: redeemingPoints }}
                       >
                         {redeemingPoints
                           ? <ActivityIndicator color={theme.accentLight} size="small" />
@@ -763,6 +767,9 @@ export default function CartScreen() {
                 style={[s.checkoutBtn, { shadowColor: theme.shadowColor }]}
                 onPress={handleCheckout}
                 disabled={validating}
+                accessibilityLabel={`Checkout, ${fmtPrice(displayedTotal)}`}
+                accessibilityHint="Reviews shipping and opens secure payment"
+                accessibilityState={{ disabled: validating, busy: validating }}
               >
                 <LinearGradient
                   colors={[...theme.primaryGradient]}

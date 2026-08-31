@@ -196,6 +196,8 @@ function HeroCard() {
             style={[s.heroShopBtn, { backgroundColor: HERO_DROP.brandColor }]}
             activeOpacity={0.85}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/buyer-product-detail?productId=prod_canvas_cargo&productName=Canvas+Cargo+Jacket' as never); }}
+            accessibilityRole="button"
+            accessibilityLabel={`Shop ${HERO_DROP.name} for ${HERO_DROP.price}`}
           >
             <Feather name="shopping-bag" size={15} color={ON_DARK} />
             <Text style={s.heroShopText}>Shop Drop — {HERO_DROP.price}</Text>
@@ -204,6 +206,9 @@ function HeroCard() {
             style={[s.heroSaveBtn, { borderColor: border }]}
             activeOpacity={0.8}
             onPress={() => { setSaved(v => !v); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+            accessibilityRole="button"
+            accessibilityLabel={saved ? `Remove ${HERO_DROP.name} from saved items` : `Save ${HERO_DROP.name}`}
+            accessibilityState={{ selected: saved }}
           >
             <Feather name="bookmark" size={18} color={saved ? HERO_DROP.brandColor : muted} />
           </TouchableOpacity>
@@ -227,6 +232,8 @@ function ForYouCard({ item }: { item: ForYouItem }) {
     <TouchableOpacity
       style={[fy.card, { backgroundColor: card, borderColor: border }]}
       activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.name} by ${item.brand}, ${item.price}`}
       onPress={() => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         // Use real DB UUID when available (API-backed item), else fall back to the item's id
@@ -248,6 +255,9 @@ function ForYouCard({ item }: { item: ForYouItem }) {
           style={fy.saveBtn}
           onPress={() => { setSaved(v => !v); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={saved ? `Remove ${item.name} from saved items` : `Save ${item.name}`}
+          accessibilityState={{ selected: saved }}
         >
           <Feather name="bookmark" size={14} color={saved ? FG : MUTED} />
         </TouchableOpacity>
@@ -277,7 +287,7 @@ const fy = StyleSheet.create({
   visualIcon:{ width: 40, height: 40, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: BG },
   tagPill:   { position: 'absolute', top: 8, left: 8, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 4, backgroundColor: BG },
   tagText:   { fontSize: 9, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: 0.5, textTransform: 'uppercase' },
-  saveBtn:   { position: 'absolute', top: 8, right: 8, width: 26, height: 26, alignItems: 'center', justifyContent: 'center' },
+  saveBtn:   { position: 'absolute', top: 0, right: 0, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   body:      { padding: 11 },
   dot:       { width: 15, height: 15, borderRadius: 3, alignItems: 'center', justifyContent: 'center' },
   dotText:   { fontSize: 7, fontFamily: 'Inter_700Bold', color: ON_DARK },
@@ -301,6 +311,8 @@ function DroppingRow({ item }: { item: typeof DROPPING_SOON[0] }) {
       style={[dr.row, { backgroundColor: card, borderColor: border }]}
       activeOpacity={0.8}
       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(('/buyer-product-detail?productId=prod_ripstop_cargo&productName=' + encodeURIComponent(item.name)) as never); }}
+      accessibilityRole="button"
+      accessibilityLabel={`${item.name} by ${item.brand}, ${item.price}${item.live ? ', live now' : `, dropping in ${item.inHours} hours`}`}
     >
       <View style={[dr.avatar, { backgroundColor: item.color }]}>
         <Text style={dr.initials}>{item.initials}</Text>
@@ -379,6 +391,8 @@ function TrendingRow({ item }: { item: TrendingItem }) {
       style={[tr.row, { backgroundColor: card, borderColor: border }]}
       activeOpacity={0.8}
       onPress={handlePress}
+      accessibilityRole="button"
+      accessibilityLabel={`#${item.rank}, ${item.name} by ${item.brand}, ${item.price}, ${item.hype}`}
     >
       <Text style={[tr.rank, { color: primary }]}>#{item.rank}</Text>
       <View style={[tr.avatar, { backgroundColor: item.color }]}>
@@ -422,7 +436,7 @@ function SectionHead({ title, sub, action, onAction }: { title: string; sub?: st
         {sub && <Text style={{ fontSize: 11, fontFamily: 'Inter_400Regular', color: muted, marginTop: 2 }}>{sub}</Text>}
       </View>
       {action && (
-        <TouchableOpacity activeOpacity={0.7} onPress={() => { Haptics.selectionAsync(); onAction?.(); }}>
+        <TouchableOpacity activeOpacity={0.7} onPress={() => { Haptics.selectionAsync(); onAction?.(); }} accessibilityRole="button" accessibilityLabel={`${action}, ${title}`} style={{ minHeight: 44, justifyContent: 'center' }}>
           <Text style={{ fontSize: 13, fontFamily: 'Inter_600SemiBold', color: primary }}>{action}</Text>
         </TouchableOpacity>
       )}
@@ -539,6 +553,8 @@ export default function DiscoverScreen() {
             style={[s.headerBtn, { backgroundColor: CARD, borderColor: border }]}
             activeOpacity={0.75}
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/search' as never); }}
+            accessibilityRole="button"
+            accessibilityLabel="Search products and brands"
           >
             <Feather name="search" size={18} color={muted} />
           </TouchableOpacity>
@@ -547,6 +563,8 @@ export default function DiscoverScreen() {
               style={[s.headerBtn, { backgroundColor: CARD, borderColor: border }]}
               activeOpacity={0.75}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push('/(buyer)/inbox' as never); }}
+              accessibilityRole="button"
+              accessibilityLabel="Notifications, unread items"
             >
               <Feather name="bell" size={18} color={muted} />
               <View style={[s.notifDot, { backgroundColor: RED }]} />
@@ -638,7 +656,7 @@ const s = StyleSheet.create({
   header:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
   greeting:  { fontSize: 12, fontFamily: 'Inter_500Medium', letterSpacing: 0.3 },
   pageTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', letterSpacing: -0.6 },
-  headerBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+  headerBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
   notifDot:  { position: 'absolute', top: 9, right: 9, width: 7, height: 7, borderRadius: 4 },
 
   hero: { borderRadius: 6, overflow: 'hidden', borderWidth: 1 },

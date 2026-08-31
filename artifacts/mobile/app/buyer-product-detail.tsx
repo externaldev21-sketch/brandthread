@@ -191,7 +191,7 @@ function ZoomableGalleryImage({ uri }: { uri: string }) {
         accessibilityLabel="Product photo. Pinch with two fingers to zoom."
       />
       {zoomed && (
-        <TouchableOpacity style={galleryStyles.resetZoom} onPress={resetZoom} accessibilityRole="button">
+        <TouchableOpacity style={galleryStyles.resetZoom} onPress={resetZoom} accessibilityRole="button" accessibilityLabel="Reset product photo zoom">
           <Feather name="minimize-2" size={14} color={ON_DARK} />
           <Text style={galleryStyles.resetZoomText}>Reset</Text>
         </TouchableOpacity>
@@ -312,6 +312,9 @@ function OptionPicker({ product, option, selections, onSelect }: {
                 ]}
                 onPress={() => { if (available) { Haptics.selectionAsync(); onSelect(option.id, val.id); } }}
                 activeOpacity={0.8}
+                accessibilityRole="radio"
+                accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', unavailable'}`}
+                accessibilityState={{ selected: isSelected, disabled: !available }}
               >
                 <View style={[op.colorDot, { backgroundColor: val.colorHex }]} />
                 {!available && <View style={op.slashOverlay}><Text style={op.slash}>✕</Text></View>}
@@ -330,6 +333,9 @@ function OptionPicker({ product, option, selections, onSelect }: {
               onPress={() => { if (available) { Haptics.selectionAsync(); onSelect(option.id, val.id); } }}
               activeOpacity={0.8}
               disabled={!available}
+              accessibilityRole="radio"
+              accessibilityLabel={`${option.name}, ${val.label}${available ? '' : ', unavailable'}`}
+              accessibilityState={{ selected: isSelected, disabled: !available }}
             >
               <Text style={[op.chipText, isSelected && op.chipTextSelected, !available && op.chipTextUnavail]}>
                 {val.label}
@@ -364,7 +370,7 @@ const makeOptionStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   chipTextUnavail: { textDecorationLine: 'line-through' },
   unavailLine: { position: 'absolute', left: 0, right: 0, top: '50%', height: 1, backgroundColor: RED },
   colorSwatch: {
-    width: 40, height: 40, borderRadius: RADIUS.sm,
+    width: 44, height: 44, borderRadius: RADIUS.sm,
     borderWidth: 2, borderColor: BORDER,
     alignItems: 'center', justifyContent: 'center',
   },
@@ -383,11 +389,11 @@ function QtySelector({ qty, max, onDec, onInc }: { qty: number; max: number; onD
     <View style={qs.root}>
       <Text style={qs.label}>Qty</Text>
       <View style={qs.ctrl}>
-        <TouchableOpacity style={qs.btn} onPress={onDec} disabled={qty <= 1} activeOpacity={0.7}>
+        <TouchableOpacity style={qs.btn} onPress={onDec} disabled={qty <= 1} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Decrease quantity" accessibilityState={{ disabled: qty <= 1 }}>
           <Feather name="minus" size={15} color={qty <= 1 ? SUBTLE : FG} />
         </TouchableOpacity>
         <Text style={qs.val}>{qty}</Text>
-        <TouchableOpacity style={qs.btn} onPress={onInc} disabled={qty >= max} activeOpacity={0.7}>
+        <TouchableOpacity style={qs.btn} onPress={onInc} disabled={qty >= max} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Increase quantity" accessibilityState={{ disabled: qty >= max }}>
           <Feather name="plus" size={15} color={qty >= max ? SUBTLE : FG} />
         </TouchableOpacity>
       </View>
@@ -399,7 +405,7 @@ const qs = StyleSheet.create({
   root: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
   label: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED },
   ctrl: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, paddingHorizontal: SP.sm },
-  btn: { paddingVertical: 8, paddingHorizontal: 6 },
+  btn: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingVertical: 8, paddingHorizontal: 6 },
   val: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, minWidth: 24, textAlign: 'center' },
   stock: { fontSize: FS.xs, fontFamily: FONT.medium, color: ORANGE },
 });
@@ -567,7 +573,7 @@ export default function BuyerProductDetailScreen() {
         <Text style={{ color: MUTED, marginTop: SP.md, fontFamily: FONT.regular, textAlign: 'center' }}>
           Product not found or no longer available.
         </Text>
-        <TouchableOpacity style={{ marginTop: SP.md }} onPress={() => router.back()} activeOpacity={0.7}>
+         <TouchableOpacity style={{ marginTop: SP.md, minHeight: COMP.minTouchTarget, justifyContent: 'center' }} onPress={() => router.back()} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Go back">
           <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.semibold }}>Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -713,7 +719,7 @@ export default function BuyerProductDetailScreen() {
         <View style={s.imageArea}>
           <ProductGallery imageUris={product.imageUris} />
           {/* Back button */}
-          <TouchableOpacity style={[s.backBtn, { top: insets.top + SP.sm }]} onPress={() => router.back()} activeOpacity={0.8}>
+          <TouchableOpacity style={[s.backBtn, { top: insets.top + SP.sm }]} onPress={() => router.back()} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Back to previous screen">
             <Feather name="chevron-left" size={ICON.md} color={FG} />
           </TouchableOpacity>
           {/* Cart button */}
@@ -721,6 +727,9 @@ export default function BuyerProductDetailScreen() {
             style={[s.cartBtn, { top: insets.top + SP.sm }]}
             onPress={() => router.push('/(buyer)/cart' as never)}
             activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Open cart"
+            accessibilityHint="View items in your cart"
           >
             <Feather name="shopping-bag" size={ICON.md} color={FG} />
           </TouchableOpacity>
@@ -744,7 +753,7 @@ export default function BuyerProductDetailScreen() {
 
           {/* Title & Seller */}
           <Text style={s.productName}>{product.name}</Text>
-          <TouchableOpacity style={s.sellerRow} onPress={() => router.push(('/seller-profile?id=' + product.sellerId) as never)} activeOpacity={0.7}>
+          <TouchableOpacity style={s.sellerRow} onPress={() => router.push(('/seller-profile?id=' + product.sellerId) as never)} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel={`View seller ${product.sellerName}`}>
             <View style={s.sellerAvatar}><Text style={s.sellerInitial}>{product.sellerName.charAt(0)}</Text></View>
             <Text style={s.sellerName}>{product.sellerName}</Text>
             <Text style={s.sellerHandle}>{product.sellerHandle}</Text>
@@ -845,6 +854,9 @@ export default function BuyerProductDetailScreen() {
               onPress={waitlistJoined ? undefined : handleJoinWaitlist}
               disabled={waitlistLoading || waitlistJoined}
               activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={waitlistJoined ? "You're on the waitlist" : 'Notify me when back in stock'}
+              accessibilityState={{ disabled: waitlistLoading || waitlistJoined, busy: waitlistLoading }}
             >
               {waitlistLoading ? (
                 <ActivityIndicator size="small" color={PURPLE_LIGHT} />
@@ -889,6 +901,9 @@ export default function BuyerProductDetailScreen() {
                 style={sz.toggle}
                 onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setSizeChartOpen(o => !o); }}
                 activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Size chart"
+                accessibilityState={{ expanded: sizeChartOpen }}
               >
                 <Text style={sz.label}>Size Chart</Text>
                 <Feather name={sizeChartOpen ? 'chevron-up' : 'chevron-down'} size={16} color={MUTED} />
@@ -944,6 +959,8 @@ export default function BuyerProductDetailScreen() {
             style={s.viewCartBtn}
             onPress={() => router.push('/(buyer)/cart' as never)}
             activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="View cart"
           >
             <LinearGradient colors={[...GRAD_SUCCESS_G]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.actionGrad}>
               <Feather name="shopping-bag" size={18} color={ON_DARK} />
@@ -956,6 +973,9 @@ export default function BuyerProductDetailScreen() {
             onPress={handleAddToCart}
             activeOpacity={0.85}
             disabled={addingToCart || !inStock}
+            accessibilityRole="button"
+            accessibilityLabel={addingToCart ? 'Adding to cart' : !allSelected ? 'Select options to add to cart' : !inStock ? 'Out of stock' : 'Add to cart'}
+            accessibilityState={{ disabled: addingToCart || !inStock, busy: addingToCart }}
           >
             {addingToCart ? (
               <ActivityIndicator color={PURPLE_LIGHT} size="small" />
@@ -976,6 +996,9 @@ export default function BuyerProductDetailScreen() {
             onPress={handleReserve}
             disabled={reserveLoading || reserved}
             activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={reserved ? 'Reserved' : 'Reserve this pre-order'}
+            accessibilityState={{ disabled: reserveLoading || reserved, busy: reserveLoading }}
           >
             <LinearGradient
               colors={reserved ? [CARD_ELEVATED, CARD_ELEVATED] : [PURPLE_DIM, PURPLE_DIM]}
@@ -1187,12 +1210,12 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   imagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.sm },
   imagePlaceholderText: { fontSize: FS.sm, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', paddingHorizontal: SP.lg },
   backBtn: {
-    position: 'absolute', left: SP.md, width: 40, height: 40,
+    position: 'absolute', left: SP.md, width: COMP.minTouchTarget, height: COMP.minTouchTarget,
     borderRadius: RADIUS.pill, backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems: 'center', justifyContent: 'center',
   },
   cartBtn: {
-    position: 'absolute', right: SP.md, width: 40, height: 40,
+    position: 'absolute', right: SP.md, width: COMP.minTouchTarget, height: COMP.minTouchTarget,
     borderRadius: RADIUS.pill, backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems: 'center', justifyContent: 'center',
   },

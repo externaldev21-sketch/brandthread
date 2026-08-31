@@ -100,6 +100,7 @@ export function PressableScale({ children, onPress, style, disabled, hitSlop, ac
   return (
     <Pressable
       {...rest}
+      accessibilityRole={rest.accessibilityRole ?? 'button'}
       onPress={onPress}
       disabled={disabled}
       hitSlop={hitSlop}
@@ -120,7 +121,7 @@ export function PressableScale({ children, onPress, style, disabled, hitSlop, ac
       style={typeof style === 'function' ? style : undefined}
     >
       {(state) => (
-        <Animated.View style={[typeof style === 'function' ? undefined : style, { transform: [{ scale }], opacity }]}>
+        <Animated.View style={[typeof style === 'function' ? undefined : style, { minHeight: COMP.minTouchTarget, transform: [{ scale }], opacity }]}>
           {typeof children === 'function' ? children(state) : children}
         </Animated.View>
       )}
@@ -366,6 +367,8 @@ export function PrimaryButton({
         hapticMedium();
         onPress();
       }}
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled, busy: !!loading }}
       style={[{ borderRadius: RADIUS.md, overflow: 'hidden' }, style]}
     >
       <LinearGradient
@@ -415,6 +418,8 @@ export function SecondaryButton({ label, onPress, icon, disabled, small, style, 
         hapticLight();
         onPress();
       }}
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
       style={[sbS.root, { height: h, borderColor: resolvedAccent + '55', backgroundColor: resolvedAccent + '14', opacity: disabled ? 0.5 : 1 }, style]}
     >
       {icon && <Feather name={icon} size={ICON.sm} color={resolvedAccent} />}
@@ -452,6 +457,8 @@ export function TertiaryButton({ label, onPress, icon, disabled, small, style, a
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress();
       }}
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!disabled }}
       style={[{ height: h, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm, opacity: disabled ? 0.4 : 1 }, style]}
     >
       {icon && <Feather name={icon} size={ICON.sm} color={resolvedAccent} />}
@@ -469,14 +476,19 @@ interface IconButtonProps {
   size?: number;
   badge?: boolean;
   badgeCount?: number;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
   style?: StyleProp<ViewStyle>;
 }
 
-export function IconButton({ name, onPress, color = FG, size = ICON.md, badge, badgeCount, style }: IconButtonProps) {
+export function IconButton({ name, onPress, color = FG, size = ICON.md, badge, badgeCount, accessibilityLabel, accessibilityHint, style }: IconButtonProps) {
   const { theme } = useAppTheme();
+  const label = accessibilityLabel ?? `${name.replace(/-/g, ' ')}${badgeCount ? `, ${badgeCount} notifications` : ''}`;
   return (
     <PressableScale
       onPress={() => { hapticLight(); onPress(); }}
+      accessibilityLabel={label}
+      accessibilityHint={accessibilityHint}
       style={[ibS.root, style]}
       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
     >
@@ -522,12 +534,19 @@ export function SearchBar({ value, onChange, placeholder = 'Search…', style, o
         onChangeText={onChange}
         placeholder={placeholder}
         placeholderTextColor={SUBTLE}
+        accessibilityLabel={placeholder}
+        accessibilityRole="search"
         onFocus={() => { setFocused(true); onFocus?.(); }}
         onBlur={() => { setFocused(false); onBlur?.(); }}
         returnKeyType="search"
       />
       {value.length > 0 && (
-        <PressableScale onPress={() => onChange('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <PressableScale
+          onPress={() => onChange('')}
+          accessibilityLabel="Clear search"
+          accessibilityHint="Removes the current search text"
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
           <Feather name="x" size={ICON.sm} color={MUTED} />
         </PressableScale>
       )}
@@ -557,6 +576,8 @@ export function FilterChip({ label, active, onPress, count }: FilterChipProps) {
   return (
     <PressableScale
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
+      accessibilityLabel={count !== undefined ? `${label}, ${count}` : label}
+      accessibilityState={{ selected: active }}
       style={[fcS.chip, active && [fcS.active, { backgroundColor: theme.accentDim, borderColor: theme.accent + '88' }]]}
     >
       <Text style={[fcS.label, active && [fcS.activeLabel, { color: theme.accentLight }]]}>{label}</Text>
@@ -728,7 +749,11 @@ export function SectionHeader({ title, action, style }: SectionHeaderProps) {
     <View style={[shS.root, style]}>
       <Text style={shS.title}>{title}</Text>
       {action && (
-        <PressableScale onPress={action.onPress} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <PressableScale
+          onPress={action.onPress}
+          accessibilityLabel={action.label}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
           <Text style={[shS.action, { color: theme.accentLight }]}>{action.label}</Text>
         </PressableScale>
       )}
@@ -946,6 +971,7 @@ export function FormInput({
           keyboardType={keyboardType}
           returnKeyType={returnKeyType}
           onSubmitEditing={onSubmitEditing}
+          accessibilityLabel={label ?? placeholder}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
         />
@@ -1031,6 +1057,8 @@ export function NavigationCard({ icon, label, description, onPress, accent, badg
   return (
     <PressableScale
       onPress={() => { hapticLight(); onPress(); }}
+      accessibilityLabel={description ? `${label}. ${description}` : label}
+      accessibilityHint="Opens this section"
       style={[ncS.root, style]}
     >
       <View style={[ncS.iconWrap, { backgroundColor: resolvedAccent + '18' }]}>

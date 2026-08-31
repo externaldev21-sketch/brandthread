@@ -141,17 +141,17 @@ function ProductCard({ product, onEdit, onDuplicate, onMore }: ProductCardProps)
 
       {/* Action row */}
       <View style={s.actionRow}>
-        <PressableScale style={s.actionBtn} onPress={onEdit}>
+        <PressableScale style={s.actionBtn} onPress={onEdit} accessibilityLabel={`Edit ${product.name}`}>
           <Feather name="edit-2" size={13} color={theme.accentLight} />
           <Text style={[s.actionLabel, { color: theme.accentLight }]}>Edit</Text>
         </PressableScale>
         <View style={s.actionDivider} />
-        <PressableScale style={s.actionBtn} onPress={onDuplicate}>
+        <PressableScale style={s.actionBtn} onPress={onDuplicate} accessibilityLabel={`Duplicate ${product.name}`}>
           <Feather name="copy" size={13} color={MUTED} />
           <Text style={s.actionLabel}>Duplicate</Text>
         </PressableScale>
         <View style={s.actionDivider} />
-        <PressableScale style={s.actionBtn} onPress={onMore}>
+        <PressableScale style={s.actionBtn} onPress={onMore} accessibilityLabel={`More actions for ${product.name}`}>
           <Feather name="more-horizontal" size={13} color={MUTED} />
           <Text style={s.actionLabel}>More</Text>
         </PressableScale>
@@ -251,7 +251,7 @@ function ActionSheet({ product, visible, onClose, onRefresh, onDelete }: ActionS
         <Text style={as.sheetTitle} numberOfLines={1}>{p.name}</Text>
         <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 460 }}>
           {actions.map((item, idx) => (
-            <PressableScale key={idx} style={as.actionItem} onPress={item.onPress}>
+            <PressableScale key={idx} style={as.actionItem} onPress={item.onPress} accessibilityLabel={`${item.label}, ${p.name}`}>
               <View style={[as.actionIcon, { backgroundColor: (item.accent ?? theme.accent) + '18' }]}>
                 <Feather name={item.icon} size={ICON.sm} color={item.accent ?? MUTED} />
               </View>
@@ -493,6 +493,7 @@ export default function ProductsScreen() {
                 key={draft.id}
                 style={s.draftCard}
                 onPress={() => router.push(('/add-product?editId=' + draft.id) as never)}
+                accessibilityLabel={`Resume ${draft.name || 'untitled product'} draft, step ${draft.currentStep ?? 1} of 10`}
               >
                 <View style={s.draftCardTop}>
                   <Feather name="edit-3" size={14} color={ORANGE} />
@@ -500,6 +501,7 @@ export default function ProductsScreen() {
                   <PressableScale
                     hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
                     onPress={() => handleDiscardDraft(draft.id, draft.name ?? '')}
+                    accessibilityLabel={`Discard ${draft.name || 'untitled product'} draft`}
                   >
                     <Feather name="x" size={13} color={MUTED} />
                   </PressableScale>
@@ -605,20 +607,24 @@ export default function ProductsScreen() {
               name="search"
               onPress={() => setSearchActive(v => !v)}
               color={searchActive ? PURPLE_LIGHT : FG}
+              accessibilityLabel={searchActive ? 'Hide product search' : 'Search products'}
             />
             <IconButton
               name="filter"
               onPress={() => setFilterModalVisible(true)}
               color={filter !== 'all' ? PURPLE_LIGHT : FG}
+              accessibilityLabel={filter === 'all' ? 'Filter products' : `Filter products, ${filter} selected`}
             />
             <IconButton
               name="download"
               onPress={() => router.push('/product-import' as never)}
+              accessibilityLabel="Import products"
             />
             <IconButton
               name="plus"
               onPress={() => router.push('/add-product' as never)}
               color={PURPLE_LIGHT}
+              accessibilityLabel="Add product"
             />
           </View>
         </View>

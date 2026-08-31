@@ -157,6 +157,7 @@ export default function ProductDetailScreen() {
           onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }}
           style={s.backBtn}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityLabel="Back"
         >
           <Feather name="arrow-left" size={ICON.md} color={FG} />
         </PressableScale>
@@ -168,6 +169,7 @@ export default function ProductDetailScreen() {
           <PressableScale
             onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(('/add-product?editId=' + id) as never); }}
             style={s.headerBtn}
+            accessibilityLabel={`Edit ${product.name}`}
           >
             <Text style={s.editBtnText}>Edit</Text>
           </PressableScale>
@@ -198,6 +200,7 @@ export default function ProductDetailScreen() {
               ]);
             }}
             style={s.iconBtnSmall}
+            accessibilityLabel={`More actions for ${product.name}`}
           >
             <Feather name="more-horizontal" size={ICON.md} color={FG} />
           </PressableScale>
@@ -219,6 +222,9 @@ export default function ProductDetailScreen() {
                 key={tab.key}
                 onPress={() => handleTabPress(tab.key, idx)}
                 style={s.tabItem}
+                accessibilityRole="tab"
+                accessibilityLabel={`${tab.label} tab`}
+                accessibilityState={{ selected: active }}
               >
                 <Text style={[s.tabLabel, active && s.tabLabelActive]}>
                   {tab.label}
@@ -731,6 +737,7 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
                   <PressableScale
                     style={[invS.adjBtn, { marginLeft: SP.sm }]}
                     onPress={() => router.push(('/inventory-adjust?itemId=' + item.id) as never)}
+                    accessibilityLabel="Adjust inventory"
                   >
                     <Feather name="sliders" size={12} color={theme.accent} />
                   </PressableScale>
@@ -774,6 +781,7 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
                   <PressableScale
                     style={invS.adjBtn}
                     onPress={() => doAdjust(-1, `Decrease ${variant.title}`)}
+                    accessibilityLabel={`Decrease ${variant.title} inventory`}
                   >
                     <Feather name="minus" size={12} color={RED} />
                   </PressableScale>
@@ -781,6 +789,7 @@ function InventoryTab({ product, setProduct, id }: { product: Product; setProduc
                   <PressableScale
                     style={invS.adjBtn}
                     onPress={() => doAdjust(1, `Increase ${variant.title}`)}
+                    accessibilityLabel={`Increase ${variant.title} inventory`}
                   >
                     <Feather name="plus" size={12} color={SUCCESS} />
                   </PressableScale>
@@ -798,7 +807,7 @@ const invS = StyleSheet.create({
   variantRow:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingVertical: SP.sm },
   variantName:   { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
   variantSku:    { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  adjBtn:        { width: 28, height: 28, borderRadius: RADIUS.sm, backgroundColor: CARD_ELEVATED,
+  adjBtn:        { width: COMP.minTouchTarget, height: COMP.minTouchTarget, borderRadius: RADIUS.sm, backgroundColor: CARD_ELEVATED,
                    borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   qty:           { fontSize: FS.base, fontFamily: FONT.bold, color: FG, minWidth: 32, textAlign: 'center' },
   divider:       { height: 1, backgroundColor: BORDER },
@@ -1247,6 +1256,8 @@ function StoreTab({
           <PressableScale
             onPress={() => { Haptics.selectionAsync(); setDescOpen(o => !o); }}
             style={st.descHeader}
+            accessibilityLabel="Description"
+            accessibilityState={{ expanded: descOpen }}
           >
             <Text style={st.descTitle}>Description</Text>
             <Feather name={descOpen ? 'chevron-up' : 'chevron-down'} size={ICON.sm} color={MUTED} />
@@ -1307,18 +1318,18 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md,
                   paddingVertical: SP.sm, minHeight: COMP.headerH, gap: SP.sm,
                   borderBottomWidth: 1, borderBottomColor: BORDER },
-  backBtn:      { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD,
+  backBtn:      { width: COMP.minTouchTarget, height: COMP.minTouchTarget, borderRadius: RADIUS.sm, backgroundColor: CARD,
                   borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   headerTitle:  { flex: 1, fontSize: FS.base, fontFamily: FONT.bold, color: FG, letterSpacing: -0.2 },
   headerRight:  { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
-  headerBtn:    { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: theme.accentDim,
+  headerBtn:    { minHeight: COMP.minTouchTarget, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: theme.accentDim,
                   borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER_ACTIVE },
   editBtnText:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: theme.accentLight },
-  iconBtnSmall: { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD,
+  iconBtnSmall: { width: COMP.minTouchTarget, height: COMP.minTouchTarget, borderRadius: RADIUS.sm, backgroundColor: CARD,
                   borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   tabBarWrap:   { borderBottomWidth: 1, borderBottomColor: BORDER, backgroundColor: SURFACE },
   tabBarContent:{ paddingHorizontal: SP.sm },
-  tabItem:      { paddingHorizontal: SP.md, paddingVertical: 12, alignItems: 'center', position: 'relative' },
+  tabItem:      { minHeight: COMP.minTouchTarget, paddingHorizontal: SP.md, paddingVertical: 12, alignItems: 'center', position: 'relative' },
   tabLabel:     { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
   tabLabelActive:{ color: FG, fontFamily: FONT.semibold },
   tabUnderline: { position: 'absolute', bottom: 0, left: SP.md, right: SP.md, height: 2,

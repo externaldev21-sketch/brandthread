@@ -52,7 +52,7 @@ function Input({ label, value, onChange, keyboardType = 'default', autoCapitaliz
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput value={value} onChangeText={onChange} keyboardType={keyboardType} autoCapitalize={autoCapitalize}
-        placeholder={label} placeholderTextColor={SUBTLE} style={styles.input} />
+        placeholder={label} placeholderTextColor={SUBTLE} accessibilityLabel={label} style={styles.input} />
     </View>
   );
 }
@@ -115,6 +115,9 @@ function Information({ contact, address, onContact, onAddress, savedAddresses, o
                 key={addr.id}
                 style={[styles.savedAddressCard, address.id === addr.id && styles.savedAddressCardActive]}
                 onPress={() => onSelectAddress(addr)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: address.id === addr.id }}
+                accessibilityLabel={`${addr.label}, ${addr.recipientName}, ${addr.street}, ${addr.city}, ${addr.state} ${addr.postalCode}`}
               >
                 <View style={[styles.radio, address.id === addr.id && styles.radioActive]} />
                 <View style={{ flex: 1 }}>
@@ -134,12 +137,19 @@ function Information({ contact, address, onContact, onAddress, savedAddresses, o
                   onAddress({ ...address, id: undefined, saveAddress: false });
                   setShowAddressForm(true);
                 }}
+                accessibilityRole="button"
+                accessibilityLabel="Edit address for this order"
               >
                 <Feather name="edit-2" size={16} color={theme.accentLight} />
                 <Text style={styles.addNewAddressText}>Edit for this order</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={styles.addNewAddressBtn} onPress={() => { onAddress({ country: 'US' }); setShowAddressForm(true); }}>
+            <TouchableOpacity
+              style={styles.addNewAddressBtn}
+              onPress={() => { onAddress({ country: 'US' }); setShowAddressForm(true); }}
+              accessibilityRole="button"
+              accessibilityLabel="Add a new address"
+            >
               <Feather name="plus" size={16} color={theme.accentLight} />
               <Text style={styles.addNewAddressText}>Add a new address</Text>
             </TouchableOpacity>
@@ -149,7 +159,7 @@ function Information({ contact, address, onContact, onAddress, savedAddresses, o
         {showAddressForm && (
           <>
             {isSignedIn && savedAddresses.length > 0 && (
-              <TouchableOpacity style={styles.useSavedBtn} onPress={() => setShowAddressForm(false)}>
+              <TouchableOpacity style={styles.useSavedBtn} onPress={() => setShowAddressForm(false)} accessibilityRole="button" accessibilityLabel="Use a saved address">
                 <Feather name="arrow-left" size={14} color={theme.accentLight} />
                 <Text style={styles.useSavedText}>Use a saved address</Text>
               </TouchableOpacity>
@@ -206,7 +216,11 @@ function Delivery({ session, onSelect, onApply, onRemove }: {
           <Text style={styles.sectionTitle}>Delivery from {group.sellerName}</Text>
           {group.availableMethods.map(method => (
             <TouchableOpacity key={method.id} style={[styles.method, group.selectedMethodId === method.id && styles.methodActive]}
-              onPress={() => onSelect(group.sellerId, method.id)}>
+              onPress={() => onSelect(group.sellerId, method.id)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: group.selectedMethodId === method.id }}
+              accessibilityLabel={`${method.service}, ${method.estimatedDelivery}, ${money(method.priceCents)}`}
+            >
               <View style={[styles.radio, group.selectedMethodId === method.id && styles.radioActive]} />
               <View style={{ flex: 1 }}><Text style={styles.methodTitle}>{method.service}</Text><Text style={styles.muted}>{method.estimatedDelivery}</Text></View>
               <Text style={styles.methodTitle}>{money(method.priceCents)}</Text>
@@ -215,22 +229,29 @@ function Delivery({ session, onSelect, onApply, onRemove }: {
         </Card>
       ))}
       <Card>
-        <TouchableOpacity style={styles.promoToggle} onPress={() => setShowPromo(value => !value)}>
+        <TouchableOpacity
+          style={styles.promoToggle}
+          onPress={() => setShowPromo(value => !value)}
+          accessibilityRole="button"
+          accessibilityLabel="Have a promo code?"
+          accessibilityState={{ expanded: showPromo }}
+          accessibilityHint={showPromo ? 'Hides the promo code field' : 'Shows the promo code field'}
+        >
           <View style={styles.row}><Feather name="tag" size={16} color={PURPLE_LIGHT} /><Text style={styles.sectionTitle}>Have a promo code?</Text></View>
           <Feather name={showPromo ? 'chevron-up' : 'chevron-down'} size={18} color={MUTED} />
         </TouchableOpacity>
         {showPromo && (
           <>
             <View style={styles.promoRow}>
-              <TextInput value={code} onChangeText={setCode} autoCapitalize="characters" placeholder="Enter code" placeholderTextColor={SUBTLE} style={[styles.input, { flex: 1, marginBottom: 0 }]} />
-              <TouchableOpacity style={styles.applyButton} disabled={applying || !code.trim()} onPress={async () => { setApplying(true); await onApply(code); setCode(''); setApplying(false); }}>
+              <TextInput value={code} onChangeText={setCode} autoCapitalize="characters" placeholder="Enter code" placeholderTextColor={SUBTLE} accessibilityLabel="Promo code" style={[styles.input, { flex: 1, marginBottom: 0 }]} />
+              <TouchableOpacity style={styles.applyButton} disabled={applying || !code.trim()} onPress={async () => { setApplying(true); await onApply(code); setCode(''); setApplying(false); }} accessibilityRole="button" accessibilityLabel="Apply promo code" accessibilityState={{ disabled: applying || !code.trim(), busy: applying }}>
                 <Text style={styles.applyText}>{applying ? '...' : 'Apply'}</Text>
               </TouchableOpacity>
             </View>
             {session.discounts.map(discount => (
               <View style={styles.discountRow} key={discount.code}>
                 <Text style={styles.discountText}>{discount.isValid ? `${discount.code} · ${discount.description}` : discount.errorMessage}</Text>
-                <TouchableOpacity onPress={() => onRemove(discount.code)}><Text style={styles.removeText}>Remove</Text></TouchableOpacity>
+                <TouchableOpacity onPress={() => onRemove(discount.code)} accessibilityRole="button" accessibilityLabel={`Remove promo code ${discount.code}`}><Text style={styles.removeText}>Remove</Text></TouchableOpacity>
               </View>
             ))}
           </>
@@ -274,7 +295,15 @@ function Review({ session, onAck }: { session: CheckoutSession; onAck: (key: str
         </Text>
       </Card>
       {session.acknowledgments.map(ack => (
-        <TouchableOpacity key={ack.key} style={styles.ack} onPress={() => onAck(ack.key, !ack.acknowledged)}>
+        <TouchableOpacity
+          key={ack.key}
+          style={styles.ack}
+          onPress={() => onAck(ack.key, !ack.acknowledged)}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: ack.acknowledged }}
+          accessibilityLabel={ack.label}
+          accessibilityHint={ack.required ? 'Required before payment' : undefined}
+        >
           <View style={[styles.checkbox, ack.acknowledged && styles.checkboxActive]}>{ack.acknowledged && <Feather name="check" size={12} color={ON_DARK} />}</View>
           <Text style={styles.ackText}>{ack.label}</Text>
         </TouchableOpacity>
@@ -396,17 +425,17 @@ function Confirmation({ session, orderNumbers, finalizing, onRefresh, refreshing
       </View>
 
       {finalizing ? (
-        <TouchableOpacity style={styles.refreshButton} onPress={onRefresh} disabled={refreshing}>
+        <TouchableOpacity style={styles.refreshButton} onPress={onRefresh} disabled={refreshing} accessibilityRole="button" accessibilityLabel="Check order status" accessibilityState={{ disabled: refreshing, busy: refreshing }}>
           {refreshing ? <ActivityIndicator color={PURPLE_LIGHT} /> : <Text style={styles.refreshText}>Check order status</Text>}
         </TouchableOpacity>
       ) : (
         <View style={{ marginTop: SP.xl, width: '100%', gap: SP.sm }}>
           {!isSignedIn && (
-            <TouchableOpacity style={styles.createAccountBtn} onPress={() => router.replace('/sign-in' as never)} activeOpacity={0.8}>
+            <TouchableOpacity style={styles.createAccountBtn} onPress={() => router.replace('/sign-in' as never)} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Create an account">
               <Text style={styles.createAccountText}>Create an account</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity style={styles.continueShopBtn} onPress={() => router.replace('/(buyer)/discover' as never)} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.continueShopBtn} onPress={() => router.replace('/(buyer)/discover' as never)} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Continue shopping">
             <Text style={styles.continueShopText}>Continue shopping</Text>
           </TouchableOpacity>
         </View>
@@ -675,7 +704,7 @@ export default function BuyerCheckoutScreen() {
     : 'Continue';
   return (
     <KeyboardAvoidingView style={styles.root} behavior="padding" keyboardVerticalOffset={0}>
-      {current.step !== 'confirmation' && <View style={[styles.header, { paddingTop: insets.top + SP.xs }]}><TouchableOpacity style={styles.back} onPress={() => { const index = STEPS.indexOf(current.step); if (index <= 0) router.back(); else void persist({ ...current, step: STEPS[index - 1] }); }}><Feather name="chevron-left" size={ICON.md} color={FG} /></TouchableOpacity><View style={{ flex: 1, alignItems: 'center' }}><Text style={styles.stepLabel}>{current.step === 'information' ? 'Information' : current.step === 'delivery' ? 'Delivery' : 'Review & Pay'}</Text><Progress step={current.step} /></View><View style={styles.back} /></View>}
+       {current.step !== 'confirmation' && <View style={[styles.header, { paddingTop: insets.top + SP.xs }]}><TouchableOpacity style={styles.back} onPress={() => { const index = STEPS.indexOf(current.step); if (index <= 0) router.back(); else void persist({ ...current, step: STEPS[index - 1] }); }} accessibilityRole="button" accessibilityLabel="Back"><Feather name="chevron-left" size={ICON.md} color={FG} /></TouchableOpacity><View style={{ flex: 1, alignItems: 'center' }}><Text style={styles.stepLabel}>{current.step === 'information' ? 'Information' : current.step === 'delivery' ? 'Delivery' : 'Review & Pay'}</Text><Progress step={current.step} /></View><View style={styles.back} /></View>}
       <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + (current.step === 'confirmation' ? 30 : 105) }} keyboardShouldPersistTaps="handled">
         {current.step === 'information' && <Information contact={contact} address={address} onContact={setContact} onAddress={setAddress} savedAddresses={savedAddresses} onSelectAddress={handleSelectAddress} />}
         {current.step === 'delivery' && <Delivery session={current} onSelect={(sellerId, methodId) => void persist({ ...current, deliveryGroups: current.deliveryGroups.map(group => group.sellerId === sellerId ? { ...group, selectedMethodId: methodId } : group) })} onApply={async code => { const discount = await applyDiscount(code, current.summary.subtotalCents, current.discounts); await persist({ ...current, discounts: [...current.discounts.filter(item => item.code !== discount.code), discount] }); }} onRemove={code => void removeDiscount(code, current.discounts).then(discounts => persist({ ...current, discounts }))} />}
@@ -685,14 +714,14 @@ export default function BuyerCheckoutScreen() {
            <Feather name="alert-circle" size={16} color={RED} style={{ marginTop: 2 }} />
            <View style={{ flex: 1 }}>
              <Text style={styles.errorText}>{error}</Text>
-             {canRetryPayment && <TouchableOpacity style={styles.retryButton} onPress={retryPayment} disabled={placing}>
+              {canRetryPayment && <TouchableOpacity style={styles.retryButton} onPress={retryPayment} disabled={placing} accessibilityRole="button" accessibilityLabel="Try a different card" accessibilityState={{ disabled: placing, busy: placing }}>
                <Feather name="credit-card" size={14} color={RED} />
                <Text style={styles.retryText}>Try a different card</Text>
              </TouchableOpacity>}
            </View>
          </View>}
       </ScrollView>
-       {current.step !== 'confirmation' && <View style={[styles.bottom, { paddingBottom: insets.bottom + SP.sm }]}><TouchableOpacity style={styles.continue} disabled={placing} onPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); void (canRetryPayment ? retryPayment() : handleContinue()); }}><LinearGradient colors={theme.primaryGradient} style={styles.continueGradient}>{placing ? <ActivityIndicator color={theme.onAccent} /> : <Text style={[styles.continueText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>{label}</Text>}</LinearGradient></TouchableOpacity></View>}
+        {current.step !== 'confirmation' && <View style={[styles.bottom, { paddingBottom: insets.bottom + SP.sm }]}><TouchableOpacity style={styles.continue} disabled={placing} onPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); void (canRetryPayment ? retryPayment() : handleContinue()); }} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: placing, busy: placing }}><LinearGradient colors={theme.primaryGradient} style={styles.continueGradient}>{placing ? <ActivityIndicator color={theme.onAccent} /> : <Text style={[styles.continueText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>{label}</Text>}</LinearGradient></TouchableOpacity></View>}
     </KeyboardAvoidingView>
   );
 }
@@ -702,10 +731,10 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const SHADOW_PURPLE = { shadowColor: theme.shadowColor, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 };
   return StyleSheet.create({
   root: { flex: 1, backgroundColor: BG }, loading: { flex: 1, backgroundColor: BG, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingBottom: SP.sm }, back: { width: 42, height: 42, justifyContent: 'center', alignItems: 'center' }, stepLabel: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, marginBottom: 5 }, progress: { flexDirection: 'row', gap: 4, width: 120 }, progressSegment: { height: 4, flex: 1, borderRadius: 2, backgroundColor: CARD_ELEVATED }, progressSegmentActive: { backgroundColor: PURPLE },
-  card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md, marginBottom: SP.md }, sectionTitle: { fontFamily: FONT.semibold, fontSize: FS.base, color: FG, marginBottom: SP.sm }, field: { marginBottom: SP.sm }, fieldLabel: { color: MUTED, fontFamily: FONT.semibold, fontSize: FS.xs, textTransform: 'uppercase', marginBottom: 4 }, input: { height: COMP.inputH, borderRadius: RADIUS.md, backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, paddingHorizontal: SP.md }, twoCol: { flexDirection: 'row', gap: SP.sm }, toggleRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingTop: SP.sm }, toggleTitle: { color: FG, fontFamily: FONT.medium, fontSize: FS.sm }, muted: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19 },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingBottom: SP.sm }, back: { width: COMP.minTouchTarget, height: COMP.minTouchTarget, justifyContent: 'center', alignItems: 'center' }, stepLabel: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, marginBottom: 5 }, progress: { flexDirection: 'row', gap: 4, width: 120 }, progressSegment: { height: 4, flex: 1, borderRadius: 2, backgroundColor: CARD_ELEVATED }, progressSegmentActive: { backgroundColor: PURPLE },
+   card: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md, marginBottom: SP.md }, sectionTitle: { fontFamily: FONT.semibold, fontSize: FS.base, color: FG, marginBottom: SP.sm }, field: { marginBottom: SP.sm }, fieldLabel: { color: MUTED, fontFamily: FONT.semibold, fontSize: FS.xs, textTransform: 'uppercase', marginBottom: 4 }, input: { minHeight: COMP.inputH, borderRadius: RADIUS.md, backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, paddingHorizontal: SP.md, paddingVertical: SP.sm }, twoCol: { flexDirection: 'row', gap: SP.sm }, toggleRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingTop: SP.sm }, toggleTitle: { color: FG, fontFamily: FONT.medium, fontSize: FS.sm }, muted: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 19 },
   method: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, padding: SP.sm, borderRadius: RADIUS.md, marginBottom: 6 }, methodActive: { backgroundColor: PURPLE_DIM }, radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: MUTED }, radioActive: { borderColor: PURPLE, backgroundColor: PURPLE }, methodTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm }, promoToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, row: { flexDirection: 'row', alignItems: 'center', gap: SP.sm }, promoRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'center' }, applyButton: { backgroundColor: PURPLE_DIM, borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: 13 }, applyText: { color: PURPLE_LIGHT, fontFamily: FONT.bold, fontSize: FS.sm }, discountRow: { flexDirection: 'row', justifyContent: 'space-between', gap: SP.sm, marginTop: SP.sm }, discountText: { flex: 1, color: SUCCESS, fontFamily: FONT.regular, fontSize: FS.sm }, removeText: { color: PURPLE_LIGHT, fontFamily: FONT.semibold, fontSize: FS.sm },
-  address: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, marginBottom: SP.md }, line: { flexDirection: 'row', justifyContent: 'space-between', gap: SP.sm, paddingVertical: 5 }, lineName: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm }, divider: { height: 1, backgroundColor: BORDER, marginVertical: SP.sm }, total: { color: FG, fontFamily: FONT.bold, fontSize: FS.lg }, multiSeller: { flexDirection: 'row', gap: SP.sm, backgroundColor: CYAN_DIM, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md }, multiSellerText: { flex: 1, color: CYAN, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 }, ack: { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', marginBottom: SP.sm }, checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1, borderColor: MUTED, alignItems: 'center', justifyContent: 'center', marginTop: 1 }, checkboxActive: { backgroundColor: PURPLE, borderColor: PURPLE }, ackText: { flex: 1, color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
+   address: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20, marginBottom: SP.md }, line: { flexDirection: 'row', justifyContent: 'space-between', gap: SP.sm, paddingVertical: 5 }, lineName: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm }, divider: { height: 1, backgroundColor: BORDER, marginVertical: SP.sm }, total: { color: FG, fontFamily: FONT.bold, fontSize: FS.lg }, multiSeller: { flexDirection: 'row', gap: SP.sm, backgroundColor: CYAN_DIM, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md }, multiSellerText: { flex: 1, color: CYAN, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 }, ack: { flexDirection: 'row', gap: SP.sm, alignItems: 'flex-start', minHeight: COMP.minTouchTarget, marginBottom: SP.sm }, checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 1, borderColor: MUTED, alignItems: 'center', justifyContent: 'center', marginTop: 1 }, checkboxActive: { backgroundColor: PURPLE, borderColor: PURPLE }, ackText: { flex: 1, color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, lineHeight: 20 },
   bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: SP.md, backgroundColor: BG, borderTopWidth: 1, borderColor: BORDER }, continue: { overflow: 'hidden', borderRadius: RADIUS.lg, ...SHADOW_PURPLE }, continueGradient: { height: COMP.buttonH, alignItems: 'center', justifyContent: 'center' }, continueText: { fontFamily: FONT.bold, fontSize: FS.base }, error: { flexDirection: 'row', gap: SP.sm, backgroundColor: RED_DIM, padding: SP.md, borderRadius: RADIUS.md }, errorText: { color: RED, flex: 1, fontFamily: FONT.medium, fontSize: FS.sm, lineHeight: 20 }, retryButton: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', marginTop: SP.sm, paddingVertical: 7, paddingHorizontal: SP.sm, borderRadius: RADIUS.md, borderWidth: 1, borderColor: RED }, retryText: { color: RED, fontFamily: FONT.semibold, fontSize: FS.sm },
   confirmation: { alignItems: 'center', paddingTop: SP.xl, position: 'relative', overflow: 'hidden' },
   confettiLayer: { position: 'absolute', top: 0, left: 0, right: 0, height: 220 },

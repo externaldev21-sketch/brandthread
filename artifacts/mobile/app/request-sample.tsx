@@ -8,6 +8,7 @@ import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useColors } from '@/hooks/useColors';
+import { COMP } from '@/lib/theme';
 import {
   getManufacturer, saveQuoteRequestDraft, submitQuoteRequest,
 } from '@/services/manufacturerService';
@@ -99,7 +100,13 @@ export default function RequestSampleScreen() {
       <View style={[styles.center, { paddingHorizontal: 28 }]}>
         <Feather name="alert-circle" size={28} color={MUTED} />
         <Text style={styles.errorText}>{loadError}</Text>
-        <TouchableOpacity style={[styles.button, { backgroundColor: colors.primary }]} onPress={() => router.replace('/manufacturer-hub' as never)}>
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: colors.primary }]}
+          onPress={() => router.replace('/manufacturer-hub' as never)}
+          accessibilityRole="button"
+          accessibilityLabel="Open Manufacturer Hub"
+          accessibilityHint="Returns to the manufacturer directory"
+        >
           <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>Open Manufacturer Hub</Text>
         </TouchableOpacity>
       </View>
@@ -109,7 +116,15 @@ export default function RequestSampleScreen() {
   return (
     <View style={[styles.root, { paddingTop: Platform.OS === 'web' ? 20 : insets.top }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}><Feather name="arrow-left" size={22} color={FG} /></TouchableOpacity>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+          accessibilityHint={`Returns without sending a sample request to ${manufacturer.name}`}
+        >
+          <Feather name="arrow-left" size={22} color={FG} />
+        </TouchableOpacity>
         <View>
           <Text style={styles.headerTitle}>Request Sample</Text>
           <Text style={styles.headerSub}>{manufacturer.name}</Text>
@@ -127,13 +142,21 @@ export default function RequestSampleScreen() {
             {QUANTITIES.map((item) => <Chip key={item} label={`${item}`} active={item === quantity} onPress={() => setQuantity(item)} color={colors.primary} />)}
           </View>
         </Field>
-        <Field label="Colorway"><TextInput value={colorway} onChangeText={setColorway} placeholder="e.g. Washed black" placeholderTextColor={MUTED} style={styles.input} /></Field>
-        <Field label="Size"><TextInput value={size} onChangeText={setSize} placeholderTextColor={MUTED} style={styles.input} /></Field>
-        <Field label="Reply contact"><TextInput value={contact} onChangeText={setContact} placeholder="Email or WhatsApp" placeholderTextColor={MUTED} style={styles.input} autoCapitalize="none" /></Field>
-        <Field label="Notes"><TextInput value={notes} onChangeText={setNotes} placeholder="Materials, construction, or deadlines" placeholderTextColor={MUTED} style={[styles.input, styles.notes]} multiline /></Field>
+        <Field label="Colorway"><TextInput accessibilityLabel="Colorway" accessibilityHint="Enter the requested sample color" value={colorway} onChangeText={setColorway} placeholder="e.g. Washed black" placeholderTextColor={MUTED} style={styles.input} /></Field>
+        <Field label="Size"><TextInput accessibilityLabel="Size" accessibilityHint="Enter the requested sample size" value={size} onChangeText={setSize} placeholderTextColor={MUTED} style={styles.input} /></Field>
+        <Field label="Reply contact"><TextInput accessibilityLabel="Reply contact" accessibilityHint="Enter an email address or WhatsApp number" value={contact} onChangeText={setContact} placeholder="Email or WhatsApp" placeholderTextColor={MUTED} style={styles.input} autoCapitalize="none" /></Field>
+        <Field label="Notes"><TextInput accessibilityLabel="Sample notes" accessibilityHint="Enter optional materials, construction, or deadline details" value={notes} onChangeText={setNotes} placeholder="Materials, construction, or deadlines" placeholderTextColor={MUTED} style={[styles.input, styles.notes]} multiline /></Field>
       </ScrollView>
       <View style={[styles.bottom, { paddingBottom: insets.bottom + 12 }]}>
-        <TouchableOpacity style={[styles.button, { backgroundColor: colors.primary }, sending && { opacity: 0.65 }]} onPress={submit} disabled={sending}>
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: colors.primary }, sending && { opacity: 0.65 }]}
+          onPress={submit}
+          disabled={sending}
+          accessibilityRole="button"
+          accessibilityLabel={sending ? 'Sending sample request' : `Send sample request to ${manufacturer.name}`}
+          accessibilityHint="Submits the selected product, quantity, and contact details"
+          accessibilityState={{ disabled: sending, busy: sending }}
+        >
           {sending && <ActivityIndicator size="small" color={colors.primaryForeground} />}
           <Text style={[styles.buttonText, { color: colors.primaryForeground }]}>{sending ? 'Sending…' : 'Send Sample Request'}</Text>
         </TouchableOpacity>
@@ -147,7 +170,17 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Chip({ label, active, onPress, color }: { label: string; active: boolean; onPress: () => void; color: string }) {
-  return <TouchableOpacity style={[styles.chip, active && { borderColor: color, backgroundColor: `${color}22` }]} onPress={onPress}><Text style={[styles.chipText, active && { color }]}>{label}</Text></TouchableOpacity>;
+  return (
+    <TouchableOpacity
+      style={[styles.chip, active && { borderColor: color, backgroundColor: `${color}22` }]}
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: active, checked: active }}
+    >
+      <Text style={[styles.chipText, active && { color }]}>{label}</Text>
+    </TouchableOpacity>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -155,15 +188,16 @@ const styles = StyleSheet.create({
   center: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', gap: 14 },
   errorText: { color: MUTED, textAlign: 'center', lineHeight: 20 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
+  backButton: { width: COMP.minTouchTarget, minHeight: COMP.minTouchTarget, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { color: FG, fontSize: 16, fontFamily: 'Inter_700Bold', textAlign: 'center' },
   headerSub: { color: MUTED, fontSize: 12, fontFamily: 'Inter_400Regular', textAlign: 'center' },
   content: { padding: 16, paddingBottom: 120, gap: 20 },
   field: { gap: 8 },
   label: { color: MUTED, fontSize: 12, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.5 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { backgroundColor: CARD, borderColor: BORDER, borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8 },
+  chip: { minHeight: COMP.minTouchTarget, backgroundColor: CARD, borderColor: BORDER, borderWidth: 1, borderRadius: 22, paddingHorizontal: 14, paddingVertical: 8, justifyContent: 'center' },
   chipText: { color: MUTED, fontSize: 13, fontFamily: 'Inter_500Medium' },
-  input: { backgroundColor: CARD, borderColor: BORDER, borderWidth: 1, borderRadius: 12, color: FG, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  input: { minHeight: COMP.minTouchTarget, backgroundColor: CARD, borderColor: BORDER, borderWidth: 1, borderRadius: 12, color: FG, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, fontFamily: 'Inter_400Regular' },
   notes: { minHeight: 100, textAlignVertical: 'top' },
   bottom: { paddingHorizontal: 16, paddingTop: 12, backgroundColor: BG, borderTopWidth: 1, borderTopColor: BORDER },
   button: { minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, paddingHorizontal: 20 },

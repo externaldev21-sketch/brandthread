@@ -266,10 +266,10 @@ export default function ProfileScreen() {
           </Text>
         </TouchableOpacity>
         <View style={s.headerIcons}>
-          <TouchableOpacity style={s.headerIconBtn} onPress={() => nav('/notifications-settings')} activeOpacity={0.75}>
+          <TouchableOpacity style={s.headerIconBtn} onPress={() => nav('/notifications-settings')} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel="Notification settings">
             <Feather name="bell" size={18} color={FG} />
           </TouchableOpacity>
-          <TouchableOpacity style={s.headerIconBtn} onPress={() => nav('/seller-settings')} activeOpacity={0.75}>
+          <TouchableOpacity style={s.headerIconBtn} onPress={() => nav('/seller-settings')} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel="Seller settings">
             <Feather name="settings" size={18} color={FG} />
           </TouchableOpacity>
         </View>
@@ -306,6 +306,8 @@ export default function ProfileScreen() {
                 router.push('/create-post' as any);
               }
             }}
+            accessibilityRole="button"
+            accessibilityLabel={myStoryIds.length > 0 ? 'View your active story' : 'Create your first story'}
           >
             {/* Gradient ring when active story */}
             {myStoryIds.length > 0 ? (
@@ -345,6 +347,9 @@ export default function ProfileScreen() {
             style={s.cameraBtn}
             activeOpacity={0.8}
             disabled={uploadingAvatar}
+            accessibilityRole="button"
+            accessibilityLabel={uploadingAvatar ? 'Uploading brand photo' : 'Change brand photo'}
+            accessibilityState={{ disabled: uploadingAvatar, busy: uploadingAvatar }}
             onPress={async () => {
               const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
               if (!perm.granted) { Alert.alert('Permission needed', 'Allow photo access to update your brand avatar.'); return; }
@@ -379,6 +384,8 @@ export default function ProfileScreen() {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               router.push('/create-post' as any);
             }}
+            accessibilityRole="button"
+            accessibilityLabel="Create story"
           >
             <Feather name="plus" size={12} color={theme.onAccent} />
           </TouchableOpacity>
@@ -444,7 +451,7 @@ export default function ProfileScreen() {
       {/* Quick Actions */}
       <View style={s.quickRow}>
         {QUICK_ACTIONS.map((qa) => (
-          <TouchableOpacity key={qa.label} style={s.quickItem} activeOpacity={0.75} onPress={() => nav(qa.route)}>
+          <TouchableOpacity key={qa.label} style={s.quickItem} activeOpacity={0.75} onPress={() => nav(qa.route)} accessibilityRole="button" accessibilityLabel={qa.label}>
             <View style={[s.quickIconBox, { backgroundColor: theme.accentDim }]}>
               <Feather name={qa.icon} size={18} color={colors.primary} />
             </View>
@@ -464,6 +471,9 @@ export default function ProfileScreen() {
               style={[s.tabItem, active && [s.tabItemActive, { borderBottomColor: theme.accent }]]}
               activeOpacity={0.75}
               onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setActiveTab(i); }}
+              accessibilityRole="tab"
+              accessibilityLabel={`${tab} tab`}
+              accessibilityState={{ selected: active }}
             >
               <Feather name={icons[i]} size={13} color={active ? colors.primary : MUTED} />
               <Text style={[s.tabLabel, active && [s.tabLabelActive, { color: theme.accentLight }]]}>{tab}</Text>
@@ -499,6 +509,8 @@ export default function ProfileScreen() {
           style={s.gridTile}
           activeOpacity={0.85}
           onPress={() => nav('/create-post')}
+          accessibilityRole="button"
+          accessibilityLabel="Create post"
         >
           <View style={s.createTile}>
             <View style={s.createPlus}>
@@ -522,6 +534,8 @@ export default function ProfileScreen() {
               key={post.id}
               style={s.gridTile}
               activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel={`${post.contentType} post, ${post.caption || 'no caption'}, created ${new Date(post.createdAt).toLocaleDateString()}`}
             >
               <LinearGradient colors={['#1F3A5F', '#0A1828']} style={s.gridInner}>
                 <View style={[s.gridMenuBtn, { opacity: 0.7 }]}>
@@ -666,7 +680,7 @@ const s = StyleSheet.create({
   headerTitle:    { fontSize: 22, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 4 },
   headerSub:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 17, maxWidth: 220 },
   headerIcons:    { flexDirection: 'row', gap: 8, marginTop: 2 },
-  headerIconBtn:  { width: 38, height: 38, borderRadius: 10, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
+  headerIconBtn:  { width: 44, height: 44, borderRadius: 10, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
 
   // Profile card
   profileCard:    { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 20, marginBottom: 20, gap: 16 },
@@ -678,8 +692,8 @@ const s = StyleSheet.create({
   avatar:         { flex: 1, borderRadius: 39, backgroundColor: '#18182E', alignItems: 'center', justifyContent: 'center' },
   avatarText:     { fontSize: 30, fontFamily: 'Inter_700Bold' },
    avatarImage:    { width: '100%', height: '100%', borderRadius: 39 },
-  cameraBtn:      { position: 'absolute', bottom: 0, right: -2, width: 26, height: 26, borderRadius: 13, backgroundColor: '#333', borderWidth: 2, borderColor: BG, alignItems: 'center', justifyContent: 'center' },
-  addStoryBtn:    { position: 'absolute', bottom: 0, left: -2, width: 26, height: 26, borderRadius: 13, borderWidth: 2, borderColor: BG, alignItems: 'center', justifyContent: 'center' },
+  cameraBtn:      { position: 'absolute', bottom: -9, right: -11, width: 44, height: 44, borderRadius: 22, backgroundColor: '#333', borderWidth: 2, borderColor: BG, alignItems: 'center', justifyContent: 'center' },
+  addStoryBtn:    { position: 'absolute', bottom: -9, left: -11, width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: BG, alignItems: 'center', justifyContent: 'center' },
 
   // Name
   nameBlock:      { flex: 1, paddingTop: 4 },

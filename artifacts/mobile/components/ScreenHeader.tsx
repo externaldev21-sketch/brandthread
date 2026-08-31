@@ -26,6 +26,8 @@ export function ScreenHeader({ title, subtitle, rightElement }: ScreenHeaderProp
       <PressableScale
         onPress={() => router.back()}
         style={[styles.backBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+        accessibilityLabel="Back"
+        accessibilityHint={`Returns from ${title}`}
       >
         <Feather name="arrow-left" size={ICON.md} color={colors.foreground} />
       </PressableScale>

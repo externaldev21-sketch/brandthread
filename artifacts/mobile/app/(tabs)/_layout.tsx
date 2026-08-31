@@ -190,9 +190,9 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
         return (
           <Pressable
             key={route.key}
-            accessibilityRole="button"
+            accessibilityRole="tab"
             accessibilityState={isFocused ? { selected: true } : {}}
-            accessibilityLabel={descriptor.options.tabBarAccessibilityLabel}
+            accessibilityLabel={showOrderBadge ? `${tabDef.label} tab, ${newOrderCount} new orders` : `${tabDef.label} tab`}
             onPress={onPress}
             onLongPress={onLongPress}
             style={styles.tab}
@@ -267,6 +267,7 @@ const styles = StyleSheet.create({
     alignItems:     'center',
     justifyContent: 'flex-start',
     gap:            4,
+    minHeight:      44,
   },
   pillWrap: {
     height:      3,

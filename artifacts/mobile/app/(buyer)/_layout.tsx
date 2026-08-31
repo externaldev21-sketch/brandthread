@@ -81,7 +81,8 @@ function BuyerTabLayout() {
         tabBarButton: (props: any) => (
           <Pressable
             {...props}
-            style={[props.style, { alignItems: 'center', justifyContent: 'center' }]}
+            accessibilityRole="tab"
+            style={[props.style, { minHeight: 44, alignItems: 'center', justifyContent: 'center' }]}
           />
         ),
       }}
@@ -91,6 +92,7 @@ function BuyerTabLayout() {
         name="index"
         options={{
           title: 'Thread',
+          tabBarAccessibilityLabel: 'Thread tab',
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
               <SymbolView name={focused ? 'play.rectangle.fill' : 'play.rectangle'} tintColor={color} size={20} />
@@ -105,6 +107,7 @@ function BuyerTabLayout() {
         name="discover"
         options={{
           title: 'Discover',
+          tabBarAccessibilityLabel: 'Discover tab',
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
               <SymbolView name={focused ? 'safari.fill' : 'safari'} tintColor={color} size={20} />
@@ -122,6 +125,7 @@ function BuyerTabLayout() {
         name="friends"
         options={{
           title: 'Friends',
+          tabBarAccessibilityLabel: 'Friends tab',
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
               <SymbolView name={focused ? 'person.2.fill' : 'person.2'} tintColor={color} size={20} />
@@ -136,6 +140,7 @@ function BuyerTabLayout() {
         name="inbox"
         options={{
           title: 'Inbox',
+          tabBarAccessibilityLabel: inboxBadgeCount > 0 ? `Inbox tab, ${inboxBadgeCount} unread items` : 'Inbox tab',
           tabBarIcon: ({ color, focused }) => (
             <TabBadge count={inboxBadgeCount} accent={theme.accent} onAccent={theme.onAccent}>
               {isIOS ? (
@@ -153,6 +158,7 @@ function BuyerTabLayout() {
         name="profile"
         options={{
           title: 'Profile',
+          tabBarAccessibilityLabel: 'Profile tab',
           tabBarIcon: ({ color, focused }) =>
             isIOS ? (
               <SymbolView name={focused ? 'person.fill' : 'person'} tintColor={color} size={20} />

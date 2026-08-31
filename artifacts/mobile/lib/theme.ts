@@ -140,10 +140,11 @@ export const ICON = {
 // ─── Component Sizes ─────────────────────────────────────────────────────────
 export const COMP = {
   buttonH:    52,   // primary button height
-  buttonHSm:  42,   // small button
+  buttonHSm:  44,   // small button; minimum comfortable touch target
   inputH:     52,   // form input
   tabBarH:    72,   // bottom tab bar
   headerH:    56,   // screen header
   cardRadius: RADIUS.lg,
-  iconBtn:    40,   // circle icon button
+  iconBtn:    44,   // icon button; minimum comfortable touch target
+  minTouchTarget: 44,
 } as const;
