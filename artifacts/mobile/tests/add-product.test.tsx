@@ -248,4 +248,44 @@ describe('AddProduct draft exit protection', () => {
     expect(alertMock).not.toHaveBeenCalled();
     expect(routerBackMock).toHaveBeenCalledOnce();
   });
+
+  it('prevents native back navigation after an immediate edit until the seller chooses to leave', async () => {
+    renderer = await renderScreen();
+
+    const nameInput = renderer.root.findByProps({ testID: 'product-input-Product name *' });
+    await act(async () => {
+      nameInput.props.onChangeText('Native back draft edit');
+    });
+
+    expect(addListenerMock).toHaveBeenCalledWith('beforeRemove', expect.any(Function));
+    const beforeRemove = addListenerMock.mock.calls[0][1] as (event: {
+      preventDefault: () => void;
+      data: { action: unknown };
+    }) => void;
+    const preventDefaultMock = vi.fn();
+    const nativeBackAction = { type: 'GO_BACK' };
+
+    await act(async () => {
+      beforeRemove({
+        preventDefault: preventDefaultMock,
+        data: { action: nativeBackAction },
+      });
+    });
+
+    expect(preventDefaultMock).toHaveBeenCalledOnce();
+    expect(alertMock).toHaveBeenCalledWith(
+      'Exit product creation?',
+      'You have unsaved changes — save as draft?',
+      expect.any(Array),
+    );
+    expect(dispatchMock).not.toHaveBeenCalled();
+
+    await act(async () => {
+      const discardButton = lastAlertButtons().find((button) => button.text === 'Discard');
+      discardButton?.onPress?.();
+      await Promise.resolve();
+    });
+
+    expect(dispatchMock).toHaveBeenCalledWith(nativeBackAction);
+  });
 });
