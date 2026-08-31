@@ -875,7 +875,37 @@ router.post("/:id/interact", requireAuth, async (req, res) => {
     return res.json({ action: "recorded" });
   }
 
-  // Toggle for like / repost
+  // Likes are idempotent: a retry or concurrent request must not create a
+  // second effective like. The partial unique index is the serialization
+  // boundary; ON CONFLICT handles the losing concurrent insert. Clients that
+  // need to unlike send value="remove"; an omitted value always means "like".
+  if (type === "like") {
+    const removing = value === "remove";
+    if (removing) {
+      await db.delete(interactions).where(and(
+        eq(interactions.userId, clerkId),
+        eq(interactions.postId, id),
+        eq(interactions.type, type),
+      ));
+    } else {
+      await db
+        .insert(interactions)
+        .values({ userId: clerkId, postId: id, type, value: null })
+        .onConflictDoNothing({
+          target: [interactions.userId, interactions.postId],
+          where: sql`type = 'like' AND post_id IS NOT NULL`,
+        });
+    }
+
+    const [{ count: newCount }] = await db
+      .select({ count: count() })
+      .from(interactions)
+      .where(and(eq(interactions.postId, id), eq(interactions.type, type)));
+
+    return res.json({ action: removing ? "removed" : "added", count: newCount });
+  }
+
+  // Toggle for repost
   const [existing] = await db
     .select({ id: interactions.id })
     .from(interactions)

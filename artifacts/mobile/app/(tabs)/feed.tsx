@@ -697,10 +697,14 @@ export default function FeedScreen() {
   }
 
   const handleLike = useCallback((id: string) => {
+    const currentlyLiked = engagements[id]?.liked ?? false;
     update(id, e => ({ liked: !e.liked, likes: e.liked ? e.likes - 1 : e.likes + 1 }));
     // Fire-and-forget — real posts get persisted; demo IDs are silently ignored server-side
-    try { const { api } = require('@/lib/api'); api.posts.interact(id, { type: 'like' }).catch(() => {}); } catch {}
-  }, []);
+    try {
+      const { api } = require('@/lib/api');
+      api.posts.interact(id, { type: 'like', value: currentlyLiked ? 'remove' : 'add' }).catch(() => {});
+    } catch {}
+  }, [engagements]);
 
   const handleDoubleTapLike = useCallback((id: string) => {
     setEngagements(prev => {

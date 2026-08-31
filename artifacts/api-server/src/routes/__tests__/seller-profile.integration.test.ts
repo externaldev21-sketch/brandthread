@@ -145,10 +145,14 @@ beforeAll(async () => {
   ]);
 
   authState.clerkUserId = sellerA;
-  const { default: sellerProfileRouter } = await import("../seller-profile");
+  const [{ default: sellerProfileRouter }, { default: postsRouter }] = await Promise.all([
+    import("../seller-profile"),
+    import("../posts"),
+  ]);
   const app = express();
   app.use(express.json());
   app.use("/api/seller", sellerProfileRouter);
+  app.use("/api/posts", postsRouter);
 
   await new Promise<void>((resolve) => {
     server = app.listen(0, "127.0.0.1", () => resolve());
@@ -201,6 +205,47 @@ describe("seller profile likes metric", () => {
 
     expect(result.status).toBe(200);
     expect(result.body.totalLikes).toBe(0);
+  });
+
+  it("keeps repeated and concurrent likes idempotent in the seller total", async () => {
+    const repeatedActor = `buyer-repeated-like-${suffix}`;
+    const concurrentActor = `buyer-concurrent-like-${suffix}`;
+    const postId = postIds[0];
+
+    authState.clerkUserId = repeatedActor;
+    const repeatedResponses = [];
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      repeatedResponses.push(await fetch(`${base}/api/posts/${postId}/interact`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "like" }),
+      }));
+    }
+    expect(repeatedResponses.every((response) => response.status === 200)).toBe(true);
+
+    authState.clerkUserId = concurrentActor;
+    const concurrentResponses = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        fetch(`${base}/api/posts/${postId}/interact`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "like" }),
+        }),
+      ),
+    );
+    expect(concurrentResponses.every((response) => response.status === 200)).toBe(true);
+
+    const likeRows = await db
+      .select({ userId: interactions.userId })
+      .from(interactions)
+      .where(eq(interactions.postId, postId));
+    expect(likeRows.filter((row) => row.userId === repeatedActor)).toHaveLength(1);
+    expect(likeRows.filter((row) => row.userId === concurrentActor)).toHaveLength(1);
+
+    authState.clerkUserId = sellerA;
+    const result = await getProfile();
+    expect(result.status).toBe(200);
+    expect(result.body.totalLikes).toBe(4);
   });
 });
 

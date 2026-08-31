@@ -235,7 +235,10 @@ export default function FriendsScreen() {
           : p,
       ),
     );
-    api.posts.interact(post.id, { type: 'like' }).catch(() => { setFeedPosts(prev => prev.map(p => p.id === post.id ? post : p)); Alert.alert('Could not update like', 'Try again.'); });
+    api.posts.interact(post.id, {
+      type: 'like',
+      value: post.likedByMe ? 'remove' : 'add',
+    }).catch(() => { setFeedPosts(prev => prev.map(p => p.id === post.id ? post : p)); Alert.alert('Could not update like', 'Try again.'); });
   }
 
   function handleRepost(postId: string) {

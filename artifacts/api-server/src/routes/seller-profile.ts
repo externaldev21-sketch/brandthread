@@ -76,7 +76,7 @@ router.get("/profile", async (req, res): Promise<void> => {
       .from(users)
       .where(eq(users.clerkId, clerkId)),
     db
-      .select({ totalLikes: count() })
+      .select({ totalLikes: sql<number>`count(distinct ${interactions.userId})` })
       .from(interactions)
       .innerJoin(posts, eq(posts.id, interactions.postId))
       .where(and(eq(posts.userId, clerkId), eq(interactions.type, "like"))),
