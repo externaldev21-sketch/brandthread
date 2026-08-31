@@ -29,6 +29,14 @@ vi.mock("../../lib/objectStorage", () => ({
 }));
 
 vi.mock("@workspace/integrations-openai-ai-server/image", () => ({
+  buildFashionPrompt: (operation: string, brief: string, context: string) =>
+    `${operation}. ${context} Keep the foreground subject or product exactly as supplied. Use Image 2 as the new background when requested. Fabric drape, seams, stitching, artwork, and typography must remain faithful. ${brief}`,
+  generateWithVisualQa: async (input: { prompt: string; generate: (prompt: string) => Promise<Buffer> }) =>
+    input.generate(input.prompt),
+  ImageQualityError: class ImageQualityError extends Error {
+    reasons: string[] = [];
+  },
+  ImageQualityUnavailableError: class ImageQualityUnavailableError extends Error {},
   generateImageBuffer: async (prompt: string) => {
     state.generationCalls.push(prompt);
     return Buffer.from("generated");
@@ -84,7 +92,7 @@ describe("Design reference image routes", () => {
     expect(response.status).toBe(200);
     expect(state.editCalls).toHaveLength(1);
     expect(state.editCalls[0].contents).toEqual(["specific-sketch"]);
-    expect(state.editCalls[0].prompt).toContain("provided source image");
+    expect(state.editCalls[0].prompt).toContain("authoritative source design");
     expect(state.generationCalls).toEqual([]);
   });
 
@@ -133,5 +141,22 @@ describe("Design reference image routes", () => {
     expect(state.editCalls).toHaveLength(1);
     expect(state.editCalls[0].contents).toEqual(["remove-me"]);
     expect(state.editCalls[0].options).toEqual({ background: "transparent" });
+  });
+
+  it("rejects HEIC before it can be mislabeled for the image provider", async () => {
+    state.editCalls = [];
+    const response = await fetch(`${base}/api/bg-removal/remove`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        image: `data:image/heic;base64,${Buffer.from("unsupported-heic").toString("base64")}`,
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: expect.stringContaining("PNG, JPG, JPEG, or WebP"),
+    });
+    expect(state.editCalls).toEqual([]);
   });
 });

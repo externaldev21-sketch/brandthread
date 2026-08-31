@@ -4,7 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { requireAuth } from "../middlewares/requireAuth";
-import { editImages } from "@workspace/integrations-openai-ai-server/image";
+import {
+  buildFashionPrompt,
+  editImages,
+  generateWithVisualQa,
+  ImageQualityError,
+  ImageQualityUnavailableError,
+} from "@workspace/integrations-openai-ai-server/image";
 
 const router = Router();
 router.use(requireAuth);
@@ -116,15 +122,28 @@ router.post("/generate", async (req, res) => {
       tmpFiles.push(filePath);
     }
 
-    const editPrompt = `The first ${refs.length} image(s) provided are reference photos showing the desired lifestyle scene, setting, mood, and photography style. The remaining ${products.length} image(s) are the brand owner's clothing product or design mockup. Create a single photorealistic, high-end lifestyle photograph: place the exact clothing product/design from the product photo(s) naturally onto a real human model within a scene that matches the style, setting, lighting, and mood of the reference photo(s). The result must look professionally shot, not AI-generated — natural skin, natural fabric drape, realistic shadows and depth of field, magazine-quality composition. ${
-      safeDescription ? `Additional direction from the brand owner: "${safeDescription}".` : ""
-    }`;
-
-    const buffer = await editImages(tmpFiles, editPrompt);
+    const editPrompt = buildFashionPrompt(
+      "lifestyle",
+      safeDescription,
+      `Images 1-${refs.length} define the scene, mood, lighting, framing, and camera treatment. The remaining ${products.length} image(s) define the exact product/design to transfer onto the model.`,
+    );
+    const buffer = await generateWithVisualQa({
+      operation: "lifestyle",
+      prompt: editPrompt,
+      brief: safeDescription,
+      references: decoded,
+      generate: (retryPrompt) => editImages(tmpFiles, retryPrompt),
+    });
     res.json({ b64_json: buffer.toString("base64") });
-  } catch (_err) {
+  } catch (err) {
     // Do not leak upstream provider error details to the client.
-    res.status(502).json({ error: "Lifestyle photo generation failed. Please try again." });
+    if (err instanceof ImageQualityError) {
+      res.status(422).json({ error: "The lifestyle image did not meet the quality check. Please try again.", retryable: true });
+    } else if (err instanceof ImageQualityUnavailableError) {
+      res.status(502).json({ error: "Lifestyle image verification is temporarily unavailable. Please try again.", retryable: true });
+    } else {
+      res.status(502).json({ error: "Lifestyle photo generation failed. Please try again." });
+    }
   } finally {
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }

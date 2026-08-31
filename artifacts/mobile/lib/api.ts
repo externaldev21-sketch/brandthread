@@ -707,11 +707,19 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
       generate: (brandName: string, style: string) => post<any>('/api/logo/generate', { brandName, style }),
     },
     mockup: {
-      generate: (prompt: string, referenceImage?: string) =>
-        post<any>('/api/mockup/generate', { prompt, ...(referenceImage ? { referenceImage } : {}) }),
+      generate: (
+        prompt: string,
+        referenceImage?: string,
+        mode: 'text_to_design' | 'sketch_to_design' | 'prompt_edit' = referenceImage ? 'prompt_edit' : 'text_to_design',
+      ) =>
+        post<any>('/api/mockup/generate', { prompt, mode, ...(referenceImage ? { referenceImage } : {}) }),
     },
     photography: {
-      generate: (images: string[], prompt: string) => post<any>('/api/photography/generate', { images, prompt }),
+      generate: (
+        images: string[],
+        prompt: string,
+        mode: 'photoshoot' | 'mockup_to_model' = 'photoshoot',
+      ) => post<any>('/api/photography/generate', { images, prompt, mode }),
       generateOutfitSwap: (
         heroImage: string,
         garmentImages: string[],

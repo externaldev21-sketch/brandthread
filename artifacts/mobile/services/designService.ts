@@ -460,7 +460,12 @@ export async function generateDesignFromText(req: AIGenerationRequest): Promise<
     req.colorPalette ? `Color palette: ${req.colorPalette}` : '',
     req.textContent ? `Include text: "${req.textContent}"` : '',
   ].filter(Boolean).join('. ');
-  const imageUris = await generateN('/mockup/generate', { prompt }, count);
+  const referenceImage = req.referenceUri ? await imageUriToDataUrl(req.referenceUri) : undefined;
+  const imageUris = await generateN('/mockup/generate', {
+    prompt,
+    mode: 'text_to_design',
+    ...(referenceImage ? { referenceImage } : {}),
+  }, count);
   return makeResult(req.prompt, req.style, imageUris);
 }
 
@@ -474,7 +479,11 @@ export async function generateSketchToDesign(req: {
   const count = req.count ?? 4;
   const prompt = `Convert this sketch to a garment design. Style: ${req.style}${req.colorPalette ? `. Colors: ${req.colorPalette}` : ''}.`;
   const referenceImage = await imageUriToDataUrl(req.sketchUri);
-  const imageUris = await generateN('/mockup/generate', { prompt, referenceImage }, count);
+  const imageUris = await generateN('/mockup/generate', {
+    prompt,
+    referenceImage,
+    mode: 'sketch_to_design',
+  }, count);
   return makeResult(prompt, req.style, imageUris);
 }
 
@@ -490,7 +499,11 @@ export async function generateMockupToModel(req: {
   const count = req.count ?? 4;
   const prompt = `Fashion model wearing the uploaded garment design. Model: ${req.modelStyle ?? 'female'}. Scene: ${req.sceneStyle ?? 'studio'}. Lighting: ${req.lightingStyle ?? 'natural'}. Professional clothing photography.`;
   const referenceImage = await imageUriToDataUrl(req.mockupUri);
-  const imageUris = await generateN('/photography/generate', { images: [referenceImage], prompt }, count);
+  const imageUris = await generateN('/photography/generate', {
+    images: [referenceImage],
+    prompt,
+    mode: 'mockup_to_model',
+  }, count);
   return makeResult(prompt, 'minimal' as AIStyleKind, imageUris);
 }
 
@@ -515,7 +528,11 @@ export async function generatePhotoshoot(req: {
     : [];
   if (productImageUris.length === 0) throw new Error('This product does not have any photos to use.');
   const referenceImages = await Promise.all(productImageUris.map(imageUriToDataUrl));
-  const imageUris = await generateN('/photography/generate', { images: referenceImages, prompt }, count);
+  const imageUris = await generateN('/photography/generate', {
+    images: referenceImages,
+    prompt,
+    mode: 'photoshoot',
+  }, count);
   return makeResult(prompt, 'editorial' as AIStyleKind, imageUris);
 }
 
@@ -529,7 +546,11 @@ export async function applyPromptEdit(req: {
 }): Promise<AIGenerationResult> {
   const prompt = `Edit garment design: ${req.prompt}. ${req.preserveProduct ? 'Keep product shape.' : ''} ${req.preserveLogo ? 'Keep the original logo and artwork unless explicitly changed.' : ''} ${req.preserveGarmentColor ? 'Keep original colors.' : ''}`.trim();
   const referenceImage = await imageUriToDataUrl(req.imageUri);
-  const imageUris = await generateN('/mockup/generate', { prompt, referenceImage }, 1);
+  const imageUris = await generateN('/mockup/generate', {
+    prompt,
+    referenceImage,
+    mode: 'prompt_edit',
+  }, 1);
   return makeResult(req.prompt, 'custom' as AIStyleKind, imageUris);
 }
 

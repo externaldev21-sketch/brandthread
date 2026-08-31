@@ -4,7 +4,14 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { requireAuth } from "../middlewares/requireAuth";
-import { editImages } from "@workspace/integrations-openai-ai-server/image";
+import {
+  buildFashionPrompt,
+  editImages,
+  generateWithVisualQa,
+  ImageQualityError,
+  ImageQualityUnavailableError,
+  type ImageOperation,
+} from "@workspace/integrations-openai-ai-server/image";
 
 const router = Router();
 router.use(requireAuth);
@@ -71,7 +78,7 @@ router.post("/generate", async (req, res) => {
     return;
   }
 
-  const { images, prompt } = req.body ?? {};
+  const { images, prompt, mode } = req.body ?? {};
   if (!Array.isArray(images) || images.length === 0) {
     res.status(400).json({ error: "At least one reference or product photo is required." });
     return;
@@ -121,15 +128,29 @@ router.post("/generate", async (req, res) => {
       tmpFiles.push(filePath);
     }
 
-    const editPrompt = `Using the provided clothing product photo(s) and any reference style photo(s), create a photorealistic studio product photograph. Show the clothing product worn by a realistic AI-generated human model, professional studio lighting, clean background, high-end e-commerce fashion photography quality. ${
-      safeDescription ? `Additional direction from the brand owner: "${safeDescription}".` : ""
-    }`;
-
-    const buffer = await editImages(tmpFiles, editPrompt);
+    const operation: ImageOperation = mode === "mockup_to_model" ? "mockup_to_model" : "photoshoot";
+    const editPrompt = buildFashionPrompt(
+      operation,
+      safeDescription,
+      "Use the uploaded product/reference photos as authoritative visual references. Create one finished image with a realistic human model and preserve the product exactly.",
+    );
+    const buffer = await generateWithVisualQa({
+      operation,
+      prompt: editPrompt,
+      brief: safeDescription,
+      references: decoded,
+      generate: (retryPrompt) => editImages(tmpFiles, retryPrompt),
+    });
     res.json({ b64_json: buffer.toString("base64") });
-  } catch (_err) {
+  } catch (err) {
     // Do not leak upstream provider error details to the client.
-    res.status(502).json({ error: "Photo generation failed. Please try again." });
+    if (err instanceof ImageQualityError) {
+      res.status(422).json({ error: "The generated photo did not meet the quality check. Please try again.", retryable: true });
+    } else if (err instanceof ImageQualityUnavailableError) {
+      res.status(502).json({ error: "Photo quality verification is temporarily unavailable. Please try again.", retryable: true });
+    } else {
+      res.status(502).json({ error: "Photo generation failed. Please try again." });
+    }
   } finally {
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }
@@ -196,6 +217,8 @@ router.post("/outfit-swap", async (req, res) => {
   const tmpFiles: string[] = [];
   const results: { garmentIndex: number; b64_json: string }[] = [];
   const errors: { garmentIndex: number }[] = [];
+  const qualityErrors: { garmentIndex: number; reasons: string[] }[] = [];
+  let providerFailureCount = 0;
 
   try {
     const heroFile = path.join(tmpDir, `${randomUUID()}-hero.png`);
@@ -207,30 +230,58 @@ router.post("/outfit-swap", async (req, res) => {
       await fs.writeFile(garmentFile, decoded[i + 1]);
       tmpFiles.push(garmentFile);
 
-      const editPrompt = `This is an Outfit Swap edit. Image 1 is the locked base hero photo and Image 2 is the new garment design. Create one photorealistic fashion photo by replacing only the clothing on the model in Image 1 with the garment design from Image 2. Preserve the exact same model identity, face, hair, body proportions, pose, hand position, camera angle, crop, framing, lighting, shadows, location, background, and composition from Image 1. Do not change the model, pose, scene, background, or camera. Make the garment fit naturally on the existing model with realistic fabric texture, drape, seams, and shadows. Do not add logos or design details that are not present in Image 2. ${
-        safeDescription ? `Additional direction from the brand owner: "${safeDescription}".` : ""
-      }`;
+      const editPrompt = buildFashionPrompt(
+        "outfit_swap",
+        safeDescription,
+        "Image 1 is the locked base hero photo. Image 2 is the selected garment design. Replace only the clothing on the existing model.",
+      );
 
       try {
-        const buffer = await editImages([heroFile, garmentFile], editPrompt);
+        const buffer = await generateWithVisualQa({
+          operation: "outfit_swap",
+          prompt: editPrompt,
+          brief: safeDescription,
+          references: [decoded[0], decoded[i + 1]],
+          generate: (retryPrompt) => editImages([heroFile, garmentFile], retryPrompt),
+        });
         results.push({ garmentIndex: i + 1, b64_json: buffer.toString("base64") });
-      } catch {
+      } catch (err) {
         // Keep successful garment results when one provider call fails.
         errors.push({ garmentIndex: i + 1 });
+        if (err instanceof ImageQualityError) {
+          qualityErrors.push({ garmentIndex: i + 1, reasons: err.reasons });
+        } else {
+          providerFailureCount += 1;
+        }
       }
     }
 
-    if (results.length === 0 && errors.length > 0) {
-      // Return each failed garment so the client can offer targeted retries,
-      // including when every garment in the batch fails.
-      res.json({ results, errors });
+    if (results.length === 0 && errors.length > 0 && providerFailureCount === 0) {
+      // Never silently return an entirely unverified batch. The client can
+      // still use the per-garment metadata for a targeted retry.
+      res.status(422).json({
+        error: "No Outfit Swap result passed the quality check. Please retry the failed garments.",
+        retryable: true,
+        results,
+        errors,
+        ...(qualityErrors.length > 0 ? { qualityErrors } : {}),
+      });
       return;
     }
     if (results.length === 0) {
-      res.status(502).json({ error: "Outfit Swap generation failed. Please try again." });
+      res.status(502).json({
+        error: "Outfit Swap generation failed. Please try again.",
+        retryable: true,
+        errors,
+        ...(qualityErrors.length > 0 ? { qualityErrors } : {}),
+      });
       return;
     }
-    res.json({ results, ...(errors.length > 0 ? { errors } : {}) });
+    res.json({
+      results,
+      ...(errors.length > 0 ? { errors } : {}),
+      ...(qualityErrors.length > 0 ? { qualityErrors } : {}),
+    });
   } catch (_err) {
     // Do not leak upstream provider error details to the client.
     res.status(502).json({ error: "Outfit Swap generation failed. Please try again." });
@@ -284,15 +335,29 @@ router.post("/outfit-swap/retry", async (req, res) => {
     const garmentFile = path.join(tmpDir, `${randomUUID()}-garment-${garmentIndex}.png`);
     await fs.writeFile(heroFile, heroBuffer);
     await fs.writeFile(garmentFile, garmentBuffer);
-    const editPrompt = `This is an Outfit Swap edit. Image 1 is the locked base hero photo and Image 2 is the new garment design. Create one photorealistic fashion photo by replacing only the clothing on the model in Image 1 with the garment design from Image 2. Preserve the exact same model identity, face, hair, body proportions, pose, hand position, camera angle, crop, framing, lighting, shadows, location, background, and composition from Image 1. Do not change the model, pose, scene, background, or camera. Make the garment fit naturally on the existing model with realistic fabric texture, drape, seams, and shadows. Do not add logos or design details that are not present in Image 2. ${
-      safeDescription ? `Additional direction from the brand owner: "${safeDescription}".` : ""
-    }`;
-    const buffer = await editImages([heroFile, garmentFile], editPrompt);
+    const editPrompt = buildFashionPrompt(
+      "outfit_swap",
+      safeDescription,
+      "Image 1 is the locked base hero photo. Image 2 is the selected garment design. Replace only the clothing on the existing model.",
+    );
+    const buffer = await generateWithVisualQa({
+      operation: "outfit_swap",
+      prompt: editPrompt,
+      brief: safeDescription,
+      references: [heroBuffer, garmentBuffer],
+      generate: (retryPrompt) => editImages([heroFile, garmentFile], retryPrompt),
+    });
     res.json({ garmentIndex, b64_json: buffer.toString("base64") });
-  } catch (_err) {
+  } catch (err) {
     // Keep the existing successful results on the client and expose only a
     // concise retry-safe message rather than provider details.
-    res.status(502).json({ error: "This garment could not be generated. Please try again." });
+    if (err instanceof ImageQualityError) {
+      res.status(422).json({ error: "This garment did not meet the quality check. Please try again.", retryable: true });
+    } else if (err instanceof ImageQualityUnavailableError) {
+      res.status(502).json({ error: "Garment quality verification is temporarily unavailable. Please try again.", retryable: true });
+    } else {
+      res.status(502).json({ error: "This garment could not be generated. Please try again." });
+    }
   } finally {
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }

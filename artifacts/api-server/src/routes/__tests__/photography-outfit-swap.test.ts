@@ -8,6 +8,7 @@ const state = vi.hoisted(() => ({
   calls: [] as string[][],
   prompts: [] as string[],
   failGarment: "",
+  qualityFailGarment: "",
   authEnabled: true,
   userId: "outfit-swap-test-user",
 }));
@@ -23,17 +24,37 @@ vi.mock("../../middlewares/requireAuth", () => ({
   },
 }));
 
-vi.mock("@workspace/integrations-openai-ai-server/image", () => ({
-  editImages: async (files: string[], prompt: string) => {
-    const contents = await Promise.all(files.map(async (file) => (await fs.readFile(file)).subarray(8).toString("utf8")));
-    state.calls.push(contents);
-    state.prompts.push(prompt);
-    if (state.failGarment && contents[1] === state.failGarment) {
-      throw new Error("provider failure");
+vi.mock("@workspace/integrations-openai-ai-server/image", () => {
+  class MockImageQualityError extends Error {
+    reasons: string[];
+    constructor(reasons: string[]) {
+      super("quality failed");
+      this.reasons = reasons;
     }
-    return Buffer.from(`swap:${contents[1]}`);
-  },
-}));
+  }
+  return {
+    buildFashionPrompt: (operation: string, brief: string, context: string) =>
+      `${operation}. ${context} Preserve the exact same model identity, pose, framing, scene continuity, fabric drape, seams, stitching, artwork, and typography. ${brief}`,
+    generateWithVisualQa: async (input: { prompt: string; generate: (prompt: string) => Promise<Buffer> }) => {
+      const output = await input.generate(input.prompt);
+      if (state.qualityFailGarment && output.toString("utf8") === `swap:${state.qualityFailGarment}`) {
+        throw new MockImageQualityError(["garment artwork shifted"]);
+      }
+      return output;
+    },
+    ImageQualityError: MockImageQualityError,
+    ImageQualityUnavailableError: class ImageQualityUnavailableError extends Error {},
+    editImages: async (files: string[], prompt: string) => {
+      const contents = await Promise.all(files.map(async (file) => (await fs.readFile(file)).subarray(8).toString("utf8")));
+      state.calls.push(contents);
+      state.prompts.push(prompt);
+      if (state.failGarment && contents[1] === state.failGarment) {
+        throw new Error("provider failure");
+      }
+      return Buffer.from(`swap:${contents[1]}`);
+    },
+  };
+});
 
 import photographyRouter from "../photography";
 
@@ -107,6 +128,7 @@ describe("Outfit Swap batch generation", () => {
     state.calls = [];
     state.prompts = [];
     state.failGarment = "";
+    state.qualityFailGarment = "";
     const response = await fetch(`${base}/api/photography/outfit-swap`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -131,7 +153,8 @@ describe("Outfit Swap batch generation", () => {
     expect(state.prompts.every((prompt) =>
       prompt.includes("locked base hero photo") &&
       prompt.includes("Preserve the exact same model identity") &&
-      prompt.includes("Do not change the model, pose, scene, background, or camera") &&
+      prompt.includes("scene continuity") &&
+      prompt.includes("fabric drape") &&
       prompt.includes("Keep the scene editorial."),
     )).toBe(true);
   });
@@ -139,6 +162,7 @@ describe("Outfit Swap batch generation", () => {
   it("charges every garment against the per-user generation limit", async () => {
     state.calls = [];
     state.failGarment = "";
+    state.qualityFailGarment = "";
     state.userId = "outfit-swap-rate-limit-user";
 
     const firstBatch = await fetch(`${base}/api/photography/outfit-swap`, {
@@ -163,6 +187,7 @@ describe("Outfit Swap batch generation", () => {
   it("returns successful garments alongside safe partial-failure metadata", async () => {
     state.calls = [];
     state.failGarment = "broken-garment";
+    state.qualityFailGarment = "";
     const response = await fetch(`${base}/api/photography/outfit-swap`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -178,5 +203,31 @@ describe("Outfit Swap batch generation", () => {
       { garmentIndex: 1, b64_json: Buffer.from("swap:good-garment").toString("base64") },
     ]);
     expect(body.errors).toEqual([{ garmentIndex: 2 }]);
+  });
+
+  it("preserves garments that pass when another garment fails visual QA", async () => {
+    state.calls = [];
+    state.failGarment = "";
+    state.qualityFailGarment = "wrong-artwork";
+    state.userId = "outfit-swap-quality-partial-user";
+    const response = await fetch(`${base}/api/photography/outfit-swap`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        heroImage: dataUrl("locked-hero"),
+        garmentImages: [dataUrl("faithful-garment"), dataUrl("wrong-artwork")],
+      }),
+    });
+
+    expect(response.status).toBe(200);
+    const body: any = await response.json();
+    expect(body.results).toEqual([
+      { garmentIndex: 1, b64_json: Buffer.from("swap:faithful-garment").toString("base64") },
+    ]);
+    expect(body.errors).toEqual([{ garmentIndex: 2 }]);
+    expect(body.qualityErrors).toEqual([
+      { garmentIndex: 2, reasons: ["garment artwork shifted"] },
+    ]);
+    state.userId = "outfit-swap-test-user";
   });
 });

@@ -79,4 +79,5 @@
 - [Expo React types under pnpm](expo-react-types-pnpm.md) — expose React declarations with typeRoots; never alias runtime `react` to @types/react because Metro consumes paths.
 - [Expo Router test placement](expo-router-test-placement.md) — never add Vitest files under the mobile app route tree; Metro imports them as routes and can break web boot.
 - [Drop broadcast claim boundary](drop-broadcast-claim-boundary.md) — manual and scheduled launch notifications share one locked, eligibility-checked claim and clear pending state atomically.
+- [Premium image acceptance](premium-image-acceptance.md) — customer-facing AI images require premium generation plus operation-specific, fail-closed visual QA with one bounded correction pass.
 - [Verified post analytics](verified-post-analytics.md) — optional post metrics expose tracked/null explicitly; never infer views, retention, or conversion rates from unrelated activity.

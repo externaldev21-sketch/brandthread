@@ -4,7 +4,15 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { requireAuth } from "../middlewares/requireAuth";
-import { editImages, generateImageBuffer } from "@workspace/integrations-openai-ai-server/image";
+import {
+  buildFashionPrompt,
+  editImages,
+  generateImageBuffer,
+  generateWithVisualQa,
+  ImageQualityError,
+  ImageQualityUnavailableError,
+  type ImageOperation,
+} from "@workspace/integrations-openai-ai-server/image";
 
 const router = Router();
 router.use(requireAuth);
@@ -56,7 +64,7 @@ router.post("/generate", async (req, res) => {
     return;
   }
 
-  const { prompt, referenceImage } = req.body ?? {};
+  const { prompt, referenceImage, mode } = req.body ?? {};
   if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
     res.status(400).json({ error: "prompt is required" });
     return;
@@ -64,9 +72,15 @@ router.post("/generate", async (req, res) => {
 
   const safePrompt = prompt.trim().slice(0, 500); // prevent prompt injection via overly long input
 
-  const fullPrompt = referenceImage
-    ? `Edit the provided source image according to this brand owner's direction: "${safePrompt}". Preserve the specific design, artwork, logo, silhouette, and other source details unless the direction explicitly requests changing them. Produce a polished, high-resolution apparel design or product mockup that remains visibly connected to the provided source.`
-    : `Photorealistic clothing product mockup based on this brand owner's description: "${safePrompt}". Show the design applied to a garment (t-shirt, hoodie, or similar apparel) on a clean studio background, professional product photography lighting, realistic fabric texture and folds, high resolution, e-commerce ready.`;
+  const allowedModes = new Set<ImageOperation>(["text_to_design", "sketch_to_design", "prompt_edit"]);
+  const operation: ImageOperation = allowedModes.has(mode) ? mode : (referenceImage ? "prompt_edit" : "text_to_design");
+  const fullPrompt = buildFashionPrompt(
+    operation,
+    safePrompt,
+    referenceImage
+      ? "Image 1 is the authoritative source design. Apply only the requested change and preserve every unrequested source detail."
+      : "Create a polished production-aware apparel design or product mockup on a clean presentation background.",
+  );
 
   const decodedReference = referenceImage === undefined ? null : decodeReferenceImage(referenceImage);
   if (referenceImage !== undefined && !decodedReference) {
@@ -81,14 +95,31 @@ router.post("/generate", async (req, res) => {
       tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "mockup-reference-"));
       const sourcePath = path.join(tmpDir, `${randomUUID()}.png`);
       await fs.writeFile(sourcePath, decodedReference);
-      buffer = await editImages([sourcePath], fullPrompt);
+      buffer = await generateWithVisualQa({
+        operation,
+        prompt: fullPrompt,
+        brief: safePrompt,
+        references: [decodedReference],
+        generate: (retryPrompt) => editImages([sourcePath], retryPrompt),
+      });
     } else {
-      buffer = await generateImageBuffer(fullPrompt, "1024x1024");
+      buffer = await generateWithVisualQa({
+        operation,
+        prompt: fullPrompt,
+        brief: safePrompt,
+        generate: (retryPrompt) => generateImageBuffer(retryPrompt, "1024x1024"),
+      });
     }
     res.json({ b64_json: buffer.toString("base64") });
-  } catch (_err) {
+  } catch (err) {
     // Do not leak upstream provider error details to the client.
-    res.status(502).json({ error: "Mockup generation failed. Please try again." });
+    if (err instanceof ImageQualityError) {
+      res.status(422).json({ error: "The generated design did not meet the quality check. Please try again.", retryable: true });
+    } else if (err instanceof ImageQualityUnavailableError) {
+      res.status(502).json({ error: "Design quality verification is temporarily unavailable. Please try again.", retryable: true });
+    } else {
+      res.status(502).json({ error: "Mockup generation failed. Please try again." });
+    }
   } finally {
     if (tmpDir) await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }

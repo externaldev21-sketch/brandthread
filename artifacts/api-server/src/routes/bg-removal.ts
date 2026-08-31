@@ -4,7 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { requireAuth } from "../middlewares/requireAuth";
-import { editImages } from "@workspace/integrations-openai-ai-server/image";
+import {
+  buildFashionPrompt,
+  editImages,
+  generateWithVisualQa,
+  ImageQualityError,
+  ImageQualityUnavailableError,
+} from "@workspace/integrations-openai-ai-server/image";
 import { objectStorageClient } from "../lib/objectStorage";
 
 const router = Router();
@@ -34,7 +40,7 @@ function checkRateLimit(userId: string): boolean {
 }
 
 const BASE64_RE = /^[A-Za-z0-9+/]+=*$/;
-const ACCEPTED_MIMES = new Set(["image/png", "image/jpeg", "image/jpg", "image/heic", "image/heif", "image/webp"]);
+const ACCEPTED_MIMES = new Set(["image/png", "image/jpeg", "image/jpg", "image/webp"]);
 const DATA_URL_RE = /^data:(image\/[a-zA-Z0-9+.-]+);base64,([A-Za-z0-9+/]+=*)$/;
 
 interface DecodedImage {
@@ -144,7 +150,7 @@ router.post("/remove", async (req, res) => {
   const decoded = decodeDataUrl(image);
   if (!decoded) {
     res.status(400).json({
-      error: "Invalid image. Accepted formats: PNG, JPG, JPEG, HEIC. Please re-upload.",
+      error: "Invalid image. Accepted formats: PNG, JPG, JPEG, or WebP. Please re-upload.",
     });
     return;
   }
@@ -160,13 +166,19 @@ router.post("/remove", async (req, res) => {
   try {
     await fs.writeFile(tmpFile, decoded.buffer);
 
-    const prompt =
-      "Remove the background completely. Keep only the main subject/product exactly as-is, " +
-      "in the same position and framing, with clean precise edges. " +
-      "Output must be a transparent PNG with no background, shadow, or texture added.";
-
-    const resultBuffer = await editImages([tmpFile], prompt, undefined, {
-      background: "transparent",
+    const prompt = buildFashionPrompt(
+      "background_remove",
+      "Remove the background completely and output a transparent PNG.",
+      "Keep only the main subject/product in the same position and framing with clean, precise edges. Add no background, shadow, texture, or new detail.",
+    );
+    const resultBuffer = await generateWithVisualQa({
+      operation: "background_remove",
+      prompt,
+      brief: "Remove only the background and preserve the complete foreground subject.",
+      references: [decoded.buffer],
+      generate: (retryPrompt) => editImages([tmpFile], retryPrompt, undefined, {
+        background: "transparent",
+      }),
     });
 
     const resultSize = resultBuffer.length;
@@ -187,7 +199,11 @@ router.post("/remove", async (req, res) => {
   } catch (err: any) {
     // Check for provider-specific rejection
     const msg = err?.message ?? "";
-    if (msg.includes("Could not process image") || msg.includes("invalid")) {
+    if (err instanceof ImageQualityError) {
+      res.status(422).json({ error: "The cutout did not preserve the subject accurately enough. Please try again.", retryable: true });
+    } else if (err instanceof ImageQualityUnavailableError) {
+      res.status(502).json({ error: "Background-removal verification is temporarily unavailable. Please try again.", retryable: true });
+    } else if (msg.includes("Could not process image") || msg.includes("invalid")) {
       res.status(422).json({ error: "The provider could not process this image. Please try a different photo." });
     } else {
       res.status(502).json({ error: "Background removal failed. Please try again." });
@@ -242,14 +258,28 @@ router.post("/replace", async (req, res) => {
     const direction = background
       ? "Use Image 2 as the new background."
       : safePrompt || (safeColor ? `Use a solid ${safeColor} background.` : `Create the requested ${safeBgType || "studio"} background.`);
-    const editPrompt =
-      `Replace only the background of Image 1. Keep the foreground subject or product exactly as it appears: preserve its identity, shape, colors, artwork, logo, texture, position, scale, crop, and fine edge detail. ${direction} ` +
-      "Blend edges, lighting, and shadows naturally, but do not redesign or replace the foreground subject.";
-
-    const resultBuffer = await editImages(files, editPrompt);
+    const editPrompt = buildFashionPrompt(
+      "background_replace",
+      direction,
+      "Image 1 is the locked foreground subject. Image 2, when present, is the authoritative replacement background. Blend edges, lighting, and shadows naturally without redesigning the foreground.",
+    );
+    const references = background ? [source.buffer, background.buffer] : [source.buffer];
+    const resultBuffer = await generateWithVisualQa({
+      operation: "background_replace",
+      prompt: editPrompt,
+      brief: direction,
+      references,
+      generate: (retryPrompt) => editImages(files, retryPrompt),
+    });
     res.json({ b64_json: resultBuffer.toString("base64") });
-  } catch {
-    res.status(502).json({ error: "Background replacement failed. Please try again." });
+  } catch (err) {
+    if (err instanceof ImageQualityError) {
+      res.status(422).json({ error: "The new background did not preserve the subject accurately enough. Please try again.", retryable: true });
+    } else if (err instanceof ImageQualityUnavailableError) {
+      res.status(502).json({ error: "Background-replacement verification is temporarily unavailable. Please try again.", retryable: true });
+    } else {
+      res.status(502).json({ error: "Background replacement failed. Please try again." });
+    }
   } finally {
     await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
   }
