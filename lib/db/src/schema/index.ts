@@ -992,9 +992,9 @@ export const teamMembers = pgTable('team_members', {
   /** NULL = legacy invite (no expiry); otherwise the token is invalid after this time. */
   expiresAt:    timestamp('expires_at'),
   /** Set after the one-time reminder email is successfully sent. */
-  reminderSentAt: timestamp('reminder_sent_at'),
+  reminderSentAt: timestamp('reminder_sent_at', { withTimezone: true }),
   /** Short-lived delivery lease for a reminder currently being sent. */
-  reminderClaimedAt: timestamp('reminder_claimed_at'),
+  reminderClaimedAt: timestamp('reminder_claimed_at', { withTimezone: true }),
   acceptedAt:   timestamp('accepted_at'),
   lastActiveAt: timestamp('last_active_at'),
   createdAt:    timestamp('created_at').defaultNow().notNull(),
