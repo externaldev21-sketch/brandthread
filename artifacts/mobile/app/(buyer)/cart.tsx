@@ -323,13 +323,16 @@ function SummaryCard({ subtotal, discountTotal, shipping, tax, total, hasPreOrde
   }
   return (
     <View style={sum.root}>
-      <Text style={sum.title}>Order Summary</Text>
+      <Text style={sum.title}>Order summary</Text>
       <Row label="Subtotal" value={fmtPrice(subtotal)} />
-      {discountTotal > 0 && <Row label="Discounts" value={`–${fmtPrice(discountTotal)}`} accent={SUCCESS} />}
-      <Row label="Est. shipping" value={fmtPrice(shipping)} small />
+      <Row label="Discounts" value={discountTotal > 0 ? `–${fmtPrice(discountTotal)}` : fmtPrice(0)} accent={discountTotal > 0 ? SUCCESS : undefined} />
+      <Row label="Shipping & fees" value={fmtPrice(shipping)} small />
       <Row label="Est. tax" value={fmtPrice(tax)} small />
       <View style={sum.divider} />
-      <Row label="Est. total" value={fmtPrice(total)} />
+      <View style={sum.totalRow}>
+        <Text style={sum.totalLabel}>Total</Text>
+        <Text style={sum.totalValue}>{fmtPrice(total)}</Text>
+      </View>
       <Text style={sum.note}>Shipping and tax are estimated. Final amount calculated at checkout.</Text>
       {hasPreOrder && (
         <View style={sum.preOrderNote}>
@@ -350,6 +353,9 @@ const sum = StyleSheet.create({
   value: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   valueSm: { fontSize: FS.sm },
   divider: { height: 1, backgroundColor: BORDER, marginVertical: SP.sm },
+  totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: SP.xs },
+  totalLabel: { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
+  totalValue: { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
   note: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, marginTop: SP.sm },
   preOrderNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: SP.sm },
   preOrderNoteText: { fontSize: FS.xs, fontFamily: FONT.regular, flex: 1 },
@@ -767,7 +773,7 @@ export default function CartScreen() {
                 style={[s.checkoutBtn, { shadowColor: theme.shadowColor }]}
                 onPress={handleCheckout}
                 disabled={validating}
-                accessibilityLabel={`Checkout, ${fmtPrice(displayedTotal)}`}
+                accessibilityLabel={`Check out, ${fmtPrice(displayedTotal)}`}
                 accessibilityHint="Reviews shipping and opens secure payment"
                 accessibilityState={{ disabled: validating, busy: validating }}
               >
@@ -782,7 +788,9 @@ export default function CartScreen() {
                   ) : (
                     <>
                       <Feather name="lock" size={16} color={theme.onAccent} />
-                      <Text style={[s.checkoutText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Checkout · {fmtPrice(displayedTotal)}</Text>
+                      <Text style={[s.checkoutText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>Check out</Text>
+                      <View style={s.checkoutSpacer} />
+                      <Text style={[s.checkoutAmount, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>{fmtPrice(displayedTotal)}</Text>
                     </>
                   )}
                 </LinearGradient>
@@ -853,11 +861,13 @@ const s = StyleSheet.create({
   checkoutGrad: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     gap: SP.sm,
     height: COMP.buttonH,
     borderRadius: RADIUS.lg,
   },
   checkoutText: { fontSize: FS.base, fontFamily: FONT.bold },
+  checkoutSpacer: { flex: 1 },
+  checkoutAmount: { fontSize: FS.base, fontFamily: FONT.bold },
   secureNote: { fontSize: FS.xs, fontFamily: FONT.regular, color: SUBTLE, textAlign: 'center', marginTop: SP.xs },
 });

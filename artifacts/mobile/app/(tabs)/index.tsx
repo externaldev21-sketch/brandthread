@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
-import { View, Text, ScrollView, StyleSheet, Animated, Modal, TextInput, FlatList, Alert, Pressable, Linking } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Animated, Modal, TextInput, FlatList, Alert, Pressable, TouchableOpacity, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -751,6 +751,84 @@ export default function SellerHomeScreen() {
             </AnimatedEntrance>
           );
         })()}
+
+        {/* ── Modular Seller Hub ─────────────────────────────────────────── */}
+        <AnimatedEntrance style={s.hubSection}>
+          <View style={s.hubSectionHeader}>
+            <View>
+              <Text style={s.hubEyebrow}>SELLER HUB</Text>
+              <Text style={s.hubTitle}>Run your business</Text>
+            </View>
+            <TouchableOpacity style={s.hubCustomize} onPress={() => setCommandModal(true)}>
+              <Feather name="sliders" size={14} color={MUTED} />
+              <Text style={s.hubCustomizeText}>Shortcuts</Text>
+            </TouchableOpacity>
+          </View>
+
+          <PressableScale style={s.hubModule} onPress={handleOpenOrders}>
+            <View style={[s.hubModuleIcon, { backgroundColor: `${BLUE}1F` }]}>
+              <Feather name="shopping-bag" size={20} color={BLUE} />
+            </View>
+            <View style={s.hubModuleCopy}>
+              <Text style={s.hubModuleTitle}>Orders</Text>
+              <View style={s.hubStatRow}>
+                <Text style={s.hubStatValue}>{orderStats?.newOrders ?? '—'}</Text>
+                <Text style={s.hubStatLabel}>new</Text>
+                <View style={s.hubStatDot} />
+                <Text style={s.hubStatValue}>{orderStats?.toProcess ?? '—'}</Text>
+                <Text style={s.hubStatLabel}>to process</Text>
+                <View style={s.hubStatDot} />
+                <Text style={s.hubStatValue}>{orderStats?.readyToShip ?? '—'}</Text>
+                <Text style={s.hubStatLabel}>ready</Text>
+              </View>
+            </View>
+            <Feather name="chevron-right" size={18} color={MUTED} />
+          </PressableScale>
+
+          <PressableScale style={s.hubModule} onPress={() => nav('/seller-inbox')}>
+            <View style={[s.hubModuleIcon, { backgroundColor: theme.accentDim }]}>
+              <Feather name="message-circle" size={20} color={theme.accent} />
+            </View>
+            <View style={s.hubModuleCopy}>
+              <Text style={s.hubModuleTitle}>Customers & support</Text>
+              <View style={s.hubStatRow}>
+                <Text style={s.hubStatValue}>{hubStats?.unreadMessages ?? '—'}</Text>
+                <Text style={s.hubStatLabel}>unread</Text>
+                <View style={s.hubStatDot} />
+                <Text style={s.hubStatValue}>{hubStats?.activeQuotes ?? '—'}</Text>
+                <Text style={s.hubStatLabel}>quotes</Text>
+                <View style={s.hubStatDot} />
+                <Text style={s.hubStatValue}>{hubStats?.samplesNeedingReview ?? '—'}</Text>
+                <Text style={s.hubStatLabel}>reviews</Text>
+              </View>
+            </View>
+            <Feather name="chevron-right" size={18} color={MUTED} />
+          </PressableScale>
+
+          <PressableScale style={s.hubModule} onPress={() => nav('/payouts')}>
+            <View style={[s.hubModuleIcon, { backgroundColor: `${SUCCESS}1F` }]}>
+              <Feather name="credit-card" size={20} color={SUCCESS} />
+            </View>
+            <View style={s.hubModuleCopy}>
+              <Text style={s.hubModuleTitle}>Payouts</Text>
+              <Text style={s.hubModuleHeadline}>{payoutInfo?.available?.formatted ?? '—'}</Text>
+              <Text style={s.hubModuleMeta}>{payoutInfo?.connected ? 'Available to pay out' : 'Connect Stripe to receive payouts'}</Text>
+            </View>
+            <Feather name="chevron-right" size={18} color={MUTED} />
+          </PressableScale>
+
+          <PressableScale style={s.hubModule} onPress={() => nav('/seller-settings')}>
+            <View style={[s.hubModuleIcon, { backgroundColor: `${GREEN_BRIGHT}1A` }]}>
+              <Feather name="shield" size={20} color={GREEN_BRIGHT} />
+            </View>
+            <View style={s.hubModuleCopy}>
+              <Text style={s.hubModuleTitle}>Account health</Text>
+              <Text style={s.hubModuleHeadline}>{pct}% ready</Text>
+              <Text style={s.hubModuleMeta}>{statsError ? 'Some live checks need attention' : 'Store, inventory and payments monitored'}</Text>
+            </View>
+            <Feather name="chevron-right" size={18} color={MUTED} />
+          </PressableScale>
+        </AnimatedEntrance>
 
         {/* ── Hero Card: Available Balance + Next Payout ───────────────── */}
         <AnimatedEntrance style={{ paddingHorizontal: SP.md, paddingTop: SP.md, marginBottom: SP.sm }}>
@@ -1918,4 +1996,24 @@ const s = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 4,
   },
+  hubSection: { paddingHorizontal: SP.md, marginBottom: SP.md, gap: 10 },
+  hubSectionHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 2 },
+  hubEyebrow: { color: SUBTLE, fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1.2 },
+  hubTitle: { color: FG, fontFamily: FONT.bold, fontSize: FS.xl, marginTop: 3 },
+  hubCustomize: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 6 },
+  hubCustomizeText: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.xs },
+  hubModule: {
+    minHeight: 88, flexDirection: 'row', alignItems: 'center', gap: SP.sm,
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    borderRadius: RADIUS.lg, padding: SP.md,
+  },
+  hubModuleIcon: { width: 44, height: 44, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
+  hubModuleCopy: { flex: 1 },
+  hubModuleTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.base, marginBottom: 7 },
+  hubModuleHeadline: { color: FG, fontFamily: FONT.bold, fontSize: FS.lg, marginBottom: 2 },
+  hubModuleMeta: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs },
+  hubStatRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 4 },
+  hubStatValue: { color: FG, fontFamily: FONT.bold, fontSize: FS.sm },
+  hubStatLabel: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs },
+  hubStatDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: SUBTLE, marginHorizontal: 2, alignSelf: 'center' },
 });

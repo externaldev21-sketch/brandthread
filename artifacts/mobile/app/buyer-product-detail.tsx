@@ -962,10 +962,8 @@ export default function BuyerProductDetailScreen() {
             accessibilityRole="button"
             accessibilityLabel="View cart"
           >
-            <LinearGradient colors={[...GRAD_SUCCESS_G]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.actionGrad}>
-              <Feather name="shopping-bag" size={18} color={ON_DARK} />
-              <Text style={s.actionBtnText}>View Cart</Text>
-            </LinearGradient>
+            <Feather name="check" size={19} color={SUCCESS} />
+            <Text style={s.srOnly}>View Cart</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
@@ -981,10 +979,8 @@ export default function BuyerProductDetailScreen() {
               <ActivityIndicator color={PURPLE_LIGHT} size="small" />
             ) : (
               <>
-                <Feather name="shopping-bag" size={18} color={allSelected && inStock ? PURPLE_LIGHT : SUBTLE} />
-                <Text style={[s.addToCartText, (!allSelected || !inStock) && { color: SUBTLE }]}>
-                  {!allSelected ? 'Select Options' : !inStock ? 'Out of Stock' : 'Add to Cart'}
-                </Text>
+                <Feather name="shopping-bag" size={19} color={allSelected && inStock ? PURPLE_LIGHT : SUBTLE} />
+                <Text style={s.srOnly}>Add to Cart</Text>
               </>
             )}
           </TouchableOpacity>
@@ -1275,15 +1271,16 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     backgroundColor: BG, borderTopWidth: 1, borderTopColor: BORDER,
   },
   addToCartBtn: {
-    flex: 1, height: COMP.buttonH, borderRadius: RADIUS.md,
+    width: COMP.buttonH, height: COMP.buttonH, borderRadius: RADIUS.md,
     borderWidth: 1, borderColor: BORDER_ACTIVE, backgroundColor: PURPLE_DIM,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm,
   },
   addToCartText: { fontSize: FS.sm, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
   buyNowBtn: { flex: 1, borderRadius: RADIUS.md, overflow: 'hidden' },
-  viewCartBtn: { flex: 2, borderRadius: RADIUS.md, overflow: 'hidden' },
+  viewCartBtn: { width: COMP.buttonH, height: COMP.buttonH, borderRadius: RADIUS.md, borderWidth: 1, borderColor: SUCCESS, backgroundColor: SUCCESS_DIM, alignItems: 'center', justifyContent: 'center' },
   actionGrad: { height: COMP.buttonH, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SP.sm },
   actionBtnText: { fontSize: FS.sm, fontFamily: FONT.bold, color: ON_DARK },
+  srOnly: { position: 'absolute', width: 1, height: 1, opacity: 0 },
   btnDisabled: { opacity: 0.5 },
   reviewsHeader: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
   reviewRow: { marginBottom: SP.md, paddingBottom: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },

@@ -37,6 +37,13 @@ const CELL_SIZE = (width - SP.md * 2 - GRID_GAP * 2) / 3;
 const TABS = ['Posts', 'Tagged', 'Reposts', 'Saved'] as const;
 type Tab = typeof TABS[number];
 
+function profileTabIcon(tab: Tab): keyof typeof Feather.glyphMap {
+  if (tab === 'Posts') return 'grid';
+  if (tab === 'Tagged') return 'user';
+  if (tab === 'Reposts') return 'repeat';
+  return 'bookmark';
+}
+
 // ─── Bottom Sheet ─────────────────────────────────────────────────────────────
 function BottomSheet({
   visible,
@@ -322,14 +329,14 @@ export default function ProfileScreen() {
               <Text style={styles.statLabel}>Posts</Text>
             </TouchableOpacity>
             <View style={styles.statDivider} />
-            <TouchableOpacity style={styles.statCol} onPress={() => router.push('/buyer-friend-requests' as any)}>
+            <TouchableOpacity style={styles.statCol} onPress={() => router.push('/connections?type=followers' as any)}>
               <Text style={styles.statNum}>{profile?.friendsCount ?? 0}</Text>
-              <Text style={styles.statLabel}>Friends</Text>
+              <Text style={styles.statLabel}>Followers</Text>
             </TouchableOpacity>
             <View style={styles.statDivider} />
-            <TouchableOpacity style={styles.statCol} onPress={() => router.push('/buyer-saved' as any)}>
-              <Text style={styles.statNum}>{savedItems.length}</Text>
-              <Text style={styles.statLabel}>Saved</Text>
+            <TouchableOpacity style={styles.statCol} onPress={() => router.push('/connections?type=following' as any)}>
+              <Text style={styles.statNum}>{profile?.followingBrandsCount ?? 0}</Text>
+              <Text style={styles.statLabel}>Following</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -407,6 +414,7 @@ export default function ProfileScreen() {
               style={[styles.tabPill, activeTab === tab && [styles.tabPillActive, { backgroundColor: theme.accentDim, borderColor: theme.accent }]]}
               onPress={() => setActiveTab(tab)}
             >
+              <Feather name={profileTabIcon(tab)} size={18} color={activeTab === tab ? theme.accent : MUTED} />
               <Text style={[styles.tabText, activeTab === tab && [styles.tabTextActive, { color: theme.accent }]]}>{tab}</Text>
             </TouchableOpacity>
           ))}
@@ -591,15 +599,15 @@ const styles = StyleSheet.create({
   highlightEmoji: { fontSize: 22 },
   highlightLabel: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED },
 
-  tabBar: { flexDirection: 'row', paddingHorizontal: SP.md, marginTop: SP.sm, gap: SP.xs },
-  tabPill: { flex: 1, paddingVertical: SP.xs + 2, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.pill, alignItems: 'center' },
+  tabBar: { flexDirection: 'row', marginTop: SP.sm, borderTopWidth: 1, borderBottomWidth: 1, borderColor: BORDER },
+  tabPill: { flex: 1, paddingVertical: 11, backgroundColor: BG, borderBottomWidth: 2, borderBottomColor: 'transparent', alignItems: 'center', gap: 3 },
   tabPillActive: {},
-  tabText: { fontFamily: FONT.medium, fontSize: FS.xs, color: MUTED },
+  tabText: { fontFamily: FONT.medium, fontSize: 10, color: MUTED },
   tabTextActive: {},
 
   gridContainer: { marginTop: SP.md },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: SP.md, gap: GRID_GAP },
-  gridCell: { width: CELL_SIZE, height: CELL_SIZE, borderRadius: RADIUS.sm, overflow: 'hidden' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: GRID_GAP },
+  gridCell: { width: CELL_SIZE + (SP.md * 2 / 3), height: CELL_SIZE + (SP.md * 2 / 3), overflow: 'hidden' },
   gridCellInner: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.xs },
   gridCaption: { fontFamily: FONT.regular, fontSize: FS.xs, color: MUTED, position: 'absolute', bottom: SP.xs, left: SP.xs, right: SP.xs },
 

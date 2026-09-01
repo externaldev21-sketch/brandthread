@@ -397,9 +397,7 @@ export default function SellerProfileScreen() {
       .catch(() => {});
   }, [params.id]);
 
-  const tabs = isOwner
-    ? ['Posts', 'Products', 'Tagged', 'Reposts', 'Saved']
-    : ['Posts', 'Products', 'Tagged', 'Reposts'];
+  const tabs = ['Posts', 'Products'];
 
   const handleFollow = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -602,7 +600,7 @@ export default function SellerProfileScreen() {
               ) : (
                 <>
                   <TouchableOpacity
-                    style={[styles.followBtn, isFollowing && styles.followingBtn]}
+                    style={[styles.profileActionBtn, styles.followBtn, isFollowing && styles.followingBtn]}
                     onPress={handleFollow}
                   >
                     <Text style={[styles.followBtnText, isFollowing && styles.followingBtnText]}>
@@ -610,10 +608,11 @@ export default function SellerProfileScreen() {
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={styles.iconOutlineBtn}
+                    style={[styles.profileActionBtn, styles.chatBtn]}
                     onPress={handleMessageSeller}
                   >
-                    <Feather name="mail" size={16} color={FG} />
+                    <Feather name="message-circle" size={16} color={FG} />
+                    <Text style={styles.chatBtnText}>Chat</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.iconOutlineBtn} onPress={handleMoreOptions}>
                     <Feather name="more-horizontal" size={16} color={FG} />
@@ -697,38 +696,15 @@ export default function SellerProfileScreen() {
             <Text style={styles.statLabel}>Followers</Text>
           </TouchableOpacity>
           <View style={styles.statDivider} />
-          <TouchableOpacity
-            style={styles.statItem}
-            onPress={() => router.push('/connections?type=following' as never)}
-          >
-            <Text style={styles.statNumber}>{formatCount(profile?.following ?? 0)}</Text>
-            <Text style={styles.statLabel}>Following</Text>
-          </TouchableOpacity>
-          <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{formatCount(profile.totalLikes)}</Text>
-            <Text style={styles.statLabel}>Likes</Text>
+            <Text style={styles.statNumber}>{apiRating && apiRating.totalCount > 0 ? apiRating.avgRating.toFixed(1) : '—'}</Text>
+            <Text style={styles.statLabel}>Rating</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <Text style={styles.statNumber}>{formatCount(profile.productCount)}</Text>
             <Text style={styles.statLabel}>Products</Text>
           </View>
-          {isOwner && (
-            <>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>{formatCount(profile.postCount)}</Text>
-                <Text style={styles.statLabel}>Posts</Text>
-              </View>
-            </>
-          )}
-          {apiRating && apiRating.totalCount > 0 && (
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>{'★ ' + apiRating.avgRating.toFixed(1)}</Text>
-              <Text style={styles.statLabel}>{apiRating.totalCount} review{apiRating.totalCount !== 1 ? 's' : ''}</Text>
-            </View>
-          )}
         </View>
 
         {/* 3 (buyer only): Shop Button */}
@@ -1125,6 +1101,14 @@ const createStyles = (colorsTheme: ReturnType<typeof useColors>) => StyleSheet.c
     justifyContent: 'flex-end',
     gap: 6,
   },
+  profileActionBtn: {
+    minWidth: 92,
+    minHeight: 38,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
   outlineBtn: {
     borderWidth: 1,
     borderColor: BORDER,
@@ -1166,6 +1150,17 @@ const createStyles = (colorsTheme: ReturnType<typeof useColors>) => StyleSheet.c
   },
   followingBtnText: {
     color: BG,
+  },
+  chatBtn: {
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 20,
+    backgroundColor: CARD,
+  },
+  chatBtnText: {
+    color: FG,
+    fontSize: 13,
+    fontFamily: FONT.semibold,
   },
   iconOutlineBtn: {
     width: 36,

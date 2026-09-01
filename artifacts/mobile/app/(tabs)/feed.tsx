@@ -54,11 +54,14 @@ interface SpotlightItem {
   comments: { id: string; user: string; text: string }[];
   reposts: number;
   shares: number;
+  saves: number;
+  location?: string;
   // Optional fields present on real seller posts
   productId?: string;
   sellerId?: string;
   productTags?: { productId: string; productName: string; priceCents: number }[];
 }
+type SpotlightProductTag = NonNullable<SpotlightItem['productTags']>[number];
 
 // ─── Live Stream feed item ────────────────────────────────────────────────────
 interface LiveStreamFeedItem {
@@ -157,7 +160,7 @@ function LiveStreamPage({ stream, onJoin }: { stream: LiveStreamFeedItem; onJoin
 }
 type EngagementState = {
   liked: boolean; likes: number;
-  saved: boolean;
+  saved: boolean; saves: number;
   reposted: boolean; reposts: number;
   following: boolean;
   comments: { id: string; user: string; text: string }[];
@@ -166,7 +169,7 @@ type EngagementState = {
 function initialEngagement(item: SpotlightItem): EngagementState {
   return {
     liked: false, likes: item.likes,
-    saved: false,
+    saved: false, saves: item.saves,
     reposted: false, reposts: item.reposts,
     following: false,
     comments: item.comments,
@@ -174,7 +177,7 @@ function initialEngagement(item: SpotlightItem): EngagementState {
 }
 
 const DEFAULT_ENGAGEMENT: EngagementState = {
-  liked: false, likes: 0, saved: false, reposted: false, reposts: 0, following: false, comments: [],
+  liked: false, likes: 0, saved: false, saves: 0, reposted: false, reposts: 0, following: false, comments: [],
 };
 
 function formatCount(n: number) {
@@ -399,7 +402,7 @@ function SpotlightPage({
           onPress={() => { onSave(item.id); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
         >
           <Feather name="bookmark" size={27} color={engagement?.saved ? theme.accent : '#FFFFFF'} />
-          <Text style={styles.railCount}>Save</Text>
+          <Text style={styles.railCount}>{formatCount(engagement?.saves ?? item.saves)}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -464,10 +467,19 @@ function SpotlightPage({
           </View>
         </TouchableOpacity>
 
-        <Text style={styles.caption} numberOfLines={2}>{item.caption}</Text>
+         {!!item.location && (
+           <View style={styles.locationRow}>
+              <Feather name="map-pin" size={12} color={`${theme.onAccent}CC`} />
+              <Text style={[styles.locationText, { color: `${theme.onAccent}CC` }]} numberOfLines={1}>{item.location}</Text>
+           </View>
+         )}
+         <Text style={styles.caption} numberOfLines={2}>
+           {item.caption}
+            {item.caption.length > 86 && <Text style={[styles.moreText, { color: theme.onAccent }]}> …more</Text>}
+         </Text>
 
         <View style={styles.soundRow}>
-          <Feather name="music" size={12} color="#FFFFFF" />
+           <Feather name="music" size={12} color={theme.onAccent} />
           <Text style={styles.soundText} numberOfLines={1}>{item.sound}</Text>
         </View>
       </View>
@@ -511,10 +523,99 @@ function mapSellerPost(post: SellerThreadPost): SpotlightItem | null {
     comments: [],
     reposts: post.repostsCount,
     shares: 0,
+    saves: Number((post as any).savedCount ?? (post as any).savesCount ?? 0),
+    location: (post as any).location ?? (post as any).locationName ?? undefined,
     productId: tag?.productId,
     sellerId: post.authorId,
     productTags: post.productTags ?? [],
   };
+}
+
+function ShopProductSheet({
+  selection,
+  onClose,
+  onBuy,
+}: {
+  selection: { item: SpotlightItem; tag?: SpotlightProductTag };
+  onClose: () => void;
+  onBuy: () => void;
+}) {
+  const { theme } = useAppTheme();
+  const insets = useSafeAreaInsets();
+  const [size, setSize] = useState('M');
+  const [color, setColor] = useState(0);
+  const product = selection.tag;
+  const name = product?.productName ?? selection.item.productName;
+  const price = product ? formatCents(product.priceCents) : selection.item.productPrice;
+  const swatches = [FG, SURFACE, MUTED, SUBTLE];
+
+  return (
+    <Modal transparent animationType="slide" visible onRequestClose={onClose}>
+      <View style={styles.shopSheetBackdrop}>
+        <TouchableWithoutFeedback onPress={onClose}>
+          <View style={StyleSheet.absoluteFill} />
+        </TouchableWithoutFeedback>
+        <View style={[styles.shopSheet, { paddingBottom: insets.bottom + SP.sm }]}>
+          <View style={styles.commentsHandle} />
+          <View style={styles.shopSheetHeader}>
+            <Text style={styles.shopSheetEyebrow}>SHOP THE POST</Text>
+            <TouchableOpacity style={styles.shopSheetClose} onPress={onClose} accessibilityLabel="Close shop preview">
+              <Feather name="x" size={18} color={FG} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.shopProductRow}>
+            <CachedImage
+              source={{ uri: selection.item.mediaUris[0] }}
+              style={styles.shopProductImage}
+              contentFit="cover"
+            />
+            <View style={styles.shopProductCopy}>
+              <Text style={styles.shopProductName} numberOfLines={2}>{name}</Text>
+              <Text style={[styles.shopProductPrice, { color: theme.accent }]}>{price}</Text>
+              <Text style={styles.shopProductSeller}>From @{selection.item.handle.replace(/^@/, '')}</Text>
+            </View>
+          </View>
+          <Text style={styles.shopOptionLabel}>Color</Text>
+          <View style={styles.shopSwatches}>
+            {swatches.map((swatch, index) => (
+              <TouchableOpacity
+                key={swatch}
+                onPress={() => setColor(index)}
+                style={[styles.shopSwatch, color === index && { borderColor: theme.accent }]}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: color === index }}
+              >
+                <View style={[styles.shopSwatchDot, { backgroundColor: swatch }]} />
+              </TouchableOpacity>
+            ))}
+          </View>
+          <View style={styles.shopOptionHeader}>
+            <Text style={styles.shopOptionLabel}>Size</Text>
+            <Text style={styles.shopSizeGuide}>Size guide</Text>
+          </View>
+          <View style={styles.shopSizes}>
+            {['XS', 'S', 'M', 'L', 'XL'].map(option => (
+              <TouchableOpacity
+                key={option}
+                onPress={() => setSize(option)}
+                style={[styles.shopSize, size === option && { borderColor: theme.accent, backgroundColor: theme.accentDim }]}
+              >
+                <Text style={[styles.shopSizeText, size === option && { color: theme.accent }]}>{option}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TouchableOpacity
+            style={[styles.shopBuyButton, { backgroundColor: theme.accent }]}
+            onPress={onBuy}
+            activeOpacity={0.85}
+          >
+            <Text style={[styles.shopBuyText, { color: theme.onAccent }]}>Buy now</Text>
+            <Feather name="arrow-right" size={17} color={theme.onAccent} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
 }
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
@@ -530,6 +631,8 @@ export default function FeedScreen() {
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotifs, setShowNotifs] = useState(false);
+  const [feedTab, setFeedTab] = useState<'following' | 'for-you'>('for-you');
+  const [shopSelection, setShopSelection] = useState<{ item: SpotlightItem; tag?: SpotlightProductTag } | null>(null);
   const [hasUnread, setHasUnread] = useState(true);
   const [sellerFeedPosts, setSellerFeedPosts] = useState<SpotlightItem[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
@@ -727,7 +830,7 @@ export default function FeedScreen() {
           api.saved.add({ targetId: id, targetType: 'post' }).catch(() => {});
         }
       } catch {}
-      return { ...prev, [id]: { ...cur, saved: !cur.saved } };
+      return { ...prev, [id]: { ...cur, saved: !cur.saved, saves: cur.saved ? Math.max(0, cur.saves - 1) : cur.saves + 1 } };
     });
   }, []);
 
@@ -756,15 +859,12 @@ export default function FeedScreen() {
 
   function handleShop(item: SpotlightItem) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const productId = (item as any).productId ?? item.id;
-    const productName = (item as any).productName ?? '';
-    router.push(('/buyer-product-detail?productId=' + productId + '&productName=' + encodeURIComponent(productName ?? '') + '&sourcePostId=' + item.id) as never);
+    setShopSelection({ item });
   }
 
   function handleShopTag(item: SpotlightItem, tag: { productId: string; productName: string; priceCents: number }) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push(('/buyer-product-detail?productId=' + encodeURIComponent(tag.productId) +
-      '&productName=' + encodeURIComponent(tag.productName) + '&sourcePostId=' + encodeURIComponent(item.id)) as never);
+    setShopSelection({ item, tag });
   }
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -934,6 +1034,25 @@ export default function FeedScreen() {
             </TouchableOpacity>
           </View>
         )}
+        {!showSearch && (
+          <View style={styles.feedTabs}>
+            {([
+              ['following', 'Following'],
+              ['for-you', 'For You'],
+            ] as const).map(([key, label]) => (
+              <TouchableOpacity
+                key={key}
+                style={styles.feedTab}
+                onPress={() => setFeedTab(key)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: feedTab === key }}
+              >
+                <Text style={[styles.feedTabText, feedTab === key && styles.feedTabTextActive]}>{label}</Text>
+                {feedTab === key && <View style={[styles.feedTabUnderline, { backgroundColor: theme.accent }]} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
 
       {/* ─ Notifications sheet ─ */}
@@ -953,6 +1072,20 @@ export default function FeedScreen() {
           </View>
         </View>
       </Modal>
+      {shopSelection && (
+        <ShopProductSheet
+          selection={shopSelection}
+          onClose={() => setShopSelection(null)}
+          onBuy={() => {
+            const productId = shopSelection.tag?.productId ?? shopSelection.item.productId ?? shopSelection.item.id;
+            const productName = shopSelection.tag?.productName ?? shopSelection.item.productName;
+            const sourcePostId = shopSelection.item.id;
+            setShopSelection(null);
+            router.push(('/buyer-product-detail?productId=' + encodeURIComponent(productId) +
+              '&productName=' + encodeURIComponent(productName) + '&sourcePostId=' + encodeURIComponent(sourcePostId)) as never);
+          }}
+        />
+      )}
 
     </View>
   );
@@ -1000,9 +1133,10 @@ const styles = StyleSheet.create({
   shopBtnText: { fontSize: FS.sm, fontFamily: FONT.bold, color: '#FFFFFF', letterSpacing: 0.4 },
 
   bottomInfo: { position: 'absolute', left: 16, right: 84, bottom: 26, gap: 8 },
-
-
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  locationText: { fontSize: FS.xs, fontFamily: FONT.medium, color: ON_DARK },
   caption: { fontSize: 14, fontFamily: FONT.regular, color: '#FFFFFF', lineHeight: 19 },
+  moreText: { fontFamily: FONT.semibold, color: ON_DARK },
   creatorRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 8 },
   creatorAvatar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#FFFFFF' },
   creatorAvatarText: { fontSize: 10, fontFamily: FONT.bold, color: '#FFFFFF' },
@@ -1017,6 +1151,11 @@ const styles = StyleSheet.create({
   unreadDot: { position: 'absolute', top: 4, right: 4, width: 9, height: 9, borderRadius: 4.5, backgroundColor: RED, borderWidth: 1.5, borderColor: BG },
   topIconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   topTitle: { flex: 1, textAlign: 'center', fontSize: FS.md, fontFamily: FONT.bold, color: '#FFFFFF' },
+  feedTabs: { alignSelf: 'center', flexDirection: 'row', gap: 26, marginTop: 2, paddingBottom: 2 },
+  feedTab: { paddingHorizontal: 4, paddingVertical: 5, alignItems: 'center' },
+  feedTabText: { color: ON_DARK, opacity: 0.6, fontFamily: FONT.semibold, fontSize: FS.sm },
+  feedTabTextActive: { color: ON_DARK, opacity: 1 },
+  feedTabUnderline: { height: 2, width: 24, borderRadius: 2, marginTop: 5 },
 
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   searchInput: {
@@ -1043,6 +1182,31 @@ const styles = StyleSheet.create({
   commentSendBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
 
   notifRow: { fontSize: 13.5, fontFamily: FONT.regular, color: FG, paddingBottom: 14 },
+  shopSheetBackdrop: { flex: 1, backgroundColor: OVERLAY, justifyContent: 'flex-end' },
+  shopSheet: {
+    backgroundColor: SURFACE, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    paddingHorizontal: SP.md, paddingTop: SP.sm, borderTopWidth: 1, borderColor: BORDER,
+  },
+  shopSheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.md },
+  shopSheetEyebrow: { fontFamily: FONT.bold, fontSize: FS.xs, color: MUTED, letterSpacing: 1.2 },
+  shopSheetClose: { width: 34, height: 34, borderRadius: 17, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
+  shopProductRow: { flexDirection: 'row', gap: SP.md, alignItems: 'center', marginBottom: SP.md },
+  shopProductImage: { width: 92, height: 112, borderRadius: RADIUS.md, backgroundColor: CARD },
+  shopProductCopy: { flex: 1, gap: 5 },
+  shopProductName: { fontFamily: FONT.bold, fontSize: FS.md, color: FG, lineHeight: 21 },
+  shopProductPrice: { fontFamily: FONT.bold, fontSize: FS.lg },
+  shopProductSeller: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs },
+  shopOptionLabel: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm, marginBottom: SP.sm },
+  shopOptionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SP.md },
+  shopSizeGuide: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.xs },
+  shopSwatches: { flexDirection: 'row', gap: 12 },
+  shopSwatch: { width: 36, height: 36, borderRadius: 18, borderWidth: 2, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  shopSwatchDot: { width: 24, height: 24, borderRadius: 12 },
+  shopSizes: { flexDirection: 'row', gap: 8, marginBottom: SP.md },
+  shopSize: { width: 44, height: 38, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  shopSizeText: { fontFamily: FONT.semibold, fontSize: FS.xs, color: FG },
+  shopBuyButton: { minHeight: 52, borderRadius: RADIUS.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  shopBuyText: { fontFamily: FONT.bold, fontSize: FS.base },
   feedFooter: {
     width: SCREEN_W, height: 72, alignItems: 'center', justifyContent: 'center',
     backgroundColor: '#000000',

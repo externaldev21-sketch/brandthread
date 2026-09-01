@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
+import Svg, { Circle, Defs, LinearGradient as SvgGradient, Path, Stop } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
@@ -40,7 +41,7 @@ const CHART_METRICS: { key: ChartMetric; label: string }[] = [
   { key: 'visitors',   label: 'Visitors'   },
 ];
 
-const DATE_PILLS: DateRangeKey[] = ['7d', '30d', '90d', 'this_month', 'this_year'];
+const DATE_PILLS: DateRangeKey[] = ['today', '7d', '30d', '90d'];
 
 const SECTION_ROUTES: Record<string, string> = {
   sales:      '/analytics-sales',
@@ -106,6 +107,37 @@ function MetricCard({ m, width }: { m: AnalyticsMetric; width: number }) {
     <View style={[styles.metricCard, { width }]}>
       <Text style={styles.metricLabel} numberOfLines={1}>{m.label}</Text>
       <Text style={styles.metricValue}>{m.formatted}</Text>
+    </View>
+  );
+}
+
+function TrendLineChart({ points, color, width }: { points: AnalyticsPoint[]; color: string; width: number }) {
+  const height = 132;
+  const chartWidth = Math.max(240, width);
+  const values = points.map(point => point.value);
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const range = Math.max(1, max - min);
+  const coords = points.map((point, index) => ({
+    x: points.length === 1 ? chartWidth / 2 : (index / (points.length - 1)) * chartWidth,
+    y: 12 + (1 - (point.value - min) / range) * (height - 28),
+  }));
+  const path = coords.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
+  const area = coords.length ? `${path} L ${chartWidth} ${height} L 0 ${height} Z` : '';
+
+  return (
+    <View style={styles.lineChartWrap}>
+      <Svg width={chartWidth} height={height}>
+        <Defs>
+          <SvgGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={color} stopOpacity="0.32" />
+            <Stop offset="1" stopColor={color} stopOpacity="0" />
+          </SvgGradient>
+        </Defs>
+        {area ? <Path d={area} fill="url(#trendFill)" /> : null}
+        {path ? <Path d={path} fill="none" stroke={color} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" /> : null}
+        {coords.length ? <Circle cx={coords[coords.length - 1].x} cy={coords[coords.length - 1].y} r={4.5} fill={color} stroke={CARD} strokeWidth={2} /> : null}
+      </Svg>
     </View>
   );
 }
@@ -187,8 +219,6 @@ export default function AnalyticsScreen() {
     }
   };
 
-  const chartMax = Math.max(...chartPoints().map(p => p.value), 1);
-
   const chartMetricValue = (): string => {
     if (!overview) return '—';
     switch (chartMetric) {
@@ -250,6 +280,40 @@ export default function AnalyticsScreen() {
         Date-range comparison is unavailable until the API can return period-scoped totals.
       </Text>
 
+      {/* ── Performance range ── */}
+      <View style={styles.rangePills}>
+        {DATE_PILLS.map(key => {
+          const option = DATE_RANGE_OPTIONS.find(item => item.key === key);
+          const selected = filter?.dateRange.key === key;
+          return (
+            <TouchableOpacity
+              key={key}
+              style={[styles.rangePill, selected && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+              onPress={() => setDateRange(key)}
+            >
+              <Text style={[styles.rangePillText, selected && { color: colors.primaryForeground }]}>
+                {key === '7d' ? '7 days' : key === '30d' ? '30 days' : key === '90d' ? '90 days' : (option?.label ?? 'Today')}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.performanceTiles}>
+        {overview ? [overview.grossRevenue, overview.orders, overview.storeVisitors, overview.conversionRate].map(metric => (
+          <View key={metric.key} style={styles.performanceTile}>
+            <Text style={styles.performanceTileLabel}>{metric.label}</Text>
+            <Text style={styles.performanceTileValue}>{metric.formatted}</Text>
+            <View style={styles.performanceTileMeta}>
+              <Feather name={metric.trend === 'down' ? 'trending-down' : metric.trend === 'up' ? 'trending-up' : 'minus'} size={12} color={metric.trend === 'down' ? RED : SUCCESS} />
+              <Text style={[styles.performanceTileChange, { color: metric.trend === 'down' ? RED : SUCCESS }]}>
+                {metric.changePct === undefined ? 'Current period' : `${Math.abs(metric.changePct).toFixed(1)}%`}
+              </Text>
+            </View>
+          </View>
+        )) : null}
+      </ScrollView>
+
       {/* ── Section nav ── */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }} contentContainerStyle={{ paddingRight: 16, gap: 8, flexDirection: 'row' }}>
         {ANALYTICS_SECTIONS.map(s => {
@@ -298,23 +362,8 @@ export default function AnalyticsScreen() {
           <Text style={styles.chartAmount}>{chartMetricValue()}</Text>
         </View>
 
-        {/* bars */}
-        <View style={styles.barsRow}>
-          {chartPoints().map((p, i) => {
-            const h = Math.max(4, (p.value / chartMax) * 90);
-            const tapped = tappedBar === i;
-            return (
-              <TouchableOpacity
-                key={i}
-                activeOpacity={0.7}
-                onPress={() => { setTappedBar(tapped ? null : i); }}
-                style={styles.barWrap}
-              >
-                <View style={[styles.bar, { height: h, backgroundColor: tapped ? colors.primary : colors.accent }]} />
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        {/* line trend */}
+        <TrendLineChart points={chartPoints()} color={colors.primary} width={screenWidth - 66} />
 
         {/* tooltip */}
         {tappedPoint && (
@@ -407,6 +456,15 @@ const styles = StyleSheet.create({
 
   sectionPill:       { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
   sectionPillText:   { fontSize: 12, fontFamily: FONT.medium, color: MUTED },
+  rangePills: { flexDirection: 'row', gap: 7, marginBottom: 14 },
+  rangePill: { flex: 1, minHeight: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER },
+  rangePillText: { fontSize: 11, fontFamily: FONT.semibold, color: MUTED },
+  performanceTiles: { flexDirection: 'row', gap: 10, paddingRight: 16, marginBottom: 18 },
+  performanceTile: { width: 142, backgroundColor: CARD, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: BORDER },
+  performanceTileLabel: { color: MUTED, fontFamily: FONT.regular, fontSize: 11, marginBottom: 6 },
+  performanceTileValue: { color: FG, fontFamily: FONT.bold, fontSize: 21 },
+  performanceTileMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 },
+  performanceTileChange: { fontFamily: FONT.medium, fontSize: 10 },
 
   chartCard:     { backgroundColor: CARD, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: BORDER, marginBottom: 24 },
   chartTab:      { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, backgroundColor: SURFACE },
@@ -422,6 +480,7 @@ const styles = StyleSheet.create({
   barsRow:       { flexDirection: 'row', alignItems: 'flex-end', height: 90, gap: 2, marginBottom: 4 },
   barWrap:       { flex: 1, alignItems: 'center', justifyContent: 'flex-end', height: 90 },
   bar:           { width: '100%', borderRadius: 3 },
+  lineChartWrap: { height: 132, marginHorizontal: -2, marginBottom: 4, overflow: 'hidden' },
   tooltip:       { backgroundColor: CARD_ELEVATED, borderRadius: 8, padding: 8, marginBottom: 8, alignSelf: 'center', borderWidth: 1, borderColor: BORDER_ACTIVE },
   tooltipDate:   { fontSize: 10, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' },
   tooltipValue:  { fontSize: 15, fontFamily: FONT.bold, color: FG, textAlign: 'center' },

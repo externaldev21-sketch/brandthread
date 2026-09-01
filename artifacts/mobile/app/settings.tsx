@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
-import { useAuth } from '@clerk/expo';
+import { useAuth, useUser } from '@clerk/expo';
 import { useRole } from '@/contexts/RoleContext';
 import { SETTINGS_CATALOG, SettingsCatalogGroup, SettingsCatalogItem } from '@/services/settingsCatalog';
 
@@ -86,10 +86,14 @@ export default function SettingsScreen() {
   const insets  = useSafeAreaInsets();
   const router  = useRouter();
   const { signOut } = useAuth();
+  const { user } = useUser();
   const { role, isLoaded: isRoleLoaded } = useRole();
   const [query, setQuery]       = useState('');
 
   const topPad = Platform.OS === 'web' ? 24 : insets.top;
+  const profileName = user?.fullName || user?.username || 'Your Brandthread profile';
+  const profileInitials = [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join('').toUpperCase() || 'BT';
+  const profileRoute = role === 'seller' ? '/edit-profile' : '/(buyer)/edit-profile';
 
   function haptic() { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }
   function handleClose() { haptic(); router.back(); }
@@ -155,6 +159,30 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        <View style={[styles.profileHeader, { borderBottomColor: colors.border }]}>
+          <View style={[styles.profileAvatar, { backgroundColor: colors.primary }]}>
+            <Text style={[styles.profileAvatarText, { color: colors.primaryForeground }]}>{profileInitials}</Text>
+          </View>
+          <View style={styles.profileCopy}>
+            <Text style={[styles.profileEyebrow, { color: colors.mutedForeground }]}>
+              {role === 'seller' ? 'Seller account' : 'Buyer account'}
+            </Text>
+            <Text style={[styles.profileName, { color: colors.foreground }]} numberOfLines={1}>{profileName}</Text>
+            <Text style={[styles.profileSub, { color: colors.mutedForeground }]} numberOfLines={1}>
+              {user?.primaryEmailAddress?.emailAddress || 'Manage your account and preferences'}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.profileEdit, { borderColor: colors.border }]}
+            onPress={() => router.push(profileRoute as never)}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel="Edit profile"
+          >
+            <Feather name="edit-2" size={15} color={colors.foreground} />
+          </TouchableOpacity>
+        </View>
+
         <View style={[styles.searchWrap, { backgroundColor: colors.secondary }]}>
           <Feather name="search" size={16} color={colors.mutedForeground} />
           <TextInput
@@ -226,6 +254,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.12)',
   },
   sheet: { flex: 1, marginTop: -16, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 16, paddingHorizontal: 20 },
+  profileHeader: { flexDirection: 'row', alignItems: 'center', paddingTop: 2, paddingBottom: 20, marginBottom: 18, borderBottomWidth: 1 },
+  profileAvatar: { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center' },
+  profileAvatarText: { fontSize: 18, fontFamily: 'Inter_700Bold' },
+  profileCopy: { flex: 1, marginLeft: 12, marginRight: 10 },
+  profileEyebrow: { fontSize: 11, fontFamily: 'Inter_600SemiBold', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
+  profileName: { fontSize: 17, fontFamily: 'Inter_700Bold' },
+  profileSub: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 3 },
+  profileEdit: { width: 34, height: 34, borderRadius: 17, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, marginBottom: 20 },
   searchInput: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
   group: { marginBottom: 22 },

@@ -7,7 +7,7 @@ import { useColors } from '@/hooks/useColors';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity, TextInput,
-  StyleSheet, Alert, Modal, Switch, RefreshControl, ActionSheetIOS, Platform, ActivityIndicator,
+  StyleSheet, Alert, Modal, Switch, RefreshControl, ActionSheetIOS, Platform, ActivityIndicator, Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -459,6 +459,8 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
       <FlatList
         data={visibleManufacturers}
         keyExtractor={item => item.id}
+        numColumns={2}
+        columnWrapperStyle={s.gridRow}
         renderItem={({ item }) => (
           <ManufacturerCard
             mfg={item}
@@ -470,7 +472,7 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
             onQuote={() => router.push((`/quote-request?manufacturerId=${item.id}`) as never)}
           />
         )}
-        contentContainerStyle={s.listContent}
+        contentContainerStyle={[s.listContent, s.gridContent]}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={PURPLE} />}
         ListEmptyComponent={
@@ -515,22 +517,40 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
   const { theme } = useAppTheme();
   return (
     <View style={card.root}>
-      {/* Row 1: avatar + name + verified */}
-      <View style={card.topRow}>
-        <View style={card.avatar}>
-          <Text style={card.avatarText}>{mfg.name.charAt(0)}</Text>
+      {/* Compact directory tile: image first, then the key sourcing details. */}
+      <TouchableOpacity onPress={onProfile} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={`View ${mfg.name} profile`}>
+        <View style={card.cover}>
+          {mfg.profileImageUri ? (
+            <Image source={{ uri: mfg.profileImageUri }} style={card.coverImage} resizeMode="cover" />
+          ) : (
+            <View style={card.coverFallback}>
+              <Text style={card.coverFallbackText}>{mfg.name.charAt(0)}</Text>
+            </View>
+          )}
+          <TouchableOpacity
+            style={card.saveOverlay}
+            onPress={onSave}
+            disabled={saving}
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={saved ? `Remove ${mfg.name} from favorites` : `Add ${mfg.name} to favorites`}
+          >
+            <Feather name="heart" size={15} color={saved ? RED : FG} />
+          </TouchableOpacity>
         </View>
+      </TouchableOpacity>
+
+      <View style={card.topRow}>
         <View style={card.nameCol}>
           <View style={card.nameRow}>
             <Text style={card.name} numberOfLines={1}>{mfg.name}</Text>
             {mfg.isVerified && (
               <View style={[card.verifiedBadge, { backgroundColor: theme.secondaryDim }]}>
-                <Feather name="check-circle" size={12} color={theme.secondary} />
-                <Text style={[card.verifiedText, { color: theme.secondary }]}>Verified</Text>
+                <Feather name="check-circle" size={11} color={theme.secondary} />
               </View>
             )}
           </View>
-          <Text style={card.location}>{mfg.city}, {mfg.country}</Text>
+          <Text style={card.location} numberOfLines={1}>{mfg.city}, {mfg.country}</Text>
           <View style={card.ratingRow}>
             <Feather name="star" size={12} color={GOLD} />
             <Text style={card.ratingText}>{mfg.reviewCount > 0 ? mfg.rating.toFixed(1) : 'Not rated'}</Text>
@@ -539,52 +559,27 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
         </View>
       </View>
 
-      <View style={card.divider} />
-
-      {/* Row 2: specialties + stats */}
-      <Text style={card.specialties} numberOfLines={1}>
+      <Text style={card.specialties} numberOfLines={2}>
         {(Array.isArray(mfg.specialties) ? mfg.specialties : []).slice(0, 3).join(' • ')}
       </Text>
-      <Text style={card.stats}>
-        MOQ: {mfg.moq || 'Contact'} · Lead: {mfg.leadTimeDays ? `${mfg.leadTimeDays}d` : 'Contact'}
-        {mfg.unitPriceMinCents > 0 ? ` · ${formatCents(mfg.unitPriceMinCents)}–${formatCents(mfg.unitPriceMaxCents)}/unit` : ''}
-      </Text>
-      <Text style={card.response}>{mfg.responseTimeHours > 0 ? `Response: ~${mfg.responseTimeHours}h` : 'Response time not provided'}</Text>
-
-      <View style={card.divider} />
-
-      {/* Certifications */}
-      {Array.isArray(mfg.certifications) && mfg.certifications.length > 0 && (
-        <View style={card.certRow}>
-          {mfg.certifications.map(cert => (
-            <View key={cert.id} style={card.certChip}>
-              <Text style={card.certText}>{cert.name}</Text>
-            </View>
-          ))}
-        </View>
-      )}
-
-      <View style={card.divider} />
+      <View style={card.detailStack}>
+        <Text style={card.stats} numberOfLines={1}>MOQ {mfg.moq || 'Contact'} · {mfg.leadTimeDays ? `${mfg.leadTimeDays}d lead` : 'Lead time varies'}</Text>
+        <Text style={card.response} numberOfLines={1}>{mfg.responseTimeHours > 0 ? `Replies in ~${mfg.responseTimeHours}h` : 'Response time not provided'}</Text>
+      </View>
 
       {/* Actions */}
       <View style={card.actionRow}>
         <TouchableOpacity
-          style={[card.heartBtn, saving && { opacity: 0.55 }]}
-          onPress={onSave}
-          disabled={saving}
+          style={card.iconAction}
+          onPress={onMessage}
           activeOpacity={0.7}
           accessibilityRole="button"
-          accessibilityLabel={saved ? `Remove ${mfg.name} from favorites` : `Add ${mfg.name} to favorites`}
+          accessibilityLabel={`Message ${mfg.name}`}
         >
-          <Feather name={saved ? 'heart' : 'heart'} size={ICON.sm} color={saved ? RED : MUTED} />
-          <Text style={[card.actionLabel, saved && { color: RED }]}>{saving ? 'Saving…' : saved ? 'Saved' : 'Save'}</Text>
+          <Feather name="mail" size={15} color={theme.secondary} />
         </TouchableOpacity>
-        <TouchableOpacity style={[card.actionBtn, { borderColor: theme.secondary }]} onPress={onMessage} activeOpacity={0.7}>
-          <Feather name="mail" size={ICON.sm} color={theme.secondary} />
-          <Text style={[card.actionLabel, { color: theme.secondary }]}>Message</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[card.actionBtn, card.profileBtn, { backgroundColor: theme.accent, borderColor: theme.accent }]} onPress={onProfile} activeOpacity={0.7}>
-          <Text style={[card.profileBtnText, { color: theme.onAccent }]}>View profile</Text>
+        <TouchableOpacity style={[card.profileBtn, { backgroundColor: theme.accent, borderColor: theme.accent }]} onPress={onQuote} activeOpacity={0.7}>
+          <Text style={[card.profileBtnText, { color: theme.onAccent }]}>Request quote</Text>
           <Feather name="arrow-right" size={ICON.sm} color={theme.onAccent} />
         </TouchableOpacity>
       </View>
@@ -593,32 +588,30 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
 }
 
 const card = StyleSheet.create({
-  root:          { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginHorizontal: SP.md, marginBottom: SP.md, padding: SP.md },
-  topRow:        { flexDirection: 'row', gap: SP.md, marginBottom: SP.sm },
-  avatar:        { width: 44, height: 44, borderRadius: 22, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER_ACTIVE },
-  avatarText:    { fontSize: FS.md, fontFamily: FONT.bold, color: PURPLE_LIGHT },
+  root:          { flex: 1, minWidth: 0, backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginBottom: SP.sm, padding: SP.sm },
+  cover:         { height: 112, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: PURPLE_DIM, position: 'relative', marginBottom: SP.sm },
+  coverImage:    { width: '100%', height: '100%' },
+  coverFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  coverFallbackText: { fontSize: 34, fontFamily: FONT.bold, color: PURPLE_LIGHT },
+  saveOverlay:   { position: 'absolute', top: 7, right: 7, width: 28, height: 28, borderRadius: 14, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
+  topRow:        { marginBottom: SP.xs },
   nameCol:       { flex: 1 },
   nameRow:       { flexDirection: 'row', alignItems: 'center', gap: SP.xs, flexWrap: 'wrap' },
-  name:          { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, flex: 1 },
-  verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: RADIUS.pill, paddingHorizontal: 6, paddingVertical: 2 },
+  name:          { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, flex: 1 },
+  verifiedBadge: { width: 17, height: 17, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
   verifiedText:  { fontSize: FS.xs, fontFamily: FONT.semibold, color: CYAN },
-  location:      { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 1 },
+  location:      { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
   ratingRow:     { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
-  ratingText:    { fontSize: FS.sm, fontFamily: FONT.semibold, color: GOLD },
+  ratingText:    { fontSize: FS.xs, fontFamily: FONT.semibold, color: GOLD },
   reviewCount:   { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
-  divider:       { height: 1, backgroundColor: BORDER, marginVertical: SP.sm },
-  specialties:   { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED, marginBottom: SP.xs },
-  stats:         { fontSize: FS.sm, fontFamily: FONT.regular, color: FG, marginBottom: SP.xs },
-  response:      { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED },
-  certRow:       { flexDirection: 'row', flexWrap: 'wrap', gap: SP.xs },
-  certChip:      { backgroundColor: 'rgba(16,185,129,0.12)', borderRadius: RADIUS.pill, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: 'rgba(16,185,129,0.25)' },
-  certText:      { fontSize: FS.xs, fontFamily: FONT.semibold, color: SUCCESS },
-  actionRow:     { flexDirection: 'row', gap: SP.sm, alignItems: 'center' },
-  heartBtn:      { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: SP.sm, paddingVertical: SP.xs, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER },
-  actionBtn:     { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: SP.sm, paddingVertical: SP.xs, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER },
-  actionLabel:   { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
-  profileBtn:    { flex: 1, justifyContent: 'center', backgroundColor: PURPLE, borderColor: PURPLE },
-  profileBtnText:{ fontSize: FS.sm, fontFamily: FONT.semibold, color: ON_DARK },
+  specialties:   { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, marginBottom: SP.xs, minHeight: 28 },
+  detailStack:   { minHeight: 36, marginBottom: SP.sm },
+  stats:         { fontSize: FS.xs, fontFamily: FONT.regular, color: FG, marginBottom: 3 },
+  response:      { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED },
+  actionRow:     { flexDirection: 'row', gap: SP.xs, alignItems: 'center' },
+  iconAction:    { width: 32, height: 32, borderRadius: RADIUS.sm, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  profileBtn:    { flex: 1, minHeight: 32, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3, borderRadius: RADIUS.sm, borderWidth: 1 },
+  profileBtnText:{ fontSize: FS.xs, fontFamily: FONT.semibold, color: ON_DARK },
 });
 
 // ─── Filter Modal ─────────────────────────────────────────────────────────────
@@ -1442,6 +1435,8 @@ const s = StyleSheet.create({
   planErrorText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.medium, color: ORANGE },
   content:      { flex: 1 },
   listContent:  { paddingTop: SP.md, paddingBottom: SP.xxl + COMP.tabBarH },
+  gridContent:  { paddingHorizontal: SP.md },
+  gridRow:      { gap: SP.sm, alignItems: 'stretch' },
   sectionHeader:{ marginBottom: SP.xs },
   searchRow:    { flexDirection: 'row', alignItems: 'center', gap: SP.sm, paddingHorizontal: SP.md, paddingVertical: SP.sm },
   searchToggle: { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },

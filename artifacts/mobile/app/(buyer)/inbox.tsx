@@ -46,16 +46,12 @@ function previewText(lastMessage: string | undefined, fallback: string): string 
 
 // ─── Segment tabs ─────────────────────────────────────────────────────────────
 
-const TABS = ['All', 'Friends', 'Sellers', 'Orders', 'Requests', 'Archived'] as const;
+const TABS = ['Messages', 'Requests'] as const;
 type Tab = typeof TABS[number];
 
 const EMPTY_MESSAGES: Record<Tab, { icon: keyof typeof Feather.glyphMap; title: string; subtitle: string }> = {
-  All:      { icon: 'message-circle', title: 'No conversations yet',     subtitle: 'Start a conversation' },
-  Friends:  { icon: 'message-circle', title: 'No friend messages',       subtitle: 'Message a friend to get started' },
-  Sellers:  { icon: 'message-circle', title: 'No seller conversations',  subtitle: 'Message a brand to get started' },
-  Orders:   { icon: 'package',        title: 'No order messages',         subtitle: 'Order messages will appear here' },
-  Requests: { icon: 'mail',           title: 'No message requests',       subtitle: 'Requests from new senders appear here' },
-  Archived: { icon: 'archive',        title: 'No archived conversations', subtitle: 'Archived chats appear here' },
+  Messages: { icon: 'message-circle', title: 'No messages yet', subtitle: 'Start a conversation' },
+  Requests: { icon: 'mail', title: 'No message requests', subtitle: 'Requests from new senders appear here' },
 };
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -68,7 +64,7 @@ export default function InboxScreen() {
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [stories, setStories] = useState<Story[]>([]);
-  const [activeTab, setActiveTab] = useState<Tab>('All');
+  const [activeTab, setActiveTab] = useState<Tab>('Messages');
   const [searchQuery, setSearchQuery] = useState('');
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const [requestActionLoading, setRequestActionLoading] = useState<string | null>(null);
@@ -105,12 +101,8 @@ export default function InboxScreen() {
     // Tab filter
     let tabMatch = false;
     switch (activeTab) {
-      case 'All':      tabMatch = !conv.isArchived; break;
-      case 'Friends':  tabMatch = conv.type === 'buyer_to_buyer' && !conv.isArchived && !conv.isRequest; break;
-      case 'Sellers':  tabMatch = (conv.type === 'buyer_to_seller' || conv.type === 'buyer_to_seller_product') && !conv.isArchived && !conv.isRequest; break;
-      case 'Orders':   tabMatch = conv.type === 'buyer_to_seller_order' && !conv.isArchived; break;
+      case 'Messages': tabMatch = !conv.isArchived && !conv.isRequest; break;
       case 'Requests': tabMatch = conv.isRequest === true && !conv.isArchived; break;
-      case 'Archived': tabMatch = conv.isArchived === true; break;
     }
     if (!tabMatch) return false;
     // Search filter
@@ -224,9 +216,10 @@ export default function InboxScreen() {
 
           {/* Info */}
           <View style={s.convCenter}>
-            <Text style={[s.convName, { fontFamily: FONT.semibold }]} numberOfLines={1}>
-              {participant.name}
-            </Text>
+            <View style={s.convNameRow}>
+              <Text style={[s.convName, { fontFamily: FONT.semibold }]} numberOfLines={1}>{participant.name}</Text>
+              {conv.lastMessageTs ? <Text style={s.convTime}>{timeAgo(conv.lastMessageTs)}</Text> : null}
+            </View>
             <Text style={[s.convPreview]} numberOfLines={1}>
               {previewText(conv.lastMessage, 'Sent you a message')}
             </Text>
@@ -363,6 +356,27 @@ export default function InboxScreen() {
         </View>
       </View>
 
+      {/* Primary Social tabs */}
+      <View style={s.primaryTabs}>
+        {TABS.map(tab => {
+          const isActive = activeTab === tab;
+          const count = tab === 'Requests' ? conversations.filter(conv => conv.isRequest && !conv.isArchived).length : conversations.filter(conv => !conv.isRequest && !conv.isArchived && conv.unreadCount > 0).length;
+          return (
+            <TouchableOpacity
+              key={tab}
+              style={[s.primaryTab, isActive && { borderBottomColor: theme.accent }]}
+              onPress={() => setActiveTab(tab)}
+              activeOpacity={0.8}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+            >
+              <Text style={[s.primaryTabText, isActive && { color: FG }]}>{tab}</Text>
+              {count > 0 && <View style={[s.primaryTabBadge, { backgroundColor: theme.accent }]}><Text style={[s.primaryTabBadgeText, { color: theme.onAccent }]}>{count > 9 ? '9+' : count}</Text></View>}
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
       {/* Stories row */}
       <ScrollView
         horizontal
@@ -430,33 +444,6 @@ export default function InboxScreen() {
         )}
       </View>
 
-      {/* Segment tabs */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={s.tabsContent}
-        style={s.tabsRow}
-      >
-        {TABS.map(tab => {
-          const isActive = activeTab === tab;
-          return (
-            <TouchableOpacity
-              key={tab}
-              style={[
-                s.tabPill,
-                isActive
-                  ? { backgroundColor: theme.accentDim, borderColor: theme.accent }
-                  : { backgroundColor: CARD, borderColor: BORDER },
-              ]}
-              onPress={() => setActiveTab(tab)}
-              activeOpacity={0.75}
-            >
-              <Text style={[s.tabText, { color: isActive ? theme.accent : MUTED }]}>{tab}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
       {/* Conversations list */}
       <FlatList
         data={filteredConvs}
@@ -501,6 +488,25 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
+  primaryTabs: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: BORDER,
+    marginTop: SP.xs,
+  },
+  primaryTab: {
+    flex: 1,
+    minHeight: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SP.xs,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  primaryTabText: { fontSize: FS.base, fontFamily: FONT.semibold, color: MUTED },
+  primaryTabBadge: { minWidth: 18, height: 18, borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
+  primaryTabBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold },
   notifBadge: {
     position: 'absolute',
     top: 4,
