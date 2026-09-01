@@ -892,10 +892,12 @@ function AuthStep({
         <View style={sa.inputWrap}>
           <Text style={sa.label}>Choose your @username</Text>
           <TextInput
+            testID="onboarding-username-input"
             style={[sa.input, usernameError ? { borderColor: 'rgba(248,113,113,0.5)' } : undefined]}
             placeholder="e.g. alex_style"
             placeholderTextColor={MUTED2}
             value={username}
+            editable
             onChangeText={v => {
               // Strip disallowed chars on the fly — no spaces or special characters
               const cleaned = v.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 30);
@@ -921,10 +923,12 @@ function AuthStep({
         <View style={sa.inputWrap}>
           <Text style={sa.label}>Referral code (optional)</Text>
           <TextInput
+            testID="onboarding-referral-input"
             style={sa.input}
             placeholder="e.g. FASHION"
             placeholderTextColor={MUTED2}
             value={referralCode}
+            editable
             onChangeText={v => onReferralCodeChange(v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12))}
             autoCapitalize="characters"
             autoCorrect={false}
@@ -1737,7 +1741,7 @@ export default function OnboardingScreen() {
       <Animated.View style={[
         sm.stepWrap,
         isAccountTypeStep && sm.accountTypeStepWrap,
-        { transform: [{ translateX: slideAnim }] },
+        isAuthStep ? sm.interactiveStepWrap : { transform: [{ translateX: slideAnim }] },
       ]}>
         {renderStep()}
       </Animated.View>
@@ -1759,7 +1763,7 @@ export default function OnboardingScreen() {
 }
 
 const sm = StyleSheet.create({
-  header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 12, gap: 8 },
+  header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 12, gap: 8, zIndex: 3 },
   progressOverlay: {
     position: 'absolute',
     top: 0,
@@ -1774,6 +1778,7 @@ const sm = StyleSheet.create({
   backBtn:   { width: 36, height: 36, justifyContent: 'center' },
   progressLabel: { width: 64, fontSize: 11, fontFamily: 'Inter_500Medium', color: MUTED, textAlign: 'right' },
   stepWrap:  { flex: 1, paddingHorizontal: 24 },
+  interactiveStepWrap: { position: 'relative', zIndex: 2 },
   accountTypeStepWrap: { paddingHorizontal: 0 },
   footer:    { paddingHorizontal: 24, paddingTop: 12 },
   backgroundDim: {

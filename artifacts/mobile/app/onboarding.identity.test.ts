@@ -27,3 +27,28 @@ describe("seller onboarding identity handoff", () => {
     expect(complete).toBeGreaterThan(brandWrite);
   });
 });
+
+describe("signup identity inputs", () => {
+  it("keeps username and referral fields editable, controlled, and above the animated layer", () => {
+    const usernameInput = source.indexOf('testID="onboarding-username-input"');
+    const referralInput = source.indexOf('testID="onboarding-referral-input"');
+
+    expect(usernameInput).toBeGreaterThan(-1);
+    expect(referralInput).toBeGreaterThan(usernameInput);
+    expect(source.slice(usernameInput, referralInput)).toContain("value={username}");
+    expect(source.slice(usernameInput, referralInput)).toContain("onUsernameChange(cleaned)");
+    expect(source.slice(usernameInput, referralInput)).toContain("editable");
+
+    const referralSection = source.slice(referralInput, referralInput + 600);
+    expect(referralSection).toContain("value={referralCode}");
+    expect(referralSection).toContain("onReferralCodeChange(");
+    expect(referralSection).toContain("editable");
+
+    expect(source).toContain(
+      "isAuthStep ? sm.interactiveStepWrap : { transform: [{ translateX: slideAnim }] }",
+    );
+    expect(source).toContain(
+      "interactiveStepWrap: { position: 'relative', zIndex: 2 }",
+    );
+  });
+});
