@@ -725,6 +725,33 @@ export interface ThreadFeedCursor {
   generalDone: boolean;
   seenPostIds: string[];
 }
+export type ThreadFeedMode = 'following' | 'for-you' | 'mixed';
+
+export interface SellerFollowState {
+  isFollowing: boolean;
+  followersCount?: number;
+}
+
+export async function getSellerFollowState(sellerId: string): Promise<SellerFollowState> {
+  return serviceRequest<SellerFollowState>(
+    `/api/social/status/${encodeURIComponent(sellerId)}`,
+  );
+}
+
+export async function setSellerFollowing(
+  sellerId: string,
+  following: boolean,
+): Promise<SellerFollowState> {
+  return serviceRequest<SellerFollowState>(
+    following
+      ? '/api/social/follow'
+      : `/api/social/follow/${encodeURIComponent(sellerId)}`,
+    following
+      ? { method: 'POST', body: JSON.stringify({ userId: sellerId }) }
+      : { method: 'DELETE' },
+  );
+}
+
 /** Backwards-compatible one-shot page loader for non-paginated callers. */
 export async function getThreadPosts(offset = 0, limit = 30): Promise<SellerThreadPost[]> {
   const cursor = createThreadFeedCursor();
@@ -1250,6 +1277,7 @@ export async function searchProfiles(query: string): Promise<ProfileSearchResult
 export async function getThreadPostsPage(
   cursor: ThreadFeedCursor = createThreadFeedCursor(),
   limit = 30,
+  mode: ThreadFeedMode = 'mixed',
 ): Promise<ThreadFeedPage> {
   const pageLimit = Number.isFinite(limit) ? Math.min(50, Math.max(1, Math.floor(limit))) : 30;
   const next: ThreadFeedCursor = {
@@ -1262,6 +1290,12 @@ export async function getThreadPostsPage(
   const seen = new Set(next.seenPostIds);
   const rows: any[] = [];
 
+  if (mode === 'following') {
+    next.generalDone = true;
+  } else if (mode === 'for-you') {
+    next.followedDone = true;
+  }
+
   const addUnique = (sourceRows: any[]) => {
     for (const row of sourceRows) {
       if (rows.length >= pageLimit) break;
@@ -1272,17 +1306,24 @@ export async function getThreadPostsPage(
   };
 
   while (rows.length < pageLimit && !next.followedDone) {
-    const followed = await requestThreadSource(
-      '/api/posts/feed',
-      next.followedOffset,
-      pageLimit,
-    );
+    let followed: any[];
+    try {
+      followed = await requestThreadSource(
+        '/api/posts/feed',
+        next.followedOffset,
+        pageLimit,
+      );
+    } catch (error) {
+      if (mode !== 'mixed') throw error;
+      next.followedDone = true;
+      break;
+    }
     next.followedOffset += followed.length;
     addUnique(followed);
     if (followed.length < pageLimit) next.followedDone = true;
   }
 
-  while (rows.length < pageLimit && next.followedDone && !next.generalDone) {
+  while (rows.length < pageLimit && !next.generalDone) {
     const general = await requestThreadSource(
       '/api/public/posts',
       next.generalOffset,
@@ -1317,10 +1358,9 @@ async function requestThreadSource(
   limit: number,
 ): Promise<any[]> {
   const query = `?limit=${limit}&offset=${offset}`;
-  return serviceRequest(`${path}${query}`).then(
-    (response) => (Array.isArray(response) ? response as any[] : []),
-    () => [] as any[],
-  );
+  const response = await serviceRequest(`${path}${query}`);
+  if (!Array.isArray(response)) throw new Error('Invalid Thread feed response');
+  return response as any[];
 }
 
 export interface ThreadFeedPage {

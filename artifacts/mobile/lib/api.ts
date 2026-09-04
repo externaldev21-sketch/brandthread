@@ -1284,13 +1284,13 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     social: {
       /** Follow another buyer */
       follow: (userId: string) =>
-        post<{ ok: boolean }>('/api/social/follow', { userId }),
+        post<{ ok: boolean; isFollowing: boolean; followersCount: number }>('/api/social/follow', { userId }),
       /** Unfollow a buyer */
       unfollow: (userId: string) =>
-        del<{ ok: boolean }>(`/api/social/follow/${encodeURIComponent(userId)}`),
+        del<{ ok: boolean; isFollowing: boolean; followersCount: number }>(`/api/social/follow/${encodeURIComponent(userId)}`),
       /** Check follow status between me and another user */
       status: (userId: string) =>
-        get<{ isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean }>(
+        get<{ isFollowing: boolean; isFollowedBy: boolean; isMutual: boolean; followersCount: number }>(
           `/api/social/status/${encodeURIComponent(userId)}`
         ),
       /** Get a buyer's public profile + follow counts */

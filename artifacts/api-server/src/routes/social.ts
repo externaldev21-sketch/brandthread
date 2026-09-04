@@ -57,6 +57,14 @@ function countOne(arr: { n: number }[] | undefined) {
   return arr?.[0]?.n ?? 0;
 }
 
+async function followerCount(userId: string): Promise<number> {
+  const [row] = await db
+    .select({ n: sql<number>`cast(count(*) as int)` })
+    .from(follows)
+    .where(eq(follows.followingId, userId));
+  return row?.n ?? 0;
+}
+
 async function buildBuyerPosts(viewerId: string, authorIds: string[], limit: number, offset: number) {
   if (authorIds.length === 0) return [];
   const rows = await db.select({
@@ -192,7 +200,7 @@ router.post("/follow", async (req, res) => {
     })();
   }
 
-  res.json({ ok: true });
+  res.json({ ok: true, isFollowing: true, followersCount: await followerCount(userId) });
 });
 
 // ─── DELETE /api/social/follow/:userId ───────────────────────────────────────
@@ -201,7 +209,7 @@ router.delete("/follow/:userId", async (req, res) => {
   const target = req.params.userId;
   await db.delete(follows)
     .where(and(eq(follows.followerId, myId), eq(follows.followingId, target)));
-  res.json({ ok: true });
+  res.json({ ok: true, isFollowing: false, followersCount: await followerCount(target) });
 });
 
 // ─── GET /api/social/status/:userId ──────────────────────────────────────────
@@ -220,7 +228,12 @@ router.get("/status/:userId", async (req, res) => {
 
   const isFollowing  = (iFollowRow?.n   ?? 0) > 0;
   const isFollowedBy = (theyFollowRow?.n ?? 0) > 0;
-  res.json({ isFollowing, isFollowedBy, isMutual: isFollowing && isFollowedBy });
+  res.json({
+    isFollowing,
+    isFollowedBy,
+    isMutual: isFollowing && isFollowedBy,
+    followersCount: await followerCount(other),
+  });
 });
 
 // ─── GET /api/social/profile/:userId ─────────────────────────────────────────

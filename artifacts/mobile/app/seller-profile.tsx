@@ -25,6 +25,7 @@ import type { Product } from '@/services/productTypes';
 import { useApi } from '@/hooks/useApi';
 import { useColors } from '@/hooks/useColors';
 import { formatCents } from '@/lib/money';
+import { getSellerFollowState, setSellerFollowing } from '@/services/socialService';
 import { BG, SURFACE, CARD, BORDER, FG, MUTED, BLUE, ORANGE, RED, FONT, FS, SP, RADIUS } from '@/lib/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -343,6 +344,7 @@ export default function SellerProfileScreen() {
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [followPending, setFollowPending] = useState(false);
 
   // Load seller data from the real API. Never fill a signed-in view with demo data.
   useEffect(() => {
@@ -365,14 +367,16 @@ export default function SellerProfileScreen() {
         } else {
           if (!sellerId) throw new Error('Seller not found.');
           api.publicSellers.recordVisit(sellerId).catch(() => {});
-          const [data, postRows] = await Promise.all([
+          const [data, postRows, followState] = await Promise.all([
             api.publicSellers.get(sellerId),
             api.posts.publicList(sellerId),
+            getSellerFollowState(sellerId),
           ]);
           const sellerPosts = postRows.map(mapApiPost);
           const products = Array.isArray(data.products) ? data.products as Product[] : [];
           setProfile(mapApiProfile(data.profile ?? {}, sellerPosts.length, products.length));
-          setFollowers(Number(data.profile?.followersCount ?? 0));
+          setFollowers(Number(followState.followersCount ?? data.profile?.followersCount ?? 0));
+          setIsFollowing(followState.isFollowing);
           setProfileImageUrl(typeof data.profile?.profileImageUrl === 'string' ? data.profile.profileImageUrl : null);
           setLiveProducts(products);
           setPosts(sellerPosts);
@@ -399,14 +403,29 @@ export default function SellerProfileScreen() {
 
   const tabs = ['Posts', 'Products'];
 
-  const handleFollow = useCallback(() => {
+  const handleFollow = useCallback(async () => {
+    if (followPending) return;
+    const sellerId = params.id ?? profile.sellerId;
+    if (!sellerId) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setIsFollowing(prev => {
-      const next = !prev;
-      setFollowers(f => next ? f + 1 : f - 1);
-      return next;
-    });
-  }, []);
+    const previousFollowing = isFollowing;
+    const previousFollowers = followers;
+    const next = !previousFollowing;
+    setFollowPending(true);
+    setIsFollowing(next);
+    setFollowers(count => Math.max(0, count + (next ? 1 : -1)));
+    try {
+      const canonical = await setSellerFollowing(sellerId, next);
+      setIsFollowing(canonical.isFollowing);
+      if (canonical.followersCount != null) setFollowers(canonical.followersCount);
+    } catch {
+      setIsFollowing(previousFollowing);
+      setFollowers(previousFollowers);
+      Alert.alert('Couldn’t update follow', 'Check your connection and try again.');
+    } finally {
+      setFollowPending(false);
+    }
+  }, [followPending, followers, isFollowing, params.id, profile.sellerId]);
 
   const handleShare = useCallback(() => {
     Share.share({ message: 'Check out @' + profile.username + ' on Brandthread' });
@@ -602,9 +621,11 @@ export default function SellerProfileScreen() {
                   <TouchableOpacity
                     style={[styles.profileActionBtn, styles.followBtn, isFollowing && styles.followingBtn]}
                     onPress={handleFollow}
+                    disabled={followPending}
+                    accessibilityState={{ disabled: followPending, selected: isFollowing }}
                   >
                     <Text style={[styles.followBtnText, isFollowing && styles.followingBtnText]}>
-                      {isFollowing ? 'Following' : 'Follow'}
+                      {followPending ? 'Updating…' : isFollowing ? 'Following' : 'Follow'}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity

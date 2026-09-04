@@ -9,7 +9,9 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import {
   createThreadFeedCursor,
+  getSellerFollowState,
   getThreadPostsPage,
+  setSellerFollowing,
   subscribeSocial,
 } from '@/services/socialService';
 import type { SellerThreadPost } from '@/services/socialService';
@@ -660,7 +662,7 @@ export default function FeedScreen() {
     else setFeedRefreshing(true);
     setFeedError(null);
     try {
-      const page = await getThreadPostsPage(initialCursor, THREAD_PAGE_SIZE);
+      const page = await getThreadPostsPage(initialCursor, THREAD_PAGE_SIZE, feedTab);
       if (feedGenerationRef.current !== generation) return;
       const rows = page.posts;
       const mapped = (Array.isArray(rows) ? rows : [])
@@ -681,7 +683,7 @@ export default function FeedScreen() {
       if (initial) setFeedLoading(false);
       else setFeedRefreshing(false);
     }
-  }, []);
+  }, [feedTab]);
 
   const loadMoreFeed = useCallback(async () => {
     if (feedLoadingMoreRef.current || !feedHasMoreRef.current || feedLoading || feedRefreshing) return;
@@ -690,7 +692,7 @@ export default function FeedScreen() {
     const generation = feedGenerationRef.current;
     const cursor = feedCursorRef.current;
     try {
-      const page = await getThreadPostsPage(cursor, THREAD_PAGE_SIZE);
+      const page = await getThreadPostsPage(cursor, THREAD_PAGE_SIZE, feedTab);
       if (feedGenerationRef.current !== generation) return;
       const rows = page.posts;
       const mapped = (Array.isArray(rows) ? rows : [])
@@ -715,7 +717,7 @@ export default function FeedScreen() {
       feedLoadingMoreRef.current = false;
       if (feedGenerationRef.current === generation) setFeedLoadingMore(false);
     }
-  }, [feedLoading, feedRefreshing]);
+  }, [feedLoading, feedRefreshing, feedTab]);
 
   useEffect(() => {
     void loadFeed(true);
@@ -768,6 +770,7 @@ export default function FeedScreen() {
   // Live streams are woven in at roughly 1 per 10 regular posts (occasional, not dominant).
   const allItems = useMemo(() => {
     const regular: (SpotlightItem | LiveStreamFeedItem)[] = [...sellerFeedPosts];
+    if (feedTab === 'following') return regular;
     if (!activeLiveStreams.length) return regular;
     // Weave live streams in: first at index 4, then every 10 after
     const result: (SpotlightItem | LiveStreamFeedItem)[] = [...regular];
@@ -776,7 +779,7 @@ export default function FeedScreen() {
       result.splice(insertAt, 0, liveItem);
     });
     return result;
-  }, [sellerFeedPosts, activeLiveStreams]);
+  }, [sellerFeedPosts, activeLiveStreams, feedTab]);
 
   const displayItems = searchQuery.trim()
     ? allItems.filter(item => {
@@ -839,7 +842,54 @@ export default function FeedScreen() {
     try { const { api } = require('@/lib/api'); api.posts.interact(id, { type: 'repost' }).catch(() => {}); } catch {}
   }, []);
 
-  const handleFollow = useCallback((id: string) => update(id, e => ({ following: !e.following })), []);
+  const handleFollow = useCallback((id: string) => {
+    const item = sellerFeedPosts.find(post => post.id === id);
+    if (!item?.sellerId) return;
+    const sellerId = item.sellerId;
+    const wasFollowing = engagements[id]?.following ?? false;
+    setEngagements(prev => Object.fromEntries(Object.entries(prev).map(([postId, state]) => [
+      postId,
+      sellerFeedPosts.find(post => post.id === postId)?.sellerId === sellerId
+        ? { ...state, following: !wasFollowing }
+        : state,
+    ])));
+    void setSellerFollowing(sellerId, !wasFollowing).then((state) => {
+      setEngagements(prev => Object.fromEntries(Object.entries(prev).map(([postId, engagement]) => [
+        postId,
+        sellerFeedPosts.find(post => post.id === postId)?.sellerId === sellerId
+          ? { ...engagement, following: state.isFollowing }
+          : engagement,
+      ])));
+      if (feedTab === 'following' && !state.isFollowing) void loadFeed();
+    }).catch(() => {
+      setEngagements(prev => Object.fromEntries(Object.entries(prev).map(([postId, engagement]) => [
+        postId,
+        sellerFeedPosts.find(post => post.id === postId)?.sellerId === sellerId
+          ? { ...engagement, following: wasFollowing }
+          : engagement,
+      ])));
+      Alert.alert('Couldn’t update follow', 'Check your connection and try again.');
+    });
+  }, [engagements, feedTab, loadFeed, sellerFeedPosts]);
+
+  useEffect(() => {
+    const sellerIds = [...new Set(sellerFeedPosts.map(post => post.sellerId).filter((id): id is string => !!id))];
+    if (sellerIds.length === 0) return;
+    let cancelled = false;
+    void Promise.all(sellerIds.map(async sellerId => [sellerId, await getSellerFollowState(sellerId)] as const))
+      .then(states => {
+        if (cancelled) return;
+        const bySeller = new Map(states);
+        setEngagements(prev => Object.fromEntries(Object.entries(prev).map(([postId, engagement]) => {
+          const sellerId = sellerFeedPosts.find(post => post.id === postId)?.sellerId;
+          return [postId, sellerId && bySeller.has(sellerId)
+            ? { ...engagement, following: bySeller.get(sellerId)!.isFollowing }
+            : engagement];
+        })));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [sellerFeedPosts]);
 
   function handleOpenComments(id: string) {
     const item = allItems.find(i => i.id === id);
@@ -910,14 +960,23 @@ export default function FeedScreen() {
                 No results for "{searchQuery}"
               </Text>
             </View>
+          ) : feedError && displayItems.length === 0 ? (
+            <View style={{ width: SCREEN_W, height: SCREEN_H, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 40 }}>
+              <Feather name="alert-circle" size={40} color={MUTED} />
+              <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center' }}>Couldn’t load Thread</Text>
+              <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' }}>{feedError}</Text>
+              <TouchableOpacity onPress={() => void loadFeed(true)}>
+                <Text style={{ color: PURPLE, fontFamily: FONT.semibold }}>Try again</Text>
+              </TouchableOpacity>
+            </View>
           ) : !feedLoading ? (
             <View style={{ width: SCREEN_W, height: SCREEN_H, alignItems: 'center', justifyContent: 'center', gap: 14, paddingHorizontal: 40 }}>
               <Feather name="film" size={40} color={MUTED} />
               <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, textAlign: 'center' }}>
-                No posts yet
+                {feedTab === 'following' ? 'No posts from followed sellers yet' : 'No posts yet'}
               </Text>
               <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', lineHeight: 20 }}>
-                Follow sellers to see their drops here
+                {feedTab === 'following' ? 'Follow sellers to build your Following feed' : 'Check back soon for new drops'}
               </Text>
             </View>
           ) : null
@@ -1043,7 +1102,10 @@ export default function FeedScreen() {
               <TouchableOpacity
                 key={key}
                 style={styles.feedTab}
-                onPress={() => setFeedTab(key)}
+                onPress={() => {
+                  setActiveIndex(0);
+                  setFeedTab(key);
+                }}
                 accessibilityRole="tab"
                 accessibilityState={{ selected: feedTab === key }}
               >

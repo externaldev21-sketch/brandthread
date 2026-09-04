@@ -115,4 +115,28 @@ describe('Thread feed pagination', () => {
       generalOffset: 0,
     });
   });
+
+  it('switches between followed-only and public-only sources without mixing tabs', async () => {
+    serviceRequest.mockImplementation(async (path: string) => (
+      path.startsWith('/api/posts/feed') ? [apiPost('followed')] : [apiPost('public')]
+    ));
+
+    const following = await getThreadPostsPage(createThreadFeedCursor(), 2, 'following');
+    const forYou = await getThreadPostsPage(createThreadFeedCursor(), 2, 'for-you');
+
+    expect(following.posts.map(post => post.id)).toEqual(['followed']);
+    expect(forYou.posts.map(post => post.id)).toEqual(['public']);
+    expect(serviceRequest.mock.calls.map(([path]) => path)).toEqual([
+      '/api/posts/feed?limit=2&offset=0',
+      '/api/public/posts?limit=2&offset=0',
+    ]);
+  });
+
+  it('keeps followed-feed failures truthful instead of falling through to public posts', async () => {
+    serviceRequest.mockRejectedValue(new Error('offline'));
+
+    await expect(getThreadPostsPage(createThreadFeedCursor(), 2, 'following'))
+      .rejects.toThrow('offline');
+    expect(serviceRequest).toHaveBeenCalledTimes(1);
+  });
 });
