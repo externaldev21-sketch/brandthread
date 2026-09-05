@@ -65,6 +65,10 @@ async function followerCount(userId: string): Promise<number> {
   return row?.n ?? 0;
 }
 
+function relationshipLockKey(firstUserId: string, secondUserId: string): string {
+  return JSON.stringify([firstUserId, secondUserId].sort());
+}
+
 async function buildBuyerPosts(viewerId: string, authorIds: string[], limit: number, offset: number) {
   if (authorIds.length === 0) return [];
   const rows = await db.select({
@@ -164,17 +168,19 @@ router.post("/follow", async (req, res) => {
     .from(users).where(eq(users.clerkId, userId)).limit(1);
   if (!target) { res.status(404).json({ error: "User not found" }); return; }
 
-  // Cannot follow someone who has blocked you
-  const [blockRow] = await db.select({ blockerId: blocks.blockerId }).from(blocks)
-    .where(and(eq(blocks.blockerId, userId), eq(blocks.blockedId, myId))).limit(1);
-  if (blockRow) { res.status(403).json({ error: "Unable to follow this user.", code: "BLOCKED" }); return; }
-
   const result = await db.transaction(async (tx) => {
     await tx.execute(sql`
       SELECT pg_advisory_xact_lock(
-        hashtextextended(${JSON.stringify([myId, userId])}, 0)
+        hashtextextended(${relationshipLockKey(myId, userId)}, 0)
       )
     `);
+    const [blockRow] = await tx.select({ blockerId: blocks.blockerId }).from(blocks)
+      .where(or(
+        and(eq(blocks.blockerId, userId), eq(blocks.blockedId, myId)),
+        and(eq(blocks.blockerId, myId), eq(blocks.blockedId, userId)),
+      )).limit(1);
+    if (blockRow) return { blocked: true as const, inserted: [], followersCount: 0 };
+
     const inserted = await tx.insert(follows)
       .values({ followerId: myId, followingId: userId })
       .onConflictDoNothing()
@@ -183,8 +189,11 @@ router.post("/follow", async (req, res) => {
       .select({ n: sql<number>`cast(count(*) as int)` })
       .from(follows)
       .where(eq(follows.followingId, userId));
-    return { inserted, followersCount: countRow?.n ?? 0 };
+    return { blocked: false as const, inserted, followersCount: countRow?.n ?? 0 };
   });
+  if (result.blocked) {
+    res.status(403).json({ error: "Unable to follow this user.", code: "BLOCKED" }); return;
+  }
 
   // Only notify when this is a genuinely new follow (not a duplicate/retry)
   if (result.inserted.length > 0) {
@@ -224,7 +233,7 @@ router.delete("/follow/:userId", async (req, res) => {
   const followersCount = await db.transaction(async (tx) => {
     await tx.execute(sql`
       SELECT pg_advisory_xact_lock(
-        hashtextextended(${JSON.stringify([myId, target])}, 0)
+        hashtextextended(${relationshipLockKey(myId, target)}, 0)
       )
     `);
     await tx.delete(follows)
@@ -628,15 +637,19 @@ router.post("/block", async (req, res) => {
     res.status(400).json({ error: "Cannot block yourself" }); return;
   }
 
-  // Upsert block record
-  await db.insert(blocks).values({ blockerId: myId, blockedId: userId })
-    .onConflictDoNothing();
-
-  // Remove any mutual follow relationship in both directions
-  await Promise.all([
-    db.delete(follows).where(and(eq(follows.followerId, myId),    eq(follows.followingId, userId))),
-    db.delete(follows).where(and(eq(follows.followerId, userId),  eq(follows.followingId, myId))),
-  ]);
+  await db.transaction(async (tx) => {
+    await tx.execute(sql`
+      SELECT pg_advisory_xact_lock(
+        hashtextextended(${relationshipLockKey(myId, userId)}, 0)
+      )
+    `);
+    await tx.insert(blocks).values({ blockerId: myId, blockedId: userId })
+      .onConflictDoNothing();
+    await tx.delete(follows).where(or(
+      and(eq(follows.followerId, myId), eq(follows.followingId, userId)),
+      and(eq(follows.followerId, userId), eq(follows.followingId, myId)),
+    ));
+  });
 
   res.json({ ok: true });
 });

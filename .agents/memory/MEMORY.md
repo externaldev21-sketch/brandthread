@@ -89,3 +89,4 @@
 - [Notification measurement integrity](notification-measurement-integrity.md) — Expo tickets are provider results, not receipts; client events need stable IDs and an account-scoped durable outbox.
 - [Post-merge setup timeout](post-merge-timeout.md) — allow five minutes for cold or forced pnpm relinks before migrations and the API build.
 - [OpenAPI integer validation](openapi-integer-validation.md) — generated validators may accept fractions for integer fields; enforce integer semantics at sensitive server boundaries.
+- [Social relationship locking](social-relationship-locking.md) — pairwise follow/block mutations share one unordered-user lock; block checks happen inside the locked transaction.
