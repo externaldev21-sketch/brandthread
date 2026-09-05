@@ -169,11 +169,25 @@ router.post("/follow", async (req, res) => {
     .where(and(eq(blocks.blockerId, userId), eq(blocks.blockedId, myId))).limit(1);
   if (blockRow) { res.status(403).json({ error: "Unable to follow this user.", code: "BLOCKED" }); return; }
 
-  const inserted = await db.insert(follows).values({ followerId: myId, followingId: userId })
-    .onConflictDoNothing().returning();
+  const result = await db.transaction(async (tx) => {
+    await tx.execute(sql`
+      SELECT pg_advisory_xact_lock(
+        hashtextextended(${JSON.stringify([myId, userId])}, 0)
+      )
+    `);
+    const inserted = await tx.insert(follows)
+      .values({ followerId: myId, followingId: userId })
+      .onConflictDoNothing()
+      .returning();
+    const [countRow] = await tx
+      .select({ n: sql<number>`cast(count(*) as int)` })
+      .from(follows)
+      .where(eq(follows.followingId, userId));
+    return { inserted, followersCount: countRow?.n ?? 0 };
+  });
 
   // Only notify when this is a genuinely new follow (not a duplicate/retry)
-  if (inserted.length > 0) {
+  if (result.inserted.length > 0) {
     (async () => {
       try {
         const [follower] = await db
@@ -200,16 +214,28 @@ router.post("/follow", async (req, res) => {
     })();
   }
 
-  res.json({ ok: true, isFollowing: true, followersCount: await followerCount(userId) });
+  res.json({ ok: true, isFollowing: true, followersCount: result.followersCount });
 });
 
 // ─── DELETE /api/social/follow/:userId ───────────────────────────────────────
 router.delete("/follow/:userId", async (req, res) => {
   const myId   = (req as any).clerkUserId as string;
   const target = req.params.userId;
-  await db.delete(follows)
-    .where(and(eq(follows.followerId, myId), eq(follows.followingId, target)));
-  res.json({ ok: true, isFollowing: false, followersCount: await followerCount(target) });
+  const followersCount = await db.transaction(async (tx) => {
+    await tx.execute(sql`
+      SELECT pg_advisory_xact_lock(
+        hashtextextended(${JSON.stringify([myId, target])}, 0)
+      )
+    `);
+    await tx.delete(follows)
+      .where(and(eq(follows.followerId, myId), eq(follows.followingId, target)));
+    const [countRow] = await tx
+      .select({ n: sql<number>`cast(count(*) as int)` })
+      .from(follows)
+      .where(eq(follows.followingId, target));
+    return countRow?.n ?? 0;
+  });
+  res.json({ ok: true, isFollowing: false, followersCount });
 });
 
 // ─── GET /api/social/status/:userId ──────────────────────────────────────────
