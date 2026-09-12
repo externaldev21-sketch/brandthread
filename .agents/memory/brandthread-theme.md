@@ -14,6 +14,12 @@ description: Which color system is canonical in the mobile app, which older pale
 
 **How to apply:** base surfaces and typography come from `lib/theme.ts`; the compatibility `useColors()` background and onboarding must resolve to the same canonical BG (`#07070F`) so buyer, seller, and auth flows never split into navy and near-black variants. Runtime accent/chrome values and multi-stop action gradients come from the shared app-theme provider. Static accent exports are chrome-only startup fallbacks, not screen styling APIs. After a rebrand, grep every route for stale fixed accent hexes, including onboarding and secondary screens. Preserve semantic status colors and intentional artwork/color-picker choices.
 
+**Onboarding visual-background rule:** Matching onboarding's flat `BG` token does not reproduce onboarding's appearance. Its visible silk ribbons, metallic gradients, trails, and particles come from `AnimatedGradientBackground`, currently mounted only by auth/onboarding routes.
+
+**Why:** A prior app-wide background request changed `#07080A` to onboarding's `#07070F`, but the difference was visually negligible and left buyer/seller screens flat because they did not render the layered background component.
+
+**How to apply:** When asked to make app screens look like onboarding, treat it as shared background-layer work, not a hex-token replacement. Mount an appropriate shared layer and ensure route roots do not paint an opaque background over it; verify onboarding and representative buyer/seller screenshots side by side.
+
 **Accent contrast rule:** Text, icons, and loading indicators directly on runtime accent fills use the preset's `onAccent`. Labels on runtime gradients also use the shared inverse text-shadow helper.
 
 **Why:** Chrome and other metallic gradients cross dark and light stops inside one control, so a fixed white label—or even an unshadowed theme foreground—can lose contrast within the same button.
