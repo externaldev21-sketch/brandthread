@@ -364,7 +364,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE_DIM = theme.accentDim;
   const PURPLE_LIGHT = theme.accentLight;
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: 'transparent' },
   header: {
     flexDirection: 'row', alignItems: 'center', gap: SP.sm,
     paddingHorizontal: SP.md, paddingVertical: SP.sm,

@@ -350,7 +350,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE = theme.accent, PURPLE_LIGHT = theme.accentLight, PURPLE_DIM = theme.accentDim, CYAN = theme.secondary, CYAN_DIM = theme.secondaryDim;
   const BORDER_ACTIVE = `${theme.accent}73`;
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: BG },
+  container: { flex: 1, backgroundColor: 'transparent' },
   backBtn: {
     position: 'absolute', left: SP.md, zIndex: 10,
     width: 40, height: 40, backgroundColor: 'rgba(7,7,15,0.7)',

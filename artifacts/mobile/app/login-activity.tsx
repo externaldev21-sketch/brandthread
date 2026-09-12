@@ -158,7 +158,7 @@ export default function LoginActivityScreen() {
 }
 
 const s = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: BG },
+  root:   { flex: 1, backgroundColor: 'transparent' },
   header: {
     height: 56, flexDirection: 'row', alignItems: 'center',
     justifyContent: 'space-between', paddingHorizontal: SP.md,

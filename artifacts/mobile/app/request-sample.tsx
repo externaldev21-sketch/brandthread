@@ -184,8 +184,8 @@ function Chip({ label, active, onPress, color }: { label: string; active: boolea
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
-  center: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', gap: 14 },
+  root: { flex: 1, backgroundColor: 'transparent' },
+  center: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: 14 },
   errorText: { color: MUTED, textAlign: 'center', lineHeight: 20 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
   backButton: { width: COMP.minTouchTarget, minHeight: COMP.minTouchTarget, alignItems: 'center', justifyContent: 'center' },

@@ -187,7 +187,7 @@ export default function DesignVersionsScreen() {
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const { accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: 'transparent' },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: { paddingHorizontal: SP.md, paddingBottom: 120 },
   emptyState: { marginTop: 60 },

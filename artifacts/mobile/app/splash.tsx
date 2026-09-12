@@ -3,7 +3,6 @@ import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
-import AnimatedGradientBackground from '@/components/branding/AnimatedGradientBackground';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 
@@ -44,8 +43,6 @@ export default function SplashScreen() {
 
   return (
     <View style={styles.root}>
-      <AnimatedGradientBackground />
-
       <View pointerEvents="none" style={styles.brandBlock}>
         {/* Logo mark */}
         <Animated.View style={[styles.logoWrap, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
@@ -76,7 +73,7 @@ export default function SplashScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   },

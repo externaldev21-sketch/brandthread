@@ -351,7 +351,7 @@ export default function ContentScreen() {
 }
 
 const s = StyleSheet.create({
-  root:    { flex: 1, backgroundColor: BG },
+  root:    { flex: 1, backgroundColor: 'transparent' },
   header:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 12 },
   backBtn: { width: 36, height: 36, borderRadius: 10, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   title:   { flex: 1, fontSize: 22, fontFamily: 'Inter_700Bold', color: FG },

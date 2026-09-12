@@ -79,7 +79,7 @@ export default function MarketingScreen() {
   return (
     <View style={{ flex: 1 }}>
     <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
+      style={[styles.container, { backgroundColor: 'transparent' }]}
       contentContainerStyle={{ paddingTop: topPad + 16, paddingBottom: bottomPad + 120, paddingHorizontal: 16 }}
       showsVerticalScrollIndicator={false}
     >

@@ -70,7 +70,7 @@ export default function CommunityScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader
         title="Community"
         subtitle="Hire vetted creatives for your brand"
@@ -260,7 +260,7 @@ export default function CommunityScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BG },
+  container: { flex: 1, backgroundColor: 'transparent' },
   headerBtn: {
     width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
     backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,

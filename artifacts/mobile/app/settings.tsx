@@ -138,7 +138,7 @@ export default function SettingsScreen() {
   }, [query, role, isRoleLoaded]);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <View style={[styles.header, { backgroundColor: '#0D0B08', paddingTop: topPad + 12 }]}>
         <View style={styles.headerTopRow}>
           <Text style={styles.headerTitle}>Settings</Text>

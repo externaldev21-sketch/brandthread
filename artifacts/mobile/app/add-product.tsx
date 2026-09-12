@@ -1452,7 +1452,7 @@ export default function AddProductScreen() {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: 'transparent',
   },
 
   // Header

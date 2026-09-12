@@ -86,7 +86,7 @@ export default function NotificationsSettingsScreen() {
   }
 
   return (
-    <View style={[s.container, { backgroundColor: BG }]}>
+    <View style={[s.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Notifications" />
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
 

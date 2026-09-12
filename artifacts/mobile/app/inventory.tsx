@@ -918,7 +918,7 @@ export default function InventoryScreen() {
   }
 
   return (
-    <View style={[s.root, { backgroundColor: BG }]}>
+    <View style={[s.root, { backgroundColor: 'transparent' }]}>
       {renderHeader()}
       {renderTabBar()}
       <View style={s.content}>
@@ -941,7 +941,7 @@ const SP_SM = SP.sm;
 
 const s = StyleSheet.create({
   root:             { flex: 1 },
-  loadingWrap:      { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', gap: SP.md },
+  loadingWrap:      { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: SP.md },
   loadingText:      { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
 
   // Header

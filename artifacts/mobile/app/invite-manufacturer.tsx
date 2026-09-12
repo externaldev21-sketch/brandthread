@@ -297,7 +297,7 @@ export default function InviteManufacturerScreen() {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

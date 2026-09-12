@@ -231,7 +231,10 @@ export default function TabLayout() {
     <>
       <Tabs
         tabBar={(props) => <CustomTabBar {...props} />}
-        screenOptions={{ headerShown: false }}
+        screenOptions={{
+          headerShown: false,
+          sceneStyle: { backgroundColor: 'transparent' },
+        }}
       >
         {/* Visible tabs */}
         <Tabs.Screen name="index"    options={{ title: 'Home' }} />

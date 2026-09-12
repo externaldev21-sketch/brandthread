@@ -10,7 +10,6 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
-import AnimatedGradientBackground from '@/components/branding/AnimatedGradientBackground';
 import { useSignIn, useSSO, useAuth, useUser } from '@clerk/expo';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
@@ -19,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { SCREEN_BG } from '@/lib/theme';
 import {
   APPLE_OAUTH_STRATEGY,
   isOAuthCancellationError,
@@ -29,7 +29,6 @@ import {
 WebBrowser.maybeCompleteAuthSession();
 
 // ─── Design tokens (exact match to onboarding / splash / welcome) ────────────
-const BG       = '#07070F';
 const FG       = '#FFFFFF';
 const MUTED    = 'rgba(255,255,255,0.5)';
 const MUTED2   = 'rgba(255,255,255,0.28)';
@@ -142,7 +141,6 @@ export default function SignInScreen() {
     return (
       <View style={[s.root, { paddingTop: insets.top }]}>
         <StatusBar barStyle="light-content" />
-        <AnimatedGradientBackground />
 
         <ScrollView
           contentContainerStyle={[s.scroll, s.sessionScroll, { paddingBottom: insets.bottom + 36 }]}
@@ -218,7 +216,6 @@ export default function SignInScreen() {
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
       <StatusBar barStyle="light-content" />
-      <AnimatedGradientBackground />
 
       <KeyboardAvoidingView
         style={{ flex: 1 }}
@@ -404,7 +401,7 @@ function mapError(err: any): string {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  root:    { flex: 1, backgroundColor: BG },
+  root:    { flex: 1, backgroundColor: SCREEN_BG },
 
   scroll: { paddingHorizontal: 24, paddingTop: 16 },
 

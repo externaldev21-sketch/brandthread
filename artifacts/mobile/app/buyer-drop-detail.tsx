@@ -344,8 +344,8 @@ export default function BuyerDropDetail() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
-  center: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl, gap: SP.md },
+  root: { flex: 1, backgroundColor: 'transparent' },
+  center: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', paddingHorizontal: SP.xl, gap: SP.md },
   errorText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center' },
   errorBack: { borderWidth: 1, borderColor: BORDER, borderRadius: RADIUS.pill, paddingHorizontal: SP.lg, paddingVertical: SP.sm },
   errorBackText: { color: FG, fontFamily: FONT.semibold, fontSize: FS.sm },

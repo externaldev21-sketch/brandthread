@@ -244,7 +244,7 @@ export default function BuyerPostCommentsScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[s.container, { backgroundColor: BG }]}
+      style={[s.container, { backgroundColor: 'transparent' }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >

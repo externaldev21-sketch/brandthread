@@ -38,6 +38,7 @@ vi.mock('@/lib/api', () => ({ useApi: vi.fn() }));
 vi.mock('@/lib/money', () => ({ formatCents: (cents: number) => `$${cents / 100}` }));
 vi.mock('@/lib/theme', () => ({
   BG: '#07070F',
+  SCREEN_BG: 'transparent',
   SURFACE: '#0D0D17',
   CARD: '#12121F',
   CARD_ELEVATED: '#18182E',

@@ -13,6 +13,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { Keyboard, Platform, Pressable, Text, View } from 'react-native';
 import { Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
+import { DarkTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
 import * as SplashScreen from 'expo-splash-screen';
 import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useUser } from '@clerk/expo';
 import { tokenCache } from '@/lib/tokenCache';
@@ -44,6 +45,15 @@ import { createNotificationResponseHandler } from '@/lib/notificationNavigation'
 import { useCanUseMarketing } from '@/contexts/CookieConsentContext';
 import { setMarketingPixelConsent, trackMarketingPixelEvent } from '@/lib/marketingPixels';
 import { captureNotificationEvent, flushNotificationEvents } from '@/lib/notificationEventOutbox';
+import AnimatedGradientBackground from '@/components/branding/AnimatedGradientBackground';
+
+const TRANSPARENT_NAVIGATION_THEME = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    background: 'transparent',
+  },
+};
 
 // Push notifications are native-only. Importing the package is safe for the
 // web bundle, but registering a handler/listener there produces unsupported
@@ -529,7 +539,7 @@ function RootLayoutNav() {
 
   if (feature && !isEnabled(feature)) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#07070F', alignItems: 'center', justifyContent: 'center', padding: 28, gap: 12 }}>
+      <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: 28, gap: 12 }}>
         <Text style={{ color: '#F5F5F7', fontFamily: 'Inter_700Bold', fontSize: 22, textAlign: 'center' }}>
           Temporarily unavailable
         </Text>
@@ -548,11 +558,20 @@ function RootLayoutNav() {
 
   return (
     <View style={{ flex: 1 }}>
+      <AnimatedGradientBackground />
       <StoreContextBanner />
       <NetworkNoticeBanner />
       <Pressable onPress={Keyboard.dismiss} accessible={false} style={{ flex: 1 }}>
         <View style={{ flex: 1 }}>
-      <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right', animationDuration: 220, gestureEnabled: true }}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'slide_from_right',
+          animationDuration: 220,
+          gestureEnabled: true,
+          contentStyle: { backgroundColor: 'transparent' },
+        }}
+      >
         {/* Boot: "/" renders BootScreen until AuthGate redirects */}
         <Stack.Screen name="index"          options={{ headerShown: false, animation: 'fade' }} />
         {/* Auth & onboarding */}
@@ -811,7 +830,9 @@ export default function RootLayout() {
                   <FeatureFlagProvider>
                     <UndoToastProvider>
                       <KeyboardProvider>
-                        <RootLayoutNav />
+                        <NavigationThemeProvider value={TRANSPARENT_NAVIGATION_THEME}>
+                          <RootLayoutNav />
+                        </NavigationThemeProvider>
                       </KeyboardProvider>
                     </UndoToastProvider>
                   </FeatureFlagProvider>

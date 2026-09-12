@@ -193,7 +193,7 @@ export default function SellerDataExportScreen() {
 }
 
 const s = StyleSheet.create({
-  root:         { flex: 1, backgroundColor: BG },
+  root:         { flex: 1, backgroundColor: 'transparent' },
   header:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
   headerTitle:  { fontSize: 17, fontFamily: 'Inter_700Bold', color: FG },
   scroll:       { padding: 16, paddingBottom: 100, gap: 16 },

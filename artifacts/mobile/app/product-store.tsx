@@ -592,7 +592,7 @@ export default function ProductStoreScreen() {
 const s = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: 'transparent',
   },
   loadingText: {
     color: MUTED,

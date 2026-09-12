@@ -593,7 +593,7 @@ export default function SubscriptionScreen() {
 const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   return StyleSheet.create({
-  root:               { flex: 1, backgroundColor: BG },
+  root:               { flex: 1, backgroundColor: 'transparent' },
   accessLoading:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:             { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
   backBtn:            { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },

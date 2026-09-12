@@ -88,7 +88,7 @@ export default function ShippingScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Shipping & Fulfillment" subtitle="Labels, carriers & returns" />
       <ScrollView
         style={{ flex: 1 }}

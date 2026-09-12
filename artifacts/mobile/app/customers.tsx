@@ -73,7 +73,7 @@ export default function CustomersScreen() {
   }, [search, fetchCustomers]);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader
         title="Customers"
         subtitle="CRM, loyalty & rewards"

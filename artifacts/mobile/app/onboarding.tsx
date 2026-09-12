@@ -36,7 +36,6 @@ import { AccountTypeStep, type AccountType } from './account-type';
 // Required on Android so the in-app browser tab closes after OAuth redirect
 WebBrowser.maybeCompleteAuthSession();
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
-import AnimatedGradientBackground from '@/components/branding/AnimatedGradientBackground';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { hydrateMyProfileFromAccount, socialKeysForUser } from '@/services/socialService';
@@ -45,7 +44,7 @@ import { SellerPlanRecommendationStep } from '@/components/onboarding/SellerPlan
 import { recommendSellerPlan } from '@/lib/sellerPlans';
 import type { SellerPlanId } from '@/lib/sellerBilling';
 import { registerGrantedPushToken } from '@/lib/contextualPushPermission';
-import { BG } from '@/lib/theme';
+import { SCREEN_BG } from '@/lib/theme';
 import {
   APPLE_OAUTH_STRATEGY,
   isOAuthCancellationError,
@@ -372,7 +371,6 @@ function LoadingAnimation({ steps, onDone }: { steps: string[]; onDone: () => vo
 
   return (
     <View style={[sl.root, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 40 }]}>
-      <AnimatedGradientBackground />
 
       {/* Logo */}
       <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }], marginBottom: 52 }}>
@@ -417,7 +415,7 @@ function LoadingAnimation({ steps, onDone }: { steps: string[]; onDone: () => vo
   );
 }
 const sl = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
+  root: { flex: 1, backgroundColor: SCREEN_BG, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40 },
   stepsList: { width: '100%', gap: 18, marginBottom: 48 },
   stepRow:   { flexDirection: 'row', alignItems: 'center', gap: 14 },
   stepIcon:  {
@@ -464,7 +462,6 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
 
   return (
     <View style={[sn.root, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 32 }]}>
-      <AnimatedGradientBackground />
 
       <Animated.View style={[sn.body, { opacity, transform: [{ translateY: slideY }] }]}>
         {/* Bell icon */}
@@ -508,7 +505,7 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
   );
 }
 const sn = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG, paddingHorizontal: 24 },
+  root: { flex: 1, backgroundColor: SCREEN_BG, paddingHorizontal: 24 },
   body: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 40 },
   bellWrap: { marginBottom: 32 },
   bellBg:   { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center', shadowOpacity: 0.5, shadowRadius: 20, shadowOffset: { width: 0, height: 0 }, elevation: 12 },
@@ -549,7 +546,6 @@ function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { fl
 
   return (
     <View style={[ss.root, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 32 }]}>
-      <AnimatedGradientBackground />
 
       <Animated.View style={[ss.body, { opacity, transform: [{ scale }, { translateY: slideY }] }]}>
         {/* Checkmark circle */}
@@ -590,7 +586,7 @@ function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { fl
   );
 }
 const ss = StyleSheet.create({
-  root:       { flex: 1, backgroundColor: BG, paddingHorizontal: 24 },
+  root:       { flex: 1, backgroundColor: SCREEN_BG, paddingHorizontal: 24 },
   body:       { flex: 1, justifyContent: 'center' },
   checkCircle:{ width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 28, shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 0 }, elevation: 12 },
   headline:   { fontSize: 36, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -1, lineHeight: 42, marginBottom: 12 },
@@ -1670,7 +1666,6 @@ export default function OnboardingScreen() {
 
   const isAuthStep = step === 0;
   const isAccountTypeStep = step === BUYER_STEP_INDEX.ACCOUNT_TYPE && !flow;
-  const hasOwnBackground = isFullScreen || isAccountTypeStep;
 
   // ── Show Continue button in footer (not auth, not goals, not full-screen) ───
   const showFooter = !isFullScreen
@@ -1687,8 +1682,7 @@ export default function OnboardingScreen() {
 
   if (!ready) {
     return (
-      <View style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' }}>
-        <AnimatedGradientBackground />
+      <View style={{ flex: 1, backgroundColor: SCREEN_BG, alignItems: 'center', justifyContent: 'center' }}>
         <View pointerEvents="none" style={sm.backgroundDim} />
         <StatusBar barStyle="light-content" />
         <ActivityIndicator color={theme.accent} />
@@ -1697,9 +1691,7 @@ export default function OnboardingScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: BG }}>
-      {!hasOwnBackground && <AnimatedGradientBackground />}
-      {!hasOwnBackground && <View pointerEvents="none" style={sm.backgroundDim} />}
+    <View style={{ flex: 1, backgroundColor: SCREEN_BG }}>
       <StatusBar barStyle="light-content" />
 
       {/* Standard header for form/auth steps. */}

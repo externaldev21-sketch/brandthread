@@ -100,6 +100,7 @@ vi.mock('@/lib/networkNotice', () => ({
 
 vi.mock('@/lib/theme', () => ({
   BG: '#09090b',
+  SCREEN_BG: 'transparent',
   CARD: '#18181b',
   BORDER: '#3f3f46',
   FG: '#fafafa',

@@ -309,7 +309,7 @@ export default function FreelancerApplyScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BG },
+  container: { flex: 1, backgroundColor: 'transparent' },
   dotsRow: { flexDirection: 'row', gap: 6, paddingHorizontal: SP.md + 4, paddingTop: SP.md },
   stepDot: { flex: 1, height: 3, borderRadius: 2, backgroundColor: BORDER },
   label: { color: FG, fontSize: FS.base, fontFamily: FONT.semibold, marginBottom: SP.xs },

@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER,
+  BG, SCREEN_BG, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE, RED,
   SURFACE, FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
@@ -461,7 +461,7 @@ export default function InboxScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: SCREEN_BG },
 
   // Header
   header: {

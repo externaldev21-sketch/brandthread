@@ -165,9 +165,9 @@ export default function AnalyticsSalesScreen() {
 const createStyles = (colors: ReturnType<typeof useColors>) => {
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT } = colors;
   return StyleSheet.create({
-  scroll:   { flex: 1, backgroundColor: BG },
+  scroll:   { flex: 1, backgroundColor: 'transparent' },
   content:  { paddingHorizontal: 16 },
-  loadWrap: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', gap: 16 },
+  loadWrap: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: 16 },
   loadText: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.sm },
   header:   { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
   backBtn:  { width: 36, height: 36, borderRadius: 18, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },

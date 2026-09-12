@@ -126,7 +126,7 @@ export default function ProductEditorScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: topPad }]}>
+    <View style={[styles.container, { backgroundColor: 'transparent', paddingTop: topPad }]}>
       {/* Top bar */}
       <View style={[styles.topBar, { borderBottomColor: colors.border }]}>
         <TouchableOpacity

@@ -18,7 +18,7 @@ export default function MobileAppBuilderScreen() {
   const primary = isDark ? '#39FF88' : '#00C853';
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Mobile App Builder" subtitle="Your brand, as a native app" />
       <ScrollView
         style={{ flex: 1 }}

@@ -53,7 +53,7 @@ export default function AutomationScreen() {
   const activeCount = Object.values(enabled).filter(Boolean).length;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Automation" subtitle="Set it and forget it — your brand runs itself" />
       <ScrollView
         style={{ flex: 1 }}

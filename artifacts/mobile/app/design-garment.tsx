@@ -285,7 +285,7 @@ export default function DesignGarmentScreen() {
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   return StyleSheet.create({
-  root:         { flex: 1, backgroundColor: BG },
+  root:         { flex: 1, backgroundColor: 'transparent' },
   topBar:       { flexDirection: 'row', alignItems: 'center', backgroundColor: SURFACE, borderBottomWidth: 1, borderBottomColor: BORDER, paddingHorizontal: SP.md, paddingBottom: SP.sm, gap: SP.sm },
   backBtn:      { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   topTitle:     { flex: 1, fontSize: FS.md, fontFamily: FONT.bold, color: FG },

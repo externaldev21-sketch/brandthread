@@ -27,7 +27,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,
-    backgroundColor: '#07070F',
+    backgroundColor: 'transparent',
   },
   label: {
     color: 'rgba(244,244,255,0.60)',

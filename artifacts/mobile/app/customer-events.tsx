@@ -14,7 +14,7 @@ export default function CustomerEventsScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader
         title="Customer events"
         rightElement={

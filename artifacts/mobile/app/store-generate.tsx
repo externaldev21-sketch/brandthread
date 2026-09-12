@@ -815,7 +815,7 @@ export default function StoreGenerateScreen() {
   const progressWidth = `${(step / TOTAL_STEPS) * 100}%`;
 
   return (
-    <View style={[st.root, { backgroundColor: BG }]}>
+    <View style={[st.root, { backgroundColor: 'transparent' }]}>
       {/* Header */}
       <View style={[st.header, { paddingTop: insets.top + SP.sm }]}>
         <View style={st.headerTop}>

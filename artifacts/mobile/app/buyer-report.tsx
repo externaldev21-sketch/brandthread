@@ -240,7 +240,7 @@ export default function BuyerReport() {
 const makeStyles = (theme: { accent: string; accentLight: string; accentDim: string }) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',

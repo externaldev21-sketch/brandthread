@@ -12,7 +12,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER,
+  BG, SCREEN_BG, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE, SUCCESS, RED, ORANGE, BLUE,
   FONT, FS, SP, RADIUS, COMP, ICON,
 } from '@/lib/theme';
@@ -309,7 +309,7 @@ export default function FriendsScreen() {
   const hasFriends = friends.length > 0;
 
   return (
-    <View style={[s.container, { backgroundColor: BG }]}>
+    <View style={[s.container, { backgroundColor: SCREEN_BG }]}>
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + SP.md }]}>
         <TouchableOpacity

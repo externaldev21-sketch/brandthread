@@ -560,7 +560,7 @@ export default function BuyerProductDetailScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color={PURPLE} size="large" />
       </View>
     );
@@ -568,7 +568,7 @@ export default function BuyerProductDetailScreen() {
 
   if (!product) {
     return (
-      <View style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
+      <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
         <Feather name="alert-circle" size={ICON.xxl} color={MUTED} />
         <Text style={{ color: MUTED, marginTop: SP.md, fontFamily: FONT.regular, textAlign: 'center' }}>
           Product not found or no longer available.
@@ -703,7 +703,7 @@ export default function BuyerProductDetailScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: BG }}>
+    <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={

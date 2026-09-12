@@ -990,11 +990,11 @@ function ActionRow({ icon, label, color = FG, onPress }: ActionRowProps) {
 const createStyles = (colorsTheme: ReturnType<typeof useColors>) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: 'transparent',
   },
   scroll: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: 'transparent',
   },
 
   // ── Absolute Header ──

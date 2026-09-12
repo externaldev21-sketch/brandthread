@@ -532,13 +532,13 @@ function RetentionChart({ data }: RetentionChartProps) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: 'transparent',
   },
 
   // ── Not Found ──
   notFound: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 28,

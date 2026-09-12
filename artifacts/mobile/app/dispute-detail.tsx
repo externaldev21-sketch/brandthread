@@ -213,7 +213,7 @@ export default function DisputeDetailScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: BG, paddingTop: insets.top }}>
+    <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: insets.top }}>
       {/* 1. HEADER */}
       <BrandthreadHeader
         title="Dispute"
@@ -474,7 +474,7 @@ export default function DisputeDetailScreen() {
 const createStyles = (theme: { accent: string; accentDim: string; secondary: string }) => {
   const { accent: PURPLE, accentDim: PURPLE_DIM, secondary: CYAN } = theme;
   return StyleSheet.create({
-  centered:           { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
+  centered:           { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   loadingText:        { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED },
   section:            { gap: SP.sm },
   sectionTitle:       { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, marginBottom: SP.xs },

@@ -1619,8 +1619,8 @@ function NotesTab({ order, noteText, setNoteText, noteType, setNoteType, onAddNo
 // ═══════════════════════════════════════════════════════
 
 const s = StyleSheet.create({
-  root:             { flex: 1, backgroundColor: BG },
-  centered:         { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
+  root:             { flex: 1, backgroundColor: 'transparent' },
+  centered:         { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
 
   // Header
   header:           { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md, paddingVertical: SP.sm, gap: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },

@@ -92,6 +92,7 @@ vi.mock('@/components/BrandthreadUI', () => {
 
 vi.mock('@/lib/theme', () => ({
   BG: '#07070F',
+  SCREEN_BG: 'transparent',
   CARD: '#12121F',
   CARD_ELEVATED: '#18182E',
   BORDER: '#303044',

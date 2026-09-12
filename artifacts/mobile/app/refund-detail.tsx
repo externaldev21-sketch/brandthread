@@ -177,7 +177,7 @@ export default function RefundDetailScreen() {
   // ── Success state ──
   if (result) {
     return (
-      <View style={{ flex: 1, backgroundColor: BG, paddingTop: insets.top }}>
+      <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: insets.top }}>
         <BrandthreadHeader title="Refund Issued" onBack={() => router.back()} />
         <View style={styles.successWrap}>
           <GradientCard colors={['rgba(16,185,129,0.18)', 'rgba(16,185,129,0.06)']} glow style={styles.successCard}>
@@ -202,7 +202,7 @@ export default function RefundDetailScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: BG, paddingTop: insets.top }}>
+    <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: insets.top }}>
       <BrandthreadHeader title="Issue Refund" onBack={() => router.back()} />
 
       <ScrollView
@@ -384,7 +384,7 @@ export default function RefundDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  centered:       { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
+  centered:       { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   loadingText:    { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED },
   successWrap:    { flex: 1, padding: SP.md, justifyContent: 'center' },
   successCard:    { alignItems: 'center', gap: SP.sm, padding: SP.lg },

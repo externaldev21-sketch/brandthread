@@ -447,7 +447,7 @@ export default function ManufacturerProfileScreen() {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: 'transparent',
   },
   backBtn: {
     width: 36, height: 36, borderRadius: RADIUS.sm,

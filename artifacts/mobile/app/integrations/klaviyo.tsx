@@ -99,7 +99,7 @@ export default function KlaviyoIntegrationScreen() {
   const topPad = Platform.OS === 'web' ? 24 : insets.top;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <View style={[styles.header, { paddingTop: topPad + 12 }]}>
         <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} onPress={() => router.back()}>
           <Feather name="chevron-left" size={22} color={colors.foreground} />

@@ -503,7 +503,7 @@ export default function DesignBgRemovalScreen() {
   ];
 
   return (
-    <View style={[s.root, { backgroundColor: BG }]}>
+    <View style={[s.root, { backgroundColor: 'transparent' }]}>
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()} activeOpacity={0.7}>

@@ -241,7 +241,7 @@ export default function BuyerSaved() {
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',

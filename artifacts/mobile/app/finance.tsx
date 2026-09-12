@@ -101,7 +101,7 @@ export default function FinanceScreen() {
 
   if (isLoadingRole) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: 'transparent' }]}>
         <ScreenHeader title="Finance" subtitle="P&L, cash flow & expenses" />
         <View style={styles.accessLoading}>
           <ActivityIndicator color={colors.primary} />
@@ -112,7 +112,7 @@ export default function FinanceScreen() {
 
   if (currentRole !== 'owner' && !isReadOnly) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: 'transparent' }]}>
         <ScreenHeader title="Finance" subtitle="P&L, cash flow & expenses" />
         <RoleLockedView screenTitle="finance" currentRole={currentRole ?? undefined} />
       </View>
@@ -120,7 +120,7 @@ export default function FinanceScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Finance" subtitle="P&L, cash flow & expenses" />
       <ScrollView
         style={{ flex: 1 }}

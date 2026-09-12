@@ -387,7 +387,7 @@ export default function ProductImportScreen() {
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',

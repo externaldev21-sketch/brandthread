@@ -319,7 +319,7 @@ export default function SellerVerificationScreen() {
 const s = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: 'transparent',
   },
   content: {
     padding: SP.lg,

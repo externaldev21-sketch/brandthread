@@ -214,7 +214,7 @@ export default function HelpScreen() {
 }
 
 const s = StyleSheet.create({
-  root:       { flex: 1, backgroundColor: BG },
+  root:       { flex: 1, backgroundColor: 'transparent' },
   header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
   headerTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', color: FG },
   searchRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: CARD, borderRadius: 12, borderWidth: 1, borderColor: BORDER, paddingHorizontal: 14, paddingVertical: 12 },

@@ -523,7 +523,7 @@ export default function InventoryAdjustScreen() {
 const createStyles = (theme: { accent: string; accentDim: string; secondary: string }) => {
   const { accent: PURPLE, accentDim: PURPLE_DIM, secondary: CYAN } = theme;
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: 'transparent' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

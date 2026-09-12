@@ -40,7 +40,7 @@ export default function GeneralSettingsScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="General" />
       <ScrollView
         style={{ flex: 1 }}

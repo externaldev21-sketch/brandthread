@@ -372,7 +372,7 @@ export default function ProductSizeChartScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  root:          { flex: 1, backgroundColor: BG },
+  root:          { flex: 1, backgroundColor: 'transparent' },
   content:       { padding: SP.lg, gap: SP.md },
   sectionTitle:  { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8 },
   label:         { fontFamily: FONT.medium, fontSize: FS.sm, color: FG },

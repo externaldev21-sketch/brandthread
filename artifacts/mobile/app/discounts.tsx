@@ -395,7 +395,7 @@ function DiscountCard({ d, onToggle, onDelete }: {
 const createStyles = (theme: { accent: string; accentLight: string; accentDim: string }) => {
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM } = theme;
   return StyleSheet.create({
-  root:       { flex: 1, backgroundColor: BG },
+  root:       { flex: 1, backgroundColor: 'transparent' },
   center:     { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm, borderBottomWidth: 1, borderBottomColor: BORDER },
   headerTitle:{ fontSize: FS.md, fontFamily: FONT.bold, color: FG },

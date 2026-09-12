@@ -987,7 +987,7 @@ function SheetHandle() {
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   return StyleSheet.create({
-  root:        { flex: 1, backgroundColor: BG },
+  root:        { flex: 1, backgroundColor: 'transparent' },
   topBar:      { flexDirection: 'row', alignItems: 'center', backgroundColor: SURFACE, borderBottomWidth: 1, borderBottomColor: BORDER, paddingHorizontal: SP.sm, paddingBottom: SP.sm, gap: SP.xs },
   topBtn:      { width: 34, height: 34, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   saveBtn:     { backgroundColor: PURPLE_DIM },

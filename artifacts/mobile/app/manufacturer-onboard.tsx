@@ -420,7 +420,7 @@ function Row({ label, value, last }: { label: string; value: string; last?: bool
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
-  root:        { flex: 1, backgroundColor: BG },
+  root:        { flex: 1, backgroundColor: 'transparent' },
   header:      { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
   backBtn:     { width: 36, height: 36, borderRadius: 10, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },

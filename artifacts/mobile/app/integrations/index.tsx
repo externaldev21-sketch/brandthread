@@ -99,7 +99,7 @@ export default function IntegrationsScreen() {
   }
 
   return (
-    <View style={[s.container, { backgroundColor: colors.background }]}>
+    <View style={[s.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Integrations" />
       <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
         <View style={s.section}>

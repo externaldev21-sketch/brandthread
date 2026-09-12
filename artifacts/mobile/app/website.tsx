@@ -131,7 +131,7 @@ export default function WebsiteScreen() {
   const selectedLayout = LAYOUTS.find((l) => l.id === selectedLayoutId) ?? LAYOUTS[0];
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Website & Store Builder" subtitle="Design, customize & publish your store" />
       <ScrollView
         style={{ flex: 1 }}

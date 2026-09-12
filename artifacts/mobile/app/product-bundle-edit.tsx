@@ -343,7 +343,7 @@ export default function ProductBundleEditScreen() {
 }
 
 const s = StyleSheet.create({
-  root:         { flex: 1, backgroundColor: BG },
+  root:         { flex: 1, backgroundColor: 'transparent' },
   content:      { padding: SP.lg, gap: SP.md },
   sectionTitle: { fontFamily: FONT.semibold, fontSize: FS.xs, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: SP.xs },
   fieldLabel:   { fontFamily: FONT.medium, fontSize: FS.sm, color: FG, marginBottom: 4 },

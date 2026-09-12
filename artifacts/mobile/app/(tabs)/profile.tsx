@@ -237,13 +237,13 @@ export default function ProfileScreen() {
   return (
     <>
     {initialLoading ? (
-      <View style={[s.loadingScreen, { backgroundColor: colors.background }]}>
+      <View style={[s.loadingScreen, { backgroundColor: 'transparent' }]}>
         <ActivityIndicator size="large" color={theme.accent} />
         <Text style={s.loadingText}>Loading your brand…</Text>
       </View>
     ) : (
     <ScrollView
-      style={[s.root, { backgroundColor: colors.background }]}
+      style={[s.root, { backgroundColor: 'transparent' }]}
       contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 120 }}
       showsVerticalScrollIndicator={false}
     >

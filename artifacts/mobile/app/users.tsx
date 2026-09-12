@@ -118,7 +118,7 @@ export default function UsersScreen() {
     const member = detail?.member;
     const activity = detail?.recentActivity ?? [];
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: 'transparent' }]}>
         <ScreenHeader title={member ? (member.name ?? member.email) : 'Team Member'} />
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
@@ -224,7 +224,7 @@ export default function UsersScreen() {
   // ── List mode (optionally filtered by role) ─────────────────────────────────
   const title = role ? `${ROLE_LABEL[String(role)] ?? String(role)}${String(role) === 'staff' ? '' : 's'}` : 'Users';
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader
         title={title}
         rightElement={

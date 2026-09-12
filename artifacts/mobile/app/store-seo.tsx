@@ -230,7 +230,7 @@ export default function StoreSEOScreen() {
 }
 
 const se = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: 'transparent' },
   header: {
     flexDirection: 'row', alignItems: 'center',
     paddingHorizontal: SP.md, paddingVertical: SP.sm,

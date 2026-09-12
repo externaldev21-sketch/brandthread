@@ -206,8 +206,8 @@ export default function ProductionDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
-  center: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', padding: SP.lg },
+  root: { flex: 1, backgroundColor: 'transparent' },
+  center: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: SP.lg },
   scroll: { padding: SP.md, gap: SP.md },
   error: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.base, textAlign: 'center' },
   retry: { marginTop: SP.md, flexDirection: 'row', alignItems: 'center', gap: SP.xs, backgroundColor: PURPLE, borderRadius: RADIUS.md, paddingHorizontal: SP.md, paddingVertical: SP.sm },

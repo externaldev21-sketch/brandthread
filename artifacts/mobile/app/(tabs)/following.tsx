@@ -16,7 +16,7 @@ import { useRouter } from 'expo-router';
 import { useApi } from '@/lib/api';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE,
+  BG, SCREEN_BG, CARD, BORDER, FG, MUTED, SUBTLE,
   SUCCESS, RED, RED_DIM,
   FONT, FS, SP, RADIUS,
 } from '@/lib/theme';
@@ -227,7 +227,7 @@ export default function FollowingScreen() {
   }));
 
   return (
-    <View style={[s.container, { backgroundColor: BG }]}>
+    <View style={[s.container, { backgroundColor: SCREEN_BG }]}>
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + 16, borderBottomColor: BORDER }]}>
         <View>

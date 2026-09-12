@@ -218,7 +218,7 @@ export default function DesignExportScreen() {
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const { accent: PURPLE, accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: 'transparent' },
   scrollContent: { paddingBottom: 120, paddingHorizontal: SP.md },
 
   header: {

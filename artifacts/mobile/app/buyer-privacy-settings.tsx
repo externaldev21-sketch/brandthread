@@ -336,7 +336,7 @@ export default function BuyerPrivacySettings() {
 const makeStyles = () => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',

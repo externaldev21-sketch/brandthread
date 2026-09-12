@@ -11,6 +11,10 @@
 
 // ─── Backgrounds ─────────────────────────────────────────────────────────────
 export const BG            = '#07070F';   // deep application background
+// Transparent route surface used by screen roots so the shared animated shell
+// remains visible. Keep BG opaque for cards, inputs, modals, and other
+// semantic dark surfaces.
+export const SCREEN_BG      = 'transparent';
 export const SURFACE       = '#0C0C17';   // slightly lifted surface (tabs, sheets)
 export const CARD          = '#12121F';   // standard card background
 export const CARD_ELEVATED = '#18182E';   // elevated card (hero, featured)

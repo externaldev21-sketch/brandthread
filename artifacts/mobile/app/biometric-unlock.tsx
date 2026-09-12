@@ -91,7 +91,7 @@ export default function BiometricUnlockScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Security" />
       {loading ? (
         <View style={styles.loadingWrap}>

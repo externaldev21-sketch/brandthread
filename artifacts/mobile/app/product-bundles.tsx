@@ -131,7 +131,7 @@ export default function ProductBundlesScreen() {
 }
 
 const s = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: BG },
+  root:   { flex: 1, backgroundColor: 'transparent' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list:   { padding: SP.md, gap: SP.sm },
   hint:   { fontFamily: FONT.regular, fontSize: FS.xs, color: SUBTLE, marginBottom: SP.xs, lineHeight: 18 },

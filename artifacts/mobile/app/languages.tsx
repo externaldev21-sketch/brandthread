@@ -70,7 +70,7 @@ export default function LanguagesScreen() {
   const currentLang = LANGUAGES.find(l => l.code === storeLanguage);
 
   return (
-    <View style={[s.container, { backgroundColor: colors.background }]}>
+    <View style={[s.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Languages" />
       {loading ? (
         <View style={s.center}><ActivityIndicator color={colors.primary} /></View>

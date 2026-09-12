@@ -174,7 +174,7 @@ export default function SetupScreen() {
   const allDone = pct === 100;
 
   return (
-    <View style={{ flex: 1, backgroundColor: BG }}>
+    <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
         <TouchableOpacity

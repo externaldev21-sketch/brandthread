@@ -11,7 +11,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuth, useUser } from '@clerk/expo';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER,
+  BG, SCREEN_BG, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE,
   FONT, FS, SP, RADIUS, COMP, ICON, OVERLAY,
   RED, RED_DIM,
@@ -556,7 +556,7 @@ export default function ProfileScreen() {
 const SAVED_TILE = (width - SP.md * 2 - SP.sm) / 2;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BG },
+  container: { flex: 1, backgroundColor: SCREEN_BG },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },
   topBarLeft: { flexDirection: 'row', alignItems: 'center', gap: SP.xs },
   topHandle: { fontFamily: FONT.semibold, fontSize: FS.sm, color: FG, marginLeft: SP.xs },

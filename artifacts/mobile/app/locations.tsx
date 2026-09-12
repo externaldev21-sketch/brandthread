@@ -128,7 +128,7 @@ export default function LocationsScreen() {
   const activeCount = locations.filter(l => l.is_active).length;
 
   return (
-    <View style={[s.container, { backgroundColor: colors.background }]}>
+    <View style={[s.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Locations" />
       {loading ? (
         <View style={s.center}><ActivityIndicator color={colors.primary} /></View>

@@ -159,6 +159,7 @@ vi.mock('@/components/ScreenHeader', () => ({
 
 vi.mock('@/lib/theme', () => ({
   BG: '#000000',
+  SCREEN_BG: 'transparent',
   CARD: '#111111',
   CARD_ELEVATED: '#18181b',
   BORDER: '#222222',

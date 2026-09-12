@@ -66,7 +66,7 @@ export default function ShareStoreScreen() {
   }
 
   return (
-    <View style={[s.root, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+    <View style={[s.root, { backgroundColor: 'transparent', paddingTop: insets.top }]}>
       {/* Header */}
       <View style={s.header}>
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()} activeOpacity={0.75}>

@@ -51,7 +51,7 @@ export default function MetafieldsScreen() {
   useFocusEffect(useCallback(() => { load(); }, []));
 
   return (
-    <View style={[s.container, { backgroundColor: colors.background }]}>
+    <View style={[s.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Metafields and metaobjects" />
       <ScrollView contentContainerStyle={{ paddingBottom: 60 }} showsVerticalScrollIndicator={false}>
         {/* Metafield definitions */}

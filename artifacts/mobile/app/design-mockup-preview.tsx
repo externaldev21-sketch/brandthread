@@ -256,7 +256,7 @@ export default function DesignMockupPreviewScreen() {
 const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const { accentDim: PURPLE_DIM, accentLight: PURPLE_LIGHT } = theme;
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: 'transparent' },
   scrollContent: { paddingBottom: 120 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SP.lg },
   disclaimer: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', marginTop: SP.md },

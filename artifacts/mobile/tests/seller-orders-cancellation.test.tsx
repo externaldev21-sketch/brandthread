@@ -106,6 +106,7 @@ vi.mock('@/lib/money', () => ({
 
 vi.mock('@/lib/theme', () => ({
   BG: '#09090b',
+  SCREEN_BG: 'transparent',
   SURFACE: '#18181b',
   CARD: '#18181b',
   CARD_ELEVATED: '#27272a',

@@ -201,7 +201,7 @@ export default function BuyerBlocked() {
 const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',

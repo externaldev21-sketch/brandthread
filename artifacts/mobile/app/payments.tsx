@@ -467,7 +467,7 @@ export default function PaymentsScreen() {
     .sort((a, b) => new Date(a.payoutDate).getTime() - new Date(b.payoutDate).getTime())[0];
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <Toast message={toast.message} visible={toast.visible} />
       <ScreenHeader title="Payments" subtitle="Drop payouts & methods" />
       <ScrollView

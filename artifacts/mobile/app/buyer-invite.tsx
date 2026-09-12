@@ -190,7 +190,7 @@ export default function BuyerInviteScreen() {
 }
 
 const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.create({
-  root:   { flex: 1, backgroundColor: BG },
+  root:   { flex: 1, backgroundColor: 'transparent' },
   header: {
     flexDirection:  'row',
     alignItems:     'center',

@@ -474,7 +474,7 @@ export default function InventoryDetailScreen() {
   // ─── Main render ─────────────────────────────────────────────────────────────
 
   return (
-    <View style={[d.root, { backgroundColor: BG }]}>
+    <View style={[d.root, { backgroundColor: 'transparent' }]}>
       {/* Header */}
       <View style={[d.header, { paddingTop: insets.top + SP.xs }]}>
         <TouchableOpacity
@@ -522,7 +522,7 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   return StyleSheet.create({
   root:             { flex: 1 },
-  loadingWrap:      { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', gap: SP.md },
+  loadingWrap:      { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: SP.md },
   loadingText:      { fontSize: FS.sm, fontFamily: FONT.medium, color: MUTED },
 
   // Header

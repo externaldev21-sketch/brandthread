@@ -1053,7 +1053,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE_DIM = theme.accentDim;
   const BORDER_ACTIVE = theme.accentLight;
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: 'transparent' },
   header: { paddingHorizontal: SP.md, paddingVertical: SP.xs },
   headerRow1: { flexDirection: 'row', alignItems: 'center', gap: SP.sm },
   backBtn: {

@@ -96,7 +96,7 @@ export default function AIStudioScreen() {
   const [selectMode, setSelectMode] = useState(false);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Design Studio" subtitle="Powered by generative AI" />
 
       {/* Mode switch */}

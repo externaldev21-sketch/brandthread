@@ -479,7 +479,7 @@ function BuyerLiveNativeScreen() {
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const PURPLE = theme.accent;
   return StyleSheet.create({
-  root:             { flex: 1, backgroundColor: BG },
+  root:             { flex: 1, backgroundColor: 'transparent' },
   center:           { alignItems: 'center', justifyContent: 'center', gap: 12 },
   overlay:          { backgroundColor: 'rgba(0,0,0,0.2)' },
   videoPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a', gap: 12 },

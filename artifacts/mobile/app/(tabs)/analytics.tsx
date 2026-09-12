@@ -16,7 +16,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
+  BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
   ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
   FONT, FS,
@@ -438,9 +438,9 @@ export default function AnalyticsScreen() {
 }
 
 const styles = StyleSheet.create({
-  scroll:        { flex: 1, backgroundColor: BG },
+  scroll:        { flex: 1, backgroundColor: SCREEN_BG },
   content:       { paddingHorizontal: 16 },
-  loadWrap:      { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', gap: 16 },
+  loadWrap:      { flex: 1, backgroundColor: SCREEN_BG, alignItems: 'center', justifyContent: 'center', gap: 16 },
   loadText:      { color: MUTED, fontFamily: FONT.medium, fontSize: FS.sm },
 
   headerRow:     { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 },

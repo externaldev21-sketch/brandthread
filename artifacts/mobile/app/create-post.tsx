@@ -1453,7 +1453,7 @@ function ProductModal({ visible, onClose, productSearch, setProductSearch, produ
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
-  root:   { flex: 1, backgroundColor: BG },
+  root:   { flex: 1, backgroundColor: 'transparent' },
   center: { alignItems: 'center', justifyContent: 'center' },
 
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
@@ -1571,7 +1571,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
 
 // ─── Modal styles ─────────────────────────────────────────────────────────────
 const createModalStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
-  root:       { flex: 1, backgroundColor: BG },
+  root:       { flex: 1, backgroundColor: 'transparent' },
   header:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: BORDER },
   title:      { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
   closeBtn:   { width: 36, height: 36, backgroundColor: CARD, borderRadius: 10, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },

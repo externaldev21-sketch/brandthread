@@ -390,7 +390,7 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
   return StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',

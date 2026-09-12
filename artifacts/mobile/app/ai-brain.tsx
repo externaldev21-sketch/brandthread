@@ -517,7 +517,7 @@ export default function AiBrainScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.root, { backgroundColor: BG }]}
+      style={[styles.root, { backgroundColor: 'transparent' }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={0}
     >
@@ -618,7 +618,7 @@ export default function AiBrainScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: 'transparent',
   },
 
   // ── Header

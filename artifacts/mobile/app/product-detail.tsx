@@ -1314,7 +1314,7 @@ const st = StyleSheet.create({
 
 const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string; shadowColor: string }) => {
   return StyleSheet.create({
-  root:         { flex: 1, backgroundColor: BG },
+  root:         { flex: 1, backgroundColor: 'transparent' },
   header:       { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SP.md,
                   paddingVertical: SP.sm, minHeight: COMP.headerH, gap: SP.sm,
                   borderBottomWidth: 1, borderBottomColor: BORDER },

@@ -116,7 +116,7 @@ export default function BillingScreen() {
 
   if (isLoadingRole) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: 'transparent' }]}>
         <ScreenHeader title="Billing" />
         <View style={styles.accessLoading}>
           <ActivityIndicator color={colors.primary} />
@@ -127,7 +127,7 @@ export default function BillingScreen() {
 
   if (currentRole !== 'owner' && !isReadOnly) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: 'transparent' }]}>
         <ScreenHeader title="Billing" />
         <RoleLockedView screenTitle="billing" currentRole={currentRole ?? undefined} />
       </View>
@@ -135,7 +135,7 @@ export default function BillingScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader
         title="Billing"
         rightElement={!isReadOnly ? (

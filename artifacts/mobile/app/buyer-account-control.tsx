@@ -192,7 +192,7 @@ export default function BuyerAccountControl() {
 }
 
 const s = StyleSheet.create({
-  page: { flex: 1, backgroundColor: BG },
+  page: { flex: 1, backgroundColor: 'transparent' },
   header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   title: { color: FG, fontFamily: FONT.bold, fontSize: FS.md },

@@ -220,7 +220,7 @@ export default function StoreBuilderScreen() {
   }
 
   return (
-    <View style={[s.root, { backgroundColor: BG }]}>
+    <View style={[s.root, { backgroundColor: 'transparent' }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
@@ -544,7 +544,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const BORDER_ACTIVE = theme.accentLight;
   return StyleSheet.create({
   root: { flex: 1 },
-  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: BG },
+  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
   header: {
     paddingHorizontal: SP.md,
     paddingBottom: SP.xl,

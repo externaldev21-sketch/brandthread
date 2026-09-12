@@ -843,7 +843,7 @@ export default function SellerConversationScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: 'transparent' },
   centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   header: {

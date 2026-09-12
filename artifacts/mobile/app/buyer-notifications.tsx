@@ -483,7 +483,7 @@ export default function BuyerNotifications() {
 const makeStyles = (theme: { accent: string; accentDim: string }) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: 'transparent',
   },
   header: {
     flexDirection: 'row',

@@ -91,12 +91,12 @@ export default function BuyerProblemReportScreen() {
   }
 
   if (loading) {
-    return <View style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={PURPLE} size="large" /></View>;
+    return <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={PURPLE} size="large" /></View>;
   }
 
   if (submitted) {
     return (
-      <View style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
+      <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
         <View style={s.successIcon}><Feather name="check" size={32} color={ON_DARK} /></View>
         <Text style={s.successTitle}>Report Submitted</Text>
         <Text style={s.successSub}>Your problem report has been received. Our team will review it and reach out if needed.</Text>
@@ -110,7 +110,7 @@ export default function BuyerProblemReportScreen() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: BG }}>
+    <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
           <Feather name="chevron-left" size={ICON.md} color={FG} />

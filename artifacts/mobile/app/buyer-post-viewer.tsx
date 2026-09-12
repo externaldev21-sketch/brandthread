@@ -336,7 +336,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   const BORDER_ACTIVE = `${theme.accent}73`, BORDER_FOCUS = `${theme.secondary}80`;
   const SHADOW_PURPLE = { shadowColor: theme.shadowColor, shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 };
   return StyleSheet.create({
-  page: { flex: 1, backgroundColor: BG },
+  page: { flex: 1, backgroundColor: 'transparent' },
   header: { height: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { flex: 1, textAlign: 'center', color: FG, fontFamily: FONT.bold, fontSize: FS.md },

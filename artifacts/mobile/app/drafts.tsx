@@ -272,7 +272,7 @@ export default function DraftsScreen() {
 const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: 'transparent',
   },
   header: {
     minHeight: 76,

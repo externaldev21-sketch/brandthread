@@ -20,7 +20,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import type { ViewToken } from 'react-native';
 import { useApi } from '@/lib/api';
 import {
-  BG, SURFACE, CARD, OVERLAY,
+  BG, SCREEN_BG, SURFACE, CARD, OVERLAY,
   BORDER, BORDER_SUBTLE,
   FG, MUTED, SUBTLE, ON_DARK,
   SUCCESS, RED,
@@ -1156,7 +1156,7 @@ export default function FeedScreen() {
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BG },
+  container: { flex: 1, backgroundColor: SCREEN_BG },
 
   pauseOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
   mediaPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#17131D' },

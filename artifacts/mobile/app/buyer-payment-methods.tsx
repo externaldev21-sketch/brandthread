@@ -221,7 +221,7 @@ export default function BuyerPaymentMethodsScreen() {
 }
 
 const s = StyleSheet.create({
-  root:    { flex: 1, backgroundColor: BG },
+  root:    { flex: 1, backgroundColor: 'transparent' },
   header:  { height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, borderBottomWidth: 1, borderBottomColor: BORDER },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
   title:   { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },

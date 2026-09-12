@@ -147,7 +147,7 @@ export default function LifestyleImagesScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.background }]}
+      style={[styles.container, { backgroundColor: 'transparent' }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScreenHeader title="Lifestyle Images" subtitle="Contextual lifestyle shots for any product" />

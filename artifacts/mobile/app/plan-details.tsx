@@ -27,7 +27,7 @@ export default function PlanDetailsScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Plan" />
       <ScrollView
         style={{ flex: 1 }}

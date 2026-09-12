@@ -14,7 +14,7 @@ import { loadBuyerProfile, saveBuyerProfile, DEFAULT_BUYER_PROFILE, type BuyerPr
 import { updateMyProfile, getMyProfile } from '@/services/socialService';
 import { api } from '@/lib/api';
 import {
-  BG, CARD, BORDER, FG, MUTED, SUBTLE,
+  BG, SCREEN_BG, CARD, BORDER, FG, MUTED, SUBTLE,
   RED, ORANGE, SUCCESS,
   FONT, FS, SP, RADIUS, OVERLAY,
 } from '@/lib/theme';
@@ -250,10 +250,10 @@ export default function BuyerEditProfileScreen() {
     router.back();
   }
 
-  if (!loaded) return <View style={{ flex: 1, backgroundColor: BG }} />;
+  if (!loaded) return <View style={{ flex: 1, backgroundColor: SCREEN_BG }} />;
 
   return (
-    <View style={[styles.container, { backgroundColor: BG }]}>
+    <View style={[styles.container, { backgroundColor: SCREEN_BG }]}>
       <View style={[styles.header, { paddingTop: topPad + 10 }]}>
         <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} onPress={() => router.back()}>
           <Feather name="chevron-left" size={24} color={FG} />

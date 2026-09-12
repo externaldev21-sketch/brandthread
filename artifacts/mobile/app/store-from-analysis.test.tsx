@@ -119,6 +119,7 @@ vi.mock('@/contexts/AppThemeContext', () => ({
 
 vi.mock('@/lib/theme', () => ({
   BG: '#09090B',
+  SCREEN_BG: 'transparent',
   CARD: '#18181B',
   SURFACE: '#27272A',
   BORDER: '#3F3F46',

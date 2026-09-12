@@ -205,7 +205,7 @@ export default function AccountTypeSettingsScreen() {
 }
 
 const s = StyleSheet.create({
-  root:        { flex: 1, backgroundColor: BG },
+  root:        { flex: 1, backgroundColor: 'transparent' },
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.sm },
   headerTitle: { fontSize: FS.md, fontFamily: FONT.bold, color: FG },
   backBtn:     { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },

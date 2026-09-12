@@ -150,7 +150,7 @@ export default function ReturnDetailScreen() {
   const reasonLabel = (r: string) => RETURN_REASONS.find(x => x.key === r)?.label ?? r;
 
   return (
-    <View style={{ flex: 1, backgroundColor: BG, paddingTop: insets.top }}>
+    <View style={{ flex: 1, backgroundColor: 'transparent', paddingTop: insets.top }}>
       {/* HEADER */}
       <BrandthreadHeader
         title="Return Request"
@@ -410,7 +410,7 @@ export default function ReturnDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  centered:        { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
+  centered:        { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' },
   loadingText:     { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED },
   section:         { gap: SP.sm },
   sectionTitle:    { fontSize: FS.base, fontFamily: FONT.semibold, color: FG, marginBottom: SP.xs },

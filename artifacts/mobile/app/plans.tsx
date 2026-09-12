@@ -458,7 +458,7 @@ function capitalize(s: string) { return s ? s.charAt(0).toUpperCase() + s.slice(
 const createStyles = (theme: { accent: string; accentLight: string; accentDim: string; secondary: string; secondaryDim: string }) => {
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM, secondary: CYAN, secondaryDim: CYAN_DIM } = theme;
   return StyleSheet.create({
-  root: { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: 'transparent' },
 
   // Header
   header: {
@@ -554,7 +554,7 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
    nativeTrial: { fontSize: FS.xs, fontFamily: FONT.regular, color: CYAN, marginTop: -SP.xs },
 
   // Awaiting Stripe overlay
-  awaitRoot: { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', gap: 20, padding: 40 },
+  awaitRoot: { flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', gap: 20, padding: 40 },
   awaitTitle: { fontSize: FS.xl, fontFamily: FONT.semibold, color: FG, textAlign: 'center' },
   awaitSub:   { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center' },
   });

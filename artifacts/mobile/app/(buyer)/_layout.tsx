@@ -67,6 +67,7 @@ function BuyerTabLayout() {
         tabBarActiveTintColor: activeTint,
         tabBarInactiveTintColor: inactiveTint,
         headerShown: false,
+        sceneStyle: { backgroundColor: 'transparent' },
         tabBarShowLabel: true,
         tabBarLabelStyle: {
           fontSize: 9,

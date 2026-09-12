@@ -12,7 +12,7 @@ import { useApi } from '@/hooks/useApi';
 import { getSetupState, markSetupStarted, dismissWelcome, completionPercent, nextTask, nextBestAction, dismissTip, markFeatureOpened, type SetupState } from '@/lib/setupStore';
 import { deriveHubStats, deriveInventoryStats, deriveOrderStats } from '@/lib/sellerDashboardStats';
 import { AnimatedEntrance, BrandthreadScreen, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SearchBar, StatCard, QuickActionCard, SectionHeader, ProgressCard, NavigationCard, GuidedTip, NewFeatureBadge, LoadingSkeleton, EmptyState, StatusBadge, PressableScale } from '@/components/BrandthreadUI';
-import { BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_SUBTLE, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, GREEN_BRIGHT, BLUE, ORANGE, RED, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
+import { BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_SUBTLE, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, GREEN_BRIGHT, BLUE, ORANGE, RED, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { reportNetworkError } from '@/lib/networkNotice';
@@ -562,7 +562,7 @@ export default function SellerHomeScreen() {
   // ── Loading skeleton ──────────────────────────────────────────────────────
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: BG }}>
+      <View style={{ flex: 1, backgroundColor: SCREEN_BG }}>
         <View style={[s.header, { paddingTop: insets.top + 8 }]}>
           <View style={{ gap: 4 }}>
             <LoadingSkeleton height={12} style={{ width: 100 }} />
@@ -594,7 +594,7 @@ export default function SellerHomeScreen() {
 
   // ── Main render ───────────────────────────────────────────────────────────
   return (
-    <View style={{ flex: 1, backgroundColor: BG }}>
+    <View style={{ flex: 1, backgroundColor: SCREEN_BG }}>
 
       {/* ── Fixed Header ─────────────────────────────────────────────────── */}
       <View style={[s.header, { paddingTop: insets.top + 8 }]}>
@@ -1277,7 +1277,7 @@ export default function SellerHomeScreen() {
         transparent={false}
         onRequestClose={() => setSearchModal(false)}
       >
-        <View style={[s.searchScreen, { backgroundColor: BG }]}>
+        <View style={[s.searchScreen, { backgroundColor: SCREEN_BG }]}>
           <View style={[s.searchHeader, { paddingTop: insets.top + 8 }]}>
             <View style={{ flex: 1 }}>
               <SearchBar

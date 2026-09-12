@@ -149,7 +149,7 @@ export default function StorePoliciesScreen() {
   if (selectedType) {
     const policyMeta = POLICY_TYPES.find(p => p.type === selectedType)!;
     return (
-      <View style={[s.root, { backgroundColor: BG }]}>
+      <View style={[s.root, { backgroundColor: 'transparent' }]}>
         <View style={[s.header, { borderBottomColor: BORDER, height: 56 + headerTopInset, paddingTop: headerTopInset }]}>
           <TouchableOpacity onPress={closeEdit} style={s.backBtn} hitSlop={{ top: 2, bottom: 2, left: 2, right: 2 }}><Feather name="x" size={21} color={FG} /></TouchableOpacity>
           <Text style={[s.headerTitle, { color: FG }]}>{policyMeta.label}</Text>
@@ -195,7 +195,7 @@ export default function StorePoliciesScreen() {
   }
 
   return (
-    <View style={[s.root, { backgroundColor: BG }]}>
+    <View style={[s.root, { backgroundColor: 'transparent' }]}>
       <View style={[s.header, { borderBottomColor: BORDER, height: 56 + headerTopInset, paddingTop: headerTopInset }]}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn} hitSlop={{ top: 2, bottom: 2, left: 2, right: 2 }}><Feather name="arrow-left" size={21} color={FG} /></TouchableOpacity>
         <Text style={[s.headerTitle, { color: FG }]}>Store policies</Text>

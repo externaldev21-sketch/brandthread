@@ -309,7 +309,7 @@ function ActionBtn({ label, primary, onPress }: { label: string; primary?: boole
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BG },
+  container: { flex: 1, backgroundColor: 'transparent' },
   tabsRow: {
     flexDirection: 'row', gap: SP.sm, paddingHorizontal: SP.md + 4, paddingTop: SP.md,
   },

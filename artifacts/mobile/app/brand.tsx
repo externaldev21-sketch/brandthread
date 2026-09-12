@@ -107,7 +107,7 @@ export default function BrandScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="Brand Creation" subtitle="Build a brand identity that sells" />
       <ScrollView
         style={{ flex: 1 }}

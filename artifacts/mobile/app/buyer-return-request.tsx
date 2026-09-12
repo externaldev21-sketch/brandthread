@@ -112,12 +112,12 @@ export default function BuyerReturnRequestScreen() {
   }
 
   if (loading) {
-    return <View style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={PURPLE} size="large" /></View>;
+    return <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={PURPLE} size="large" /></View>;
   }
 
   if (submitted) {
     return (
-      <View style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
+      <View style={{ flex: 1, backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: SP.xl }}>
         <View style={s.successIcon}>
           <Feather name="check" size={32} color={ON_DARK} />
         </View>
@@ -137,7 +137,7 @@ export default function BuyerReturnRequestScreen() {
   const returnDeadline = order?.createdAt ? new Date(new Date(order.createdAt).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString() : '';
 
   return (
-    <View style={{ flex: 1, backgroundColor: BG }}>
+    <View style={{ flex: 1, backgroundColor: 'transparent' }}>
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
         <TouchableOpacity style={s.backBtn} onPress={() => router.back()} activeOpacity={0.7}>

@@ -35,7 +35,7 @@ export default function AppIconScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <ScreenHeader title="App icon" />
       <ScrollView
         style={{ flex: 1 }}

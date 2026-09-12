@@ -457,7 +457,7 @@ export default function FreelancerProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: BG },
+  container: { flex: 1, backgroundColor: 'transparent' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: SP.sm },
   errorText: { color: MUTED, fontSize: FS.sm, fontFamily: FONT.regular, textAlign: 'center', paddingHorizontal: SP.xl },
   heroCard: {

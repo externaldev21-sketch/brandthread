@@ -23,7 +23,7 @@ import {
 import { useApi } from '@/hooks/useApi';
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import {
-  BG, CARD, CARD_ELEVATED, BORDER,
+  BG, SCREEN_BG, CARD, CARD_ELEVATED, BORDER,
   FG, MUTED, SUBTLE,
   SUCCESS, SUCCESS_DIM,
   ORANGE, ORANGE_DIM,
@@ -599,7 +599,7 @@ export default function CartScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: BG }}>
+      <View style={{ flex: 1, backgroundColor: SCREEN_BG }}>
         <BrandedLoader label="Gathering your picks…" />
       </View>
     );
@@ -609,7 +609,7 @@ export default function CartScreen() {
   const hasSaved = cart.savedItems.length > 0;
 
   return (
-    <View style={{ flex: 1, backgroundColor: BG }}>
+    <View style={{ flex: 1, backgroundColor: SCREEN_BG }}>
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + SP.sm }]}>
         <Text style={s.headerTitle}>Cart</Text>

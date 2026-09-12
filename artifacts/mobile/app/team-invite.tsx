@@ -93,7 +93,7 @@ export default function TeamInviteScreen() {
   const roleLabel = ROLE_LABEL[invite?.role] ?? invite?.role ?? '';
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{ margin: 24 }} />

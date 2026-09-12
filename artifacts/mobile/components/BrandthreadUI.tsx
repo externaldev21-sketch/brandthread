@@ -18,7 +18,7 @@ import Svg, { Line as SvgLine } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, SURFACE, CARD, CARD_ELEVATED,
+  BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED,
   BORDER, BORDER_ACTIVE, BORDER_FOCUS,
   FG, MUTED, SUBTLE,
   SUCCESS, SUCCESS_DIM, GREEN_BRIGHT,
@@ -195,7 +195,7 @@ export function BrandthreadScreen({
   const insets = useSafeAreaInsets();
   const containerStyle: ViewStyle = {
     flex: 1,
-    backgroundColor: BG,
+    backgroundColor: SCREEN_BG,
     paddingTop: noSafeTop ? 0 : insets.top,
     paddingBottom: noSafeBottom ? 0 : 0,
   };

@@ -376,7 +376,7 @@ export default function BuyerFriendRequestsScreen() {
 }
 
 const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => StyleSheet.create({
-  container:       { flex: 1, backgroundColor: BG },
+  container:       { flex: 1, backgroundColor: 'transparent' },
   header:          { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingBottom: SP.md, borderBottomWidth: 1, borderColor: BORDER },
   headerTitle:     { fontFamily: FONT.bold, fontSize: FS.lg, color: FG },
   tabBar:          { flexDirection: 'row', borderBottomWidth: 1, borderColor: BORDER },

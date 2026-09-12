@@ -105,6 +105,7 @@ vi.mock('@/hooks/useHeaderTopInset', () => ({
 
 vi.mock('@/lib/theme', () => ({
   BG: '#09090b',
+  SCREEN_BG: 'transparent',
   CARD: '#18181b',
   SURFACE: '#27272a',
   BORDER: '#3f3f46',

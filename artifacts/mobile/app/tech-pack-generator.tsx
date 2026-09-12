@@ -253,7 +253,7 @@ export default function TechPackGeneratorScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: colors.background }]}
+      style={[styles.container, { backgroundColor: 'transparent' }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScreenHeader title="Tech Pack Generator" subtitle="Professional tech packs for manufacturers" />
