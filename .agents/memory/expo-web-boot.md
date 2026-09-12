@@ -15,10 +15,10 @@ Keep test and spec modules outside Expo Router's `app/` directory.
 - Web body background is painted dark at module scope in `_layout.tsx` (guarded for SSR).
 - Put route regression tests in a top-level test directory, never beside route files under `app/`. Expo Router can evaluate those files while building the route graph; a Vitest import outside its runner makes static rendering return HTTP 500.
 
-## Dev preview bypass (?bt_preview)
-Opening the web app with `?bt_preview=buyer` or `?bt_preview=seller` (dev builds, web only, handled in the root layout) seeds local onboarding/role state at module scope and skips the Clerk gate + auth redirects, so any auth-gated screen can be loaded directly by URL with no sign-in. Group segments are stripped from web URLs (`/(buyer)/discover` → `/discover`); bare `/` auto-redirects to the previewed role's home.
+## Dev preview bypass
+Development web previews default to the seller role, seed local onboarding/role state at module scope, and skip the Clerk gate + auth redirects. `?bt_preview=buyer` explicitly switches design review to the buyer role. Group segments are stripped from web URLs (`/(buyer)/discover` → `/discover`); bare `/` redirects to the effective preview role's home.
 **Why:** the screenshot browser and canvas iframes are stateless — no Clerk session, no localStorage — so without this, no auth-gated screen can ever be shown or captured outside a tester run.
-**How to apply:** use these URLs for canvas live frames and design review. Screens tied to the Clerk user render fallbacks. Inert without the param; never ships to production behavior.
+**How to apply:** use the bare preview URL for seller review and add `?bt_preview=buyer` for buyer review. Screens tied to the Clerk user render fallbacks. The bypass is web + development only and never changes production or native end-user onboarding.
 
 ## Debugging gotcha
 The Screenshot tool captures web pages before async boot completes (sub-second), so it shows the loading state even when the app works — it cannot observe anything time-based. Use the Playwright testing subagent to watch a page over tens of seconds (console timeline, network failures, final render). Verifying signed-in flows: Clerk programmatic login + seeding localStorage (`onboarding_complete`, `user_role`, `splash_seen`) reproduces any auth/role state.

@@ -17,10 +17,10 @@ export default function Index() {
 
   useEffect(() => {
     if (!__DEV__ || Platform.OS !== 'web') return;
-    if (previewRole !== 'buyer' && previewRole !== 'seller') return;
     if (!rootNavigationState?.key) return;
+    const effectivePreviewRole = previewRole === 'buyer' ? 'buyer' : 'seller';
     const redirect = setTimeout(() => {
-      router.replace((previewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/') as never);
+      router.replace((effectivePreviewRole === 'buyer' ? '/(buyer)/' : '/(tabs)/') as never);
     }, 50);
     return () => clearTimeout(redirect);
   }, [previewRole, rootNavigationState?.key, router]);

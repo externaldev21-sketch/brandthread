@@ -82,10 +82,9 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 }
 
 // ─── DEV design-preview bypass (web + dev builds only) ───────────────────────
-// Opening the web app with ?bt_preview=buyer or ?bt_preview=seller seeds the
-// local onboarding/role state and skips the Clerk auth gate, so individual
-// screens can be viewed/captured directly without signing in (used for design
-// review). Inert on native, in production builds, and without the param.
+// The development web preview defaults to the seller experience and skips the
+// Clerk/onboarding gates. ?bt_preview=buyer remains available for buyer review.
+// This is inert on native and in production builds.
 // ─── DEV: bypass all auth + onboarding on every platform ─────────────────────
 // Set to 'buyer' or 'seller' to jump straight to that dashboard on device.
 // Set back to null when you're ready to test real sign-in.
@@ -94,9 +93,7 @@ const DEV_BYPASS_ROLE: 'buyer' | 'seller' | null = null;
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
   if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined') return null;
   const v = new URLSearchParams(window.location.search).get('bt_preview');
-  // Preview mode must be opt-in. Never let a normal browser visit bypass Clerk
-  // just because it is running in the development web bundle.
-  return v === 'buyer' || v === 'seller' ? v : null;
+  return v === 'buyer' ? 'buyer' : 'seller';
 })();
 
 // Seed storage so AuthGate doesn't loop waiting on onboarding data.
