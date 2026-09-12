@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
 import StripeConnectWarning from '@/components/StripeConnectWarning';
-import { View, Text, ScrollView, StyleSheet, Animated, Modal, TextInput, FlatList, Alert, Pressable, TouchableOpacity, Linking } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Animated, Modal, TextInput, FlatList, Alert, Pressable, TouchableOpacity, Linking, StyleProp, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -54,37 +54,16 @@ function orderStatusLabel(status: string): string {
   }
 }
 
-function timeAgo(dateStr: string): string {
-  const parts = dateStr.split(' ');
-  if (parts.length >= 2) {
-    const month = parts[0];
-    const day = parseInt(parts[1].replace(',', ''));
-    const now = new Date();
-    const orderDate = new Date(`${month} ${day}, ${now.getFullYear()}`);
-    const diffMs = now.getTime() - orderDate.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) return 'Today';
-    if (diffDays === 1) return '1d ago';
-    return `${diffDays}d ago`;
-  }
-  return dateStr;
-}
-
 type RevenueTrendPoint = { day: string; totalCents: number };
 
-function getTrendSummary(points: RevenueTrendPoint[]): {
-  direction: 'up' | 'down' | 'flat';
-  label: string;
-} | null {
+function getTrendSummary(points: RevenueTrendPoint[]): { direction: 'up' | 'down' | 'flat'; label: string; } | null {
   if (points.length < 2) return null;
   const windowSize = Math.floor(points.length / 2);
   const earlier = points.slice(0, windowSize).reduce((sum, point) => sum + point.totalCents, 0);
   const recent = points.slice(-windowSize).reduce((sum, point) => sum + point.totalCents, 0);
 
   if (earlier === 0) {
-    return recent > 0
-      ? { direction: 'up', label: 'Up from no earlier sales' }
-      : { direction: 'flat', label: 'No movement yet' };
+    return recent > 0 ? { direction: 'up', label: 'Up from no earlier sales' } : { direction: 'flat', label: 'No movement yet' };
   }
 
   const change = ((recent - earlier) / earlier) * 100;
@@ -102,11 +81,7 @@ function normalizeRevenueTrend(rows: unknown[]): RevenueTrendPoint[] {
   rows.forEach((row) => {
     if (!row || typeof row !== 'object') throw new Error('Invalid revenue trend response.');
     const candidate = row as { day?: unknown; date?: unknown; total_cents?: unknown };
-    const day = typeof candidate.day === 'string'
-      ? candidate.day
-      : typeof candidate.date === 'string'
-        ? candidate.date
-        : '';
+    const day = typeof candidate.day === 'string' ? candidate.day : typeof candidate.date === 'string' ? candidate.date : '';
     const totalCents = candidate.total_cents;
     const date = new Date(day);
     if (!day || Number.isNaN(date.getTime()) || !Number.isSafeInteger(totalCents)) {
@@ -126,116 +101,147 @@ function normalizeRevenueTrend(rows: unknown[]): RevenueTrendPoint[] {
   });
 }
 
-function trendDateRange(points: RevenueTrendPoint[]): string {
-  if (points.length === 0) return 'Last 7 days';
-  const start = new Date(points[0].day);
-  const end = new Date(points[points.length - 1].day);
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 'Last 7 days';
-  const format = (date: Date) => date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    timeZone: 'UTC',
-  });
-  return `${format(start)} – ${format(end)}`;
+// ─── Local Components ─────────────────────────────────────────────────────────
+
+function UnifiedCard({ children, style, onPress, glow = false }: { children: React.ReactNode, style?: StyleProp<ViewStyle>, onPress?: () => void, glow?: boolean }) {
+  const { theme } = useAppTheme();
+  const cardStyle = [
+    s.unifiedCard,
+    glow && { shadowColor: theme.accent, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.35, shadowRadius: 16, elevation: 8 },
+    style
+  ];
+  return onPress ? <PressableScale onPress={onPress} style={cardStyle}>{children}</PressableScale> : <View style={cardStyle}>{children}</View>;
 }
 
-function RevenueTrendChart({
-  points,
-  loading,
-  error,
-  accent,
-  accentLight,
-}: {
-  points: RevenueTrendPoint[] | null;
-  loading: boolean;
-  error: boolean;
-  accent: string;
-  accentLight: string;
-}) {
+function KPICard({ label, value, onPress, trend, trendColor, style }: { label: string, value: string, onPress?: () => void, trend?: { label: string, direction: string } | null, trendColor?: string, style?: StyleProp<ViewStyle> }) {
+  return (
+    <View style={style}>
+      <UnifiedCard onPress={onPress} style={{ width: '100%', padding: 14, minHeight: 96, gap: 4, justifyContent: 'center' }}>
+        <Text style={s.metricLabel} numberOfLines={1}>{label}</Text>
+        <Text style={s.metricValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{value}</Text>
+        {trend && (
+          <View style={[s.trendPillInline, { backgroundColor: trendColor + '12', borderColor: trendColor + '30' }]}>
+            <Feather name={trend.direction === 'up' ? 'trending-up' : trend.direction === 'down' ? 'trending-down' : 'minus'} size={10} color={trendColor} />
+            <Text style={[s.trendPillText, { color: trendColor }]} numberOfLines={1}>{trend.label}</Text>
+          </View>
+        )}
+      </UnifiedCard>
+    </View>
+  );
+}
+
+function ListGroup({ children, style }: { children: React.ReactNode, style?: StyleProp<ViewStyle> }) {
+  return (
+    <View style={[s.listGroup, style]}>
+      {children}
+    </View>
+  );
+}
+
+function ListItem({ icon, title, subtitle, value, onPress, isLast, iconColor = FG, rightElement, badge }: any) {
+  const content = (
+    <View style={s.listItem}>
+       <View style={[s.listIconWrap, { backgroundColor: iconColor + '1A' }]}>
+         <Feather name={icon} size={16} color={iconColor} />
+       </View>
+       <View style={s.listBody}>
+         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+           <Text style={[s.listTitle, subtitle && { marginBottom: 2 }]} numberOfLines={1}>{title}</Text>
+           {badge !== undefined && badge > 0 && (
+              <View style={{ backgroundColor: RED, borderRadius: 10, paddingHorizontal: 5, paddingVertical: 1 }}>
+                <Text style={{ fontSize: 10, fontFamily: FONT.bold, color: '#FFF' }}>{badge > 9 ? '9+' : badge}</Text>
+              </View>
+           )}
+         </View>
+         {subtitle && <Text style={s.listSubtitle} numberOfLines={1}>{subtitle}</Text>}
+       </View>
+       <View style={s.listRight}>
+         {value && <Text style={s.listValue}>{value}</Text>}
+         {rightElement}
+         {onPress && <Feather name="chevron-right" size={16} color={SUBTLE} />}
+       </View>
+    </View>
+  );
+
+  if (onPress) {
+    return (
+      <>
+        <PressableScale onPress={onPress}>{content}</PressableScale>
+        {!isLast && <View style={s.listDivider} />}
+      </>
+    );
+  }
+
+  return (
+    <>
+      {content}
+      {!isLast && <View style={s.listDivider} />}
+    </>
+  );
+}
+
+function RevenueTrendChart({ points, loading, error, accent }: { points: RevenueTrendPoint[] | null; loading: boolean; error: boolean; accent: string; }) {
   const animation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     animation.setValue(0);
     if (points && points.length > 0) {
-      Animated.timing(animation, {
-        toValue: 1,
-        duration: 700,
-        useNativeDriver: false,
-      }).start();
+      Animated.timing(animation, { toValue: 1, duration: ANIM.slow, useNativeDriver: false }).start();
     }
     return () => animation.stopAnimation();
   }, [animation, points]);
 
-  if (error) {
-    return (
-      <View style={s.revenueChartEmpty}>
-        <Feather name="alert-circle" size={16} color={ORANGE} />
-        <Text style={s.revenueChartEmptyText}>Revenue trend unavailable</Text>
-      </View>
-    );
-  }
+  if (error) return <View style={s.chartEmpty}><Feather name="alert-circle" size={14} color={ORANGE} /><Text style={s.chartEmptyText}>Trend unavailable</Text></View>;
 
   if (loading) {
     return (
-      <View style={s.revenueChart}>
-        {Array.from({ length: 7 }).map((_, index) => (
-          <View key={index} style={s.revenueBarColumn}>
-            <View style={[s.revenueBarTrack, { height: 84 }]}>
-              <View style={[s.revenueBar, { height: 28, backgroundColor: accent, opacity: 0.14 }]} />
-            </View>
-            <Text style={s.revenueDay}>—</Text>
+      <View style={s.chartContainer}>
+        {Array.from({ length: 7 }).map((_, i) => (
+          <View key={i} style={s.chartBarWrap}>
+            <View style={[s.chartBar, { height: '30%', backgroundColor: SUBTLE, opacity: 0.2 }]} />
           </View>
         ))}
       </View>
     );
   }
 
-  if (!points || points.length === 0) {
-    return (
-      <View style={s.revenueChartEmpty}>
-        <Feather name="bar-chart-2" size={16} color={SUBTLE} />
-        <Text style={s.revenueChartEmptyText}>No sales in this period yet</Text>
-      </View>
-    );
-  }
+  if (!points || points.length === 0) return <View style={s.chartEmpty}><Feather name="bar-chart-2" size={14} color={SUBTLE} /><Text style={s.chartEmptyText}>No sales yet</Text></View>;
 
-  const maxCents = Math.max(...points.map((point) => point.totalCents), 1);
-  const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const maxCents = Math.max(...points.map((p) => p.totalCents), 1);
   const today = new Date().toISOString().slice(0, 10);
+  const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
   return (
-    <View style={s.revenueChart}>
+    <View style={s.chartContainer}>
       {points.map((point, index) => {
-        const date = new Date(point.day);
         const isToday = point.day.slice(0, 10) === today;
+        const date = new Date(point.day);
         const dayLabel = Number.isNaN(date.getTime()) ? '·' : (dayLabels[date.getUTCDay()] ?? '·');
-        const targetHeight = point.totalCents === 0
-          ? 0
-          : Math.max(8, (point.totalCents / maxCents) * 84);
+        const targetHeightPct = point.totalCents === 0 ? 8 : (point.totalCents / maxCents) * 100;
         return (
-          <View key={`${point.day}-${index}`} style={s.revenueBarColumn}>
-            <View style={s.revenueBarTrack}>
+          <View key={`${point.day}-${index}`} style={s.chartBarWrap}>
+            <View style={s.chartBarTrack}>
               <Animated.View
                 style={[
-                  s.revenueBar,
+                  s.chartBar,
                   {
-                    height: animation.interpolate({ inputRange: [0, 1], outputRange: [4, targetHeight] }),
-                    minHeight: targetHeight === 0 ? 0 : 4,
-                    backgroundColor: isToday ? accentLight : accent,
-                    opacity: isToday ? 1 : 0.62,
+                    height: animation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0%', `${Math.max(8, targetHeightPct)}%`]
+                    }),
+                    backgroundColor: isToday ? accent : FG,
+                    opacity: isToday ? 1 : 0.25,
                   },
                 ]}
               />
             </View>
-            <Text style={[s.revenueDay, isToday && { color: accentLight }]}>{dayLabel}</Text>
+            <Text style={[s.chartDay, isToday && { color: accent }]}>{dayLabel}</Text>
           </View>
         );
       })}
     </View>
   );
 }
-
-// ─── Command Menu items ────────────────────────────────────────────────────────
 
 const COMMAND_ITEMS = [
   { label: 'Create product',    icon: 'package'      as const, route: '/(tabs)/products' },
@@ -248,8 +254,6 @@ const COMMAND_ITEMS = [
   { label: 'Analytics',         icon: 'bar-chart-2'  as const, route: '/(tabs)/analytics' },
   { label: 'Settings',          icon: 'settings'     as const, route: '/settings'  },
 ];
-
-// ─── Default setup state ──────────────────────────────────────────────────────
 
 const DEFAULT_SETUP: SetupState = {
   started: false,
@@ -275,39 +279,17 @@ export default function SellerHomeScreen() {
   const [statsError, setStatsError] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const [setupState, setSetupState] = useState<SetupState>(DEFAULT_SETUP);
-  // Real per-seller dashboard stats — null while loading or on error.
-  // No fake/seed fallback: chips show '—' until real data arrives.
-  const [dashStats, setDashStats] = useState<{
-    revenueCents: number;
-    orders: number;
-    storefrontVisits: number;
-    completedOrders: number;
-  } | null>(null);
+
+  const [dashStats, setDashStats] = useState<{ revenueCents: number; orders: number; storefrontVisits: number; completedOrders: number; } | null>(null);
   const [dashStatsError, setDashStatsError] = useState(false);
   const [searchModal, setSearchModal] = useState(false);
   const [commandModal, setCommandModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [hubStats, setHubStats] = useState<{
-    activeQuotes: number;
-    samplesNeedingReview: number;
-    activeProduction: number;
-    unreadMessages: number;
-  } | null>(null);
-  const [orderStats, setOrderStats] = useState<{
-    newOrders: number;
-    toProcess: number;
-    readyToShip: number;
-  } | null>(null);
-  const [unseenOrderCount, setUnseenOrderCount] = useState(() =>
-    getSellerOrderBadgeCount(userId),
-  );
-  const [invStats, setInvStats] = useState<{
-    lowStockCount: number;
-    outOfStockCount: number;
-    incomingCount: number;
-    delayedCount: number;
-  } | null>(null);
-  // ── Dashboard visual upgrade state ────────────────────────────────────────
+  const [hubStats, setHubStats] = useState<{ activeQuotes: number; samplesNeedingReview: number; activeProduction: number; unreadMessages: number; } | null>(null);
+  const [orderStats, setOrderStats] = useState<{ newOrders: number; toProcess: number; readyToShip: number; } | null>(null);
+  const [unseenOrderCount, setUnseenOrderCount] = useState(() => getSellerOrderBadgeCount(userId));
+  const [invStats, setInvStats] = useState<{ lowStockCount: number; outOfStockCount: number; incomingCount: number; delayedCount: number; } | null>(null);
+
   const [recentOrders, setRecentOrders] = useState<any[] | null>(null);
   const [searchProducts, setSearchProducts] = useState<any[]>([]);
   const [searchOrders, setSearchOrders] = useState<any[]>([]);
@@ -317,87 +299,54 @@ export default function SellerHomeScreen() {
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
   const [subscriptionProvider, setSubscriptionProvider] = useState<'stripe' | 'revenuecat' | 'none'>('none');
   const [billingPortalLoading, setBillingPortalLoading] = useState(false);
-  const progressAnim = useRef(new Animated.Value(0)).current;
+
   const dashboardScrollY = useRef(new Animated.Value(0)).current;
 
-  // Keep the home orders row in sync with the Orders tab's per-seller badge.
-  // Hydrating here also covers direct home-screen entry before the tab bar's
-  // first poll has completed.
   useEffect(() => {
     if (!userId) {
       setUnseenOrderCount(0);
       return;
     }
-
     let active = true;
-    const syncCount = () => {
-      if (active) setUnseenOrderCount(getSellerOrderBadgeCount(userId));
-    };
-
+    const syncCount = () => { if (active) setUnseenOrderCount(getSellerOrderBadgeCount(userId)); };
     syncCount();
     const unsubscribe = subscribe(syncCount);
     initFromStorage(userId).then(syncCount);
-
-    return () => {
-      active = false;
-      unsubscribe();
-    };
+    return () => { active = false; unsubscribe(); };
   }, [userId]);
 
-  // ── Load setup state ──────────────────────────────────────────────────────
   const loadSetup = useCallback(async () => {
     const state = await getSetupState();
     setSetupState(state);
     setLoading(false);
-    const pct = completionPercent(state);
-    Animated.timing(progressAnim, {
-      toValue: pct / 100,
-      duration: ANIM.slow,
-      useNativeDriver: false,
-    }).start();
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      loadSetup();
-    }, 0);
-    // Show skeleton for at least 500ms
+    const timer = setTimeout(() => { loadSetup(); }, 0);
     const minLoad = setTimeout(() => {}, 500);
     setStatsError(false);
     setDashStatsError(false);
     setSalesTrendError(false);
     setDashStats(null);
     setSalesTrend(null);
-    // ── Real per-seller dashboard stats (revenue, orders, conversion rate) ──
+
     api.analytics.dashboard().then((data: any) => {
       const revenueCents = data?.revenue?.totalCents;
       const orders = data?.orders?.total;
       const storefrontVisits = data?.storefrontVisits;
       const completedOrders = data?.completedOrders;
-      if (
-        !Number.isSafeInteger(revenueCents)
-        || !Number.isSafeInteger(orders)
-        || !Number.isSafeInteger(storefrontVisits)
-        || !Number.isSafeInteger(completedOrders)
-      ) {
+      if (!Number.isSafeInteger(revenueCents) || !Number.isSafeInteger(orders) || !Number.isSafeInteger(storefrontVisits) || !Number.isSafeInteger(completedOrders)) {
         throw new Error('Invalid dashboard analytics response.');
       }
-      setDashStats({
-        revenueCents,
-        orders,
-        storefrontVisits,
-        completedOrders,
-      });
+      setDashStats({ revenueCents, orders, storefrontVisits, completedOrders });
       setDashStatsError(false);
     }).catch((error) => {
-      // Leave dashStats as null — chips show '—' rather than a fabricated number
       setDashStats(null);
       setDashStatsError(true);
       setStatsError(true);
       reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
-    // Optional operational summaries use authenticated server data only.
-    // A plan-gated/unavailable hub stays hidden rather than falling back to demo records.
+
     Promise.all([
       api.sellerHub.quoteRequests.list(),
       api.manufacturers.sampleOrders.list(),
@@ -409,6 +358,7 @@ export default function SellerHomeScreen() {
         Array.isArray(threads) ? threads : [],
       ));
     }).catch(() => setHubStats(null));
+
     api.inventory.list().then((rows: any) => {
       setInvStats(deriveInventoryStats(Array.isArray(rows) ? rows : []));
     }).catch((error) => {
@@ -416,7 +366,7 @@ export default function SellerHomeScreen() {
       setStatsError(true);
       reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
-    // ── Dashboard visual upgrade: hero card + trend chart + real orders ──
+
     api.finance.balance().then((data: any) => {
       setPayoutInfo(data && typeof data === 'object' ? data : null);
     }).catch((error) => {
@@ -424,6 +374,7 @@ export default function SellerHomeScreen() {
       setStatsError(true);
       reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
+
     api.orders.list().then((rows: any) => {
       const list = Array.isArray(rows) ? rows : [];
       setOrderStats(deriveOrderStats(list));
@@ -435,6 +386,7 @@ export default function SellerHomeScreen() {
       setStatsError(true);
       reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
+
     api.products.list().then((rows: any) => {
       setSearchProducts(Array.isArray(rows) ? rows : []);
     }).catch((error) => {
@@ -442,10 +394,9 @@ export default function SellerHomeScreen() {
       setStatsError(true);
       reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
+
     api.analytics.revenue('last7').then((data: any) => {
-      if (!data || typeof data !== 'object' || !Array.isArray(data.daily)) {
-        throw new Error('Invalid revenue analytics response.');
-      }
+      if (!data || typeof data !== 'object' || !Array.isArray(data.daily)) throw new Error('Invalid revenue analytics response.');
       setSalesTrend(normalizeRevenueTrend(data.daily));
       setSalesTrendError(false);
     }).catch((error) => {
@@ -454,55 +405,33 @@ export default function SellerHomeScreen() {
       setStatsError(true);
       reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
+
     return () => { clearTimeout(timer); clearTimeout(minLoad); };
-  // The Clerk getToken function can be re-instantiated by the Expo web preview.
-  // retryKey is the only intentional reload trigger for this page-wide fetch.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retryKey]);
 
-  // Subscription status is checked whenever the seller returns to the home
-  // screen so a renewal failure is visible without requiring a full reload.
   useFocusEffect(
     useCallback(() => {
       let active = true;
       setSubscriptionStatus(null);
       setSubscriptionProvider('none');
-      api.seller.subscription.status()
-        .then((data) => {
-          if (active) {
-            setSubscriptionStatus(data?.status ?? null);
-            setSubscriptionProvider(data?.effectiveProvider ?? 'none');
-          }
-        })
-        .catch(() => {
-          // Keep the current banner state when the status check is transiently unavailable.
-        });
-      return () => {
-        active = false;
-      };
+      api.seller.subscription.status().then((data) => {
+        if (active) {
+          setSubscriptionStatus(data?.status ?? null);
+          setSubscriptionProvider(data?.effectiveProvider ?? 'none');
+        }
+      }).catch(() => {});
+      return () => { active = false; };
     }, [api]),
   );
 
-  // ── Derived values ────────────────────────────────────────────────────────
   const pct = completionPercent(setupState);
-  const nextT = nextTask(setupState);
-  const nba = nextBestAction(setupState);
   const showWelcome = !setupState.started && !setupState.dismissed;
   const showProgress = setupState.started && pct < 100;
-
-  // ── Search results ────────────────────────────────────────────────────────
   const q = searchQuery.toLowerCase().trim();
-  const productResults = q
-    ? searchProducts.filter(p => String(p.name ?? '').toLowerCase().includes(q))
-    : [];
-  const orderResults = q
-    ? searchOrders.filter(o =>
-        String(o.orderNumber ?? '').toLowerCase().includes(q) ||
-        String(o.customer?.name ?? o.customerName ?? '').toLowerCase().includes(q)
-      )
-    : [];
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
+  const productResults = q ? searchProducts.filter(p => String(p.name ?? '').toLowerCase().includes(q)) : [];
+  const orderResults = q ? searchOrders.filter(o => String(o.orderNumber ?? '').toLowerCase().includes(q) || String(o.customer?.name ?? o.customerName ?? '').toLowerCase().includes(q)) : [];
+
   function nav(route: string) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push(route as never);
@@ -518,21 +447,12 @@ export default function SellerHomeScreen() {
     setBillingPortalLoading(true);
     try {
       const target = getBillingRecoveryTarget(subscriptionProvider, managementURL);
-      if (target === 'revenuecat') {
-        await Linking.openURL(managementURL!);
-        return;
-      }
-      if (target === 'subscription') {
-        router.push('/subscription' as never);
-        return;
-      }
+      if (target === 'revenuecat') { await Linking.openURL(managementURL!); return; }
+      if (target === 'subscription') { router.push('/subscription' as never); return; }
       const { url } = await api.seller.subscription.portal();
       await Linking.openURL(url);
     } catch (error: any) {
-      Alert.alert(
-        'Billing portal unavailable',
-        error?.message ?? 'Could not open the billing portal. Please try again.',
-      );
+      Alert.alert('Billing portal unavailable', error?.message ?? 'Could not open the billing portal. Please try again.');
     } finally {
       setBillingPortalLoading(false);
     }
@@ -542,11 +462,6 @@ export default function SellerHomeScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const next = await markSetupStarted();
     setSetupState(next);
-    Animated.timing(progressAnim, {
-      toValue: completionPercent(next) / 100,
-      duration: ANIM.slow,
-      useNativeDriver: false,
-    }).start();
   }
 
   async function handleDismissWelcome() {
@@ -555,11 +470,90 @@ export default function SellerHomeScreen() {
     setSetupState(next);
   }
 
-  function closeCommand() {
-    setCommandModal(false);
+  // ─── Alerts Construction ───────────────────────────────────────────────────
+  const alerts = [];
+  if (isSubscriptionPaymentRecoveryRequired(subscriptionStatus)) {
+    alerts.push({
+      id: 'sub-fail',
+      icon: 'credit-card',
+      color: RED,
+      title: 'Payment failed',
+      subtitle: 'Update your card to keep your features.',
+      rightElement: <Text style={{ color: RED, fontSize: 13, fontFamily: FONT.bold }}>Update</Text>,
+      onPress: handleOpenBillingPortal,
+      loading: billingPortalLoading,
+    });
+  }
+  if (statsError) {
+    alerts.push({
+      id: 'stats-error',
+      icon: 'alert-triangle',
+      color: ORANGE,
+      title: 'Live data unavailable',
+      subtitle: 'Tap to retry connection',
+      onPress: () => setRetryKey(k => k + 1),
+    });
+  }
+  if (unseenOrderCount > 0) {
+    alerts.push({
+      id: 'unseen-orders',
+      icon: 'shopping-bag',
+      color: BLUE,
+      title: `${unseenOrderCount} new order${unseenOrderCount > 1 ? 's' : ''}`,
+      subtitle: 'Action needed — tap to review',
+      onPress: handleOpenOrders,
+    });
+  } else if (orderStats && orderStats.newOrders === 0 && orderStats.readyToShip > 0) {
+    alerts.push({
+      id: 'ready-orders',
+      icon: 'truck',
+      color: SUCCESS,
+      title: `${orderStats.readyToShip} order${orderStats.readyToShip > 1 ? 's' : ''} ready to ship`,
+      subtitle: 'Mark as shipped',
+      onPress: () => nav('/(tabs)/orders'),
+    });
   }
 
-  // ── Loading skeleton ──────────────────────────────────────────────────────
+  if (invStats && invStats.outOfStockCount > 0) {
+    alerts.push({
+      id: 'inv-out',
+      icon: 'alert-circle',
+      color: RED,
+      title: `${invStats.outOfStockCount} item${invStats.outOfStockCount > 1 ? 's' : ''} out of stock`,
+      subtitle: 'Restock now',
+      onPress: () => nav('/inventory'),
+    });
+  } else if (invStats && invStats.lowStockCount > 0) {
+    alerts.push({
+      id: 'inv-low',
+      icon: 'trending-down',
+      color: ORANGE,
+      title: `${invStats.lowStockCount} item${invStats.lowStockCount > 1 ? 's' : ''} running low`,
+      subtitle: 'Review stock levels',
+      onPress: () => nav('/inventory'),
+    });
+  }
+
+  if (hubStats && hubStats.samplesNeedingReview > 0) {
+    alerts.push({
+      id: 'hub-samples',
+      icon: 'package',
+      color: ORANGE,
+      title: `${hubStats.samplesNeedingReview} sample${hubStats.samplesNeedingReview > 1 ? 's' : ''} need review`,
+      subtitle: 'Manufacturer update',
+      onPress: () => nav('/manufacturer-hub'),
+    });
+  } else if (hubStats && hubStats.unreadMessages > 0) {
+    alerts.push({
+      id: 'hub-msgs',
+      icon: 'message-circle',
+      color: BLUE,
+      title: `${hubStats.unreadMessages} new message${hubStats.unreadMessages > 1 ? 's' : ''}`,
+      subtitle: 'Manufacturer update',
+      onPress: () => nav('/manufacturer-hub'),
+    });
+  }
+
   if (loading) {
     return (
       <View style={{ flex: 1, backgroundColor: SCREEN_BG }}>
@@ -573,795 +567,362 @@ export default function SellerHomeScreen() {
             <LoadingSkeleton height={40} style={{ width: 40, borderRadius: RADIUS.sm }} />
           </View>
         </View>
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ padding: SP.md, gap: 12, paddingBottom: 160 }}
-          showsVerticalScrollIndicator={false}
-        >
-          <LoadingSkeleton height={120} />
-          <LoadingSkeleton height={80} />
-          <LoadingSkeleton height={100} />
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <LoadingSkeleton height={90} style={{ flex: 1 }} />
-            <LoadingSkeleton height={90} style={{ flex: 1 }} />
-            <LoadingSkeleton height={90} style={{ flex: 1 }} />
-            <LoadingSkeleton height={90} style={{ flex: 1 }} />
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: SP.md, gap: SP.xl, paddingBottom: 160 }} showsVerticalScrollIndicator={false}>
+          <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
+            <LoadingSkeleton height={94} style={{ width: '48%', borderRadius: RADIUS.lg }} />
+            <LoadingSkeleton height={94} style={{ width: '48%', borderRadius: RADIUS.lg }} />
+            <LoadingSkeleton height={94} style={{ width: '48%', borderRadius: RADIUS.lg }} />
+            <LoadingSkeleton height={94} style={{ width: '48%', borderRadius: RADIUS.lg }} />
           </View>
+          <LoadingSkeleton height={130} style={{ borderRadius: RADIUS.lg }} />
+          <LoadingSkeleton height={200} style={{ borderRadius: RADIUS.lg }} />
         </ScrollView>
       </View>
     );
   }
 
-  // ── Main render ───────────────────────────────────────────────────────────
+  const trend = salesTrend ? getTrendSummary(salesTrend) : null;
+  const trendColor = trend?.direction === 'down' ? RED : trend?.direction === 'up' ? GREEN_BRIGHT : MUTED;
+
   return (
     <View style={{ flex: 1, backgroundColor: SCREEN_BG }}>
-
-      {/* ── Fixed Header ─────────────────────────────────────────────────── */}
       <View style={[s.header, { paddingTop: insets.top + 8 }]}>
         <View>
           <Text style={s.greetSmall}>{greeting()}</Text>
           <Text style={s.brandName}>Brandthread</Text>
         </View>
         <View style={{ flexDirection: 'row', gap: 8 }}>
-          <IconButton
-            name="search"
-            onPress={() => { setSearchQuery(''); setSearchModal(true); }}
-          />
-          <IconButton
-            name="bell"
-            badge
-            onPress={() => Alert.alert('Notifications', 'No new notifications.')}
-          />
+          <IconButton name="search" onPress={() => { setSearchQuery(''); setSearchModal(true); }} />
+          <IconButton name="bell" badge={unseenOrderCount > 0} badgeCount={unseenOrderCount} onPress={() => Alert.alert('Notifications', 'No new notifications.')} />
         </View>
       </View>
 
-      {/* The full balance hero scrolls naturally; this compact summary takes
-          over beneath the app header once the hero leaves the viewport. */}
       <Animated.View
         pointerEvents="box-none"
         style={[
           s.compactBalanceWrap,
           {
-            height: dashboardScrollY.interpolate({
-              inputRange: [72, 132],
-              outputRange: [0, 52],
-              extrapolate: 'clamp',
-            }),
-            opacity: dashboardScrollY.interpolate({
-              inputRange: [84, 126],
-              outputRange: [0, 1],
-              extrapolate: 'clamp',
-            }),
+            height: dashboardScrollY.interpolate({ inputRange: [72, 132], outputRange: [0, 52], extrapolate: 'clamp' }),
+            opacity: dashboardScrollY.interpolate({ inputRange: [84, 126], outputRange: [0, 1], extrapolate: 'clamp' }),
           },
         ]}
       >
-        <PressableScale
-          style={[s.compactBalance, { borderColor: theme.accentDim }]}
-          onPress={() => nav('/payouts')}
-          accessibilityLabel={`Available balance ${payoutInfo?.available?.formatted ?? 'loading'}. Open payouts`}
-        >
+        <PressableScale style={[s.compactBalance, { borderColor: theme.accentDim }]} onPress={() => nav('/payouts')} accessibilityLabel="Open payouts">
           <View style={[s.compactBalanceIcon, { backgroundColor: theme.accentDim }]}>
             <Feather name="credit-card" size={15} color={theme.accent} />
           </View>
           <Text style={s.compactBalanceLabel}>Available</Text>
-          <Text style={s.compactBalanceValue}>
-            {payoutInfo === null ? '· · ·' : (payoutInfo?.available?.formatted ?? '$0.00')}
-          </Text>
+          <Text style={s.compactBalanceValue}>{payoutInfo === null ? '· · ·' : (payoutInfo?.available?.formatted ?? '$0.00')}</Text>
           <Feather name="chevron-right" size={16} color={MUTED} />
         </PressableScale>
       </Animated.View>
 
-      {/* ── Scrollable Content ───────────────────────────────────────────── */}
       <Animated.ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 160 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         scrollEventThrottle={16}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: dashboardScrollY } } }],
-          { useNativeDriver: false },
-        )}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: dashboardScrollY } } }], { useNativeDriver: false })}
       >
+        <StripeConnectWarning />
 
-        {/* ── Revenue command center ─────────────────────────────────────── */}
-        {(() => {
-          const trend = salesTrend ? getTrendSummary(salesTrend) : null;
-          const trendColor = trend?.direction === 'down' ? RED : trend?.direction === 'up' ? GREEN_BRIGHT : MUTED;
-          return (
-            <AnimatedEntrance style={{ paddingHorizontal: SP.md, paddingTop: SP.md, marginBottom: SP.md }}>
-              <PressableScale
-                style={s.revenueHero}
-                onPress={() => nav('/(tabs)/analytics')}
-                accessibilityRole="button"
-                accessibilityLabel="Open revenue analytics"
-              >
-                <View style={s.revenueHeroHeader}>
-                  <View style={s.revenueHeroEyebrow}>
-                    <View style={[s.revenueLiveDot, { backgroundColor: dashStatsError ? ORANGE : GREEN_BRIGHT }]} />
-                    <Text style={s.revenueEyebrowText}>BUSINESS PULSE</Text>
-                  </View>
-                  <View style={s.revenueAnalyticsLink}>
-                    <Text style={[s.revenueAnalyticsText, { color: theme.accentLight }]}>Analytics</Text>
-                    <Feather name="arrow-up-right" size={14} color={theme.accentLight} />
-                  </View>
-                </View>
-
-                <View style={s.revenueHeadlineRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={s.revenueLabel}>Revenue</Text>
-                    <Text style={s.revenueValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.64}>
-                      {dashStats === null ? '—' : formatCents(dashStats.revenueCents)}
-                    </Text>
-                    <Text style={s.revenueContext}>
-                      {dashStatsError ? 'Live revenue is unavailable' : dashStats === null ? 'Loading live revenue…' : 'All time'}
-                    </Text>
-                  </View>
-                  {trend && (
-                    <View style={[
-                      s.revenueTrendPill,
-                      {
-                        borderColor: trend?.direction === 'flat' ? BORDER : `${trendColor}66`,
-                        backgroundColor: trend?.direction === 'flat' ? 'rgba(255,255,255,0.06)' : `${trendColor}16`,
-                      },
-                    ]}>
-                      <Feather
-                        name={trend.direction === 'up' ? 'trending-up' : trend.direction === 'down' ? 'trending-down' : 'minus'}
-                        size={15}
-                        color={trendColor}
-                      />
-                      <Text style={[s.revenueTrendText, { color: trendColor }]}>{trend.label}</Text>
-                    </View>
-                  )}
-                </View>
-
-                <View style={s.revenueChartHeader}>
-                  <Text style={s.revenueChartTitle}>Revenue trend</Text>
-                  <Text style={s.revenueChartDate}>{trendDateRange(salesTrend ?? [])}</Text>
-                </View>
-                <RevenueTrendChart
-                  points={salesTrend}
-                  loading={salesTrend === null && !salesTrendError}
-                  error={salesTrendError}
-                  accent={theme.accent}
-                  accentLight={theme.accentLight}
-                />
-
-                <View style={s.revenueMetricsRow}>
-                  <View style={s.revenueMetric}>
-                    <Text style={s.revenueMetricValue}>{dashStats === null ? '—' : String(dashStats.orders)}</Text>
-                    <Text style={s.revenueMetricLabel}>Orders</Text>
-                  </View>
-                  <View style={s.revenueMetricDivider} />
-                  <View style={s.revenueMetric}>
-                    <Text style={s.revenueMetricValue}>{dashStats === null ? '—' : String(dashStats.storefrontVisits)}</Text>
-                    <Text style={s.revenueMetricLabel}>Visitors</Text>
-                  </View>
-                  <View style={s.revenueMetricDivider} />
-                  <View style={s.revenueMetric}>
-                    <Text style={s.revenueMetricValue}>
-                      {dashStats === null || dashStats.storefrontVisits === 0
-                        ? '—'
-                        : `${(dashStats.completedOrders / dashStats.storefrontVisits * 100).toFixed(1)}%`}
-                    </Text>
-                    <Text style={s.revenueMetricLabel}>Conversion</Text>
-                  </View>
-                </View>
-              </PressableScale>
-            </AnimatedEntrance>
-          );
-        })()}
-
-        {/* ── Modular Seller Hub ─────────────────────────────────────────── */}
-        <AnimatedEntrance style={s.hubSection}>
-          <View style={s.hubSectionHeader}>
-            <View>
-              <Text style={s.hubEyebrow}>SELLER HUB</Text>
-              <Text style={s.hubTitle}>Run your business</Text>
-            </View>
-            <TouchableOpacity style={s.hubCustomize} onPress={() => setCommandModal(true)}>
-              <Feather name="sliders" size={14} color={MUTED} />
-              <Text style={s.hubCustomizeText}>Shortcuts</Text>
+        <AnimatedEntrance delay={0} style={s.pageSection}>
+          <View style={s.sectionHeaderRow}>
+            <Text style={s.sectionHeaderTitle}>Overview</Text>
+            <TouchableOpacity onPress={() => nav('/(tabs)/analytics')}>
+               <Text style={s.sectionHeaderAction}>Analytics</Text>
             </TouchableOpacity>
           </View>
 
-          <PressableScale style={s.hubModule} onPress={handleOpenOrders}>
-            <View style={[s.hubModuleIcon, { backgroundColor: `${BLUE}1F` }]}>
-              <Feather name="shopping-bag" size={20} color={BLUE} />
-            </View>
-            <View style={s.hubModuleCopy}>
-              <Text style={s.hubModuleTitle}>Orders</Text>
-              <View style={s.hubStatRow}>
-                <Text style={s.hubStatValue}>{orderStats?.newOrders ?? '—'}</Text>
-                <Text style={s.hubStatLabel}>new</Text>
-                <View style={s.hubStatDot} />
-                <Text style={s.hubStatValue}>{orderStats?.toProcess ?? '—'}</Text>
-                <Text style={s.hubStatLabel}>to process</Text>
-                <View style={s.hubStatDot} />
-                <Text style={s.hubStatValue}>{orderStats?.readyToShip ?? '—'}</Text>
-                <Text style={s.hubStatLabel}>ready</Text>
-              </View>
-            </View>
-            <Feather name="chevron-right" size={18} color={MUTED} />
-          </PressableScale>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
+            <KPICard
+               label="Net Revenue"
+               value={dashStats === null ? '—' : formatCents(dashStats.revenueCents)}
+               trend={trend}
+               trendColor={trendColor}
+               onPress={() => nav('/(tabs)/analytics')}
+               style={{ width: '48%' }}
+            />
+            <KPICard
+               label="Orders"
+               value={dashStats === null ? '—' : String(dashStats.orders)}
+               onPress={() => nav('/(tabs)/orders')}
+               style={{ width: '48%' }}
+            />
+            <KPICard
+               label="Visitors"
+               value={dashStats === null ? '—' : String(dashStats.storefrontVisits)}
+               style={{ width: '48%' }}
+            />
+            <KPICard
+               label="Conversion"
+               value={dashStats === null || dashStats.storefrontVisits === 0 ? '—' : `${(dashStats.completedOrders / dashStats.storefrontVisits * 100).toFixed(1)}%`}
+               style={{ width: '48%' }}
+            />
+          </View>
 
-          <PressableScale style={s.hubModule} onPress={() => nav('/seller-inbox')}>
-            <View style={[s.hubModuleIcon, { backgroundColor: theme.accentDim }]}>
-              <Feather name="message-circle" size={20} color={theme.accent} />
-            </View>
-            <View style={s.hubModuleCopy}>
-              <Text style={s.hubModuleTitle}>Customers & support</Text>
-              <View style={s.hubStatRow}>
-                <Text style={s.hubStatValue}>{hubStats?.unreadMessages ?? '—'}</Text>
-                <Text style={s.hubStatLabel}>unread</Text>
-                <View style={s.hubStatDot} />
-                <Text style={s.hubStatValue}>{hubStats?.activeQuotes ?? '—'}</Text>
-                <Text style={s.hubStatLabel}>quotes</Text>
-                <View style={s.hubStatDot} />
-                <Text style={s.hubStatValue}>{hubStats?.samplesNeedingReview ?? '—'}</Text>
-                <Text style={s.hubStatLabel}>reviews</Text>
-              </View>
-            </View>
-            <Feather name="chevron-right" size={18} color={MUTED} />
-          </PressableScale>
-
-          <PressableScale style={s.hubModule} onPress={() => nav('/payouts')}>
-            <View style={[s.hubModuleIcon, { backgroundColor: `${SUCCESS}1F` }]}>
-              <Feather name="credit-card" size={20} color={SUCCESS} />
-            </View>
-            <View style={s.hubModuleCopy}>
-              <Text style={s.hubModuleTitle}>Payouts</Text>
-              <Text style={s.hubModuleHeadline}>{payoutInfo?.available?.formatted ?? '—'}</Text>
-              <Text style={s.hubModuleMeta}>{payoutInfo?.connected ? 'Available to pay out' : 'Connect Stripe to receive payouts'}</Text>
-            </View>
-            <Feather name="chevron-right" size={18} color={MUTED} />
-          </PressableScale>
-
-          <PressableScale style={s.hubModule} onPress={() => nav('/seller-settings')}>
-            <View style={[s.hubModuleIcon, { backgroundColor: `${GREEN_BRIGHT}1A` }]}>
-              <Feather name="shield" size={20} color={GREEN_BRIGHT} />
-            </View>
-            <View style={s.hubModuleCopy}>
-              <Text style={s.hubModuleTitle}>Account health</Text>
-              <Text style={s.hubModuleHeadline}>{pct}% ready</Text>
-              <Text style={s.hubModuleMeta}>{statsError ? 'Some live checks need attention' : 'Store, inventory and payments monitored'}</Text>
-            </View>
-            <Feather name="chevron-right" size={18} color={MUTED} />
-          </PressableScale>
+          <UnifiedCard onPress={() => nav('/(tabs)/analytics')} style={{ padding: SP.sm, paddingBottom: 12 }}>
+             <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6, marginBottom: SP.sm, alignItems: 'center' }}>
+                <Text style={s.metricLabel}>Revenue Trend</Text>
+                <Text style={{ fontSize: 11, fontFamily: FONT.medium, color: MUTED }}>Last 7 days</Text>
+             </View>
+             <RevenueTrendChart points={salesTrend} loading={salesTrend === null && !salesTrendError} error={salesTrendError} accent={theme.accentLight} />
+          </UnifiedCard>
         </AnimatedEntrance>
 
-        {/* ── Hero Card: Available Balance + Next Payout ───────────────── */}
-        <AnimatedEntrance style={{ paddingHorizontal: SP.md, paddingTop: SP.md, marginBottom: SP.sm }}>
-          <LinearGradient
-            colors={theme.heroGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={[s.heroCard, { shadowColor: theme.shadowColor }]}
-          >
-            <View style={s.heroTop}>
-              <View>
-                <Text style={s.heroLabel}>Available Balance</Text>
-                <Text style={s.heroBalance}>
-                  {payoutInfo === null
-                    ? '· · ·'
-                    : (payoutInfo?.available?.formatted ?? '$0.00')}
-                </Text>
-              </View>
-              <PressableScale
-                style={s.heroPayoutsBtn}
-                onPress={() => nav('/payouts')}
-              >
-                <Text style={s.heroPayoutsBtnTxt}>Payouts</Text>
-                <Feather name="arrow-right" size={11} color="rgba(255,255,255,0.75)" />
-              </PressableScale>
-            </View>
-            <View style={s.heroBottom}>
-              <Feather
-                name={payoutInfo?.nextPayout ? 'clock' : 'info'}
-                size={12}
-                color="rgba(255,255,255,0.5)"
-              />
-              <Text style={s.heroNextTxt}>
-                {payoutInfo === null
-                  ? 'Loading…'
-                  : payoutInfo?.nextPayout
-                    ? (() => {
-                        const arr = payoutInfo.nextPayout.estimatedArrival
-                          ?? payoutInfo.nextPayout.estimated_arrival;
-                        const dateStr = arr
-                          ? new Date(arr * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                          : 'auto-schedule';
-                        return `Next payout ${payoutInfo.nextPayout.formatted} · ${dateStr}`;
-                      })()
-                    : payoutInfo?.connected
-                      ? 'No pending payouts'
-                      : 'Connect Stripe to enable payouts'}
-              </Text>
-            </View>
-          </LinearGradient>
-        </AnimatedEntrance>
-
-        {/* ── Stripe Connect Warning Banner ────────────────────────────── */}
-        <StripeConnectWarning />
-
-        {/* ── Subscription payment failure ─────────────────────────────── */}
-        {isSubscriptionPaymentRecoveryRequired(subscriptionStatus) && (
-          <Pressable
-            style={s.paymentFailureBanner}
-            onPress={handleOpenBillingPortal}
-            disabled={billingPortalLoading}
-            accessibilityRole="button"
-            accessibilityLabel="Payment failed. Update your card to keep your features."
-            testID="seller-payment-failure-banner"
-          >
-            <View style={s.paymentFailureIcon}>
-              <Feather name="credit-card" size={16} color={RED} />
-            </View>
-            <View style={s.paymentFailureCopy}>
-              <Text style={s.paymentFailureTitle}>Payment failed</Text>
-              <Text style={s.paymentFailureBody}>Payment failed — update your card to keep your features.</Text>
-            </View>
-            {billingPortalLoading ? (
-              <Text style={s.paymentFailureAction}>Opening…</Text>
-            ) : (
-              <>
-                <Text style={s.paymentFailureAction}>Update card</Text>
-                <Feather name="chevron-right" size={16} color={RED} />
-              </>
-            )}
-          </Pressable>
-        )}
-
-        {/* ── Stats Error Banner ────────────────────────────────────────── */}
-        {statsError && (
-          <PressableScale
-            style={{ marginHorizontal: SP.md, marginBottom: SP.sm, flexDirection: 'row', alignItems: 'center', gap: SP.sm, backgroundColor: 'rgba(249,115,22,0.1)', borderRadius: RADIUS.md, padding: SP.sm, borderWidth: 1, borderColor: 'rgba(249,115,22,0.25)' }}
-            onPress={() => { setRetryKey(key => key + 1); }}
-          >
-            <Feather name="alert-triangle" size={14} color={ORANGE} />
-            <Text style={{ flex: 1, fontSize: FS.xs, fontFamily: FONT.regular, color: ORANGE }}>Some live data is unavailable — tap to retry</Text>
-          </PressableScale>
-        )}
-
-        {/* ── Welcome Card ──────────────────────────────────────────────── */}
-        {showWelcome && (
-          <AnimatedEntrance delay={ANIM.fast} style={{ paddingHorizontal: SP.md, paddingTop: SP.md, marginBottom: SP.md }}>
-            <GradientCard
-              colors={[theme.accentDim, theme.secondaryDim]}
-              glow
-            >
-              <Text style={s.welcomeTitle}>Your brand workspace is ready.</Text>
-              <Text style={[s.welcomeSub, { marginTop: 6, marginBottom: SP.md }]}>
-                Build your first drop, set up your storefront, and start selling.
-              </Text>
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <PrimaryButton
-                  label="Start setup"
-                  onPress={handleStartSetup}
-                  small
-                  style={{ flex: 1 }}
-                />
-                <SecondaryButton
-                  label="Explore on my own"
-                  onPress={handleDismissWelcome}
-                  small
-                  style={{ flex: 1 }}
-                />
-              </View>
-            </GradientCard>
+        {alerts.length > 0 && (
+          <AnimatedEntrance delay={50} style={s.pageSection}>
+             <View style={s.sectionHeaderRow}>
+               <Text style={s.sectionHeaderTitle}>Needs Attention</Text>
+             </View>
+             <ListGroup>
+               {alerts.map((a, i) => (
+                 <ListItem
+                   key={a.id}
+                   icon={a.icon}
+                   iconColor={a.color}
+                   title={a.title}
+                   subtitle={a.subtitle}
+                   onPress={a.loading ? undefined : a.onPress}
+                   rightElement={a.rightElement}
+                   isLast={i === alerts.length - 1}
+                 />
+               ))}
+             </ListGroup>
           </AnimatedEntrance>
         )}
 
+        {showWelcome && (
+          <AnimatedEntrance delay={100} style={s.pageSection}>
+            <UnifiedCard glow>
+              <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, letterSpacing: -0.2 }}>Your brand workspace is ready.</Text>
+              <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 6, marginBottom: SP.md }}>
+                Build your first drop, set up your storefront, and start selling.
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <PrimaryButton label="Start setup" onPress={handleStartSetup} small style={{ flex: 1 }} />
+                <SecondaryButton label="Explore on my own" onPress={handleDismissWelcome} small style={{ flex: 1 }} />
+              </View>
+            </UnifiedCard>
+          </AnimatedEntrance>
+        )}
 
-        {/* ── Setup Checklist ──────────────────────────────────────────── */}
         {showProgress && (
-          <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
-            <BrandthreadCard>
-              {/* Header: title + "X of 9 complete" */}
-              <View style={s.checklistHeader}>
-                <Text style={s.checklistTitle}>Finish setting up your brand</Text>
-                <Text style={s.checklistCount}>
-                  {setupState.tasks.filter(t => t.completed).length} of {setupState.tasks.length} complete
-                </Text>
-              </View>
-              {/* Slim animated progress bar */}
-              <View style={s.progressTrack}>
-                <Animated.View
-                  style={[s.progressFill, {
-                    width: progressAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
-                  }]}
-                />
-              </View>
-              {/* Checklist rows */}
-              <View style={{ marginTop: SP.sm }}>
-                {setupState.tasks.map((task, idx) => (
-                  <PressableScale
-                    key={task.id}
-                    style={[s.checkRow, idx < setupState.tasks.length - 1 && s.checkRowBorder]}
-                    onPress={() => {
-                      if (!task.completed) {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        nav(task.route);
-                      }
-                    }}
-                  >
-                    {/* Circle: empty = incomplete, green-filled = done */}
-                    <View style={[s.checkCircle, task.completed && s.checkCircleDone]}>
-                      {task.completed && <Feather name="check" size={11} color="#fff" />}
-                    </View>
-                    {/* Label — struck through when complete */}
-                    <Text
-                      style={[s.checkLabel, task.completed && s.checkLabelDone]}
-                      numberOfLines={1}
-                    >
-                      {task.label}
-                    </Text>
-                    {/* Optional badge — only when not yet done */}
-                    {task.optional && !task.completed && (
-                      <View style={s.optionalBadge}>
-                        <Text style={s.optionalText}>Optional</Text>
-                      </View>
-                    )}
-                    {/* Chevron on incomplete rows */}
-                    {!task.completed && (
-                      <Feather name="chevron-right" size={15} color={MUTED} />
-                    )}
-                  </PressableScale>
-                ))}
-              </View>
-            </BrandthreadCard>
-          </View>
+          <AnimatedEntrance delay={100} style={s.pageSection}>
+             <View style={s.sectionHeaderRow}>
+               <Text style={s.sectionHeaderTitle}>Finish Setup</Text>
+               <Text style={s.sectionHeaderAction}>{setupState.tasks.filter(t => t.completed).length} of {setupState.tasks.length} done</Text>
+             </View>
+             <ListGroup>
+               {setupState.tasks.map((task, i) => (
+                 <ListItem
+                   key={task.id}
+                   icon={task.completed ? "check-circle" : "circle"}
+                   iconColor={task.completed ? SUCCESS : MUTED}
+                   title={task.label}
+                   onPress={task.completed ? undefined : () => nav(task.route)}
+                   rightElement={task.optional && !task.completed ? (
+                     <View style={{ backgroundColor: 'rgba(255,255,255,0.06)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                        <Text style={{ fontSize: 10, fontFamily: FONT.medium, color: MUTED }}>Optional</Text>
+                     </View>
+                   ) : null}
+                   isLast={i === setupState.tasks.length - 1}
+                 />
+               ))}
+             </ListGroup>
+          </AnimatedEntrance>
         )}
 
-        {/* ── Zone B: Action Zone — Quick Actions (established sellers only) ── */}
         {!showWelcome && !showProgress && (
-        <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
-          <SectionHeader title="Quick actions" style={{ paddingHorizontal: 0, marginBottom: SP.sm }} />
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-            <QuickActionCard
-              label="Create Post"
-              icon="video"
-              accent={theme.accent}
-              badge={!setupState.openedFeatures.includes('create-post')}
-              onPress={() => {
-                markFeatureOpened('create-post');
-                nav('/create-post');
-              }}
-              style={{ width: '48.5%' }}
-            />
-            <QuickActionCard
-              label="Add Product"
-              icon="plus-circle"
-              accent={theme.secondary}
-              onPress={() => nav('/(tabs)/products')}
-              style={{ width: '48.5%' }}
-            />
-            <QuickActionCard
-              label="View Orders"
-              icon="shopping-bag"
-              accent={BLUE}
-              onPress={() => nav('/(tabs)/orders')}
-              style={{ width: '48.5%' }}
-            />
-            <QuickActionCard
-              label="Studio"
-              icon="zap"
-              accent={ORANGE}
-              onPress={() => nav('/(tabs)/studio')}
-              style={{ width: '48.5%' }}
-            />
-          </View>
-        </View>
+          <AnimatedEntrance delay={100} style={s.pageSection}>
+             <View style={s.sectionHeaderRow}>
+               <Text style={s.sectionHeaderTitle}>Operations</Text>
+               <TouchableOpacity onPress={() => setCommandModal(true)}>
+                 <Text style={s.sectionHeaderAction}>Shortcuts</Text>
+               </TouchableOpacity>
+             </View>
+             <ListGroup>
+                <ListItem
+                  icon="shopping-bag"
+                  iconColor={BLUE}
+                  title="Orders"
+                  subtitle={orderStats ? `${orderStats.newOrders} new, ${orderStats.toProcess} to process` : 'Loading...'}
+                  onPress={() => nav('/(tabs)/orders')}
+                  badge={unseenOrderCount}
+                />
+                <ListItem
+                  icon="message-circle"
+                  iconColor={theme.accentLight}
+                  title="Customers"
+                  subtitle={hubStats ? `${hubStats.unreadMessages} unread, ${hubStats.activeQuotes} quotes` : 'Loading...'}
+                  onPress={() => nav('/seller-inbox')}
+                />
+                <ListItem
+                  icon="credit-card"
+                  iconColor={SUCCESS}
+                  title="Payouts"
+                  subtitle={payoutInfo?.available?.formatted ?? '—'}
+                  onPress={() => nav('/payouts')}
+                />
+                <ListItem
+                  icon="shield"
+                  iconColor={GREEN_BRIGHT}
+                  title="Account health"
+                  subtitle={`${pct}% ready`}
+                  onPress={() => nav('/seller-settings')}
+                  isLast
+                />
+             </ListGroup>
+          </AnimatedEntrance>
         )}
 
-        {/* ── Zone C: Recent Activity (unified — order + inventory + manufacturer) ── */}
-        <View style={{ paddingHorizontal: SP.md, marginBottom: SP.md }}>
-          <SectionHeader
-            title="Recent activity"
-            action={{ label: 'View all', onPress: () => nav('/(tabs)/orders') }}
-            style={{ paddingHorizontal: 0 }}
-          />
-          <View style={{ gap: 8 }}>
+        {!showWelcome && !showProgress && (
+          <AnimatedEntrance delay={150} style={s.pageSection}>
+             <View style={s.sectionHeaderRow}>
+               <Text style={s.sectionHeaderTitle}>Quick Actions</Text>
+             </View>
+             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                <QuickActionCard label="Create Post" icon="video" accent={theme.accent} badge={!setupState.openedFeatures.includes('create-post')} onPress={() => { markFeatureOpened('create-post'); nav('/create-post'); }} style={{ width: '48%' }} />
+                <QuickActionCard label="Add Product" icon="plus-circle" accent={theme.secondary} onPress={() => nav('/(tabs)/products')} style={{ width: '48%' }} />
+                <QuickActionCard label="View Orders" icon="shopping-bag" accent={BLUE} onPress={() => nav('/(tabs)/orders')} style={{ width: '48%' }} />
+                <QuickActionCard label="Studio" icon="zap" accent={ORANGE} onPress={() => nav('/(tabs)/studio')} style={{ width: '48%' }} />
+             </View>
+          </AnimatedEntrance>
+        )}
 
-            {/* Recent orders — real API data, up to 3 */}
-            {recentOrders === null ? (
-              <LoadingSkeleton height={68} />
-            ) : recentOrders.length === 0 ? (
-              <GradientCard
-                colors={[theme.accentDim, theme.secondaryDim, theme.accentDim]}
-                glow
-                style={{ marginBottom: 0 }}
-              >
-                {/* Icon + headline */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm }}>
-                  <View style={{
-                    width: 40, height: 40, borderRadius: RADIUS.md,
-                    backgroundColor: theme.accentDim,
-                    borderWidth: 1, borderColor: theme.accent + '59',
-                    alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    <Feather name="zap" size={ICON.md} color={theme.accentLight} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: FS.base, fontFamily: FONT.bold, color: FG, letterSpacing: -0.2 }}>
-                      Ready for your first drop?
-                    </Text>
-                    <Text style={{ fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 }}>
-                      A few quick moves to get shoppers to your store.
-                    </Text>
-                  </View>
-                </View>
-                {/* CTA buttons */}
-                <PrimaryButton
-                  label="Share Your Store"
-                  icon="share-2"
-                  small
-                  onPress={() => nav('/share-store')}
-                  style={{ marginBottom: 8 }}
-                />
-                <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <SecondaryButton
-                    label="Add Product"
-                    icon="plus-circle"
-                    small
-                    onPress={() => nav('/(tabs)/products')}
-                    style={{ flex: 1 }}
-                  />
-                  <SecondaryButton
-                    label="Post a Drop"
-                    icon="video"
-                    small
-                    onPress={() => nav('/create-post')}
-                    style={{ flex: 1 }}
-                  />
-                </View>
-              </GradientCard>
-            ) : recentOrders.map((order: any) => {
-              const customerName = order.customerName ?? order.customer?.name ?? order.buyerName ?? 'Unknown';
-               const totalCents   = typeof order.totalCents   === 'number' ? order.totalCents
-                                  : typeof order.total_cents  === 'number' ? order.total_cents : 0;
-              const orderNum     = order.orderNumber ?? order.order_number
-                                 ?? `#${String(order.id ?? '').slice(-6).toUpperCase()}`;
-              const rawDate      = order.createdAt ?? order.created_at ?? '';
-              const dateStr      = rawDate
-                ? new Date(rawDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                : '';
-              return (
-                <BrandthreadCard
-                  key={order.id}
-                  style={{ marginBottom: 0 }}
-                  onPress={() => nav(`/order-detail?id=${order.id}`)}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: SP.sm }}>
-                    <View style={s.orderIconCircle}>
-                      <Feather name="shopping-bag" size={ICON.sm} color={theme.accentLight} />
+        <AnimatedEntrance delay={200} style={s.pageSection}>
+           <View style={s.sectionHeaderRow}>
+             <Text style={s.sectionHeaderTitle}>Recent Orders</Text>
+             <TouchableOpacity onPress={() => nav('/(tabs)/orders')}>
+               <Text style={s.sectionHeaderAction}>View all</Text>
+             </TouchableOpacity>
+           </View>
+
+           {recentOrders === null ? (
+              <LoadingSkeleton height={140} style={{ borderRadius: RADIUS.lg }} />
+           ) : recentOrders.length === 0 ? (
+              <UnifiedCard glow style={{ padding: SP.lg }}>
+                 <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+                    <View style={[s.listIconWrap, { backgroundColor: theme.accentDim }]}>
+                       <Feather name="zap" size={16} color={theme.accentLight} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={s.orderNumber}>{orderNum}</Text>
-                        <StatusBadge
-                          label={orderStatusLabel(order.status)}
-                          variant={orderStatusVariant(order.status)}
-                          small
-                        />
-                        <Text style={[s.orderTime, { marginLeft: 'auto' }]}>{dateStr}</Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
-                        <Text style={s.orderCustomer}>{customerName}</Text>
-                        <Text style={s.orderTotal}>{formatCents(totalCents)}</Text>
-                      </View>
+                       <Text style={{ fontSize: FS.md, fontFamily: FONT.bold, color: FG, letterSpacing: -0.2 }}>Ready for your first drop?</Text>
+                       <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 4 }}>A few quick moves to get shoppers to your store.</Text>
                     </View>
-                  </View>
-                </BrandthreadCard>
-              );
-            })}
+                 </View>
+                 <PrimaryButton label="Share Your Store" icon="share-2" small onPress={() => nav('/share-store')} style={{ marginBottom: 8 }} />
+                 <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <SecondaryButton label="Add Product" icon="plus-circle" small onPress={() => nav('/(tabs)/products')} style={{ flex: 1 }} />
+                    <SecondaryButton label="Post a Drop" icon="video" small onPress={() => nav('/create-post')} style={{ flex: 1 }} />
+                 </View>
+              </UnifiedCard>
+           ) : (
+              <ListGroup>
+                 {recentOrders.map((order, i) => {
+                    const customerName = order.customerName ?? order.customer?.name ?? order.buyerName ?? 'Unknown';
+                    const totalCents   = typeof order.totalCents   === 'number' ? order.totalCents : typeof order.total_cents  === 'number' ? order.total_cents : 0;
+                    const orderNum     = order.orderNumber ?? order.order_number ?? `#${String(order.id ?? '').slice(-6).toUpperCase()}`;
 
-            {/* Unseen order alert — uses the same per-seller watermark as the
-                Orders tab badge, so both touch-points show the same count. */}
-            {unseenOrderCount > 0 && (
-              <NavigationCard
-                label={`${unseenOrderCount} new order${unseenOrderCount > 1 ? 's' : ''} — action needed`}
-                icon="shopping-bag"
-                accent={BLUE}
-                description="Tap to review"
-                badge={unseenOrderCount}
-                onPress={handleOpenOrders}
-              />
-            )}
-            {unseenOrderCount === 0 && orderStats && orderStats.newOrders === 0 && orderStats.readyToShip > 0 && (
-              <NavigationCard
-                label={`${orderStats.readyToShip} order${orderStats.readyToShip > 1 ? 's' : ''} ready to ship`}
-                icon="truck"
-                accent={SUCCESS}
-                description="Mark as shipped"
-                badge
-                onPress={() => nav('/(tabs)/orders')}
-              />
-            )}
-
-            {/* Inventory alert — out-of-stock takes priority over low-stock */}
-            {invStats && invStats.outOfStockCount > 0 && (
-              <NavigationCard
-                label={`${invStats.outOfStockCount} item${invStats.outOfStockCount > 1 ? 's' : ''} out of stock`}
-                icon="alert-circle"
-                accent={RED}
-                description="Restock now"
-                badge
-                onPress={() => nav('/inventory')}
-              />
-            )}
-            {invStats && invStats.outOfStockCount === 0 && invStats.lowStockCount > 0 && (
-              <NavigationCard
-                label={`${invStats.lowStockCount} item${invStats.lowStockCount > 1 ? 's' : ''} running low`}
-                icon="trending-down"
-                accent={ORANGE}
-                description="Review stock levels"
-                onPress={() => nav('/inventory')}
-              />
-            )}
-
-            {/* Manufacturer update — samples take priority over messages */}
-            {hubStats && hubStats.samplesNeedingReview > 0 && (
-              <NavigationCard
-                label={`${hubStats.samplesNeedingReview} sample${hubStats.samplesNeedingReview > 1 ? 's' : ''} need review`}
-                icon="package"
-                accent={ORANGE}
-                description="Open Manufacturer Hub"
-                badge
-                onPress={() => nav('/manufacturer-hub')}
-              />
-            )}
-            {hubStats && hubStats.samplesNeedingReview === 0 && hubStats.unreadMessages > 0 && (
-              <NavigationCard
-                label={`${hubStats.unreadMessages} new manufacturer message${hubStats.unreadMessages > 1 ? 's' : ''}`}
-                icon="message-circle"
-                accent={theme.secondary}
-                description="Tap to reply"
-                badge
-                onPress={() => nav('/manufacturer-hub')}
-              />
-            )}
-
-          </View>
-        </View>
-
-        {/* ── Go to Command Menu trigger ────────────────────────────────── */}
-        <PrimaryButton
-          label="Go to →"
-          icon="command"
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            setCommandModal(true);
-          }}
-          style={{ marginHorizontal: SP.md, marginBottom: SP.lg }}
-        />
+                    return (
+                      <ListItem
+                        key={order.id}
+                        icon="shopping-bag"
+                        iconColor={FG}
+                        title={customerName}
+                        subtitle={orderNum}
+                        value={formatCents(totalCents)}
+                        rightElement={<StatusBadge label={orderStatusLabel(order.status)} variant={orderStatusVariant(order.status)} small />}
+                        onPress={() => nav(`/order-detail?id=${order.id}`)}
+                        isLast={i === recentOrders.length - 1}
+                      />
+                    );
+                 })}
+              </ListGroup>
+           )}
+        </AnimatedEntrance>
 
       </Animated.ScrollView>
 
-      {/* ── Command Menu Modal ────────────────────────────────────────────── */}
-      <Modal
-        visible={commandModal}
-        animationType="slide"
-        transparent
-        onRequestClose={closeCommand}
-      >
-        <Pressable style={s.modalOverlay} onPress={closeCommand} />
-        <View style={[s.bottomSheet, { paddingBottom: Math.max(insets.bottom, SP.lg) }]}>
-          <View style={s.sheetHandle} />
-          <Text style={s.commandTitle}>Go to</Text>
-          <View style={s.commandGrid}>
-            {COMMAND_ITEMS.map((item) => (
-              <PressableScale
-                key={item.label}
-                style={s.commandItem}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  closeCommand();
-                  setTimeout(() => nav(item.route), 100);
-                }}
-              >
-                <View style={s.commandIconWrap}>
-                  <Feather name={item.icon} size={ICON.md} color={theme.accentLight} />
-                </View>
-                <Text style={s.commandLabel} numberOfLines={2}>{item.label}</Text>
-              </PressableScale>
-            ))}
+      <AIBrainFAB context={{ screen: 'home' as const }} bottomOffset={72} />
+
+      <Modal visible={commandModal} animationType="slide" transparent>
+        <View style={s.modalOverlay}>
+          <Pressable style={s.modalOverlay} onPress={() => setCommandModal(false)} />
+          <View style={[s.bottomSheet, { paddingBottom: Math.max(insets.bottom, SP.lg) }]}>
+            <View style={s.sheetHandle} />
+            <Text style={s.commandTitle}>Create & manage</Text>
+            <View style={s.commandGrid}>
+              {COMMAND_ITEMS.map((item) => (
+                <PressableScale
+                  key={item.label}
+                  style={s.commandItem}
+                  onPress={() => { setCommandModal(false); setTimeout(() => nav(item.route), 150); }}
+                >
+                  <View style={s.commandIconWrap}>
+                    <Feather name={item.icon} size={18} color={theme.accentLight} />
+                  </View>
+                  <Text style={s.commandLabel}>{item.label}</Text>
+                </PressableScale>
+              ))}
+            </View>
           </View>
         </View>
       </Modal>
 
-      {/* ── Global Search Modal ───────────────────────────────────────────── */}
-      <Modal
-        visible={searchModal}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setSearchModal(false)}
-      >
-        <View style={[s.searchScreen, { backgroundColor: SCREEN_BG }]}>
-          <View style={[s.searchHeader, { paddingTop: insets.top + 8 }]}>
-            <View style={{ flex: 1 }}>
-              <SearchBar
-                value={searchQuery}
-                onChange={setSearchQuery}
-                placeholder="Search products, orders…"
-              />
-            </View>
-            <PressableScale
-              onPress={() => setSearchModal(false)}
-              style={s.searchClose}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Text style={{ fontSize: FS.sm, fontFamily: FONT.medium, color: theme.accentLight }}>Cancel</Text>
+      <Modal visible={searchModal} animationType="slide" transparent>
+        <View style={[s.searchScreen, { paddingTop: insets.top, backgroundColor: BG }]}>
+          <View style={s.searchHeader}>
+            <SearchBar value={searchQuery} onChange={setSearchQuery} placeholder="Search orders or products…" style={{ flex: 1 }} />
+            <PressableScale onPress={() => setSearchModal(false)} style={s.searchClose}>
+              <Text style={{ fontSize: FS.base, fontFamily: FONT.medium, color: MUTED }}>Cancel</Text>
             </PressableScale>
           </View>
-
-          <ScrollView
-            contentContainerStyle={{ paddingHorizontal: SP.md, paddingBottom: 40 }}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            {!q ? (
-              /* Empty state: show categories */
-              <View style={{ gap: 8, marginTop: SP.md }}>
-                <Text style={s.searchSectionTitle}>Browse</Text>
-                <NavigationCard label="Products" icon="package" onPress={() => { setSearchModal(false); nav('/(tabs)/products'); }} accent={theme.secondary} />
-                <NavigationCard label="Orders" icon="shopping-bag" onPress={() => { setSearchModal(false); nav('/(tabs)/orders'); }} accent={theme.accent} />
-                <NavigationCard label="Studio" icon="zap" onPress={() => { setSearchModal(false); nav('/(tabs)/studio'); }} accent={ORANGE} />
-                <NavigationCard label="Analytics" icon="bar-chart-2" onPress={() => { setSearchModal(false); nav('/(tabs)/analytics'); }} accent={BLUE} />
-              </View>
-            ) : (
-              <View style={{ gap: SP.md, marginTop: SP.md }}>
-                {productResults.length > 0 && (
-                  <View style={{ gap: 8 }}>
-                    <Text style={s.searchSectionTitle}>Products</Text>
-                    {productResults.map((p) => (
-                      <NavigationCard
-                        key={p.id}
-                        label={p.name}
-                        icon="package"
-                        description={`${p.status}${typeof p.priceCents === 'number' ? ` · ${formatCents(p.priceCents)}` : ''}`}
-                        accent={theme.secondary}
-                        onPress={() => { setSearchModal(false); nav('/(tabs)/products'); }}
-                      />
-                    ))}
-                  </View>
-                )}
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: SP.md, paddingBottom: 120 }}>
+            {searchQuery.length > 0 ? (
+              <>
                 {orderResults.length > 0 && (
-                  <View style={{ gap: 8 }}>
+                  <View style={{ marginBottom: SP.lg }}>
                     <Text style={s.searchSectionTitle}>Orders</Text>
-                    {orderResults.map((o) => (
-                      <NavigationCard
-                        key={o.id}
-                        label={o.orderNumber}
-                        icon="shopping-bag"
-                        description={`${o.customer.name} · ${formatCents(o.totalCents)}`}
-                        accent={theme.accent}
-                        onPress={() => { setSearchModal(false); nav('/(tabs)/orders'); }}
-                      />
+                    {orderResults.map(o => (
+                      <PressableScale key={o.id} onPress={() => { setSearchModal(false); nav(`/order-detail?id=${o.id}`); }} style={{ paddingVertical: SP.sm, borderBottomWidth: 1, borderColor: BORDER }}>
+                        <Text style={{ fontSize: FS.base, fontFamily: FONT.medium, color: FG }}>{o.orderNumber} — {o.customer?.name ?? o.customerName}</Text>
+                        <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 2 }}>{formatCents(o.total_cents ?? o.totalCents ?? 0)} • {orderStatusLabel(o.status)}</Text>
+                      </PressableScale>
                     ))}
                   </View>
                 )}
-                {productResults.length === 0 && orderResults.length === 0 && (
-                  <EmptyState
-                    icon="search"
-                    title="No results"
-                    description={`Nothing matched "${searchQuery}". Try a different term.`}
-                  />
+                {productResults.length > 0 && (
+                  <View style={{ marginBottom: SP.lg }}>
+                    <Text style={s.searchSectionTitle}>Products</Text>
+                    {productResults.map(p => (
+                      <PressableScale key={p.id} onPress={() => { setSearchModal(false); nav(`/(tabs)/products`); }} style={{ paddingVertical: SP.sm, borderBottomWidth: 1, borderColor: BORDER }}>
+                        <Text style={{ fontSize: FS.base, fontFamily: FONT.medium, color: FG }}>{p.name}</Text>
+                        <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 2 }}>{formatCents(p.price_cents ?? p.priceCents ?? 0)}</Text>
+                      </PressableScale>
+                    ))}
+                  </View>
                 )}
+                {orderResults.length === 0 && productResults.length === 0 && (
+                  <Text style={{ fontSize: FS.base, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', marginTop: SP.xl }}>No results found for "{searchQuery}"</Text>
+                )}
+              </>
+            ) : (
+              <View style={{ alignItems: 'center', marginTop: SP.xl }}>
+                <Feather name="search" size={32} color={MUTED} style={{ marginBottom: SP.sm }} />
+                <Text style={{ fontSize: FS.base, fontFamily: FONT.medium, color: FG, textAlign: 'center' }}>Search your store</Text>
+                <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, textAlign: 'center', marginTop: 4 }}>Find orders by number or customer name, and products by title.</Text>
               </View>
             )}
           </ScrollView>
         </View>
       </Modal>
-      <AIBrainFAB context={{ screen: 'home' as const }} bottomOffset={72} />
     </View>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const s = StyleSheet.create({
-  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1369,462 +930,19 @@ const s = StyleSheet.create({
     paddingHorizontal: SP.md,
     paddingBottom: SP.sm,
     backgroundColor: SCREEN_BG,
+    zIndex: 10,
   },
   greetSmall: {
-    fontSize: FS.xs,
+    fontSize: 12,
     fontFamily: FONT.medium,
     color: MUTED,
-    letterSpacing: 0.1,
+    letterSpacing: 0.5,
   },
   brandName: {
     fontSize: FS.xl,
     fontFamily: FONT.bold,
     color: FG,
-    letterSpacing: -0.4,
-  },
-
-  // Welcome card
-  welcomeTitle: {
-    fontSize: FS.xl,
-    fontFamily: FONT.bold,
-    color: FG,
     letterSpacing: -0.3,
-  },
-  welcomeSub: {
-    fontSize: FS.sm,
-    fontFamily: FONT.regular,
-    color: MUTED,
-    lineHeight: 20,
-  },
-
-  // Next best action
-  recommendedLabel: {
-    fontSize: 10,
-    fontFamily: FONT.bold,
-    color: SUBTLE,
-    letterSpacing: 0.8,
-  },
-  nbaLabel: {
-    fontSize: FS.md,
-    fontFamily: FONT.bold,
-    color: FG,
-    letterSpacing: -0.2,
-  },
-
-  // ── Setup checklist ───────────────────────────────────────────────────────
-  checklistHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  checklistTitle: {
-    fontSize: FS.base,
-    fontFamily: FONT.bold,
-    color: FG,
-  },
-  checklistCount: {
-    fontSize: FS.sm,
-    fontFamily: FONT.semibold,
-    color: PURPLE_LIGHT,
-  },
-  // Slim progress bar (still animated via progressAnim ref)
-  progressTrack: {
-    height: 3,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 99,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: PURPLE,
-    borderRadius: 99,
-  },
-  // Checklist rows
-  checkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 11,
-  },
-  checkRowBorder: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: BORDER,
-  },
-  checkCircle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1.5,
-    borderColor: BORDER,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  checkCircleDone: {
-    backgroundColor: SUCCESS,
-    borderColor: SUCCESS,
-  },
-  checkLabel: {
-    flex: 1,
-    fontSize: FS.sm,
-    fontFamily: FONT.semibold,
-    color: FG,
-  },
-  checkLabelDone: {
-    color: MUTED,
-    textDecorationLine: 'line-through' as const,
-  },
-  optionalBadge: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  optionalText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: MUTED,
-  },
-
-  // ── Revenue command center ───────────────────────────────────────────────
-  revenueHero: {
-    backgroundColor: CARD_ELEVATED_GLASS,
-    borderRadius: RADIUS.xl,
-    borderWidth: 1,
-    borderColor: BORDER_ACTIVE,
-    padding: SP.lg,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
-  },
-  revenueHeroHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: SP.lg,
-  },
-  revenueHeroEyebrow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
-  revenueLiveDot: {
-    width: 7,
-    height: 7,
-    borderRadius: RADIUS.pill,
-  },
-  revenueEyebrowText: {
-    fontSize: 10,
-    fontFamily: FONT.bold,
-    color: MUTED,
-    letterSpacing: 1.2,
-  },
-  revenueAnalyticsLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  revenueAnalyticsText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
-  },
-  revenueHeadlineRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: SP.sm,
-    marginBottom: SP.lg,
-  },
-  revenueLabel: {
-    fontSize: FS.sm,
-    fontFamily: FONT.medium,
-    color: MUTED,
-    marginBottom: 3,
-  },
-  revenueValue: {
-    fontSize: 42,
-    lineHeight: 48,
-    fontFamily: FONT.extrabold,
-    color: FG,
-    letterSpacing: -1.5,
-  },
-  revenueContext: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: SUBTLE,
-    marginTop: 2,
-  },
-  revenueTrendPill: {
-    maxWidth: 132,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    borderWidth: 1,
-    borderRadius: RADIUS.pill,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    marginBottom: 4,
-  },
-  revenueTrendText: {
-    flexShrink: 1,
-    fontSize: 10,
-    lineHeight: 13,
-    fontFamily: FONT.semibold,
-  },
-  revenueChartHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SP.sm,
-  },
-  revenueChartTitle: {
-    fontSize: FS.sm,
-    fontFamily: FONT.semibold,
-    color: FG,
-  },
-  revenueChartDate: {
-    fontSize: FS.xs,
-    fontFamily: FONT.medium,
-    color: MUTED,
-  },
-  revenueChart: {
-    height: 120,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: BORDER_SUBTLE,
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-around',
-    paddingHorizontal: SP.sm,
-    paddingTop: SP.sm,
-    paddingBottom: 10,
-  },
-  revenueBarColumn: {
-    flex: 1,
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 8,
-  },
-  revenueBarTrack: {
-    height: 84,
-    width: '58%',
-    minWidth: 10,
-    maxWidth: 22,
-    justifyContent: 'flex-end',
-    borderRadius: RADIUS.pill,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    overflow: 'hidden',
-  },
-  revenueBar: {
-    width: '100%',
-    borderRadius: RADIUS.pill,
-  },
-  revenueDay: {
-    fontSize: 9,
-    fontFamily: FONT.bold,
-    color: SUBTLE,
-    textTransform: 'uppercase' as const,
-  },
-  revenueChartEmpty: {
-    height: 120,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SP.sm,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: BORDER_SUBTLE,
-  },
-  revenueChartEmptyText: {
-    fontSize: FS.xs,
-    fontFamily: FONT.medium,
-    color: MUTED,
-  },
-  revenueMetricsRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    marginTop: SP.lg,
-  },
-  revenueMetric: {
-    flex: 1,
-    gap: 3,
-  },
-  revenueMetricDivider: {
-    width: 1,
-    backgroundColor: BORDER,
-    marginHorizontal: SP.sm,
-  },
-  revenueMetricValue: {
-    fontSize: FS.lg,
-    fontFamily: FONT.bold,
-    color: FG,
-  },
-  revenueMetricLabel: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: MUTED,
-  },
-
-  // Legacy compact stats tokens retained for existing consumers.
-  statsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: SP.md,
-    marginBottom: SP.md,
-    marginTop: SP.sm,
-  },
-  statChip: {
-    flex: 1,
-    backgroundColor: CARD_GLASS,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: BORDER,
-    paddingVertical: SP.sm,
-    alignItems: 'center',
-    gap: 2,
-  },
-  statChipWarn: {
-    borderColor: 'rgba(249,115,22,0.4)',
-  },
-  paymentFailureBanner: {
-    marginHorizontal: SP.md,
-    marginBottom: SP.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
-    backgroundColor: 'rgba(239,68,68,0.12)',
-    borderRadius: RADIUS.md,
-    padding: SP.sm,
-    borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.45)',
-  },
-  paymentFailureIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: RADIUS.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(239,68,68,0.16)',
-  },
-  paymentFailureCopy: {
-    flex: 1,
-    gap: 2,
-  },
-  paymentFailureTitle: {
-    color: RED,
-    fontSize: FS.sm,
-    fontFamily: FONT.semibold,
-  },
-  paymentFailureBody: {
-    color: FG,
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    lineHeight: 16,
-  },
-  paymentFailureAction: {
-    color: RED,
-    fontSize: FS.xs,
-    fontFamily: FONT.semibold,
-  },
-  statChipVal: {
-    fontSize: FS.xl,
-    fontFamily: FONT.bold,
-    color: FG,
-  },
-  statChipLbl: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: MUTED,
-  },
-
-  // Recent orders
-  orderIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: PURPLE_DIM,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  orderNumber: {
-    fontSize: FS.sm,
-    fontFamily: FONT.bold,
-    color: PURPLE_LIGHT,
-  },
-  orderTime: {
-    fontSize: FS.xs,
-    fontFamily: FONT.regular,
-    color: SUBTLE,
-  },
-  orderCustomer: {
-    fontSize: FS.sm,
-    fontFamily: FONT.medium,
-    color: FG,
-  },
-  orderTotal: {
-    fontSize: FS.sm,
-    fontFamily: FONT.semibold,
-    color: FG,
-  },
-
-  // ── Hero card (gradient balance card) ───────────────────────────────────
-  heroCard: {
-    borderRadius: RADIUS.lg,
-    padding: SP.lg,
-    gap: 14,
-    shadowOpacity: 0.45,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 12,
-  },
-  heroTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  heroLabel: {
-    fontSize: 11,
-    fontFamily: FONT.medium,
-    color: 'rgba(255,255,255,0.65)',
-    letterSpacing: 0.6,
-    marginBottom: 6,
-  },
-  heroBalance: {
-    fontSize: 34,
-    fontFamily: FONT.bold,
-    color: '#FFFFFF',
-    letterSpacing: -1.2,
-  },
-  heroPayoutsBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  heroPayoutsBtnTxt: {
-    fontSize: 12,
-    fontFamily: FONT.semibold,
-    color: 'rgba(255,255,255,0.9)',
-  },
-  heroBottom: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
-  heroNextTxt: {
-    fontSize: 12,
-    fontFamily: FONT.regular,
-    color: 'rgba(255,255,255,0.6)',
-    flex: 1,
   },
   compactBalanceWrap: {
     overflow: 'hidden',
@@ -1862,56 +980,166 @@ const s = StyleSheet.create({
     fontSize: FS.md,
   },
 
-  // ── 7-day trend chart ────────────────────────────────────────────────────
-  trendHeaderRow: {
+  // ─── Unified System ────────────────────────────────────────────────────────
+  pageSection: {
+    paddingHorizontal: SP.md,
+    marginBottom: SP.xl,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginBottom: SP.sm,
+    paddingHorizontal: 4,
+  },
+  sectionHeaderTitle: {
+    fontSize: 13,
+    fontFamily: FONT.bold,
+    color: MUTED,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  sectionHeaderAction: {
+    fontSize: 13,
+    fontFamily: FONT.medium,
+    color: SUBTLE,
+  },
+  unifiedCard: {
+    backgroundColor: CARD_GLASS,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: BORDER_SUBTLE,
+  },
+  listGroup: {
+    backgroundColor: CARD_GLASS,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: BORDER_SUBTLE,
+    overflow: 'hidden',
+  },
+  listItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
+    padding: SP.md,
+    gap: SP.sm,
   },
-  trendTitle: {
-    fontSize: FS.sm,
+  listIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: RADIUS.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  listBody: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  listTitle: {
+    fontSize: 15,
     fontFamily: FONT.semibold,
+    color: FG,
+    letterSpacing: -0.2,
+  },
+  listSubtitle: {
+    fontSize: 13,
+    fontFamily: FONT.regular,
     color: MUTED,
   },
-  trendWeekTotal: {
-    fontSize: FS.xs,
-    fontFamily: FONT.medium,
-    color: PURPLE_LIGHT,
-  },
-  trendChart: {
-    backgroundColor: CARD_GLASS,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: BORDER,
+  listRight: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-around',
-    paddingHorizontal: SP.sm,
-    paddingBottom: 10,
-    paddingTop: SP.md,
-    height: 90,
-  },
-  trendBarWrap: {
-    flex: 1,
     alignItems: 'center',
-    gap: 7,
-    justifyContent: 'flex-end',
+    gap: 8,
+    paddingLeft: 8,
   },
-  trendBar: {
-    width: '70%',
-    borderRadius: 3,
-    minHeight: 4,
-  },
-  trendDay: {
-    fontSize: 9,
+  listValue: {
+    fontSize: 15,
     fontFamily: FONT.semibold,
-    color: SUBTLE,
-    textTransform: 'uppercase' as const,
-    letterSpacing: 0.3,
+    color: FG,
+  },
+  listDivider: {
+    position: 'absolute',
+    bottom: 0,
+    left: SP.md + 34 + SP.sm,
+    right: 0,
+    height: 1,
+    backgroundColor: BORDER_SUBTLE,
   },
 
-  // Command modal
+  // ─── Business Pulse ────────────────────────────────────────────────────────
+  metricLabel: {
+    fontSize: 13,
+    fontFamily: FONT.medium,
+    color: MUTED,
+  },
+  metricValue: {
+    fontSize: 26,
+    fontFamily: FONT.extrabold,
+    color: FG,
+    letterSpacing: -0.8,
+    marginTop: 2,
+  },
+  trendPillInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    alignSelf: 'flex-start',
+  },
+  trendPillText: {
+    fontSize: 11,
+    fontFamily: FONT.bold,
+  },
+
+  chartContainer: {
+    height: 90,
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    paddingHorizontal: 6,
+    paddingTop: 8,
+  },
+  chartBarWrap: {
+    width: 24,
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 6,
+  },
+  chartBarTrack: {
+    width: 6,
+    height: 60,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: RADIUS.pill,
+    overflow: 'hidden',
+  },
+  chartBar: {
+    width: '100%',
+    borderRadius: RADIUS.pill,
+  },
+  chartDay: {
+    fontSize: 9,
+    fontFamily: FONT.bold,
+    color: SUBTLE,
+    textTransform: 'uppercase' as const,
+  },
+  chartEmpty: {
+    height: 90,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  chartEmptyText: {
+    fontSize: FS.xs,
+    fontFamily: FONT.medium,
+    color: MUTED,
+  },
+
+  // ─── Modals ────────────────────────────────────────────────────────────────
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -1972,8 +1200,6 @@ const s = StyleSheet.create({
     color: MUTED,
     textAlign: 'center',
   },
-
-  // Search modal
   searchScreen: {
     flex: 1,
   },
@@ -1996,24 +1222,4 @@ const s = StyleSheet.create({
     textTransform: 'uppercase',
     marginBottom: 4,
   },
-  hubSection: { paddingHorizontal: SP.md, marginBottom: SP.md, gap: 10 },
-  hubSectionHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 2 },
-  hubEyebrow: { color: SUBTLE, fontFamily: FONT.bold, fontSize: FS.xs, letterSpacing: 1.2 },
-  hubTitle: { color: FG, fontFamily: FONT.bold, fontSize: FS.xl, marginTop: 3 },
-  hubCustomize: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 6 },
-  hubCustomizeText: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.xs },
-  hubModule: {
-    minHeight: 88, flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    backgroundColor: CARD_GLASS, borderWidth: 1, borderColor: BORDER,
-    borderRadius: RADIUS.lg, padding: SP.md,
-  },
-  hubModuleIcon: { width: 44, height: 44, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },
-  hubModuleCopy: { flex: 1 },
-  hubModuleTitle: { color: FG, fontFamily: FONT.semibold, fontSize: FS.base, marginBottom: 7 },
-  hubModuleHeadline: { color: FG, fontFamily: FONT.bold, fontSize: FS.lg, marginBottom: 2 },
-  hubModuleMeta: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs },
-  hubStatRow: { flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', gap: 4 },
-  hubStatValue: { color: FG, fontFamily: FONT.bold, fontSize: FS.sm },
-  hubStatLabel: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.xs },
-  hubStatDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: SUBTLE, marginHorizontal: 2, alignSelf: 'center' },
 });
