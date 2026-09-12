@@ -21,7 +21,7 @@ function BuyerTabLayout() {
   const { theme } = useAppTheme();
   const [inboxBadgeCount, setInboxBadgeCount] = useState(0);
 
-  const pillBg       = 'rgba(12,12,23,0.96)'; // SURFACE with opacity
+  const pillBg       = 'rgba(12, 12, 23, 0.65)'; // SURFACE with opacity
   const activeTint   = theme.accent;
   const inactiveTint = SUBTLE;
 

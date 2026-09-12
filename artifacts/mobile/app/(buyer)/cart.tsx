@@ -23,7 +23,7 @@ import {
 import { useApi } from '@/hooks/useApi';
 import { invalidateSellerPaymentStatusCache } from '@/lib/api';
 import {
-  BG, SCREEN_BG, CARD, CARD_ELEVATED, BORDER,
+  BG, SCREEN_BG, CARD, CARD_ELEVATED, CARD_GLASS, CARD_ELEVATED_GLASS, BORDER,
   FG, MUTED, SUBTLE,
   SUCCESS, SUCCESS_DIM,
   ORANGE, ORANGE_DIM,
@@ -61,7 +61,7 @@ function QuantityControl({ value, max, onDec, onInc }: {
 }
 const qc = StyleSheet.create({
   root: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  btn:  { width: COMP.minTouchTarget, height: COMP.minTouchTarget, borderRadius: 8, backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  btn:  { width: COMP.minTouchTarget, height: COMP.minTouchTarget, borderRadius: 8, backgroundColor: CARD_ELEVATED_GLASS, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   btnDisabled: { opacity: 0.4 },
   val:  { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, minWidth: 20, textAlign: 'center' },
 });
@@ -154,7 +154,7 @@ const ir = StyleSheet.create({
   root: { flexDirection: 'row', gap: SP.sm, paddingVertical: SP.sm },
   img: {
     width: 80, height: 100, borderRadius: RADIUS.md,
-    backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER,
+    backgroundColor: CARD_ELEVATED_GLASS, borderWidth: 1, borderColor: BORDER,
     alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
   productImage: { width: '100%', height: '100%' },
@@ -245,7 +245,7 @@ function SellerGroup({
 }
 
 const sg = StyleSheet.create({
-  root: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md, marginBottom: SP.md },
+  root: { backgroundColor: CARD_GLASS, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md, marginBottom: SP.md },
   sellerRow: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
   avatar: { width: 36, height: 36, borderRadius: RADIUS.pill, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   avatarText: { fontSize: FS.sm, fontFamily: FONT.bold },
@@ -295,7 +295,7 @@ function SavedItemRow({ item, onMove, onRemove }: {
 
 const si = StyleSheet.create({
   root: { flexDirection: 'row', gap: SP.sm, paddingVertical: SP.sm },
-  img: { width: 56, height: 70, borderRadius: RADIUS.sm, backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
+  img: { width: 56, height: 70, borderRadius: RADIUS.sm, backgroundColor: CARD_ELEVATED_GLASS, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   name: { fontSize: FS.sm, fontFamily: FONT.medium, color: FG },
   variant: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginBottom: 2 },
   price: { fontSize: FS.sm, fontFamily: FONT.semibold, color: FG, marginBottom: 4 },
@@ -345,7 +345,7 @@ function SummaryCard({ subtotal, discountTotal, shipping, tax, total, hasPreOrde
 }
 
 const sum = StyleSheet.create({
-  root: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md, marginBottom: SP.md },
+  root: { backgroundColor: CARD_GLASS, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md, marginBottom: SP.md },
   title: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
   label: { fontSize: FS.base, fontFamily: FONT.regular, color: MUTED },
@@ -827,17 +827,17 @@ const s = StyleSheet.create({
   headerBadgeText: { fontSize: FS.xs, fontFamily: FONT.bold, color: '#fff' },
   savedSection: { marginBottom: SP.md },
   savedTitle: { fontSize: FS.sm, fontFamily: FONT.semibold, color: MUTED, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: SP.sm },
-  savedCard: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md },
+  savedCard: { backgroundColor: CARD_GLASS, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, padding: SP.md },
   divider: { height: 1, backgroundColor: BORDER, marginVertical: SP.xs },
   multiSellerNotice: { flexDirection: 'row', gap: SP.sm, borderRadius: RADIUS.md, padding: SP.md, marginBottom: SP.md },
   multiSellerText: { flex: 1, fontSize: FS.sm, fontFamily: FONT.regular, lineHeight: 20 },
-  loyaltyCard: { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, padding: SP.md, marginBottom: SP.md },
+  loyaltyCard: { backgroundColor: CARD_GLASS, borderRadius: RADIUS.lg, borderWidth: 1, padding: SP.md, marginBottom: SP.md },
   loyaltyHeading: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.sm },
   loyaltyIcon: { width: 30, height: 30, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   loyaltyTitle: { fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
   loyaltySub: { fontSize: FS.xs, fontFamily: FONT.regular, color: MUTED, marginTop: 2 },
   pointsRow: { flexDirection: 'row', gap: SP.sm, alignItems: 'center' },
-  pointsInput: { flex: 1, height: COMP.inputH, borderRadius: RADIUS.md, backgroundColor: CARD_ELEVATED, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, paddingHorizontal: SP.md },
+  pointsInput: { flex: 1, height: COMP.inputH, borderRadius: RADIUS.md, backgroundColor: CARD_ELEVATED_GLASS, borderWidth: 1, borderColor: BORDER, color: FG, fontFamily: FONT.regular, paddingHorizontal: SP.md },
   pointsApply: { minWidth: 76, height: COMP.inputH, borderRadius: RADIUS.md, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   pointsApplyDisabled: { opacity: 0.5 },
   pointsApplyText: { fontSize: FS.sm, fontFamily: FONT.bold },

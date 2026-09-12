@@ -16,7 +16,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import {
-  BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
+  BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED, CARD_GLASS, CARD_ELEVATED_GLASS, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM,
   ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD,
   FONT, FS,
@@ -460,13 +460,13 @@ const styles = StyleSheet.create({
   rangePill: { flex: 1, minHeight: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: SURFACE, borderWidth: 1, borderColor: BORDER },
   rangePillText: { fontSize: 11, fontFamily: FONT.semibold, color: MUTED },
   performanceTiles: { flexDirection: 'row', gap: 10, paddingRight: 16, marginBottom: 18 },
-  performanceTile: { width: 142, backgroundColor: CARD, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: BORDER },
+  performanceTile: { width: 142, backgroundColor: CARD_GLASS, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: BORDER },
   performanceTileLabel: { color: MUTED, fontFamily: FONT.regular, fontSize: 11, marginBottom: 6 },
   performanceTileValue: { color: FG, fontFamily: FONT.bold, fontSize: 21 },
   performanceTileMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 },
   performanceTileChange: { fontFamily: FONT.medium, fontSize: 10 },
 
-  chartCard:     { backgroundColor: CARD, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: BORDER, marginBottom: 24 },
+  chartCard:     { backgroundColor: CARD_GLASS, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: BORDER, marginBottom: 24 },
   chartTab:      { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, backgroundColor: SURFACE },
   chartTabText:  { fontSize: 11, fontFamily: FONT.medium, color: MUTED },
   groupTab:      { width: 24, height: 24, borderRadius: 6, alignItems: 'center', justifyContent: 'center', backgroundColor: SURFACE },
@@ -489,7 +489,7 @@ const styles = StyleSheet.create({
 
   sectionTitle:  { fontSize: 16, fontFamily: FONT.semibold, color: FG, marginBottom: 12 },
   metricsGrid:   { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 24 },
-  metricCard:    { backgroundColor: CARD, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: BORDER },
+  metricCard:    { backgroundColor: CARD_GLASS, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: BORDER },
   metricLabel:   { fontSize: 11, fontFamily: FONT.regular, color: MUTED, marginBottom: 4 },
   metricValue:   { fontSize: 22, fontFamily: FONT.bold, color: FG, marginBottom: 4 },
   metricChangeRow:{ flexDirection: 'row', alignItems: 'center', gap: 3 },
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
 
   insightHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   viewAll:       { fontSize: 13, fontFamily: FONT.medium },
-  insightCard:   { flexDirection: 'row', gap: 12, backgroundColor: CARD_ELEVATED, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: BORDER, borderLeftWidth: 3, marginBottom: 10 },
+  insightCard:   { flexDirection: 'row', gap: 12, backgroundColor: CARD_ELEVATED_GLASS, borderRadius: 14, padding: 14, borderWidth: 1, borderColor: BORDER, borderLeftWidth: 3, marginBottom: 10 },
   insightIconWrap:{ width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 2 },
   insightTitle:  { fontSize: 14, fontFamily: FONT.semibold, color: FG, marginBottom: 4 },
   insightWhat:   { fontSize: 12, fontFamily: FONT.regular, color: MUTED, marginBottom: 4 },

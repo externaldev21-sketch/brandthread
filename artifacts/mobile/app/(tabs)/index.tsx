@@ -12,7 +12,7 @@ import { useApi } from '@/hooks/useApi';
 import { getSetupState, markSetupStarted, dismissWelcome, completionPercent, nextTask, nextBestAction, dismissTip, markFeatureOpened, type SetupState } from '@/lib/setupStore';
 import { deriveHubStats, deriveInventoryStats, deriveOrderStats } from '@/lib/sellerDashboardStats';
 import { AnimatedEntrance, BrandthreadScreen, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SearchBar, StatCard, QuickActionCard, SectionHeader, ProgressCard, NavigationCard, GuidedTip, NewFeatureBadge, LoadingSkeleton, EmptyState, StatusBadge, PressableScale } from '@/components/BrandthreadUI';
-import { BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_SUBTLE, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, GREEN_BRIGHT, BLUE, ORANGE, RED, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
+import { BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED, CARD_GLASS, CARD_ELEVATED_GLASS, BORDER, BORDER_SUBTLE, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, GREEN_BRIGHT, BLUE, ORANGE, RED, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { reportNetworkError } from '@/lib/networkNotice';
@@ -1274,7 +1274,7 @@ export default function SellerHomeScreen() {
       <Modal
         visible={searchModal}
         animationType="fade"
-        transparent={false}
+        transparent={true}
         onRequestClose={() => setSearchModal(false)}
       >
         <View style={[s.searchScreen, { backgroundColor: SCREEN_BG }]}>
@@ -1368,7 +1368,7 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: SP.md,
     paddingBottom: SP.sm,
-    backgroundColor: BG,
+    backgroundColor: SCREEN_BG,
   },
   greetSmall: {
     fontSize: FS.xs,
@@ -1489,7 +1489,7 @@ const s = StyleSheet.create({
 
   // ── Revenue command center ───────────────────────────────────────────────
   revenueHero: {
-    backgroundColor: CARD_ELEVATED,
+    backgroundColor: CARD_ELEVATED_GLASS,
     borderRadius: RADIUS.xl,
     borderWidth: 1,
     borderColor: BORDER_ACTIVE,
@@ -1679,7 +1679,7 @@ const s = StyleSheet.create({
   },
   statChip: {
     flex: 1,
-    backgroundColor: CARD,
+    backgroundColor: CARD_GLASS,
     borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: BORDER,
@@ -1828,7 +1828,7 @@ const s = StyleSheet.create({
   },
   compactBalanceWrap: {
     overflow: 'hidden',
-    backgroundColor: BG,
+    backgroundColor: SCREEN_BG,
     zIndex: 20,
   },
   compactBalance: {
@@ -1838,7 +1838,7 @@ const s = StyleSheet.create({
     paddingHorizontal: SP.sm,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    backgroundColor: CARD,
+    backgroundColor: CARD_GLASS,
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.sm,
@@ -1880,7 +1880,7 @@ const s = StyleSheet.create({
     color: PURPLE_LIGHT,
   },
   trendChart: {
-    backgroundColor: CARD,
+    backgroundColor: CARD_GLASS,
     borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: BORDER,
@@ -1921,7 +1921,7 @@ const s = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: CARD,
+    backgroundColor: CARD_GLASS,
     borderTopLeftRadius: RADIUS.xl,
     borderTopRightRadius: RADIUS.xl,
     paddingHorizontal: SP.lg,
@@ -1951,7 +1951,7 @@ const s = StyleSheet.create({
     width: '30%',
     alignItems: 'center',
     gap: SP.sm,
-    backgroundColor: CARD_ELEVATED,
+    backgroundColor: CARD_ELEVATED_GLASS,
     borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: BORDER,
@@ -2004,7 +2004,7 @@ const s = StyleSheet.create({
   hubCustomizeText: { color: MUTED, fontFamily: FONT.medium, fontSize: FS.xs },
   hubModule: {
     minHeight: 88, flexDirection: 'row', alignItems: 'center', gap: SP.sm,
-    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
+    backgroundColor: CARD_GLASS, borderWidth: 1, borderColor: BORDER,
     borderRadius: RADIUS.lg, padding: SP.md,
   },
   hubModuleIcon: { width: 44, height: 44, borderRadius: RADIUS.md, alignItems: 'center', justifyContent: 'center' },

@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import {
   BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED,
+  SURFACE_GLASS, CARD_GLASS, CARD_ELEVATED_GLASS, SKELETON_GLASS,
   BORDER, BORDER_ACTIVE, BORDER_FOCUS,
   FG, MUTED, SUBTLE,
   SUCCESS, SUCCESS_DIM, GREEN_BRIGHT,
@@ -285,7 +286,7 @@ interface BrandthreadCardProps {
 export function BrandthreadCard({ children, style, onPress, glow = false, elevated = false }: BrandthreadCardProps) {
   const { theme } = useAppTheme();
   const s: ViewStyle = {
-    backgroundColor: elevated ? CARD_ELEVATED : CARD,
+    backgroundColor: elevated ? CARD_ELEVATED_GLASS : CARD_GLASS,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: BORDER,
@@ -1110,7 +1111,7 @@ export function LoadingSkeleton({ height = 80, style }: { height?: number; style
   }, []);
   return (
     <Animated.View
-      style={[{ height, backgroundColor: CARD, borderRadius: RADIUS.md, opacity: anim }, style]}
+      style={[{ height, backgroundColor: SKELETON_GLASS, borderRadius: RADIUS.md, opacity: anim }, style]}
     />
   );
 }
@@ -1202,20 +1203,20 @@ export function HapticSwitch({ onValueChange, ...props }: SwitchProps) {
 }
 
 const skS = StyleSheet.create({
-  feed: { padding: SP.md, gap: SP.sm, backgroundColor: BG },
+  feed: { padding: SP.md, gap: SP.sm, backgroundColor: SCREEN_BG },
   feedHeader: { width: '100%', borderRadius: 0 },
   feedMedia: { width: '100%', borderRadius: RADIUS.lg },
   feedMeta: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginTop: SP.sm },
-  feedAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: CARD },
+  feedAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: SKELETON_GLASS },
   feedLines: { flex: 1, gap: 7 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: SP.sm, padding: SP.md },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: SP.sm, padding: SP.md, backgroundColor: SCREEN_BG },
   productCard: { gap: 8, marginBottom: SP.md },
   productImage: { width: '100%', borderRadius: RADIUS.md },
-  searchList: { padding: SP.md, gap: SP.sm },
+  searchList: { padding: SP.md, gap: SP.sm, backgroundColor: SCREEN_BG },
   searchRow: { flexDirection: 'row', alignItems: 'center', gap: SP.md },
   searchThumb: { width: 60, borderRadius: RADIUS.md },
   searchLines: { flex: 1, gap: 8 },
-  checkout: { flex: 1, backgroundColor: BG },
+  checkout: { flex: 1, backgroundColor: SCREEN_BG },
   checkoutHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: SP.md },
   checkoutBody: { flex: 1, padding: SP.md, gap: SP.md },
   checkoutButton: { marginHorizontal: SP.md, marginBottom: SP.lg },

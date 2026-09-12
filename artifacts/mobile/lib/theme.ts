@@ -19,6 +19,11 @@ export const SURFACE       = '#0C0C17';   // slightly lifted surface (tabs, shee
 export const CARD          = '#12121F';   // standard card background
 export const CARD_ELEVATED = '#18182E';   // elevated card (hero, featured)
 export const OVERLAY       = 'rgba(0,0,0,0.72)'; // modal overlay
+export const SURFACE_GLASS = 'rgba(12, 12, 23, 0.65)'; // glassy tabs/sheets
+export const CARD_GLASS    = 'rgba(18, 18, 31, 0.45)'; // glassy card
+export const CARD_ELEVATED_GLASS = 'rgba(24, 24, 46, 0.65)'; // glassy elevated
+export const SKELETON_GLASS = 'rgba(255,255,255,0.05)'; // translucent shimmer
+
 
 // ─── Borders ─────────────────────────────────────────────────────────────────
 export const BORDER          = 'rgba(255,255,255,0.07)';

@@ -13,6 +13,7 @@ import { Tabs } from 'expo-router';
 import {
   BORDER,
   BG,
+  SURFACE_GLASS,
   MUTED,
   FG,
   FONT,
@@ -154,7 +155,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
         {
           height: 72 + insets.bottom,
           paddingBottom: insets.bottom,
-          backgroundColor: BG,
+          backgroundColor: SURFACE_GLASS,
           borderTopColor: BORDER,
         },
       ]}
@@ -260,7 +261,7 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   bar: {
     flexDirection:   'row',
-    backgroundColor: '#07070F',
+    backgroundColor: 'transparent',
     borderTopWidth:  StyleSheet.hairlineWidth,
     borderTopColor:  'rgba(255,255,255,0.07)',
     paddingTop:      8,

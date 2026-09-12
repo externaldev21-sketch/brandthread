@@ -19,7 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { formatCents } from '@/lib/money';
 import { getEntitlementRejection } from '@/lib/entitlementError';
 import {
-  BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE,
+  BG, SURFACE, CARD, CARD_ELEVATED, CARD_GLASS, CARD_ELEVATED_GLASS, SURFACE_GLASS, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
   CYAN, SUCCESS, BLUE, ORANGE, RED, GOLD, ON_DARK,
   GRAD_PRIMARY, FONT, FS, SP, RADIUS, COMP, ICON,
@@ -588,7 +588,7 @@ function ManufacturerCard({ mfg, saved, saving, onSave, onMessage, onProfile, on
 }
 
 const card = StyleSheet.create({
-  root:          { flex: 1, minWidth: 0, backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginBottom: SP.sm, padding: SP.sm },
+  root:          { flex: 1, minWidth: 0, backgroundColor: CARD_GLASS, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginBottom: SP.sm, padding: SP.sm },
   cover:         { height: 112, borderRadius: RADIUS.md, overflow: 'hidden', backgroundColor: PURPLE_DIM, position: 'relative', marginBottom: SP.sm },
   coverImage:    { width: '100%', height: '100%' },
   coverFallback: { flex: 1, alignItems: 'center', justifyContent: 'center' },
@@ -710,7 +710,7 @@ function FilterModal({ visible, filters, onApply, onClose }: {
 }
 
 const fm = StyleSheet.create({
-  root:        { flex: 1, backgroundColor: SURFACE },
+  root:        { flex: 1, backgroundColor: SURFACE_GLASS },
   handle:      { width: 36, height: 4, borderRadius: 2, backgroundColor: BORDER, alignSelf: 'center', marginTop: SP.sm },
   header:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SP.md, paddingVertical: SP.md },
   title:       { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },
@@ -858,7 +858,7 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
 }
 
 const relCard = StyleSheet.create({
-  root:     { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginHorizontal: SP.md, marginBottom: SP.md, padding: SP.md },
+  root:     { backgroundColor: CARD_GLASS, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginHorizontal: SP.md, marginBottom: SP.md, padding: SP.md },
   topRow:   { flexDirection: 'row', gap: SP.md },
   avatar:   { width: 44, height: 44, borderRadius: 22, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER_ACTIVE },
   avatarText:{ fontSize: FS.md, fontFamily: FONT.bold, color: PURPLE_LIGHT },
@@ -1080,7 +1080,7 @@ function QuoteReceivedCard({ quote, manufacturerName, canCompare, onAccept, onDe
 }
 
 const qc = StyleSheet.create({
-  root:       { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginHorizontal: SP.md, marginBottom: SP.md, padding: SP.md },
+  root:       { backgroundColor: CARD_GLASS, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginHorizontal: SP.md, marginBottom: SP.md, padding: SP.md },
   topRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.xs },
   productName:{ fontSize: FS.base, fontFamily: FONT.semibold, color: FG, flex: 1, marginRight: SP.sm },
   mfgName:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginBottom: SP.xs },
@@ -1183,7 +1183,7 @@ function SamplesTab({ router }: { router: ReturnType<typeof useRouter> }) {
 }
 
 const smpCard = StyleSheet.create({
-  root:       { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginHorizontal: SP.md, marginBottom: SP.md, padding: SP.md },
+  root:       { backgroundColor: CARD_GLASS, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginHorizontal: SP.md, marginBottom: SP.md, padding: SP.md },
   topRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SP.xs },
   productName:{ fontSize: FS.base, fontFamily: FONT.semibold, color: FG, flex: 1, marginRight: SP.sm },
   mfgName:    { fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginBottom: SP.xs },
@@ -1299,7 +1299,7 @@ function ProductionTab({ router }: { router: ReturnType<typeof useRouter> }) {
 }
 
 const prodCard = StyleSheet.create({
-  root:       { backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginHorizontal: SP.md, marginBottom: SP.md, padding: SP.md },
+  root:       { backgroundColor: CARD_GLASS, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginHorizontal: SP.md, marginBottom: SP.md, padding: SP.md },
   topRow:     { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: SP.sm },
   nameCol:    { flex: 1, marginRight: SP.sm },
   productName:{ fontSize: FS.base, fontFamily: FONT.semibold, color: FG },
@@ -1401,7 +1401,7 @@ function MessagesTab({ router }: { router: ReturnType<typeof useRouter> }) {
 }
 
 const msgCard = StyleSheet.create({
-  root:      { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: CARD, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginHorizontal: SP.md, marginBottom: SP.sm, padding: SP.md },
+  root:      { flexDirection: 'row', alignItems: 'center', gap: SP.md, backgroundColor: CARD_GLASS, borderRadius: RADIUS.lg, borderWidth: 1, borderColor: BORDER, marginHorizontal: SP.md, marginBottom: SP.sm, padding: SP.md },
   avatar:    { width: 44, height: 44, borderRadius: 22, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER_ACTIVE },
   avatarText:{ fontSize: FS.md, fontFamily: FONT.bold, color: PURPLE_LIGHT },
   body:      { flex: 1 },
@@ -1424,7 +1424,7 @@ const s = StyleSheet.create({
   headerTitle:  { fontSize: FS.xl, fontFamily: FONT.bold, color: FG, letterSpacing: -0.3 },
   headerActions:{ flexDirection: 'row', gap: SP.sm },
   headerBtn:    { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
-  tabBarWrapper:{ borderBottomWidth: 1, borderBottomColor: BORDER, backgroundColor: SURFACE },
+  tabBarWrapper:{ borderBottomWidth: 1, borderBottomColor: BORDER, backgroundColor: SURFACE_GLASS },
   tabBarContent:{ paddingHorizontal: SP.md },
   tabItem:      { marginRight: SP.sm, alignItems: 'center' },
   tabInner:     { flexDirection: 'row', alignItems: 'center', gap: SP.xs, paddingVertical: SP.sm, paddingHorizontal: SP.sm },

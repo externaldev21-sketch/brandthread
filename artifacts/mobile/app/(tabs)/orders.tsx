@@ -6,7 +6,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, GRAD_DARK_FADE, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
+import { BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED, CARD_GLASS, CARD_ELEVATED_GLASS, BORDER, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, BLUE, BLUE_DIM, ORANGE, ORANGE_DIM, RED, RED_DIM, GOLD, GRAD_CARD_GLOW, GRAD_DARK_FADE, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM, CYAN, CYAN_DIM } from '@/lib/theme';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, FilterChip, StatusBadge, SectionHeader, EmptyState, StatCard, SearchBar, BrandedLoader } from '@/components/BrandthreadUI';
 import { filterOrders, sortOrders } from '@/services/orderService';
@@ -1000,7 +1000,7 @@ const s = StyleSheet.create({
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     top: 72,
-    backgroundColor: BG,
+    backgroundColor: SCREEN_BG,
     zIndex: 10,
   },
 
@@ -1041,7 +1041,7 @@ const s = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: RADIUS.sm,
-    backgroundColor: CARD,
+    backgroundColor: CARD_GLASS,
     borderWidth: 1,
     borderColor: BORDER,
     alignItems: 'center',
@@ -1057,7 +1057,7 @@ const s = StyleSheet.create({
   },
   statChip: {
     alignItems: 'center',
-    backgroundColor: CARD,
+    backgroundColor: CARD_GLASS,
     borderRadius: RADIUS.md,
     borderWidth: 1,
     paddingHorizontal: SP.md,
@@ -1110,7 +1110,7 @@ const s = StyleSheet.create({
 
   // Order card
   card: {
-    backgroundColor: CARD,
+    backgroundColor: CARD_GLASS,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: BORDER,
@@ -1120,7 +1120,7 @@ const s = StyleSheet.create({
   },
   cardSelected: {
     borderColor: BORDER_ACTIVE,
-    backgroundColor: CARD_ELEVATED,
+    backgroundColor: CARD_ELEVATED_GLASS,
   },
   cardRisk: {
     borderColor: RED + '44',
@@ -1136,7 +1136,7 @@ const s = StyleSheet.create({
     borderRadius: 10,
     borderWidth: 1.5,
     borderColor: BORDER,
-    backgroundColor: CARD,
+    backgroundColor: CARD_GLASS,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,
@@ -1426,7 +1426,7 @@ const s = StyleSheet.create({
     gap: 3,
     paddingHorizontal: SP.sm,
     paddingVertical: SP.xs,
-    backgroundColor: CARD,
+    backgroundColor: CARD_GLASS,
     borderRadius: RADIUS.sm,
     borderWidth: 1,
     borderColor: BORDER,
@@ -1490,7 +1490,7 @@ const s = StyleSheet.create({
     marginTop: SP.md,
     alignItems: 'center',
     paddingVertical: SP.md,
-    backgroundColor: CARD,
+    backgroundColor: CARD_GLASS,
     borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: BORDER,

@@ -20,6 +20,12 @@ description: Which color system is canonical in the mobile app, which older pale
 
 **How to apply:** When asked to make app screens look like onboarding, treat it as shared background-layer work, not a hex-token replacement. Mount an appropriate shared layer and ensure route roots do not paint an opaque background over it; verify onboarding and representative buyer/seller screenshots side by side.
 
+**Glass surface rule:** Large panels over the shared animated background use the semantic glass tokens, with a subtle border; full-screen wrappers use `SCREEN_BG`. Skeletons use the translucent shimmer token. Compact controls may retain stronger opacity for contrast.
+
+**Why:** Opaque navy `CARD`, `CARD_ELEVATED`, `SURFACE`, and legacy `useColors()` fills formed obvious rectangles over the animated shell even after route roots became transparent.
+
+**How to apply:** Use glass tokens for dashboard modules, analytics tiles, cart summaries, settings rows, manufacturer panels, empty states, and tab bars. Keep opaque tokens for compact controls or true modal/media separation only. Keep the legacy color bridge aligned with the same glass values.
+
 **Accent contrast rule:** Text, icons, and loading indicators directly on runtime accent fills use the preset's `onAccent`. Labels on runtime gradients also use the shared inverse text-shadow helper.
 
 **Why:** Chrome and other metallic gradients cross dark and light stops inside one control, so a fixed white label—or even an unshadowed theme foreground—can lose contrast within the same button.

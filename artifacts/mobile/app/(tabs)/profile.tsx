@@ -44,7 +44,9 @@ interface SocialCounts {
 // ─── Design tokens ─────────────────────────────────────────────────────────
 
 const BG     = '#07070F';
+const SCREEN_BG = 'transparent';
 const CARD   = '#12121F';
+const CARD_GLASS = 'rgba(18, 18, 31, 0.45)';
 const BORDER = 'rgba(255,255,255,0.07)';
 const FG     = '#F4F4FF';
 const MUTED  = 'rgba(244,244,255,0.50)';
@@ -669,7 +671,7 @@ const s = StyleSheet.create({
   root: { flex: 1 },
    loadingScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
    loadingText: { color: MUTED, fontSize: 13, fontFamily: 'Inter_500Medium' },
-   loadError: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 20, marginBottom: 16, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD },
+   loadError: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 20, marginBottom: 16, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD_GLASS },
    loadErrorTitle: { color: FG, fontSize: 12, fontFamily: 'Inter_600SemiBold' },
    loadErrorText: { color: MUTED, fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
    loadRetry: { fontSize: 12, fontFamily: 'Inter_700Bold' },
@@ -680,7 +682,7 @@ const s = StyleSheet.create({
   headerTitle:    { fontSize: 22, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 4 },
   headerSub:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 17, maxWidth: 220 },
   headerIcons:    { flexDirection: 'row', gap: 8, marginTop: 2 },
-  headerIconBtn:  { width: 44, height: 44, borderRadius: 10, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' },
+  headerIconBtn:  { width: 44, height: 44, borderRadius: 10, borderWidth: 1, borderColor: BORDER, backgroundColor: CARD_GLASS, alignItems: 'center', justifyContent: 'center' },
 
   // Profile card
   profileCard:    { flexDirection: 'row', alignItems: 'flex-start', paddingHorizontal: 20, marginBottom: 20, gap: 16 },
@@ -688,7 +690,7 @@ const s = StyleSheet.create({
   // Avatar
   avatarSection:  { position: 'relative' },
   avatarGlow:     { width: 88, height: 88, borderRadius: 44, padding: 3, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.6, shadowRadius: 14, elevation: 12 },
-  avatarRing:     { flex: 1, borderRadius: 42, overflow: 'hidden', backgroundColor: BG, padding: 3 },
+  avatarRing:     { flex: 1, borderRadius: 42, overflow: 'hidden', backgroundColor: SCREEN_BG, padding: 3 },
   avatar:         { flex: 1, borderRadius: 39, backgroundColor: '#18182E', alignItems: 'center', justifyContent: 'center' },
   avatarText:     { fontSize: 30, fontFamily: 'Inter_700Bold' },
    avatarImage:    { width: '100%', height: '100%', borderRadius: 39 },
@@ -712,7 +714,7 @@ const s = StyleSheet.create({
   statLabel:      { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 1 },
 
   // Quick actions
-  quickRow:       { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 16, paddingVertical: 4, backgroundColor: CARD, borderTopWidth: 1, borderBottomWidth: 1, borderColor: BORDER, marginBottom: 24 },
+  quickRow:       { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: 16, paddingVertical: 4, backgroundColor: CARD_GLASS, borderTopWidth: 1, borderBottomWidth: 1, borderColor: BORDER, marginBottom: 24 },
   quickItem:      { alignItems: 'center', paddingVertical: 14, gap: 6 },
   quickIconBox:   { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   quickLabel:     { fontSize: 11, fontFamily: 'Inter_500Medium', color: FG, textAlign: 'center' },
@@ -722,10 +724,10 @@ const s = StyleSheet.create({
   analyticsTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: FG },
   analyticsSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 8 },
   perfGrid:       { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  perfCard:       { width: '48.5%', backgroundColor: CARD, borderRadius: 14, borderWidth: 1, borderColor: BORDER, padding: 14 },
+  perfCard:       { width: '48.5%', backgroundColor: CARD_GLASS, borderRadius: 14, borderWidth: 1, borderColor: BORDER, padding: 14 },
   perfLabel:      { fontSize: 11, fontFamily: 'Inter_500Medium', color: MUTED, marginBottom: 6 },
   perfValue:      { fontSize: 18, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.3 },
-  neutralAnalyticsState: { alignItems: 'center', borderWidth: 1, borderColor: BORDER, borderRadius: 14, backgroundColor: CARD, padding: 20, marginTop: 8, gap: 7 },
+  neutralAnalyticsState: { alignItems: 'center', borderWidth: 1, borderColor: BORDER, borderRadius: 14, backgroundColor: CARD_GLASS, padding: 20, marginTop: 8, gap: 7 },
   neutralAnalyticsTitle: { color: FG, fontFamily: 'Inter_600SemiBold', fontSize: 14 },
   neutralAnalyticsText: { color: MUTED, fontFamily: 'Inter_400Regular', fontSize: 12, textAlign: 'center', lineHeight: 17 },
 
@@ -739,7 +741,7 @@ const s = StyleSheet.create({
   // Grid
   grid:           { flexDirection: 'row', flexWrap: 'wrap' },
   gridTile:       { width: '33.333%', aspectRatio: 0.78, padding: 1 },
-  createTile:     { flex: 1, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12 },
+  createTile:     { flex: 1, backgroundColor: CARD_GLASS, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12 },
   createPlus:     { width: 40, height: 40, borderRadius: 20, borderWidth: 1.5, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
   createTitle:    { fontSize: 12, fontFamily: 'Inter_700Bold', color: FG, textAlign: 'center' },
   createSub:      { fontSize: 10, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center', lineHeight: 14 },
@@ -754,7 +756,7 @@ const s = StyleSheet.create({
   // Quick profile editor
   sheetModal:       { flex: 1, justifyContent: 'flex-end' },
   sheetBackdrop:    { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.68)' },
-  sheet:            { backgroundColor: CARD, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: BORDER, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 26 },
+  sheet:            { backgroundColor: CARD_GLASS, borderTopLeftRadius: 24, borderTopRightRadius: 24, borderTopWidth: 1, borderColor: BORDER, paddingHorizontal: 20, paddingTop: 10, paddingBottom: 26 },
   sheetHandle:      { width: 38, height: 4, borderRadius: 2, backgroundColor: 'rgba(244,244,255,0.25)', alignSelf: 'center', marginBottom: 18 },
   sheetHeader:      { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 22 },
   sheetTitle:       { color: FG, fontFamily: 'Inter_700Bold', fontSize: 20, marginBottom: 4 },
@@ -763,7 +765,7 @@ const s = StyleSheet.create({
   inputLabel:       { color: FG, fontFamily: 'Inter_600SemiBold', fontSize: 13, marginBottom: 8 },
   bioLabelRow:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 18 },
   characterCount:   { color: MUTED, fontFamily: 'Inter_400Regular', fontSize: 11, marginBottom: 8 },
-  textInput:        { minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: BORDER, backgroundColor: BG, color: FG, fontFamily: 'Inter_400Regular', fontSize: 15, paddingHorizontal: 14, paddingVertical: 12 },
+  textInput:        { minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: BORDER, backgroundColor: SCREEN_BG, color: FG, fontFamily: 'Inter_400Regular', fontSize: 15, paddingHorizontal: 14, paddingVertical: 12 },
   bioInput:         { minHeight: 96, maxHeight: 128 },
   sheetActions:     { flexDirection: 'row', gap: 10, marginTop: 24 },
   cancelButton:     { flex: 1, minHeight: 48, borderRadius: 12, borderWidth: 1, borderColor: BORDER, alignItems: 'center', justifyContent: 'center' },
