@@ -12,7 +12,7 @@ description: Which color system is canonical in the mobile app, which older pale
 
 **Why:** the buyer side shipped with three palettes at once (purple tokens, Vault Archive cream/green leftovers, and a bespoke Discover palette), which read as two different apps. Stale theme memory describing an old rebrand as current made this worse.
 
-**How to apply:** base surfaces and typography come from `lib/theme.ts`; runtime accent/chrome values and multi-stop action gradients come from the shared app-theme provider. Static accent exports are chrome-only startup fallbacks, not screen styling APIs. After a rebrand, grep every route for stale fixed accent hexes, including onboarding and secondary screens. Preserve semantic status colors and intentional artwork/color-picker choices.
+**How to apply:** base surfaces and typography come from `lib/theme.ts`; the compatibility `useColors()` background and onboarding must resolve to the same canonical BG (`#07070F`) so buyer, seller, and auth flows never split into navy and near-black variants. Runtime accent/chrome values and multi-stop action gradients come from the shared app-theme provider. Static accent exports are chrome-only startup fallbacks, not screen styling APIs. After a rebrand, grep every route for stale fixed accent hexes, including onboarding and secondary screens. Preserve semantic status colors and intentional artwork/color-picker choices.
 
 **Accent contrast rule:** Text, icons, and loading indicators directly on runtime accent fills use the preset's `onAccent`. Labels on runtime gradients also use the shared inverse text-shadow helper.
 

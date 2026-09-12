@@ -398,7 +398,7 @@ function SellerLiveNativeScreen() {
 }
 
 const s = StyleSheet.create({
-  root:             { flex: 1, backgroundColor: '#000' },
+  root:             { flex: 1, backgroundColor: BG },
   overlay:          { backgroundColor: 'rgba(0,0,0,0.25)' },
   cameraPlaceholder:{ alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a', gap: 12 },
   cameraPlaceholderText: { color: MUTED, fontFamily: FONT.regular, fontSize: FS.sm, textAlign: 'center', paddingHorizontal: 40 },

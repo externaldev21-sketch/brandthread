@@ -45,6 +45,7 @@ import { SellerPlanRecommendationStep } from '@/components/onboarding/SellerPlan
 import { recommendSellerPlan } from '@/lib/sellerPlans';
 import type { SellerPlanId } from '@/lib/sellerBilling';
 import { registerGrantedPushToken } from '@/lib/contextualPushPermission';
+import { BG } from '@/lib/theme';
 import {
   APPLE_OAUTH_STRATEGY,
   isOAuthCancellationError,
@@ -54,7 +55,6 @@ import {
 } from '@/lib/oauthFlow';
 
 // ─── Palette ────────────────────────────────────────────────────────────────
-const BG      = '#07070F';
 const CARD    = 'rgba(255,255,255,0.045)';
 const BORDER  = 'rgba(255,255,255,0.09)';
 const GREEN   = '#34D399';

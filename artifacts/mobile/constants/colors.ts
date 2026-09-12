@@ -6,7 +6,7 @@
  * `lib/theme.ts` so the whole app is visually consistent.
  *
  * Key mappings to lib/theme constants:
- *   background      → BG           #07080A
+ *   background      → BG           #07070F
  *   foreground      → FG           #F8FAFC
  *   card            → CARD         #17191D
  *   primary         → Chrome       #C7CDD5
@@ -47,7 +47,7 @@ const colors = {
   dark: {
     text:                '#F8FAFC',
     tint:                '#C7CDD5',
-    background:          '#07080A',
+    background:          '#07070F',
     foreground:          '#F8FAFC',
     card:                '#17191D',
     cardForeground:      '#F8FAFC',
