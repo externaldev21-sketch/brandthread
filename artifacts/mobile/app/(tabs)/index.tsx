@@ -12,6 +12,7 @@ import { useApi } from '@/hooks/useApi';
 import { getSetupState, markSetupStarted, dismissWelcome, completionPercent, nextTask, nextBestAction, dismissTip, markFeatureOpened, type SetupState } from '@/lib/setupStore';
 import { deriveHubStats, deriveInventoryStats, deriveOrderStats } from '@/lib/sellerDashboardStats';
 import { AnimatedEntrance, BrandthreadScreen, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SearchBar, StatCard, QuickActionCard, SectionHeader, ProgressCard, NavigationCard, GuidedTip, NewFeatureBadge, LoadingSkeleton, EmptyState, StatusBadge, PressableScale } from '@/components/BrandthreadUI';
+import { SellerDashboardKPIGrid } from '@/components/SellerDashboardKPIGrid';
 import { BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED, CARD_GLASS, CARD_ELEVATED_GLASS, BORDER, BORDER_SUBTLE, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, GREEN_BRIGHT, BLUE, ORANGE, RED, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
@@ -111,23 +112,6 @@ function UnifiedCard({ children, style, onPress, glow = false }: { children: Rea
     style
   ];
   return onPress ? <PressableScale onPress={onPress} style={cardStyle}>{children}</PressableScale> : <View style={cardStyle}>{children}</View>;
-}
-
-function KPICard({ label, value, onPress, trend, trendColor, style }: { label: string, value: string, onPress?: () => void, trend?: { label: string, direction: string } | null, trendColor?: string, style?: StyleProp<ViewStyle> }) {
-  return (
-    <View style={style}>
-      <UnifiedCard onPress={onPress} style={{ width: '100%', padding: 14, minHeight: 96, gap: 4, justifyContent: 'center' }}>
-        <Text style={s.metricLabel} numberOfLines={1}>{label}</Text>
-        <Text style={s.metricValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{value}</Text>
-        {trend && (
-          <View style={[s.trendPillInline, { backgroundColor: trendColor + '12', borderColor: trendColor + '30' }]}>
-            <Feather name={trend.direction === 'up' ? 'trending-up' : trend.direction === 'down' ? 'trending-down' : 'minus'} size={10} color={trendColor} />
-            <Text style={[s.trendPillText, { color: trendColor }]} numberOfLines={1}>{trend.label}</Text>
-          </View>
-        )}
-      </UnifiedCard>
-    </View>
-  );
 }
 
 function ListGroup({ children, style }: { children: React.ReactNode, style?: StyleProp<ViewStyle> }) {
@@ -635,32 +619,28 @@ export default function SellerHomeScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
-            <KPICard
-               label="Net Revenue"
-               value={dashStats === null ? '—' : formatCents(dashStats.revenueCents)}
-               trend={trend}
-               trendColor={trendColor}
-               onPress={() => nav('/(tabs)/analytics')}
-               style={{ width: '48%' }}
-            />
-            <KPICard
-               label="Orders"
-               value={dashStats === null ? '—' : String(dashStats.orders)}
-               onPress={() => nav('/(tabs)/orders')}
-               style={{ width: '48%' }}
-            />
-            <KPICard
-               label="Visitors"
-               value={dashStats === null ? '—' : String(dashStats.storefrontVisits)}
-               style={{ width: '48%' }}
-            />
-            <KPICard
-               label="Conversion"
-               value={dashStats === null || dashStats.storefrontVisits === 0 ? '—' : `${(dashStats.completedOrders / dashStats.storefrontVisits * 100).toFixed(1)}%`}
-               style={{ width: '48%' }}
-            />
-          </View>
+          <SellerDashboardKPIGrid cards={[
+            {
+              label: 'Net Revenue',
+              value: dashStats === null ? '—' : formatCents(dashStats.revenueCents),
+              trend,
+              trendColor,
+              onPress: () => nav('/(tabs)/analytics'),
+            },
+            {
+              label: 'Orders',
+              value: dashStats === null ? '—' : String(dashStats.orders),
+              onPress: () => nav('/(tabs)/orders'),
+            },
+            {
+              label: 'Visitors',
+              value: dashStats === null ? '—' : String(dashStats.storefrontVisits),
+            },
+            {
+              label: 'Conversion',
+              value: dashStats === null || dashStats.storefrontVisits === 0 ? '—' : `${(dashStats.completedOrders / dashStats.storefrontVisits * 100).toFixed(1)}%`,
+            },
+          ]} />
 
           <UnifiedCard onPress={() => nav('/(tabs)/analytics')} style={{ padding: SP.sm, paddingBottom: 12 }}>
              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6, marginBottom: SP.sm, alignItems: 'center' }}>
