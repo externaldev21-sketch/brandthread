@@ -828,18 +828,19 @@ export function QuickActionCard({ icon, label, onPress, accent, badge, style }: 
     <PressableScale
       onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); onPress(); }}
       style={[qaS.root, style]}
+      testID={`quick-action-card-${label.toLowerCase().replace(/\s+/g, '-')}`}
     >
       <View style={[qaS.iconWrap, { backgroundColor: resolvedAccent + '18' }]}>
         <Feather name={icon} size={ICON.md} color={resolvedAccent} />
         {badge && <View style={[qaS.dot, { backgroundColor: theme.accent }]} />}
       </View>
-      <Text style={qaS.label} numberOfLines={1}>{label}</Text>
+      <Text style={qaS.label} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{label}</Text>
     </PressableScale>
   );
 }
 
 const qaS = StyleSheet.create({
-  root:    { alignItems: 'center', gap: SP.sm, backgroundColor: CARD,
+  root:    { width: '100%', minWidth: 0, alignItems: 'center', gap: SP.sm, backgroundColor: CARD,
              borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: 14 },
   iconWrap:{ width: 44, height: 44, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   dot:     { position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4 },

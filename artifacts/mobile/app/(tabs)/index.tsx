@@ -11,8 +11,9 @@ import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
 import { getSetupState, markSetupStarted, dismissWelcome, completionPercent, nextTask, nextBestAction, dismissTip, markFeatureOpened, type SetupState } from '@/lib/setupStore';
 import { deriveHubStats, deriveInventoryStats, deriveOrderStats } from '@/lib/sellerDashboardStats';
-import { AnimatedEntrance, BrandthreadScreen, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SearchBar, StatCard, QuickActionCard, SectionHeader, ProgressCard, NavigationCard, GuidedTip, NewFeatureBadge, LoadingSkeleton, EmptyState, StatusBadge, PressableScale } from '@/components/BrandthreadUI';
+import { AnimatedEntrance, BrandthreadScreen, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SearchBar, StatCard, SectionHeader, ProgressCard, NavigationCard, GuidedTip, NewFeatureBadge, LoadingSkeleton, EmptyState, StatusBadge, PressableScale } from '@/components/BrandthreadUI';
 import { SellerDashboardKPIGrid } from '@/components/SellerDashboardKPIGrid';
+import { SellerQuickActionsGrid } from '@/components/SellerQuickActionsGrid';
 import { BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED, CARD_GLASS, CARD_ELEVATED_GLASS, BORDER, BORDER_SUBTLE, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, GREEN_BRIGHT, BLUE, ORANGE, RED, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
@@ -762,12 +763,12 @@ export default function SellerHomeScreen() {
              <View style={s.sectionHeaderRow}>
                <Text style={s.sectionHeaderTitle}>Quick Actions</Text>
              </View>
-             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                <QuickActionCard label="Create Post" icon="video" accent={theme.accent} badge={!setupState.openedFeatures.includes('create-post')} onPress={() => { markFeatureOpened('create-post'); nav('/create-post'); }} style={{ width: '48%' }} />
-                <QuickActionCard label="Add Product" icon="plus-circle" accent={theme.secondary} onPress={() => nav('/(tabs)/products')} style={{ width: '48%' }} />
-                <QuickActionCard label="View Orders" icon="shopping-bag" accent={BLUE} onPress={() => nav('/(tabs)/orders')} style={{ width: '48%' }} />
-                <QuickActionCard label="Studio" icon="zap" accent={ORANGE} onPress={() => nav('/(tabs)/studio')} style={{ width: '48%' }} />
-             </View>
+             <SellerQuickActionsGrid actions={[
+               { label: 'Create Post', icon: 'video', accent: theme.accent, badge: !setupState.openedFeatures.includes('create-post'), onPress: () => { markFeatureOpened('create-post'); nav('/create-post'); } },
+               { label: 'Add Product', icon: 'plus-circle', accent: theme.secondary, onPress: () => nav('/(tabs)/products') },
+               { label: 'View Orders', icon: 'shopping-bag', accent: BLUE, onPress: () => nav('/(tabs)/orders') },
+               { label: 'Studio', icon: 'zap', accent: ORANGE, onPress: () => nav('/(tabs)/studio') },
+             ]} />
           </AnimatedEntrance>
         )}
 
