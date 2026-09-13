@@ -7,7 +7,7 @@ import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Image, RefreshControl,
   Animated, Dimensions, PanResponder,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { formatCents } from '@/lib/money';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import {
   addToCart, createBuyNowSession, replaceCartItemVariant,
   getCart,
@@ -424,6 +425,10 @@ export default function BuyerProductDetailScreen() {
     editCartItemId?: string;
   }>();
   const router = useRouter();
+  const pathname = usePathname();
+  const { push, back } = useThreadPull();
+  const usesThreadPull = pathname === '/thread-product-detail';
+  const leaveProduct = () => usesThreadPull ? back() : router.back();
   const insets = useSafeAreaInsets();
   const api    = useApi();
   const { isSignedIn } = useAuth();
@@ -573,7 +578,7 @@ export default function BuyerProductDetailScreen() {
         <Text style={{ color: MUTED, marginTop: SP.md, fontFamily: FONT.regular, textAlign: 'center' }}>
           Product not found or no longer available.
         </Text>
-         <TouchableOpacity style={{ marginTop: SP.md, minHeight: COMP.minTouchTarget, justifyContent: 'center' }} onPress={() => router.back()} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Go back">
+         <TouchableOpacity style={{ marginTop: SP.md, minHeight: COMP.minTouchTarget, justifyContent: 'center' }} onPress={leaveProduct} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Go back">
           <Text style={{ color: PURPLE_LIGHT, fontFamily: FONT.semibold }}>Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -695,7 +700,11 @@ export default function BuyerProductDetailScreen() {
 
       const cart = await getCart();
       await createBuyNowSession(product!, variant, qty, cart);
-      router.push('/buyer-checkout?source=buynow' as never);
+      if (usesThreadPull) {
+        push('/thread-checkout?source=buynow' as never);
+      } else {
+        router.push('/buyer-checkout?source=buynow' as never);
+      }
     } catch (e) {
       Alert.alert('Error', 'Something went wrong. Please try again.');
     }
@@ -719,7 +728,7 @@ export default function BuyerProductDetailScreen() {
         <View style={s.imageArea}>
           <ProductGallery imageUris={product.imageUris} />
           {/* Back button */}
-          <TouchableOpacity style={[s.backBtn, { top: insets.top + SP.sm }]} onPress={() => router.back()} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Back to previous screen">
+          <TouchableOpacity style={[s.backBtn, { top: insets.top + SP.sm }]} onPress={leaveProduct} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Back to previous screen">
             <Feather name="chevron-left" size={ICON.md} color={FG} />
           </TouchableOpacity>
           {/* Cart button */}
@@ -1079,9 +1088,12 @@ function SizeChartViewer({ chart }: { chart: SizeChart }) {
 }
 
 function RelatedProducts({ productId }: { productId: string }) {
+  const { push } = useThreadPull();
   const { theme } = useAppTheme();
   const api = useApi();
   const router = useRouter();
+  const pathname = usePathname();
+  const usesThreadPull = pathname === '/thread-product-detail';
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -1137,7 +1149,11 @@ function RelatedProducts({ productId }: { productId: string }) {
             activeOpacity={0.8}
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.push({ pathname: '/buyer-product-detail' as any, params: { productId: p.id } });
+              if (usesThreadPull) {
+                push({ pathname: '/thread-product-detail' as any, params: { productId: p.id } } as never);
+              } else {
+                router.push({ pathname: '/buyer-product-detail' as any, params: { productId: p.id } });
+              }
             }}
           >
             <View style={{ width: 140, height: 180, backgroundColor: CARD_ELEVATED, borderRadius: RADIUS.md, overflow: 'hidden', marginBottom: SP.sm }}>

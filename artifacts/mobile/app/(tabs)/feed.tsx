@@ -30,6 +30,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FeedSkeleton } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { formatCents } from '@/lib/money';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
@@ -251,6 +252,7 @@ function SpotlightPage({
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { push } = useThreadPull();
   // Clear the floating pill tab bar (see (tabs)/_layout.tsx: bottomOffset + height 72 + margin).
   const tabBarClearance = Math.max(insets.bottom, 8) + 12 + 72 + 14;
   const [paused, setPaused] = useState(false);
@@ -429,7 +431,7 @@ function SpotlightPage({
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                const tags = (item as any).productTags as Array<{ productId: string; productName: string; priceCents: number }>;
               if (tags.length === 1) {
-                router.push(('/buyer-product-detail?productId=' + tags[0].productId) as never);
+                push(('/thread-product-detail?productId=' + tags[0].productId) as never);
               } else {
                 Alert.alert('Shop this post', tags.map(t => t.productName).join('\n'));
               }
@@ -627,6 +629,7 @@ export default function FeedScreen() {
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, secondary: CYAN } = theme;
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { push } = useThreadPull();
 
   const [engagements, setEngagements] = useState<Record<string, EngagementState>>({});
   const [activeIndex, setActiveIndex] = useState(0);
@@ -1143,7 +1146,7 @@ export default function FeedScreen() {
             const productName = shopSelection.tag?.productName ?? shopSelection.item.productName;
             const sourcePostId = shopSelection.item.id;
             setShopSelection(null);
-            router.push(('/buyer-product-detail?productId=' + encodeURIComponent(productId) +
+            push(('/thread-product-detail?productId=' + encodeURIComponent(productId) +
               '&productName=' + encodeURIComponent(productName) + '&sourcePostId=' + encodeURIComponent(sourcePostId)) as never);
           }}
         />

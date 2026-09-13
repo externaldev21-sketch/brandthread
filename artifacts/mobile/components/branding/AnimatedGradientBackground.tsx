@@ -15,7 +15,12 @@ import Svg, {
   Path,
   Stop,
 } from 'react-native-svg';
-import { BG, GRAD_HERO, GRAD_PRIMARY } from '@/lib/theme';
+import { useAppTheme } from '@/contexts/AppThemeContext';
+import {
+  createBackgroundPalette,
+  hexToRgba,
+  type BackgroundPalette,
+} from '@/lib/backgroundPalette';
 
 type SilkRibbonConfig = {
   center: number;
@@ -190,9 +195,11 @@ function FloatingParticle({
 function ParticleField({
   width,
   height,
+  palette,
 }: {
   width: number;
   height: number;
+  palette: BackgroundPalette;
 }) {
   const particles = useRef<ParticleConfig[] | null>(null);
   if (!particles.current) {
@@ -207,7 +214,7 @@ function ParticleField({
           particle={particle}
           width={width}
           height={height}
-          color={index % 4 === 0 ? GRAD_HERO[2] : GRAD_PRIMARY[3]}
+          color={index % 4 === 0 ? palette.particlePrimary : palette.particleSecondary}
         />
       ))}
     </View>
@@ -219,11 +226,13 @@ function LightTrail({
   duration,
   delay,
   reverse = false,
+  palette,
 }: {
   top: number;
   duration: number;
   delay: number;
   reverse?: boolean;
+  palette: BackgroundPalette;
 }) {
   const { width } = useWindowDimensions();
   const progress = useRef(new Animated.Value(0)).current;
@@ -271,10 +280,10 @@ function LightTrail({
     >
       <LinearGradient
         colors={[
-          'rgba(243,245,247,0)',
-          'rgba(243,245,247,0.08)',
-          'rgba(243,245,247,0.62)',
-          'rgba(243,245,247,0)',
+          hexToRgba(palette.ribbonLight, 0),
+          palette.trailSoft,
+          palette.trailStrong,
+          hexToRgba(palette.ribbonLight, 0),
         ]}
         locations={[0, 0.35, 0.72, 1]}
         start={{ x: 0, y: 0.5 }}
@@ -339,11 +348,13 @@ function SilkRibbon({
   index,
   width,
   height,
+  palette,
 }: {
   ribbon: SilkRibbonConfig;
   index: number;
   width: number;
   height: number;
+  palette: BackgroundPalette;
 }) {
   const [elapsed, setElapsed] = useState(0);
   const frame = useRef<number | null>(null);
@@ -385,7 +396,7 @@ function SilkRibbon({
       <Path
         d={body}
         fill="none"
-        stroke={GRAD_HERO[1]}
+        stroke={palette.ribbonMid}
         strokeWidth={height * 0.035}
         strokeLinecap="round"
         opacity={0.035 * pulse}
@@ -401,7 +412,7 @@ function SilkRibbon({
       <Path
         d={sheen}
         fill="none"
-        stroke={GRAD_HERO[2]}
+        stroke={palette.ribbonLight}
         strokeWidth={height * 0.0018}
         strokeLinecap="round"
         opacity={0.16 * pulse}
@@ -413,9 +424,11 @@ function SilkRibbon({
 function SilkRibbonField({
   width,
   height,
+  palette,
 }: {
   width: number;
   height: number;
+  palette: BackgroundPalette;
 }) {
   return (
     <View pointerEvents="none" style={styles.silkField}>
@@ -430,19 +443,19 @@ function SilkRibbonField({
               x2="100%"
               y2={index % 2 === 0 ? '100%' : '0%'}
             >
-              <Stop offset="0%" stopColor={GRAD_HERO[0]} stopOpacity={0.94} />
-              <Stop offset="32%" stopColor={GRAD_HERO[1]} stopOpacity={0.18} />
-              <Stop offset="49%" stopColor={GRAD_HERO[2]} stopOpacity={0.055} />
-              <Stop offset="64%" stopColor={GRAD_HERO[3]} stopOpacity={0.14} />
-              <Stop offset="100%" stopColor={GRAD_HERO[4]} stopOpacity={0.95} />
+              <Stop offset="0%" stopColor={palette.ribbonDark} stopOpacity={0.94} />
+              <Stop offset="32%" stopColor={palette.ribbonMid} stopOpacity={0.18} />
+              <Stop offset="49%" stopColor={palette.ribbonLight} stopOpacity={0.055} />
+              <Stop offset="64%" stopColor={palette.ribbonMid} stopOpacity={0.14} />
+              <Stop offset="100%" stopColor={palette.ribbonDark} stopOpacity={0.95} />
             </SvgGradient>
           ))}
           <SvgGradient id="silk-sheen" x1="0%" y1="0%" x2="100%" y2="0%">
-            <Stop offset="0%" stopColor={GRAD_HERO[1]} stopOpacity={0} />
-            <Stop offset="35%" stopColor={GRAD_HERO[2]} stopOpacity={0.1} />
-            <Stop offset="58%" stopColor={GRAD_HERO[2]} stopOpacity={0.3} />
-            <Stop offset="78%" stopColor={GRAD_HERO[3]} stopOpacity={0.08} />
-            <Stop offset="100%" stopColor={GRAD_HERO[1]} stopOpacity={0} />
+            <Stop offset="0%" stopColor={palette.ribbonMid} stopOpacity={0} />
+            <Stop offset="35%" stopColor={palette.sheen} stopOpacity={0.1} />
+            <Stop offset="58%" stopColor={palette.sheen} stopOpacity={0.3} />
+            <Stop offset="78%" stopColor={palette.ribbonMid} stopOpacity={0.08} />
+            <Stop offset="100%" stopColor={palette.ribbonMid} stopOpacity={0} />
           </SvgGradient>
         </Defs>
         {SILK_RIBBONS.map((ribbon, index) => (
@@ -452,6 +465,7 @@ function SilkRibbonField({
             index={index}
             width={width}
             height={height}
+            palette={palette}
           />
         ))}
       </Svg>
@@ -465,19 +479,22 @@ export default function AnimatedGradientBackground({
   style?: StyleProp<ViewStyle>;
 }) {
   const { width, height } = useWindowDimensions();
+  const { theme } = useAppTheme();
+  const palette = createBackgroundPalette(theme);
 
   return (
-    <View pointerEvents="none" style={[styles.root, style]}>
+    <View pointerEvents="none" style={[styles.root, { backgroundColor: palette.base }, style]}>
       <LinearGradient
-        colors={[BG, GRAD_HERO[0], BG]}
+        colors={[palette.anchorStart, palette.base, palette.deepHue, palette.anchorEnd]}
+        locations={[0, 0.32, 0.68, 1]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.baseGradient}
       />
-      <SilkRibbonField width={width} height={height} />
-      <LightTrail top={height * 0.26} duration={18000} delay={7000} />
-      <LightTrail top={height * 0.72} duration={24000} delay={13000} reverse />
-      <ParticleField width={width} height={height} />
+      <SilkRibbonField width={width} height={height} palette={palette} />
+      <LightTrail top={height * 0.26} duration={18000} delay={7000} palette={palette} />
+      <LightTrail top={height * 0.72} duration={24000} delay={13000} reverse palette={palette} />
+      <ParticleField width={width} height={height} palette={palette} />
     </View>
   );
 }
@@ -485,7 +502,6 @@ export default function AnimatedGradientBackground({
 const styles = StyleSheet.create({
   root: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: BG,
     overflow: 'hidden',
   },
   baseGradient: {

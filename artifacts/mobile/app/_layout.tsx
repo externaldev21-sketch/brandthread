@@ -19,6 +19,7 @@ import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useUser } from '@cle
 import { tokenCache } from '@/lib/tokenCache';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { RoleProvider } from '@/contexts/RoleContext';
+import { ThreadPullProvider } from '@/contexts/ThreadPullTransitionContext';
 import { AppThemeProvider } from '@/contexts/AppThemeContext';
 import BootScreen from '@/components/BootScreen';
 import * as Notifications from 'expo-notifications';
@@ -675,8 +676,10 @@ function RootLayoutNav() {
         <Stack.Screen name="analytics-profit"      options={{ headerShown: false, animation: 'slide_from_right' }} />
         {/* Buyer commerce screens */}
         <Stack.Screen name="buyer-product-detail"  options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />
+        <Stack.Screen name="thread-product-detail" options={{ headerShown: false, animation: 'none', gestureEnabled: false }} />
         <Stack.Screen name="ip-report"             options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-checkout"        options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="thread-checkout"       options={{ headerShown: false, animation: 'none', gestureEnabled: false }} />
         <Stack.Screen name="buyer-return-request"  options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-refund-request"  options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="buyer-problem-report"  options={{ headerShown: false, animation: 'slide_from_right' }} />
@@ -832,7 +835,9 @@ export default function RootLayout() {
                     <UndoToastProvider>
                       <KeyboardProvider>
                         <NavigationThemeProvider value={TRANSPARENT_NAVIGATION_THEME}>
-                          <RootLayoutNav />
+                          <ThreadPullProvider>
+                            <RootLayoutNav />
+                          </ThreadPullProvider>
                         </NavigationThemeProvider>
                       </KeyboardProvider>
                     </UndoToastProvider>

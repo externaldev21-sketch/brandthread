@@ -1,5 +1,5 @@
 - [Brandthread theme](brandthread-theme.md) — dark-only base surfaces remain; runtime accent selection is user-scoped and replaces the former fixed-purple-only rule. Retired light/Vault palettes stay retired.
-- [Runtime app themes](runtime-app-themes.md) — user-selected Brandthread accent applies across buyer and seller shared chrome; keep additions on the provider, never role-specific theme keys.
+- [Runtime app themes](runtime-app-themes.md) — user-selected Brandthread accent applies across buyer/seller chrome and the animated background; keep one provider and user-scoped key.
 - [Clerk Expo v3 Signals API](clerk-expo-v3-signals-api.md) — @clerk/expo v3 hooks return SignInFutureResource; use password()+finalize() not create()+setActive(); Metro needs _tmp_ blockList fix.
 - [Brandthread backend architecture](brandthread-backend-architecture.md) — ownerId scoping, transactional orders, lib/db build requirement, clerkClient usage, healthz double-path gotcha.
 - [Inbox structural flattening](inbox-flattening-pattern.md) — Brandthread screens (profile, inbox) use flat Instagram-style rows, no card chrome; keep new screens consistent.
@@ -90,3 +90,4 @@
 - [Post-merge setup timeout](post-merge-timeout.md) — allow five minutes for cold or forced pnpm relinks before migrations and the API build.
 - [OpenAPI integer validation](openapi-integer-validation.md) — generated validators may accept fractions for integer fields; enforce integer semantics at sensitive server boundaries.
 - [Social relationship locking](social-relationship-locking.md) — pairwise follow/block mutations share one unordered-user lock; block checks happen inside the locked transaction.
+- [Thread-pull commerce transition](thread-pull-commerce-transition.md) — signature motion uses funnel-only route aliases so unrelated product and checkout visits retain native navigation.

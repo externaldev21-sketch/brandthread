@@ -20,6 +20,7 @@ import {
   FONT, FS, SP, RADIUS
 } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
+import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { useAuth } from '@clerk/expo';
 import { formatCents } from '@/lib/money';
 
@@ -138,6 +139,7 @@ function LiveDot({ color }: { color: string }) {
 
 function HeroCard() {
   const router  = useRouter();
+  const { push } = useThreadPull();
   const time    = useCountdown(HERO_DROP.countdown);
   const [saved, setSaved] = useState(false);
   const soldPct = Math.round(((HERO_DROP.units - HERO_DROP.remaining) / HERO_DROP.units) * 100);
@@ -195,7 +197,7 @@ function HeroCard() {
           <TouchableOpacity
             style={[s.heroShopBtn, { backgroundColor: HERO_DROP.brandColor }]}
             activeOpacity={0.85}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); router.push('/buyer-product-detail?productId=prod_canvas_cargo&productName=Canvas+Cargo+Jacket' as never); }}
+            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); push('/thread-product-detail?productId=prod_canvas_cargo&productName=Canvas+Cargo+Jacket' as never); }}
             accessibilityRole="button"
             accessibilityLabel={`Shop ${HERO_DROP.name} for ${HERO_DROP.price}`}
           >
@@ -222,6 +224,7 @@ function HeroCard() {
 
 function ForYouCard({ item }: { item: ForYouItem }) {
   const router = useRouter();
+  const { push } = useThreadPull();
   const [saved, setSaved] = useState(false);
   const card   = CARD;
   const border = BORDER;
@@ -239,7 +242,7 @@ function ForYouCard({ item }: { item: ForYouItem }) {
         // Use real DB UUID when available (API-backed item), else fall back to the item's id
         const pid = encodeURIComponent(item.productId ?? item.id);
         const name = encodeURIComponent(item.name);
-        router.push((`/buyer-product-detail?productId=${pid}&productName=${name}`) as never);
+        push((`/thread-product-detail?productId=${pid}&productName=${name}`) as never);
       }}
     >
       <View style={[fy.visual, { backgroundColor: item.color }]}>
@@ -301,6 +304,7 @@ const fy = StyleSheet.create({
 
 function DroppingRow({ item }: { item: typeof DROPPING_SOON[0] }) {
   const router = useRouter();
+  const { push } = useThreadPull();
   const card   = CARD;
   const border = BORDER;
   const fg     = FG;
@@ -310,7 +314,7 @@ function DroppingRow({ item }: { item: typeof DROPPING_SOON[0] }) {
     <TouchableOpacity
       style={[dr.row, { backgroundColor: card, borderColor: border }]}
       activeOpacity={0.8}
-      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.push(('/buyer-product-detail?productId=prod_ripstop_cargo&productName=' + encodeURIComponent(item.name)) as never); }}
+      onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); push(('/thread-product-detail?productId=prod_ripstop_cargo&productName=' + encodeURIComponent(item.name)) as never); }}
       accessibilityRole="button"
       accessibilityLabel={`${item.name} by ${item.brand}, ${item.price}${item.live ? ', live now' : `, dropping in ${item.inHours} hours`}`}
     >
@@ -368,6 +372,7 @@ type TrendingItem = {
 
 function TrendingRow({ item }: { item: TrendingItem }) {
   const router  = useRouter();
+  const { push } = useThreadPull();
   const card    = CARD;
   const border  = BORDER;
   const fg      = FG;
@@ -382,7 +387,7 @@ function TrendingRow({ item }: { item: TrendingItem }) {
       router.push((`/seller-profile?sellerId=${encodeURIComponent(item.brandId)}`) as never);
     } else {
       // Static fallback: navigate by name (demo behaviour)
-      router.push((`/buyer-product-detail?productId=${encodeURIComponent(item.id)}&productName=${encodeURIComponent(item.name)}`) as never);
+      push((`/thread-product-detail?productId=${encodeURIComponent(item.id)}&productName=${encodeURIComponent(item.name)}`) as never);
     }
   }
 

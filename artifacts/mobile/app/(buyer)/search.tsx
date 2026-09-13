@@ -16,6 +16,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { reportNetworkError } from '@/lib/networkNotice';
 import { EmptyState, SearchResultsSkeleton } from '@/components/BrandthreadUI';
+import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { CachedImage } from '@/components/CachedImage';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 
@@ -69,6 +70,7 @@ function MasonryCard({ item, accent, onPress }: {
 export default function SearchScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { push } = useThreadPull();
   const bg      = BG;
   const card    = CARD;
   const border  = BORDER;
@@ -232,7 +234,7 @@ export default function SearchScreen() {
     if (r.kind === 'brand' && (r as any).sellerId) {
       router.push({ pathname: '/seller-profile' as any, params: { sellerId: (r as any).sellerId } });
     } else if (r.kind === 'product' && (r as any).productId) {
-      router.push({ pathname: '/buyer-product-detail' as any, params: { productId: (r as any).productId } });
+      push({ pathname: '/thread-product-detail' as any, params: { productId: (r as any).productId } } as never);
     } else {
       goToBrand();
     }

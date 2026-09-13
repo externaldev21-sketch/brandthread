@@ -3,6 +3,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import colors from '@/constants/colors';
+import { createBackgroundPalette } from '@/lib/backgroundPalette';
 import { BG, SCREEN_BG } from '@/lib/theme';
 
 const appPath = (relativePath: string) => resolve(process.cwd(), 'app', relativePath);
@@ -34,6 +35,41 @@ describe('app background theme', () => {
       const source = readFileSync(appPath(route), 'utf8');
       expect(source).not.toContain('AnimatedGradientBackground');
     }
+  });
+
+  it('derives the complete animated background palette from the selected app theme', () => {
+    const preset = (id: string, accent: string, accentLight: string, secondary: string, hueBase: string) => ({
+      id,
+      name: id,
+      accent,
+      accentLight,
+      accentDim: '',
+      onAccent: '#FFFFFF',
+      secondary,
+      secondaryDim: '',
+      primaryGradient: [hueBase, accent, accentLight],
+      heroGradient: [hueBase, accent, accentLight],
+      glowGradient: ['', ''],
+      shadowColor: accent,
+    } as any);
+    const red = preset('red', '#B9342F', '#E46F5A', '#E46F5A', '#32100E');
+    const green = preset('green', '#71823C', '#ADBE73', '#ADBE73', '#30391D');
+    const chrome = preset('chrome', '#C7CDD5', '#F8FAFC', '#7D8793', '#090A0C');
+    const redPalette = createBackgroundPalette(red);
+    const greenPalette = createBackgroundPalette(green);
+    const chromePalette = createBackgroundPalette(chrome);
+
+    expect(redPalette.base).not.toBe(greenPalette.base);
+    expect(redPalette.anchorStart).not.toBe(greenPalette.anchorStart);
+    expect(redPalette.anchorEnd).not.toBe(greenPalette.anchorEnd);
+    expect(redPalette.ribbonMid).not.toBe(greenPalette.ribbonMid);
+    expect(redPalette.trailStrong).toContain('228,111,90');
+    expect(greenPalette.trailStrong).toContain('173,190,115');
+    expect(chromePalette.particlePrimary).toBe(chrome.accentLight);
+
+    const backgroundSource = readFileSync(resolve(process.cwd(), 'components/branding/AnimatedGradientBackground.tsx'), 'utf8');
+    expect(backgroundSource).not.toContain("from '@/lib/theme'");
+    expect(backgroundSource).toContain('colors={[palette.anchorStart, palette.base, palette.deepHue, palette.anchorEnd]}');
   });
 
   it('keeps buyer and seller navigation scenes transparent', () => {

@@ -110,6 +110,7 @@ vi.mock('expo-linear-gradient', () => ({
 
 vi.mock('expo-router', () => ({
   useLocalSearchParams: useLocalSearchParamsMock,
+  usePathname: () => '/buyer-product-detail',
   useRouter: () => routerMock,
 }));
 

@@ -4,6 +4,7 @@
  */
 import React, { useState, useCallback } from 'react';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import {
   View, Text, ScrollView, StyleSheet, Image,
   ActivityIndicator, Alert, TextInput, RefreshControl,
@@ -367,6 +368,7 @@ export default function CartScreen() {
   const { theme } = useAppTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { push } = useThreadPull();
   const api = useApi();
   const { isSignedIn } = useAuth();
   const { showUndo } = useUndoToast();
@@ -490,7 +492,7 @@ export default function CartScreen() {
   }
 
   function handleEditVariant(item: CartItem) {
-    router.push(('/buyer-product-detail?productId=' + item.productId + '&editVariantId=' + item.variantId + '&editCartItemId=' + item.id) as never);
+    push(('/thread-product-detail?productId=' + item.productId + '&editVariantId=' + item.variantId + '&editCartItemId=' + item.id) as never);
   }
 
   async function handleApplyPoints() {
@@ -590,7 +592,7 @@ export default function CartScreen() {
         undefined,
         loyaltyRedemption ?? undefined,
       );
-      router.push(('/buyer-checkout?source=cart') as never);
+      push(('/thread-checkout?source=cart') as never);
     } catch {
       Alert.alert('Error', 'Something went wrong. Please try again.');
     }

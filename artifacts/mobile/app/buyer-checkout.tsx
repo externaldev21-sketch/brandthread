@@ -9,13 +9,14 @@ import {
   StyleSheet, Text, TextInput, TouchableOpacity, View, Animated, Image,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useColors } from '@/hooks/useColors';
 import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import {
   applyDiscount, clearCart, clearCheckoutSession, createCheckoutSession,
   getCart, getCheckoutSession, removeDiscount, saveCheckoutProgress, validateCart,
@@ -492,6 +493,10 @@ export default function BuyerCheckoutScreen() {
   const styles = makeStyles(theme);
   const { source } = useLocalSearchParams<{ source?: string }>();
   const router = useRouter();
+  const pathname = usePathname();
+  const { back } = useThreadPull();
+  const usesThreadPull = pathname === '/thread-checkout';
+  const leaveCheckout = () => usesThreadPull ? back() : router.back();
   const insets = useSafeAreaInsets();
   const api = useApi();
   const { isSignedIn } = useAuth();
@@ -512,7 +517,7 @@ export default function BuyerCheckoutScreen() {
     let next = await getCheckoutSession();
     if (!next) {
       const cart = await getCart();
-      if (!cart.items.length) { router.back(); return; }
+      if (!cart.items.length) { leaveCheckout(); return; }
       next = await createCheckoutSession(cart, source === 'buynow');
     }
     if (next.step === 'contact' || next.step === 'shipping' || next.step === 'discounts' || next.step === 'payment') next.step = 'information';
@@ -783,7 +788,7 @@ export default function BuyerCheckoutScreen() {
     : 'Continue';
   return (
     <KeyboardAvoidingView style={styles.root} behavior="padding" keyboardVerticalOffset={0}>
-       {current.step !== 'confirmation' && <View style={[styles.header, { paddingTop: insets.top + SP.xs }]}><TouchableOpacity style={styles.back} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back"><Feather name="chevron-left" size={ICON.md} color={FG} /></TouchableOpacity><View style={{ flex: 1, alignItems: 'center' }}><Text style={styles.stepLabel}>Secure checkout</Text><Progress step={current.step} /></View><View style={styles.back} /></View>}
+       {current.step !== 'confirmation' && <View style={[styles.header, { paddingTop: insets.top + SP.xs }]}><TouchableOpacity style={styles.back} onPress={leaveCheckout} accessibilityRole="button" accessibilityLabel="Back"><Feather name="chevron-left" size={ICON.md} color={FG} /></TouchableOpacity><View style={{ flex: 1, alignItems: 'center' }}><Text style={styles.stepLabel}>Secure checkout</Text><Progress step={current.step} /></View><View style={styles.back} /></View>}
       <ScrollView contentContainerStyle={{ padding: SP.md, paddingBottom: insets.bottom + (current.step === 'confirmation' ? 30 : 105) }} keyboardShouldPersistTaps="handled">
          {current.step !== 'confirmation' && (
            <>
