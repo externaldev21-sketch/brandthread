@@ -7,7 +7,7 @@
  */
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert, Linking } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -16,6 +16,7 @@ import { BG, CARD, BORDER, FG, MUTED, SUBTLE, SUCCESS, SUCCESS_DIM, RED, RED_DIM
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadHeader, PrimaryButton, SecondaryButton, GradientCard, BrandedLoadingState } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
+import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 
 type VerificationStatus = 'unverified' | 'pending' | 'verified' | 'failed';
 
@@ -79,6 +80,8 @@ export default function SellerVerificationScreen() {
   const { theme } = useAppTheme();
   const { accent: PURPLE, accentLight: PURPLE_LIGHT, accentDim: PURPLE_DIM } = theme;
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const launchedFromSellerSetup = isSellerSetupOrigin(params.from);
   const insets = useSafeAreaInsets();
   const api = useApi();
 
@@ -86,6 +89,14 @@ export default function SellerVerificationScreen() {
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+
+  function leaveSetupDestination() {
+    if (launchedFromSellerSetup) {
+      router.replace(SELLER_HOME_ROUTE as never);
+      return;
+    }
+    router.back();
+  }
 
   // Load current verification status
   const loadStatus = useCallback(async () => {
@@ -177,7 +188,7 @@ export default function SellerVerificationScreen() {
   if (loading) {
     return (
       <View style={[s.root, { paddingTop: insets.top }]}>
-        <BrandthreadHeader title="Identity Verification" onBack={() => router.back()} />
+        <BrandthreadHeader title="Identity Verification" onBack={leaveSetupDestination} />
         <BrandedLoadingState message="Checking verification status…" />
       </View>
     );
@@ -188,7 +199,7 @@ export default function SellerVerificationScreen() {
 
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
-      <BrandthreadHeader title="Identity Verification" onBack={() => router.back()} />
+      <BrandthreadHeader title="Identity Verification" onBack={leaveSetupDestination} />
 
       <ScrollView
         style={{ flex: 1 }}

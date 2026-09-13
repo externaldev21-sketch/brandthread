@@ -35,6 +35,7 @@ import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { useApi } from '@/lib/api';
 import { markVideoClipUploaded, normalizeTrimBounds } from '@/lib/videoEditing';
+import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const BG     = '#07070F';
@@ -136,9 +137,18 @@ export default function CreatePostScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const api = useApi();
-  const params = useLocalSearchParams<{ accountType?: string; editId?: string }>();
+  const params = useLocalSearchParams<{ accountType?: string; editId?: string; from?: string }>();
   const isBuyer = params.accountType === 'buyer';
   const editId = typeof params.editId === 'string' ? params.editId : undefined;
+  const isSellerSetup = isSellerSetupOrigin(params.from);
+
+  function leaveSetupDestination() {
+    if (isSellerSetup) {
+      router.replace(SELLER_HOME_ROUTE as never);
+      return;
+    }
+    router.back();
+  }
 
   // ── Step ──
   const [step, setStep] = useState<Step>('media-pick');
@@ -226,7 +236,7 @@ export default function CreatePostScreen() {
         const post = posts.find(item => item.id === editId);
         if (!post) {
           Alert.alert('Post not found', 'This post may have been deleted.', [
-            { text: 'OK', onPress: () => router.back() },
+            { text: 'OK', onPress: leaveSetupDestination },
           ]);
           return;
         }
@@ -266,7 +276,7 @@ export default function CreatePostScreen() {
       .catch(() => {
         if (!active) return;
         Alert.alert('Could not load post', 'Check your connection and try again.', [
-          { text: 'OK', onPress: () => router.back() },
+          { text: 'OK', onPress: leaveSetupDestination },
         ]);
       })
       .finally(() => { if (active) setLoadingEdit(false); });
@@ -524,7 +534,7 @@ export default function CreatePostScreen() {
       <View style={[s.root, { paddingTop: topPad }]}>
         {/* Header */}
         <View style={s.header}>
-          <TouchableOpacity onPress={() => haptic(() => router.back())} style={s.iconBtn}>
+          <TouchableOpacity onPress={() => haptic(leaveSetupDestination)} style={s.iconBtn}>
             <Feather name="arrow-left" size={22} color={FG} />
           </TouchableOpacity>
           <Text style={s.headerTitle}>{isBuyer ? 'Add to Story' : editId ? 'Edit Post' : 'Create Post'}</Text>
@@ -1096,7 +1106,7 @@ export default function CreatePostScreen() {
                 haptic(() => {});
                 try {
                   await persistSellerPost(true);
-                  Alert.alert('Draft saved', 'Your draft has been saved.', [{ text: 'OK', onPress: () => router.back() }]);
+                  Alert.alert('Draft saved', 'Your draft has been saved.', [{ text: 'OK', onPress: leaveSetupDestination }]);
                  } catch (error) {
                    Alert.alert('Draft not saved', error instanceof Error ? error.message : 'Could not save draft. Please try again.');
                 }
@@ -1197,7 +1207,9 @@ export default function CreatePostScreen() {
         <TouchableOpacity
           style={{ marginTop: 24 }}
           activeOpacity={0.85}
-          onPress={() => haptic(() => router.replace('/(tabs)/profile' as never))}
+          onPress={() => haptic(() => router.replace(
+            (isSellerSetup ? SELLER_HOME_ROUTE : '/(tabs)/profile') as never,
+          ))}
         >
           <LinearGradient colors={theme.primaryGradient} style={s.publishBtn}>
             <Text style={[s.publishBtnText, { color: theme.onAccent }, getOnAccentTextStyle(theme)]}>View Profile</Text>

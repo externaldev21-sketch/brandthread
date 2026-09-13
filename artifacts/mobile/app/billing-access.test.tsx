@@ -94,6 +94,7 @@ vi.mock('expo-web-browser', () => ({
 
 vi.mock('expo-router', () => ({
   useRouter: () => routerMock,
+  useLocalSearchParams: () => ({}),
   useFocusEffect: (callback: () => void) => {
     const React = require('react') as typeof import('react');
     React.useEffect(callback, [callback]);

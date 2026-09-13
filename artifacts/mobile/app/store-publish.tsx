@@ -5,7 +5,7 @@ import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
@@ -17,6 +17,7 @@ import {
 import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, StatusBadge } from '@/components/BrandthreadUI';
 import { getStorefront, validateStore, publishStore, unpublishStore, StoreValidationResult } from '@/services/storeService';
 import { Storefront } from '@/services/storeTypes';
+import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 
 const ERROR_ROUTES: Record<string, string> = {
   'Store name is required.': '/store-settings',
@@ -29,12 +30,21 @@ export default function StorePublishScreen() {
   const { theme } = useAppTheme();
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
+  const params = useLocalSearchParams<{ from?: string }>();
   const headerTopInset = useHeaderTopInset();
   const [store, setStore] = useState<Storefront | null>(null);
   const [validation, setValidation] = useState<StoreValidationResult | null>(null);
   const [validating, setValidating] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [published, setPublished] = useState(false);
+
+  const leaveSetupDestination = () => {
+    if (isSellerSetupOrigin(params.from)) {
+      router.replace(SELLER_HOME_ROUTE as never);
+      return;
+    }
+    router.back();
+  };
 
   const doValidate = async () => {
     setValidating(true);
@@ -102,7 +112,7 @@ export default function StorePublishScreen() {
     <View style={pub.root}>
       <View style={[pub.header, { paddingTop: headerTopInset + SP.sm }]}>
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={leaveSetupDestination}
           style={pub.backBtn}
           hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
         >
@@ -201,7 +211,11 @@ export default function StorePublishScreen() {
               <Text style={pub.successUrl}>https://{storeUrl}.brandthread.app</Text>
               <View style={pub.successActions}>
                 <SecondaryButton label="View Store" onPress={() => Alert.alert('View Store', `Open https://${storeUrl}.brandthread.app in browser.`)} icon="external-link" style={{ flex: 1 }} />
-                <PrimaryButton label="Continue Editing" onPress={() => router.back()} style={{ flex: 1 }} />
+                <PrimaryButton
+                  label={isSellerSetupOrigin(params.from) ? 'Done' : 'Continue Editing'}
+                  onPress={leaveSetupDestination}
+                  style={{ flex: 1 }}
+                />
               </View>
             </View>
           </BrandthreadCard>

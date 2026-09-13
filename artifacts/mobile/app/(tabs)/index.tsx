@@ -22,6 +22,7 @@ import { useRevenueCat } from '@/lib/revenueCat';
 import { getBillingRecoveryTarget, isSubscriptionPaymentRecoveryRequired } from '@/lib/subscriptionRecovery';
 import { initFromStorage, subscribe } from '@/lib/orderBadgeStore';
 import { getSellerOrderBadgeCount, openSellerOrders } from '@/lib/sellerOrderBadge';
+import { withSellerSetupOrigin } from '@/lib/setupNavigation';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -165,7 +166,53 @@ function ListItem({ icon, title, subtitle, value, onPress, isLast, iconColor = F
   );
 }
 
-function RevenueTrendChart({ points, loading, error, accent }: { points: RevenueTrendPoint[] | null; loading: boolean; error: boolean; accent: string; }) {
+function DashboardUnavailableState({
+  title,
+  message,
+  onRetry,
+  compact = false,
+}: {
+  title: string;
+  message: string;
+  onRetry: () => void;
+  compact?: boolean;
+}) {
+  const { theme } = useAppTheme();
+  return (
+    <View
+      style={[s.unavailableCard, compact && s.unavailableCardCompact]}
+      accessibilityRole="alert"
+      testID="seller-dashboard-unavailable"
+    >
+      <View style={[s.unavailableIcon, { backgroundColor: theme.accentDim, borderColor: theme.accent + '2E' }]}>
+        <Feather name="cloud" size={18} color={theme.accentLight} />
+      </View>
+      <View style={s.unavailableCopy}>
+        <Text style={s.unavailableTitle}>{title}</Text>
+        <Text style={s.unavailableMessage}>{message}</Text>
+      </View>
+      <SecondaryButton
+        label="Retry"
+        icon="refresh-cw"
+        small
+        onPress={onRetry}
+        style={compact ? s.unavailableButtonCompact : s.unavailableButton}
+      />
+    </View>
+  );
+}
+
+function RevenueTrendChart({
+  points,
+  loading,
+  error,
+  accent,
+}: {
+  points: RevenueTrendPoint[] | null;
+  loading: boolean;
+  error: boolean;
+  accent: string;
+}) {
   const animation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -175,8 +222,6 @@ function RevenueTrendChart({ points, loading, error, accent }: { points: Revenue
     }
     return () => animation.stopAnimation();
   }, [animation, points]);
-
-  if (error) return <View style={s.chartEmpty}><Feather name="alert-circle" size={14} color={ORANGE} /><Text style={s.chartEmptyText}>Trend unavailable</Text></View>;
 
   if (loading) {
     return (
@@ -190,15 +235,22 @@ function RevenueTrendChart({ points, loading, error, accent }: { points: Revenue
     );
   }
 
-  if (!points || points.length === 0) return <View style={s.chartEmpty}><Feather name="bar-chart-2" size={14} color={SUBTLE} /><Text style={s.chartEmptyText}>No sales yet</Text></View>;
-
-  const maxCents = Math.max(...points.map((p) => p.totalCents), 1);
+  const hasNoData = error || !points || points.length === 0;
+  const chartPoints = hasNoData
+    ? Array.from({ length: 7 }, (_, index) => {
+        const day = new Date();
+        day.setUTCDate(day.getUTCDate() - (6 - index));
+        return { day: day.toISOString(), totalCents: 0 };
+      })
+    : points;
+  const maxCents = Math.max(...chartPoints.map((p) => p.totalCents), 1);
   const today = new Date().toISOString().slice(0, 10);
   const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
   return (
     <View style={s.chartContainer}>
-      {points.map((point, index) => {
+      {hasNoData && <Text style={s.chartNoDataLabel}>No revenue data yet</Text>}
+      {chartPoints.map((point, index) => {
         const isToday = point.day.slice(0, 10) === today;
         const date = new Date(point.day);
         const dayLabel = Number.isNaN(date.getTime()) ? '·' : (dayLabels[date.getUTCDay()] ?? '·');
@@ -210,12 +262,12 @@ function RevenueTrendChart({ points, loading, error, accent }: { points: Revenue
                 style={[
                   s.chartBar,
                   {
-                    height: animation.interpolate({
+                    height: hasNoData ? '4%' : animation.interpolate({
                       inputRange: [0, 1],
-                      outputRange: ['0%', `${Math.max(8, targetHeightPct)}%`]
+                      outputRange: ['0%', `${Math.max(8, targetHeightPct)}%`],
                     }),
                     backgroundColor: isToday ? accent : FG,
-                    opacity: isToday ? 1 : 0.25,
+                    opacity: hasNoData ? 0.12 : isToday ? 1 : 0.25,
                   },
                 ]}
               />
@@ -261,7 +313,6 @@ export default function SellerHomeScreen() {
   const api = useApi();
   const { managementURL } = useRevenueCat();
   const [loading, setLoading] = useState(true);
-  const [statsError, setStatsError] = useState(false);
   const [retryKey, setRetryKey] = useState(0);
   const [setupState, setSetupState] = useState<SetupState>(DEFAULT_SETUP);
 
@@ -276,6 +327,7 @@ export default function SellerHomeScreen() {
   const [invStats, setInvStats] = useState<{ lowStockCount: number; outOfStockCount: number; incomingCount: number; delayedCount: number; } | null>(null);
 
   const [recentOrders, setRecentOrders] = useState<any[] | null>(null);
+  const [ordersError, setOrdersError] = useState(false);
   const [searchProducts, setSearchProducts] = useState<any[]>([]);
   const [searchOrders, setSearchOrders] = useState<any[]>([]);
   const [payoutInfo,   setPayoutInfo]   = useState<any | null>(null);
@@ -309,9 +361,9 @@ export default function SellerHomeScreen() {
   useEffect(() => {
     const timer = setTimeout(() => { loadSetup(); }, 0);
     const minLoad = setTimeout(() => {}, 500);
-    setStatsError(false);
     setDashStatsError(false);
     setSalesTrendError(false);
+    setOrdersError(false);
     setDashStats(null);
     setSalesTrend(null);
 
@@ -328,7 +380,6 @@ export default function SellerHomeScreen() {
     }).catch((error) => {
       setDashStats(null);
       setDashStatsError(true);
-      setStatsError(true);
       reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
 
@@ -348,7 +399,6 @@ export default function SellerHomeScreen() {
       setInvStats(deriveInventoryStats(Array.isArray(rows) ? rows : []));
     }).catch((error) => {
       setInvStats(null);
-      setStatsError(true);
       reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
 
@@ -356,7 +406,6 @@ export default function SellerHomeScreen() {
       setPayoutInfo(data && typeof data === 'object' ? data : null);
     }).catch((error) => {
       setPayoutInfo(null);
-      setStatsError(true);
       reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
 
@@ -365,10 +414,11 @@ export default function SellerHomeScreen() {
       setOrderStats(deriveOrderStats(list));
       setRecentOrders(list.slice(0, 3));
       setSearchOrders(list);
+      setOrdersError(false);
     }).catch((error) => {
       setOrderStats(null);
       setRecentOrders(null);
-      setStatsError(true);
+      setOrdersError(true);
       reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
 
@@ -376,7 +426,6 @@ export default function SellerHomeScreen() {
       setSearchProducts(Array.isArray(rows) ? rows : []);
     }).catch((error) => {
       setSearchProducts([]);
-      setStatsError(true);
       reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
 
@@ -387,7 +436,6 @@ export default function SellerHomeScreen() {
     }).catch((error) => {
       setSalesTrend(null);
       setSalesTrendError(true);
-      setStatsError(true);
       reportNetworkError(error, () => setRetryKey(key => key + 1));
     });
 
@@ -424,11 +472,7 @@ export default function SellerHomeScreen() {
 
   function openSetupTask(task: SetupState['tasks'][number]) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (task.id === 'first_product') {
-      router.replace('/add-product?from=seller-setup' as never);
-      return;
-    }
-    router.push(task.route as never);
+    router.replace(withSellerSetupOrigin(task.route) as never);
   }
 
   function handleOpenOrders() {
@@ -476,16 +520,6 @@ export default function SellerHomeScreen() {
       rightElement: <Text style={{ color: RED, fontSize: 13, fontFamily: FONT.bold }}>Update</Text>,
       onPress: handleOpenBillingPortal,
       loading: billingPortalLoading,
-    });
-  }
-  if (statsError) {
-    alerts.push({
-      id: 'stats-error',
-      icon: 'alert-triangle',
-      color: ORANGE,
-      title: 'Live data unavailable',
-      subtitle: 'Tap to retry connection',
-      onPress: () => setRetryKey(k => k + 1),
     });
   }
   if (unseenOrderCount > 0) {
@@ -629,6 +663,13 @@ export default function SellerHomeScreen() {
             </TouchableOpacity>
           </View>
 
+          {dashStatsError ? (
+            <DashboardUnavailableState
+              title="Your overview will be ready shortly"
+              message="We couldn't refresh your latest numbers. Your workspace is still available."
+              onRetry={() => setRetryKey(key => key + 1)}
+            />
+          ) : (
           <SellerDashboardKPIGrid cards={[
             {
               label: 'Net Revenue',
@@ -651,13 +692,19 @@ export default function SellerHomeScreen() {
               value: dashStats === null || dashStats.storefrontVisits === 0 ? '—' : `${(dashStats.completedOrders / dashStats.storefrontVisits * 100).toFixed(1)}%`,
             },
           ]} />
+          )}
 
           <UnifiedCard onPress={() => nav('/(tabs)/analytics')} style={{ padding: SP.sm, paddingBottom: 12 }}>
              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6, marginBottom: SP.sm, alignItems: 'center' }}>
                 <Text style={s.metricLabel}>Revenue Trend</Text>
                 <Text style={{ fontSize: 11, fontFamily: FONT.medium, color: MUTED }}>Last 7 days</Text>
              </View>
-             <RevenueTrendChart points={salesTrend} loading={salesTrend === null && !salesTrendError} error={salesTrendError} accent={theme.accentLight} />
+             <RevenueTrendChart
+               points={salesTrend}
+               loading={salesTrend === null && !salesTrendError}
+               error={salesTrendError}
+               accent={theme.accentLight}
+             />
           </UnifiedCard>
         </AnimatedEntrance>
 
@@ -789,7 +836,13 @@ export default function SellerHomeScreen() {
              </TouchableOpacity>
            </View>
 
-           {recentOrders === null ? (
+           {ordersError ? (
+              <DashboardUnavailableState
+                title="Orders are taking a moment"
+                message="We couldn't refresh your latest orders just yet."
+                onRetry={() => setRetryKey(key => key + 1)}
+              />
+           ) : recentOrders === null ? (
               <LoadingSkeleton height={140} style={{ borderRadius: RADIUS.lg }} />
            ) : recentOrders.length === 0 ? (
               <UnifiedCard glow style={{ padding: SP.lg }}>
@@ -1117,16 +1170,66 @@ const s = StyleSheet.create({
     color: SUBTLE,
     textTransform: 'uppercase' as const,
   },
-  chartEmpty: {
-    height: 90,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  chartEmptyText: {
+  chartNoDataLabel: {
+    position: 'absolute',
+    top: 4,
+    left: 0,
+    right: 0,
+    textAlign: 'center',
     fontSize: FS.xs,
     fontFamily: FONT.medium,
+    color: SUBTLE,
+  },
+  unavailableCard: {
+    minHeight: 132,
+    padding: SP.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: SELLER_DASHBOARD_GLASS,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: RADIUS.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 20,
+    elevation: 3,
+  },
+  unavailableCardCompact: {
+    minHeight: 100,
+    paddingVertical: 12,
+  },
+  unavailableIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unavailableCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  unavailableTitle: {
+    color: FG,
+    fontFamily: FONT.semibold,
+    fontSize: FS.sm,
+    lineHeight: 18,
+  },
+  unavailableMessage: {
     color: MUTED,
+    fontFamily: FONT.regular,
+    fontSize: FS.xs,
+    lineHeight: 16,
+    marginTop: 3,
+  },
+  unavailableButton: {
+    minWidth: 92,
+  },
+  unavailableButtonCompact: {
+    minWidth: 84,
   },
 
   // ─── Modals ────────────────────────────────────────────────────────────────

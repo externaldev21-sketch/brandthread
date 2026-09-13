@@ -18,6 +18,7 @@ import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
 import { LinearGradient } from 'expo-linear-gradient';
 import { formatCents } from '@/lib/money';
 import { getEntitlementRejection } from '@/lib/entitlementError';
+import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, CARD_GLASS, CARD_ELEVATED_GLASS, SURFACE_GLASS, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -149,8 +150,17 @@ export default function ManufacturerHub() {
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { tab } = useLocalSearchParams<{ tab?: string }>();
+  const { tab, from } = useLocalSearchParams<{ tab?: string; from?: string }>();
   const [activeTab, setActiveTab] = useState<Tab>(tab === 'messages' ? 'messages' : 'discover');
+  const isSellerSetup = isSellerSetupOrigin(from);
+
+  function leaveSetupDestination() {
+    if (isSellerSetup) {
+      router.replace(SELLER_HOME_ROUTE as never);
+      return;
+    }
+    router.back();
+  }
 
   const { hasPlan, loading: planLoading, error: planError, retry: retryPlan } = useSubscriptionPlan();
   const [upsellVisible, setUpsellVisible] = useState(false);
@@ -174,7 +184,7 @@ export default function ManufacturerHub() {
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
       {/* Header */}
-      <HubHeader activeTab={activeTab} router={router} />
+      <HubHeader activeTab={activeTab} router={router} onLeave={leaveSetupDestination} />
 
       {/* Tab bar */}
       <View style={s.tabBarWrapper}>
@@ -237,7 +247,7 @@ export default function ManufacturerHub() {
         requiredPlan="growth"
         onClose={() => {
           setUpsellVisible(false);
-          router.back();
+          leaveSetupDestination();
         }}
         onUpgrade={() => {
           setUpsellVisible(false);
@@ -250,13 +260,17 @@ export default function ManufacturerHub() {
 
 // ─── Hub Header ───────────────────────────────────────────────────────────────
 
-function HubHeader({ activeTab, router }: { activeTab: Tab; router: ReturnType<typeof useRouter> }) {
+function HubHeader({ activeTab, router, onLeave }: {
+  activeTab: Tab;
+  router: ReturnType<typeof useRouter>;
+  onLeave: () => void;
+}) {
   return (
     <View style={s.header}>
       {/* Back button — always visible */}
       <TouchableOpacity
         style={s.headerBtn}
-        onPress={() => router.back()}
+        onPress={onLeave}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         activeOpacity={0.75}
       >

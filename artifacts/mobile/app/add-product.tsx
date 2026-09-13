@@ -31,6 +31,7 @@ import { Product, ProductDraft, ProductCategory, PRODUCT_CATEGORIES, SIZE_PRESET
 
 import { calcPricing, generateVariantCombinations, buildVariantTitle, validateForPublish } from '@/lib/productUtils';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
+import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -121,7 +122,7 @@ export default function AddProductScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const params = useLocalSearchParams();
-  const launchedFromSellerSetup = params.from === 'seller-setup';
+  const launchedFromSellerSetup = isSellerSetupOrigin(params.from);
   const insets = useSafeAreaInsets();
   const api = useApi();
 
@@ -436,7 +437,7 @@ export default function AddProductScreen() {
   function leaveProductFlow() {
     isExitingRef.current = true;
     if (launchedFromSellerSetup) {
-      router.replace('/(tabs)/' as never);
+      router.replace(SELLER_HOME_ROUTE as never);
       return;
     }
     router.back();

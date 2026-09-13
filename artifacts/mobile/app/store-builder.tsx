@@ -5,7 +5,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet,
   RefreshControl, ActivityIndicator, Alert, Modal, TextInput,
   KeyboardAvoidingView, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,6 +26,7 @@ import {
   Storefront, StorePublishStatus, THREAD_THEME_ID, THREAD_THEME_NAME,
   THREAD_THEME_LIGHT_PALETTE,
 } from '@/services/storeTypes';
+import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 
 function getStatusVariant(status: StorePublishStatus): 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple' {
   switch (status) {
@@ -66,6 +67,7 @@ export default function StoreBuilderScreen() {
   const s = makeStyles(theme);
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
+  const params = useLocalSearchParams<{ from?: string }>();
   const insets = useSafeAreaInsets();
   const [store, setStore] = useState<Storefront | null>(null);
   const [loading, setLoading] = useState(true);
@@ -76,6 +78,14 @@ export default function StoreBuilderScreen() {
   const [importJob, setImportJob] = useState<ShopifyImportJob | null>(null);
   const [importError, setImportError] = useState('');
   const [submittingImport, setSubmittingImport] = useState(false);
+
+  const leaveSetupDestination = () => {
+    if (isSellerSetupOrigin(params.from)) {
+      router.replace(SELLER_HOME_ROUTE as never);
+      return;
+    }
+    router.back();
+  };
 
   const loadData = useCallback(async () => {
     try {
@@ -234,7 +244,7 @@ export default function StoreBuilderScreen() {
           style={[s.header, { paddingTop: insets.top + SP.md }]}
         >
           <TouchableOpacity
-            onPress={() => router.back()}
+            onPress={leaveSetupDestination}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             activeOpacity={0.75}
             style={{ width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: 'rgba(0,0,0,0.25)', alignItems: 'center' as const, justifyContent: 'center' as const, marginBottom: SP.sm }}

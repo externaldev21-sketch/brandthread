@@ -23,6 +23,7 @@ import {
   FONT, FS, SP, RADIUS, COMP, ICON, ANIM,
 } from '@/lib/theme';
 import { useColors } from '@/hooks/useColors';
+import { withSellerSetupOrigin } from '@/lib/setupNavigation';
 import {
   getSetupState, completeTask, skipTask,
   SetupState, SetupTask, SetupTaskId,
@@ -161,7 +162,7 @@ export default function SetupScreen() {
   function handleTaskPress(task: SetupTask) {
     if (task.completed) return;
     Alert.alert(task.label, task.description, [
-      { text: 'Open', onPress: () => { try { router.push(task.route as never); } catch { /* ok */ } } },
+      { text: 'Open', onPress: () => { try { router.replace(withSellerSetupOrigin(task.route) as never); } catch { /* ok */ } } },
       { text: 'Mark complete', onPress: () => handleComplete(task.id) },
       { text: 'Cancel', style: 'cancel' },
     ]);

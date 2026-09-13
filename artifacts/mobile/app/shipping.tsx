@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, Alert, Platform } from 'react-native';
 import { useColors } from '@/hooks/useColors';
-import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import { Badge } from '@/components/Badge';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
+import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 
 const SHIPMENTS = [
   { id: 'SH-8821', customer: 'Jordan Lee', carrier: 'UPS', status: 'In Transit', eta: 'Jul 10', progress: 70 },
@@ -28,11 +29,22 @@ function capitalize(s: string) {
 export default function ShippingScreen() {
   const colors = useColors();
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const launchedFromSellerSetup = isSellerSetupOrigin(params.from);
+  const insets = useSafeAreaInsets();
   const api = useApi();
 
   const [sellerReturns, setSellerReturns] = useState<any[]>([]);
   const [shippingRates, setShippingRates] = useState<any[]>([]);
   const [ratesLoading, setRatesLoading] = useState(false);
+
+  function leaveSetupDestination() {
+    if (launchedFromSellerSetup) {
+      router.replace(SELLER_HOME_ROUTE as never);
+      return;
+    }
+    router.back();
+  }
 
   useEffect(() => {
     api.returns.listSeller().then(data => setSellerReturns(data ?? [])).catch(() => {});
@@ -89,7 +101,28 @@ export default function ShippingScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
-      <ScreenHeader title="Shipping & Fulfillment" subtitle="Labels, carriers & returns" />
+      <View style={[
+        styles.header,
+        {
+          paddingTop: Platform.OS === 'web' ? 67 : insets.top + 8,
+          borderBottomColor: colors.border,
+        },
+      ]}>
+        <TouchableOpacity
+          onPress={leaveSetupDestination}
+          style={[styles.headerBack, { backgroundColor: colors.card, borderColor: colors.border }]}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+          accessibilityHint="Returns from Shipping & Fulfillment"
+        >
+          <Feather name="arrow-left" size={20} color={colors.foreground} />
+        </TouchableOpacity>
+        <View style={styles.headerTitleBlock}>
+          <Text style={[styles.headerTitle, { color: colors.foreground }]}>Shipping & Fulfillment</Text>
+          <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]}>Labels, carriers & returns</Text>
+        </View>
+        <View style={styles.headerRightSlot} />
+      </View>
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
@@ -251,6 +284,27 @@ export default function ShippingScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    minHeight: 88,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    gap: 8,
+  },
+  headerBack: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  headerTitleBlock: { flex: 1 },
+  headerTitle: { fontSize: 20, fontFamily: 'Inter_700Bold', letterSpacing: -0.3 },
+  headerSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 4 },
+  headerRightSlot: { width: 40 },
   back: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
   backText: { fontSize: 15, fontFamily: 'Inter_500Medium' },
   pageTitle: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 4 },

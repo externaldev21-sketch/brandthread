@@ -587,6 +587,7 @@ function RootLayoutNav() {
         <Stack.Screen name="camera-capture"    options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
         <Stack.Screen name="brand"            options={{ headerShown: false }} />
         <Stack.Screen name="seller-profile"   options={{ headerShown: false, animation: 'slide_from_right' }} />
+        <Stack.Screen name="seller-verification" options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="create-post"      options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal' }} />
         <Stack.Screen name="post-analytics"   options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="setup"            options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'modal' }} />

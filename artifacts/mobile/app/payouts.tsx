@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import * as WebBrowser from 'expo-web-browser';
@@ -15,6 +15,7 @@ import { isManagerRole } from '@/lib/roleError';
 import { RoleLockedView } from '@/components/RoleLockedView';
 import StripeConnectWarning, { ConnectStatus, normalizeConnectStatus } from '@/components/StripeConnectWarning';
 import { useTeamRole } from '@/hooks/useTeamRole';
+import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 
 type PayoutStatus = 'paid' | 'pending' | 'in_transit' | 'failed';
 
@@ -54,6 +55,8 @@ export default function PayoutsScreen() {
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const params = useLocalSearchParams();
+  const launchedFromSellerSetup = isSellerSetupOrigin(params.from);
   const api    = useApi();
   const { currentRole, isLoadingRole } = useTeamRole();
   const isReadOnly = isManagerRole(currentRole);
@@ -66,6 +69,14 @@ export default function PayoutsScreen() {
   const [isConnecting, setIsConnecting] = useState(false);
   const connectRequestRef = useRef(false);
   const onboardingOpenRef = useRef(false);
+
+  function leaveSetupDestination() {
+    if (launchedFromSellerSetup) {
+      router.replace(SELLER_HOME_ROUTE as never);
+      return;
+    }
+    router.back();
+  }
 
   const refreshConnectStatus = useCallback(async () => {
     if (connectRequestRef.current) return;
@@ -153,7 +164,7 @@ export default function PayoutsScreen() {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => { haptic(); router.back(); }} style={styles.backBtn}>
+          <TouchableOpacity onPress={() => { haptic(); leaveSetupDestination(); }} style={styles.backBtn}>
             <Feather name="chevron-left" size={24} color={FG} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Payouts</Text>
@@ -170,7 +181,7 @@ export default function PayoutsScreen() {
     return (
       <View style={[styles.root, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => { haptic(); router.back(); }} style={styles.backBtn}>
+          <TouchableOpacity onPress={() => { haptic(); leaveSetupDestination(); }} style={styles.backBtn}>
             <Feather name="chevron-left" size={24} color={FG} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Payouts</Text>
@@ -185,7 +196,7 @@ export default function PayoutsScreen() {
     <View style={[styles.root, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => { haptic(); router.back(); }} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => { haptic(); leaveSetupDestination(); }} style={styles.backBtn}>
           <Feather name="chevron-left" size={24} color={FG} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Payouts</Text>

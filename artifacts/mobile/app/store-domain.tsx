@@ -5,7 +5,7 @@ import {
   View, Text, ScrollView, TextInput, TouchableOpacity,
   StyleSheet, Alert,
 } from 'react-native';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useRouter, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { Feather } from '@expo/vector-icons';
 import { useHeaderTopInset } from '@/hooks/useHeaderTopInset';
 import {
@@ -18,6 +18,7 @@ import { BrandthreadCard, PrimaryButton, SecondaryButton, SectionHeader, StatusB
 import { getStorefront, updateDomain } from '@/services/storeService';
 import { useApi } from '@/lib/api';
 import { StoreDomain } from '@/services/storeTypes';
+import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
 
 type MergedDomain = StoreDomain & { dnsToken?: string };
 
@@ -26,6 +27,7 @@ export default function StoreDomainScreen() {
   const dm = makeStyles(theme);
   const { primary: PURPLE, accent: PURPLE_DIM, accentForeground: PURPLE_LIGHT, info: CYAN } = useColors();
   const router = useRouter();
+  const params = useLocalSearchParams<{ from?: string }>();
   const headerTopInset = useHeaderTopInset();
   const api = useApi();
   const [domains, setDomains] = useState<MergedDomain[]>([]);
@@ -34,6 +36,14 @@ export default function StoreDomainScreen() {
   const [subdomainInput, setSubdomainInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [verifying, setVerifying] = useState<string | null>(null);
+
+  const leaveSetupDestination = () => {
+    if (isSellerSetupOrigin(params.from)) {
+      router.replace(SELLER_HOME_ROUTE as never);
+      return;
+    }
+    router.back();
+  };
 
   const load = useCallback(async () => {
     const s = await getStorefront();
@@ -131,7 +141,7 @@ export default function StoreDomainScreen() {
     <View style={dm.root}>
       <View style={[dm.header, { paddingTop: headerTopInset + SP.sm }]}>
         <TouchableOpacity
-          onPress={() => router.back()}
+          onPress={leaveSetupDestination}
           style={dm.backBtn}
           hitSlop={{ top: 4, bottom: 4, left: 4, right: 4 }}
         >
