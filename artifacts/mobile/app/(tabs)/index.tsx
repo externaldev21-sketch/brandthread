@@ -25,6 +25,7 @@ import { getSellerOrderBadgeCount, openSellerOrders } from '@/lib/sellerOrderBad
 import { withSellerSetupOrigin } from '@/lib/setupNavigation';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+import { SellerDashboardActionRow, SellerDashboardListGroup, SellerDashboardListItem, SellerDashboardSectionHeader, SellerDashboardTrendHeader } from '@/components/SellerDashboardSections';
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -116,55 +117,7 @@ function UnifiedCard({ children, style, onPress, glow = false }: { children: Rea
   return onPress ? <PressableScale onPress={onPress} style={cardStyle}>{children}</PressableScale> : <View style={cardStyle}>{children}</View>;
 }
 
-function ListGroup({ children, style }: { children: React.ReactNode, style?: StyleProp<ViewStyle> }) {
-  return (
-    <View style={[s.listGroup, style]}>
-      {children}
-    </View>
-  );
-}
-
-function ListItem({ icon, title, subtitle, value, onPress, isLast, iconColor = FG, rightElement, badge }: any) {
-  const content = (
-    <View style={s.listItem}>
-       <View style={[s.listIconWrap, { backgroundColor: iconColor + '1A' }]}>
-         <Feather name={icon} size={16} color={iconColor} />
-       </View>
-       <View style={s.listBody}>
-         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-           <Text style={[s.listTitle, subtitle && { marginBottom: 2 }]} numberOfLines={1}>{title}</Text>
-           {badge !== undefined && badge > 0 && (
-              <View style={{ backgroundColor: RED, borderRadius: 10, paddingHorizontal: 5, paddingVertical: 1 }}>
-                <Text style={{ fontSize: 10, fontFamily: FONT.bold, color: '#FFF' }}>{badge > 9 ? '9+' : badge}</Text>
-              </View>
-           )}
-         </View>
-         {subtitle && <Text style={s.listSubtitle} numberOfLines={1}>{subtitle}</Text>}
-       </View>
-       <View style={s.listRight}>
-         {value && <Text style={s.listValue}>{value}</Text>}
-         {rightElement}
-         {onPress && <Feather name="chevron-right" size={16} color={SUBTLE} />}
-       </View>
-    </View>
-  );
-
-  if (onPress) {
-    return (
-      <>
-        <PressableScale onPress={onPress}>{content}</PressableScale>
-        {!isLast && <View style={s.listDivider} />}
-      </>
-    );
-  }
-
-  return (
-    <>
-      {content}
-      {!isLast && <View style={s.listDivider} />}
-    </>
-  );
-}
+const ListGroup = SellerDashboardListGroup;
 
 function DashboardUnavailableState({
   title,
@@ -656,12 +609,7 @@ export default function SellerHomeScreen() {
         <StripeConnectWarning />
 
         <AnimatedEntrance delay={0} style={s.pageSection}>
-          <View style={s.sectionHeaderRow}>
-            <Text style={s.sectionHeaderTitle}>Overview</Text>
-            <TouchableOpacity onPress={() => nav('/(tabs)/analytics')}>
-               <Text style={s.sectionHeaderAction}>Analytics</Text>
-            </TouchableOpacity>
-          </View>
+          <SellerDashboardSectionHeader title="Overview" action="Analytics" onAction={() => nav('/(tabs)/analytics')} />
 
           {dashStatsError ? (
             <DashboardUnavailableState
@@ -695,10 +643,7 @@ export default function SellerHomeScreen() {
           )}
 
           <UnifiedCard onPress={() => nav('/(tabs)/analytics')} style={{ padding: SP.sm, paddingBottom: 12 }}>
-             <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 6, marginBottom: SP.sm, alignItems: 'center' }}>
-                <Text style={s.metricLabel}>Revenue Trend</Text>
-                <Text style={{ fontSize: 11, fontFamily: FONT.medium, color: MUTED }}>Last 7 days</Text>
-             </View>
+             <SellerDashboardTrendHeader />
              <RevenueTrendChart
                points={salesTrend}
                loading={salesTrend === null && !salesTrendError}
@@ -710,9 +655,7 @@ export default function SellerHomeScreen() {
 
         {alerts.length > 0 && (
           <AnimatedEntrance delay={50} style={s.pageSection}>
-             <View style={s.sectionHeaderRow}>
-               <Text style={s.sectionHeaderTitle}>Needs Attention</Text>
-             </View>
+             <SellerDashboardSectionHeader title="Needs Attention" />
              <ListGroup>
                {alerts.map((a, i) => (
                  <ListItem
@@ -733,24 +676,27 @@ export default function SellerHomeScreen() {
         {showWelcome && (
           <AnimatedEntrance delay={100} style={s.pageSection}>
             <UnifiedCard glow>
-              <Text style={{ fontSize: FS.lg, fontFamily: FONT.bold, color: FG, letterSpacing: -0.2 }}>Your brand workspace is ready.</Text>
-              <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 6, marginBottom: SP.md }}>
+              <Text style={s.welcomeTitle} maxFontSizeMultiplier={2}>Your brand workspace is ready.</Text>
+              <Text style={s.welcomeBody} maxFontSizeMultiplier={2}>
                 Build your first drop, set up your storefront, and start selling.
               </Text>
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <PrimaryButton label="Start setup" onPress={handleStartSetup} small style={{ flex: 1 }} />
-                <SecondaryButton label="Explore on my own" onPress={handleDismissWelcome} small style={{ flex: 1 }} />
-              </View>
+              <SellerDashboardActionRow
+                testID="seller-dashboard-welcome-actions"
+                actions={[
+                  { label: 'Start setup', variant: 'primary', onPress: handleStartSetup },
+                  { label: 'Explore on my own', variant: 'secondary', onPress: handleDismissWelcome },
+                ]}
+              />
             </UnifiedCard>
           </AnimatedEntrance>
         )}
 
         {showProgress && (
           <AnimatedEntrance delay={100} style={s.pageSection}>
-             <View style={s.sectionHeaderRow}>
-               <Text style={s.sectionHeaderTitle}>Finish Setup</Text>
-               <Text style={s.sectionHeaderAction}>{setupState.tasks.filter(t => t.completed).length} of {setupState.tasks.length} done</Text>
-             </View>
+             <SellerDashboardSectionHeader
+               title="Finish Setup"
+               action={`${setupState.tasks.filter(t => t.completed).length} of ${setupState.tasks.length} done`}
+             />
              <ListGroup>
                {setupState.tasks.map((task, i) => (
                  <ListItem
@@ -773,12 +719,7 @@ export default function SellerHomeScreen() {
 
         {!showWelcome && !showProgress && (
           <AnimatedEntrance delay={100} style={s.pageSection}>
-             <View style={s.sectionHeaderRow}>
-               <Text style={s.sectionHeaderTitle}>Operations</Text>
-               <TouchableOpacity onPress={() => setCommandModal(true)}>
-                 <Text style={s.sectionHeaderAction}>Shortcuts</Text>
-               </TouchableOpacity>
-             </View>
+             <SellerDashboardSectionHeader title="Operations" action="Shortcuts" onAction={() => setCommandModal(true)} />
              <ListGroup>
                 <ListItem
                   icon="shopping-bag"
@@ -816,9 +757,7 @@ export default function SellerHomeScreen() {
 
         {!showWelcome && !showProgress && (
           <AnimatedEntrance delay={150} style={s.pageSection}>
-             <View style={s.sectionHeaderRow}>
-               <Text style={s.sectionHeaderTitle}>Quick Actions</Text>
-             </View>
+             <SellerDashboardSectionHeader title="Quick Actions" />
              <SellerQuickActionsGrid actions={[
                { label: 'Create Post', icon: 'video', accent: theme.accent, badge: !setupState.openedFeatures.includes('create-post'), onPress: () => { markFeatureOpened('create-post'); nav('/create-post'); } },
                { label: 'Add Product', icon: 'plus-circle', accent: theme.secondary, onPress: () => nav('/(tabs)/products') },
@@ -829,12 +768,7 @@ export default function SellerHomeScreen() {
         )}
 
         <AnimatedEntrance delay={200} style={s.pageSection}>
-           <View style={s.sectionHeaderRow}>
-             <Text style={s.sectionHeaderTitle}>Recent Orders</Text>
-             <TouchableOpacity onPress={() => nav('/(tabs)/orders')}>
-               <Text style={s.sectionHeaderAction}>View all</Text>
-             </TouchableOpacity>
-           </View>
+           <SellerDashboardSectionHeader title="Recent Orders" action="View all" onAction={() => nav('/(tabs)/orders')} />
 
            {ordersError ? (
               <DashboardUnavailableState
@@ -851,15 +785,18 @@ export default function SellerHomeScreen() {
                        <Feather name="zap" size={16} color={theme.accentLight} />
                     </View>
                     <View style={{ flex: 1 }}>
-                       <Text style={{ fontSize: FS.md, fontFamily: FONT.bold, color: FG, letterSpacing: -0.2 }}>Ready for your first drop?</Text>
-                       <Text style={{ fontSize: FS.sm, fontFamily: FONT.regular, color: MUTED, marginTop: 4 }}>A few quick moves to get shoppers to your store.</Text>
+                       <Text style={s.emptyOrdersTitle} maxFontSizeMultiplier={2}>Ready for your first drop?</Text>
+                       <Text style={s.emptyOrdersBody} maxFontSizeMultiplier={2}>A few quick moves to get shoppers to your store.</Text>
                     </View>
                  </View>
                  <PrimaryButton label="Share Your Store" icon="share-2" small onPress={() => nav('/share-store')} style={{ marginBottom: 8 }} />
-                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <SecondaryButton label="Add Product" icon="plus-circle" small onPress={() => nav('/(tabs)/products')} style={{ flex: 1 }} />
-                    <SecondaryButton label="Post a Drop" icon="video" small onPress={() => nav('/create-post')} style={{ flex: 1 }} />
-                 </View>
+                  <SellerDashboardActionRow
+                    testID="seller-dashboard-empty-order-actions"
+                    actions={[
+                      { label: 'Add Product', icon: 'plus-circle', variant: 'secondary', onPress: () => nav('/(tabs)/products') },
+                      { label: 'Post a Drop', icon: 'video', variant: 'secondary', onPress: () => nav('/create-post') },
+                    ]}
+                  />
               </UnifiedCard>
            ) : (
               <ListGroup>
@@ -1114,6 +1051,35 @@ const s = StyleSheet.create({
     fontFamily: FONT.medium,
     color: MUTED,
   },
+  welcomeTitle: {
+    fontSize: FS.lg,
+    lineHeight: 26,
+    fontFamily: FONT.bold,
+    color: FG,
+    letterSpacing: -0.2,
+  },
+  welcomeBody: {
+    fontSize: FS.sm,
+    lineHeight: 20,
+    fontFamily: FONT.regular,
+    color: MUTED,
+    marginTop: 6,
+    marginBottom: SP.md,
+  },
+  emptyOrdersTitle: {
+    fontSize: FS.md,
+    lineHeight: 22,
+    fontFamily: FONT.bold,
+    color: FG,
+    letterSpacing: -0.2,
+  },
+  emptyOrdersBody: {
+    fontSize: FS.sm,
+    lineHeight: 20,
+    fontFamily: FONT.regular,
+    color: MUTED,
+    marginTop: 4,
+  },
   metricValue: {
     fontSize: 26,
     fontFamily: FONT.extrabold,
@@ -1316,3 +1282,5 @@ const s = StyleSheet.create({
     marginBottom: 4,
   },
 });
+
+const ListItem = SellerDashboardListItem;

@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
@@ -65,6 +66,8 @@ export default function StripeConnectWarning({
 }: StripeConnectWarningProps) {
   const api = useApi();
   const { theme } = useAppTheme();
+  const { width, fontScale } = useWindowDimensions();
+  const useLargeTextLayout = width < 402 || fontScale >= 1.3;
   const styles = React.useMemo(() => createStyles(theme), [theme]);
   const [localStatus, setLocalStatus] = useState<ConnectStatus | null>(null);
   const [loading, setLoading] = useState(false);
@@ -134,33 +137,38 @@ export default function StripeConnectWarning({
 
   return (
     <TouchableOpacity
-      style={styles.connectBanner}
+      style={[styles.connectBanner, useLargeTextLayout && styles.connectBannerLargeText]}
       onPress={handleFixStripeConnect}
       activeOpacity={0.85}
       disabled={loading || isConnecting}
       accessibilityRole="button"
       accessibilityLabel="Fix Stripe Connect setup"
     >
-      <View style={styles.connectBannerIcon}>
-        <Feather name="alert-circle" size={20} color={RED} />
+      <View style={styles.connectBannerMain}>
+        <View style={styles.connectBannerIcon}>
+          <Feather name="alert-circle" size={20} color={RED} />
+        </View>
+        <View style={styles.message}>
+          <Text style={styles.connectBannerTitle} maxFontSizeMultiplier={2}>
+            {connectStatus.connected
+              ? 'Payments restricted — fix your Stripe account'
+              : 'Payments unavailable — connect Stripe to get paid'}
+          </Text>
+          <Text style={styles.connectBannerSub} maxFontSizeMultiplier={2}>
+            {connectStatus.connected
+              ? 'Buyers can\'t checkout until Stripe verifies your account. Tap to complete setup.'
+              : 'Your store is live but buyers can\'t pay yet. Tap to connect Stripe.'}
+          </Text>
+        </View>
       </View>
-      <View style={styles.message}>
-        <Text style={styles.connectBannerTitle}>
-          {connectStatus.connected
-            ? 'Payments restricted — fix your Stripe account'
-            : 'Payments unavailable — connect Stripe to get paid'}
-        </Text>
-        <Text style={styles.connectBannerSub}>
-          {connectStatus.connected
-            ? 'Buyers can\'t checkout until Stripe verifies your account. Tap to complete setup.'
-            : 'Your store is live but buyers can\'t pay yet. Tap to connect Stripe.'}
-        </Text>
-      </View>
-      <View style={styles.connectBannerArrow}>
+      <View
+        style={[styles.connectBannerArrow, useLargeTextLayout && styles.connectBannerArrowLargeText]}
+        testID="stripe-connect-warning-action"
+      >
         {loading || isConnecting
-          ? <Text style={styles.opening}>Opening…</Text>
+          ? <Text style={styles.opening} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={2}>Opening…</Text>
           : <>
-              <Text style={styles.connectBannerFix}>Fix Now</Text>
+              <Text style={styles.connectBannerFix} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8} maxFontSizeMultiplier={2}>Fix Now</Text>
               <Feather name="chevron-right" size={14} color={RED} />
             </>}
       </View>
@@ -173,13 +181,23 @@ const createStyles = (theme: { accent: string; accentDim: string; onAccent: stri
     marginHorizontal: SP.md,
     marginBottom: SP.sm,
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: SP.sm,
     backgroundColor: theme.accentDim,
     borderRadius: RADIUS.md,
     padding: SP.md,
     borderWidth: 1,
     borderColor: theme.accent,
+  },
+  connectBannerLargeText: {
+    flexDirection: 'column',
+  },
+  connectBannerMain: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: SP.sm,
   },
   connectBannerIcon: {
     width: 36,
@@ -209,6 +227,12 @@ const createStyles = (theme: { accent: string; accentDim: string; onAccent: stri
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
+    flexShrink: 0,
+    minHeight: 36,
+  },
+  connectBannerArrowLargeText: {
+    alignSelf: 'flex-end',
+    minHeight: 0,
   },
   connectBannerFix: {
     fontSize: 11,

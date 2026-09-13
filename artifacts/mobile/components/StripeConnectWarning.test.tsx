@@ -11,7 +11,9 @@ const {
   canOpenURLMock,
   hapticMock,
   openURLMock,
+  windowMetrics,
 } = vi.hoisted(() => ({
+  windowMetrics: { width: 402, height: 874, scale: 1, fontScale: 1 },
   api: {
     seller: {
       connect: {
@@ -47,6 +49,7 @@ vi.mock('react-native', () => {
     StyleSheet: { create: (styles: unknown) => styles },
     Text: nativeComponent('Text'),
     TouchableOpacity: nativeComponent('TouchableOpacity'),
+    useWindowDimensions: () => windowMetrics,
     View: nativeComponent('View'),
   };
 });
@@ -112,6 +115,8 @@ function warningButton(renderer: ReactTestRenderer) {
 
 describe('StripeConnectWarning', () => {
   beforeEach(() => {
+    windowMetrics.width = 402;
+    windowMetrics.fontScale = 1;
     api.seller.connect.onboard.mockReset();
     api.seller.connect.status.mockReset();
     canOpenURLMock.mockReset();
@@ -169,6 +174,30 @@ describe('StripeConnectWarning', () => {
     expect(canOpenURLMock).toHaveBeenCalledWith(onboardingUrl);
     expect(openURLMock).toHaveBeenCalledWith(onboardingUrl);
     expect(hapticMock).toHaveBeenCalledTimes(1);
+    renderer.unmount();
+  });
+
+  it.each([320, 375, 402])('stacks controls and leaves payment messaging unrestricted at %ipx with 2x text', async width => {
+    windowMetrics.width = width;
+    windowMetrics.fontScale = 2;
+    const renderer = await renderWarning(status());
+    const button = warningButton(renderer);
+    const style = Object.assign({}, ...button.props.style.filter(Boolean));
+    expect(style.flexDirection).toBe('column');
+
+    const texts = renderer.root.findAllByType('Text' as React.ElementType);
+    const title = texts.find(node => String(node.props.children).startsWith('Payments unavailable'))!;
+    const description = texts.find(node => String(node.props.children).startsWith('Your store is live'))!;
+    expect(title.props.numberOfLines).toBeUndefined();
+    expect(description.props.numberOfLines).toBeUndefined();
+    expect(title.props.maxFontSizeMultiplier).toBe(2);
+    expect(description.props.maxFontSizeMultiplier).toBe(2);
+
+    const actionParent = renderer.root.findAllByProps({ testID: 'stripe-connect-warning-action' })
+      .find(node => String(node.type) === 'View')!;
+    const actionStyles = Array.isArray(actionParent.props.style) ? actionParent.props.style.flat(Infinity) : [actionParent.props.style];
+    const actionStyle = Object.assign({}, ...actionStyles.filter(Boolean));
+    expect(actionStyle.alignSelf).toBe('flex-end');
     renderer.unmount();
   });
 });
