@@ -22,20 +22,17 @@ vi.mock('react-native', () => ({
   View: nativeComponent('View'),
 }));
 
-vi.mock('@expo/vector-icons', () => ({
-  Feather: { glyphMap: {} },
-}));
-
+vi.mock('@expo/vector-icons', () => ({ Feather: { glyphMap: {} } }));
 vi.mock('@/components/BrandthreadUI', () => ({
   QuickActionCard: ({ label, badge, style }: { label: string; badge?: boolean; style?: unknown }) =>
     React.createElement(
       'PressableScale',
       { style, testID: `quick-action-card-${label.toLowerCase().replace(/\s+/g, '-')}` },
-      React.createElement(
-        'Text',
-        { numberOfLines: 2, maxFontSizeMultiplier: 2, style: { minHeight: 32, lineHeight: 16 } },
-        label,
-      ),
+      React.createElement('Text', {
+        numberOfLines: 1,
+        adjustsFontSizeToFit: true,
+        minimumFontScale: 0.9,
+      }, label),
       badge ? React.createElement('View', { testID: `quick-action-badge-${label.toLowerCase().replace(/\s+/g, '-')}` }) : null,
     ),
 }));
@@ -96,28 +93,50 @@ describe('seller Quick Actions compact layout', () => {
     expect(renderedCardWidth).toBeGreaterThanOrEqual(138);
   });
 
-  it('keeps labels readable at 2x accessibility font scaling and each card aligned', async () => {
+  it.each([1.3, 1.6, 2])('keeps labels horizontal and card geometry unchanged at font scale %s', async fontScale => {
     await act(async () => {
       renderer = create(<SellerQuickActionsGrid actions={actions} />);
     });
 
     for (const action of actions) {
+      const column = renderer!.root.findByProps({ testID: `seller-quick-action-${action.label.toLowerCase().replace(/\s+/g, '-')}` });
       const card = renderer!.root.findByProps({ testID: `quick-action-card-${action.label.toLowerCase().replace(/\s+/g, '-')}` });
-      expect(flattenStyle(card.props.style)).toMatchObject({ width: '100%', height: '100%', minWidth: 0 });
-      expect(textNode(card).props).toMatchObject({
-        numberOfLines: 2,
-        maxFontSizeMultiplier: 2,
+      const label = textNode(card);
+
+      expect(flattenStyle(column.props.style)).toMatchObject({
+        width: SELLER_COMPACT_GRID_COLUMN_WIDTH,
+        minWidth: 0,
       });
-      expect(flattenStyle(textNode(card).props.style)).toMatchObject({ minHeight: 32, lineHeight: 16 });
+      expect(flattenStyle(card.props.style)).toMatchObject({ width: '100%', minWidth: 0 });
+      expect(label.props).toMatchObject({
+        numberOfLines: 1,
+        adjustsFontSizeToFit: true,
+        minimumFontScale: 0.9,
+      });
+      expect(label.props.maxFontSizeMultiplier).toBeUndefined();
+
+      const narrowestCardWidth = (320 - 32) * SELLER_COMPACT_GRID_COLUMN_FRACTION;
+      const horizontalPadding = 8;
+      const estimatedLabelWidth = action.label.length * 12 * fontScale * 0.49 * label.props.minimumFontScale;
+      expect(estimatedLabelWidth).toBeLessThanOrEqual(narrowestCardWidth - horizontalPadding);
     }
   });
 
-  it('renders the Create Post badge without adding badges to the other actions', async () => {
+  it('renders the Create Post badge without changing its column geometry', async () => {
     await act(async () => {
       renderer = create(<SellerQuickActionsGrid actions={actions} />);
     });
 
     expect(renderer!.root.findAllByProps({ testID: 'quick-action-badge-create-post' })).toHaveLength(1);
-    expect(renderer!.root.findAll(node => typeof node.props.testID === 'string' && node.props.testID.startsWith('quick-action-badge-'))).toHaveLength(1);
+    expect(renderer!.root.findAll(node =>
+      typeof node.props.testID === 'string' && node.props.testID.startsWith('quick-action-badge-'),
+    )).toHaveLength(1);
+
+    const badgeColumn = renderer!.root.findByProps({ testID: 'seller-quick-action-create-post' });
+    const nonBadgeColumns = actions.slice(1).map(action =>
+      renderer!.root.findByProps({ testID: `seller-quick-action-${action.label.toLowerCase().replace(/\s+/g, '-')}` }),
+    );
+    expect(nonBadgeColumns.map(column => flattenStyle(column.props.style)))
+      .toEqual(nonBadgeColumns.map(() => flattenStyle(badgeColumn.props.style)));
   });
 });

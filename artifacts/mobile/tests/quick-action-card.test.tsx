@@ -41,29 +41,22 @@ vi.mock('react-native', () => ({
   View: nativeComponent('View'),
 }));
 
-vi.mock('expo-linear-gradient', () => ({
-  LinearGradient: nativeComponent('LinearGradient'),
-}));
-
+vi.mock('expo-linear-gradient', () => ({ LinearGradient: nativeComponent('LinearGradient') }));
 vi.mock('@expo/vector-icons', () => ({
   Feather: Object.assign(nativeComponent('Feather'), { glyphMap: {} }),
 }));
-
 vi.mock('react-native-svg', () => ({
   default: nativeComponent('Svg'),
   Line: nativeComponent('Line'),
 }));
-
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
 }));
-
 vi.mock('expo-haptics', () => ({
   impactAsync: vi.fn(),
   selectionAsync: vi.fn(),
   ImpactFeedbackStyle: { Light: 'light', Medium: 'medium' },
 }));
-
 vi.mock('@/contexts/AppThemeContext', () => ({
   getOnAccentTextStyle: () => ({}),
   useAppTheme: () => ({
@@ -78,24 +71,29 @@ vi.mock('@/contexts/AppThemeContext', () => ({
     },
   }),
 }));
-
 vi.mock('@/lib/haptics', () => ({
   hapticLight: vi.fn(),
   hapticMedium: vi.fn(),
   hapticSelection: vi.fn(),
 }));
-
 vi.mock('@/components/KeyboardAwareScrollViewCompat', () => ({
   KeyboardAwareScrollViewCompat: nativeComponent('KeyboardAwareScrollViewCompat'),
 }));
 
 import { QuickActionCard } from '@/components/BrandthreadUI';
 
+const actions = [
+  { label: 'Create Post', badge: true },
+  { label: 'Add Product', badge: false },
+  { label: 'View Orders', badge: false },
+  { label: 'Studio', badge: false },
+];
+
 function flattenStyle(style: unknown): Record<string, unknown> {
   return Object.assign({}, ...(Array.isArray(style) ? style.flat(Infinity) : [style]).filter(Boolean));
 }
 
-describe('QuickActionCard compact layout contract', () => {
+describe('QuickActionCard accessibility layout contract', () => {
   let renderer: ReactTestRenderer | null = null;
 
   afterEach(async () => {
@@ -105,10 +103,7 @@ describe('QuickActionCard compact layout contract', () => {
     renderer = null;
   });
 
-  it.each([
-    { label: 'Create Post', badge: true },
-    { label: 'Add Product', badge: false },
-  ])('keeps the $label card full width with badge=$badge', async ({ label, badge }) => {
+  it.each(actions)('keeps the $label card full width with badge=$badge', async ({ label, badge }) => {
     await act(async () => {
       renderer = create(
         <QuickActionCard
@@ -121,20 +116,50 @@ describe('QuickActionCard compact layout contract', () => {
       );
     });
 
-    const card = renderer!.root.findByProps({ testID: `quick-action-card-${label.toLowerCase().replace(/\s+/g, '-')}` });
+      const card = renderer!.root.findByProps({ testID: `quick-action-card-${label.toLowerCase().replace(/\s+/g, '-')}` });
     expect(flattenStyle(card.props.style)).toMatchObject({ width: '100%', minWidth: 0 });
 
-    const labelNode = card.findByType('Text' as React.ElementType);
+      const labelNode = card.findByType('Text' as React.ElementType);
     expect(labelNode.props).toMatchObject({
-      numberOfLines: 2,
-      maxFontSizeMultiplier: 2,
+      numberOfLines: 1,
+      adjustsFontSizeToFit: true,
+      minimumFontScale: 0.9,
     });
-    expect(flattenStyle(labelNode.props.style)).toMatchObject({ minHeight: 32, lineHeight: 16 });
+    expect(labelNode.props.maxFontSizeMultiplier).toBeUndefined();
+    expect(flattenStyle(labelNode.props.style)).toMatchObject({ width: '100%', minWidth: 0 });
 
     const dots = card.findAllByType('View' as React.ElementType).filter(node => {
       const style = flattenStyle(node.props.style);
       return style.position === 'absolute' && style.width === 8 && style.height === 8;
     });
     expect(dots).toHaveLength(badge ? 1 : 0);
+  });
+
+  it.each([1.3, 1.6, 2])('honors font scale %s without vertical label wrapping', async fontScale => {
+    for (const { label, badge } of actions) {
+      await act(async () => {
+        renderer = create(
+          <QuickActionCard
+            label={label}
+            icon="video"
+            accent="#a855f7"
+            badge={badge}
+            onPress={vi.fn()}
+          />,
+        );
+      });
+
+      const card = renderer!.root.findByProps({ testID: `quick-action-card-${label.toLowerCase().replace(/\s+/g, '-')}` });
+      const labelNode = card.findByType('Text' as React.ElementType);
+      expect(labelNode.props.numberOfLines).toBe(1);
+      expect(labelNode.props.adjustsFontSizeToFit).toBe(true);
+      expect(labelNode.props.maxFontSizeMultiplier).toBeUndefined();
+      expect(fontScale * labelNode.props.minimumFontScale).toBeGreaterThanOrEqual(fontScale * 0.9);
+
+      await act(async () => {
+        renderer?.unmount();
+      });
+      renderer = null;
+    }
   });
 });
