@@ -834,7 +834,7 @@ export function QuickActionCard({ icon, label, onPress, accent, badge, style }: 
         <Feather name={icon} size={ICON.md} color={resolvedAccent} />
         {badge && <View style={[qaS.dot, { backgroundColor: theme.accent }]} />}
       </View>
-      <Text style={qaS.label} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{label}</Text>
+      <Text style={qaS.label} numberOfLines={2} maxFontSizeMultiplier={2}>{label}</Text>
     </PressableScale>
   );
 }
@@ -844,7 +844,7 @@ const qaS = StyleSheet.create({
              borderRadius: RADIUS.md, borderWidth: 1, borderColor: BORDER, padding: 14 },
   iconWrap:{ width: 44, height: 44, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   dot:     { position: 'absolute', top: -2, right: -2, width: 8, height: 8, borderRadius: 4 },
-  label:   { fontSize: FS.xs, fontFamily: FONT.medium, color: MUTED, textAlign: 'center' },
+  label:   { minHeight: 32, fontSize: FS.xs, lineHeight: 16, fontFamily: FONT.medium, color: MUTED, textAlign: 'center' },
 });
 
 // ─── GuidedTip ────────────────────────────────────────────────────────────────

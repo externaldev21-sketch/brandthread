@@ -33,6 +33,7 @@ export function SellerQuickActionsGrid({ actions }: { actions: SellerQuickAction
 const styles = StyleSheet.create({
   card: {
     width: '100%',
+    height: '100%',
     minWidth: 0,
     backgroundColor: SELLER_DASHBOARD_GLASS,
     borderColor: BORDER,

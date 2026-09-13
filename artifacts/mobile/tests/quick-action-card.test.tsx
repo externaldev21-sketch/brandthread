@@ -126,10 +126,10 @@ describe('QuickActionCard compact layout contract', () => {
 
     const labelNode = card.findByType('Text' as React.ElementType);
     expect(labelNode.props).toMatchObject({
-      numberOfLines: 1,
-      adjustsFontSizeToFit: true,
-      minimumFontScale: 0.8,
+      numberOfLines: 2,
+      maxFontSizeMultiplier: 2,
     });
+    expect(flattenStyle(labelNode.props.style)).toMatchObject({ minHeight: 32, lineHeight: 16 });
 
     const dots = card.findAllByType('View' as React.ElementType).filter(node => {
       const style = flattenStyle(node.props.style);

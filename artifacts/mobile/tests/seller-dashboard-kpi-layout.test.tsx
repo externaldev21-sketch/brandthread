@@ -95,7 +95,7 @@ describe('seller dashboard KPI layout', () => {
     expect(renderedCardWidth).toBeGreaterThanOrEqual(138);
   });
 
-  it('keeps every label and value to one line', async () => {
+  it('keeps labels and values readable at 2x accessibility font scaling', async () => {
     await act(async () => {
       renderer = create(<SellerDashboardKPIGrid cards={cards} />);
     });
@@ -103,10 +103,13 @@ describe('seller dashboard KPI layout', () => {
     for (const card of cards) {
       const node = renderer!.root.findByProps({ testID: `seller-kpi-${card.label.toLowerCase()}` });
       const [label, value] = textNodes(node);
-      expect(label.props.numberOfLines).toBe(1);
+      expect(label.props.numberOfLines).toBe(2);
+      expect(label.props.maxFontSizeMultiplier).toBe(2);
+      expect(flattenStyle(label.props.style)).toMatchObject({ lineHeight: 16, minHeight: 32 });
       expect(value.props.numberOfLines).toBe(1);
       expect(value.props.adjustsFontSizeToFit).toBe(true);
-      expect(value.props.minimumFontScale).toBe(0.5);
+      expect(value.props.minimumFontScale).toBe(0.65);
+      expect(value.props.maxFontSizeMultiplier).toBe(2);
     }
   });
 
@@ -118,7 +121,7 @@ describe('seller dashboard KPI layout', () => {
     for (const label of ['Revenue', 'Orders']) {
       const card = renderer!.root.findByProps({ testID: `seller-kpi-${label.toLowerCase()}` });
       const wrapper = card.findByType('PressableScale' as React.ElementType);
-      expect(flattenStyle(wrapper.props.style)).toMatchObject({ width: '100%', minWidth: 0 });
+      expect(flattenStyle(wrapper.props.style)).toMatchObject({ width: '100%', height: '100%', minWidth: 0 });
     }
 
     for (const label of ['Visitors', 'Conversion']) {
@@ -126,6 +129,7 @@ describe('seller dashboard KPI layout', () => {
       const wrapper = card.findAllByType('View' as React.ElementType).find(node => flattenStyle(node.props.style).width === '100%');
       expect(wrapper).toBeTruthy();
       expect(flattenStyle(wrapper!.props.style).minWidth).toBe(0);
+      expect(flattenStyle(wrapper!.props.style).height).toBe('100%');
     }
   });
 });

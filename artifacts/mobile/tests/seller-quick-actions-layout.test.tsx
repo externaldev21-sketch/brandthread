@@ -31,7 +31,11 @@ vi.mock('@/components/BrandthreadUI', () => ({
     React.createElement(
       'PressableScale',
       { style, testID: `quick-action-card-${label.toLowerCase().replace(/\s+/g, '-')}` },
-      React.createElement('Text', { numberOfLines: 1, adjustsFontSizeToFit: true, minimumFontScale: 0.8 }, label),
+      React.createElement(
+        'Text',
+        { numberOfLines: 2, maxFontSizeMultiplier: 2, style: { minHeight: 32, lineHeight: 16 } },
+        label,
+      ),
       badge ? React.createElement('View', { testID: `quick-action-badge-${label.toLowerCase().replace(/\s+/g, '-')}` }) : null,
     ),
 }));
@@ -92,19 +96,19 @@ describe('seller Quick Actions compact layout', () => {
     expect(renderedCardWidth).toBeGreaterThanOrEqual(138);
   });
 
-  it('keeps labels horizontal and each clickable card full width', async () => {
+  it('keeps labels readable at 2x accessibility font scaling and each card aligned', async () => {
     await act(async () => {
       renderer = create(<SellerQuickActionsGrid actions={actions} />);
     });
 
     for (const action of actions) {
       const card = renderer!.root.findByProps({ testID: `quick-action-card-${action.label.toLowerCase().replace(/\s+/g, '-')}` });
-      expect(flattenStyle(card.props.style)).toMatchObject({ width: '100%', minWidth: 0 });
+      expect(flattenStyle(card.props.style)).toMatchObject({ width: '100%', height: '100%', minWidth: 0 });
       expect(textNode(card).props).toMatchObject({
-        numberOfLines: 1,
-        adjustsFontSizeToFit: true,
-        minimumFontScale: 0.8,
+        numberOfLines: 2,
+        maxFontSizeMultiplier: 2,
       });
+      expect(flattenStyle(textNode(card).props.style)).toMatchObject({ minHeight: 32, lineHeight: 16 });
     }
   });
 

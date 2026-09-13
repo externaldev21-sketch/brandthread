@@ -37,8 +37,16 @@ export function SellerDashboardKPICard({
   ];
   const content = (
     <>
-      <Text style={styles.label} numberOfLines={1}>{label}</Text>
-      <Text style={styles.value} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>{value}</Text>
+      <Text style={styles.label} numberOfLines={2} maxFontSizeMultiplier={2}>{label}</Text>
+      <Text
+        style={styles.value}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.65}
+        maxFontSizeMultiplier={2}
+      >
+        {value}
+      </Text>
       {trend && (
         <View style={[styles.trend, { backgroundColor: trendColor + '12', borderColor: trendColor + '30' }]}>
           <Feather
@@ -46,7 +54,15 @@ export function SellerDashboardKPICard({
             size={10}
             color={trendColor}
           />
-          <Text style={[styles.trendText, { color: trendColor }]} numberOfLines={1}>{trend.label}</Text>
+          <Text
+            style={[styles.trendText, { color: trendColor }]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+            maxFontSizeMultiplier={2}
+          >
+            {trend.label}
+          </Text>
         </View>
       )}
     </>
@@ -77,6 +93,7 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '100%',
+    height: '100%',
     minWidth: 0,
     minHeight: 96,
     justifyContent: 'center',
@@ -94,6 +111,8 @@ const styles = StyleSheet.create({
     color: MUTED,
     fontFamily: FONT.medium,
     fontSize: FS.xs,
+    lineHeight: 16,
+    minHeight: 32,
   },
   value: {
     color: FG,
