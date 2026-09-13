@@ -1,5 +1,9 @@
-- [Brandthread theme](brandthread-theme.md) — dark-only base surfaces remain; runtime accent selection is user-scoped and replaces the former fixed-purple-only rule. Retired light/Vault palettes stay retired.
-- [Runtime app themes](runtime-app-themes.md) — user-selected Brandthread accent applies across buyer/seller chrome and the animated background; keep one provider and user-scoped key.
+- [Brandthread theme](brandthread-theme.md) — dark-only surfaces remain; runtime accents are user-scoped. Retired light/Vault palettes stay retired.
+- [Brandthread Woven system](brandthread-woven-system.md) — the thread/weaving language is definitive; future UI refines this system instead of adding another style.
+- [Runtime app themes](runtime-app-themes.md) — one user-scoped provider themes buyer/seller chrome; only the focused scene runs the background animator.
+- [Onboarding value-first contract](onboarding-value-first.md) — defaults stay editable; seller personalization and one optional, durable AI success precede plan commitment.
+- [Seller trial reminder delivery](seller-trial-reminder-delivery.md) — create on day four of an exact five-day trial; leases, retries, preferences, and per-token dedupe protect delivery.
+- [Transparent navigation isolation](transparent-navigation-isolation.md) — every root scene needs an opaque plane; only the focused scene animates, and inactive tab scenes detach.
 - [Clerk Expo v3 Signals API](clerk-expo-v3-signals-api.md) — @clerk/expo v3 hooks return SignInFutureResource; use password()+finalize() not create()+setActive(); Metro needs _tmp_ blockList fix.
 - [Brandthread backend architecture](brandthread-backend-architecture.md) — ownerId scoping, transactional orders, lib/db build requirement, clerkClient usage, healthz double-path gotcha.
 - [Inbox structural flattening](inbox-flattening-pattern.md) — Brandthread screens (profile, inbox) use flat Instagram-style rows, no card chrome; keep new screens consistent.
@@ -28,6 +32,7 @@
 - [Content Publishing Architecture](content-publishing-architecture.md) — seller post → AsyncStorage → Thread feed; SellerThreadPost expanded to 30+ fields; seed data; feed.tsx dynamic loading; create-post purple theme.
 - [Expo web boot & root route](expo-web-boot.md) — boot never blank; dev web preview defaults to seller and bypasses auth; ?bt_preview=buyer overrides for captures; static screenshots catch FOIT.
 - [Expo dependency repair](expo-dependency-repair.md) — never interrupt pnpm’s forced mobile relink; run long repairs in background and restart Metro only after package links return.
+- [Expo Go native module boundary](expo-go-native-module-boundary.md) — Expo Go startup must not statically import custom native modules absent from its client; keep those behind compatible fallbacks.
 - [Expo root navigation readiness](expo-root-navigation-readiness.md) — defer preview redirects until Expo Router registers the root Stack or web preview crashes before first paint.
 - [Expo native prebuild guards](expo-native-prebuild-guards.md) — package lifecycle scripts do not intercept direct `expo prebuild`; invariant checks belong in Expo config plugins.
 - [Push notifications & service config](push-notifications-service-config.md) — expo-notifications wired in _layout.tsx; configureServices(getToken) + PushRegistrar components; expo-camera must be ~17.0.10 for Expo 54.

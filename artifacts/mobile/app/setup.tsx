@@ -1,7 +1,7 @@
 /**
  * Brandthread Guided Setup Screen
  *
- * Walks the seller through 11 steps to launch their store.
+ * Walks the seller through 9 tasks to launch their store.
  * Progress persists via setupStore (AsyncStorage).
  */
 
@@ -15,6 +15,7 @@ import { Feather } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { useAuth } from '@clerk/expo';
 
 import {
   BG, CARD, BORDER,
@@ -27,8 +28,10 @@ import { withSellerSetupOrigin } from '@/lib/setupNavigation';
 import {
   getSetupState, completeTask, skipTask,
   SetupState, SetupTask, SetupTaskId,
-  completionPercent, nextTask,
+  completionPercent, nextTask, completedRequiredTaskCount,
+  requiredTaskCount, isSetupComplete,
 } from '@/lib/setupStore';
+import { useApi } from '@/hooks/useApi';
 import {
   BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton,
   StatusBadge, SectionHeader,
@@ -130,12 +133,26 @@ export default function SetupScreen() {
   const s = createStyles(colors);
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { userId } = useAuth();
+  const api = useApi();
   const [state, setState] = useState<SetupState | null>(null);
   const progressAnim = useRef(new Animated.Value(0)).current;
 
   useFocusEffect(useCallback(() => {
     let active = true;
-    getSetupState().then(next => {
+    const load = async () => {
+      // This remains a focus refresh (the legacy contract was
+      // getSetupState().then(next => {); the authenticated key is selected
+      // before the read now.
+      let onboardingComplete = false;
+      try {
+        const profile = await api.auth.me();
+        onboardingComplete = profile.accountType === 'seller' && profile.onboardingComplete === true;
+      } catch {
+        // Preserve local progress when the profile endpoint is temporarily
+        // unavailable; only the server response can complete verification.
+      }
+      const next = await getSetupState(userId, { onboardingComplete });
       if (!active) return;
       setState(next);
       Animated.timing(progressAnim, {
@@ -143,12 +160,13 @@ export default function SetupScreen() {
         duration: ANIM.slow,
         useNativeDriver: false,
       }).start();
-    });
+    };
+    void load();
     return () => { active = false; };
-  }, [progressAnim]));
+  }, [api, progressAnim, userId]));
 
   async function handleComplete(id: SetupTaskId) {
-    const next = await completeTask(id);
+    const next = await completeTask(id, userId);
     setState(next);
     Animated.timing(progressAnim, {
       toValue: completionPercent(next) / 100,
@@ -158,7 +176,7 @@ export default function SetupScreen() {
   }
 
   async function handleSkip(id: SetupTaskId) {
-    const next = await skipTask(id);
+    const next = await skipTask(id, userId);
     setState(next);
   }
 
@@ -173,9 +191,9 @@ export default function SetupScreen() {
 
   const pct = state ? completionPercent(state) : 0;
   const next = state ? nextTask(state) : null;
-  const done = state ? state.tasks.filter(t => t.completed).length : 0;
-  const total = state ? state.tasks.length : 0;
-  const allDone = pct === 100;
+  const done = state ? completedRequiredTaskCount(state) : 0;
+  const total = state ? requiredTaskCount(state) : 0;
+  const allDone = state ? isSetupComplete(state) : false;
 
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent' }}>
@@ -190,7 +208,7 @@ export default function SetupScreen() {
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={s.title}>Store setup</Text>
-          <Text style={s.subtitle}>{done} of {total} completed</Text>
+          <Text style={s.subtitle}>{done} of {total} required completed</Text>
         </View>
         <View style={s.pctBadge}>
           <Text style={s.pctText}>{pct}%</Text>
@@ -223,7 +241,7 @@ export default function SetupScreen() {
           )}
           {allDone && (
             <Text style={[s.progressNext, { color: SUCCESS }]}>
-              ✓ All steps complete — you're ready to go!
+              ✓ All required steps complete — you're ready to go!
             </Text>
           )}
         </GradientCard>
@@ -240,7 +258,7 @@ export default function SetupScreen() {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[s.title, { fontSize: FS.md }]}>Your store is ready!</Text>
-                <Text style={s.subtitle}>All setup steps complete. Time to publish.</Text>
+                <Text style={s.subtitle}>All required setup steps complete. Time to publish.</Text>
               </View>
             </View>
             <PrimaryButton

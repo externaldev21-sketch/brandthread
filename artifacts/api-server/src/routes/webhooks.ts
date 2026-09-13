@@ -921,12 +921,20 @@ async function handleSubscriptionUpdated(sub: any) {
   const periodEnd: Date | null = sub.current_period_end
     ? new Date(sub.current_period_end * 1000)
     : null;
+  const trialStartedAt: Date | null = typeof sub.trial_start === "number"
+    ? new Date(sub.trial_start * 1000)
+    : null;
+  const trialEndsAt: Date | null = typeof sub.trial_end === "number"
+    ? new Date(sub.trial_end * 1000)
+    : null;
 
   await db.update(users).set({
     subscriptionId:     sub.id,
     subscriptionStatus: sub.status,
     ...(planId    ? { subscriptionPlanId:     planId    } : {}),
     ...(periodEnd ? { subscriptionPeriodEnd:  periodEnd } : {}),
+    ...(trialStartedAt ? { subscriptionTrialStartedAt: trialStartedAt } : {}),
+    ...(trialEndsAt ? { subscriptionTrialEndsAt: trialEndsAt } : {}),
     updatedAt: new Date(),
   }).where(eq(users.stripeCustomerId, customerId));
 
@@ -968,6 +976,21 @@ export async function handleSubscriptionTrialWillEnd(sub: any, eventId: string):
       { subscriptionId: sub.id, customerId },
       "Trial-ending event missing trial end date",
     );
+    return;
+  }
+
+  // Stripe's trial_will_end event is normally emitted three days before the
+  // end of a five-day trial. Day-four reminders are sent by the scheduled
+  // worker from the persisted trial window; do not send this early event in
+  // production or it would violate the one-reminder contract. The fallback
+  // keeps compatibility with legacy webhook payloads that lack trial_start.
+  if (typeof sub.trial_start === "number") {
+    await db.update(users).set({
+      subscriptionTrialStartedAt: new Date(sub.trial_start * 1000),
+      subscriptionTrialEndsAt: new Date(trialEndUnix * 1000),
+      updatedAt: new Date(),
+    }).where(eq(users.stripeCustomerId, customerId));
+    logger.info({ subscriptionId: sub.id, customerId }, "Persisted trial window for scheduled day-four reminder");
     return;
   }
 

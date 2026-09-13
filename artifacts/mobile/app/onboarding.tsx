@@ -10,6 +10,7 @@ import {
   Alert,
   Animated,
   Dimensions,
+  Image,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -36,7 +37,12 @@ import { AccountTypeStep, type AccountType } from './account-type';
 // Required on Android so the in-app browser tab closes after OAuth redirect
 WebBrowser.maybeCompleteAuthSession();
 import BrandthreadLogo from '@/components/branding/BrandthreadLogo';
-import { getOnAccentTextStyle, useAppTheme } from '@/contexts/AppThemeContext';
+import {
+  APP_THEME_PRESETS,
+  getOnAccentTextStyle,
+  useAppTheme,
+  type AppThemeId,
+} from '@/contexts/AppThemeContext';
 import { useApi } from '@/lib/api';
 import { hydrateMyProfileFromAccount, socialKeysForUser } from '@/services/socialService';
 import { DEFAULT_BUYER_PROFILE, saveBuyerProfileForUser } from '@/lib/buyerProfile';
@@ -85,6 +91,9 @@ const SELLER_GOALS = [
   'Grow sales', 'Build content', 'Manage inventory', 'Ship orders',
   'Understand analytics', 'Manage customers',
 ];
+const DEFAULT_BUYER_INTERESTS = ['Basics', 'Minimal', 'Sustainable fashion'];
+const DEFAULT_SELLER_GOALS = ['Create designs', 'Launch my store', 'Build content'];
+const LOGO_SAMPLE_STYLES = ['Minimalist', 'Bold', 'Vintage', 'Luxury', 'Streetwear', 'Playful'];
 
 const BUYER_LOADING_STEPS  = ['Learning your style', 'Curating your Thread', 'Finding brands you\'ll love', 'Finishing your profile'];
 const SELLER_LOADING_STEPS = ['Mapping your brand workspace', 'Preparing your product pipeline', 'Connecting your growth tools', 'Finishing your dashboard'];
@@ -121,6 +130,10 @@ function draftKeyForUser(userId?: string | null): string | null {
 }
 
 type Flow = 'buyer' | 'seller';
+
+function isAppThemeId(value: unknown): value is AppThemeId {
+  return typeof value === 'string' && APP_THEME_PRESETS.some((preset) => preset.id === value);
+}
 
 // Drafts from before Auth became the literal first onboarding step need a
 // one-time translation so closing the app still resumes at the equivalent
@@ -268,6 +281,8 @@ function Chip({ label, selected, onPress }: { label: string; selected: boolean; 
   return (
     <TouchableOpacity
       style={[sc.chip, selected && { backgroundColor: theme.accentDim, borderColor: theme.accent, borderWidth: 1.5 }]}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
       activeOpacity={0.75}
     >
@@ -285,6 +300,8 @@ function RadioRow({ label, sub, selected, onPress }: { label: string; sub: strin
   return (
     <TouchableOpacity
       style={[sr.row, selected && { borderColor: theme.accent, borderWidth: 1.5, backgroundColor: theme.secondaryDim }]}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
       onPress={() => { Haptics.selectionAsync(); onPress(); }}
       activeOpacity={0.8}
     >
@@ -812,7 +829,7 @@ function AuthStep({
           {/* Sign in */}
           <TouchableOpacity
             style={sa.existingSignInBtn}
-            onPress={() => router.push('/sign-in' as never)}
+            onPress={() => router.replace('/sign-in' as never)}
             activeOpacity={0.88}
           >
             <LinearGradient
@@ -1079,9 +1096,166 @@ const sa = StyleSheet.create({
   continueBtnText:{ fontSize: 14, fontFamily: 'Inter_500Medium', color: MUTED },
 });
 
+// Theme selection is local until the seller's server onboarding transaction
+// succeeds. The sample is authenticated and consumed by a server-side
+// identity bucket, so clearing app storage cannot grant another generation.
+function SellerPreviewStep({
+  brandName,
+  selectedThemeId,
+  onSelectTheme,
+  onContinue,
+  generateSample,
+}: {
+  brandName: string;
+  selectedThemeId: AppThemeId;
+  onSelectTheme: (id: AppThemeId) => void;
+  onContinue: () => void;
+  generateSample: (style: string) => Promise<{ b64_json: string }>;
+}) {
+  const { theme } = useAppTheme();
+  const [sampleStyle, setSampleStyle] = useState('Minimalist');
+  const [sampleUri, setSampleUri] = useState<string | null>(null);
+  const [sampleError, setSampleError] = useState('');
+  const [generating, setGenerating] = useState(false);
+
+  const handleGenerate = async () => {
+    if (generating || sampleUri) return;
+    setGenerating(true);
+    setSampleError('');
+    try {
+      const result = await generateSample(sampleStyle);
+      if (!result?.b64_json) throw new Error('The AI service returned no image.');
+      setSampleUri(`data:image/png;base64,${result.b64_json}`);
+    } catch (error: any) {
+      setSampleError(error?.message || 'The sample could not be generated. Try again.');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  return (
+    <ScrollView contentContainerStyle={spreview.scroll} showsVerticalScrollIndicator={false}>
+      <Text style={spreview.headline}>Make it feel like yours.</Text>
+      <Text style={spreview.sub}>
+        Pick a storefront accent, then try one free AI logo sample before choosing a plan.
+        Your choices stay editable later.
+      </Text>
+
+      <Text style={spreview.sectionLabel}>Storefront accent</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={spreview.themeRow}>
+        {APP_THEME_PRESETS.map((preset) => {
+          const selected = preset.id === selectedThemeId;
+          return (
+            <TouchableOpacity
+              key={preset.id}
+              testID={`onboarding-theme-${preset.id}`}
+              style={[spreview.themeCard, selected && { borderColor: preset.accent, borderWidth: 2 }]}
+              accessibilityRole="radio"
+              accessibilityState={{ selected }}
+              accessibilityLabel={`${preset.name} storefront theme`}
+              onPress={() => { Haptics.selectionAsync(); onSelectTheme(preset.id); }}
+              activeOpacity={0.8}
+            >
+              <LinearGradient colors={preset.heroGradient} style={spreview.themeSwatch}>
+                <View style={[spreview.themeDot, { backgroundColor: preset.accent }]} />
+                <View style={[spreview.themeLine, { backgroundColor: preset.secondary }]} />
+              </LinearGradient>
+              <Text style={spreview.themeName}>{preset.name}</Text>
+              {selected ? <Feather name="check-circle" size={14} color={preset.accentLight} /> : null}
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+      <Text style={spreview.hint}>Saved when your seller workspace is created.</Text>
+
+      <View style={spreview.sampleHeader}>
+        <View style={{ flex: 1 }}>
+          <Text style={spreview.sectionLabel}>One free AI sample</Text>
+          <Text style={spreview.sampleSub}>See your brand name as a logo. This calls the real generator.</Text>
+        </View>
+        <Feather name="zap" size={18} color={theme.accentLight} />
+      </View>
+      <View style={spreview.styleRow}>
+        {LOGO_SAMPLE_STYLES.map((style) => (
+          <Chip key={style} label={style} selected={sampleStyle === style} onPress={() => setSampleStyle(style)} />
+        ))}
+      </View>
+
+      {sampleUri ? (
+        <View style={[spreview.resultCard, { borderColor: theme.accent }]}>
+          <Image source={{ uri: sampleUri }} style={spreview.resultImage} resizeMode="contain" accessibilityLabel={`${brandName} AI logo sample`} />
+          <View style={spreview.resultCaption}>
+            <Feather name="check" size={15} color={GREEN} />
+            <Text style={spreview.resultText}>Your real AI sample is ready.</Text>
+          </View>
+        </View>
+      ) : (
+        <TouchableOpacity
+          testID="onboarding-generate-sample"
+          activeOpacity={0.88}
+          onPress={() => { void handleGenerate(); }}
+          disabled={generating}
+        >
+          <LinearGradient colors={theme.primaryGradient} style={spreview.generateButton}>
+            {generating
+              ? <ActivityIndicator color={theme.onAccent} />
+              : <><Feather name="image" size={18} color={theme.onAccent} /><Text style={[spreview.generateText, getOnAccentTextStyle(theme)]}>Generate free sample</Text></>}
+          </LinearGradient>
+        </TouchableOpacity>
+      )}
+      {sampleError ? (
+        <View style={spreview.errorBox}>
+          <Text style={spreview.errorText}>{sampleError}</Text>
+          <TouchableOpacity onPress={() => { void handleGenerate(); }} disabled={generating || !!sampleUri}>
+            <Text style={[spreview.retryText, { color: theme.accentLight }]}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+      <TouchableOpacity
+        testID="onboarding-preview-continue"
+        accessibilityRole="button"
+        accessibilityLabel={sampleUri ? 'Continue to plans' : 'Skip sample and continue to plans'}
+        style={spreview.continueButton}
+        onPress={onContinue}
+      >
+        <Text style={spreview.continueText}>{sampleUri ? 'Continue to plans' : 'Skip sample · Continue to plans'}</Text>
+      </TouchableOpacity>
+    </ScrollView>
+  );
+}
+const spreview = StyleSheet.create({
+  scroll: { flexGrow: 1, paddingBottom: 28 },
+  headline: { fontSize: 28, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.5, marginBottom: 8 },
+  sub: { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 21, marginBottom: 22 },
+  sectionLabel: { fontSize: 13, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 8 },
+  themeRow: { gap: 10, paddingRight: 8 },
+  themeCard: { width: 106, minHeight: 104, padding: 7, borderRadius: 14, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+  themeSwatch: { height: 58, borderRadius: 9, padding: 10, justifyContent: 'space-between' },
+  themeDot: { width: 18, height: 18, borderRadius: 9 },
+  themeLine: { width: 42, height: 4, borderRadius: 2 },
+  themeName: { flex: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: FG, marginTop: 7 },
+  hint: { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED2, marginTop: 7, marginBottom: 24 },
+  sampleHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 },
+  sampleSub: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 18, paddingRight: 18 },
+  styleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 14 },
+  resultCard: { borderRadius: 16, borderWidth: 1, backgroundColor: '#F7F7F7', overflow: 'hidden', marginBottom: 14 },
+  resultImage: { width: '100%', height: 190 },
+  resultCaption: { flexDirection: 'row', gap: 7, alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, backgroundColor: 'rgba(0,0,0,0.86)' },
+  resultText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: FG },
+  generateButton: { borderRadius: 14, paddingVertical: 15, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
+  generateText: { fontSize: 15, fontFamily: 'Inter_700Bold' },
+  errorBox: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 9, padding: 11, borderRadius: 10, backgroundColor: 'rgba(248,113,113,0.10)' },
+  errorText: { flex: 1, fontSize: 12, lineHeight: 17, color: ERR },
+  retryText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
+  continueButton: { marginTop: 16, borderRadius: 14, paddingVertical: 15, alignItems: 'center', backgroundColor: GREEN },
+  continueDisabled: { backgroundColor: 'rgba(255,255,255,0.07)' },
+  continueText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#06110B' },
+  continueTextDisabled: { color: MUTED2 },
+});
+
 // ─── Main onboarding component ────────────────────────────────────────────────
 export default function OnboardingScreen() {
-  const { theme } = useAppTheme();
+  const { theme, selectTheme } = useAppTheme();
   const { isSignedIn, signOut, isLoaded: authLoaded } = useAuth();
   const { user, isLoaded: userLoaded }                = useUser();
   const { signUp }              = useSignUp();
@@ -1107,13 +1281,15 @@ export default function OnboardingScreen() {
       ? referralCodeParam.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12)
       : '',
   );
-  const [styleInterests, setStyleArr]     = useState<string[]>([]);
+  const [styleInterests, setStyleArr]     = useState<string[]>(DEFAULT_BUYER_INTERESTS);
 
   // Seller data
   const [brandName, setBrandName]         = useState('');
-  const [brandStage, setBrandStage]       = useState('');
-  const [goals, setGoals]                 = useState<string[]>([]);
+  const [brandStage, setBrandStage]       = useState('idea');
+  const [goals, setGoals]                 = useState<string[]>(DEFAULT_SELLER_GOALS);
   const [selectedPlanId, setSelectedPlanId] = useState<SellerPlanId>('starter');
+  const [selectedThemeId, setSelectedThemeId] = useState<AppThemeId>('purple');
+  const [planPrepDone, setPlanPrepDone] = useState(false);
 
   const [finishing, setFinishing]         = useState(false);
 
@@ -1161,11 +1337,12 @@ export default function OnboardingScreen() {
               setStep(restoreDraftStep(draft.flow, draft.step ?? 0, draft.version));
               setFirstName(draft.firstName ?? '');
               setUsername(draft.username ?? '');
-              setStyleArr(draft.styleInterests ?? []);
+              setStyleArr(draft.styleInterests ?? DEFAULT_BUYER_INTERESTS);
               setBrandName(draft.brandName ?? '');
-              setBrandStage(draft.brandStage ?? '');
-              setGoals(draft.goals ?? []);
+              setBrandStage(draft.brandStage ?? 'idea');
+              setGoals(draft.goals ?? DEFAULT_SELLER_GOALS);
               setSelectedPlanId(draft.selectedPlanId ?? recommendSellerPlan(draft.brandStage ?? '', draft.goals ?? []).planId);
+              setSelectedThemeId(isAppThemeId(draft.selectedThemeId) ? draft.selectedThemeId : 'purple');
             }
           } catch { /* bad json, ignore */ }
         }
@@ -1186,11 +1363,11 @@ export default function OnboardingScreen() {
     const data = {
       version: DRAFT_VERSION,
       ownerId: userId,
-      flow, step, firstName, username, styleInterests, brandName, brandStage, goals, selectedPlanId,
+      flow, step, firstName, username, styleInterests, brandName, brandStage, goals, selectedPlanId, selectedThemeId,
       ...overrides,
     };
     await AsyncStorage.setItem(draftKey, JSON.stringify(data));
-  }, [flow, step, firstName, username, styleInterests, brandName, brandStage, goals, selectedPlanId, user?.id]);
+  }, [flow, step, firstName, username, styleInterests, brandName, brandStage, goals, selectedPlanId, selectedThemeId, user?.id]);
 
   // Persist onboarding answers under the authenticated user's immutable ID.
   useEffect(() => {
@@ -1354,6 +1531,9 @@ export default function OnboardingScreen() {
       // Seller brand/profile writes are now complete; make completion the final
       // durable server transition before writing device-local routing state.
       await api.auth.completeOnboarding('seller');
+      // AppThemeContext scopes this write to the authenticated Clerk user.
+      // It happens only after the server confirms seller onboarding.
+      await selectTheme(selectedThemeId);
       await AsyncStorage.multiSet([
         [ONBOARDING_KEY, 'true'],
         [ONBOARDING_OWNER_KEY, profile.clerkId],
@@ -1627,13 +1807,33 @@ export default function OnboardingScreen() {
 
       // Step 6: Personalized plan recommendation
       if (step === SELLER_STEP_INDEX.PLAN) return (
-        <SellerPlanRecommendationStep
-          brandStage={brandStage}
-          goals={goals}
-          selectedPlanId={selectedPlanId}
-          onSelect={setSelectedPlanId}
-          onContinue={() => goNext()}
-        />
+        planPrepDone ? (
+          <SellerPlanRecommendationStep
+            brandStage={brandStage}
+            goals={goals}
+            selectedPlanId={selectedPlanId}
+            onSelect={setSelectedPlanId}
+            onContinue={() => goNext()}
+          />
+        ) : (
+          <SellerPreviewStep
+            brandName={brandName.trim()}
+            selectedThemeId={selectedThemeId}
+            onSelectTheme={setSelectedThemeId}
+            generateSample={async (style) => {
+              // Establish the seller role on the authenticated server profile
+              // before the sample endpoint evaluates seller eligibility. This
+              // is still incomplete onboarding until finishSeller commits it.
+              const account = await api.auth.sync({ name: firstName.trim() });
+              if (account.accountType === 'buyer') {
+                throw new Error('This account is already set up as a buyer.');
+              }
+              await api.auth.updateProfile({ accountType: 'seller' });
+              return api.logo.onboardingSample(brandName.trim(), style);
+            }}
+            onContinue={() => setPlanPrepDone(true)}
+          />
+        )
       );
 
       // Step 7: Loading

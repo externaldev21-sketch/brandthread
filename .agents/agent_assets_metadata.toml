@@ -6,6 +6,7 @@ id = "ljv8t49Mla-JOqN1a9R57"
 uri = "file://artifacts/video/public/audio/bg_music.mp3"
 type = "audio"
 title = "background music"
+logical_id = "2dc171d9-7e3a-4138-bc16-9cf1d5372753"
 
 [[outputs]]
 id = "RLAZuz2muvaXYGODonOoR"
@@ -13,6 +14,7 @@ uri = "file://screenshots/buyer-thread.jpg"
 type = "image"
 title = "Thread — new look"
 description = "Buyer home feed: dark with purple accents, unified tab bar."
+logical_id = "20eee2a5-9f0c-46c0-9c4a-2b4da4297005"
 
 [[outputs]]
 id = "hEH0fu0oc6EoHZ-RlP4Cu"
@@ -20,6 +22,7 @@ uri = "file://screenshots/buyer-discover.jpg"
 type = "image"
 title = "Discover — new look"
 description = "Was cream and green — now matches the rest of the app."
+logical_id = "03b61906-1416-4254-a9f5-a50500f58647"
 
 [[outputs]]
 id = "1q8YgXSMMR-stF8c_7CGh"
@@ -27,6 +30,7 @@ uri = "file://screenshots/buyer-profile.jpg"
 type = "image"
 title = "Profile — new look"
 description = "Dark purple identity, consistent bottom bar."
+logical_id = "189e6412-700b-4142-8fb9-d72cefdb8a68"
 
 [[outputs]]
 id = "3sw-GrFlPNmdnytjn5tPE"
@@ -34,6 +38,7 @@ uri = "file://brandthread-mobile.zip"
 type = "unspecified"
 title = "Brandthread Mobile — source code"
 description = "All app files, excluding node_modules and build artifacts. 3.8 MB."
+logical_id = "19bf1fb6-8b63-47b6-b2d4-e6b64a687103"
 
 [[outputs]]
 id = "pgbyJEr9-JB7lHFyQEa9x"
@@ -41,3 +46,4 @@ uri = "file://exports/brandthread-full-source.tar.gz"
 type = "unspecified"
 title = "Brandthread full source archive"
 description = "Complete Brandthread source workspace for sharing with Claude. Includes app artifacts, API server, shared libraries, scripts, assets, package manifests, and project configuration. Excludes dependencies, build output, Git history, logs, screenshots, agent metadata, and secret/env files."
+logical_id = "ff040822-ae9a-4cee-93f8-9479b3c27f83"

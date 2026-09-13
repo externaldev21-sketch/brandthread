@@ -101,6 +101,9 @@ router.use("/seller/export",   sellerExportRouter);
 router.use("/call",            callRouter);
 router.use("/healthz",         healthRouter);
 router.use("/auth",            authRouter);
+// This route is intentionally before paid AI mounts: it is the single,
+// server-enforced sample offered during seller onboarding.
+router.use("/onboarding-sample", logoRouter);
 router.use("/products",        tc, productsRouter);
 router.use("/orders",          tc, ordersRouter);
 router.use("/customers",       tc, customersRouter);

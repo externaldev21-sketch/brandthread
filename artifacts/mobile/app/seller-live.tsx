@@ -223,7 +223,7 @@ function SellerLiveNativeScreen() {
             await (api as any).live.end(params.streamId);
           } catch {}
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          router.replace('/(seller)/(tabs)/home' as any);
+          router.dismissTo('/(tabs)/' as any);
         },
       },
     ]);

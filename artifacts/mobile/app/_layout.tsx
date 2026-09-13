@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import {
@@ -13,7 +12,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { Keyboard, Platform, Pressable, Text, View } from 'react-native';
 import { Stack, useRootNavigationState, useRouter, useSegments } from 'expo-router';
-import { DarkTheme, ThemeProvider as NavigationThemeProvider } from '@react-navigation/native';
+import { DarkTheme, ThemeProvider as NavigationThemeProvider, useIsFocused } from '@react-navigation/native';
 import * as SplashScreen from 'expo-splash-screen';
 import { ClerkProvider, ClerkLoaded, ClerkLoading, useAuth, useUser } from '@clerk/expo';
 import { tokenCache } from '@/lib/tokenCache';
@@ -55,6 +54,17 @@ const TRANSPARENT_NAVIGATION_THEME = {
     background: 'transparent',
   },
 };
+
+function IsolatedStackScene({ children }: { children: React.ReactNode }) {
+  const isFocused = useIsFocused();
+
+  return (
+    <View style={{ flex: 1, backgroundColor: '#07070F' }}>
+      {isFocused ? <AnimatedGradientBackground /> : null}
+      {children}
+    </View>
+  );
+}
 
 // Push notifications are native-only. Importing the package is safe for the
 // web bundle, but registering a handler/listener there produces unsupported
@@ -559,12 +569,14 @@ function RootLayoutNav() {
 
   return (
     <View style={{ flex: 1 }}>
-      <AnimatedGradientBackground />
       <StoreContextBanner />
       <NetworkNoticeBanner />
       <Pressable onPress={Keyboard.dismiss} accessible={false} style={{ flex: 1 }}>
         <View style={{ flex: 1 }}>
       <Stack
+        screenLayout={({ children }) => (
+          <IsolatedStackScene>{children}</IsolatedStackScene>
+        )}
         screenOptions={{
           headerShown: false,
           animation: 'slide_from_right',
@@ -833,13 +845,11 @@ export default function RootLayout() {
                 <RevenueCatProvider>
                   <FeatureFlagProvider>
                     <UndoToastProvider>
-                      <KeyboardProvider>
-                        <NavigationThemeProvider value={TRANSPARENT_NAVIGATION_THEME}>
-                          <ThreadPullProvider>
-                            <RootLayoutNav />
-                          </ThreadPullProvider>
-                        </NavigationThemeProvider>
-                      </KeyboardProvider>
+                      <NavigationThemeProvider value={TRANSPARENT_NAVIGATION_THEME}>
+                        <ThreadPullProvider>
+                          <RootLayoutNav />
+                        </ThreadPullProvider>
+                      </NavigationThemeProvider>
                     </UndoToastProvider>
                   </FeatureFlagProvider>
                 </RevenueCatProvider>

@@ -1,0 +1,19 @@
+kind = "design-system"
+previewPath = "/brandthread-woven/"
+title = "Brandthread Woven"
+description = "The definitive Brandthread design system: neutral charcoal surfaces, user-scoped signature accents, editorial condensed typography, and a literal thread-and-weaving component language for buyer and seller experiences."
+version = "1.0.0"
+id = "artifacts/brandthread-woven"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/brandthread-woven/" ]
+localPort = 22628
+
+[services.development]
+run = "pnpm --filter @workspace/brandthread-woven run dev"
+
+[services.env]
+PORT = "22628"
+BASE_PATH = "/brandthread-woven/"

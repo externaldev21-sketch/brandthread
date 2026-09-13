@@ -4,7 +4,7 @@
  * In production, upgrade to direct APNs/FCM for higher throughput.
  */
 import { db, notificationDeliveries, notificationEvents, pushTokens, users } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { logger } from "./logger";
 import crypto from "node:crypto";
 
@@ -35,7 +35,8 @@ export type PushEventCategory =
   | "social"
   | "production"
   | "payout"
-  | "dispute";
+  | "dispute"
+  | "subscription";
 
 const PUSH_CATEGORY_BY_FEED_CATEGORY: Readonly<Record<string, PushEventCategory>> = {
   drop: "drop",
@@ -97,6 +98,7 @@ export function preferenceKey(accountType: string | null, category: PushEventCat
       payout: "payout_confirmations",
       message: "customer_messages",
       dispute: "disputes",
+      subscription: "subscription_trial",
     };
     return sellerPreferences[category] ?? null;
   }
@@ -124,12 +126,22 @@ export function buildExpoPushMessages(
   }));
 }
 
+/** Keep stable-ID retries limited to token deliveries that are not sent. */
+export function unsentPushTokens(
+  tokens: { token: string }[],
+  sentTokens: Iterable<string>,
+): { token: string }[] {
+  const sent = new Set(sentTokens);
+  return tokens.filter((token) => !sent.has(token.token));
+}
+
 export async function sendPushToUser(
   userId: string,
   payload: PushPayload,
   category?: PushEventCategory,
   analyticsOwnerId = userId,
-): Promise<void> {
+): Promise<boolean> {
+  let delivered = true;
   try {
     if (category) {
       const [recipient] = await db
@@ -141,14 +153,14 @@ export async function sendPushToUser(
         .where(eq(users.clerkId, userId))
         .limit(1);
       const key = preferenceKey(recipient?.accountType ?? null, category);
-      if (key && recipient?.preferences?.[key] === false) return;
+      if (key && recipient?.preferences?.[key] === false) return false;
     }
     const tokens = await db
       .select({ token: pushTokens.token })
       .from(pushTokens)
       .where(eq(pushTokens.userId, userId));
 
-    if (!tokens.length) return;
+    if (!tokens.length) return false;
 
     const notificationId =
       typeof payload.data?.notificationId === "string" && payload.data.notificationId
@@ -158,14 +170,26 @@ export async function sendPushToUser(
       ...payload,
       data: { ...(payload.data ?? {}), notificationId },
     };
-    const messages = buildExpoPushMessages(tokens, enrichedPayload);
+    // Stable notification IDs are also the delivery idempotency key. Never
+    // include a token whose delivery is already sent: a second token failing
+    // must not cause a successful device to receive the same push again.
+    const sentRows = await db
+      .select({ pushToken: notificationDeliveries.pushToken })
+      .from(notificationDeliveries)
+      .where(and(
+        eq(notificationDeliveries.notificationId, notificationId),
+        eq(notificationDeliveries.status, "sent"),
+      ));
+    const pendingTokens = unsentPushTokens(tokens, sentRows.map((row) => row.pushToken));
+    if (!pendingTokens.length) return true;
+    const messages = buildExpoPushMessages(pendingTokens, enrichedPayload);
 
     // Expo Push Service accepts up to 100 messages per request
     const chunks: Array<{ messages: typeof messages; tokenRows: typeof tokens }> = [];
     for (let i = 0; i < messages.length; i += 100) {
       chunks.push({
         messages: messages.slice(i, i + 100),
-        tokenRows: tokens.slice(i, i + 100),
+        tokenRows: pendingTokens.slice(i, i + 100),
       });
     }
 
@@ -180,8 +204,17 @@ export async function sendPushToUser(
           })),
         ).onConflictDoUpdate({
           target: [notificationDeliveries.notificationId, notificationDeliveries.pushToken],
+          // Never reset a successful device when another device needs retry.
           set: { status: "queued", providerMessageId: null, providerStatus: null, providerError: null, sentAt: null, providerResultAt: null },
-        }).returning({ id: notificationDeliveries.id });
+          where: sql`${notificationDeliveries.status} <> 'sent'`,
+        }).returning({ id: notificationDeliveries.id, pushToken: notificationDeliveries.pushToken });
+
+        // Close the race between the sent-token read and this upsert.
+        const rowsByToken = new Map(deliveryRows.map((row) => [row.pushToken, row]));
+        const sendableTokenRows = tokenRows.filter((token) => rowsByToken.has(token.token));
+        const sendableRows = sendableTokenRows.map((token) => rowsByToken.get(token.token)!);
+        const sendableMessages = buildExpoPushMessages(sendableTokenRows, enrichedPayload);
+        if (!sendableRows.length) return;
 
         let response: Response;
         try {
@@ -191,10 +224,10 @@ export async function sendPushToUser(
               "Content-Type": "application/json",
               "Accept-Encoding": "gzip, deflate",
             },
-            body: JSON.stringify(chunk),
+            body: JSON.stringify(sendableMessages),
           });
         } catch (err) {
-          await Promise.all(deliveryRows.map((row) =>
+          await Promise.all(sendableRows.map((row) =>
             db.update(notificationDeliveries).set({
               status: "provider_error",
               providerError: err instanceof Error ? err.message : "Push provider request failed",
@@ -202,6 +235,7 @@ export async function sendPushToUser(
             }).where(eq(notificationDeliveries.id, row.id)),
           ));
           logger.warn({ err, category }, "Push notification send failed");
+          delivered = false;
           return;
         }
 
@@ -213,9 +247,10 @@ export async function sendPushToUser(
           // A non-JSON provider response is recorded as a provider error below.
         }
 
-        await Promise.all(deliveryRows.map((row, index) => {
+        await Promise.all(sendableRows.map((row, index) => {
           const result = providerResults[index];
           const ok = response.ok && result?.status === "ok";
+          if (!ok) delivered = false;
           const providerError = result?.message ?? result?.details?.error
             ?? (!response.ok ? `Push provider returned HTTP ${response.status}` : "Push provider rejected notification");
           return db.update(notificationDeliveries).set({
@@ -229,8 +264,12 @@ export async function sendPushToUser(
         }));
       }),
     );
+    // A provider rejection is a failed immediate delivery and must remain
+    // retryable for durable reminder workers.
+    return delivered;
   } catch (err) {
     logger.warn({ err, category }, "Push notification delivery failed");
+    return false;
   }
 }
 

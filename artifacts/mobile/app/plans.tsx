@@ -506,7 +506,17 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
     padding: SP.lg,
     gap: SP.md,
   },
-  cardHighlight: { backgroundColor: CARD_ELEVATED, borderColor: BORDER_ACTIVE },
+  cardHighlight: {
+    backgroundColor: CARD_ELEVATED,
+    borderColor: PURPLE,
+    borderWidth: 2,
+    shadowColor: PURPLE,
+    shadowOpacity: 0.32,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 7,
+    transform: [{ scale: 1.015 }],
+  },
   cardCurrent:   { borderColor: SUCCESS },
 
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },

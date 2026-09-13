@@ -359,13 +359,13 @@ export default function SubscriptionScreen() {
              {SELLER_PLANS.map((plan) => {
               const isCurrent = plan.id === selectedPlan;
               return (
-                <View key={plan.id} style={[styles.planCard, isCurrent && styles.planCardHighlight, plan.highlight && !isCurrent && styles.planCardFeatured]}>
+                <View key={plan.id} style={[styles.planCard, plan.highlight && styles.planCardFeatured, isCurrent && styles.planCardHighlight]}>
                   {isCurrent && (
                     <View style={styles.popularBadge}>
                       <Text style={styles.popularText}>CURRENT PLAN</Text>
                     </View>
                   )}
-                  {plan.highlight && !isCurrent && (
+                  {plan.highlight && (
                     <View style={[styles.popularBadge, { backgroundColor: PURPLE_DIM }]}>
                       <Text style={[styles.popularText, { color: PURPLE_LIGHT }]}>MOST POPULAR</Text>
                     </View>
@@ -614,7 +614,17 @@ const createStyles = (theme: { accent: string; accentLight: string; accentDim: s
   sectionTitle:       { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: SP.sm, textTransform: 'uppercase', letterSpacing: 0.5 },
   planCard:           { backgroundColor: CARD, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: BORDER, marginBottom: SP.md },
   planCardHighlight:  { borderColor: SUCCESS, backgroundColor: CARD_ELEVATED },
-  planCardFeatured:   { borderColor: PURPLE, backgroundColor: CARD_ELEVATED },
+  planCardFeatured:   {
+    borderColor: PURPLE,
+    backgroundColor: CARD_ELEVATED,
+    borderWidth: 2,
+    shadowColor: PURPLE,
+    shadowOpacity: 0.32,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 7,
+    transform: [{ scale: 1.015 }],
+  },
    growthComparison:   { backgroundColor: CARD, borderRadius: RADIUS.lg, padding: SP.md, borderWidth: 1, borderColor: BORDER, marginBottom: SP.md },
    growthComparisonHeader: { flexDirection: 'row', alignItems: 'center', gap: SP.sm, marginBottom: SP.lg },
    growthComparisonIcon: { width: 36, height: 36, borderRadius: RADIUS.sm, backgroundColor: PURPLE_DIM, alignItems: 'center', justifyContent: 'center' },

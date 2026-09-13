@@ -51,8 +51,9 @@ function BuyerTabLayout() {
 
   const tabBarStyle = {
     position: 'relative' as const,
-    height: 50 + insets.bottom,
+    height: 64 + insets.bottom,
     paddingBottom: insets.bottom,
+    paddingTop: 4,
     borderRadius: 0,
     borderTopWidth: 1,
     borderTopColor: BORDER,
@@ -63,7 +64,9 @@ function BuyerTabLayout() {
 
   return (
     <Tabs
+      detachInactiveScreens
       screenOptions={{
+        freezeOnBlur: true,
         tabBarActiveTintColor: activeTint,
         tabBarInactiveTintColor: inactiveTint,
         headerShown: false,
@@ -78,12 +81,12 @@ function BuyerTabLayout() {
         tabBarBackground: () => (
           <View style={[StyleSheet.absoluteFill, { backgroundColor: pillBg }]} />
         ),
-        tabBarItemStyle: { paddingVertical: 4 },
+        tabBarItemStyle: { paddingVertical: 0 },
         tabBarButton: (props: any) => (
           <Pressable
             {...props}
             accessibilityRole="tab"
-            style={[props.style, { minHeight: 44, alignItems: 'center', justifyContent: 'center' }]}
+            style={[props.style, { minHeight: 48, alignItems: 'center', justifyContent: 'center' }]}
           />
         ),
       }}

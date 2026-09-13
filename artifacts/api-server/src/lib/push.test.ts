@@ -3,6 +3,7 @@ import {
   buildExpoPushMessages,
   normalizePushEventCategory,
   preferenceKey,
+  unsentPushTokens,
 } from "./push";
 
 describe("push notification delivery contract", () => {
@@ -33,6 +34,13 @@ describe("push notification delivery contract", () => {
       title: "New message",
       body: "Hello",
     })[0]).toMatchObject({ sound: "default" });
+  });
+
+  it("retries only the unsent device in a mixed multi-device delivery", () => {
+    expect(unsentPushTokens(
+      [{ token: "device-a" }, { token: "device-b" }, { token: "device-c" }],
+      ["device-a", "device-c"],
+    )).toEqual([{ token: "device-b" }]);
   });
 
   it("uses the bundled order sound and Android order channel for seller orders", () => {

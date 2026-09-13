@@ -23,11 +23,13 @@ describe('app background theme', () => {
     expect(SCREEN_BG).toBe('transparent');
   });
 
-  it('mounts one shared animated background behind the root stack', () => {
+  it('isolates every root stack scene on its own animated background plane', () => {
     const rootLayout = readFileSync(appPath('_layout.tsx'), 'utf8');
 
     expect(rootLayout).toContain("import AnimatedGradientBackground from '@/components/branding/AnimatedGradientBackground'");
-    expect(rootLayout).toContain('<AnimatedGradientBackground />');
+    expect(rootLayout).toContain('screenLayout={({ children }) => (');
+    expect(rootLayout).toContain('<IsolatedStackScene>{children}</IsolatedStackScene>');
+    expect(rootLayout).toContain('{isFocused ? <AnimatedGradientBackground /> : null}');
     expect(rootLayout).toContain("contentStyle: { backgroundColor: 'transparent' }");
     expect(rootLayout).toContain('<NavigationThemeProvider value={TRANSPARENT_NAVIGATION_THEME}>');
 
@@ -80,6 +82,10 @@ describe('app background theme', () => {
 
     expect(sellerLayout).toContain("sceneStyle: { backgroundColor: 'transparent' }");
     expect(buyerLayout).toContain("sceneStyle: { backgroundColor: 'transparent' }");
+    expect(sellerLayout).toContain('detachInactiveScreens');
+    expect(buyerLayout).toContain('detachInactiveScreens');
+    expect(sellerLayout).toContain('freezeOnBlur: true');
+    expect(buyerLayout).toContain('freezeOnBlur: true');
     expect(sellerHome).toContain('backgroundColor: SCREEN_BG');
     expect(buyerInbox).toContain('backgroundColor: SCREEN_BG');
   });

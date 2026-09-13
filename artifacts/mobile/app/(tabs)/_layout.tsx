@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -146,8 +145,6 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
     };
   }, [api, userId]);
 
-  if (Platform.OS === 'web') return null;
-
   return (
     <View
       style={[
@@ -231,8 +228,10 @@ export default function TabLayout() {
   return (
     <>
       <Tabs
+        detachInactiveScreens
         tabBar={(props) => <CustomTabBar {...props} />}
         screenOptions={{
+          freezeOnBlur: true,
           headerShown: false,
           sceneStyle: { backgroundColor: 'transparent' },
         }}

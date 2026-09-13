@@ -9,7 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useAuth } from '@clerk/expo';
 import { useApi } from '@/hooks/useApi';
-import { getSetupState, markSetupStarted, dismissWelcome, completionPercent, nextTask, nextBestAction, dismissTip, markFeatureOpened, type SetupState } from '@/lib/setupStore';
+import { getSetupState, markSetupStarted, dismissWelcome, completionPercent, nextTask, nextBestAction, dismissTip, markFeatureOpened, completedRequiredTaskCount, requiredTaskCount, isSetupComplete, type SetupState } from '@/lib/setupStore';
 import { deriveHubStats, deriveInventoryStats, deriveOrderStats } from '@/lib/sellerDashboardStats';
 import { AnimatedEntrance, BrandthreadScreen, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SearchBar, StatCard, SectionHeader, ProgressCard, NavigationCard, GuidedTip, NewFeatureBadge, LoadingSkeleton, EmptyState, StatusBadge, PressableScale } from '@/components/BrandthreadUI';
 import { SellerDashboardKPIGrid } from '@/components/SellerDashboardKPIGrid';
@@ -288,6 +288,9 @@ export default function SellerHomeScreen() {
   const [salesTrendError, setSalesTrendError] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
   const [subscriptionProvider, setSubscriptionProvider] = useState<'stripe' | 'revenuecat' | 'none'>('none');
+  const [trialBanner, setTrialBanner] = useState<{
+    visible: boolean; day: number | null; daysRemaining: number; trialEndsAt: string; message: string; cta: string;
+  } | null>(null);
   const [billingPortalLoading, setBillingPortalLoading] = useState(false);
 
   const dashboardScrollY = useRef(new Animated.Value(0)).current;
@@ -306,13 +309,20 @@ export default function SellerHomeScreen() {
   }, [userId]);
 
   const loadSetup = useCallback(async () => {
-    const state = await getSetupState();
+    let onboardingComplete = false;
+    try {
+      const profile = await api.auth.me();
+      onboardingComplete = profile.accountType === 'seller' && profile.onboardingComplete === true;
+    } catch {
+      // The local checklist remains available if profile refresh is offline.
+    }
+    const state = await getSetupState(userId, { onboardingComplete });
     setSetupState(state);
     setLoading(false);
-  }, []);
+  }, [api, userId]);
 
   useEffect(() => {
-    const timer = setTimeout(() => { loadSetup(); }, 0);
+    const timer = setTimeout(() => { void loadSetup(); }, 0);
     const minLoad = setTimeout(() => {}, 500);
     setDashStatsError(false);
     setSalesTrendError(false);
@@ -393,17 +403,19 @@ export default function SellerHomeScreen() {
     });
 
     return () => { clearTimeout(timer); clearTimeout(minLoad); };
-  }, [retryKey]);
+  }, [loadSetup, retryKey]);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
       setSubscriptionStatus(null);
       setSubscriptionProvider('none');
+      setTrialBanner(null);
       api.seller.subscription.status().then((data) => {
         if (active) {
           setSubscriptionStatus(data?.status ?? null);
           setSubscriptionProvider(data?.effectiveProvider ?? 'none');
+          setTrialBanner(data?.trialBanner ?? null);
         }
       }).catch(() => {});
       return () => { active = false; };
@@ -412,7 +424,7 @@ export default function SellerHomeScreen() {
 
   const pct = completionPercent(setupState);
   const showWelcome = !setupState.started && !setupState.dismissed;
-  const showProgress = setupState.started && pct < 100;
+  const showProgress = setupState.started && !isSetupComplete(setupState);
   const q = searchQuery.toLowerCase().trim();
 
   const productResults = q ? searchProducts.filter(p => String(p.name ?? '').toLowerCase().includes(q)) : [];
@@ -449,15 +461,27 @@ export default function SellerHomeScreen() {
     }
   }
 
+  async function dismissTrialBanner() {
+    const current = trialBanner;
+    if (!current) return;
+    setTrialBanner(null);
+    try {
+      await api.seller.subscription.dismissTrialBanner(current.trialEndsAt);
+    } catch {
+      // Restore it if the server could not persist the dismissal.
+      setTrialBanner(current);
+    }
+  }
+
   async function handleStartSetup() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const next = await markSetupStarted();
+    const next = await markSetupStarted(userId);
     setSetupState(next);
   }
 
   async function handleDismissWelcome() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const next = await dismissWelcome();
+    const next = await dismissWelcome(userId);
     setSetupState(next);
   }
 
@@ -608,6 +632,38 @@ export default function SellerHomeScreen() {
       >
         <StripeConnectWarning />
 
+        {trialBanner?.visible && (
+          <AnimatedEntrance delay={0} style={s.pageSection}>
+            <View
+              style={[s.trialBanner, { borderColor: theme.accent + '66', backgroundColor: theme.accentDim }]}
+              accessibilityRole="alert"
+              testID="seller-trial-banner"
+            >
+              <View style={[s.trialBannerIcon, { backgroundColor: theme.accent + '24' }]}>
+                <Feather name="clock" size={19} color={theme.accentLight} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={s.trialBannerTitle}>Your trial ends soon</Text>
+                <Text style={s.trialBannerBody}>
+                  {trialBanner.message}
+                  {trialBanner.daysRemaining > 1 ? ` ${trialBanner.daysRemaining} days left.` : ''}
+                </Text>
+                <PressableScale
+                  onPress={() => nav('/subscription')}
+                  style={[s.trialBannerCta, { backgroundColor: theme.accent }]}
+                  accessibilityRole="button"
+                >
+                  <Text style={[s.trialBannerCtaText, { color: theme.onAccent }]}>Manage subscription</Text>
+                  <Feather name="arrow-right" size={14} color={theme.onAccent} />
+                </PressableScale>
+              </View>
+              <Pressable onPress={dismissTrialBanner} hitSlop={10} accessibilityLabel="Dismiss trial reminder">
+                <Feather name="x" size={16} color={MUTED} />
+              </Pressable>
+            </View>
+          </AnimatedEntrance>
+        )}
+
         <AnimatedEntrance delay={0} style={s.pageSection}>
           <SellerDashboardSectionHeader title="Overview" action="Analytics" onAction={() => nav('/(tabs)/analytics')} />
 
@@ -695,8 +751,26 @@ export default function SellerHomeScreen() {
           <AnimatedEntrance delay={100} style={s.pageSection}>
              <SellerDashboardSectionHeader
                title="Finish Setup"
-               action={`${setupState.tasks.filter(t => t.completed).length} of ${setupState.tasks.length} done`}
+                action={`${completedRequiredTaskCount(setupState)} of ${requiredTaskCount(setupState)} required`}
              />
+              <UnifiedCard style={s.setupProgressCard}>
+                <View style={s.setupProgressHeader}>
+                  <View>
+                    <Text style={s.setupProgressTitle}>Setup progress</Text>
+                    <Text style={s.setupProgressSubtitle}>
+                      {completedRequiredTaskCount(setupState)} of {requiredTaskCount(setupState)} required tasks complete
+                    </Text>
+                  </View>
+                  <Text style={s.setupProgressPercent}>{pct}%</Text>
+                </View>
+                <View
+                  accessibilityRole="progressbar"
+                  accessibilityLabel={`Setup progress: ${pct}%`}
+                  style={s.setupProgressTrack}
+                >
+                  <View style={[s.setupProgressFill, { width: `${pct}%`, backgroundColor: theme.accent }]} />
+                </View>
+              </UnifiedCard>
              <ListGroup>
                {setupState.tasks.map((task, i) => (
                  <ListItem
@@ -710,7 +784,7 @@ export default function SellerHomeScreen() {
                         <Text style={{ fontSize: 10, fontFamily: FONT.medium, color: MUTED }}>Optional</Text>
                      </View>
                    ) : null}
-                   isLast={i === setupState.tasks.length - 1}
+                    isLast={i === setupState.tasks.length - 1}
                  />
                ))}
              </ListGroup>
@@ -759,7 +833,7 @@ export default function SellerHomeScreen() {
           <AnimatedEntrance delay={150} style={s.pageSection}>
              <SellerDashboardSectionHeader title="Quick Actions" />
              <SellerQuickActionsGrid actions={[
-               { label: 'Create Post', icon: 'video', accent: theme.accent, badge: !setupState.openedFeatures.includes('create-post'), onPress: () => { markFeatureOpened('create-post'); nav('/create-post'); } },
+               { label: 'Create Post', icon: 'video', accent: theme.accent, badge: !setupState.openedFeatures.includes('create-post'), onPress: () => { markFeatureOpened('create-post', userId); nav('/create-post'); } },
                { label: 'Add Product', icon: 'plus-circle', accent: theme.secondary, onPress: () => nav('/(tabs)/products') },
                { label: 'View Orders', icon: 'shopping-bag', accent: BLUE, onPress: () => nav('/(tabs)/orders') },
                { label: 'Studio', icon: 'zap', accent: ORANGE, onPress: () => nav('/(tabs)/studio') },
@@ -1066,6 +1140,43 @@ const s = StyleSheet.create({
     marginTop: 6,
     marginBottom: SP.md,
   },
+  setupProgressCard: {
+    padding: SP.md,
+    marginBottom: SP.sm,
+  },
+  setupProgressHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: SP.md,
+    marginBottom: SP.sm,
+  },
+  setupProgressTitle: {
+    fontSize: FS.sm,
+    fontFamily: FONT.semibold,
+    color: FG,
+  },
+  setupProgressSubtitle: {
+    fontSize: FS.xs,
+    fontFamily: FONT.regular,
+    color: MUTED,
+    marginTop: 3,
+  },
+  setupProgressPercent: {
+    fontSize: FS.lg,
+    fontFamily: FONT.bold,
+    color: FG,
+  },
+  setupProgressTrack: {
+    height: 8,
+    borderRadius: RADIUS.pill,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  setupProgressFill: {
+    height: '100%',
+    borderRadius: RADIUS.pill,
+  },
   emptyOrdersTitle: {
     fontSize: FS.md,
     lineHeight: 22,
@@ -1196,6 +1307,49 @@ const s = StyleSheet.create({
   },
   unavailableButtonCompact: {
     minWidth: 84,
+  },
+  trialBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    marginHorizontal: SP.md,
+    marginBottom: SP.md,
+    padding: SP.md,
+    borderWidth: 1,
+    borderRadius: RADIUS.lg,
+  },
+  trialBannerIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: RADIUS.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trialBannerTitle: {
+    color: FG,
+    fontFamily: FONT.semibold,
+    fontSize: FS.base,
+  },
+  trialBannerBody: {
+    color: MUTED,
+    fontFamily: FONT.regular,
+    fontSize: FS.xs,
+    lineHeight: 17,
+    marginTop: 3,
+  },
+  trialBannerCta: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+    borderRadius: RADIUS.sm,
+  },
+  trialBannerCtaText: {
+    fontFamily: FONT.semibold,
+    fontSize: FS.xs,
   },
 
   // ─── Modals ────────────────────────────────────────────────────────────────

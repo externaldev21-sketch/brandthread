@@ -26,6 +26,7 @@ import { logger } from "../lib/logger";
 import { getWebOrigin } from "../lib/webOrigin";
 import { getEffectiveEntitlement, reconcileRevenueCatEntitlement } from "../lib/nativeEntitlements";
 import { PLAN_CATALOGUE, isSellerPlanId, type SellerPlanId as PlanId } from "../lib/planCatalogue";
+import { isDayFourOfFive } from "../jobs/sellerTrialReminder";
 
 const router = Router();
 router.use(requireAuth);
@@ -120,6 +121,9 @@ router.get("/status", requireRole("owner"), async (req, res) => {
         subscriptionStatus:    users.subscriptionStatus,
         subscriptionPeriodEnd: users.subscriptionPeriodEnd,
         subscriptionPlanId:    users.subscriptionPlanId,
+        subscriptionTrialStartedAt: users.subscriptionTrialStartedAt,
+        subscriptionTrialEndsAt: users.subscriptionTrialEndsAt,
+        trialBannerDismissedTrialEnd: users.subscriptionTrialBannerDismissedTrialEnd,
         stripeCustomerId:      users.stripeCustomerId,
       })
       .from(users)
@@ -146,6 +150,9 @@ router.get("/status", requireRole("owner"), async (req, res) => {
       res.json({
         plan, status: effective.provider === "revenuecat" ? effective.status : "none",
         renewsOn: null, trialEnd: null,
+        trialStartAt: user.subscriptionTrialStartedAt?.toISOString() ?? null,
+        trialEndAt: user.subscriptionTrialEndsAt?.toISOString() ?? null,
+        trialBanner: null,
         amountCents: effective.provider === "revenuecat" ? PLAN_CATALOGUE[plan].amountCents : 0,
         paymentMethodLabel: null,
         effectiveProvider: effective.provider,
@@ -170,8 +177,25 @@ router.get("/status", requireRole("owner"), async (req, res) => {
     const trialEndFmt = trialEnd
       ? trialEnd.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
       : null;
-
+    const trialStartAt = sub.trial_start
+      ? new Date(sub.trial_start * 1000)
+      : user.subscriptionTrialStartedAt;
+    const trialEndsAt = trialEnd ?? user.subscriptionTrialEndsAt;
     const planId = user.subscriptionPlanId ?? "starter";
+    const isDayFour = sub.status === "trialing" && trialStartAt && trialEndsAt
+      ? isDayFourOfFive(trialStartAt, trialEndsAt, new Date())
+      : false;
+    const trialBanner = isDayFour && user.trialBannerDismissedTrialEnd !== trialEndsAt!.toISOString()
+      ? {
+          visible: true,
+          day: 4,
+          daysRemaining: Math.max(0, Math.ceil((trialEndsAt!.getTime() - Date.now()) / (24 * 60 * 60 * 1000))),
+          trialEndsAt: trialEndsAt!.toISOString(),
+          message: `Keep your ${PLAN_CATALOGUE[planId as PlanId]?.name ?? "seller"} tools—including your storefront, products, and checkout—by choosing a plan before your trial ends.`,
+          cta: "Manage subscription",
+        }
+      : null;
+
     const amountCents = PLAN_CATALOGUE[planId as PlanId]?.amountCents ?? 0;
 
     // Payment method label — card brand + last4
@@ -187,6 +211,9 @@ router.get("/status", requireRole("owner"), async (req, res) => {
       status:             sub.status,
       renewsOn,
       trialEnd:           trialEndFmt,
+      trialStartAt:       trialStartAt?.toISOString() ?? null,
+      trialEndAt:         trialEndsAt?.toISOString() ?? null,
+      trialBanner,
       amountCents,
       paymentMethodLabel: pmLabel,
       // Reaching this branch means the persisted Stripe subscription was
@@ -200,6 +227,44 @@ router.get("/status", requireRole("owner"), async (req, res) => {
     if (status < 500) { res.status(status).json({ error: err.message }); return; }
     req.log.error({ err }, "Failed to fetch subscription status");
     res.status(500).json({ error: "Failed to fetch subscription status" });
+  }
+});
+
+/** Persist dismissal for this exact trial only; a future trial shows again. */
+router.post("/trial-banner/dismiss", requireRole("owner"), async (req, res) => {
+  try {
+    const clerkUserId = (req as any).clerkUserId as string;
+    const [user] = await db.select({
+      trialEndsAt: users.subscriptionTrialEndsAt,
+    }).from(users).where(eq(users.clerkId, clerkUserId)).limit(1);
+    const serverTrialEndAt = user?.trialEndsAt?.toISOString();
+    const requestedTrialEndAt = typeof req.body?.trialEndAt === "string"
+      ? req.body.trialEndAt
+      : serverTrialEndAt;
+    if (!serverTrialEndAt || requestedTrialEndAt !== serverTrialEndAt) {
+      res.status(400).json({ error: "A valid trialEndAt is required" });
+      return;
+    }
+    const [window] = await db.select({
+      trialStartedAt: users.subscriptionTrialStartedAt,
+      status: users.subscriptionStatus,
+    }).from(users).where(eq(users.clerkId, clerkUserId)).limit(1);
+    if (
+      window?.status !== "trialing" ||
+      !window.trialStartedAt ||
+      !isDayFourOfFive(window.trialStartedAt, new Date(serverTrialEndAt), new Date())
+    ) {
+      res.status(400).json({ error: "Trial reminder is only available on day four" });
+      return;
+    }
+    await db.update(users).set({
+      subscriptionTrialBannerDismissedTrialEnd: serverTrialEndAt,
+      updatedAt: new Date(),
+    }).where(eq(users.clerkId, clerkUserId));
+    res.json({ ok: true, trialEndAt: serverTrialEndAt });
+  } catch (err) {
+    req.log.error({ err }, "Failed to dismiss trial banner");
+    res.status(500).json({ error: "Failed to dismiss trial banner" });
   }
 });
 

@@ -1,4 +1,4 @@
-import { index, integer, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { index, integer, pgTable, text, timestamp, uuid, unique } from "drizzle-orm/pg-core";
 
 export const rateLimitBuckets = pgTable("rate_limit_buckets", {
   bucketKey: text("bucket_key").primaryKey(),
@@ -7,6 +7,17 @@ export const rateLimitBuckets = pgTable("rate_limit_buckets", {
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 }, (table) => ({
   expiresAtIdx: index("rate_limit_buckets_expires_at_idx").on(table.expiresAt),
+}));
+
+/** Durable one-success allowance for the seller onboarding AI sample. */
+export const onboardingAiSamples = pgTable("onboarding_ai_samples", {
+  accountId: text("account_id").primaryKey(),
+  status: text("status").notNull().default("reserved"),
+  reservationId: text("reservation_id").notNull(),
+  reservedAt: timestamp("reserved_at", { withTimezone: true }).notNull().defaultNow(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+}, (table) => ({
+  reservationIdx: index("onboarding_ai_samples_reservation_idx").on(table.reservationId),
 }));
 
 export const stripeWebhookEvents = pgTable("stripe_webhook_events", {
@@ -32,3 +43,21 @@ export const stripeTrialWarningEvents = pgTable("stripe_trial_warning_events", {
   eventId: text("event_id").primaryKey(),
   recordedAt: timestamp("recorded_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const sellerTrialReminderEvents = pgTable("seller_trial_reminder_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sellerId: text("seller_id").notNull(),
+  trialEndAt: timestamp("trial_end_at", { withTimezone: true }).notNull(),
+  status: text("status").notNull().default("pending"),
+  attemptCount: integer("attempt_count").notNull().default(0),
+  nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true }).notNull().defaultNow(),
+  lastError: text("last_error"),
+  claimedAt: timestamp("claimed_at", { withTimezone: true }),
+  leaseExpiresAt: timestamp("lease_expires_at", { withTimezone: true }),
+  sentAt: timestamp("sent_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  sellerTrialUnique: unique("seller_trial_reminder_events_seller_trial_unique")
+    .on(table.sellerId, table.trialEndAt),
+  trialEndIdx: index("seller_trial_reminder_events_trial_end_idx").on(table.trialEndAt),
+}));

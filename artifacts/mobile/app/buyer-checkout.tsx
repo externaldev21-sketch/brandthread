@@ -6,7 +6,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert, Platform, ScrollView,
-  StyleSheet, Text, TextInput, TouchableOpacity, View, Animated, Image,
+  StyleSheet, Text, TextInput, TouchableOpacity, View, Animated, Image, KeyboardAvoidingView,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
@@ -38,7 +38,6 @@ import {
   mergeCheckoutFormState,
 } from '@/lib/checkoutReadiness';
 import { CheckoutSkeleton, HapticSwitch } from '@/components/BrandthreadUI';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 
 const STEPS: CheckoutStep[] = ['information', 'delivery', 'review', 'confirmation'];
 const money = formatCents;

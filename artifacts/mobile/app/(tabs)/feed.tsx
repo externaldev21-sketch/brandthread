@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, TouchableWithoutFeedback,
   Dimensions, Animated, Alert, Share, TextInput, Modal,
-  Platform, ScrollView, RefreshControl, ActivityIndicator,
+  Platform, ScrollView, RefreshControl, ActivityIndicator, KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -29,7 +29,6 @@ import {
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { FeedSkeleton } from '@/components/BrandthreadUI';
 import { CachedImage } from '@/components/CachedImage';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { formatCents } from '@/lib/money';
 

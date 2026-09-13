@@ -42,6 +42,12 @@ export const users = pgTable('users', {
   subscriptionStatus:      text('subscription_status').default('none'),
   subscriptionPeriodEnd:   timestamp('subscription_period_end'),
   subscriptionPlanId:      text('subscription_plan_id').default('starter'),
+  // Authoritative trial window copied from Stripe subscription events. Keeping
+  // this on the seller record lets reminder workers run without trusting a
+  // client-provided date (and lets the dashboard render while Stripe is down).
+  subscriptionTrialStartedAt: timestamp('subscription_trial_started_at', { withTimezone: true }),
+  subscriptionTrialEndsAt:    timestamp('subscription_trial_ends_at', { withTimezone: true }),
+  subscriptionTrialBannerDismissedTrialEnd: text('subscription_trial_banner_dismissed_trial_end'),
   // Trust signals & Stripe Identity verification
   verified:                     boolean('verified').notNull().default(false),
   /** 'unverified' | 'pending' | 'verified' | 'failed' */
@@ -69,6 +75,7 @@ export const users = pgTable('users', {
     .$type<Record<string, boolean>>()
     .notNull()
     .default({}),
+  notificationDigest: text('notification_digest').notNull().default('realtime'),
   // A tombstone is retained after an account erasure request.  Keeping the
   // Clerk subject prevents a delayed client sync from creating a fresh profile.
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
@@ -710,6 +717,9 @@ export const notificationsFeed = pgTable('notifications_feed', {
   newOrderReceivedUnique: uniqueIndex('notifications_feed_new_order_received_unique')
     .on(table.userId, table.type, table.targetId)
     .where(sql`${table.type} = 'new_order_received' AND ${table.targetId} IS NOT NULL`),
+  subscriptionTrialDayFourUnique: uniqueIndex('notifications_feed_subscription_trial_day_4_unique')
+    .on(table.userId, table.type, table.targetId)
+    .where(sql`${table.type} = 'subscription_trial_day_4' AND ${table.targetId} IS NOT NULL`),
 }));
 
 export const notificationDeliveries = pgTable('notification_deliveries', {

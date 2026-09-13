@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Platform, TextInput, Image as RNImage, Modal, Pressable,
+  Platform, TextInput, Image as RNImage, Modal, Pressable, KeyboardAvoidingView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -18,7 +18,6 @@ import { reportNetworkError } from '@/lib/networkNotice';
 import { EmptyState, SearchResultsSkeleton } from '@/components/BrandthreadUI';
 import { useThreadPull } from '@/contexts/ThreadPullTransitionContext';
 import { CachedImage } from '@/components/CachedImage';
-import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 
 type PersonResult = {
   userId: string; name: string; username: string | null;

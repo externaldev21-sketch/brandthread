@@ -1,0 +1,33 @@
+import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+const read = (relativePath: string) =>
+  readFileSync(resolve(process.cwd(), relativePath), 'utf8');
+
+describe('browser preview safe areas and Expo Go startup', () => {
+  it('keeps both buyer and seller tab bars visible and reachable on web', () => {
+    const buyerTabs = read('app/(buyer)/_layout.tsx');
+    const sellerTabs = read('app/(tabs)/_layout.tsx');
+    const cookieConsent = read('contexts/CookieConsentContext.tsx');
+
+    expect(buyerTabs).toContain('height: 64 + insets.bottom');
+    expect(buyerTabs).toContain('minHeight: 48');
+    expect(sellerTabs).not.toContain("if (Platform.OS === 'web') return null");
+    expect(cookieConsent).toContain('bottom:72+SP.md');
+  });
+
+  it('does not statically load the unavailable keyboard-controller native module', () => {
+    const startupFiles = [
+      'app/_layout.tsx',
+      'components/KeyboardAwareScrollViewCompat.tsx',
+      'app/buyer-checkout.tsx',
+      'app/(buyer)/search.tsx',
+      'app/(tabs)/feed.tsx',
+    ];
+
+    for (const file of startupFiles) {
+      expect(read(file)).not.toContain("from 'react-native-keyboard-controller'");
+    }
+  });
+});

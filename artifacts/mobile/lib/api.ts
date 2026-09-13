@@ -737,6 +737,8 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
     },
     logo: {
       generate: (brandName: string, style: string) => post<any>('/api/logo/generate', { brandName, style }),
+      onboardingSample: (brandName: string, style: string) =>
+        post<{ b64_json: string }>('/api/onboarding-sample/logo', { brandName, style }),
     },
     mockup: {
       generate: (
@@ -1130,11 +1132,23 @@ export function createApi(getToken: GetToken, getCacheScope: GetCacheScope = () 
           plan: string;               // 'starter' | 'growth' | 'pro'
           status: string;             // 'active' | 'trialing' | 'past_due' | 'canceled' | 'none'
           trialEnd: string | null;    // formatted date when in trial, null otherwise
+          trialStartAt: string | null;
+          trialEndAt: string | null;
+          trialBanner: {
+            visible: boolean;
+            day: number | null;
+            daysRemaining: number;
+            trialEndsAt: string;
+            message: string;
+            cta: string;
+          } | null;
           renewsOn: string | null;    // e.g. "Aug 14, 2026"
           amountCents: number;        // monthly charge in cents (0 for starter)
           paymentMethodLabel: string | null; // e.g. "Visa ···4242"
           effectiveProvider: 'stripe' | 'revenuecat' | 'none';
         }>('/api/seller/subscription/status'),
+        dismissTrialBanner: (trialEndAt: string) =>
+          post<{ ok: boolean; trialEndAt: string }>('/api/seller/subscription/trial-banner/dismiss', { trialEndAt }),
         /** Read-only invoice summaries for the active seller store. */
         invoices: () => get<{
           invoices: Array<{

@@ -30,6 +30,7 @@ const SELLER_DEFAULTS = {
   payout_confirmations: true,
   customer_messages: true,
   disputes: true,
+  subscription_trial: true,
 };
 
 function defaultsFor(accountType: string | null | undefined) {
@@ -111,8 +112,14 @@ router.put("/", async (req, res) => {
       );
     }
 
+    const [saved] = await db
+      .select({ digest: sql<string>`notification_digest` })
+      .from(users)
+      .where(eq(users.clerkId, clerkId))
+      .limit(1);
+
     return res.json({
-      digest: (digest ?? "realtime") as DigestMode,
+      digest: (saved?.digest ?? digest ?? "realtime") as DigestMode,
       role: current.accountType === "seller" ? "seller" : "buyer",
       categories: merged,
     });
