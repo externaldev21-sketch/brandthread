@@ -17,6 +17,7 @@ import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BrandthreadHeader, PrimaryButton, SecondaryButton, GradientCard, BrandedLoadingState } from '@/components/BrandthreadUI';
 import { useApi } from '@/lib/api';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
+import { completeTask } from '@/lib/setupStore';
 
 type VerificationStatus = 'unverified' | 'pending' | 'verified' | 'failed';
 
@@ -103,6 +104,9 @@ export default function SellerVerificationScreen() {
     try {
       const data = await (api as any).seller.verification.status();
       setState(data);
+      if (data?.verificationStatus === 'verified') {
+        await completeTask('verify_account');
+      }
     } catch (err) {
       console.warn('verification status error:', err);
     } finally {

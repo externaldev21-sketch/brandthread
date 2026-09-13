@@ -58,4 +58,31 @@ describe('seller setup destination navigation', () => {
     expect(addProduct).toContain("{ text: 'Done', onPress: leaveProductFlow }");
     expect(createPost).toContain("(isSellerSetup ? SELLER_HOME_ROUTE : '/(tabs)/profile') as never");
   });
+
+  it('records all nine tasks only from successful work or refreshed server truth', () => {
+    const completionSignals = [
+      ['app/seller-verification.tsx', "data?.verificationStatus === 'verified'", "completeTask('verify_account')"],
+      ['app/payouts.tsx', 'normalized?.connected && normalized.chargesEnabled && normalized.payoutsEnabled', "completeTask('connect_payments')"],
+      ['app/add-product.tsx', 'await api.products.create(serverCreatePayload)', "completeTask('first_product')"],
+      ['app/shipping.tsx', 'await api.shippingRates.create', "completeTask('shipping_rates')"],
+      ['app/store-builder.tsx', 'await applyTheme', "completeTask('customize_store')"],
+      ['app/store-domain.tsx', "verificationStatus === 'verified'", "completeTask('connect_domain')"],
+      ['app/store-publish.tsx', 'result.success', "completeTask('publish_store')"],
+      ['app/create-post.tsx', 'await persistSellerPost(false)', "completeTask('first_post')"],
+      ['app/manufacturer-hub.tsx', 'await saveManufacturer', "completeTask('connect_manufacturer')"],
+    ] as const;
+
+    for (const [file, successSignal, completionSignal] of completionSignals) {
+      const destination = read(file);
+      expect(destination).toContain(successSignal);
+      expect(destination).toContain(completionSignal);
+    }
+  });
+
+  it('refreshes persisted progress whenever the checklist regains focus', () => {
+    const setup = read('app/setup.tsx');
+
+    expect(setup).toContain('useFocusEffect(useCallback(() => {');
+    expect(setup).toContain('getSetupState().then(next => {');
+  });
 });

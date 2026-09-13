@@ -32,6 +32,7 @@ import { Product, ProductDraft, ProductCategory, PRODUCT_CATEGORIES, SIZE_PRESET
 import { calcPricing, generateVariantCombinations, buildVariantTitle, validateForPublish } from '@/lib/productUtils';
 import { formatCents, parseDecimalToCents } from '@/lib/money';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
+import { completeTask } from '@/lib/setupStore';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -654,6 +655,7 @@ export default function AddProductScreen() {
         ]);
       } else {
         const newProduct = await api.products.create(serverCreatePayload) as any;
+        await completeTask('first_product');
         await deleteDraft(draftId.current);
         Alert.alert('Product published!', name + ' is now live.', [
           { text: 'View product', onPress: () => router.replace('/product-detail?id=' + newProduct.id as never) },

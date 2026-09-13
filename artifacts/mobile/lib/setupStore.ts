@@ -177,7 +177,7 @@ export async function dismissWelcome(): Promise<SetupState> {
 
 export async function completeTask(id: SetupTaskId): Promise<SetupState> {
   const state = await getSetupState();
-  const tasks = state.tasks.map(t => t.id === id ? { ...t, completed: true } : t);
+  const tasks = state.tasks.map(t => t.id === id ? { ...t, completed: true, skipped: false } : t);
   const nextIncomplete = tasks.find(t => !t.completed && !t.skipped);
   const next: SetupState = { ...state, tasks, currentStep: nextIncomplete?.id ?? null };
   await saveSetupState(next);

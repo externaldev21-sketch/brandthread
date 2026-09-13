@@ -5,14 +5,14 @@
  * Progress persists via setupStore (AsyncStorage).
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Animated, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 
@@ -133,16 +133,19 @@ export default function SetupScreen() {
   const [state, setState] = useState<SetupState | null>(null);
   const progressAnim = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    getSetupState().then(s => {
-      setState(s);
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    getSetupState().then(next => {
+      if (!active) return;
+      setState(next);
       Animated.timing(progressAnim, {
-        toValue: completionPercent(s) / 100,
+        toValue: completionPercent(next) / 100,
         duration: ANIM.slow,
         useNativeDriver: false,
       }).start();
     });
-  }, []);
+    return () => { active = false; };
+  }, [progressAnim]));
 
   async function handleComplete(id: SetupTaskId) {
     const next = await completeTask(id);

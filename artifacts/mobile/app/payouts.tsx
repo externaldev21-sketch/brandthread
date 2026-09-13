@@ -16,6 +16,7 @@ import { RoleLockedView } from '@/components/RoleLockedView';
 import StripeConnectWarning, { ConnectStatus, normalizeConnectStatus } from '@/components/StripeConnectWarning';
 import { useTeamRole } from '@/hooks/useTeamRole';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
+import { completeTask } from '@/lib/setupStore';
 
 type PayoutStatus = 'paid' | 'pending' | 'in_transit' | 'failed';
 
@@ -83,7 +84,11 @@ export default function PayoutsScreen() {
     connectRequestRef.current = true;
     try {
       const data = await api.seller.connect.status();
-      setConnectStatus(normalizeConnectStatus(data));
+      const normalized = normalizeConnectStatus(data);
+      setConnectStatus(normalized);
+      if (normalized?.connected && normalized.chargesEnabled && normalized.payoutsEnabled) {
+        await completeTask('connect_payments');
+      }
     } catch {
       setConnectStatus(null);
     } finally {
