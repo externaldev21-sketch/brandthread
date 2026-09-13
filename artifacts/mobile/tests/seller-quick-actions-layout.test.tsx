@@ -37,6 +37,11 @@ vi.mock('@/components/BrandthreadUI', () => ({
 }));
 
 import { SellerQuickActionsGrid } from '@/components/SellerQuickActionsGrid';
+import {
+  SELLER_COMPACT_GRID_COLUMN_FRACTION,
+  SELLER_COMPACT_GRID_COLUMN_WIDTH,
+  SELLER_COMPACT_GRID_GAP,
+} from '@/components/sellerCompactGridLayout';
 
 const actions = [
   { label: 'Create Post', icon: 'video' as const, accent: '#a855f7', badge: true, onPress: vi.fn() },
@@ -67,17 +72,23 @@ describe('seller Quick Actions compact layout', () => {
     });
 
     const grid = renderer!.root.findByProps({ testID: 'seller-quick-actions-grid' });
-    expect(flattenStyle(grid.props.style)).toMatchObject({ flexDirection: 'row', flexWrap: 'wrap', gap: 10 });
+    expect(flattenStyle(grid.props.style)).toMatchObject({
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: SELLER_COMPACT_GRID_GAP,
+    });
 
     const columns = actions.map(action =>
       renderer!.root.findByProps({ testID: `seller-quick-action-${action.label.toLowerCase().replace(/\s+/g, '-')}` }),
     );
-    expect(columns.map(column => flattenStyle(column.props.style).width)).toEqual(['48%', '48%', '48%', '48%']);
+    expect(columns.map(column => flattenStyle(column.props.style).width)).toEqual(
+      actions.map(() => SELLER_COMPACT_GRID_COLUMN_WIDTH),
+    );
     expect(columns.every(column => flattenStyle(column.props.style).minWidth === 0)).toBe(true);
 
     const contentWidth = viewportWidth - 32;
-    const renderedCardWidth = contentWidth * 0.48;
-    expect(renderedCardWidth * 2 + 10).toBeLessThanOrEqual(contentWidth);
+    const renderedCardWidth = contentWidth * SELLER_COMPACT_GRID_COLUMN_FRACTION;
+    expect(renderedCardWidth * 2 + SELLER_COMPACT_GRID_GAP).toBeLessThanOrEqual(contentWidth);
     expect(renderedCardWidth).toBeGreaterThanOrEqual(138);
   });
 

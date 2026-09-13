@@ -3,6 +3,7 @@ import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 import { PressableScale } from '@/components/BrandthreadUI';
+import { sellerCompactGridStyles } from '@/components/sellerCompactGridLayout';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { BORDER, CARD_GLASS, FG, FONT, FS, MUTED, RADIUS } from '@/lib/theme';
 
@@ -52,7 +53,7 @@ export function SellerDashboardKPICard({
   );
 
   return (
-    <View style={[styles.column, style]} testID={`seller-kpi-${label.toLowerCase().replace(/\s+/g, '-')}`}>
+    <View style={[sellerCompactGridStyles.column, style]} testID={`seller-kpi-${label.toLowerCase().replace(/\s+/g, '-')}`}>
       {onPress ? (
         <PressableScale onPress={onPress} style={cardStyle}>{content}</PressableScale>
       ) : (
@@ -64,7 +65,7 @@ export function SellerDashboardKPICard({
 
 export function SellerDashboardKPIGrid({ cards }: { cards: SellerDashboardKPI[] }) {
   return (
-    <View style={styles.grid} testID="seller-kpi-grid">
+    <View style={[sellerCompactGridStyles.grid, styles.grid]} testID="seller-kpi-grid">
       {cards.map(card => <SellerDashboardKPICard key={card.label} {...card} />)}
     </View>
   );
@@ -72,14 +73,7 @@ export function SellerDashboardKPIGrid({ cards }: { cards: SellerDashboardKPI[] 
 
 const styles = StyleSheet.create({
   grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
     marginBottom: 10,
-  },
-  column: {
-    width: '48%',
-    minWidth: 0,
   },
   card: {
     width: '100%',

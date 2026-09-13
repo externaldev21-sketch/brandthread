@@ -41,6 +41,11 @@ vi.mock('@/contexts/AppThemeContext', () => ({
 }));
 
 import { SellerDashboardKPIGrid } from '@/components/SellerDashboardKPIGrid';
+import {
+  SELLER_COMPACT_GRID_COLUMN_FRACTION,
+  SELLER_COMPACT_GRID_COLUMN_WIDTH,
+  SELLER_COMPACT_GRID_GAP,
+} from '@/components/sellerCompactGridLayout';
 
 const cards = [
   { label: 'Revenue', value: '$12,345.67', onPress: vi.fn() },
@@ -72,17 +77,21 @@ describe('seller dashboard KPI layout', () => {
 
     const grid = renderer!.root.findByProps({ testID: 'seller-kpi-grid' });
     const gridStyle = flattenStyle(grid.props.style);
-    expect(gridStyle).toMatchObject({ flexDirection: 'row', flexWrap: 'wrap', gap: 10 });
+    expect(gridStyle).toMatchObject({
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: SELLER_COMPACT_GRID_GAP,
+    });
 
     const cardNodes = cards.map(card =>
       renderer!.root.findByProps({ testID: `seller-kpi-${card.label.toLowerCase()}` }),
     );
     const columnWidths = cardNodes.map(card => flattenStyle(card.props.style).width);
-    expect(columnWidths).toEqual(['48%', '48%', '48%', '48%']);
+    expect(columnWidths).toEqual(cards.map(() => SELLER_COMPACT_GRID_COLUMN_WIDTH));
 
     const contentWidth = viewportWidth - 32;
-    const renderedCardWidth = contentWidth * 0.48;
-    expect(renderedCardWidth * 2 + 10).toBeLessThanOrEqual(contentWidth);
+    const renderedCardWidth = contentWidth * SELLER_COMPACT_GRID_COLUMN_FRACTION;
+    expect(renderedCardWidth * 2 + SELLER_COMPACT_GRID_GAP).toBeLessThanOrEqual(contentWidth);
     expect(renderedCardWidth).toBeGreaterThanOrEqual(138);
   });
 
