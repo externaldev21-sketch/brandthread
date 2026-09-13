@@ -5,7 +5,7 @@ import { Feather } from '@expo/vector-icons';
 import { PressableScale } from '@/components/BrandthreadUI';
 import { sellerCompactGridStyles } from '@/components/sellerCompactGridLayout';
 import { useAppTheme } from '@/contexts/AppThemeContext';
-import { BORDER, CARD_GLASS, FG, FONT, FS, MUTED, RADIUS } from '@/lib/theme';
+import { BORDER, SELLER_DASHBOARD_GLASS, FG, FONT, FS, MUTED, RADIUS } from '@/lib/theme';
 
 export interface SellerDashboardKPI {
   label: string;
@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderRadius: RADIUS.lg,
-    backgroundColor: CARD_GLASS,
+    backgroundColor: SELLER_DASHBOARD_GLASS,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,

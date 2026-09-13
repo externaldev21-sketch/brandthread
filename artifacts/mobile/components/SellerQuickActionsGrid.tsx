@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 
 import { QuickActionCard } from '@/components/BrandthreadUI';
 import { sellerCompactGridStyles } from '@/components/sellerCompactGridLayout';
+import { BORDER, SELLER_DASHBOARD_GLASS } from '@/lib/theme';
 
 export interface SellerQuickAction {
   label: string;
@@ -33,5 +34,7 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     minWidth: 0,
+    backgroundColor: SELLER_DASHBOARD_GLASS,
+    borderColor: BORDER,
   },
 });

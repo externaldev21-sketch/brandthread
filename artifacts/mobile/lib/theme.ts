@@ -23,6 +23,8 @@ export const SURFACE_GLASS = 'rgba(12, 12, 23, 0.65)'; // glassy tabs/sheets
 export const CARD_GLASS    = 'rgba(18, 18, 31, 0.45)'; // glassy card
 export const CARD_ELEVATED_GLASS = 'rgba(24, 24, 46, 0.65)'; // glassy elevated
 export const SKELETON_GLASS = 'rgba(255,255,255,0.05)'; // translucent shimmer
+export const SELLER_DASHBOARD_GLASS = 'rgba(16, 16, 16, 0.54)'; // neutral graphite dashboard panels
+export const SELLER_DASHBOARD_GLASS_ELEVATED = 'rgba(26, 26, 26, 0.68)'; // neutral elevated dashboard panels
 
 
 // ─── Borders ─────────────────────────────────────────────────────────────────

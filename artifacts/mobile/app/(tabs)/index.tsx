@@ -14,7 +14,7 @@ import { deriveHubStats, deriveInventoryStats, deriveOrderStats } from '@/lib/se
 import { AnimatedEntrance, BrandthreadScreen, BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, IconButton, SearchBar, StatCard, SectionHeader, ProgressCard, NavigationCard, GuidedTip, NewFeatureBadge, LoadingSkeleton, EmptyState, StatusBadge, PressableScale } from '@/components/BrandthreadUI';
 import { SellerDashboardKPIGrid } from '@/components/SellerDashboardKPIGrid';
 import { SellerQuickActionsGrid } from '@/components/SellerQuickActionsGrid';
-import { BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED, CARD_GLASS, CARD_ELEVATED_GLASS, BORDER, BORDER_SUBTLE, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, GREEN_BRIGHT, BLUE, ORANGE, RED, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
+import { BG, SCREEN_BG, SURFACE, CARD, CARD_ELEVATED, SELLER_DASHBOARD_GLASS, SELLER_DASHBOARD_GLASS_ELEVATED, BORDER, BORDER_SUBTLE, BORDER_ACTIVE, FG, MUTED, SUBTLE, SUCCESS, GREEN_BRIGHT, BLUE, ORANGE, RED, GOLD, FONT, FS, SP, RADIUS, COMP, ICON, ANIM, PURPLE, PURPLE_LIGHT, PURPLE_DIM } from '@/lib/theme';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
 import { reportNetworkError } from '@/lib/networkNotice';
@@ -937,7 +937,7 @@ const s = StyleSheet.create({
     paddingHorizontal: SP.sm,
     borderRadius: RADIUS.md,
     borderWidth: 1,
-    backgroundColor: CARD_GLASS,
+    backgroundColor: SELLER_DASHBOARD_GLASS,
     flexDirection: 'row',
     alignItems: 'center',
     gap: SP.sm,
@@ -986,13 +986,13 @@ const s = StyleSheet.create({
     color: SUBTLE,
   },
   unifiedCard: {
-    backgroundColor: CARD_GLASS,
+    backgroundColor: SELLER_DASHBOARD_GLASS,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: BORDER_SUBTLE,
   },
   listGroup: {
-    backgroundColor: CARD_GLASS,
+    backgroundColor: SELLER_DASHBOARD_GLASS,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: BORDER_SUBTLE,
@@ -1130,7 +1130,7 @@ const s = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: CARD_GLASS,
+    backgroundColor: SELLER_DASHBOARD_GLASS_ELEVATED,
     borderTopLeftRadius: RADIUS.xl,
     borderTopRightRadius: RADIUS.xl,
     paddingHorizontal: SP.lg,
@@ -1160,7 +1160,7 @@ const s = StyleSheet.create({
     width: '30%',
     alignItems: 'center',
     gap: SP.sm,
-    backgroundColor: CARD_ELEVATED_GLASS,
+    backgroundColor: SELLER_DASHBOARD_GLASS_ELEVATED,
     borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: BORDER,
