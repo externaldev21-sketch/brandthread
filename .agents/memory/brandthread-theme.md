@@ -26,6 +26,12 @@ description: Which color system is canonical in the mobile app, which older pale
 
 **How to apply:** Use glass tokens for dashboard modules, analytics tiles, cart summaries, settings rows, manufacturer panels, empty states, and tab bars. Keep opaque tokens for compact controls or true modal/media separation only. Keep the legacy color bridge aligned with the same glass values.
 
+**Transparent stack navigation rule:** A full-screen flow launched from a transparent tab scene must replace the tab route or provide its own complete backdrop; a generic push can leave the previous tab visibly mounted underneath.
+
+**Why:** The seller setup checklist pushed Add Product above the transparent dashboard, making both screens appear overlapped.
+
+**How to apply:** For replacement flows, pass an origin parameter and explicitly replace back to the correct tab from every close, save-and-exit, and completion path.
+
 **Accent contrast rule:** Text, icons, and loading indicators directly on runtime accent fills use the preset's `onAccent`. Labels on runtime gradients also use the shared inverse text-shadow helper.
 
 **Why:** Chrome and other metallic gradients cross dark and light stops inside one control, so a fixed white label—or even an unshadowed theme foreground—can lose contrast within the same button.

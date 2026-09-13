@@ -422,6 +422,15 @@ export default function SellerHomeScreen() {
     router.push(route as never);
   }
 
+  function openSetupTask(task: SetupState['tasks'][number]) {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (task.id === 'first_product') {
+      router.replace('/add-product?from=seller-setup' as never);
+      return;
+    }
+    router.push(task.route as never);
+  }
+
   function handleOpenOrders() {
     openSellerOrders(userId, nav);
   }
@@ -702,7 +711,7 @@ export default function SellerHomeScreen() {
                    icon={task.completed ? "check-circle" : "circle"}
                    iconColor={task.completed ? SUCCESS : MUTED}
                    title={task.label}
-                   onPress={task.completed ? undefined : () => nav(task.route)}
+                    onPress={task.completed ? undefined : () => openSetupTask(task)}
                    rightElement={task.optional && !task.completed ? (
                      <View style={{ backgroundColor: 'rgba(255,255,255,0.06)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
                         <Text style={{ fontSize: 10, fontFamily: FONT.medium, color: MUTED }}>Optional</Text>

@@ -121,6 +121,7 @@ export default function AddProductScreen() {
   const router = useRouter();
   const navigation = useNavigation();
   const params = useLocalSearchParams();
+  const launchedFromSellerSetup = params.from === 'seller-setup';
   const insets = useSafeAreaInsets();
   const api = useApi();
 
@@ -432,21 +433,27 @@ export default function AddProductScreen() {
     );
   }
 
-  function handleExit() {
-    if (!hasUnsavedChanges) {
-      router.back();
+  function leaveProductFlow() {
+    isExitingRef.current = true;
+    if (launchedFromSellerSetup) {
+      router.replace('/(tabs)/' as never);
       return;
     }
-    showExitAlert(() => {
-      isExitingRef.current = true;
-      router.back();
-    });
+    router.back();
+  }
+
+  function handleExit() {
+    if (!hasUnsavedChanges) {
+      leaveProductFlow();
+      return;
+    }
+    showExitAlert(leaveProductFlow);
   }
 
   async function handleSaveDraftAndExit() {
     await saveDraftAndClear(buildDraftSnapshot());
     Alert.alert('Draft saved', 'You can continue editing later.');
-    router.back();
+    leaveProductFlow();
   }
 
   async function handleSaveDraftInPlace() {
@@ -642,14 +649,14 @@ export default function AddProductScreen() {
         await deleteDraft(draftId.current);
         Alert.alert('Product updated!', name + ' has been updated.', [
           { text: 'View product', onPress: () => router.replace('/product-detail?id=' + editProductId as never) },
-          { text: 'Done', onPress: () => router.back() },
+          { text: 'Done', onPress: leaveProductFlow },
         ]);
       } else {
         const newProduct = await api.products.create(serverCreatePayload) as any;
         await deleteDraft(draftId.current);
         Alert.alert('Product published!', name + ' is now live.', [
           { text: 'View product', onPress: () => router.replace('/product-detail?id=' + newProduct.id as never) },
-          { text: 'Done', onPress: () => router.back() },
+          { text: 'Done', onPress: leaveProductFlow },
         ]);
       }
     } catch {
