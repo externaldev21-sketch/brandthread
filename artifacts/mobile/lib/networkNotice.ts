@@ -13,7 +13,9 @@ type Listener = () => void;
 
 let notice: NetworkNotice | null = null;
 let nextId = 1;
+let expiryTimer: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<Listener>();
+const NOTICE_TTL_MS = 10_000;
 
 function emit() {
   listeners.forEach((listener) => listener());
@@ -74,6 +76,10 @@ export function subscribeNetworkNotice(listener: Listener): () => void {
 }
 
 export function dismissNetworkNotice(): void {
+  if (expiryTimer) {
+    clearTimeout(expiryTimer);
+    expiryTimer = null;
+  }
   if (!notice) return;
   notice = null;
   emit();
@@ -88,7 +94,7 @@ export function isAuthError(error: unknown): boolean {
 export function classifyNetworkError(error: unknown): NetworkNoticeKind | null {
   if (isAuthError(error)) return null;
   if (error instanceof ApiError) {
-    return error.status >= 500 || error.status === 408 || error.status === 429
+    return error.status >= 500 || error.status === 408
       ? 'server'
       : null;
   }
@@ -96,7 +102,7 @@ export function classifyNetworkError(error: unknown): NetworkNoticeKind | null {
   const match = message.match(/\bAPI (\d{3})\b/);
   if (match) {
     const status = Number(match[1]);
-    return status >= 500 || status === 408 || status === 429 ? 'server' : null;
+    return status >= 500 || status === 408 ? 'server' : null;
   }
   if (
     error instanceof TypeError ||
@@ -127,6 +133,14 @@ export function reportNetworkError(
     retrying: false,
   };
   emit();
+  if (expiryTimer) clearTimeout(expiryTimer);
+  const reportedId = notice.id;
+  expiryTimer = setTimeout(() => {
+    expiryTimer = null;
+    if (notice?.id !== reportedId) return;
+    notice = null;
+    emit();
+  }, NOTICE_TTL_MS);
 }
 
 export async function retryNetworkNotice(): Promise<void> {
@@ -136,7 +150,7 @@ export async function retryNetworkNotice(): Promise<void> {
   emit();
   try {
     await current.retry();
-    if (notice?.id === current.id) notice = null;
+    if (notice?.id === current.id) dismissNetworkNotice();
   } catch (error) {
     if (notice?.id === current.id) {
       const kind = classifyNetworkError(error) ?? current.kind;

@@ -4,7 +4,7 @@
  * Every request attaches the Clerk Bearer token supplied by getToken().
  */
 import { useAuth } from '@clerk/expo';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ApiError,
@@ -1754,13 +1754,16 @@ export type BrandthreadApi = ReturnType<typeof createApi>;
 /**
  * useApi() — hook for React components.
  * Returns a fully-authed BrandthreadApi instance tied to the current Clerk session.
- * Memoised — identity is stable as long as getToken doesn't change.
+ * Memoised per user. Clerk may return a new getToken function between renders,
+ * so the client reads it through a ref instead of rebuilding on function identity.
  */
 export function useApi(): BrandthreadApi {
   const { getToken, userId } = useAuth();
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
   return useMemo(
-    () => createApi(async () => getToken(), () => userId ?? 'anonymous'),
-    [getToken, userId],
+    () => createApi(async () => getTokenRef.current(), () => userId ?? 'anonymous'),
+    [userId],
   );
 }
 

@@ -7,7 +7,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 
 import {
   BORDER,
@@ -52,6 +52,7 @@ const INACTIVE_COLOR = 'rgba(244,244,255,0.40)';
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const api = useApi();
   const { userId } = useAuth();
   const { theme } = useAppTheme();
@@ -177,7 +178,11 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
             canPreventDefault: true,
           });
           if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name);
+            if (route.name === 'profile') {
+              router.replace('/(tabs)/profile');
+            } else {
+              navigation.navigate(route.name);
+            }
           }
         };
 

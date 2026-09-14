@@ -226,17 +226,17 @@ export default function ProfileScreen() {
 
   return (
     <>
-    {initialLoading ? (
-      <View style={[s.loadingScreen, { backgroundColor: 'transparent' }]}>
-        <ActivityIndicator size="large" color={theme.accent} />
-        <Text style={s.loadingText}>Loading your brand…</Text>
-      </View>
-    ) : (
     <ScrollView
       style={[s.root, { backgroundColor: 'transparent' }]}
       contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 120 }}
       showsVerticalScrollIndicator={false}
     >
+      {initialLoading && (
+        <View style={s.loadingInline} accessibilityLiveRegion="polite">
+          <ActivityIndicator size="small" color={theme.accent} />
+          <Text style={s.loadingText}>Loading profile details…</Text>
+        </View>
+      )}
       {/* ── Top bar: brand name + icons ── */}
       <View style={s.topBar}>
         <TouchableOpacity
@@ -521,7 +521,6 @@ export default function ProfileScreen() {
       </View>
       )}
     </ScrollView>
-    )}
 
       {/* ── Profile Editor Modal ── */}
       <Modal
@@ -619,7 +618,14 @@ export default function ProfileScreen() {
 
 const s = StyleSheet.create({
   root: { flex: 1 },
-  loadingScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+  loadingInline: {
+    minHeight: 40,
+    paddingHorizontal: SP.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SP.sm,
+  },
   loadingText: { color: MUTED, fontSize: FS.sm, fontFamily: FONT.medium },
   loadError: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
