@@ -11,6 +11,8 @@
     "native:prebuild": "node scripts/native-prebuild.js",
     "serve": "node server/serve.js",
     "test": "vitest run",
+    "test:navigation:web": "node tests/navigation-scene-isolation.web.mjs",
+    "test:navigation:native": "vitest run tests/navigation-scene-isolation.native.test.tsx tests/navigation-scene-isolation.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "verify:app-identity": "node scripts/verify-app-identity.js",
     "verify:apple-auth": "node scripts/verify-apple-auth.js",

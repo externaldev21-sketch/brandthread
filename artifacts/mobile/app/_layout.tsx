@@ -108,9 +108,10 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 // Set to 'buyer' or 'seller' to jump straight to that dashboard on device.
 // Set back to null when you're ready to test real sign-in.
 const DEV_BYPASS_ROLE: 'buyer' | 'seller' | null = null;
+const NAVIGATION_ISOLATION_TEST = process.env.EXPO_PUBLIC_NAVIGATION_ISOLATION_TEST === '1';
 
 const PREVIEW_ROLE: 'buyer' | 'seller' | null = (() => {
-  if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  if ((!__DEV__ && !NAVIGATION_ISOLATION_TEST) || Platform.OS !== 'web' || typeof window === 'undefined') return null;
   const v = new URLSearchParams(window.location.search).get('bt_preview');
   return v === 'buyer' ? 'buyer' : 'seller';
 })();
@@ -143,7 +144,7 @@ const DEV_FORCE_ONBOARDING_START = false;
 
 // Screens that don't require authentication
 const AUTH_SCREENS = ['sign-in', 'forgot-password', 'splash'];
-const PUBLIC_SCREENS = ['privacy', 'terms'];
+const PUBLIC_SCREENS = ['privacy', 'terms', ...(NAVIGATION_ISOLATION_TEST ? ['navigation-isolation-probe'] : [])];
 
 // ─── Auth gate ────────────────────────────────────────────────────────────────
 function AuthGate() {
@@ -593,6 +594,9 @@ function RootLayoutNav() {
         {/* Main app */}
         <Stack.Screen name="(tabs)"         options={{ headerShown: false }} />
         <Stack.Screen name="(buyer)"        options={{ headerShown: false }} />
+        {NAVIGATION_ISOLATION_TEST ? (
+          <Stack.Screen name="navigation-isolation-probe" options={{ headerShown: false, animation: 'none', presentation: 'card', contentStyle: OPAQUE_SCREEN_CONTENT }} />
+        ) : null}
         {/* Feature screens */}
         <Stack.Screen name="chat/[id]"        options={{ headerShown: false, animation: 'slide_from_right' }} />
         <Stack.Screen name="camera-capture"    options={{ headerShown: false, animation: 'slide_from_bottom', presentation: 'fullScreenModal', contentStyle: OPAQUE_SCREEN_CONTENT }} />

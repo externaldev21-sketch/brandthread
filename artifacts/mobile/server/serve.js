@@ -10,7 +10,11 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const STATIC_ROOT = path.resolve(__dirname, '..', 'static-build');
+const STATIC_ROOT = path.resolve(
+  __dirname,
+  '..',
+  process.env.EXPO_WEB_BUILD_DIR || 'static-build',
+);
 const GENERATED_HOST = 'brandthread.replit.app';
 const CANONICAL_ORIGIN = 'https://brandthread.app';
 const basePath = (process.env.BASE_PATH || '/').replace(/\/+$/, '');
