@@ -8,7 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApi } from '@/lib/api';
 import { formatCents } from '@/lib/money';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
-import { completeTask } from '@/lib/setupStore';
+import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 
 const SHIPMENTS = [
   { id: 'SH-8821', customer: 'Jordan Lee', carrier: 'UPS', status: 'In Transit', eta: 'Jul 10', progress: 70 },
@@ -83,8 +83,10 @@ export default function ShippingScreen() {
             }
             try {
               setRatesLoading(true);
-              const newRate = await api.shippingRates.create({ name: name.trim(), flatRateCents: cents });
-               await completeTask('shipping_rates');
+              const newRate = await completeSetupTaskAfter(
+                'shipping_rates',
+                () => api.shippingRates.create({ name: name.trim(), flatRateCents: cents }),
+              );
               setShippingRates(prev => [...prev, newRate]);
             } catch (e: any) {
               Alert.alert('Error', e?.message ?? 'Could not create shipping rate.');

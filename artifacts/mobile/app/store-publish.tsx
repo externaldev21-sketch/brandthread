@@ -18,7 +18,7 @@ import { BrandthreadCard, GradientCard, PrimaryButton, SecondaryButton, StatusBa
 import { getStorefront, validateStore, publishStore, unpublishStore, StoreValidationResult } from '@/services/storeService';
 import { Storefront } from '@/services/storeTypes';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
-import { completeTask } from '@/lib/setupStore';
+import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 
 const ERROR_ROUTES: Record<string, string> = {
   'Store name is required.': '/store-settings',
@@ -53,9 +53,7 @@ export default function StorePublishScreen() {
       const s = await getStorefront();
       setStore(s);
       setPublished(s.publishStatus === 'published');
-      if (s.publishStatus === 'published') {
-        await completeTask('publish_store');
-      }
+      await completeSetupTaskWhen('publish_store', s.publishStatus === 'published');
       const v = await validateStore();
       setValidation(v);
     } finally {
@@ -79,7 +77,7 @@ export default function StorePublishScreen() {
             try {
               const result = await publishStore();
               if (result.success) {
-                await completeTask('publish_store');
+                await completeSetupTaskWhen('publish_store', result.success);
                 setPublished(true);
                 await doValidate();
               } else {

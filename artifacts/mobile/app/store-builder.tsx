@@ -27,7 +27,7 @@ import {
   THREAD_THEME_LIGHT_PALETTE,
 } from '@/services/storeTypes';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
-import { completeTask } from '@/lib/setupStore';
+import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 
 function getStatusVariant(status: StorePublishStatus): 'success' | 'info' | 'warning' | 'error' | 'neutral' | 'purple' {
   switch (status) {
@@ -190,8 +190,10 @@ export default function StoreBuilderScreen() {
     if (startingTheme) return;
     setStartingTheme(true);
     try {
-      await applyTheme(THREAD_THEME_ID, 'light');
-      await completeTask('customize_store');
+      await completeSetupTaskAfter(
+        'customize_store',
+        () => applyTheme(THREAD_THEME_ID, 'light'),
+      );
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.push('/store-editor' as never);
     } catch {

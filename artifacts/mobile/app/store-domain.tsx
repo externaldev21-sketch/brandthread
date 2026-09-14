@@ -19,7 +19,7 @@ import { getStorefront, updateDomain } from '@/services/storeService';
 import { useApi } from '@/lib/api';
 import { StoreDomain } from '@/services/storeTypes';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
-import { completeTask } from '@/lib/setupStore';
+import { completeSetupTaskWhen } from '@/lib/setupCompletion';
 
 type MergedDomain = StoreDomain & { dnsToken?: string };
 
@@ -66,9 +66,10 @@ export default function StoreDomainScreen() {
         dnsToken:           d.verifyToken,
       }));
       setDomains([...(btDomain ? [btDomain] : []), ...customFromApi]);
-      if (customFromApi.some(domain => domain.verificationStatus === 'verified')) {
-        await completeTask('connect_domain');
-      }
+      await completeSetupTaskWhen(
+        'connect_domain',
+        customFromApi.some(domain => domain.verificationStatus === 'verified'),
+      );
     } catch {
       setDomains(localDomains);
     }
@@ -114,7 +115,7 @@ export default function StoreDomainScreen() {
       if (verifiedDomain?.verified !== true) {
         throw new Error('Domain verification is still pending.');
       }
-      await completeTask('connect_domain');
+      await completeSetupTaskWhen('connect_domain', verifiedDomain?.verified === true);
       await load();
       Alert.alert('Verified ✓', 'Your domain is verified and SSL is being issued.');
     } catch {

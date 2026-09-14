@@ -19,7 +19,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { formatCents } from '@/lib/money';
 import { getEntitlementRejection } from '@/lib/entitlementError';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
-import { completeTask } from '@/lib/setupStore';
+import { completeSetupTaskAfter, completeSetupTaskWhen } from '@/lib/setupCompletion';
 import {
   BG, SURFACE, CARD, CARD_ELEVATED, CARD_GLASS, CARD_ELEVATED_GLASS, SURFACE_GLASS, BORDER, BORDER_ACTIVE,
   FG, MUTED, SUBTLE, PURPLE, PURPLE_LIGHT, PURPLE_DIM,
@@ -396,8 +396,10 @@ function DiscoverTab({ router }: { router: ReturnType<typeof useRouter> }) {
         await unfavoriteManufacturer(mfg.id);
         setSavedIds(prev => { const s = new Set(prev); s.delete(mfg.id); return s; });
       } else {
-        await saveManufacturer(mfg.id);
-        await completeTask('connect_manufacturer');
+        await completeSetupTaskAfter(
+          'connect_manufacturer',
+          () => saveManufacturer(mfg.id),
+        );
         setSavedIds(prev => new Set(prev).add(mfg.id));
       }
     } catch (e) {
@@ -757,7 +759,7 @@ function MyManufacturersTab({ router }: { router: ReturnType<typeof useRouter> }
       const rels = await getRelationships();
       const safeRels = Array.isArray(rels) ? rels : [];
       setRelationships(safeRels);
-      if (safeRels.length > 0) await completeTask('connect_manufacturer');
+      await completeSetupTaskWhen('connect_manufacturer', safeRels.length > 0);
       const map: Record<string, Manufacturer> = {};
       await Promise.all(safeRels.map(async rel => {
         const mfg = await getManufacturer(rel.manufacturerId);

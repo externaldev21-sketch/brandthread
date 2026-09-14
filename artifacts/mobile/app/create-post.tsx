@@ -36,7 +36,7 @@ import { formatCents } from '@/lib/money';
 import { useApi } from '@/lib/api';
 import { markVideoClipUploaded, normalizeTrimBounds } from '@/lib/videoEditing';
 import { isSellerSetupOrigin, SELLER_HOME_ROUTE } from '@/lib/setupNavigation';
-import { completeTask } from '@/lib/setupStore';
+import { completeSetupTaskAfter } from '@/lib/setupCompletion';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const BG     = '#0A0A0B';
@@ -1137,8 +1137,11 @@ export default function CreatePostScreen() {
                 setIsPublishing(true);
                 setStep('publishing');
                 try {
-                  await persistSellerPost(false);
-                  if (!editId) await completeTask('first_post');
+                  if (editId) {
+                    await persistSellerPost(false);
+                  } else {
+                    await completeSetupTaskAfter('first_post', () => persistSellerPost(false));
+                  }
                   setStep('done');
                  } catch (error) {
                   setStep('post-details');
