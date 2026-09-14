@@ -180,7 +180,7 @@ export default function StorePreview() {
             colors={[primaryColor, accentColor]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
           >
             <View style={previewStyles.heroContent}>
               <Text style={[previewStyles.heroHeading, { color: '#fff' }]} numberOfLines={1}>

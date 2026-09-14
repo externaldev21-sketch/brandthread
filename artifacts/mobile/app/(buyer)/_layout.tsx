@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View, useColorScheme, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
@@ -228,7 +228,7 @@ function TabIcon({
   name, color, focused, accent,
 }: {
   name: keyof typeof Feather.glyphMap;
-  color: string;
+  color: ColorValue;
   focused: boolean;
   accent: string;
 }) {

@@ -998,7 +998,7 @@ const s = StyleSheet.create({
     backgroundColor: SCREEN_BG,
   },
   loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     top: 72,
     backgroundColor: SCREEN_BG,
     zIndex: 10,

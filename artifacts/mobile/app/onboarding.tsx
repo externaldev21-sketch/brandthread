@@ -2565,7 +2565,7 @@ const sm = StyleSheet.create({
   accountTypeStepWrap: { paddingHorizontal: 0 },
   footer:    { paddingHorizontal: 24, paddingTop: 8 },
   backgroundDim: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(7,7,15,0.34)',
   },
 

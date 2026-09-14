@@ -14,7 +14,6 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import * as MediaLibrary from 'expo-media-library';
 import { File, Paths } from 'expo-file-system';
 import { useApi } from '@/hooks/useApi';
 
@@ -70,6 +69,7 @@ export default function BackgroundRemovalScreen() {
     if (!resultB64 || saving) return;
     setSaving(true);
     try {
+      const MediaLibrary = await import('expo-media-library');
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission needed', 'Please allow photo library access to save your image.');

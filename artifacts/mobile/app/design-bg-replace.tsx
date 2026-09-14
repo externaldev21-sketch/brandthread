@@ -334,7 +334,7 @@ const createStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
   resultLabel:        { fontSize: FS.base, fontFamily: FONT.semibold, color: PURPLE_LIGHT },
   resultActions:      { gap: SP.sm, paddingHorizontal: SP.md, marginTop: SP.sm },
   actionBtn:          { width: '100%' },
-  overlay:            { ...StyleSheet.absoluteFillObject, backgroundColor: OVERLAY, alignItems: 'center', justifyContent: 'center', zIndex: 99 },
+  overlay:            { ...StyleSheet.absoluteFill, backgroundColor: OVERLAY, alignItems: 'center', justifyContent: 'center', zIndex: 99 },
   overlayCard:        { width: 280, padding: 0, overflow: 'hidden' },
   overlayGrad:        { alignItems: 'center', gap: SP.md, padding: SP.xl, borderRadius: RADIUS.lg },
   overlayTitle:       { fontSize: FS.lg, fontFamily: FONT.bold, color: FG },

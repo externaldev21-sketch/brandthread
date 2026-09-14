@@ -304,7 +304,7 @@ function LiveStreamPage({ stream, onJoin }: { stream: LiveStreamFeedItem; onJoin
   return (
     <View style={{ width: SCREEN_W, height: SCREEN_H, backgroundColor: '#0a0209' }}>
       {/* Gradient background */}
-      <View style={{ ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(10,80,100,0.18)' }} />
+      <View style={{ ...StyleSheet.absoluteFill, backgroundColor: 'rgba(10,80,100,0.18)' }} />
       {/* Centre glow */}
       <View style={{ position: 'absolute', top: SCREEN_H * 0.25, alignSelf: 'center', width: 280, height: 280, borderRadius: 140, backgroundColor: theme.accentDim }} />
 
@@ -1400,7 +1400,7 @@ export default function FeedScreen({ buyerMode = false }: { buyerMode?: boolean 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: SCREEN_BG },
 
-  pauseOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
+  pauseOverlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
   mediaPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#17131D' },
   heartBurst: { position: 'absolute', top: '38%', left: '50%', marginLeft: -55, marginTop: -55 },
   mediaDots: { position: 'absolute', top: '50%', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', gap: 5 },

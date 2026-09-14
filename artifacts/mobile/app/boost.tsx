@@ -598,7 +598,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => {
     overflow: 'hidden',
     position: 'relative',
   },
-  tileScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.16)' },
+  tileScrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.16)' },
   tileCaption: {
     position: 'absolute', left: 7, right: 7, bottom: 7,
     color: '#fff', fontFamily: FONT.semibold, fontSize: 11, lineHeight: 14,
@@ -609,7 +609,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => {
     alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.62)',
   },
   thumbnailFallback: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: CARD_ELEVATED,

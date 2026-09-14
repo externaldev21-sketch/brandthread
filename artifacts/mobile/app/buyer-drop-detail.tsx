@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: SP.md },
   productTile: { width: (W - SP.md * 2 - 10) / 2, borderRadius: RADIUS.sm, overflow: 'hidden', backgroundColor: CARD },
   productMedia: { height: (W - SP.md * 2 - 10) * 0.68, justifyContent: 'flex-end' },
-  productFallback: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: CARD },
+  productFallback: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: CARD },
   productCaption: { padding: 11 },
   productName: { color: ON_DARK, fontFamily: FONT.bold, fontSize: FS.sm, lineHeight: 17 },
   productCategory: { color: ON_DARK_MUTED, fontFamily: FONT.semibold, fontSize: 8, letterSpacing: 1.1, marginTop: 5 },

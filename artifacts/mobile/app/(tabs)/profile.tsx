@@ -737,7 +737,7 @@ const s = StyleSheet.create({
 
   // Profile editor sheet
   sheetModal:       { flex: 1, justifyContent: 'flex-end' },
-  sheetBackdrop:    { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.68)' },
+  sheetBackdrop:    { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.68)' },
   sheet: {
     backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
     borderTopWidth: 1, borderColor: BORDER, paddingHorizontal: SP.md, paddingTop: SP.sm, paddingBottom: 26,

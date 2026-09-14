@@ -504,7 +504,7 @@ export default function DateRangePicker({ visible, current, onApply, onClose }: 
 
 const styles = StyleSheet.create({
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: '#00000055',
   },
   sheet: {

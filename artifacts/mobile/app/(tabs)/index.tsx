@@ -1294,7 +1294,7 @@ const s = StyleSheet.create({
 
   // ─── Modals ────────────────────────────────────────────────────────────────
   modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.6)',
   },
   bottomSheet: {

@@ -24,7 +24,14 @@ import type {
 } from '@/services/socialTypes';
 import { useApi } from '@/lib/api';
 import * as ImagePicker from 'expo-image-picker';
-import { Audio } from 'expo-av';
+import {
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioPlayer,
+  useAudioPlayerStatus,
+  useAudioRecorder,
+} from 'expo-audio';
 import { useColors } from '@/hooks/useColors';
 import { useAppTheme } from '@/contexts/AppThemeContext';
 import { formatCents } from '@/lib/money';
@@ -146,8 +153,9 @@ export default function BuyerConversationScreen() {
   const [isUploading, setIsUploading]         = useState(false);
   const [playingVoiceUri, setPlayingVoiceUri] = useState<string | null>(null);
   const [showMediaSheet, setShowMediaSheet]   = useState(false);
-  const recordingRef = useRef<Audio.Recording | null>(null);
-  const soundRef     = useRef<any>(null);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const voicePlayer = useAudioPlayer(null);
+  const voicePlayerStatus = useAudioPlayerStatus(voicePlayer);
 
   // Attachment state
   const [selectedAttachment, setSelectedAttachment] = useState<MessageAttachment | null>(null);
@@ -217,6 +225,10 @@ export default function BuyerConversationScreen() {
       setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
     }
   }, [messages.length]);
+
+  useEffect(() => {
+    if (voicePlayerStatus.didJustFinish) setPlayingVoiceUri(null);
+  }, [voicePlayerStatus.didJustFinish]);
 
   // ── Derived ─────────────────────────────────────────────────────────────────
 
@@ -370,12 +382,10 @@ export default function BuyerConversationScreen() {
   async function handleToggleRecording() {
     if (isRecording) {
       setIsRecording(false);
-      const rec = recordingRef.current;
-      recordingRef.current = null;
-      if (!rec) return;
       try {
-        await rec.stopAndUnloadAsync();
-        const uri = rec.getURI();
+        await recorder.stop();
+        const status = recorder.getStatus();
+        const uri = recorder.uri ?? status.url;
         if (!uri) return;
         setIsUploading(true);
         const response = await fetch(uri);
@@ -387,17 +397,20 @@ export default function BuyerConversationScreen() {
           binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + CHUNK, bytes.byteLength)));
         }
         const url = await uploadMedia(btoa(binary), 'audio/m4a', 'm4a');
-        const st = await rec.getStatusAsync();
-        const dur = Math.round(((st as any).durationMillis ?? 0) / 1000);
+        const dur = Math.round(status.durationMillis / 1000);
         setSelectedAttachment({ type: 'voice', uri: url, title: 'Voice message', meta: { duration: String(dur) } });
       } catch { Alert.alert('Recording error', 'Could not save voice message. Please try again.'); }
-      finally { setIsUploading(false); }
+      finally {
+        setIsUploading(false);
+        void setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
+      }
     } else {
       try {
-        await Audio.requestPermissionsAsync();
-        await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-        const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-        recordingRef.current = recording;
+        const permission = await requestRecordingPermissionsAsync();
+        if (!permission.granted) throw new Error('Microphone permission denied');
+        await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+        await recorder.prepareToRecordAsync();
+        recorder.record();
         setIsRecording(true);
       } catch { Alert.alert('Mic unavailable', 'Could not access microphone. Check permissions in Settings.'); }
     }
@@ -407,23 +420,16 @@ export default function BuyerConversationScreen() {
 
   async function handlePlayVoice(uri: string) {
     if (playingVoiceUri === uri) {
-      await soundRef.current?.stopAsync().catch(() => {});
-      await soundRef.current?.unloadAsync().catch(() => {});
-      soundRef.current = null;
+      voicePlayer.pause();
+      await voicePlayer.seekTo(0).catch(() => {});
       setPlayingVoiceUri(null);
       return;
     }
-    await soundRef.current?.stopAsync().catch(() => {});
-    await soundRef.current?.unloadAsync().catch(() => {});
-    soundRef.current = null;
+    voicePlayer.pause();
     try {
       setPlayingVoiceUri(uri);
-      const { sound } = await Audio.Sound.createAsync({ uri });
-      soundRef.current = sound;
-      await sound.playAsync();
-      sound.setOnPlaybackStatusUpdate((st: any) => {
-        if (st.didJustFinish) { soundRef.current = null; setPlayingVoiceUri(null); }
-      });
+      voicePlayer.replace({ uri });
+      voicePlayer.play();
     } catch { setPlayingVoiceUri(null); }
   }
 

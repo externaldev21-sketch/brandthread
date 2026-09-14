@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 7 },
   },
   pressed: { transform: [{ scale: 0.92 }], opacity: 0.9 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.68)' },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.68)' },
   sheet: {
     position: 'absolute',
     left: 0,

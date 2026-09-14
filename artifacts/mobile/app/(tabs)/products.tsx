@@ -899,7 +899,7 @@ const s = StyleSheet.create({
 
 const as = StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: 'rgba(0,0,0,0.72)',
   },
   sheet: {

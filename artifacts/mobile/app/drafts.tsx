@@ -459,7 +459,7 @@ const createStyles = (colors: ReturnType<typeof useColors>) => StyleSheet.create
     height: SP.sm,
   },
   loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(7,7,15,0.6)',

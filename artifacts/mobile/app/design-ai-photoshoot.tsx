@@ -29,7 +29,6 @@ import {
 } from '@/services/designService';
 import { useApi } from '@/hooks/useApi';
 import { File, Paths } from 'expo-file-system';
-import * as MediaLibrary from 'expo-media-library';
 
 const { width: SW } = Dimensions.get('window');
 const COL_W = (SW - SP.lg * 2 - SP.sm) / 2;
@@ -124,6 +123,7 @@ export default function AIPhotoshootScreen() {
   }, [api]);
 
   async function saveDataUriToDevice(dataUri: string): Promise<void> {
+    const MediaLibrary = await import('expo-media-library');
     const { status } = await MediaLibrary.requestPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission required', 'Please allow photo library access to save images.');

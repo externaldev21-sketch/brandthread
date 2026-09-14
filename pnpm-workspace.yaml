@@ -75,8 +75,8 @@ onlyBuiltDependencies:
   - unrs-resolver
 
 overrides:
-  "@types/react": "19.1.17"
-  "@types/react-dom": "19.1.7"
+  "@types/react": "19.2.18"
+  "@types/react-dom": "19.2.7"
   # replit uses linux-x64 only, we can exclude all other platforms
   "esbuild>@esbuild/darwin-arm64": "-"
   "esbuild>@esbuild/darwin-x64": "-"

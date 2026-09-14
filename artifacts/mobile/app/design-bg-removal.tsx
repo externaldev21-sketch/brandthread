@@ -22,7 +22,6 @@ import { useAuth } from '@clerk/expo';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
-import * as MediaLibrary from 'expo-media-library';
 import { File, Paths } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -325,6 +324,7 @@ export default function DesignBgRemovalScreen() {
   async function handleExportPNG() {
     if (!result || !resultDisplayUri) return;
     try {
+      const MediaLibrary = await import('expo-media-library');
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert('Permission required', 'Allow photo library access to export the PNG.');

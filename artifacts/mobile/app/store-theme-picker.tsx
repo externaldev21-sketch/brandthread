@@ -348,7 +348,7 @@ const makeStyles = (theme: ReturnType<typeof useAppTheme>['theme']) => {
     position: 'relative',
   },
   swatchGradient: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   colorDots: {
     position: 'absolute',

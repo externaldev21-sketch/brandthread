@@ -1008,7 +1008,7 @@ const styles = StyleSheet.create({
   collectionCount: { color: MUTED, fontSize: FS.xs, fontFamily: FONT.medium, marginBottom: 3 },
 
   // Action sheet
-  modalOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.55)' },
+  modalOverlay: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0,0,0,0.55)' },
   actionSheet: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: CARD, borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl,
