@@ -20,9 +20,10 @@ description: How the Brandthread API client is exported and wired; which pattern
 ## Rule
 
 **React components** → `const api = useApi()` at the top of the component. Its identity must remain stable for the active user even if Clerk changes the `getToken` function identity; read the latest token getter through a ref.  
+**Compatibility hook paths** → re-export the canonical hook; never implement a second Clerk-bound memoization strategy.
 **Non-component module code or legacy imports** → `api` singleton (requires ServiceConfigurer to have run first).
 
-**Why:** `useApi` was missing from the file for many sessions, causing runtime `undefined` errors. Rebuilding the client whenever Clerk changes `getToken` identity also creates effect loops in screens whose loaders depend on `api`. The singleton + configureApi pattern supports non-hook callsites.
+**Why:** `useApi` was missing from the file for many sessions, causing runtime `undefined` errors. Rebuilding the client whenever Clerk changes `getToken` identity creates effect loops, request storms, rate limiting, and visible layout churn in screens whose loaders depend on `api`. The singleton + configureApi pattern supports non-hook callsites.
 
 ## Story + feed-posting architecture (migration 011)
 

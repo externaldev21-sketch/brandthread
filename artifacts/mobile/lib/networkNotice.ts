@@ -105,7 +105,6 @@ export function classifyNetworkError(error: unknown): NetworkNoticeKind | null {
     return status >= 500 || status === 408 ? 'server' : null;
   }
   if (
-    error instanceof TypeError ||
     /network request failed|failed to fetch|network error|internet connection|offline/i.test(message)
   ) {
     return 'offline';

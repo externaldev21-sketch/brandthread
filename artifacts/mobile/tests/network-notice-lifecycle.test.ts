@@ -18,6 +18,10 @@ describe('network notice lifecycle', () => {
     expect(classifyNetworkError(new ApiError(429, 'Too many requests'))).toBeNull();
   });
 
+  it('does not present unrelated programming TypeErrors as offline', () => {
+    expect(classifyNetworkError(new TypeError('Cannot read properties of undefined'))).toBeNull();
+  });
+
   it('expires a transient connectivity notice', () => {
     vi.useFakeTimers();
     reportNetworkError(new TypeError('Failed to fetch'));

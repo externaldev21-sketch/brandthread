@@ -293,8 +293,6 @@ export default function SellerHomeScreen() {
   } | null>(null);
   const [billingPortalLoading, setBillingPortalLoading] = useState(false);
 
-  const dashboardScrollY = useRef(new Animated.Value(0)).current;
-
   useEffect(() => {
     if (!userId) {
       setUnseenOrderCount(0);
@@ -602,33 +600,11 @@ export default function SellerHomeScreen() {
         </View>
       </View>
 
-      <Animated.View
-        pointerEvents="box-none"
-        style={[
-          s.compactBalanceWrap,
-          {
-            height: dashboardScrollY.interpolate({ inputRange: [72, 132], outputRange: [0, 52], extrapolate: 'clamp' }),
-            opacity: dashboardScrollY.interpolate({ inputRange: [84, 126], outputRange: [0, 1], extrapolate: 'clamp' }),
-          },
-        ]}
-      >
-        <PressableScale style={[s.compactBalance, { borderColor: theme.accentDim }]} onPress={() => nav('/payouts')} accessibilityLabel="Open payouts">
-          <View style={[s.compactBalanceIcon, { backgroundColor: theme.accentDim }]}>
-            <Feather name="credit-card" size={15} color={theme.accent} />
-          </View>
-          <Text style={s.compactBalanceLabel}>Available</Text>
-          <Text style={s.compactBalanceValue}>{payoutInfo === null ? '· · ·' : (payoutInfo?.available?.formatted ?? '$0.00')}</Text>
-          <Feather name="chevron-right" size={16} color={MUTED} />
-        </PressableScale>
-      </Animated.View>
-
       <Animated.ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: 160 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        scrollEventThrottle={16}
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: dashboardScrollY } } }], { useNativeDriver: false })}
       >
         <StripeConnectWarning />
 
@@ -998,42 +974,6 @@ const s = StyleSheet.create({
     color: FG,
     letterSpacing: -0.3,
   },
-  compactBalanceWrap: {
-    overflow: 'hidden',
-    backgroundColor: SCREEN_BG,
-    zIndex: 20,
-  },
-  compactBalance: {
-    height: 44,
-    marginHorizontal: SP.md,
-    marginTop: 4,
-    paddingHorizontal: SP.sm,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    backgroundColor: SELLER_DASHBOARD_GLASS,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SP.sm,
-  },
-  compactBalanceIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: RADIUS.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  compactBalanceLabel: {
-    flex: 1,
-    color: MUTED,
-    fontFamily: FONT.medium,
-    fontSize: FS.xs,
-  },
-  compactBalanceValue: {
-    color: FG,
-    fontFamily: FONT.bold,
-    fontSize: FS.md,
-  },
-
   // ─── Unified System ────────────────────────────────────────────────────────
   pageSection: {
     paddingHorizontal: SP.md,

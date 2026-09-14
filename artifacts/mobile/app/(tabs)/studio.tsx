@@ -5,10 +5,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import AIBrainFAB from '@/components/AIBrainFAB';
-import SellerTutorialOverlay from '@/components/SellerTutorialOverlay';
 import PlanUpsellModal from '@/components/PlanUpsellModal';
 import { useSubscriptionPlan } from '@/hooks/useSubscriptionPlan';
-import { useApi } from '@/lib/api';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, useWindowDimensions, Alert, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
@@ -119,7 +117,6 @@ export default function StudioScreen() {
   const cols    = getColumns(windowWidth);
   const toolCardWidth = cardWidth(windowWidth, cols);
 
-  const api = useApi();
   const { hasPlan, loading: planLoading, error: planError, retry: retryPlan } = useSubscriptionPlan();
 
   const [dismissedTips,  setDismissedTips]  = useState<string[]>([]);
@@ -127,7 +124,6 @@ export default function StudioScreen() {
   const [projects,       setProjects]       = useState<DesignProject[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [projectsError,  setProjectsError]  = useState<string | null>(null);
-  const [showTutorial,   setShowTutorial]   = useState(false);
 
   // Plan upsell state
   const [upsellVisible,  setUpsellVisible]  = useState(false);
@@ -149,24 +145,6 @@ export default function StudioScreen() {
   }, []);
 
   useEffect(() => { loadProjects(); }, [loadProjects]);
-
-  // Check if first-time seller — show tutorial overlay once
-  useEffect(() => {
-    (async () => {
-      try {
-        const seen = await AsyncStorage.getItem('bt:seller:tutorial_seen:v1');
-        if (!seen) setShowTutorial(true);
-      } catch { /* non-fatal */ }
-    })();
-  }, []);
-
-  const handleDismissTutorial = useCallback(async () => {
-    setShowTutorial(false);
-    try {
-      await AsyncStorage.setItem('bt:seller:tutorial_seen:v1', 'true');
-      api.seller.markTutorialSeen().catch(() => {});
-    } catch { /* non-fatal */ }
-  }, [api]);
 
   // load dismissed tips
   useEffect(() => {
@@ -193,25 +171,22 @@ export default function StudioScreen() {
   const handleToolPress = useCallback(async (tool: StudioTool) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    if (planError) {
-      retryPlan();
-      return;
-    }
-
-    if (planLoading) return;
-
     // Gate Growth-only tools for Starter sellers
-    if (GROWTH_REQUIRED_TOOLS.has(tool.id) && !hasPlan('growth')) {
+    if (
+      GROWTH_REQUIRED_TOOLS.has(tool.id) &&
+      (planLoading || !!planError || !hasPlan('growth'))
+    ) {
+      if (planError) retryPlan();
       setUpsellFeature(tool.title);
       setUpsellVisible(true);
       return;
     }
 
-    if (tool.badge) {
-      await markFeatureOpened(tool.id);
-      setOpenedFeatures(prev => [...prev, tool.id]);
-    }
     router.push(tool.route as never);
+    if (tool.badge) {
+      setOpenedFeatures(prev => [...prev, tool.id]);
+      void markFeatureOpened(tool.id).catch(() => {});
+    }
   }, [router, hasPlan, planError, planLoading, retryPlan]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -421,8 +396,6 @@ export default function StudioScreen() {
 
       </ScrollView>
       <AIBrainFAB context={{ screen: 'design_studio' as const }} bottomOffset={72} />
-      <SellerTutorialOverlay visible={showTutorial} onDismiss={handleDismissTutorial} />
-
       {/* Plan upsell modal — shown when Starter seller taps a Growth-only tool */}
       <PlanUpsellModal
         visible={upsellVisible}

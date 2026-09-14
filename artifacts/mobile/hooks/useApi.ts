@@ -1,12 +1,6 @@
-import { useAuth } from '@clerk/expo';
-import { useMemo } from 'react';
-import { createApi } from '@/lib/api';
-
 /**
  * Returns a fully-typed API client bound to the current Clerk session token.
- * Re-creates the client only when the auth state changes.
+ * Keep this compatibility path pointed at the canonical stable hook so screens
+ * cannot accidentally recreate their API client on Clerk getToken identity changes.
  */
-export function useApi() {
-  const { getToken } = useAuth();
-  return useMemo(() => createApi(() => getToken()), [getToken]);
-}
+export { useApi } from '@/lib/api';

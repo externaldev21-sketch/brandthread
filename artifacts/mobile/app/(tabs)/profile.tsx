@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image,
   KeyboardAvoidingView, Modal, Platform, TextInput,
-  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Feather } from '@expo/vector-icons';
@@ -72,7 +71,6 @@ export default function ProfileScreen() {
   const [bioInput, setBioInput] = useState('');
   const [savingProfile, setSavingProfile] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
 
   const loadPosts = useCallback(async () => {
@@ -141,11 +139,12 @@ export default function ProfileScreen() {
     }
   }, [api]);
 
-  const loadPage = useCallback(async () => {
+  const loadPage = useCallback(() => {
     setLoadError(false);
-    setInitialLoading(true);
-    await Promise.all([loadPosts(), loadMyStories(), loadProfile(), loadSocialCounts()]);
-    setInitialLoading(false);
+    void loadPosts();
+    void loadMyStories();
+    void loadSocialCounts();
+    void loadProfile();
   }, [loadPosts, loadMyStories, loadProfile, loadSocialCounts]);
 
   useEffect(() => {
@@ -231,12 +230,6 @@ export default function ProfileScreen() {
       contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 120 }}
       showsVerticalScrollIndicator={false}
     >
-      {initialLoading && (
-        <View style={s.loadingInline} accessibilityLiveRegion="polite">
-          <ActivityIndicator size="small" color={theme.accent} />
-          <Text style={s.loadingText}>Loading profile details…</Text>
-        </View>
-      )}
       {/* ── Top bar: brand name + icons ── */}
       <View style={s.topBar}>
         <TouchableOpacity
@@ -618,15 +611,6 @@ export default function ProfileScreen() {
 
 const s = StyleSheet.create({
   root: { flex: 1 },
-  loadingInline: {
-    minHeight: 40,
-    paddingHorizontal: SP.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SP.sm,
-  },
-  loadingText: { color: MUTED, fontSize: FS.sm, fontFamily: FONT.medium },
   loadError: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     marginHorizontal: SP.md, marginBottom: SP.md, padding: 12,
