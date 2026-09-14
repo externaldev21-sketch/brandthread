@@ -44,9 +44,9 @@ const CARD   = '#18181B';
 const BORDER = 'rgba(255,255,255,0.07)';
 const FG     = '#F4F4FF';
 const MUTED  = 'rgba(244,244,255,0.50)';
-const BLUE   = '#3B82F6';
+const BLUE   = '#D4D4D8';
 const ORANGE = '#F97316';
-const PINK   = '#EC4899';
+const PINK   = '#A1A1AA';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 

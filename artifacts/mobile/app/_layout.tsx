@@ -81,7 +81,7 @@ if (Platform.OS !== 'web') {
       name:       'Brandthread',
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#5B5CFF',
+      lightColor: '#F7F7FA',
     });
     Notifications.setNotificationChannelAsync('orders', {
       name:       'Orders',
@@ -89,7 +89,7 @@ if (Platform.OS !== 'web') {
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       sound: 'order-received.wav',
-      lightColor: '#5B5CFF',
+      lightColor: '#F7F7FA',
     });
   }
 }

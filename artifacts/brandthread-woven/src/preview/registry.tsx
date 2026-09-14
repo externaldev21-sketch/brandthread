@@ -21,7 +21,7 @@ export type NavGroup = { name: string; entries: PreviewEntry[] };
 
 export const DESIGN_SYSTEM = {
   title: 'Brandthread',
-  description: 'A true-black fashion-commerce system with bold sans typography and one confident blue-violet accent.',
+  description: 'A true-black fashion-commerce system with bold sans typography and a strict grayscale hierarchy.',
 } as const;
 
 export const OVERVIEW_ENTRY: PreviewEntry = {
@@ -35,7 +35,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     name: 'Foundations',
     entries: [
-      { id: 'colors', name: 'Color', description: 'True black, neutral graphite, and one saturated blue-violet accent.', Page: ColorsPage },
+      { id: 'colors', name: 'Color', description: 'True black, white, and neutral graphite with semantic color reserved for status meaning.', Page: ColorsPage },
       { id: 'type', name: 'Typography', description: 'Bold, confident sans-serif hierarchy.', Page: FontsPage },
       { id: 'layout', name: 'Layout', description: 'Tighter radii, deliberate spacing, full-bleed media.', Page: LayoutPage },
     ],

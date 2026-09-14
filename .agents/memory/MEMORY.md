@@ -1,6 +1,6 @@
-- [Brandthread theme](brandthread-theme.md) — true-black buyer/seller chrome uses one #5B5CFF accent; no accent-wash panels or decorative thread motifs.
+- [Brandthread theme](brandthread-theme.md) — buyer/seller chrome is strictly black, white, and gray; color is reserved for semantic status and authored content.
 - [Brandthread design system](brandthread-woven-system.md) — Inter hierarchy and clean primitives replace the retired Woven/thread/stitch presentation.
-- [Runtime app themes](runtime-app-themes.md) — legacy theme IDs remain compatible but all resolve to the canonical blue-violet accent and neutral shell.
+- [Runtime app themes](runtime-app-themes.md) — legacy theme IDs remain compatible but all resolve to the canonical monochrome emphasis and neutral shell.
 - [Onboarding value-first contract](onboarding-value-first.md) — defaults stay editable; seller personalization and one optional, durable AI success precede plan commitment.
 - [Seller trial reminder delivery](seller-trial-reminder-delivery.md) — create on day four of an exact five-day trial; leases, retries, preferences, and per-token dedupe protect delivery.
 - [Transparent navigation isolation](transparent-navigation-isolation.md) — every root scene needs an opaque plane; only the focused scene animates, and inactive tab scenes detach.

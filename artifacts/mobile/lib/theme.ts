@@ -4,8 +4,8 @@
  * Single source of truth for all colors, spacing, typography, and animation tokens.
  * Every Seller screen must import from here — no local color redefinitions.
  *
- * Design language: true black, bold sans type, and one saturated blue-violet.
- * Legacy aliases remain for compatibility but resolve to the same accent.
+ * Design language: true black, bold sans type, and a strict grayscale hierarchy.
+ * Legacy color-named aliases remain for compatibility but resolve to grayscale.
  */
 
 // ─── Backgrounds ─────────────────────────────────────────────────────────────
@@ -29,8 +29,8 @@ export const SELLER_DASHBOARD_GLASS_ELEVATED = 'rgba(26, 26, 26, 0.68)'; // neut
 // ─── Borders ─────────────────────────────────────────────────────────────────
 export const BORDER          = 'rgba(255,255,255,0.07)';
 export const BORDER_SUBTLE   = 'rgba(255,255,255,0.04)';
-export const BORDER_ACTIVE   = '#5B5CFF';
-export const BORDER_FOCUS    = '#5B5CFF';
+export const BORDER_ACTIVE   = '#F7F7FA';
+export const BORDER_FOCUS    = '#F7F7FA';
 
 // ─── Text ─────────────────────────────────────────────────────────────────────
 export const FG      = '#F7F7FA';
@@ -39,9 +39,9 @@ export const SUBTLE  = 'rgba(247,247,250,0.34)';
 export const ON_DARK = '#FFFFFF';                        // on gradient/colored bg
 export const ON_DARK_MUTED = 'rgba(255,255,255,0.72)';   // secondary text on gradient/colored bg
 
-// ─── Brand Accent ─────────────────────────────────────────────────────────────
-export const ACCENT        = '#5B5CFF';
-export const ACCENT_LIGHT  = '#8B8CFF';
+// ─── Primary Emphasis ─────────────────────────────────────────────────────────
+export const ACCENT        = '#F7F7FA';
+export const ACCENT_LIGHT  = '#FFFFFF';
 // No colored panel wash: compatibility dim tokens resolve to neutral graphite.
 export const ACCENT_DIM    = 'rgba(255,255,255,0.055)';
 export const PURPLE        = ACCENT;
@@ -55,7 +55,7 @@ export const CYAN_DIM      = ACCENT_DIM;
 export const SUCCESS        = '#10B981';   // completion, available, shipped
 export const SUCCESS_DIM    = 'rgba(16,185,129,0.15)';
 export const GREEN_BRIGHT   = '#39FF88';   // revenue highlight ONLY (not UI chrome)
-export const BLUE           = ACCENT;      // info and processing use the brand accent
+export const BLUE           = ACCENT;      // compatibility alias; info chrome is grayscale
 export const BLUE_DIM       = ACCENT_DIM;
 export const ORANGE         = '#F97316';   // warning, draft
 export const ORANGE_DIM     = 'rgba(249,115,22,0.15)';
@@ -118,9 +118,9 @@ export const RADIUS = {
 
 // ─── Shadows ──────────────────────────────────────────────────────────────────
 export const SHADOW_PURPLE = {
-  shadowColor: ACCENT,
+  shadowColor: '#000000',
   shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.35,
+  shadowOpacity: 0.4,
   shadowRadius: 16,
   elevation: 8,
 } as const;

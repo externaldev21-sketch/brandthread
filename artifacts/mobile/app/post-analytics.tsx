@@ -23,7 +23,7 @@ const BORDER    = 'rgba(255,255,255,0.07)';
 const FG        = '#F4F4FF';
 const MUTED     = 'rgba(244,244,255,0.50)';
 const GREEN     = '#10B981';
-const BLUE      = '#3B82F6';
+const BLUE      = '#D4D4D8';
 const ORANGE    = '#F97316';
 const ERR       = '#F87171';
 

@@ -3,11 +3,11 @@ name: Brandthread theme — canonical palette
 description: The authoritative app-wide palette, accent boundary, and exclusions for buyer and seller UI
 ---
 
-**Rule:** Buyer and seller chrome use a true near-black `#0A0A0B` base, neutral graphite surfaces, white/muted-grey text, and one saturated `#5B5CFF` accent. Compatibility dim tokens resolve to a subtle neutral graphite—not an accent tint—so selected states remain visible without broad colored washes.
+**Rule:** Buyer and seller chrome is strictly monochrome: a true near-black `#0A0A0B` base, neutral graphite surfaces, white primary emphasis, and muted-gray supporting text. Compatibility color aliases resolve to grayscale, and dim tokens remain neutral graphite.
 
-**Why:** The user replaced earlier navy, chrome, multicolor runtime, and Woven directions with one consistent system. Broad translucent blue-violet backgrounds made the app read navy instead of black.
+**Why:** The user explicitly superseded the blue-violet direction with an app-wide black, white, and gray correction so decorative color never competes with products or status meaning.
 
-**How to apply:** Use the accent only for primary actions, selected states, links, badges, live/status indicators, focus rings, and key chart data. Keep the shared route shell neutral near-black. Preserve semantic red/green/orange, seller-authored storefront palettes, product/canvas colors, creative-tool swatches, and third-party provider colors.
+**How to apply:** Use white or light gray for primary actions, selected states, links, focus rings, and key chart data; use black text on white primary fills. Preserve semantic red/green/orange only when the color communicates status or risk. Preserve seller-authored storefront palettes, product/canvas colors, creative-tool swatches, avatar seed colors, and third-party provider colors as content rather than app chrome.
 
 **Rule:** Inter is the UI family: 700/600 for titles and actions, 400/500 for body and labels. Thin/light/extrabold aliases resolve to supported regular/bold weights.
 

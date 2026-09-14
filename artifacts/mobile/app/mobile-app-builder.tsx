@@ -15,7 +15,7 @@ const FEATURES = [
 export default function MobileAppBuilderScreen() {
   const colors = useColors();
   const isDark = colors.background === '#121110' || colors.background.startsWith('#0');
-  const primary = isDark ? '#39FF88' : '#00C853';
+  const primary = colors.primary;
 
   return (
     <View style={[styles.container, { backgroundColor: 'transparent' }]}>
@@ -25,7 +25,7 @@ export default function MobileAppBuilderScreen() {
         contentContainerStyle={{ paddingTop: 16, paddingBottom: 100, paddingHorizontal: 20 }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.heroCard, { backgroundColor: isDark ? '#17140F' : colors.secondary, borderColor: isDark ? '#00C85344' : colors.border }]}>
+        <View style={[styles.heroCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.heroTop}>
             <View style={[styles.heroIcon, { backgroundColor: primary + '22' }]}>
               <Feather name="smartphone" size={22} color={primary} />
@@ -37,7 +37,7 @@ export default function MobileAppBuilderScreen() {
             Turn your storefront into a fully branded iOS & Android app — no code required.
           </Text>
           <TouchableOpacity style={[styles.ctaBtn, { backgroundColor: primary }]} activeOpacity={0.85}>
-            <Feather name="zap" size={15} color="#03150B" />
+            <Feather name="zap" size={15} color={colors.primaryForeground} />
             <Text style={styles.ctaText}>Start building</Text>
           </TouchableOpacity>
         </View>

@@ -21,7 +21,7 @@ const BORDER = 'rgba(255,255,255,0.07)';
 const FG     = '#F4F4FF';
 const MUTED  = 'rgba(244,244,255,0.50)';
 const GREEN  = '#22C55E';
-const BLUE   = '#3B82F6';
+const BLUE   = '#D4D4D8';
 const ORANGE = '#F97316';
 type FilterTab = 'all' | ContentStatus;
 
@@ -32,7 +32,7 @@ const getContentTypes = (primary: string, secondary: string): { type: ContentTyp
   { type: 'story',        label: 'Story',           icon: 'circle',       color: ORANGE },
   { type: 'announcement', label: 'Announcement',    icon: 'bell',         color: GREEN  },
   { type: 'countdown',    label: 'Drop Countdown',  icon: 'clock',        color: '#FBBF24' },
-  { type: 'behind_scenes',label: 'Behind Scenes',   icon: 'camera',       color: '#EC4899' },
+  { type: 'behind_scenes',label: 'Behind Scenes',   icon: 'camera',       color: secondary },
   { type: 'poll',         label: 'Poll',            icon: 'bar-chart-2',  color: BLUE   },
 ];
 

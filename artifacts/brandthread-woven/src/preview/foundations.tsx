@@ -5,7 +5,7 @@ import { ThreadTabIndicator } from '../components/thread-tab-indicator';
 import { WovenDivider } from '../components/woven-divider';
 
 const SWATCHES = [
-  ['Blue-violet accent', 'bg-primary'],
+  ['Primary white', 'bg-primary'],
   ['Neutral ink', 'bg-foreground'],
   ['Charcoal canvas', 'bg-background border'],
   ['Functional glass', 'bg-card border'],
@@ -58,7 +58,7 @@ export function ColorsPage() {
       ))}
       <div className="border border-dashed border-primary bg-card p-5 sm:col-span-2">
         <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Runtime rule</p>
-        <p className="mt-3 max-w-xl text-xl">Blue-violet marks primary actions, selected states, links, and key data. Neutral surfaces never shift hue.</p>
+        <p className="mt-3 max-w-xl text-xl">White and light gray mark primary actions, selected states, links, and key data. Surfaces remain black and neutral graphite.</p>
       </div>
     </div>
   );

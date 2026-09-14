@@ -175,8 +175,8 @@ function Calendar({ month, rangeStart, rangeEnd, onDayPress, colors, isDark }: C
   // Pad to complete last row
   while (cells.length % 7 !== 0) cells.push(null);
 
-  const primary = isDark ? '#39FF88' : '#00C853';
-  const rangeBg = isDark ? '#39FF8828' : '#00C85318';
+  const primary = colors.primary;
+  const rangeBg = colors.muted;
   const rangeEdgeBg = primary;
   const todayD = today0();
 
@@ -328,7 +328,7 @@ export default function DateRangePicker({ visible, current, onApply, onClose }: 
   const [rangeStart, setRangeStart] = useState<Date | null>(current.start);
   const [rangeEnd, setRangeEnd] = useState<Date | null>(current.end);
 
-  const primary = isDark ? '#39FF88' : '#00C853';
+  const primary = colors.primary;
 
   function selectPreset(id: PresetId) {
     setSelectedId(id);

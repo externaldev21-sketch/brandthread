@@ -42,35 +42,35 @@ export function getOnAccentTextStyle(theme: AppThemePreset): TextStyle {
   };
 }
 
-const CANONICAL_ACCENT = '#5B5CFF';
-const CANONICAL_ACCENT_LIGHT = '#8B8CFF';
+const CANONICAL_ACCENT = '#F7F7FA';
+const CANONICAL_ACCENT_LIGHT = '#FFFFFF';
 const canonicalPreset = (id: AppThemeId, name: string): AppThemePreset => ({
   id,
   name,
   accent: CANONICAL_ACCENT,
   accentLight: CANONICAL_ACCENT_LIGHT,
   accentDim: 'rgba(255,255,255,0.055)',
-  onAccent: '#FFFFFF',
+  onAccent: '#0A0A0B',
   secondary: CANONICAL_ACCENT,
   secondaryDim: 'rgba(255,255,255,0.055)',
   primaryGradient: [CANONICAL_ACCENT, CANONICAL_ACCENT],
   heroGradient: ['#0A0A0B', '#18181B'],
   glowGradient: ['rgba(255,255,255,0.06)', 'rgba(255,255,255,0.01)'],
-  shadowColor: CANONICAL_ACCENT,
+  shadowColor: '#000000',
 });
 
 export const APP_THEME_PRESETS: readonly AppThemePreset[] = [
-  canonicalPreset('purple', 'Blue Violet'),
-  canonicalPreset('olive', 'Blue Violet'),
-  canonicalPreset('navy', 'Blue Violet'),
-  canonicalPreset('champagne', 'Blue Violet'),
-  canonicalPreset('black', 'Blue Violet'),
-  canonicalPreset('silver', 'Blue Violet'),
-  canonicalPreset('black-gold', 'Blue Violet'),
-  canonicalPreset('emerald-gold', 'Blue Violet'),
-  canonicalPreset('leopard-red', 'Blue Violet'),
-  canonicalPreset('maroon', 'Blue Violet'),
-  canonicalPreset('gold', 'Blue Violet'),
+  canonicalPreset('purple', 'Monochrome'),
+  canonicalPreset('olive', 'Monochrome'),
+  canonicalPreset('navy', 'Monochrome'),
+  canonicalPreset('champagne', 'Monochrome'),
+  canonicalPreset('black', 'Monochrome'),
+  canonicalPreset('silver', 'Monochrome'),
+  canonicalPreset('black-gold', 'Monochrome'),
+  canonicalPreset('emerald-gold', 'Monochrome'),
+  canonicalPreset('leopard-red', 'Monochrome'),
+  canonicalPreset('maroon', 'Monochrome'),
+  canonicalPreset('gold', 'Monochrome'),
 ] as const;
 
 export const DEFAULT_THEME = APP_THEME_PRESETS.find((theme) => theme.id === 'purple')!;

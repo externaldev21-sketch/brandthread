@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
+import { ACCENT } from '@/lib/theme';
 
 type Mode = 'buyer' | 'seller';
 
@@ -91,7 +92,7 @@ const styles = StyleSheet.create({
     width: 88,
     height: 30,
     borderRadius: 100,
-    backgroundColor: '#00C853',
+    backgroundColor: ACCENT,
   },
   option: {
     width: 88,

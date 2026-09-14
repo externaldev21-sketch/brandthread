@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 
 import colors from '@/constants/colors';
 import { createBackgroundPalette } from '@/lib/backgroundPalette';
-import { BG, SCREEN_BG } from '@/lib/theme';
+import { ACCENT, ACCENT_LIGHT, BG, SCREEN_BG } from '@/lib/theme';
 
 const appPath = (relativePath: string) => resolve(process.cwd(), 'app', relativePath);
 
@@ -21,6 +21,14 @@ describe('app background theme', () => {
     expect(BG).toBe('#0A0A0B');
     expect(colors.dark.background).toBe(BG);
     expect(SCREEN_BG).toBe('transparent');
+  });
+
+  it('keeps app chrome strictly grayscale', () => {
+    expect(ACCENT).toBe('#F7F7FA');
+    expect(ACCENT_LIGHT).toBe('#FFFFFF');
+    expect(colors.dark.primary).toBe(ACCENT);
+    expect(colors.dark.primaryForeground).toBe(BG);
+    expect(colors.dark.info).toBe('#D4D4D8');
   });
 
   it('isolates every root stack scene on its own animated background plane', () => {

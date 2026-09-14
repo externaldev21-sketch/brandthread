@@ -356,12 +356,12 @@ const CONFETTI = [
   { left: '5%', color: SUCCESS, delay: 0, x: -14 },
   { left: '13%', color: 'accent', delay: 90, x: 18 },
   { left: '22%', color: 'secondary', delay: 180, x: -8 },
-  { left: '31%', color: '#F59E0B', delay: 50, x: 14 },
+  { left: '31%', color: 'secondary', delay: 50, x: 14 },
   { left: '42%', color: '#F87171', delay: 230, x: -18 },
   { left: '53%', color: SUCCESS, delay: 110, x: 10 },
   { left: '64%', color: 'accent', delay: 20, x: -12 },
   { left: '73%', color: 'secondary', delay: 260, x: 17 },
-  { left: '82%', color: '#F59E0B', delay: 140, x: -10 },
+  { left: '82%', color: 'secondary', delay: 140, x: -10 },
   { left: '92%', color: '#F87171', delay: 70, x: 13 },
 ] as const;
 

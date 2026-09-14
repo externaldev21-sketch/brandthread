@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { Platform, StyleSheet, Text, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PressableScale } from '@/components/BrandthreadUI';
-import { BORDER, CARD, FG, MUTED, SUCCESS, FONT, FS, SP, RADIUS } from '@/lib/theme';
+import { ACCENT, BORDER, CARD, FG, MUTED, FONT, FS, SP, RADIUS } from '@/lib/theme';
 import { COOKIE_CONSENT_VERSION, CookieConsent, canUseAnalytics as canUseAnalyticsValue, canUseMarketing as canUseMarketingValue } from '@/lib/cookieConsent';
 
 export { COOKIE_CONSENT_VERSION, CookieConsent, canUseAnalytics, canUseMarketing } from '@/lib/cookieConsent';
@@ -38,4 +38,4 @@ export function ChangeCookiePreferences({ style }: { style?: any }) {
   const { openPreferences } = useCookieConsent();
   return <PressableScale style={style} onPress={openPreferences}><Text style={s.link}>Change cookie preferences</Text></PressableScale>;
 }
-const s = StyleSheet.create({ banner:{position:'absolute',bottom:72+SP.md,left:SP.md,right:SP.md,zIndex:2000,elevation:2000,backgroundColor:CARD,borderColor:BORDER,borderWidth:1,borderRadius:RADIUS.md,padding:SP.md,gap:SP.sm},copy:{color:FG,fontFamily:FONT.regular,fontSize:FS.xs,lineHeight:18},choices:{gap:SP.sm},choiceRow:{gap:3},choiceDescription:{color:MUTED,fontFamily:FONT.regular,fontSize:FS.xs,lineHeight:17},actions:{flexDirection:'row',flexWrap:'wrap',gap:SP.md,alignItems:'center'},link:{color:MUTED,fontFamily:FONT.semibold,fontSize:FS.xs},accept:{color:SUCCESS,fontFamily:FONT.bold,fontSize:FS.sm},choice:{color:FG,fontFamily:FONT.medium,fontSize:FS.sm} });
+const s = StyleSheet.create({ banner:{position:'absolute',bottom:72+SP.md,left:SP.md,right:SP.md,zIndex:2000,elevation:2000,backgroundColor:CARD,borderColor:BORDER,borderWidth:1,borderRadius:RADIUS.md,padding:SP.md,gap:SP.sm},copy:{color:FG,fontFamily:FONT.regular,fontSize:FS.xs,lineHeight:18},choices:{gap:SP.sm},choiceRow:{gap:3},choiceDescription:{color:MUTED,fontFamily:FONT.regular,fontSize:FS.xs,lineHeight:17},actions:{flexDirection:'row',flexWrap:'wrap',gap:SP.md,alignItems:'center'},link:{color:MUTED,fontFamily:FONT.semibold,fontSize:FS.xs},accept:{color:ACCENT,fontFamily:FONT.bold,fontSize:FS.sm},choice:{color:FG,fontFamily:FONT.medium,fontSize:FS.sm} });
