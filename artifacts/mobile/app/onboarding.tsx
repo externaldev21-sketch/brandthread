@@ -258,22 +258,43 @@ function mapClerkError(err: any): string {
 
 // ─── Shared UI ───────────────────────────────────────────────────────────────
 
-function GradientBar({ fraction }: { fraction: number }) {
+/**
+ * Minimal step-dot indicator replaces the heavy gradient progress bar.
+ * Uses only existing palette references — no new color literals.
+ * `current` is 0-based active index; `total` is total step count.
+ */
+function StepDots({ current, total }: { current: number; total: number }) {
   const { theme } = useAppTheme();
-  const clamped = Math.min(1, Math.max(0, fraction));
   return (
-    <View style={sbar.track}>
-      <LinearGradient
-        colors={theme.heroGradient}
-        start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-        style={[sbar.fill, { width: `${Math.round(clamped * 100)}%` }]}
-      />
+    <View style={sdots.row} accessibilityLabel={`Step ${current + 1} of ${total}`}>
+      {Array.from({ length: total }).map((_, i) => {
+        const filled = i <= current;
+        const active = i === current;
+        return (
+          <View
+            key={i}
+            style={[
+              sdots.dot,
+              active && { width: 18 },
+            ]}
+          >
+            {filled && (
+              <LinearGradient
+                colors={theme.heroGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={StyleSheet.absoluteFill}
+              />
+            )}
+          </View>
+        );
+      })}
     </View>
   );
 }
-const sbar = StyleSheet.create({
-  track: { height: 3, backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 2, overflow: 'hidden' },
-  fill:  { height: 3, borderRadius: 2 },
+const sdots = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
 });
 
 function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
@@ -291,7 +312,7 @@ function Chip({ label, selected, onPress }: { label: string; selected: boolean; 
   );
 }
 const sc = StyleSheet.create({
-  chip:       { backgroundColor: CARD, borderWidth: 1, borderColor: BORDER, borderRadius: 100, paddingHorizontal: 14, paddingVertical: 9 },
+  chip:       { backgroundColor: CARD, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, borderRadius: 100, paddingHorizontal: 14, paddingVertical: 9 },
   chipText:   { fontSize: 14, fontFamily: 'Inter_500Medium', color: MUTED },
 });
 
@@ -316,12 +337,12 @@ function RadioRow({ label, sub, selected, onPress }: { label: string; sub: strin
   );
 }
 const sr = StyleSheet.create({
-  row:     { backgroundColor: CARD, borderRadius: 16, borderWidth: 1, borderColor: BORDER, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  row:     { backgroundColor: CARD, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12 },
   label:   { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG, marginBottom: 2 },
   labelOn: { color: FG },
   sub:     { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 18 },
-  circle:  { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  dot:     { width: 10, height: 10, borderRadius: 5 },
+  circle:  { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: BORDER, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  dot:     { width: 9, height: 9, borderRadius: 5 },
 });
 
 function PrimaryButton({ label, onPress, disabled, loading }: { label: string; onPress: () => void; disabled?: boolean; loading?: boolean }) {
@@ -342,7 +363,7 @@ function PrimaryButton({ label, onPress, disabled, loading }: { label: string; o
   );
 }
 const spb = StyleSheet.create({
-  btn:         { borderRadius: 16, paddingVertical: 17, alignItems: 'center' },
+  btn:         { borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
   btnDisabled: { backgroundColor: 'rgba(255,255,255,0.06)' },
   text:        { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
   textDisabled:{ color: MUTED2 },
@@ -523,19 +544,19 @@ function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: (
 }
 const sn = StyleSheet.create({
   root: { flex: 1, backgroundColor: SCREEN_BG, paddingHorizontal: 24 },
-  body: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 40 },
-  bellWrap: { marginBottom: 32 },
-  bellBg:   { width: 80, height: 80, borderRadius: 24, alignItems: 'center', justifyContent: 'center', shadowOpacity: 0.5, shadowRadius: 20, shadowOffset: { width: 0, height: 0 }, elevation: 12 },
-  headline: { fontSize: 28, fontFamily: 'Inter_700Bold', color: FG, textAlign: 'center', letterSpacing: -0.5, marginBottom: 12 },
-  sub:      { fontSize: 15, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
-  examples: { gap: 12, width: '100%' },
+  body: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 32 },
+  bellWrap: { marginBottom: 28 },
+  bellBg:   { width: 72, height: 72, borderRadius: 20, alignItems: 'center', justifyContent: 'center', shadowOpacity: 0.5, shadowRadius: 20, shadowOffset: { width: 0, height: 0 }, elevation: 12 },
+  headline: { fontSize: 28, fontFamily: 'Inter_700Bold', color: FG, textAlign: 'center', letterSpacing: -0.5, marginBottom: 10 },
+  sub:      { fontSize: 15, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center', lineHeight: 22, marginBottom: 28 },
+  examples: { gap: 11, width: '100%' },
   exampleRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   exampleDot: { width: 6, height: 6, borderRadius: 3 },
   exampleText:{ fontSize: 14, fontFamily: 'Inter_400Regular', color: FG },
-  btns: { gap: 12 },
-  enableBtn: { borderRadius: 16, paddingVertical: 17, alignItems: 'center' },
+  btns: { gap: 10 },
+  enableBtn: { borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
   enableBtnText: { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
-  skipBtn: { paddingVertical: 14, alignItems: 'center' },
+  skipBtn: { paddingVertical: 13, alignItems: 'center' },
   skipText: { fontSize: 15, fontFamily: 'Inter_500Medium', color: MUTED },
 });
 
@@ -605,12 +626,12 @@ function SuccessScreen({ flow, firstName, brandName, onFinish, finishing }: { fl
 const ss = StyleSheet.create({
   root:       { flex: 1, backgroundColor: SCREEN_BG, paddingHorizontal: 24 },
   body:       { flex: 1, justifyContent: 'center' },
-  checkCircle:{ width: 80, height: 80, borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 28, shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 0 }, elevation: 12 },
-  headline:   { fontSize: 36, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -1, lineHeight: 42, marginBottom: 12 },
-  brandBadge: { alignSelf: 'flex-start', borderRadius: 100, paddingHorizontal: 14, paddingVertical: 5, marginBottom: 12, borderWidth: 1 },
+  checkCircle:{ width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 24, shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 0 }, elevation: 12 },
+  headline:   { fontSize: 34, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -1, lineHeight: 40, marginBottom: 10 },
+  brandBadge: { alignSelf: 'flex-start', borderRadius: 100, paddingHorizontal: 12, paddingVertical: 4, marginBottom: 10, borderWidth: 1 },
   brandBadgeText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  desc:       { fontSize: 15, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 22, marginBottom: 28 },
-  features:   { gap: 12 },
+  desc:       { fontSize: 15, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 22, marginBottom: 24 },
+  features:   { gap: 10 },
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   featureText:{ fontSize: 14, fontFamily: 'Inter_400Regular', color: FG },
 });
@@ -1042,55 +1063,55 @@ function AuthStep({
 }
 const sa = StyleSheet.create({
   scroll:    { flexGrow: 1, paddingVertical: 8, gap: 0 },
-  headline:  { fontSize: 28, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.5, marginBottom: 6 },
-  sub:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 24 },
-  oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: BORDER, paddingVertical: 14, backgroundColor: CARD, marginBottom: 10 },
+  headline:  { fontSize: 28, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.5, marginBottom: 4 },
+  sub:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 20 },
+  oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, paddingVertical: 13, backgroundColor: CARD, marginBottom: 9 },
   // Apple button: solid black per Apple Human Interface Guidelines
   appleBtn:  { backgroundColor: '#000000', borderColor: 'rgba(255,255,255,0.15)' },
   oauthText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
-  divider:   { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 18 },
+  divider:   { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 14 },
   divLine:   { flex: 1, height: 1, backgroundColor: BORDER },
   divText:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED },
-  inputWrap: { marginBottom: 14 },
-  label:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, marginBottom: 6 },
-  input:     { backgroundColor: INPUT_BG, borderWidth: 1, borderColor: INPUT_BD, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: 'Inter_400Regular', color: FG },
+  inputWrap: { marginBottom: 12 },
+  label:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, marginBottom: 5 },
+  input:     { backgroundColor: INPUT_BG, borderWidth: StyleSheet.hairlineWidth, borderColor: INPUT_BD, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: 'Inter_400Regular', color: FG },
   codeInput: { letterSpacing: 8, fontSize: 22, textAlign: 'center', fontFamily: 'Inter_700Bold' },
   pwRow:     { flexDirection: 'row', alignItems: 'center', backgroundColor: INPUT_BG, borderWidth: 1, borderColor: INPUT_BD, borderRadius: 12 },
   pwInput:   { flex: 1, borderWidth: 0, backgroundColor: 'transparent' },
   eyeBtn:    { paddingHorizontal: 14 },
   hint:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 4 },
-  error:     { color: ERR, fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 12 },
-  resendBtn: { paddingVertical: 12, alignItems: 'center', marginTop: 8 },
+  error:     { color: ERR, fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 10 },
+  resendBtn: { paddingVertical: 12, alignItems: 'center', marginTop: 6 },
   resendText:{ fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED },
-  legal:     { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED2, textAlign: 'center', lineHeight: 18, marginTop: 14 },
+  legal:     { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED2, textAlign: 'center', lineHeight: 18, marginTop: 12 },
   // Existing-account panel
   existingEmailChip: {
     alignSelf: 'flex-start',
     borderRadius: 20, borderWidth: 1,
-    paddingHorizontal: 14, paddingVertical: 7, marginBottom: 20,
+    paddingHorizontal: 14, paddingVertical: 6, marginBottom: 16,
   },
   existingEmailText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   existingCard: {
-    borderRadius: 16, borderWidth: 1,
-    padding: 18, marginBottom: 24,
+    borderRadius: 12, borderWidth: 1,
+    padding: 16, marginBottom: 20,
   },
   existingCardTitle: {
-    fontSize: 17, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 8, lineHeight: 23,
+    fontSize: 17, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 6, lineHeight: 23,
   },
   existingCardSub: {
     fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 20,
   },
-  existingSignInBtn:  { marginBottom: 10, borderRadius: 14, overflow: 'hidden' },
-  existingSignInGrad: { paddingVertical: 17, alignItems: 'center', borderRadius: 14 },
+  existingSignInBtn:  { marginBottom: 9, borderRadius: 12, overflow: 'hidden' },
+  existingSignInGrad: { paddingVertical: 16, alignItems: 'center', borderRadius: 12 },
   existingSignInText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
   existingDiffBtn: {
-    borderRadius: 14, paddingVertical: 16, alignItems: 'center',
+    borderRadius: 12, paddingVertical: 15, alignItems: 'center',
     borderWidth: 1, borderColor: BORDER,
   },
   existingDiffText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
   // Active-session warning
-  sessionBtn:     { marginTop: 8, marginBottom: 12, borderRadius: 16, overflow: 'hidden' },
-  sessionBtnGrad: { paddingVertical: 17, alignItems: 'center', paddingHorizontal: 20 },
+  sessionBtn:     { marginTop: 8, marginBottom: 10, borderRadius: 14, overflow: 'hidden' },
+  sessionBtnGrad: { paddingVertical: 16, alignItems: 'center', paddingHorizontal: 20 },
   sessionBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
   continueBtn:    { paddingVertical: 14, alignItems: 'center' },
   continueBtnText:{ fontSize: 14, fontFamily: 'Inter_500Medium', color: MUTED },
@@ -1224,30 +1245,30 @@ function SellerPreviewStep({
   );
 }
 const spreview = StyleSheet.create({
-  scroll: { flexGrow: 1, paddingBottom: 28 },
-  headline: { fontSize: 28, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.5, marginBottom: 8 },
-  sub: { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 21, marginBottom: 22 },
+  scroll: { flexGrow: 1, paddingBottom: 24 },
+  headline: { fontSize: 26, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.5, marginBottom: 6 },
+  sub: { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 21, marginBottom: 18 },
   sectionLabel: { fontSize: 13, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 8 },
-  themeRow: { gap: 10, paddingRight: 8 },
-  themeCard: { width: 106, minHeight: 104, padding: 7, borderRadius: 14, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
-  themeSwatch: { height: 58, borderRadius: 9, padding: 10, justifyContent: 'space-between' },
-  themeDot: { width: 18, height: 18, borderRadius: 9 },
-  themeLine: { width: 42, height: 4, borderRadius: 2 },
-  themeName: { flex: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: FG, marginTop: 7 },
-  hint: { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED2, marginTop: 7, marginBottom: 24 },
-  sampleHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 10 },
+  themeRow: { gap: 8, paddingRight: 8 },
+  themeCard: { width: 98, minHeight: 96, padding: 6, borderRadius: 12, backgroundColor: CARD, borderWidth: 1, borderColor: BORDER },
+  themeSwatch: { height: 52, borderRadius: 8, padding: 9, justifyContent: 'space-between' },
+  themeDot: { width: 16, height: 16, borderRadius: 8 },
+  themeLine: { width: 36, height: 3, borderRadius: 2 },
+  themeName: { flex: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: FG, marginTop: 6 },
+  hint: { fontSize: 11, fontFamily: 'Inter_400Regular', color: MUTED2, marginTop: 6, marginBottom: 20 },
+  sampleHeader: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 8 },
   sampleSub: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 18, paddingRight: 18 },
-  styleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginBottom: 14 },
-  resultCard: { borderRadius: 16, borderWidth: 1, backgroundColor: '#F7F7F7', overflow: 'hidden', marginBottom: 14 },
-  resultImage: { width: '100%', height: 190 },
-  resultCaption: { flexDirection: 'row', gap: 7, alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, backgroundColor: 'rgba(0,0,0,0.86)' },
+  styleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
+  resultCard: { borderRadius: 12, borderWidth: 1, backgroundColor: '#F7F7F7', overflow: 'hidden', marginBottom: 12 },
+  resultImage: { width: '100%', height: 180 },
+  resultCaption: { flexDirection: 'row', gap: 7, alignItems: 'center', paddingHorizontal: 12, paddingVertical: 9, backgroundColor: 'rgba(0,0,0,0.86)' },
   resultText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: FG },
-  generateButton: { borderRadius: 14, paddingVertical: 15, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
+  generateButton: { borderRadius: 12, paddingVertical: 14, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
   generateText: { fontSize: 15, fontFamily: 'Inter_700Bold' },
-  errorBox: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 9, padding: 11, borderRadius: 10, backgroundColor: 'rgba(248,113,113,0.10)' },
+  errorBox: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginTop: 8, padding: 10, borderRadius: 9, backgroundColor: 'rgba(248,113,113,0.10)' },
   errorText: { flex: 1, fontSize: 12, lineHeight: 17, color: ERR },
   retryText: { fontSize: 13, fontFamily: 'Inter_700Bold' },
-  continueButton: { marginTop: 16, borderRadius: 14, paddingVertical: 15, alignItems: 'center', backgroundColor: GREEN },
+  continueButton: { marginTop: 14, borderRadius: 12, paddingVertical: 14, alignItems: 'center', backgroundColor: GREEN },
   continueDisabled: { backgroundColor: 'rgba(255,255,255,0.07)' },
   continueText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: '#06110B' },
   continueTextDisabled: { color: MUTED2 },
@@ -1593,27 +1614,17 @@ export default function OnboardingScreen() {
     return true;
   }
 
-  // ── Progress bar ────────────────────────────────────────────────────────────
+  // ── Step dots indicator ──────────────────────────────────────────────────────
   function showsProgressBar(): boolean {
     return true;
   }
 
-  function progressFraction(): number {
+  function progressSteps(): { current: number; total: number } {
     const progressFlow = flow ?? selectedFlow;
     const total = progressFlow === 'buyer' ? 7 : 10;
-    return Math.min(1, (step + 1) / total);
+    return { current: Math.min(step, total - 1), total };
   }
 
-  function progressLabel(): string {
-    const progressFlow = flow ?? selectedFlow;
-    if (!progressFlow) {
-      return step === BUYER_STEP_INDEX.AUTH ? 'Step 1' : 'Step 2';
-    }
-    const total = progressFlow === 'buyer' ? 7 : 10;
-    if (step >= total - 1) return 'Complete';
-    if (step === total - 2) return 'Almost done';
-    return `Step ${step + 1} of ${total}`;
-  }
 
   // ── Step rendering ──────────────────────────────────────────────────────────
   function renderStep() {
@@ -1902,16 +1913,13 @@ export default function OnboardingScreen() {
             onPress={goBack}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <Feather name="chevron-left" size={22} color={MUTED} />
+            <Feather name="chevron-left" size={20} color={MUTED} />
           </TouchableOpacity>
 
           {showsProgressBar() && (
-            <View style={{ flex: 1, marginRight: 10 }}>
-              <GradientBar fraction={progressFraction()} />
+            <View style={{ flex: 1 }}>
+              <StepDots current={progressSteps().current} total={progressSteps().total} />
             </View>
-          )}
-          {showsProgressBar() && (
-            <Text style={sm.progressLabel}>{progressLabel()}</Text>
           )}
         </View>
       )}
@@ -1922,10 +1930,7 @@ export default function OnboardingScreen() {
           pointerEvents="none"
           style={[sm.progressOverlay, { paddingTop: insets.top + 8 }]}
         >
-          <View style={{ flex: 1, marginRight: 10 }}>
-            <GradientBar fraction={progressFraction()} />
-          </View>
-          <Text style={sm.progressLabel}>{progressLabel()}</Text>
+          <StepDots current={progressSteps().current} total={progressSteps().total} />
         </View>
       )}
 
@@ -1955,7 +1960,7 @@ export default function OnboardingScreen() {
 }
 
 const sm = StyleSheet.create({
-  header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 12, gap: 8, zIndex: 3 },
+  header:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingBottom: 8, gap: 10, zIndex: 3 },
   progressOverlay: {
     position: 'absolute',
     top: 0,
@@ -1965,32 +1970,31 @@ const sm = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingBottom: 12,
+    paddingBottom: 8,
   },
-  backBtn:   { width: 36, height: 36, justifyContent: 'center' },
-  progressLabel: { width: 64, fontSize: 11, fontFamily: 'Inter_500Medium', color: MUTED, textAlign: 'right' },
+  backBtn:   { width: 32, height: 32, justifyContent: 'center' },
   stepWrap:  { flex: 1, paddingHorizontal: 24 },
   interactiveStepWrap: { position: 'relative', zIndex: 2 },
   accountTypeStepWrap: { paddingHorizontal: 0 },
-  footer:    { paddingHorizontal: 24, paddingTop: 12 },
+  footer:    { paddingHorizontal: 24, paddingTop: 8 },
   backgroundDim: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(7,7,15,0.34)',
   },
 
-  scroll:    { flexGrow: 1, paddingTop: 12, paddingBottom: 40 },
-  stepHeadline: { fontSize: 32, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.8, lineHeight: 38, marginBottom: 8 },
-  stepSub:   { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 21, marginBottom: 28 },
+  scroll:    { flexGrow: 1, paddingTop: 8, paddingBottom: 40 },
+  stepHeadline: { fontSize: 32, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.8, lineHeight: 38, marginBottom: 6 },
+  stepSub:   { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 21, marginBottom: 20 },
   inputWrap: { gap: 4 },
-  label:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, marginBottom: 6 },
-  input:     { backgroundColor: INPUT_BG, borderWidth: 1, borderColor: INPUT_BD, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 14, fontSize: 16, fontFamily: 'Inter_400Regular', color: FG },
-  inputHint: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED2, marginTop: 6 },
+  label:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, marginBottom: 5 },
+  input:     { backgroundColor: INPUT_BG, borderWidth: StyleSheet.hairlineWidth, borderColor: INPUT_BD, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 16, fontFamily: 'Inter_400Regular', color: FG },
+  inputHint: { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED2, marginTop: 5 },
   chipGrid:  { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  radioList: { gap: 10 },
+  radioList: { gap: 8 },
   selectionHint: { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED, textAlign: 'center', marginTop: 8 },
   buildBtn:  { marginTop: 8 },
   buildBtnDisabled: { opacity: 0.5 },
-  buildBtnInner: { borderRadius: 16, paddingVertical: 17, alignItems: 'center' },
+  buildBtnInner: { borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
   buildBtnText: { fontSize: 16, fontFamily: 'Inter_700Bold', color: FG },
   buildBtnTextDisabled: { color: MUTED2 },
 });
