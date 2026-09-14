@@ -34,6 +34,7 @@
 - [Expo dependency repair](expo-dependency-repair.md) — never interrupt pnpm’s forced mobile relink; run long repairs in background and restart Metro only after package links return.
 - [Expo Go native module boundary](expo-go-native-module-boundary.md) — Expo Go startup must not statically import custom native modules absent from its client; keep those behind compatible fallbacks.
 - [Expo root navigation readiness](expo-root-navigation-readiness.md) — defer preview redirects until Expo Router registers the root Stack or web preview crashes before first paint.
+- [Expo tunnel fallback](expo-tunnel-fallback.md) — prefer Expo tunnel startup, but fall back to proxied LAN mode when Ngrok fails before Metro opens the artifact port.
 - [Expo native prebuild guards](expo-native-prebuild-guards.md) — package lifecycle scripts do not intercept direct `expo prebuild`; invariant checks belong in Expo config plugins.
 - [Push notifications & service config](push-notifications-service-config.md) — expo-notifications wired in _layout.tsx; configureServices(getToken) + PushRegistrar components; expo-camera must be ~17.0.10 for Expo 54.
 - [DB package project references](db-project-references.md) — lib/db uses composite:true + emitDeclarationOnly; must run tsc --build in lib/db before api-server TypeScript checks will see new exports.
