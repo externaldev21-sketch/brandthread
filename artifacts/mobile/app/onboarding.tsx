@@ -1,8 +1,10 @@
 /**
  * Brandthread Onboarding — complete buyer + seller flows
  *
- * BUYER  steps: 0=Auth 1=AccountType 2=Name 3=Style 4=Loading 5=Notifications 6=Success
- * SELLER steps: 0=Auth 1=AccountType 2=Name 3=BrandName 4=Stage 5=Goals 6=Plan 7=Loading 8=Notifications 9=Success
+ * NEW STEP ORDER (v6):
+ * BOTH:   0=AccountType (buyer/seller choice, before Clerk account creation)
+ * BUYER:  1=Auth  2=Name  3=Style  4=Loading  5=Notifications  6=Success
+ * SELLER: 1=Auth  2=Name  3=BrandName  4=BrandStage  5=Goals  6=Plan  7=Loading  8=Notifications  9=Success
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -73,11 +75,24 @@ const ERR     = '#F87171';
 const { width: SW } = Dimensions.get('window');
 
 // ─── Data ───────────────────────────────────────────────────────────────────
-const STYLE_INTERESTS = [
-  'Streetwear', 'Luxury', 'Vintage', 'Athleisure', 'Basics',
-  'Accessories', 'Sneakers', 'Denim', 'Graphic tees', 'Minimal',
-  'Avant-garde', 'Sustainable fashion',
+const STYLE_INTERESTS_WITH_EMOJI: { label: string; emoji: string }[] = [
+  { label: 'Streetwear',        emoji: '🏙️' },
+  { label: 'Luxury',            emoji: '💎' },
+  { label: 'Vintage',           emoji: '🕰️' },
+  { label: 'Athleisure',        emoji: '🏃' },
+  { label: 'Basics',            emoji: '👕' },
+  { label: 'Accessories',       emoji: '👜' },
+  { label: 'Sneakers',          emoji: '👟' },
+  { label: 'Denim',             emoji: '🧥' },
+  { label: 'Graphic tees',      emoji: '🎨' },
+  { label: 'Minimal',           emoji: '◻️' },
+  { label: 'Avant-garde',       emoji: '🌀' },
+  { label: 'Sustainable fashion', emoji: '🌿' },
 ];
+
+// Keep the plain string list for compatibility with existing code that checks
+// membership / draft serialization / API calls.
+const STYLE_INTERESTS = STYLE_INTERESTS_WITH_EMOJI.map((i) => i.label);
 
 const BRAND_STAGES = [
   { value: 'idea',    label: 'Just an idea',    sub: "I'm starting from zero." },
@@ -100,11 +115,13 @@ const SELLER_LOADING_STEPS = ['Mapping your brand workspace', 'Preparing your pr
 
 const LEGACY_DRAFT_KEY = 'onboarding_draft';
 const DRAFT_KEY_PREFIX = 'onboarding_draft:';
-const DRAFT_VERSION = 5;
+const PENDING_FLOW_KEY = 'onboarding_pending_flow';
+const DRAFT_VERSION = 6;
 
+// ─── Step indices (v6 order: AccountType first, then path-specific auth) ──────
 const BUYER_STEP_INDEX = {
-  AUTH: 0,
-  ACCOUNT_TYPE: 1,
+  ACCOUNT_TYPE: 0,
+  AUTH: 1,
   NAME: 2,
   STYLE: 3,
   LOADING: 4,
@@ -113,8 +130,8 @@ const BUYER_STEP_INDEX = {
 } as const;
 
 const SELLER_STEP_INDEX = {
-  AUTH: 0,
-  ACCOUNT_TYPE: 1,
+  ACCOUNT_TYPE: 0,
+  AUTH: 1,
   NAME: 2,
   BRAND_NAME: 3,
   BRAND_STAGE: 4,
@@ -135,24 +152,60 @@ function isAppThemeId(value: unknown): value is AppThemeId {
   return typeof value === 'string' && APP_THEME_PRESETS.some((preset) => preset.id === value);
 }
 
-// Drafts from before Auth became the literal first onboarding step need a
-// one-time translation so closing the app still resumes at the equivalent
-// screen. Version 1 seller drafts also had a removed product-model step.
+/**
+ * Drafts from before v6 need a one-time translation.
+ * v6: AccountType=0, Auth=1, then path-specific steps 2+
+ * v5: Auth=0, AccountType=1, then path-specific steps 2+
+ * v4: Same order as v5 but without PLAN step in seller
+ * v1-v3: various older orders
+ */
 function restoreDraftStep(flow: Flow, step: number, version?: number): number {
   if (version === DRAFT_VERSION) return step;
+
+  // v5 → v6: AccountType moved from 1 to 0, Auth moved from 0 to 1; steps 2+ unchanged
+  if (version === 5) {
+    if (flow === 'buyer') {
+      // v5: 0=Auth, 1=AccountType, 2=Name, 3=Style, 4=Loading, 5=Notifications, 6=Success
+      // v6: 0=AccountType, 1=Auth, 2=Name, 3=Style, 4=Loading, 5=Notifications, 6=Success
+      const v5ToBuyer: Record<number, number> = {
+        0: BUYER_STEP_INDEX.AUTH,
+        1: BUYER_STEP_INDEX.ACCOUNT_TYPE,
+        2: BUYER_STEP_INDEX.NAME,
+        3: BUYER_STEP_INDEX.STYLE,
+        4: BUYER_STEP_INDEX.LOADING,
+        5: BUYER_STEP_INDEX.NOTIFICATIONS,
+        6: BUYER_STEP_INDEX.SUCCESS,
+      };
+      return v5ToBuyer[step] ?? BUYER_STEP_INDEX.ACCOUNT_TYPE;
+    }
+    // v5 seller: 0=Auth, 1=AccountType, 2=Name, 3=BrandName, 4=BrandStage, 5=Goals, 6=Plan, 7=Loading, 8=Notifications, 9=Success
+    const v5ToSeller: Record<number, number> = {
+      0: SELLER_STEP_INDEX.AUTH,
+      1: SELLER_STEP_INDEX.ACCOUNT_TYPE,
+      2: SELLER_STEP_INDEX.NAME,
+      3: SELLER_STEP_INDEX.BRAND_NAME,
+      4: SELLER_STEP_INDEX.BRAND_STAGE,
+      5: SELLER_STEP_INDEX.GOALS,
+      6: SELLER_STEP_INDEX.PLAN,
+      7: SELLER_STEP_INDEX.LOADING,
+      8: SELLER_STEP_INDEX.NOTIFICATIONS,
+      9: SELLER_STEP_INDEX.SUCCESS,
+    };
+    return v5ToSeller[step] ?? SELLER_STEP_INDEX.ACCOUNT_TYPE;
+  }
 
   if (version === 4) {
     const previousStep = flow === 'buyer'
       ? [BUYER_STEP_INDEX.AUTH, BUYER_STEP_INDEX.ACCOUNT_TYPE, BUYER_STEP_INDEX.NAME, BUYER_STEP_INDEX.STYLE, BUYER_STEP_INDEX.LOADING, BUYER_STEP_INDEX.NOTIFICATIONS, BUYER_STEP_INDEX.SUCCESS]
       : [SELLER_STEP_INDEX.AUTH, SELLER_STEP_INDEX.ACCOUNT_TYPE, SELLER_STEP_INDEX.NAME, SELLER_STEP_INDEX.BRAND_NAME, SELLER_STEP_INDEX.BRAND_STAGE, SELLER_STEP_INDEX.GOALS, SELLER_STEP_INDEX.LOADING, SELLER_STEP_INDEX.NOTIFICATIONS, SELLER_STEP_INDEX.SUCCESS];
-    return previousStep[step] ?? (flow === 'buyer' ? BUYER_STEP_INDEX.AUTH : SELLER_STEP_INDEX.AUTH);
+    return previousStep[step] ?? (flow === 'buyer' ? BUYER_STEP_INDEX.ACCOUNT_TYPE : SELLER_STEP_INDEX.ACCOUNT_TYPE);
   }
 
   if (version === 3) {
     const previousStep = flow === 'buyer'
       ? [BUYER_STEP_INDEX.AUTH, BUYER_STEP_INDEX.NAME, BUYER_STEP_INDEX.STYLE, BUYER_STEP_INDEX.LOADING, BUYER_STEP_INDEX.NOTIFICATIONS, BUYER_STEP_INDEX.SUCCESS]
       : [SELLER_STEP_INDEX.AUTH, SELLER_STEP_INDEX.NAME, SELLER_STEP_INDEX.BRAND_NAME, SELLER_STEP_INDEX.BRAND_STAGE, SELLER_STEP_INDEX.GOALS, SELLER_STEP_INDEX.LOADING, SELLER_STEP_INDEX.NOTIFICATIONS, SELLER_STEP_INDEX.SUCCESS];
-    return previousStep[step] ?? (flow === 'buyer' ? BUYER_STEP_INDEX.AUTH : SELLER_STEP_INDEX.AUTH);
+    return previousStep[step] ?? (flow === 'buyer' ? BUYER_STEP_INDEX.ACCOUNT_TYPE : SELLER_STEP_INDEX.ACCOUNT_TYPE);
   }
 
   if (flow === 'buyer') {
@@ -165,7 +218,7 @@ function restoreDraftStep(flow: Flow, step: number, version?: number): number {
       4: BUYER_STEP_INDEX.NOTIFICATIONS,
       5: BUYER_STEP_INDEX.SUCCESS,
     };
-    return previousBuyerStep[step] ?? BUYER_STEP_INDEX.AUTH;
+    return previousBuyerStep[step] ?? BUYER_STEP_INDEX.ACCOUNT_TYPE;
   }
 
   if (version === 2) {
@@ -181,7 +234,7 @@ function restoreDraftStep(flow: Flow, step: number, version?: number): number {
       6: SELLER_STEP_INDEX.NOTIFICATIONS,
       7: SELLER_STEP_INDEX.SUCCESS,
     };
-    return previousSellerStep[step] ?? SELLER_STEP_INDEX.AUTH;
+    return previousSellerStep[step] ?? SELLER_STEP_INDEX.ACCOUNT_TYPE;
   }
 
   // Version 1 seller order included a product-model step and put Auth at 5.
@@ -196,21 +249,17 @@ function restoreDraftStep(flow: Flow, step: number, version?: number): number {
     7: SELLER_STEP_INDEX.NOTIFICATIONS,
     8: SELLER_STEP_INDEX.SUCCESS,
   };
-  return previousLegacySellerStep[step] ?? SELLER_STEP_INDEX.AUTH;
+  return previousLegacySellerStep[step] ?? SELLER_STEP_INDEX.ACCOUNT_TYPE;
 }
 
 // ─── Clerk error mapper ──────────────────────────────────────────────────────
-// Maps Clerk error objects to user-facing strings.
-// Uses .code first (most reliable), then conservative message matching.
 function mapClerkError(err: any): string {
   if (!err) return 'Something went wrong. Please try again.';
 
-  // Clerk may wrap errors: err.errors[0] or err directly
   const inner = err?.errors?.[0] ?? err;
   const code  = (inner?.code ?? '').toLowerCase();
   const msg   = (inner?.message ?? inner?.longMessage ?? err?.message ?? '').toLowerCase();
 
-  // ── Code-based mapping ───────────────────────────────────────────────────
   if (code === 'form_identifier_exists')
     return 'An account already exists with this email. Sign in instead.';
   if (code === 'session_exists' || code === 'identifier_already_signed_in')
@@ -234,9 +283,6 @@ function mapClerkError(err: any): string {
   if (code === 'form_identifier_not_found' || code === 'form_password_incorrect')
     return 'Incorrect email or password.';
 
-  // ── Conservative message-string fallback ─────────────────────────────────
-  // Only match unambiguous phrases — avoids false-positives from the word
-  // "identifier" appearing in session-related errors.
   if (msg.includes('that email address is taken') || (msg.includes('email') && msg.includes('already exists') && !msg.includes('session')))
     return 'An account already exists with this email. Sign in instead.';
   if (msg.includes('already signed in') || (msg.includes('session') && msg.includes('exists')))
@@ -252,16 +298,14 @@ function mapClerkError(err: any): string {
   if (msg.includes('rate limit') || msg.includes('too many'))
     return 'Too many attempts. Please wait and try again.';
 
-  // Return raw message as last resort — always better than hiding the error
   return inner?.message || err?.message || 'Something went wrong. Please try again.';
 }
 
 // ─── Shared UI ───────────────────────────────────────────────────────────────
 
 /**
- * Minimal step-dot indicator replaces the heavy gradient progress bar.
+ * Minimal step-dot indicator.
  * Uses only existing palette references — no new color literals.
- * `current` is 0-based active index; `total` is total step count.
  */
 function StepDots({ current, total }: { current: number; total: number }) {
   const { theme } = useAppTheme();
@@ -295,6 +339,35 @@ function StepDots({ current, total }: { current: number; total: number }) {
 const sdots = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
+});
+
+/**
+ * Style-interest chip with solid-fill selected state and checkmark.
+ * Selected: solid accent-dim background, accent border, checkmark + label.
+ */
+function StyleChip({ label, emoji, selected, onPress }: { label: string; emoji: string; selected: boolean; onPress: () => void }) {
+  const { theme } = useAppTheme();
+  return (
+    <TouchableOpacity
+      style={[
+        ssc.chip,
+        selected && { backgroundColor: theme.accentDim, borderColor: theme.accent, borderWidth: 1.5 },
+      ]}
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: selected }}
+      onPress={() => { Haptics.selectionAsync(); onPress(); }}
+      activeOpacity={0.75}
+    >
+      <Text style={ssc.emoji}>{emoji}</Text>
+      {selected && <Feather name="check" size={11} color={theme.accentLight} style={{ marginRight: 1 }} />}
+      <Text style={[ssc.chipText, selected && { color: theme.accentLight }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+const ssc = StyleSheet.create({
+  chip:     { backgroundColor: CARD, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, borderRadius: 100, paddingHorizontal: 12, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 5 },
+  emoji:    { fontSize: 14 },
+  chipText: { fontSize: 14, fontFamily: 'Inter_500Medium', color: MUTED },
 });
 
 function Chip({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
@@ -471,8 +544,6 @@ const sl = StyleSheet.create({
 
 
 // ─── Notifications step ────────────────────────────────────────────────────────
-// This is an explanatory consent screen only. The native dialog is intentionally
-// deferred until the user has received value from a real action in the app.
 function NotificationsStep({ flow, onEnable, onSkip }: { flow: Flow; onEnable: () => void; onSkip: () => void }) {
   const { theme } = useAppTheme();
   const insets  = useSafeAreaInsets();
@@ -636,32 +707,31 @@ const ss = StyleSheet.create({
   featureText:{ fontSize: 14, fontFamily: 'Inter_400Regular', color: FG },
 });
 
-// ─── Auth step ────────────────────────────────────────────────────────────────
-type AuthPhase = 'form' | 'verify' | 'existing-account';
+// ─── Buyer Auth Step — bold "Sign up" screen with stacked OAuth rows ──────────
+type BuyerAuthPhase = 'choose' | 'email-form' | 'verify' | 'existing-account';
 
-interface AuthStepProps {
+interface BuyerAuthStepProps {
   signUp: ReturnType<typeof useSignUp>['signUp'];
   startGoogleOAuth: () => Promise<any>;
   startAppleOAuth: () => Promise<any>;
   onAuthComplete: () => void;
   onDevClear: () => Promise<void>;
-  /** The @username the user typed above the auth form. */
   username: string;
   onUsernameChange: (v: string) => void;
   referralCode: string;
   onReferralCodeChange: (v: string) => void;
 }
 
-function AuthStep({
+function BuyerAuthStep({
   signUp, startGoogleOAuth, startAppleOAuth, onAuthComplete, onDevClear,
   username, onUsernameChange, referralCode, onReferralCodeChange,
-}: AuthStepProps) {
+}: BuyerAuthStepProps) {
   const { theme } = useAppTheme();
   const router = useRouter();
   const { isSignedIn, signOut } = useAuth();
   const { user } = useUser();
 
-  const [phase, setPhase]               = useState<AuthPhase>('form');
+  const [phase, setPhase]               = useState<BuyerAuthPhase>('choose');
   const [email, setEmail]               = useState('');
   const [password, setPassword]         = useState('');
   const [code, setCode]                 = useState('');
@@ -672,14 +742,12 @@ function AuthStep({
   const [clearingSession, setClearSession] = useState(false);
   const [usernameError, setUsernameError] = useState('');
 
-  // username format: letters, numbers, underscores only, 3-30 chars
   const USERNAME_REGEX_AUTH = /^[a-zA-Z0-9_]{3,30}$/;
   const isUsernameValid = USERNAME_REGEX_AUTH.test(username.trim());
   const canSubmit = email.includes('@') && password.length >= 8 && isUsernameValid;
   const canVerify = code.length === 6;
   const currentEmail = user?.primaryEmailAddress?.emailAddress ?? '';
 
-  // ── Clear local test session ─────────────────────────────────────────────────
   async function handleClearSession() {
     setClearSession(true);
     setError('');
@@ -693,18 +761,13 @@ function AuthStep({
     }
   }
 
-  // ── Sign-up ──────────────────────────────────────────────────────────────────
   async function handleSignUp() {
     if (!canSubmit || loading) return;
-
-    // CRITICAL: if a session already exists Clerk returns session_exists, which
-    // the old code misclassified as "email already taken". Block this early.
     if (isSignedIn) {
       const who = currentEmail ? `as ${currentEmail}` : 'with another account';
       setError(`You are currently signed in ${who}. Tap "Sign out and create another account" below.`);
       return;
     }
-
     setLoading(true);
     setError('');
     try {
@@ -712,7 +775,6 @@ function AuthStep({
         emailAddress: email.trim().toLowerCase(),
         password,
       });
-
       if (err) {
         const inner = (err as any)?.errors?.[0] ?? err;
         const errCode = ((inner as any)?.code ?? '').toLowerCase();
@@ -723,7 +785,6 @@ function AuthStep({
         }
         return;
       }
-
       await signUp.verifications.sendEmailCode();
       setPhase('verify');
     } catch (e: any) {
@@ -739,14 +800,12 @@ function AuthStep({
     }
   }
 
-  // ── Verify email code ────────────────────────────────────────────────────────
   async function handleVerify() {
     if (!canVerify || loading) return;
     setLoading(true);
     setError('');
     try {
       await signUp.verifications.verifyEmailCode({ code });
-
       if (signUp.status === 'complete') {
         await signUp.finalize({
           navigate: ({ decorateUrl }: { decorateUrl: (url: string) => string }) => {
@@ -770,7 +829,6 @@ function AuthStep({
     }
   }
 
-  // ── OAuth ────────────────────────────────────────────────────────────────────
   async function handleOAuth(startFlow: () => Promise<any>, provider: string) {
     setOAuth(provider);
     setError('');
@@ -792,102 +850,69 @@ function AuthStep({
     }
   }
 
-  // ── Active session warning ───────────────────────────────────────────────────
-  if (isSignedIn && phase === 'form') {
+  // Already signed-in guard
+  if (isSignedIn && phase === 'choose') {
     return (
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={sa.scroll} keyboardShouldPersistTaps="handled">
-          <Text style={sa.headline}>Already signed in</Text>
-          <Text style={sa.sub}>
-            {currentEmail
-              ? `You are currently signed in as ${currentEmail}.`
-              : 'You are currently signed in.'}
+        <ScrollView contentContainerStyle={sba.scroll} keyboardShouldPersistTaps="handled">
+          <Text style={sba.headline}>Already signed in</Text>
+          <Text style={sba.sub}>
+            {currentEmail ? `You are currently signed in as ${currentEmail}.` : 'You are currently signed in.'}
             {'\n\n'}Sign out first to create a new account, or continue with your current account.
           </Text>
-
-          <TouchableOpacity
-            style={sa.sessionBtn}
-            onPress={handleClearSession}
-            disabled={clearingSession}
-            activeOpacity={0.85}
-          >
-            <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sa.sessionBtnGrad}>
+          <TouchableOpacity style={sba.sessionBtn} onPress={handleClearSession} disabled={clearingSession} activeOpacity={0.85}>
+            <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sba.sessionBtnGrad}>
               {clearingSession
                 ? <ActivityIndicator color={theme.onAccent} size="small" />
-                : <Text style={[sa.sessionBtnText, getOnAccentTextStyle(theme)]}>Sign out and create another account</Text>}
+                : <Text style={[sba.sessionBtnText, getOnAccentTextStyle(theme)]}>Sign out and create another account</Text>}
             </LinearGradient>
           </TouchableOpacity>
-
-          <TouchableOpacity style={sa.continueBtn} onPress={onAuthComplete} activeOpacity={0.8}>
-            <Text style={sa.continueBtnText}>Continue with current account →</Text>
+          <TouchableOpacity style={sba.continueBtn} onPress={onAuthComplete} activeOpacity={0.8}>
+            <Text style={sba.continueBtnText}>Continue with current account →</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     );
   }
 
-  // ── Existing account panel ──────────────────────────────────────────────────
+  // Existing account
   if (phase === 'existing-account') {
     return (
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={sa.scroll} keyboardShouldPersistTaps="handled">
-          <Text style={sa.headline}>Account exists.</Text>
-          <Text style={sa.sub}>An account already exists with this email.</Text>
-
-          {/* Email chip */}
-          <View style={[sa.existingEmailChip, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
-            <Text style={[sa.existingEmailText, { color: theme.accentLight }]}>{email}</Text>
+        <ScrollView contentContainerStyle={sba.scroll} keyboardShouldPersistTaps="handled">
+          <Text style={sba.headline}>Account exists.</Text>
+          <Text style={sba.sub}>An account already exists with this email.</Text>
+          <View style={[sba.existingEmailChip, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
+            <Text style={[sba.existingEmailText, { color: theme.accentLight }]}>{email}</Text>
           </View>
-
-          {/* Info card */}
-          <View style={[sa.existingCard, { backgroundColor: theme.secondaryDim, borderColor: theme.accentDim }]}>
-            <Text style={sa.existingCardTitle}>Sign in to continue your Brandthread journey.</Text>
-            <Text style={sa.existingCardSub}>
-              Use your existing account to complete setup. Your onboarding answers are saved.
-            </Text>
+          <View style={[sba.existingCard, { backgroundColor: theme.secondaryDim, borderColor: theme.accentDim }]}>
+            <Text style={sba.existingCardTitle}>Sign in to continue your Brandthread journey.</Text>
+            <Text style={sba.existingCardSub}>Use your existing account to complete setup. Your onboarding answers are saved.</Text>
           </View>
-
-          {/* Sign in */}
-          <TouchableOpacity
-            style={sa.existingSignInBtn}
-            onPress={() => router.replace('/sign-in' as never)}
-            activeOpacity={0.88}
-          >
-            <LinearGradient
-              colors={theme.primaryGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={sa.existingSignInGrad}
-            >
-              <Text style={[sa.existingSignInText, getOnAccentTextStyle(theme)]}>Sign in</Text>
+          <TouchableOpacity style={sba.existingSignInBtn} onPress={() => router.replace('/sign-in' as never)} activeOpacity={0.88}>
+            <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={sba.existingSignInGrad}>
+              <Text style={[sba.existingSignInText, getOnAccentTextStyle(theme)]}>Sign in</Text>
             </LinearGradient>
           </TouchableOpacity>
-
-          {/* Use different email */}
-          <TouchableOpacity
-            style={sa.existingDiffBtn}
-            onPress={() => { setPhase('form'); setEmail(''); setPassword(''); setError(''); }}
-            activeOpacity={0.85}
-          >
-            <Text style={sa.existingDiffText}>Use a different email</Text>
+          <TouchableOpacity style={sba.existingDiffBtn} onPress={() => { setPhase('choose'); setEmail(''); setPassword(''); setError(''); }} activeOpacity={0.85}>
+            <Text style={sba.existingDiffText}>Use a different email</Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     );
   }
 
-  // ── Email verification ───────────────────────────────────────────────────────
+  // Verification
   if (phase === 'verify') {
     return (
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={sa.scroll} keyboardShouldPersistTaps="handled">
-          <Text style={sa.headline}>Check your email</Text>
-          <Text style={sa.sub}>We sent a 6-digit code to {email}</Text>
-
-          <View style={sa.inputWrap}>
-            <Text style={sa.label}>Verification code</Text>
+        <ScrollView contentContainerStyle={sba.scroll} keyboardShouldPersistTaps="handled">
+          <Text style={sba.headline}>Check your email</Text>
+          <Text style={sba.sub}>We sent a 6-digit code to {email}</Text>
+          <View style={sba.inputWrap}>
+            <Text style={sba.label}>Verification code</Text>
             <TextInput
-              style={[sa.input, sa.codeInput]}
+              style={[sba.input, sba.codeInput]}
               placeholder="000000"
               placeholderTextColor={MUTED2}
               value={code}
@@ -897,43 +922,560 @@ function AuthStep({
               autoFocus
             />
           </View>
-
-          {error ? <Text style={sa.error}>{error}</Text> : null}
-
-          <PrimaryButton
-            label={loading ? 'Verifying…' : 'Verify email'}
-            onPress={handleVerify}
-            disabled={!canVerify}
-            loading={loading}
-          />
-
-          <TouchableOpacity style={sa.resendBtn} onPress={() => signUp.verifications.sendEmailCode()}>
-            <Text style={sa.resendText}>{"Didn't get it? "}<Text style={{ color: theme.accentLight }}>Resend</Text></Text>
+          {error ? <Text style={sba.error}>{error}</Text> : null}
+          <PrimaryButton label={loading ? 'Verifying…' : 'Verify email'} onPress={handleVerify} disabled={!canVerify} loading={loading} />
+          <TouchableOpacity style={sba.resendBtn} onPress={() => signUp.verifications.sendEmailCode()}>
+            <Text style={sba.resendText}>{"Didn't get it? "}<Text style={{ color: theme.accentLight }}>Resend</Text></Text>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
     );
   }
 
-  // ── Sign-up form ─────────────────────────────────────────────────────────────
+  // Email form (revealed via "Use email" in choose phase)
+  if (phase === 'email-form') {
+    return (
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={sba.scroll} keyboardShouldPersistTaps="handled">
+          <TouchableOpacity onPress={() => { setPhase('choose'); setError(''); }} style={sba.backToChoose} activeOpacity={0.7}>
+            <Feather name="arrow-left" size={16} color={MUTED} />
+            <Text style={sba.backToChooseText}>Back</Text>
+          </TouchableOpacity>
+          <Text style={sba.headline}>Create your account</Text>
+          <Text style={sba.sub}>One account for everything on Brandthread.</Text>
+
+          <View style={sba.inputWrap}>
+            <Text style={sba.label}>Choose your @username</Text>
+            <TextInput
+              testID="onboarding-username-input"
+              style={[sba.input, usernameError ? { borderColor: 'rgba(248,113,113,0.5)' } : undefined]}
+              placeholder="e.g. alex_style"
+              placeholderTextColor={MUTED2}
+              value={username}
+              editable
+              onChangeText={v => {
+                const cleaned = v.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 30);
+                onUsernameChange(cleaned);
+                if (cleaned.length > 0 && cleaned.length < 3) {
+                  setUsernameError('At least 3 characters');
+                } else {
+                  setUsernameError('');
+                }
+              }}
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={30}
+            />
+            {usernameError
+              ? <Text style={sba.hint}>{usernameError}</Text>
+              : username.length > 0
+                ? <Text style={sba.hint}>@{username} · letters, numbers, underscores only</Text>
+                : <Text style={sba.hint}>Letters, numbers, and underscores only</Text>}
+          </View>
+
+          <View style={sba.inputWrap}>
+            <Text style={sba.label}>Referral code (optional)</Text>
+            <TextInput
+              testID="onboarding-referral-input"
+              style={sba.input}
+              placeholder="e.g. FASHION"
+              placeholderTextColor={MUTED2}
+              value={referralCode}
+              editable
+              onChangeText={v => onReferralCodeChange(v.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12))}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={12}
+            />
+            <Text style={sba.hint}>Enter the code from the friend who invited you.</Text>
+          </View>
+
+          <View style={sba.inputWrap}>
+            <Text style={sba.label}>Email address</Text>
+            <TextInput
+              style={sba.input}
+              placeholder="mila@nightshiftstudio.co"
+              placeholderTextColor={MUTED2}
+              value={email}
+              onChangeText={setEmail}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              autoComplete="email"
+            />
+          </View>
+
+          <View style={sba.inputWrap}>
+            <Text style={sba.label}>Password</Text>
+            <View style={sba.pwRow}>
+              <TextInput
+                style={[sba.input, sba.pwInput]}
+                placeholder="Minimum 8 characters"
+                placeholderTextColor={MUTED2}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPw}
+                autoComplete="new-password"
+              />
+              <TouchableOpacity style={sba.eyeBtn} onPress={() => setShowPw(v => !v)}>
+                <Feather name={showPw ? 'eye-off' : 'eye'} size={18} color={MUTED} />
+              </TouchableOpacity>
+            </View>
+            {password.length > 0 && password.length < 8 && (
+              <Text style={sba.hint}>Use at least 8 characters</Text>
+            )}
+          </View>
+
+          {error ? <Text style={sba.error}>{error}</Text> : null}
+
+          <PrimaryButton label={loading ? 'Creating account…' : 'Create account'} onPress={handleSignUp} disabled={!canSubmit} loading={loading} />
+
+          <Text style={sba.legal}>
+            By continuing you agree to our{' '}
+            <Text style={{ color: theme.accentLight }} onPress={() => Linking.openURL('https://brandthread.app/terms')}>Terms</Text>
+            {' and '}
+            <Text style={{ color: theme.accentLight }} onPress={() => Linking.openURL('https://brandthread.app/privacy')}>Privacy Policy</Text>.
+          </Text>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  // Default: bold "Sign up" chooser — OAuth rows first, then "Use email"
+  return (
+    <View style={{ flex: 1 }}>
+      <ScrollView contentContainerStyle={sba.chooseScroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <Text style={sba.chooseHeadline}>Sign up</Text>
+        <Text style={sba.chooseSub}>Discover brands, buy products, and follow the drops that move you.</Text>
+
+        {/* Google row */}
+        <TouchableOpacity
+          style={sba.bigRow}
+          onPress={() => handleOAuth(startGoogleOAuth, 'Google')}
+          activeOpacity={0.85}
+          disabled={!!oauthLoading || loading}
+        >
+          {oauthLoading === 'Google' ? (
+            <ActivityIndicator color={theme.accentLight} size="small" />
+          ) : (
+            <>
+              <View style={sba.bigRowIcon}>
+                <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ fontFamily: 'Inter_700Bold', fontSize: 12, color: '#FFFFFF', lineHeight: 14 }}>G</Text>
+                </View>
+              </View>
+              <Text style={sba.bigRowText}>Continue with Google</Text>
+              <Feather name="chevron-right" size={16} color={MUTED2} />
+            </>
+          )}
+        </TouchableOpacity>
+
+        {/* Apple row — iOS only */}
+        {Platform.OS === 'ios' && (
+          <TouchableOpacity
+            style={[sba.bigRow, sba.appleRow]}
+            onPress={() => handleOAuth(startAppleOAuth, 'Apple')}
+            activeOpacity={0.85}
+            disabled={!!oauthLoading || loading}
+          >
+            {oauthLoading === 'Apple' ? (
+              <ActivityIndicator color={FG} size="small" />
+            ) : (
+              <>
+                <View style={sba.bigRowIcon}>
+                  <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
+                </View>
+                <Text style={sba.bigRowText}>Continue with Apple</Text>
+                <Feather name="chevron-right" size={16} color={MUTED2} />
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+
+        {/* Use email row */}
+        <TouchableOpacity
+          style={sba.bigRow}
+          onPress={() => setPhase('email-form')}
+          activeOpacity={0.85}
+          disabled={!!oauthLoading || loading}
+        >
+          <View style={sba.bigRowIcon}>
+            <Feather name="mail" size={20} color={MUTED} />
+          </View>
+          <Text style={sba.bigRowText}>Use email</Text>
+          <Feather name="chevron-right" size={16} color={MUTED2} />
+        </TouchableOpacity>
+
+        {error ? <Text style={[sba.error, { textAlign: 'center', marginTop: 8 }]}>{error}</Text> : null}
+
+        <TouchableOpacity style={sba.signInLink} onPress={() => router.replace('/sign-in' as never)} activeOpacity={0.8}>
+          <Text style={sba.signInLinkText}>Already have an account? <Text style={{ color: theme.accentLight }}>Sign in</Text></Text>
+        </TouchableOpacity>
+
+        <Text style={sba.legal}>
+          By continuing you agree to our{' '}
+          <Text style={{ color: theme.accentLight }} onPress={() => Linking.openURL('https://brandthread.app/terms')}>Terms</Text>
+          {' and '}
+          <Text style={{ color: theme.accentLight }} onPress={() => Linking.openURL('https://brandthread.app/privacy')}>Privacy Policy</Text>.
+        </Text>
+      </ScrollView>
+    </View>
+  );
+}
+
+// ─── Seller Auth Step — single-column labeled form ────────────────────────────
+type SellerAuthPhase = 'form' | 'verify' | 'existing-account';
+
+interface SellerAuthStepProps {
+  signUp: ReturnType<typeof useSignUp>['signUp'];
+  startGoogleOAuth: () => Promise<any>;
+  startAppleOAuth: () => Promise<any>;
+  onAuthComplete: () => void;
+  onDevClear: () => Promise<void>;
+  username: string;
+  onUsernameChange: (v: string) => void;
+  referralCode: string;
+  onReferralCodeChange: (v: string) => void;
+  /** Prefill first name captured on the auth form into the later name step */
+  onFirstNamePrefill: (firstName: string) => void;
+  /** Prefill last name (stored for profile write) */
+  onLastNamePrefill: (lastName: string) => void;
+}
+
+function SellerAuthStep({
+  signUp, startGoogleOAuth, startAppleOAuth, onAuthComplete, onDevClear,
+  username, onUsernameChange, referralCode, onReferralCodeChange,
+  onFirstNamePrefill, onLastNamePrefill,
+}: SellerAuthStepProps) {
+  const { theme } = useAppTheme();
+  const router = useRouter();
+  const { isSignedIn, signOut } = useAuth();
+  const { user } = useUser();
+
+  const [phase, setPhase]             = useState<SellerAuthPhase>('form');
+  const [email, setEmail]             = useState('');
+  const [formFirstName, setFormFirstName] = useState('');
+  const [formLastName, setFormLastName]   = useState('');
+  const [password, setPassword]       = useState('');
+  const [confirmPassword, setConfirm] = useState('');
+  const [code, setCode]               = useState('');
+  const [showPw, setShowPw]           = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [loading, setLoading]         = useState(false);
+  const [oauthLoading, setOAuth]      = useState('');
+  const [error, setError]             = useState('');
+  const [clearingSession, setClearSession] = useState(false);
+  const [usernameError, setUsernameError] = useState('');
+
+  const USERNAME_REGEX_AUTH = /^[a-zA-Z0-9_]{3,30}$/;
+  const isUsernameValid = USERNAME_REGEX_AUTH.test(username.trim());
+  const passwordsMatch = password === confirmPassword;
+  const canSubmit = email.includes('@') && password.length >= 8 && passwordsMatch && isUsernameValid && formFirstName.trim().length >= 1;
+  const canVerify = code.length === 6;
+  const currentEmail = user?.primaryEmailAddress?.emailAddress ?? '';
+
+  async function handleClearSession() {
+    setClearSession(true);
+    setError('');
+    try {
+      if (isSignedIn) await signOut();
+      await onDevClear();
+    } catch {
+      // session may already be cleared
+    } finally {
+      setClearSession(false);
+    }
+  }
+
+  async function handleSignUp() {
+    if (!canSubmit || loading) return;
+    if (!passwordsMatch) { setError('Passwords do not match.'); return; }
+    if (isSignedIn) {
+      const who = currentEmail ? `as ${currentEmail}` : 'with another account';
+      setError(`You are currently signed in ${who}. Tap "Sign out and create another account" below.`);
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      // Prefill name fields before account creation so draft restore gets them
+      const fn = formFirstName.trim();
+      const ln = formLastName.trim();
+      onFirstNamePrefill(fn);
+      onLastNamePrefill(ln);
+
+      const { error: err } = await signUp.password({
+        emailAddress: email.trim().toLowerCase(),
+        password,
+      });
+      if (err) {
+        const inner = (err as any)?.errors?.[0] ?? err;
+        const errCode = ((inner as any)?.code ?? '').toLowerCase();
+        if (errCode === 'form_identifier_exists') {
+          setPhase('existing-account');
+        } else {
+          setError(mapClerkError(err));
+        }
+        return;
+      }
+      await signUp.verifications.sendEmailCode();
+      setPhase('verify');
+    } catch (e: any) {
+      const excInner = e?.errors?.[0] ?? e;
+      const excCode  = (excInner?.code ?? '').toLowerCase();
+      if (excCode === 'form_identifier_exists') {
+        setPhase('existing-account');
+      } else {
+        setError(mapClerkError(e));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleVerify() {
+    if (!canVerify || loading) return;
+    setLoading(true);
+    setError('');
+    try {
+      await signUp.verifications.verifyEmailCode({ code });
+      if (signUp.status === 'complete') {
+        await signUp.finalize({
+          navigate: ({ decorateUrl }: { decorateUrl: (url: string) => string }) => {
+            const referralQuery = referralCode
+              ? `&referralCode=${encodeURIComponent(referralCode)}`
+              : '';
+            const url = decorateUrl(`/onboarding?postAuth=1${referralQuery}`);
+            if (url.startsWith('http') && typeof window !== 'undefined') {
+              window.location.href = url;
+            } else {
+              router.replace('/onboarding' as never);
+            }
+          },
+        });
+        onAuthComplete();
+      }
+    } catch (e: any) {
+      setError(mapClerkError(e));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleOAuth(startFlow: () => Promise<any>, provider: string) {
+    setOAuth(provider);
+    setError('');
+    try {
+      const result = await startFlow();
+      if (result?.createdSessionId && result?.setActive) {
+        await result.setActive({ session: result.createdSessionId });
+      }
+      if (isOAuthFlowComplete(result)) {
+        onAuthComplete();
+      } else if (result?.signUp) {
+        setError(`${provider} sign-in needs one more step. Please try again.`);
+      }
+    } catch (e: any) {
+      if (isOAuthCancellationError(e)) { setOAuth(''); return; }
+      setError(mapOAuthError(provider, e));
+    } finally {
+      setOAuth('');
+    }
+  }
+
+  // Already signed in
+  if (isSignedIn && phase === 'form') {
+    return (
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={ssa.scroll} keyboardShouldPersistTaps="handled">
+          <Text style={ssa.headline}>Already signed in</Text>
+          <Text style={ssa.sub}>
+            {currentEmail ? `You are currently signed in as ${currentEmail}.` : 'You are currently signed in.'}
+            {'\n\n'}Sign out first to create a new account, or continue with your current account.
+          </Text>
+          <TouchableOpacity style={ssa.sessionBtn} onPress={handleClearSession} disabled={clearingSession} activeOpacity={0.85}>
+            <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={ssa.sessionBtnGrad}>
+              {clearingSession
+                ? <ActivityIndicator color={theme.onAccent} size="small" />
+                : <Text style={[ssa.sessionBtnText, getOnAccentTextStyle(theme)]}>Sign out and create another account</Text>}
+            </LinearGradient>
+          </TouchableOpacity>
+          <TouchableOpacity style={ssa.continueBtn} onPress={onAuthComplete} activeOpacity={0.8}>
+            <Text style={ssa.continueBtnText}>Continue with current account →</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  // Existing account
+  if (phase === 'existing-account') {
+    return (
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={ssa.scroll} keyboardShouldPersistTaps="handled">
+          <Text style={ssa.headline}>Account exists.</Text>
+          <Text style={ssa.sub}>An account already exists with this email.</Text>
+          <View style={[ssa.existingEmailChip, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}>
+            <Text style={[ssa.existingEmailText, { color: theme.accentLight }]}>{email}</Text>
+          </View>
+          <View style={[ssa.existingCard, { backgroundColor: theme.secondaryDim, borderColor: theme.accentDim }]}>
+            <Text style={ssa.existingCardTitle}>Sign in to continue your Brandthread journey.</Text>
+            <Text style={ssa.existingCardSub}>Use your existing account to complete setup. Your onboarding answers are saved.</Text>
+          </View>
+          <TouchableOpacity style={ssa.existingSignInBtn} onPress={() => router.replace('/sign-in' as never)} activeOpacity={0.88}>
+            <LinearGradient colors={theme.primaryGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={ssa.existingSignInGrad}>
+              <Text style={[ssa.existingSignInText, getOnAccentTextStyle(theme)]}>Sign in</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+          <TouchableOpacity style={ssa.existingDiffBtn} onPress={() => { setPhase('form'); setEmail(''); setPassword(''); setConfirm(''); setError(''); }} activeOpacity={0.85}>
+            <Text style={ssa.existingDiffText}>Use a different email</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  // Verification
+  if (phase === 'verify') {
+    return (
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={ssa.scroll} keyboardShouldPersistTaps="handled">
+          <Text style={ssa.headline}>Check your email</Text>
+          <Text style={ssa.sub}>We sent a 6-digit code to {email}</Text>
+          <View style={ssa.inputWrap}>
+            <Text style={ssa.label}>Verification code</Text>
+            <TextInput
+              style={[ssa.input, ssa.codeInput]}
+              placeholder="000000"
+              placeholderTextColor={MUTED2}
+              value={code}
+              onChangeText={setCode}
+              keyboardType="number-pad"
+              maxLength={6}
+              autoFocus
+            />
+          </View>
+          {error ? <Text style={ssa.error}>{error}</Text> : null}
+          <PrimaryButton label={loading ? 'Verifying…' : 'Verify email'} onPress={handleVerify} disabled={!canVerify} loading={loading} />
+          <TouchableOpacity style={ssa.resendBtn} onPress={() => signUp.verifications.sendEmailCode()}>
+            <Text style={ssa.resendText}>{"Didn't get it? "}<Text style={{ color: theme.accentLight }}>Resend</Text></Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    );
+  }
+
+  // Main seller sign-up form: single-column labeled fields
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-      <ScrollView contentContainerStyle={sa.scroll} keyboardShouldPersistTaps="handled">
-        <Text style={sa.headline}>Create your account</Text>
-         <Text style={sa.sub}>One account for everything on Brandthread.</Text>
+      <ScrollView contentContainerStyle={ssa.scroll} keyboardShouldPersistTaps="handled">
+        <Text style={ssa.headline}>Create your account</Text>
+        <Text style={ssa.sub}>Build your brand on Brandthread.</Text>
 
-        {/* Username — collected here so both OAuth and email-password paths get a handle */}
-        <View style={sa.inputWrap}>
-          <Text style={sa.label}>Choose your @username</Text>
+        {/* Email */}
+        <View style={ssa.inputWrap}>
+          <Text style={ssa.label}>Email address</Text>
+          <TextInput
+            style={ssa.input}
+            placeholder="brand@yourstudio.co"
+            placeholderTextColor={MUTED2}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            autoComplete="email"
+          />
+        </View>
+
+        {/* First name */}
+        <View style={ssa.inputWrap}>
+          <Text style={ssa.label}>First name</Text>
+          <TextInput
+            style={ssa.input}
+            placeholder="Alex"
+            placeholderTextColor={MUTED2}
+            value={formFirstName}
+            onChangeText={setFormFirstName}
+            autoCapitalize="words"
+            maxLength={40}
+          />
+        </View>
+
+        {/* Last name */}
+        <View style={ssa.inputWrap}>
+          <Text style={ssa.label}>Last name</Text>
+          <TextInput
+            style={ssa.input}
+            placeholder="Rivera"
+            placeholderTextColor={MUTED2}
+            value={formLastName}
+            onChangeText={setFormLastName}
+            autoCapitalize="words"
+            maxLength={40}
+          />
+        </View>
+
+        {/* Password */}
+        <View style={ssa.inputWrap}>
+          <Text style={ssa.label}>Password</Text>
+          <View style={ssa.pwRow}>
+            <TextInput
+              style={[ssa.input, ssa.pwInput]}
+              placeholder="Minimum 8 characters"
+              placeholderTextColor={MUTED2}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPw}
+              autoComplete="new-password"
+            />
+            <TouchableOpacity style={ssa.eyeBtn} onPress={() => setShowPw(v => !v)}>
+              <Feather name={showPw ? 'eye-off' : 'eye'} size={18} color={MUTED} />
+            </TouchableOpacity>
+          </View>
+          {password.length > 0 && password.length < 8 && (
+            <Text style={ssa.hint}>Use at least 8 characters</Text>
+          )}
+        </View>
+
+        {/* Confirm password */}
+        <View style={ssa.inputWrap}>
+          <Text style={ssa.label}>Confirm password</Text>
+          <View style={ssa.pwRow}>
+            <TextInput
+              style={[ssa.input, ssa.pwInput, !passwordsMatch && confirmPassword.length > 0 ? { borderColor: ERR } : undefined]}
+              placeholder="Re-enter password"
+              placeholderTextColor={MUTED2}
+              value={confirmPassword}
+              onChangeText={setConfirm}
+              secureTextEntry={!showConfirm}
+              autoComplete="new-password"
+            />
+            <TouchableOpacity style={ssa.eyeBtn} onPress={() => setShowConfirm(v => !v)}>
+              <Feather name={showConfirm ? 'eye-off' : 'eye'} size={18} color={MUTED} />
+            </TouchableOpacity>
+          </View>
+          {!passwordsMatch && confirmPassword.length > 0 && (
+            <Text style={[ssa.hint, { color: ERR }]}>Passwords do not match</Text>
+          )}
+        </View>
+
+        {/* Divider */}
+        <View style={ssa.divider}>
+          <View style={ssa.divLine} />
+          <Text style={ssa.divText}>optional</Text>
+          <View style={ssa.divLine} />
+        </View>
+
+        {/* Username */}
+        <View style={ssa.inputWrap}>
+          <Text style={ssa.label}>Choose your @username</Text>
           <TextInput
             testID="onboarding-username-input"
-            style={[sa.input, usernameError ? { borderColor: 'rgba(248,113,113,0.5)' } : undefined]}
-            placeholder="e.g. alex_style"
+            style={[ssa.input, usernameError ? { borderColor: ERR } : undefined]}
+            placeholder="e.g. noire_collective"
             placeholderTextColor={MUTED2}
             value={username}
             editable
             onChangeText={v => {
-              // Strip disallowed chars on the fly — no spaces or special characters
               const cleaned = v.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 30);
               onUsernameChange(cleaned);
               if (cleaned.length > 0 && cleaned.length < 3) {
@@ -947,18 +1489,18 @@ function AuthStep({
             maxLength={30}
           />
           {usernameError
-            ? <Text style={sa.hint}>{usernameError}</Text>
+            ? <Text style={ssa.hint}>{usernameError}</Text>
             : username.length > 0
-              ? <Text style={sa.hint}>@{username} · letters, numbers, underscores only</Text>
-              : <Text style={sa.hint}>Letters, numbers, and underscores only</Text>
-          }
+              ? <Text style={ssa.hint}>@{username} · letters, numbers, underscores only</Text>
+              : <Text style={ssa.hint}>Letters, numbers, and underscores only</Text>}
         </View>
 
-        <View style={sa.inputWrap}>
-          <Text style={sa.label}>Referral code (optional)</Text>
+        {/* Referral code */}
+        <View style={ssa.inputWrap}>
+          <Text style={ssa.label}>Referral code (optional)</Text>
           <TextInput
             testID="onboarding-referral-input"
-            style={sa.input}
+            style={ssa.input}
             placeholder="e.g. FASHION"
             placeholderTextColor={MUTED2}
             value={referralCode}
@@ -968,90 +1510,47 @@ function AuthStep({
             autoCorrect={false}
             maxLength={12}
           />
-          <Text style={sa.hint}>Enter the code from the friend who invited you.</Text>
+          <Text style={ssa.hint}>Enter the code from the friend who invited you.</Text>
         </View>
 
-        {/* OAuth — disabled until a valid username is entered */}
+        {error ? <Text style={ssa.error}>{error}</Text> : null}
+
+        <PrimaryButton label={loading ? 'Creating account…' : 'Create account'} onPress={handleSignUp} disabled={!canSubmit} loading={loading} />
+
+        {/* OAuth options below the main CTA */}
+        <View style={ssa.divider}>
+          <View style={ssa.divLine} />
+          <Text style={ssa.divText}>or continue with</Text>
+          <View style={ssa.divLine} />
+        </View>
+
         <TouchableOpacity
-          style={[sa.oauthBtn, !isUsernameValid && { opacity: 0.45 }]}
+          style={[ssa.oauthBtn, !isUsernameValid && { opacity: 0.45 }]}
           onPress={() => handleOAuth(startGoogleOAuth, 'Google')}
           activeOpacity={0.85}
           disabled={!!oauthLoading || loading || !isUsernameValid}
         >
           {oauthLoading === 'Google' ? <ActivityIndicator color={theme.accentLight} size="small" /> : <>
-            <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: '#4285F4', alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: 'Inter_700Bold', fontSize: 11, color: '#FFFFFF', lineHeight: 13 }}>G</Text></View>
-            <Text style={sa.oauthText}>Continue with Google</Text>
+            <View style={{ width: 18, height: 18, borderRadius: 9, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: 'Inter_700Bold', fontSize: 11, color: FG, lineHeight: 13 }}>G</Text></View>
+            <Text style={ssa.oauthText}>Continue with Google</Text>
           </>}
         </TouchableOpacity>
 
         {Platform.OS === 'ios' && (
           <TouchableOpacity
-            style={[sa.oauthBtn, sa.appleBtn, !isUsernameValid && { opacity: 0.45 }]}
+            style={[ssa.oauthBtn, ssa.appleBtn, !isUsernameValid && { opacity: 0.45 }]}
             onPress={() => handleOAuth(startAppleOAuth, 'Apple')}
             activeOpacity={0.85}
             disabled={!!oauthLoading || loading || !isUsernameValid}
           >
             {oauthLoading === 'Apple' ? <ActivityIndicator color={theme.accentLight} size="small" /> : <>
-              <Ionicons name="logo-apple" size={20} color="#FFFFFF" />
-              <Text style={[sa.oauthText, { color: '#FFFFFF' }]}>Continue with Apple</Text>
+              <Ionicons name="logo-apple" size={20} color={FG} />
+              <Text style={[ssa.oauthText, { color: '#FFFFFF' }]}>Continue with Apple</Text>
             </>}
           </TouchableOpacity>
         )}
 
-        {/* Divider */}
-        <View style={sa.divider}>
-          <View style={sa.divLine} />
-          <Text style={sa.divText}>or</Text>
-          <View style={sa.divLine} />
-        </View>
-
-        {/* Email */}
-        <View style={sa.inputWrap}>
-          <Text style={sa.label}>Email address</Text>
-          <TextInput
-            style={sa.input}
-            placeholder="mila@nightshiftstudio.co"
-            placeholderTextColor={MUTED2}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoComplete="email"
-          />
-        </View>
-
-        {/* Password */}
-        <View style={sa.inputWrap}>
-          <Text style={sa.label}>Password</Text>
-          <View style={sa.pwRow}>
-            <TextInput
-              style={[sa.input, sa.pwInput]}
-              placeholder="Minimum 8 characters"
-              placeholderTextColor={MUTED2}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPw}
-              autoComplete="new-password"
-            />
-            <TouchableOpacity style={sa.eyeBtn} onPress={() => setShowPw(v => !v)}>
-              <Feather name={showPw ? 'eye-off' : 'eye'} size={18} color={MUTED} />
-            </TouchableOpacity>
-          </View>
-          {password.length > 0 && password.length < 8 && (
-            <Text style={sa.hint}>Use at least 8 characters</Text>
-          )}
-        </View>
-
-        {error ? <Text style={sa.error}>{error}</Text> : null}
-
-        <PrimaryButton
-          label={loading ? 'Creating account…' : 'Create account'}
-          onPress={handleSignUp}
-          disabled={!canSubmit}
-          loading={loading}
-        />
-
-        <Text style={sa.legal}>
+        <Text style={ssa.legal}>
           By continuing you agree to our{' '}
           <Text style={{ color: theme.accentLight }} onPress={() => Linking.openURL('https://brandthread.app/terms')}>Terms</Text>
           {' and '}
@@ -1061,17 +1560,27 @@ function AuthStep({
     </KeyboardAvoidingView>
   );
 }
-const sa = StyleSheet.create({
+
+// Shared styles for buyer auth step
+const sba = StyleSheet.create({
   scroll:    { flexGrow: 1, paddingVertical: 8, gap: 0 },
+  chooseScroll: { flexGrow: 1, paddingVertical: 24, gap: 0 },
+  chooseHeadline: { fontSize: 36, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -1.2, marginBottom: 8 },
+  chooseSub: { fontSize: 15, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 22, marginBottom: 32 },
+  bigRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER,
+    paddingVertical: 16, paddingHorizontal: 16, backgroundColor: CARD, marginBottom: 10,
+  },
+  appleRow: { backgroundColor: '#000000', borderColor: 'rgba(255,255,255,0.15)' },
+  bigRowIcon: { width: 28, alignItems: 'center' },
+  bigRowText: { flex: 1, fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
+  signInLink: { paddingVertical: 16, alignItems: 'center' },
+  signInLinkText: { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED },
+  backToChoose: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 },
+  backToChooseText: { fontSize: 14, fontFamily: 'Inter_500Medium', color: MUTED },
   headline:  { fontSize: 28, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.5, marginBottom: 4 },
   sub:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 20 },
-  oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, paddingVertical: 13, backgroundColor: CARD, marginBottom: 9 },
-  // Apple button: solid black per Apple Human Interface Guidelines
-  appleBtn:  { backgroundColor: '#000000', borderColor: 'rgba(255,255,255,0.15)' },
-  oauthText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
-  divider:   { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 14 },
-  divLine:   { flex: 1, height: 1, backgroundColor: BORDER },
-  divText:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED },
   inputWrap: { marginBottom: 12 },
   label:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, marginBottom: 5 },
   input:     { backgroundColor: INPUT_BG, borderWidth: StyleSheet.hairlineWidth, borderColor: INPUT_BD, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: 'Inter_400Regular', color: FG },
@@ -1084,7 +1593,6 @@ const sa = StyleSheet.create({
   resendBtn: { paddingVertical: 12, alignItems: 'center', marginTop: 6 },
   resendText:{ fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED },
   legal:     { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED2, textAlign: 'center', lineHeight: 18, marginTop: 12 },
-  // Existing-account panel
   existingEmailChip: {
     alignSelf: 'flex-start',
     borderRadius: 20, borderWidth: 1,
@@ -1109,7 +1617,6 @@ const sa = StyleSheet.create({
     borderWidth: 1, borderColor: BORDER,
   },
   existingDiffText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
-  // Active-session warning
   sessionBtn:     { marginTop: 8, marginBottom: 10, borderRadius: 14, overflow: 'hidden' },
   sessionBtnGrad: { paddingVertical: 16, alignItems: 'center', paddingHorizontal: 20 },
   sessionBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
@@ -1117,9 +1624,61 @@ const sa = StyleSheet.create({
   continueBtnText:{ fontSize: 14, fontFamily: 'Inter_500Medium', color: MUTED },
 });
 
-// Theme selection is local until the seller's server onboarding transaction
-// succeeds. The sample is authenticated and consumed by a server-side
-// identity bucket, so clearing app storage cannot grant another generation.
+// Shared styles for seller auth step
+const ssa = StyleSheet.create({
+  scroll:    { flexGrow: 1, paddingVertical: 8, gap: 0 },
+  headline:  { fontSize: 28, fontFamily: 'Inter_700Bold', color: FG, letterSpacing: -0.5, marginBottom: 4 },
+  sub:       { fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, marginBottom: 20 },
+  inputWrap: { marginBottom: 12 },
+  label:     { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: MUTED, marginBottom: 5 },
+  input:     { backgroundColor: INPUT_BG, borderWidth: StyleSheet.hairlineWidth, borderColor: INPUT_BD, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, fontSize: 15, fontFamily: 'Inter_400Regular', color: FG },
+  codeInput: { letterSpacing: 8, fontSize: 22, textAlign: 'center', fontFamily: 'Inter_700Bold' },
+  pwRow:     { flexDirection: 'row', alignItems: 'center', backgroundColor: INPUT_BG, borderWidth: 1, borderColor: INPUT_BD, borderRadius: 12 },
+  pwInput:   { flex: 1, borderWidth: 0, backgroundColor: 'transparent' },
+  eyeBtn:    { paddingHorizontal: 14 },
+  hint:      { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED, marginTop: 4 },
+  error:     { color: ERR, fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 10 },
+  resendBtn: { paddingVertical: 12, alignItems: 'center', marginTop: 6 },
+  resendText:{ fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED },
+  divider:   { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 14 },
+  divLine:   { flex: 1, height: 1, backgroundColor: BORDER },
+  divText:   { fontSize: 13, fontFamily: 'Inter_400Regular', color: MUTED },
+  oauthBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, borderColor: BORDER, paddingVertical: 13, backgroundColor: CARD, marginBottom: 9 },
+  appleBtn:  { backgroundColor: SCREEN_BG, borderColor: BORDER },
+  oauthText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: FG },
+  legal:     { fontSize: 12, fontFamily: 'Inter_400Regular', color: MUTED2, textAlign: 'center', lineHeight: 18, marginTop: 12 },
+  existingEmailChip: {
+    alignSelf: 'flex-start',
+    borderRadius: 20, borderWidth: 1,
+    paddingHorizontal: 14, paddingVertical: 6, marginBottom: 16,
+  },
+  existingEmailText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  existingCard: {
+    borderRadius: 12, borderWidth: 1,
+    padding: 16, marginBottom: 20,
+  },
+  existingCardTitle: {
+    fontSize: 17, fontFamily: 'Inter_700Bold', color: FG, marginBottom: 6, lineHeight: 23,
+  },
+  existingCardSub: {
+    fontSize: 14, fontFamily: 'Inter_400Regular', color: MUTED, lineHeight: 20,
+  },
+  existingSignInBtn:  { marginBottom: 9, borderRadius: 12, overflow: 'hidden' },
+  existingSignInGrad: { paddingVertical: 16, alignItems: 'center', borderRadius: 12 },
+  existingSignInText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+  existingDiffBtn: {
+    borderRadius: 12, paddingVertical: 15, alignItems: 'center',
+    borderWidth: 1, borderColor: BORDER,
+  },
+  existingDiffText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+  sessionBtn:     { marginTop: 8, marginBottom: 10, borderRadius: 14, overflow: 'hidden' },
+  sessionBtnGrad: { paddingVertical: 16, alignItems: 'center', paddingHorizontal: 20 },
+  sessionBtnText: { fontSize: 15, fontFamily: 'Inter_700Bold', color: FG },
+  continueBtn:    { paddingVertical: 14, alignItems: 'center' },
+  continueBtnText:{ fontSize: 14, fontFamily: 'Inter_500Medium', color: MUTED },
+});
+
+// ─── Seller preview / theme selection step ────────────────────────────────────
 function SellerPreviewStep({
   brandName,
   selectedThemeId,
@@ -1291,11 +1850,13 @@ export default function OnboardingScreen() {
 
   const [flow, setFlow]           = useState<Flow | null>(null);
   const [selectedFlow, setSelectedFlow] = useState<AccountType | null>(null);
+  // Step 0 = AccountType for both paths (v6 ordering)
   const [step, setStep]           = useState(0);
   const [ready, setReady]         = useState(false);
 
   // Buyer data
   const [firstName, setFirstName]         = useState('');
+  const [lastName, setLastName]           = useState('');
   const [username, setUsername]           = useState('');
   const [referralCode, setReferralCode]   = useState(
     typeof referralCodeParam === 'string'
@@ -1318,7 +1879,6 @@ export default function OnboardingScreen() {
   const restoredDraft = useRef(false);
 
   // Clerk may take longer than local storage to initialize in a web preview.
-  // Never let that delay preselect a role before an account exists.
   useEffect(() => {
     const fallback = setTimeout(() => {
       setReady(true);
@@ -1328,9 +1888,6 @@ export default function OnboardingScreen() {
 
   // ── Restore draft for the active account ─────────────────────────────────────
   useEffect(() => {
-    // Wait until Clerk has resolved a signed-in identity before choosing the
-    // one-time restore key. The independent timeout above covers the web
-    // preview without letting it commit a restore for an unknown account.
     if (!authLoaded || (isSignedIn && !userLoaded)) return;
     if (isSignedIn && !user?.id) return;
     if (restoredDraft.current) return;
@@ -1340,14 +1897,13 @@ export default function OnboardingScreen() {
       try {
         const signedInUserId = user?.id;
         const draftKey = draftKeyForUser(signedInUserId);
-        // Discard the old global draft rather than risking restoration into a
-        // different account on a shared device. Onboarding answers are only
-        // persisted after Clerk identifies the user under their own key.
         await AsyncStorage.removeItem(LEGACY_DRAFT_KEY);
-        const values = draftKey
-          ? await AsyncStorage.multiGet([draftKey])
-          : [];
+        const values = await AsyncStorage.multiGet([
+          ...(draftKey ? [draftKey] : []),
+          PENDING_FLOW_KEY,
+        ]);
         const draftVal = draftKey ? values.find(([key]) => key === draftKey)?.[1] : null;
+        const pendingFlow = values.find(([key]) => key === PENDING_FLOW_KEY)?.[1];
 
         if (draftVal) {
           try {
@@ -1357,6 +1913,7 @@ export default function OnboardingScreen() {
               setSelectedFlow(draft.flow);
               setStep(restoreDraftStep(draft.flow, draft.step ?? 0, draft.version));
               setFirstName(draft.firstName ?? '');
+              setLastName(draft.lastName ?? '');
               setUsername(draft.username ?? '');
               setStyleArr(draft.styleInterests ?? DEFAULT_BUYER_INTERESTS);
               setBrandName(draft.brandName ?? '');
@@ -1366,6 +1923,14 @@ export default function OnboardingScreen() {
               setSelectedThemeId(isAppThemeId(draft.selectedThemeId) ? draft.selectedThemeId : 'purple');
             }
           } catch { /* bad json, ignore */ }
+        } else if (pendingFlow === 'buyer' || pendingFlow === 'seller') {
+          setFlow(pendingFlow);
+          setSelectedFlow(pendingFlow);
+          setStep(
+            isSignedIn && postAuth === '1'
+              ? pendingFlow === 'buyer' ? BUYER_STEP_INDEX.NAME : SELLER_STEP_INDEX.NAME
+              : pendingFlow === 'buyer' ? BUYER_STEP_INDEX.AUTH : SELLER_STEP_INDEX.AUTH,
+          );
         }
       } catch {
         // Local persistence is optional; a storage issue must not block signup.
@@ -1374,7 +1939,7 @@ export default function OnboardingScreen() {
       }
     }
     init();
-  }, [authLoaded, userLoaded, isSignedIn, user?.id]);
+  }, [authLoaded, userLoaded, isSignedIn, postAuth, user?.id]);
 
   // ── Persist draft ───────────────────────────────────────────────────────────
   const saveDraft = useCallback(async (overrides?: Record<string, unknown>) => {
@@ -1384,11 +1949,11 @@ export default function OnboardingScreen() {
     const data = {
       version: DRAFT_VERSION,
       ownerId: userId,
-      flow, step, firstName, username, styleInterests, brandName, brandStage, goals, selectedPlanId, selectedThemeId,
+      flow, step, firstName, lastName, username, styleInterests, brandName, brandStage, goals, selectedPlanId, selectedThemeId,
       ...overrides,
     };
     await AsyncStorage.setItem(draftKey, JSON.stringify(data));
-  }, [flow, step, firstName, username, styleInterests, brandName, brandStage, goals, selectedPlanId, selectedThemeId, user?.id]);
+  }, [flow, step, firstName, lastName, username, styleInterests, brandName, brandStage, goals, selectedPlanId, selectedThemeId, user?.id]);
 
   // Persist onboarding answers under the authenticated user's immutable ID.
   useEffect(() => {
@@ -1398,15 +1963,22 @@ export default function OnboardingScreen() {
 
   // ── Auth completion handler (OAuth/native without remount) ──────────────────
   const handleAuthComplete = useCallback(() => {
-    setStep(flow
-      ? flow === 'buyer' ? BUYER_STEP_INDEX.NAME : SELLER_STEP_INDEX.NAME
-      : BUYER_STEP_INDEX.ACCOUNT_TYPE);
+    // After auth, move to the first post-auth step (Name) for the chosen flow
+    if (flow === 'buyer') {
+      setStep(BUYER_STEP_INDEX.NAME);
+    } else if (flow === 'seller') {
+      setStep(SELLER_STEP_INDEX.NAME);
+    } else {
+      // No flow set yet — go to auth but shouldn't happen in v6 order
+      setStep(BUYER_STEP_INDEX.AUTH);
+    }
   }, [flow]);
 
-  // Email verification can reload the web route while Clerk finalizes. The
-  // route marker guarantees account type is still the immediate next screen.
+  // Email verification can reload the web route while Clerk finalizes.
   useEffect(() => {
     if (ready && isSignedIn && postAuth === '1' && !flow) {
+      // postAuth=1 means we just verified email; step 0 = AccountType was already passed
+      // If flow is still null, go to AccountType so user can choose
       setStep(BUYER_STEP_INDEX.ACCOUNT_TYPE);
     }
   }, [flow, isSignedIn, postAuth, ready]);
@@ -1417,9 +1989,12 @@ export default function OnboardingScreen() {
     if (!ready) return;
     if (prevSignedIn.current === null) { prevSignedIn.current = isSignedIn ?? false; return; }
     if (!prevSignedIn.current && isSignedIn) {
-      setStep(flow
-        ? flow === 'buyer' ? BUYER_STEP_INDEX.NAME : SELLER_STEP_INDEX.NAME
-        : BUYER_STEP_INDEX.ACCOUNT_TYPE);
+      // Just signed in via OAuth — move to Name step (flow is already set from AccountType choice)
+      if (flow === 'buyer') {
+        setStep(BUYER_STEP_INDEX.NAME);
+      } else if (flow === 'seller') {
+        setStep(SELLER_STEP_INDEX.NAME);
+      }
     }
     prevSignedIn.current = isSignedIn ?? false;
   }, [isSignedIn, ready, flow]);
@@ -1449,11 +2024,12 @@ export default function OnboardingScreen() {
   async function continueFromAccountType() {
     if (!selectedFlow) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // After AccountType (step 0), go to path-specific Auth (step 1)
     const next = selectedFlow === 'buyer'
-      ? BUYER_STEP_INDEX.NAME
-      : SELLER_STEP_INDEX.NAME;
+      ? BUYER_STEP_INDEX.AUTH
+      : SELLER_STEP_INDEX.AUTH;
     await AsyncStorage.multiSet([
-      ['user_role', selectedFlow],
+      [PENDING_FLOW_KEY, selectedFlow],
       [ONBOARDING_KEY, 'false'],
     ]);
     setFlow(selectedFlow);
@@ -1466,7 +2042,8 @@ export default function OnboardingScreen() {
     if (finishing) return;
     setFinishing(true);
     try {
-      const name = firstName.trim();
+      // Compose full name from firstName (and optionally lastName if we captured it)
+      const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ') || firstName.trim();
       const uname = username.trim().toLowerCase();
       const profile = await api.auth.sync({ name });
       const updated = await api.auth.updateProfile({
@@ -1487,17 +2064,11 @@ export default function OnboardingScreen() {
         username: updated.username ?? uname,
       });
       if (referralCode.trim()) {
-        await api.referrals.apply(referralCode.trim()).catch(() => {
-          // Referral attribution is optional and must not strand account setup.
-        });
+        await api.referrals.apply(referralCode.trim()).catch(() => {});
       }
-      // Style interests improve recommendations but are not required identity
-      // data, so a temporary failure must not strand account creation.
       if (styleInterests.length > 0) {
         await api.seller.saveOnboardingData({ styleInterests }).catch(() => {});
       }
-      // Commit completion only after every required server/profile write above
-      // succeeds. AuthGate can then safely restore this role on another device.
       await api.auth.completeOnboarding('buyer');
       await AsyncStorage.multiSet([
         [ONBOARDING_KEY, 'true'],
@@ -1507,10 +2078,10 @@ export default function OnboardingScreen() {
         ['onboarding_style_interests', JSON.stringify(styleInterests)],
       ]);
       await AsyncStorage.multiRemove([draftKeyForUser(profile.clerkId)!, LEGACY_DRAFT_KEY]);
-      // Preserve registration for people who granted access in a prior install
-      // or device setting without showing a prompt during onboarding.
+      await AsyncStorage.removeItem(PENDING_FLOW_KEY);
       void registerGrantedPushToken(profile.clerkId, api);
-      router.replace('/(buyer)/' as never);
+      // Route to the feed explainer for first-time buyers
+      router.replace('/thread-explainer' as never);
     } catch {
       setFinishing(false);
       Alert.alert(
@@ -1525,11 +2096,9 @@ export default function OnboardingScreen() {
     if (finishing) return;
     setFinishing(true);
     try {
-      const name = firstName.trim();
+      const name = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ') || firstName.trim();
       const uname = username.trim().toLowerCase();
       const profile = await api.auth.sync({ name });
-      // This is the actual seller profile write. The previous flow only
-      // stored these answers locally and called the optional questionnaire API.
       await api.auth.onboarding({
         brandName: brandName.trim(),
         brandStage,
@@ -1541,19 +2110,12 @@ export default function OnboardingScreen() {
         accountType: 'seller',
       });
       if (referralCode.trim()) {
-        await api.referrals.apply(referralCode.trim()).catch(() => {
-          // The server makes valid referral application atomic and idempotent.
-        });
+        await api.referrals.apply(referralCode.trim()).catch(() => {});
       }
-      // Brand profile data — critical; surface error if it fails
       if (goals.length > 0 || brandStage) {
         await api.seller.saveOnboardingData({ goals, brandStage });
       }
-      // Seller brand/profile writes are now complete; make completion the final
-      // durable server transition before writing device-local routing state.
       await api.auth.completeOnboarding('seller');
-      // AppThemeContext scopes this write to the authenticated Clerk user.
-      // It happens only after the server confirms seller onboarding.
       await selectTheme(selectedThemeId);
       await AsyncStorage.multiSet([
         [ONBOARDING_KEY, 'true'],
@@ -1561,15 +2123,13 @@ export default function OnboardingScreen() {
         ['user_role', 'seller'],
         ['onboarding_first_name', firstName],
         ['onboarding_brand_name', brandName],
-        ['onboarding_brand_stage', brandStage],   // read by plans.tsx for tier recommendation
+        ['onboarding_brand_stage', brandStage],
         ['onboarding_goals', JSON.stringify(goals)],
         ['onboarding_selected_plan', selectedPlanId],
       ]);
       await AsyncStorage.multiRemove([draftKeyForUser(profile.clerkId)!, LEGACY_DRAFT_KEY]);
-      // This only registers an existing grant; it never asks the OS here.
+      await AsyncStorage.removeItem(PENDING_FLOW_KEY);
       void registerGrantedPushToken(profile.clerkId, api);
-      // Seed the AI brand memory in the background so the assistant has real
-      // context on the seller's stage/goals from day one — non-blocking
       api.ai.brandMemoryRebuild().catch(() => {});
       router.replace('/(tabs)/' as never);
     } catch {
@@ -1583,11 +2143,10 @@ export default function OnboardingScreen() {
   }
 
   // ── Developer reset ─────────────────────────────────────────────────────────
-  // Signs out of Clerk, wipes all local test state. Does NOT delete backend accounts.
   async function devReset() {
     try { if (isSignedIn) await signOut(); } catch {}
     await AsyncStorage.multiRemove([
-      ONBOARDING_KEY, ONBOARDING_OWNER_KEY, 'user_role', LEGACY_DRAFT_KEY,
+      ONBOARDING_KEY, ONBOARDING_OWNER_KEY, 'user_role', LEGACY_DRAFT_KEY, PENDING_FLOW_KEY,
       ...(user?.id ? [draftKeyForUser(user.id)!] : []),
       'onboarding_first_name', 'onboarding_brand_name',
       'onboarding_style_interests', 'splash_seen',
@@ -1597,8 +2156,11 @@ export default function OnboardingScreen() {
 
   // ── Validation ──────────────────────────────────────────────────────────────
   function canContinue(): boolean {
-    if (step === BUYER_STEP_INDEX.AUTH) return true;
+    // Step 0 = AccountType: handled by AccountTypeStep's own CTA
     if (step === BUYER_STEP_INDEX.ACCOUNT_TYPE) return !!selectedFlow;
+    // Auth step: user can always "continue" (auth has its own internal validation)
+    if (flow === 'buyer' && step === BUYER_STEP_INDEX.AUTH) return true;
+    if (flow === 'seller' && step === SELLER_STEP_INDEX.AUTH) return true;
     if (!flow) return false;
     if (flow === 'buyer') {
       if (step === BUYER_STEP_INDEX.NAME) return firstName.trim().length >= 2;
@@ -1625,23 +2187,9 @@ export default function OnboardingScreen() {
     return { current: Math.min(step, total - 1), total };
   }
 
-
   // ── Step rendering ──────────────────────────────────────────────────────────
   function renderStep() {
-    if (step === BUYER_STEP_INDEX.AUTH) return (
-      <AuthStep
-        signUp={signUp}
-        startGoogleOAuth={startGoogleOAuth}
-        startAppleOAuth={startAppleOAuth}
-        onAuthComplete={handleAuthComplete}
-        onDevClear={devReset}
-        username={username}
-        onUsernameChange={setUsername}
-        referralCode={referralCode}
-        onReferralCodeChange={setReferralCode}
-      />
-    );
-
+    // Step 0: AccountType (before any auth — buyer/seller choice)
     if (step === BUYER_STEP_INDEX.ACCOUNT_TYPE && !flow) return (
       <AccountTypeStep
         selected={selectedFlow}
@@ -1651,10 +2199,37 @@ export default function OnboardingScreen() {
       />
     );
 
+    // If flow is already set (draft restore) and we're at step 0, still show AccountType
+    if (step === 0 && flow) {
+      return (
+        <AccountTypeStep
+          selected={flow}
+          onSelect={(t) => { setSelectedFlow(t); setFlow(t); }}
+          onContinue={() => { void continueFromAccountType(); }}
+          embedded
+        />
+      );
+    }
+
     if (!flow) return null;
 
     /* ─── BUYER STEPS ─── */
     if (flow === 'buyer') {
+      // Step 1: Buyer Auth — bold Sign up screen
+      if (step === BUYER_STEP_INDEX.AUTH) return (
+        <BuyerAuthStep
+          signUp={signUp}
+          startGoogleOAuth={startGoogleOAuth}
+          startAppleOAuth={startAppleOAuth}
+          onAuthComplete={handleAuthComplete}
+          onDevClear={devReset}
+          username={username}
+          onUsernameChange={setUsername}
+          referralCode={referralCode}
+          onReferralCodeChange={setReferralCode}
+        />
+      );
+
       // Step 2: Name
       if (step === BUYER_STEP_INDEX.NAME) return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
@@ -1678,16 +2253,17 @@ export default function OnboardingScreen() {
         </KeyboardAvoidingView>
       );
 
-      // Step 3: Style interests
+      // Step 3: Style interests — emoji chips with solid-fill selected state
       if (step === BUYER_STEP_INDEX.STYLE) return (
         <ScrollView contentContainerStyle={sm.scroll} showsVerticalScrollIndicator={false}>
           <Text style={sm.stepHeadline}>What do you{'\n'}want to see?</Text>
           <Text style={sm.stepSub}>Pick a few for better recommendations. You can skip this for now.</Text>
           <View style={sm.chipGrid}>
-            {STYLE_INTERESTS.map((item) => (
-              <Chip
+            {STYLE_INTERESTS_WITH_EMOJI.map(({ label: item, emoji }) => (
+              <StyleChip
                 key={item}
                 label={item}
+                emoji={emoji}
                 selected={styleInterests.includes(item)}
                 onPress={() => setStyleArr((prev) => prev.includes(item) ? prev.filter((v) => v !== item) : [...prev, item])}
               />
@@ -1718,7 +2294,24 @@ export default function OnboardingScreen() {
 
     /* ─── SELLER STEPS ─── */
     if (flow === 'seller') {
-      // Step 2: Name
+      // Step 1: Seller Auth — single-column labeled form
+      if (step === SELLER_STEP_INDEX.AUTH) return (
+        <SellerAuthStep
+          signUp={signUp}
+          startGoogleOAuth={startGoogleOAuth}
+          startAppleOAuth={startAppleOAuth}
+          onAuthComplete={handleAuthComplete}
+          onDevClear={devReset}
+          username={username}
+          onUsernameChange={setUsername}
+          referralCode={referralCode}
+          onReferralCodeChange={setReferralCode}
+          onFirstNamePrefill={setFirstName}
+          onLastNamePrefill={setLastName}
+        />
+      );
+
+      // Step 2: Name (pre-filled from auth form)
       if (step === SELLER_STEP_INDEX.NAME) return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={sm.scroll} keyboardShouldPersistTaps="handled">
@@ -1832,9 +2425,6 @@ export default function OnboardingScreen() {
             selectedThemeId={selectedThemeId}
             onSelectTheme={setSelectedThemeId}
             generateSample={async (style) => {
-              // Establish the seller role on the authenticated server profile
-              // before the sample endpoint evaluates seller eligibility. This
-              // is still incomplete onboarding until finishSeller commits it.
               const account = await api.auth.sync({ name: firstName.trim() });
               if (account.accountType === 'buyer') {
                 throw new Error('This account is already set up as a buyer.');
@@ -1852,7 +2442,7 @@ export default function OnboardingScreen() {
         <LoadingAnimation steps={SELLER_LOADING_STEPS} onDone={() => setStep(SELLER_STEP_INDEX.NOTIFICATIONS)} />
       );
 
-      // Step 7: Notifications
+      // Step 8: Notifications
       if (step === SELLER_STEP_INDEX.NOTIFICATIONS) return (
         <NotificationsStep
           flow="seller"
@@ -1861,7 +2451,7 @@ export default function OnboardingScreen() {
         />
       );
 
-      // Step 8: Success
+      // Step 9: Success
       if (step === SELLER_STEP_INDEX.SUCCESS) return (
         <SuccessScreen flow="seller" firstName={firstName} brandName={brandName} onFinish={finishSeller} finishing={finishing} />
       );
@@ -1870,15 +2460,14 @@ export default function OnboardingScreen() {
     return null;
   }
 
-  // Loading, notification, and success screens keep their full-screen layout,
-  // while a compact progress overlay remains visible through completion.
   const isFullScreen = (flow === 'buyer' && step >= BUYER_STEP_INDEX.LOADING)
                      || (flow === 'seller' && step >= SELLER_STEP_INDEX.LOADING);
 
-  const isAuthStep = step === 0;
-  const isAccountTypeStep = step === BUYER_STEP_INDEX.ACCOUNT_TYPE && !flow;
+  const isAccountTypeStep = step === 0;
+  const isAuthStep = (flow === 'buyer' && step === BUYER_STEP_INDEX.AUTH)
+                   || (flow === 'seller' && step === SELLER_STEP_INDEX.AUTH);
 
-  // ── Show Continue button in footer (not auth, not goals, not full-screen) ───
+  // Show Continue button in footer (not auth, not goals, not full-screen, not account type)
   const showFooter = !isFullScreen
     && !isAuthStep
     && !isAccountTypeStep
@@ -1905,7 +2494,7 @@ export default function OnboardingScreen() {
     <View style={{ flex: 1, backgroundColor: SCREEN_BG }}>
       <StatusBar barStyle="light-content" />
 
-      {/* Standard header for form/auth steps. */}
+      {/* Standard header for form steps */}
       {!isFullScreen && (
         <View style={[sm.header, { paddingTop: insets.top + 8 }]}>
           <TouchableOpacity
@@ -1924,7 +2513,7 @@ export default function OnboardingScreen() {
         </View>
       )}
 
-      {/* Full-screen steps retain an unobtrusive progress signal. */}
+      {/* Full-screen steps retain an unobtrusive progress signal */}
       {isFullScreen && showsProgressBar() && (
         <View
           pointerEvents="none"
@@ -1953,8 +2542,6 @@ export default function OnboardingScreen() {
           />
         </View>
       )}
-
-      {/* Dev reset (5-tap on header logo area) */}
     </View>
   );
 }

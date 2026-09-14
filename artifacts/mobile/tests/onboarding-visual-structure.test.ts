@@ -24,4 +24,75 @@ describe('onboarding visual structure', () => {
       'borderWidth: StyleSheet.hairlineWidth',
     );
   });
+
+  it('buyer step 0 is account-type (role choice before Clerk account creation)', () => {
+    const onboarding = read('app/onboarding.tsx');
+    // ACCOUNT_TYPE is now step 0 in v6 order
+    expect(onboarding).toContain('ACCOUNT_TYPE: 0');
+    // AUTH is step 1 in the new buyer ordering
+    expect(onboarding).toContain('AUTH: 1,');
+  });
+
+  it('splash is a logo-only auto-advancing screen with no CTA button', () => {
+    const splash = read('app/splash.tsx');
+    // No "Get started" button text
+    expect(splash).not.toContain('Get started');
+    // Has auto-advance timer
+    expect(splash).toContain('setTimeout(continueForward');
+    // No ctaWrap or cta style (no explicit CTA)
+    expect(splash).not.toContain('ctaWrap');
+  });
+
+  it('buyer style interests use emoji and solid-fill selected state with checkmark', () => {
+    const onboarding = read('app/onboarding.tsx');
+    // Emoji data present
+    expect(onboarding).toContain('STYLE_INTERESTS_WITH_EMOJI');
+    // StyleChip with emoji prop
+    expect(onboarding).toContain('function StyleChip');
+    // Feather check icon rendered when selected
+    expect(onboarding).toContain('name="check"');
+    // Solid fill selected state (backgroundColor on selected chip)
+    expect(onboarding).toContain('backgroundColor: theme.accentDim');
+  });
+
+  it('seller auth form has email, first name, last name, password, confirm password fields', () => {
+    const onboarding = read('app/onboarding.tsx');
+    expect(onboarding).toContain('function SellerAuthStep');
+    expect(onboarding).toContain('First name');
+    expect(onboarding).toContain('Last name');
+    expect(onboarding).toContain('Confirm password');
+    expect(onboarding).toContain('formFirstName');
+    expect(onboarding).toContain('formLastName');
+    expect(onboarding).toContain('confirmPassword');
+    expect(onboarding).toContain('passwordsMatch');
+  });
+
+  it('buyer auth has bold Sign up header with stacked OAuth rows before email option', () => {
+    const onboarding = read('app/onboarding.tsx');
+    expect(onboarding).toContain('function BuyerAuthStep');
+    expect(onboarding).toContain('chooseHeadline');
+    expect(onboarding).toContain('Sign up');
+    expect(onboarding).toContain('Use email');
+    // email-form phase shows the form
+    expect(onboarding).toContain("email-form");
+  });
+
+  it('thread explainer screen exists and routes buyers to the feed', () => {
+    const explainer = read('app/thread-explainer.tsx');
+    const layout = read('app/_layout.tsx');
+    expect(explainer).toContain('thread_explainer_seen:');
+    expect(explainer).toContain("ownerId !== userId || role !== 'buyer'");
+    expect(explainer).toContain("router.replace('/(buyer)/'");
+    expect(explainer).toContain('Enter the Thread');
+    expect(layout).toContain("threadExplainerSeen === false");
+    expect(layout).toContain("router.replace('/thread-explainer'");
+  });
+
+  it('draft version incremented to 6 and v5 migration exists', () => {
+    const onboarding = read('app/onboarding.tsx');
+    expect(onboarding).toContain('DRAFT_VERSION = 6');
+    expect(onboarding).toContain('version === 5');
+    expect(onboarding).toContain("PENDING_FLOW_KEY = 'onboarding_pending_flow'");
+    expect(onboarding).toContain('[PENDING_FLOW_KEY, selectedFlow]');
+  });
 });

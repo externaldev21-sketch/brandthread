@@ -32,3 +32,73 @@ describe("seller pre-plan experience", () => {
     expect(source).toContain("await selectTheme(selectedThemeId)");
   });
 });
+
+describe("v6 step order: AccountType first, then path-specific auth", () => {
+  it("ACCOUNT_TYPE is step 0 for both flows", () => {
+    // Buyer
+    expect(source).toContain("ACCOUNT_TYPE: 0,");
+    // AUTH is step 1 (not 0)
+    expect(source).toContain("AUTH: 1,");
+  });
+
+  it("buyer flows through AccountType → BuyerAuth → Name → Style", () => {
+    // The AccountTypeStep is rendered at step 0
+    expect(source).toContain("step === BUYER_STEP_INDEX.ACCOUNT_TYPE");
+    // BuyerAuthStep is rendered at step 1
+    expect(source).toContain("step === BUYER_STEP_INDEX.AUTH");
+    expect(source).toContain("function BuyerAuthStep");
+    expect(source).toContain("step === BUYER_STEP_INDEX.NAME");
+    expect(source).toContain("step === BUYER_STEP_INDEX.STYLE");
+  });
+
+  it("seller flows through AccountType → SellerAuth → Name → BrandName", () => {
+    expect(source).toContain("function SellerAuthStep");
+    expect(source).toContain("step === SELLER_STEP_INDEX.AUTH");
+    expect(source).toContain("step === SELLER_STEP_INDEX.NAME");
+    expect(source).toContain("step === SELLER_STEP_INDEX.BRAND_NAME");
+  });
+
+  it("draft version is 6 and migrates v5 drafts correctly", () => {
+    expect(source).toContain("DRAFT_VERSION = 6");
+    expect(source).toContain("version === 5");
+  });
+
+  it("seller auth has confirm password validation", () => {
+    expect(source).toContain("Confirm password");
+    expect(source).toContain("passwordsMatch");
+    expect(source).toContain("Passwords do not match");
+  });
+
+  it("buyer auth 'Use email' reveals the email form", () => {
+    expect(source).toContain("'email-form'");
+    expect(source).toContain("Use email");
+    expect(source).toContain("chooseHeadline");
+  });
+
+  it("buyer success routes to thread-explainer, seller to tabs", () => {
+    expect(source).toContain("router.replace('/thread-explainer'");
+    expect(source).toContain("router.replace('/(tabs)/'");
+  });
+
+  it("style interests carry emoji and solid-fill selected chip with checkmark", () => {
+    expect(source).toContain("STYLE_INTERESTS_WITH_EMOJI");
+    expect(source).toContain("emoji: '🏙️'");
+    expect(source).toContain("function StyleChip");
+    // Solid fill: accentDim background on selected state
+    expect(source).toContain("backgroundColor: theme.accentDim");
+    // Checkmark icon when selected
+    expect(source).toContain('name="check"');
+  });
+
+  it("seller name step is pre-filled from auth form first/last name", () => {
+    expect(source).toContain("onFirstNamePrefill");
+    expect(source).toContain("onLastNamePrefill");
+    expect(source).toContain("onFirstNamePrefill(fn)");
+    expect(source).toContain("onLastNamePrefill(ln)");
+  });
+
+  it("combined name is written to profile with first and last name", () => {
+    // Name is composed as 'firstName lastName'
+    expect(source).toContain("[firstName.trim(), lastName.trim()].filter(Boolean).join(' ')");
+  });
+});

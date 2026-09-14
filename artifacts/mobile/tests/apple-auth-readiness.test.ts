@@ -24,6 +24,8 @@ describe("Apple auth end-to-end code contract", () => {
     expect(onboardingSource).toContain("strategy: APPLE_OAUTH_STRATEGY");
     expect(onboardingSource).toContain("if (result?.createdSessionId && result?.setActive)");
     expect(onboardingSource).toContain("if (isOAuthFlowComplete(result))");
+    // After v6 restructure: AccountType is step 0, so after OAuth the user
+    // goes to NAME step (no longer ACCOUNT_TYPE). AccountType still exists.
     expect(onboardingSource).toContain("BUYER_STEP_INDEX.ACCOUNT_TYPE");
   });
 
@@ -44,7 +46,8 @@ describe("Apple auth end-to-end code contract", () => {
     const sellerBrandWrite = onboardingSource.indexOf("await api.auth.onboarding({");
     expect(sellerCompletion).toBeGreaterThan(sellerBrandWrite);
     expect(onboardingSource).toContain("[ONBOARDING_OWNER_KEY, profile.clerkId]");
-    expect(onboardingSource).toContain("router.replace('/(buyer)/'");
+    // v6: buyers go to thread-explainer first, sellers still go to /(tabs)/
+    expect(onboardingSource).toContain("router.replace('/thread-explainer'");
     expect(onboardingSource).toContain("router.replace('/(tabs)/'");
   });
 

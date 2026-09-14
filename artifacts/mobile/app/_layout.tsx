@@ -159,6 +159,7 @@ function AuthGate() {
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const [onboardingDone, setOnboardingDone]       = useState(false);
   const [storedRole, setStoredRole]               = useState<string | null>(null);
+  const [threadExplainerSeen, setThreadExplainerSeen] = useState<boolean | null>(null);
   const [splashSeen, setSplashSeen]               = useState<boolean | null>(null);
   const [pendingInvite, setPendingInvite]         = useState<string | null>(null);
   const prevSignedInRef = useRef<boolean | null>(null);
@@ -214,7 +215,12 @@ function AuthGate() {
     let cancelled = false;
     setOnboardingChecked(false);
     void (async () => {
-      const pairs = await AsyncStorage.multiGet([ONBOARDING_KEY, 'user_role', ONBOARDING_OWNER_KEY]);
+      const pairs = await AsyncStorage.multiGet([
+        ONBOARDING_KEY,
+        'user_role',
+        ONBOARDING_OWNER_KEY,
+        `thread_explainer_seen:${userId}`,
+      ]);
       // These legacy keys remain readable for the current session, but a
       // completion is trusted only when it belongs to the signed-in Clerk user.
       // This prevents a shared device from routing account B into account A's
@@ -257,6 +263,7 @@ function AuthGate() {
       if (cancelled) return;
       setOnboardingDone(done);
       setStoredRole(role);
+      setThreadExplainerSeen(role !== 'buyer' || pairs[3][1] === 'true');
       setOnboardingChecked(true);
     })();
     return () => { cancelled = true; };
@@ -280,7 +287,10 @@ function AuthGate() {
     const atRoot          = !segments[0] || (segments[0] as string) === 'index';
     // Team invite links must be viewable signed-out (deep-link entry point)
     const inInvite        = (segments[0] as string) === 'team-invite';
-    const inProtectedArea = !inAuthScreen && !inOnboarding && !inInvite && !inPublicScreen;
+    // Thread explainer is a post-onboarding buyer screen — let authenticated
+    // users stay on it; the screen itself handles its own seen-state redirect.
+    const inThreadExplainer = (segments[0] as string) === 'thread-explainer';
+    const inProtectedArea = !inAuthScreen && !inOnboarding && !inInvite && !inPublicScreen && !inThreadExplainer;
 
     // Allow public access to specific buyer routes for guests
     const isGuestAllowedRoute =
@@ -311,7 +321,7 @@ function AuthGate() {
 
     if (!onboardingChecked) return; // AsyncStorage still loading — prevent loops
 
-    // Account type is chosen inside onboarding after account creation.
+    // Account type is chosen inside onboarding before account creation.
     // Keep all incomplete authenticated users in that single flow.
     // Exception: sellers are allowed on /plans after finishing the onboarding
     // wizard but before picking a subscription plan (onboarding_complete is
@@ -328,9 +338,21 @@ function AuthGate() {
       return;
     }
 
+    if (
+      onboardingDone
+      && storedRole === 'buyer'
+      && threadExplainerSeen === false
+      && !inThreadExplainer
+    ) {
+      router.replace('/thread-explainer' as never);
+      return;
+    }
+
     // Onboarding done → route away from auth/onboarding screens and the
-    // bare "/" boot route to the correct dashboard
-    if (onboardingDone && (inAuthScreen || inOnboarding || atRoot)) {
+    // bare "/" boot route to the correct dashboard.
+    // Thread explainer is an intentional post-onboarding buyer screen — don't
+    // redirect buyers away from it; it handles its own navigation.
+    if (onboardingDone && (inAuthScreen || inOnboarding || atRoot) && !inThreadExplainer) {
       const dest = storedRole === 'buyer' ? '/(buyer)/' : '/(tabs)/';
       router.replace(dest as never);
       return;
@@ -342,7 +364,7 @@ function AuthGate() {
     } else if (onboardingDone && storedRole === 'seller' && inBuyerGroup) {
       router.replace('/(tabs)/' as never);
     }
-  }, [isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole, splashSeen, pendingInvite, rootNavigationState?.key]);
+  }, [isSignedIn, isLoaded, segments, onboardingChecked, onboardingDone, storedRole, threadExplainerSeen, splashSeen, pendingInvite, rootNavigationState?.key]);
 
   return null;
 }
@@ -590,7 +612,8 @@ function RootLayoutNav() {
         <Stack.Screen name="splash"         options={{ headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="sign-in"        options={{ headerShown: false }} />
         <Stack.Screen name="forgot-password" options={{ headerShown: false, animation: 'slide_from_right' }} />
-        <Stack.Screen name="onboarding"     options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="onboarding"        options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="thread-explainer"  options={{ headerShown: false, animation: 'fade', gestureEnabled: false }} />
         {/* Main app */}
         <Stack.Screen name="(tabs)"         options={{ headerShown: false }} />
         <Stack.Screen name="(buyer)"        options={{ headerShown: false }} />

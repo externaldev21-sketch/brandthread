@@ -3,17 +3,17 @@ name: Onboarding flow decisions
 description: Durable Brandthread onboarding progression and draft-compatibility rules.
 ---
 
-Clerk account creation is the literal first onboarding step for both roles. Account type is chosen only after authentication. Buyer order is Auth, Account Type, Name, Style, Loading, Notifications, Success. Seller order is Auth, Account Type, Name, Brand Name, Brand Stage, Goals, Loading, Notifications, Success. Product-model selection belongs later in product or store setup.
+Path selection precedes Clerk account creation. Buyer order is Account Type, buyer-specific Auth, Name, Style, Loading, Notifications, Success, then a one-time Thread explainer. Seller order is Account Type, seller-specific Auth, Name, Brand Name, Brand Stage, Goals, Plan, Loading, Notifications, Success. Product-model selection belongs later in product or store setup.
 
-**Why:** The user explicitly requires account ownership to exist before role choice or any personal or brand questionnaire data is collected.
+**Why:** The user explicitly requires buyers and sellers to choose their path before seeing a role-specific account-creation experience.
 
-**How to apply:** Keep Auth at index 0 and Account Type at index 1. Preserve the seven-step buyer and nine-step seller totals, migrate older drafts to equivalent screens, keep buyer Style and seller Goals skippable, and only persist drafts under the signed-in Clerk user's immutable ID.
+**How to apply:** Keep Account Type at index 0 and Auth at index 1. Preserve later questions, migrate older drafts to equivalent screens, keep buyer Style and seller Goals skippable, persist only the pre-auth role as ephemeral pending state, and move durable drafts under the signed-in Clerk user.
 
-For a brand-new local session, the first-run path is one animated Splash/Get Started screen, then generic Clerk account creation, then Account Type.
+For a brand-new local session, the first-run path is a brief auto-advancing logo-only splash, then Account Type, then role-specific Clerk account creation.
 
-**Why:** The user explicitly requires one deliberate Get Started action before account creation and requires the buyer/seller decision immediately after the account exists.
+**Why:** The user explicitly requires branding to appear before any choice or form and the buyer/seller decision to shape the account-creation pattern.
 
-**How to apply:** Route all create-account entry points to onboarding Auth, never to the legacy standalone account-type route. Role-specific questions begin only after the authenticated user chooses Buyer or Seller.
+**How to apply:** Route create-account entry through onboarding Account Type, never the legacy standalone route. Preserve the pending role across Clerk redirects, and require an owner-matched buyer role before showing the Thread explainer.
 
 Onboarding completion is a final server-authoritative transition shared by buyer and seller flows. Required profile/brand writes must succeed first; only then may the server persist completion and the client bind local routing state to the Clerk user.
 
